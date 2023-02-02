@@ -1,24 +1,24 @@
 [workspace]
 members = [
-    "anvil",
-    "anvil/core",
-    "anvil/rpc",
-    "anvil/server",
-    "cast",
-    "binder",
-    "cli",
-    "cli/test-utils",
-    "common",
-    "config",
-    "doc",
-    "evm",
-    "fmt",
-    "forge",
-    "ui",
-    "utils",
-    "chisel",
-    "macros",
-    "macros/impl",
+  "anvil",
+  "anvil/core",
+  "anvil/rpc",
+  "anvil/server",
+  "cast",
+  "binder",
+  "cli",
+  "cli/test-utils",
+  "common",
+  "config",
+  "doc",
+  "evm",
+  "fmt",
+  "forge",
+  "ui",
+  "utils",
+  "chisel",
+  "macros",
+  "macros/impl",
 ]
 
 [profile.dev]
@@ -45,18 +45,18 @@ opt-level = 3
 debug = 0
 panic = 'unwind'
 # better recompile times
-incremental = true
 codegen-units = 16
+incremental = true
 
 [profile.release]
 # Optimize for binary size, but keep loop vectorization
 opt-level = "s"
 # Performance optimizations
-lto = "fat"
-debug = 0
-strip = true
-panic = "abort"
 codegen-units = 1
+debug = 0
+lto = "fat"
+panic = "abort"
+strip = true
 
 # # Patch ethers-rs with a local checkout then run `cargo update -p ethers`
 # [patch."https://github.com/gakonst/ethers-rs"]

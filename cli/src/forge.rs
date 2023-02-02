@@ -119,6 +119,12 @@ fn main() -> eyre::Result<()> {
         Subcommands::Doc(cmd) => {
             cmd.run()?;
         }
+        Subcommands::ZkBuild(cmd) => {
+            cmd.run()?;
+        }
+        Subcommands::ZkCreate(cmd) => {
+            utils::block_on(cmd.run())?;
+        }
     }
 
     Ok(())

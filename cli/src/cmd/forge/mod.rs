@@ -63,3 +63,7 @@ pub mod tree;
 pub mod update;
 pub mod verify;
 pub mod watch;
+pub mod zk_build;
+pub mod zk_create;
+pub mod zksolc;
+pub mod zksolc_manager;

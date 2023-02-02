@@ -64,7 +64,7 @@ impl ProviderBuilder {
         if url_str.starts_with("localhost:") {
             // invalid url: non-prefixed URL scheme is not allowed, so we prepend the default http
             // prefix
-            return Self::new(format!("http://{url_str}"))
+            return Self::new(format!("http://{url_str}"));
         }
         let err = format!("Invalid provider url: {url_str}");
         Self {
@@ -228,7 +228,7 @@ where
         match chain {
             Chain::Polygon | Chain::PolygonMumbai => {
                 let estimator = Polygon::new(chain)?.category(GasCategory::Standard);
-                return Ok(estimator.estimate_eip1559_fees().await?)
+                return Ok(estimator.estimate_eip1559_fees().await?);
             }
             _ => {}
         }
