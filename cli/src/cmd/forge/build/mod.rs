@@ -1,4 +1,5 @@
 //! Build command
+
 use crate::cmd::{
     forge::{
         install::{self},
@@ -79,6 +80,10 @@ pub struct BuildArgs {
     #[clap(flatten)]
     #[serde(skip)]
     pub watch: WatchArgs,
+
+    #[clap(help_heading = "Compiler options", long, help = "Compile with ZkSync.")]
+    #[serde(skip)]
+    pub zksync: bool,
 }
 
 impl Cmd for BuildArgs {
@@ -95,8 +100,17 @@ impl Cmd for BuildArgs {
             project = config.project()?;
         }
 
-        let filters = self.skip.unwrap_or_default();
+        if self.zksync {
+            compile_zksync(&config, &project);
+        } else {
+            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
+            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
+            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
+            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
+            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
+        }
 
+        let filters = self.skip.unwrap_or_default();
         if self.args.silent {
             compile::suppress_compile_with_filter(&project, filters)
         } else {
@@ -104,6 +118,17 @@ impl Cmd for BuildArgs {
             compiler.compile(&project)
         }
     }
+}
+
+pub fn compile_zksync(config: &Config, project: &Project) {
+    println!("Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, ");
+    println!("Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, ");
+    
+    println!("{:?}", config);
+    println!("{:?}", project);
+
+    println!("Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, ");
+    println!("Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, ");
 }
 
 impl BuildArgs {
