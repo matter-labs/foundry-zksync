@@ -23,8 +23,9 @@ use foundry_config::{
     Config,
 };
 use serde::Serialize;
+use std::process::Command;
 use watchexec::config::{InitConfig, RuntimeConfig};
-
+use downloader::{self, Download, Downloader};
 mod core;
 pub use self::core::CoreBuildArgs;
 
@@ -89,11 +90,12 @@ pub struct BuildArgs {
 impl Cmd for BuildArgs {
     type Output = ProjectCompileOutput;
     fn run(self) -> eyre::Result<Self::Output> {
+        println!("{:#?}", self);
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
 
-        if install::install_missing_dependencies(&mut config, &project, self.args.silent) &&
-            config.auto_detect_remappings
+        if install::install_missing_dependencies(&mut config, &project, self.args.silent)
+            && config.auto_detect_remappings
         {
             // need to re-configure here to also catch additional remappings
             config = self.load_config();
@@ -103,9 +105,6 @@ impl Cmd for BuildArgs {
         if self.zksync {
             compile_zksync(&config, &project);
         } else {
-            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
-            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
-            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
             println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
             println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
         }
@@ -120,15 +119,53 @@ impl Cmd for BuildArgs {
     }
 }
 
+use std::fs;
 pub fn compile_zksync(config: &Config, project: &Project) {
-    println!("Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, ");
-    println!("Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, ");
-    
-    println!("{:?}", config);
-    println!("{:?}", project);
+    let zkout_path =
+        &format!("{}{}", project.paths.root.display(), "/zksolc");
+    fs::create_dir_all(std::path::Path::new( zkout_path));
+    // println!("{:#?}, config", config);
+    // println!("{:#?} project root", project.paths);
+    let base_path = project.paths.root.clone();
+    let mut base_path_string = base_path.clone().into_os_string().into_string().unwrap();
+    base_path_string.push_str("/cli/src/cmd/forge/build/assets/zksolc-linux-amd64-musl-v1.3.0");
+    // println!("{:#?}, base_path", &base_path_string);
 
-    println!("Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, ");
-    println!("Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, Ricky, ");
+    //check for compiler
+    let _filepath =
+        &format!("{}{}", project.paths.root.display(), "/zksolc/zksolc-linux-amd64-musl-v1.3.0");
+    let b = std::path::Path::new(_filepath).exists();
+    // println!("{}: {}", _filepath, b);
+
+    if !b {
+        let download: Download = Download::new("https://github.com/matter-labs/zksolc-bin/blob/main/linux-amd64/zksolc-linux-amd64-musl-v1.3.0");
+        // println!("{:#?} download", download.file_name);
+        //get downloader builder
+        let mut builder = Downloader::builder();
+        //assign download folder
+        builder.download_folder(std::path::Path::new(&format!("{}{}", project.paths.root.display(), "/zksolc")));
+        //build downloader
+        let mut d_loader = builder.build().unwrap();
+        //download compiler
+        d_loader.download(&[download]);
+        // println!("{:#?} result", result);
+        
+    }
+
+    let src_path = &format!("{}{}", project.paths.sources.display(), "/Counter.sol");
+    let zksolc_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/zksolc-linux-amd64-musl-v1.3.0");
+    let output: &str = &format!("{}{}", project.paths.root.display(), "/zksolc");
+
+    println!("{:#?}, src_path", &src_path);
+    println!("{:#?}, zksolc_path", &zksolc_path);
+
+    let output = Command::new("/home/shakes/foundry-zksync/foundry-zksync/cli/src/cmd/forge/build/assets/zksolc-linux-amd64-musl-v1.3.0")
+        // .arg("--help")
+        .args(["--abi", "--bin", "-hashes", src_path, "-o", zkout_path, "--overwrite" ])
+        .output()
+        .expect("failed to execute process");
+
+    println!("{:#?} output", output);
 }
 
 impl BuildArgs {
