@@ -10,9 +10,9 @@ use crate::{
 use cast::SimpleCast;
 use clap::{Parser, ValueHint};
 use ethers::{
-    abi::{Abi, Constructor, Token},
+    abi::{Abi, Constructor, Token, AbiObject},
     prelude::{artifacts::BytecodeObject, ContractFactory, Middleware},
-    solc::{info::ContractInfo, utils::canonicalized},
+    solc::{info::ContractInfo, utils::{canonicalized, read_json_file}, Project},
     types::{transaction::eip2718::TypedTransaction, Chain},
 };
 use eyre::Context;
@@ -21,6 +21,13 @@ use rustc_hex::ToHex;
 use serde_json::json;
 use std::{path::PathBuf, sync::Arc};
 use tracing::log::trace;
+
+//for zksync
+use ethers::prelude::{Provider, Http, Wallet};
+use std::convert::TryFrom;
+use serde_json;
+use std::fs;
+use ethers::abi::JsonAbi;
 
 /// CLI arguments for `forge create`.
 #[derive(Debug, Clone, Parser)]
@@ -82,13 +89,23 @@ pub struct CreateArgs {
 
     #[clap(flatten)]
     retry: RetryArgs,
+
+    #[clap(help_heading = "Compiler options", long, help = "Deploy with ZkSync.")]
+    pub zksync: bool,
 }
 
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> eyre::Result<()> {
-        // Find Project & Compile
+        // Find Project
         let project = self.opts.project()?;
+
+        if self.zksync {
+            Self::deploy_zksync(&project)
+        };
+
+        // Compile Project
+        // println!("{:#?}, project ---->>>", project);
         let mut output = if self.json || self.opts.silent {
             // Suppress compile stdout messages when printing json output or when silent
             compile::suppress_compile(&project)
@@ -118,8 +135,11 @@ impl CreateArgs {
             }
         };
 
+        
+
         // Add arguments to constructor
         let config = self.eth.try_load_config_emit_warnings()?;
+        println!("{:#?}, config ---->>>", config);
         let provider = Arc::new(try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?);
         let params = match abi.constructor {
             Some(ref v) => {
@@ -141,7 +161,7 @@ impl CreateArgs {
             let provider =
                 Arc::try_unwrap(provider).expect("Only one ref; qed.").with_sender(sender);
             self.deploy(abi, bin, params, provider).await?;
-            return Ok(())
+            return Ok(());
         }
 
         // Deploy with signer
@@ -158,6 +178,40 @@ impl CreateArgs {
 
         Ok(())
     }
+
+    fn deploy_zksync(project: &Project) {
+        //get abi and bytecode
+        let output_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/combined.json");
+
+        let data = fs::read_to_string(output_path).expect("Unable to read file");
+        let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
+        println!("{:#?}, combined.json ---->>>", res["contracts"]);
+        let bytecode = &res["contracts"]["src/Greeter.sol:Greeter"];
+        // let bytecode = serde_json::from_str::<ethers::abi::JsonAbi>(_bytecode).unwrap();
+        println!("{:#?}, bytecode ---->>>", bytecode.get("bin") );      
+        
+
+        //get abi        
+        let abi_path: &str = &format!("{}{}", project.paths.artifacts.display(), "/Greeter.sol/Greeter.json");
+        let abi_data = fs::read_to_string(abi_path).expect("Unable to read file");
+        // let res1: serde_json::Value = serde_json::from_str(&abi_data).expect("Unable to parse");
+        let abi = serde_json::from_str::<ethers::abi::JsonAbi>(&abi_data).unwrap();
+        // println!("{:#?}, abi ---->>>", abi.into(ethers_core::abi::raw::AbiObject));
+        // let abi = &res1["abi"];
+
+        // let abi = Contract.load
+
+        // connect to the network
+        let client = Provider::<Http>::try_from("https://zksync2-testnet.zksync.dev").unwrap();
+        let client = std::sync::Arc::new(client);
+        // println!("{:#?}, client ---->>>", client);
+        // println!("{:#?}, project ---->>>", project);
+
+        // create a factory which will be used to deploy instances of the contract
+        // let factory = ContractFactory::new(ethers::abi::Abi(abi), bytecode, client);
+
+    }
+
 
     /// Ensures the verify command can be executed.
     ///
@@ -220,8 +274,8 @@ impl CreateArgs {
                     e
                 }
             })?;
-        let is_legacy = self.tx.legacy ||
-            Chain::try_from(chain).map(|x| Chain::is_legacy(&x)).unwrap_or_default();
+        let is_legacy = self.tx.legacy
+            || Chain::try_from(chain).map(|x| Chain::is_legacy(&x)).unwrap_or_default();
         let mut deployer = if is_legacy { deployer.legacy() } else { deployer };
 
         // set tx value if specified
@@ -310,7 +364,7 @@ impl CreateArgs {
         };
 
         if !self.verify {
-            return Ok(())
+            return Ok(());
         }
 
         println!("Starting contract verification...");

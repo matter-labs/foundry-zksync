@@ -24,6 +24,8 @@ use foundry_config::{
 };
 use serde::Serialize;
 use std::process::Command;
+use std::fs::set_permissions;
+use std::os::unix::prelude::PermissionsExt;
 use watchexec::config::{InitConfig, RuntimeConfig};
 use downloader::{self, Download, Downloader};
 mod core;
@@ -136,6 +138,12 @@ pub fn compile_zksync(config: &Config, project: &Project) {
         &format!("{}{}", project.paths.root.display(), "/zksolc/zksolc-linux-amd64-musl-v1.3.0");
     let b = std::path::Path::new(_filepath).exists();
     // println!("{}: {}", _filepath, b);
+    // let src_path = &format!("{}{}", project.paths.sources.display(), "/*.sol");
+    let counter_path = &format!("{}{}", project.paths.sources.display(), "/Counter.sol");
+    let greeter_path = &format!("{}{}", project.paths.sources.display(), "/Greeter.sol");    
+    let zksolc_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/zksolc-linux-amd64-musl-v1.3.0");
+    let output: &str = &format!("{}{}", project.paths.root.display(), "/zksolc");
+
 
     if !b {
         let download: Download = Download::new("https://github.com/matter-labs/zksolc-bin/blob/main/linux-amd64/zksolc-linux-amd64-musl-v1.3.0");
@@ -147,21 +155,23 @@ pub fn compile_zksync(config: &Config, project: &Project) {
         //build downloader
         let mut d_loader = builder.build().unwrap();
         //download compiler
-        d_loader.download(&[download]);
-        // println!("{:#?} result", result);
+        let d_load = d_loader.download(&[download]);
+        // println!("{:#?} d_load", d_load);
+
+        let perm = set_permissions(std::path::Path::new(zksolc_path), PermissionsExt::from_mode(0o755)).unwrap();
         
+
     }
 
-    let src_path = &format!("{}{}", project.paths.sources.display(), "/Counter.sol");
-    let zksolc_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/zksolc-linux-amd64-musl-v1.3.0");
-    let output: &str = &format!("{}{}", project.paths.root.display(), "/zksolc");
+    // "--combined-json", "abi,hashes",
+    // , "--output-dir", zkout_path, "--overwrite"
+    // "--hashes",
+    // println!("{:#?}, src_path", &src_path);
+    // println!("{:#?}, zksolc_path", &zksolc_path);
 
-    println!("{:#?}, src_path", &src_path);
-    println!("{:#?}, zksolc_path", &zksolc_path);
-
-    let output = Command::new("/home/shakes/foundry-zksync/foundry-zksync/cli/src/cmd/forge/build/assets/zksolc-linux-amd64-musl-v1.3.0")
+    let output = Command::new("/home/shakes/foundry-zksync/foundry-zksync/cli/src/cmd/forge/build/assets/zksolc-linux-amd64-musl-v1.3.1")
         // .arg("--help")
-        .args(["--abi", "--bin", "-hashes", src_path, "-o", zkout_path, "--overwrite" ])
+        .args([greeter_path,  "--abi", "--combined-json", "hashes,bin,abi" , "--output-dir", zkout_path, "--overwrite"])
         .output()
         .expect("failed to execute process");
 
