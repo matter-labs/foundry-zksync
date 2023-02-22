@@ -10,24 +10,25 @@ use crate::{
 use cast::SimpleCast;
 use clap::{Parser, ValueHint};
 use ethers::{
-    abi::{Abi, Constructor, Token, AbiObject},
+    abi::{Abi, AbiObject, Constructor, Token},
     prelude::{artifacts::BytecodeObject, ContractFactory, Middleware},
-    solc::{info::ContractInfo, utils::{canonicalized, read_json_file}, Project},
+    solc::{
+        info::ContractInfo,
+        utils::{canonicalized, read_json_file},
+    },
     types::{transaction::eip2718::TypedTransaction, Chain},
 };
 use eyre::Context;
 use foundry_common::{abi::parse_tokens, compile, estimate_eip1559_fees, try_get_http_provider};
+use foundry_config::Config;
 use rustc_hex::ToHex;
 use serde_json::json;
 use std::{path::PathBuf, sync::Arc};
 use tracing::log::trace;
 
 //for zksync
-use ethers::prelude::{Provider, Http, Wallet};
-use std::convert::TryFrom;
-use serde_json;
-use std::fs;
-use ethers::abi::JsonAbi;
+
+use crate::cmd::forge::zksync_deploy;
 
 /// CLI arguments for `forge create`.
 #[derive(Debug, Clone, Parser)]
@@ -100,8 +101,10 @@ impl CreateArgs {
         // Find Project
         let project = self.opts.project()?;
 
+        let config = self.eth.try_load_config_emit_warnings()?;
+
         if self.zksync {
-            Self::deploy_zksync(&project)
+            let _deployed = zksync_deploy::deploy_zksync(&config, &project);
         };
 
         // Compile Project
@@ -135,11 +138,9 @@ impl CreateArgs {
             }
         };
 
-        
-
         // Add arguments to constructor
-        let config = self.eth.try_load_config_emit_warnings()?;
-        println!("{:#?}, config ---->>>", config);
+
+        // println!("{:#?}, config ---->>>", config);
         let provider = Arc::new(try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?);
         let params = match abi.constructor {
             Some(ref v) => {
@@ -178,40 +179,6 @@ impl CreateArgs {
 
         Ok(())
     }
-
-    fn deploy_zksync(project: &Project) {
-        //get abi and bytecode
-        let output_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/combined.json");
-
-        let data = fs::read_to_string(output_path).expect("Unable to read file");
-        let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
-        println!("{:#?}, combined.json ---->>>", res["contracts"]);
-        let bytecode = &res["contracts"]["src/Greeter.sol:Greeter"];
-        // let bytecode = serde_json::from_str::<ethers::abi::JsonAbi>(_bytecode).unwrap();
-        println!("{:#?}, bytecode ---->>>", bytecode.get("bin") );      
-        
-
-        //get abi        
-        let abi_path: &str = &format!("{}{}", project.paths.artifacts.display(), "/Greeter.sol/Greeter.json");
-        let abi_data = fs::read_to_string(abi_path).expect("Unable to read file");
-        // let res1: serde_json::Value = serde_json::from_str(&abi_data).expect("Unable to parse");
-        let abi = serde_json::from_str::<ethers::abi::JsonAbi>(&abi_data).unwrap();
-        // println!("{:#?}, abi ---->>>", abi.into(ethers_core::abi::raw::AbiObject));
-        // let abi = &res1["abi"];
-
-        // let abi = Contract.load
-
-        // connect to the network
-        let client = Provider::<Http>::try_from("https://zksync2-testnet.zksync.dev").unwrap();
-        let client = std::sync::Arc::new(client);
-        // println!("{:#?}, client ---->>>", client);
-        // println!("{:#?}, project ---->>>", project);
-
-        // create a factory which will be used to deploy instances of the contract
-        // let factory = ContractFactory::new(ethers::abi::Abi(abi), bytecode, client);
-
-    }
-
 
     /// Ensures the verify command can be executed.
     ///

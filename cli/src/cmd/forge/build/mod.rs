@@ -3,7 +3,7 @@
 use crate::cmd::{
     forge::{
         install::{self},
-        watch::WatchArgs,
+        watch::WatchArgs, zksync_compile,
     },
     Cmd, LoadConfig,
 };
@@ -23,11 +23,8 @@ use foundry_config::{
     Config,
 };
 use serde::Serialize;
-use std::process::Command;
-use std::fs::set_permissions;
-use std::os::unix::prelude::PermissionsExt;
 use watchexec::config::{InitConfig, RuntimeConfig};
-use downloader::{self, Download, Downloader};
+
 mod core;
 pub use self::core::CoreBuildArgs;
 
@@ -105,7 +102,7 @@ impl Cmd for BuildArgs {
         }
 
         if self.zksync {
-            compile_zksync(&config, &project);
+            zksync_compile::compile_zksync(&config, &project);
         } else {
             println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
             println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
@@ -121,62 +118,7 @@ impl Cmd for BuildArgs {
     }
 }
 
-use std::fs;
-pub fn compile_zksync(config: &Config, project: &Project) {
-    let zkout_path =
-        &format!("{}{}", project.paths.root.display(), "/zksolc");
-    fs::create_dir_all(std::path::Path::new( zkout_path));
-    // println!("{:#?}, config", config);
-    // println!("{:#?} project root", project.paths);
-    let base_path = project.paths.root.clone();
-    let mut base_path_string = base_path.clone().into_os_string().into_string().unwrap();
-    base_path_string.push_str("/cli/src/cmd/forge/build/assets/zksolc-linux-amd64-musl-v1.3.0");
-    // println!("{:#?}, base_path", &base_path_string);
 
-    //check for compiler
-    let _filepath =
-        &format!("{}{}", project.paths.root.display(), "/zksolc/zksolc-linux-amd64-musl-v1.3.0");
-    let b = std::path::Path::new(_filepath).exists();
-    // println!("{}: {}", _filepath, b);
-    // let src_path = &format!("{}{}", project.paths.sources.display(), "/*.sol");
-    let counter_path = &format!("{}{}", project.paths.sources.display(), "/Counter.sol");
-    let greeter_path = &format!("{}{}", project.paths.sources.display(), "/Greeter.sol");    
-    let zksolc_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/zksolc-linux-amd64-musl-v1.3.0");
-    let output: &str = &format!("{}{}", project.paths.root.display(), "/zksolc");
-
-
-    if !b {
-        let download: Download = Download::new("https://github.com/matter-labs/zksolc-bin/blob/main/linux-amd64/zksolc-linux-amd64-musl-v1.3.0");
-        // println!("{:#?} download", download.file_name);
-        //get downloader builder
-        let mut builder = Downloader::builder();
-        //assign download folder
-        builder.download_folder(std::path::Path::new(&format!("{}{}", project.paths.root.display(), "/zksolc")));
-        //build downloader
-        let mut d_loader = builder.build().unwrap();
-        //download compiler
-        let d_load = d_loader.download(&[download]);
-        // println!("{:#?} d_load", d_load);
-
-        let perm = set_permissions(std::path::Path::new(zksolc_path), PermissionsExt::from_mode(0o755)).unwrap();
-        
-
-    }
-
-    // "--combined-json", "abi,hashes",
-    // , "--output-dir", zkout_path, "--overwrite"
-    // "--hashes",
-    // println!("{:#?}, src_path", &src_path);
-    // println!("{:#?}, zksolc_path", &zksolc_path);
-
-    let output = Command::new("/home/shakes/foundry-zksync/foundry-zksync/cli/src/cmd/forge/build/assets/zksolc-linux-amd64-musl-v1.3.1")
-        // .arg("--help")
-        .args([greeter_path,  "--abi", "--combined-json", "hashes,bin,abi" , "--output-dir", zkout_path, "--overwrite"])
-        .output()
-        .expect("failed to execute process");
-
-    println!("{:#?} output", output);
-}
 
 impl BuildArgs {
     /// Returns the `Project` for the current workspace
