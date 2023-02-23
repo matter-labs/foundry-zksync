@@ -42,7 +42,7 @@ pub async fn deploy_zksync(config: &Config, project: &Project) -> Result<()> {
 
     // Build Deployer
     let deployer_builder = DeployContractBuilder::new(&wallet);
-    println!("{:#?}, deployer_builder ---->>>", deployer_builder);
+    // println!("{:#?}, deployer_builder ---->>>", deployer_builder);
 
     //get abi and bytecode
     let output_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/combined.json");
