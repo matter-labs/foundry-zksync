@@ -20,12 +20,6 @@ pub async fn deploy_zksync(config: &Config, project: &Project) -> Result<()> {
     // println!("{:#?}, rpc_url ---->>>", rpc_url);
     // println!("{:#?}, config ---->>>", config.rpc_endpoints.endpoints["goerli"]);
 
-    // connect to the network
-    // let client = Provider::<Http>::try_from("https://zksync2-testnet.zksync.dev").unwrap();
-    let client =
-        Provider::<Http>::try_from("https://goerli.infura.io/v3/332aa765e52d4f219b8408485be193c1")
-            .unwrap();
-
     let private_key = H256::from([5; 32]);
     let eth_signer = PrivateKeySigner::new(private_key);
     // println!("{:#?}, eth_signer ---->>>", eth_signer.get_address());
@@ -94,6 +88,11 @@ pub async fn deploy_zksync(config: &Config, project: &Project) -> Result<()> {
 
     let bytecode_hash_bytes = bytecode_hash.bytes();
     // println!("{:#?}, bytecode_hash_bytes ---->>>", bytecode_hash_bytes);
+    // connect to the network
+    // let client = Provider::<Http>::try_from("https://zksync2-testnet.zksync.dev").unwrap();
+    let client =
+        Provider::<Http>::try_from("https://goerli.infura.io/v3/332aa765e52d4f219b8408485be193c1")
+            .unwrap();
 
     let client = std::sync::Arc::new(client);
     println!("{:#?}, client url---->>>", client.url());
