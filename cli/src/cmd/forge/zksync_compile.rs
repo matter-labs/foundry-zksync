@@ -20,8 +20,8 @@ pub fn compile_zksync(config: &Config, project: &Project) {
     let zksolc_path = &format!("{}{}", zkout_path, "/zksolc-linux-amd64-musl-v1.3.5");
     let b = std::path::Path::new(zksolc_path).exists();
 
-    // let contract_path = &format!("{}{}", project.paths.sources.display(), "/Counter.sol");
-    let contract_path = &format!("{}{}", project.paths.sources.display(), "/Greeter.sol");
+    let contract_path = &format!("{}{}", project.paths.sources.display(), "/Counter.sol");
+    // let contract_path = &format!("{}{}", project.paths.sources.display(), "/Greeter.sol");
 
     if !b {
         let download: Download = Download::new("https://github.com/matter-labs/zksolc-bin/raw/main/linux-amd64/zksolc-linux-amd64-musl-v1.3.5");

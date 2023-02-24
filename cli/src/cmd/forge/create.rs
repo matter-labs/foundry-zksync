@@ -103,8 +103,10 @@ impl CreateArgs {
 
         let config = self.eth.try_load_config_emit_warnings()?;
 
+        println!("{:#?}, self.zksync ---->>>", self.zksync);
+
         if self.zksync {
-            let _deployed = zksync_deploy::deploy_zksync(&config, &project);
+            let _deployed = zksync_deploy::deploy_zksync(&config, &project).await?;
         };
 
         // Compile Project

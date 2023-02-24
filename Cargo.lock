@@ -3212,6 +3212,8 @@ dependencies = [
  "which",
  "yansi",
  "zksync",
+ "zksync_types",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -9631,7 +9633,7 @@ dependencies = [
  "codegen 0.2.0",
  "crossbeam 0.8.2",
  "derivative",
- "env_logger 0.9.3",
+ "env_logger 0.10.0",
  "hex",
  "num-bigint 0.4.3",
  "num-integer",

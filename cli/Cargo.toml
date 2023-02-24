@@ -91,6 +91,8 @@ which = "4.2.5"
 # zksync = {git = "https://github.com/matter-labs/zksync-era.git"}
 # zksync = {git = "https://github.com/sammyshakes/zksync-era.git"}
 zksync = {path = "../../../foundry-zksync/zksync-repos/zksync-era/sdk/zksync-rs"}
+zksync_types = {path = "../../../foundry-zksync/zksync-repos/zksync-era/core/lib/types"}
+zksync_utils = {path = "../../../foundry-zksync/zksync-repos/zksync-era/core/lib/utils"}
 
 [dev-dependencies]
 anvil = {path = "../anvil"}
