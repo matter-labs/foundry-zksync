@@ -1,32 +1,39 @@
-use ethers::prelude::{ContractFactory, Http, Provider, Wallet};
-use ethers::solc::Project;
+use ethers::abi::Token;
+use ethers::prelude::{ContractFactory, Http, Project, Provider, Wallet};
 use ethers::types::{Address, Bytes};
 use foundry_config::Config;
 use serde_json;
-use sha2::{Digest, Sha256};
 use std::convert::TryFrom;
-use std::env;
-use std::fs;
 use std::io::{Read, Result};
+use std::{env, fs};
 use zksync;
 use zksync::operations::DeployContractBuilder;
 use zksync::types::H256;
 use zksync::zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
-use zksync::{ethereum, EthereumProvider};
-use zksync::{signer, wallet};
+use zksync::{ethereum, signer, wallet, EthereumProvider};
 
-pub async fn deploy_zksync(config: &Config, project: &Project) -> Result<()> {
+pub async fn deploy_zksync(
+    config: &Config,
+    project: &Project,
+    constructor_params: Vec<Token>,
+) -> Result<()> {
     // println!("{:#?}, project ---->>>", project);
     // println!("{:#?}, config ---->>>", config);
+    // println!("{:#?}, constructor_params ---->>>", constructor_params);
+
+    //test env vars
+    let path = env::current_dir()?;
+    println!("The current directory is {}", path.display());
+
     //get abi and bytecode
     let output_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/combined.json");
     let data = fs::read_to_string(output_path).expect("Unable to read file");
     //convert to json
     let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
     // println!("{:#?}, combined.json ---->>>", res["contracts"]);
-    // let contract = &res["contracts"]["src/Greeter.sol:Greeter"];
-    let contract = &res["contracts"]["src/Counter.sol:Counter"];
+    let contract = &res["contracts"]["src/Greeter.sol:Greeter"];
+    // let contract = &res["contracts"]["src/Counter.sol:Counter"];
     // let contract_json = serde_json::from_str::<ethers::abi::JsonAbi>(contract).unwrap();
     // println!("{:#?}, contract_json ---->>>", contract_json.get("bin") );
 
@@ -59,7 +66,7 @@ pub async fn deploy_zksync(config: &Config, project: &Project) -> Result<()> {
     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
         .expect("Can't get an address from the private key");
     let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(280));
-    println!("{:#?}, _signer ---->>>", _signer);
+    // println!("{:#?}, _signer ---->>>", _signer);
 
     let deployer_builder;
     let wallet =
@@ -72,11 +79,11 @@ pub async fn deploy_zksync(config: &Config, project: &Project) -> Result<()> {
         }
         Err(e) => panic!("error wallet: {e:?}"),
     };
-    let bytecode_counter: Bytes =
+    let bytecode: Bytes =
         serde_json::from_value(res["contracts"]["src/Counter.sol:Counter"]["bin"].clone()).unwrap();
-    // let bytecode_greeter: Bytes =
+    // let bytecode: Bytes =
     //     serde_json::from_value(res["contracts"]["src/Greeter.sol:Greeter"]["bin"].clone()).unwrap();
-    let bytecode_v = bytecode_counter.to_vec();
+    let bytecode_v = bytecode.to_vec();
     let bytecode_array: &[u8] = &bytecode_v;
 
     //validate bytecode
@@ -86,11 +93,26 @@ pub async fn deploy_zksync(config: &Config, project: &Project) -> Result<()> {
     }
 
     //get bytecode hash
-    let bytecode_hash = zksync_utils::bytecode::hash_bytecode(bytecode_array);
+    // let bytecode_hash = zksync_utils::bytecode::hash_bytecode(bytecode_array);
     // println!("{:#?}, bytecode_hash ---->>>", bytecode_hash);
+
+    let mut construct_args = Vec::<u8>::new();
+    for arg in constructor_params {
+        println!("{:#?}, arg ---->>>", arg);
+        if let Some(value) = arg.into_string() {
+            println!("{:#?}, value ---->>>", value);
+            construct_args = value.into_bytes();
+        }
+    }
+    println!("{:#?}, construct_args ---->>>", construct_args);
+
+    //factory deps
     let factory_deps = vec![bytecode_v.clone()];
 
-    let deployer = deployer_builder.bytecode(bytecode_v).factory_deps(factory_deps);
+    let deployer = deployer_builder
+        .bytecode(bytecode_v)
+        .factory_deps(factory_deps)
+        .constructor_calldata(construct_args);
 
     let est_gas = deployer.estimate_fee(None).await;
     match est_gas {

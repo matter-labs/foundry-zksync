@@ -101,14 +101,6 @@ impl CreateArgs {
         // Find Project
         let project = self.opts.project()?;
 
-        let config = self.eth.try_load_config_emit_warnings()?;
-
-        println!("{:#?}, self.zksync ---->>>", self.zksync);
-
-        if self.zksync {
-            let _deployed = zksync_deploy::deploy_zksync(&config, &project).await?;
-        };
-
         // Compile Project
         // println!("{:#?}, project ---->>>", project);
         let mut output = if self.json || self.opts.silent {
@@ -141,6 +133,7 @@ impl CreateArgs {
         };
 
         // Add arguments to constructor
+        let config = self.eth.try_load_config_emit_warnings()?;
 
         // println!("{:#?}, config ---->>>", config);
         let provider = Arc::new(try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?);
@@ -155,6 +148,11 @@ impl CreateArgs {
                 self.parse_constructor_args(v, &constructor_args)?
             }
             None => vec![],
+        };
+
+        // println!("{:#?}, self.zksync ---->>>", self.zksync);
+        if self.zksync {
+            let _deployed = zksync_deploy::deploy_zksync(&config, &project, params.clone()).await?;
         };
 
         if self.unlocked {

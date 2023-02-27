@@ -52,7 +52,6 @@ pub fn compile_zksync(config: &Config, project: &Project) {
     }
 
     let output = Command::new(zksolc_path)
-        // .arg("--help")
         .args([
             contract_path,
             "--abi",
