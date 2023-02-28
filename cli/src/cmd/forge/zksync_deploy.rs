@@ -97,20 +97,10 @@ pub async fn deploy_zksync(
     // let bytecode_hash = zksync_utils::bytecode::hash_bytecode(bytecode_array);
     // println!("{:#?}, bytecode_hash ---->>>", bytecode_hash);
 
-    let mut construct_args = Vec::<u8>::new();
-    let param_array = constructor_params.as_slice();
-    let encoded_args = encode(param_array);
+    //get and encode constructor args
+    let encoded_args = encode(constructor_params.as_slice());
 
     println!("{:#?}, encoded_args ---->>>", encoded_args);
-
-    // for arg in constructor_params {
-    //     println!("{:#?}, arg ---->>>", arg);
-    //     if let Some(value) = arg.into_string() {
-    //         println!("{:#?}, value ---->>>", value.as_bytes());
-    //         // construct_args = value.clone();
-    //     }
-    // }
-    // println!("{:#?}, construct_args ---->>>", construct_args);
 
     //factory deps
     let factory_deps = vec![bytecode_v.clone()];
