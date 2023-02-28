@@ -1,4 +1,4 @@
-use ethers::abi::Token;
+use ethers::abi::{encode, Token};
 use ethers::prelude::{ContractFactory, Http, Project, Provider, Wallet};
 use ethers::types::{Address, Bytes};
 use foundry_config::Config;
@@ -34,6 +34,7 @@ pub async fn deploy_zksync(
     // println!("{:#?}, combined.json ---->>>", res["contracts"]);
     let contract = &res["contracts"]["src/Greeter.sol:Greeter"];
     // let contract = &res["contracts"]["src/Counter.sol:Counter"];
+
     // let contract_json = serde_json::from_str::<ethers::abi::JsonAbi>(contract).unwrap();
     // println!("{:#?}, contract_json ---->>>", contract_json.get("bin") );
 
@@ -79,10 +80,10 @@ pub async fn deploy_zksync(
         }
         Err(e) => panic!("error wallet: {e:?}"),
     };
-    let bytecode: Bytes =
-        serde_json::from_value(res["contracts"]["src/Counter.sol:Counter"]["bin"].clone()).unwrap();
     // let bytecode: Bytes =
-    //     serde_json::from_value(res["contracts"]["src/Greeter.sol:Greeter"]["bin"].clone()).unwrap();
+    //     serde_json::from_value(res["contracts"]["src/Counter.sol:Counter"]["bin"].clone()).unwrap();
+    let bytecode: Bytes =
+        serde_json::from_value(res["contracts"]["src/Greeter.sol:Greeter"]["bin"].clone()).unwrap();
     let bytecode_v = bytecode.to_vec();
     let bytecode_array: &[u8] = &bytecode_v;
 
@@ -97,14 +98,19 @@ pub async fn deploy_zksync(
     // println!("{:#?}, bytecode_hash ---->>>", bytecode_hash);
 
     let mut construct_args = Vec::<u8>::new();
-    for arg in constructor_params {
-        println!("{:#?}, arg ---->>>", arg);
-        if let Some(value) = arg.into_string() {
-            println!("{:#?}, value ---->>>", value);
-            construct_args = value.into_bytes();
-        }
-    }
-    println!("{:#?}, construct_args ---->>>", construct_args);
+    let param_array = constructor_params.as_slice();
+    let encoded_args = encode(param_array);
+
+    println!("{:#?}, encoded_args ---->>>", encoded_args);
+
+    // for arg in constructor_params {
+    //     println!("{:#?}, arg ---->>>", arg);
+    //     if let Some(value) = arg.into_string() {
+    //         println!("{:#?}, value ---->>>", value.as_bytes());
+    //         // construct_args = value.clone();
+    //     }
+    // }
+    // println!("{:#?}, construct_args ---->>>", construct_args);
 
     //factory deps
     let factory_deps = vec![bytecode_v.clone()];
@@ -112,7 +118,7 @@ pub async fn deploy_zksync(
     let deployer = deployer_builder
         .bytecode(bytecode_v)
         .factory_deps(factory_deps)
-        .constructor_calldata(construct_args);
+        .constructor_calldata(encoded_args);
 
     let est_gas = deployer.estimate_fee(None).await;
     match est_gas {
@@ -125,6 +131,7 @@ pub async fn deploy_zksync(
         Ok(dep) => println!("{dep:?}, deploy success"),
         Err(e) => println!("{:#?}, error", e),
     }
+    println!("<---- IGNORE ERRORS BELOW THIS LINE---->>>");
 
     // connect to the network
     // let zk_client = Provider::<Http>::try_from("https://zksync2-testnet.zksync.dev").unwrap();
