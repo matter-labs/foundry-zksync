@@ -3,7 +3,8 @@
 use crate::cmd::{
     forge::{
         install::{self},
-        watch::WatchArgs, zksync_compile,
+        watch::WatchArgs,
+        zksync_compile,
     },
     Cmd, LoadConfig,
 };
@@ -101,8 +102,10 @@ impl Cmd for BuildArgs {
             project = config.project()?;
         }
 
+        println!("{:#?}, BuildArgs ---->>>", self);
+
         if self.zksync {
-            zksync_compile::compile_zksync(&config, &project);
+            zksync_compile::compile_zksync(&config);
         } else {
             println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
             println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
@@ -117,8 +120,6 @@ impl Cmd for BuildArgs {
         }
     }
 }
-
-
 
 impl BuildArgs {
     /// Returns the `Project` for the current workspace

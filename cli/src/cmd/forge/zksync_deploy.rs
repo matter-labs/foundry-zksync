@@ -1,7 +1,9 @@
-use ethers::abi::{encode, Token};
+use ethers::abi::{encode, Abi, Token};
 use ethers::prelude::{ContractFactory, Http, Project, Provider, Wallet};
+use ethers::solc::info::ContractInfo;
 use ethers::types::{Address, Bytes};
 use foundry_config::Config;
+use rustc_hex::ToHex;
 use serde_json;
 use std::convert::TryFrom;
 use std::io::{Read, Result};
@@ -12,19 +14,25 @@ use zksync::types::H256;
 use zksync::zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{ethereum, signer, wallet, EthereumProvider};
+use zksync_types::H160;
 
 pub async fn deploy_zksync(
     config: &Config,
     project: &Project,
     constructor_params: Vec<Token>,
+    contract_info: ContractInfo,
+    abi: Abi,
 ) -> Result<()> {
     // println!("{:#?}, project ---->>>", project);
     // println!("{:#?}, config ---->>>", config);
     // println!("{:#?}, constructor_params ---->>>", constructor_params);
+    println!("{:#?}, contract_info ---->>>", contract_info.path);
+    let contract_name = contract_info.name;
 
     //test env vars
     let path = env::current_dir()?;
     println!("The current directory is {}", path.display());
+    // panic!();
 
     //get abi and bytecode
     let output_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/combined.json");
@@ -59,9 +67,7 @@ pub async fn deploy_zksync(
     //------------------------------------------//
 
     let pk = "d5b54c3da4bd2722bb9dd3df5aa86e71b8db43560be88b1a271feb4df3268b54";
-    let p_key = decode_hex(pk).unwrap();
-    let priv_key: &[u8] = &p_key;
-    let private_key = H256::from_slice(priv_key);
+    let private_key = H256::from_slice(&decode_hex(pk).unwrap());
 
     let eth_signer = PrivateKeySigner::new(private_key);
     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
@@ -93,14 +99,18 @@ pub async fn deploy_zksync(
         Err(e) => println!("{e:#?} bytecode not valid"),
     }
 
-    //get bytecode hash
+    //get bytecode hash,
+    // this may or may not be needed to retrieve
+    // contract address from ContractDeployed Event
     // let bytecode_hash = zksync_utils::bytecode::hash_bytecode(bytecode_array);
     // println!("{:#?}, bytecode_hash ---->>>", bytecode_hash);
 
     //get and encode constructor args
     let encoded_args = encode(constructor_params.as_slice());
+    let hex_args = &encoded_args.to_hex::<String>();
 
-    println!("{:#?}, encoded_args ---->>>", encoded_args);
+    // println!("{:#?}, encoded_args ---->>>", encoded_args);
+    // println!("{:#?}, hex_args ---->>>", hex_args);
 
     //factory deps
     let factory_deps = vec![bytecode_v.clone()];
@@ -116,11 +126,49 @@ pub async fn deploy_zksync(
         Err(c) => println!("{:#?}, error", c),
     }
 
+    //SUCCESSFULLY DEPLOYED AND MANUALLY VERIFIED GREETER CONTRACT TO ZKSYNC
+    // 0x8059F965610FaD505E4e51c7b1462cBc7049ed10
+
+    let deployed_contract = "8059F965610FaD505E4e51c7b1462cBc7049ed10";
+    let ctx = decode_hex(deployed_contract).unwrap();
+    let deployed_contract = ctx.as_slice();
+    let deployed_contract = zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap();
+    println!("{:#?}, deployed_contract", deployed_contract);
+
+    let function = abi.functions.get("setGreeting").unwrap().get(0).unwrap();
+    println!("{:#?},function", function);
+
+    let arg1 = Token::String("Hello, ZK from PW".to_owned());
+
+    let encoded_function_call = function.encode_input(&[arg1]).ok().unwrap();
+    // println!("{:#?},encoded_function_call", encoded_function_call);
+
+    // TEMP DISABLE DEPLOYMENT WHILE TESTING CONTRACT INTERACTION
     let tx = deployer.send().await;
     match tx {
-        Ok(dep) => println!("{dep:?}, deploy success"),
+        Ok(dep) => {
+            println!("{dep:?}, deploy success");
+        }
         Err(e) => println!("{:#?}, error", e),
     }
+
+    //now that we are deployed, we can try to execute something
+    let wallet = wallet.unwrap();
+    let execute_builder = wallet.start_execute_contract();
+    // let estimate_fee = execute_builder
+    //     .contract_address(deployed_contract)
+    //     .calldata(&encoded_function_call)
+    //     .estimate_fee(None)
+    //     .await
+    //     .unwrap();
+
+    let tx = execute_builder
+        .contract_address(deployed_contract)
+        .calldata(encoded_function_call)
+        .send()
+        .await
+        .unwrap();
+    println!("{:#?}, <----------> tx", tx);
     println!("<---- IGNORE ERRORS BELOW THIS LINE---->>>");
 
     // connect to the network

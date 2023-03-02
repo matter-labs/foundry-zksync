@@ -1,12 +1,16 @@
 use downloader::{Download, Downloader};
-use ethers::solc::Project;
+use ethers::solc::{ArtifactId, ConfigurableContractArtifact, Project, Solc};
+use foundry_common::compile::{self, ProjectCompiler, SkipBuildFilter};
 use foundry_config::Config;
-use std::fs;
 use std::fs::set_permissions;
+use std::fs::{self, File};
+use std::io::Write;
 use std::os::unix::prelude::PermissionsExt;
 use std::process::Command;
 
-pub fn compile_zksync(config: &Config, project: &Project) {
+pub fn compile_zksync(config: &Config) {
+    let mut project = config.project().unwrap();
+
     let root_path = project.paths.root.display();
     let zkout_path = &format!("{}{}", root_path, "/zksolc");
 
@@ -51,21 +55,56 @@ pub fn compile_zksync(config: &Config, project: &Project) {
         };
     }
 
+    //create new Solc object
+    // let zk_compiler = Solc::new(zksolc_path).args([
+    //     contract_path,
+    //     "--abi",
+    //     "--bin",
+    //     // "--combined-json",
+    //     // "abi,hashes,bin",
+    //     // "--output-dir",
+    //     // zkout_path,
+    //     // "--overwrite",
+    // ]);
+    // println!("{:#?} zk_compiler", &zk_compiler);
+    // let compiler = ProjectCompiler::with_filter(
+    //     false,
+    //     false,
+    //     vec![SkipBuildFilter::Tests, SkipBuildFilter::Scripts],
+    // );
+    // // configure compiler object
+    // project.solc = zk_compiler;
+    // println!("{:#?} project", &project);
+    // let compile_result = compiler.compile(&project).unwrap();
+    // println!("{:#?} compile_result", &compile_result.compiled_artifacts());
+    // let arts = project.compile().unwrap();
+    // println!("{:#?} arts", arts);
+    // let mut buffer = File::create("foo.txt").unwrap();
+
+    // buffer.write_all(&compile_result).unwrap();
+
+    //
+
     let output = Command::new(zksolc_path)
         .args([
             contract_path,
             "--abi",
+            "--bin",
+            "--hashes",
+            "--optimize",
             "--combined-json",
-            "abi,hashes,bin",
+            "abi,bin,bin-runtime",
             "--output-dir",
-            zkout_path,
+            zkout_path.trim(),
             "--overwrite",
         ])
         .output()
         .expect("failed to execute process");
 
-    println!("{:#?} output", &output);
+    let mut buffer = File::create("foo.json").unwrap();
 
-    println!("{:#?} project", &project);
-    println!("{:#?} config", &config);
+    println!("{:#?} output", &output);
+    buffer.write_all(&output.stdout).unwrap();
+    // println!("{:#?} project", &project);
+    // println!("{:#?} config", &config);
 }

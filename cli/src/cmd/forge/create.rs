@@ -152,7 +152,14 @@ impl CreateArgs {
 
         // println!("{:#?}, self.zksync ---->>>", self.zksync);
         if self.zksync {
-            let _deployed = zksync_deploy::deploy_zksync(&config, &project, params.clone()).await?;
+            let _deployed = zksync_deploy::deploy_zksync(
+                &config,
+                &project,
+                params.clone(),
+                self.contract.clone(),
+                abi.clone(),
+            )
+            .await?;
         };
 
         if self.unlocked {
