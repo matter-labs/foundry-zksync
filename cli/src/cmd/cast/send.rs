@@ -7,6 +7,9 @@ use foundry_common::try_get_http_provider;
 use foundry_config::{Chain, Config};
 use std::sync::Arc;
 
+//for zksync
+use crate::cmd::cast::send_zksync;
+
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
 pub struct SendTxArgs {
@@ -64,10 +67,23 @@ pub enum SendTxSubcommands {
         #[clap(help = "The arguments of the function to call.", value_name = "ARGS")]
         args: Vec<String>,
     },
+    #[clap(name = "--zksync", about = "Use to send to zksync")]
+    ZkSync,
 }
 
 impl SendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
+        println!("{:#?}, sendTxArgs", self);
+        if let Some(T) = &self.command {
+            send_zksync::send_zksync(
+                &self.to,
+                &self.args,
+                &self.sig,
+                &self.eth.rpc_url,
+                &self.eth.wallet.private_key,
+            )
+            .await?;
+        }
         let SendTxArgs {
             eth,
             to,

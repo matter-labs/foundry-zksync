@@ -1,7 +1,7 @@
 use ethers::abi::{encode, Abi, Token};
-use ethers::prelude::{ContractFactory, Http, Project, Provider, Wallet};
+use ethers::prelude::{ContractFactory, Http, Project, Provider};
 use ethers::solc::info::ContractInfo;
-use ethers::types::{Address, Bytes};
+use ethers::types::Bytes;
 use foundry_config::Config;
 use rustc_hex::ToHex;
 use serde_json;
@@ -9,7 +9,6 @@ use std::convert::TryFrom;
 use std::io::{Read, Result};
 use std::{env, fs};
 use zksync;
-use zksync::operations::DeployContractBuilder;
 use zksync::types::H256;
 use zksync::zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
@@ -41,6 +40,7 @@ pub async fn deploy_zksync(
     let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
     // println!("{:#?}, combined.json ---->>>", res["contracts"]);
     let contract = &res["contracts"]["src/Greeter.sol:Greeter"];
+    println!("{:#?}, contract ---->>>", contract.as_object());
     // let contract = &res["contracts"]["src/Counter.sol:Counter"];
 
     // let contract_json = serde_json::from_str::<ethers::abi::JsonAbi>(contract).unwrap();
@@ -126,24 +126,6 @@ pub async fn deploy_zksync(
         Err(c) => println!("{:#?}, error", c),
     }
 
-    //SUCCESSFULLY DEPLOYED AND MANUALLY VERIFIED GREETER CONTRACT TO ZKSYNC
-    // 0x8059F965610FaD505E4e51c7b1462cBc7049ed10
-
-    let deployed_contract = "8059F965610FaD505E4e51c7b1462cBc7049ed10";
-    let ctx = decode_hex(deployed_contract).unwrap();
-    let deployed_contract = ctx.as_slice();
-    let deployed_contract = zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap();
-    println!("{:#?}, deployed_contract", deployed_contract);
-
-    let function = abi.functions.get("setGreeting").unwrap().get(0).unwrap();
-    println!("{:#?},function", function);
-
-    let arg1 = Token::String("Hello, ZK from PW".to_owned());
-
-    let encoded_function_call = function.encode_input(&[arg1]).ok().unwrap();
-    // println!("{:#?},encoded_function_call", encoded_function_call);
-
-    // TEMP DISABLE DEPLOYMENT WHILE TESTING CONTRACT INTERACTION
     let tx = deployer.send().await;
     match tx {
         Ok(dep) => {
@@ -152,23 +134,6 @@ pub async fn deploy_zksync(
         Err(e) => println!("{:#?}, error", e),
     }
 
-    //now that we are deployed, we can try to execute something
-    let wallet = wallet.unwrap();
-    let execute_builder = wallet.start_execute_contract();
-    // let estimate_fee = execute_builder
-    //     .contract_address(deployed_contract)
-    //     .calldata(&encoded_function_call)
-    //     .estimate_fee(None)
-    //     .await
-    //     .unwrap();
-
-    let tx = execute_builder
-        .contract_address(deployed_contract)
-        .calldata(encoded_function_call)
-        .send()
-        .await
-        .unwrap();
-    println!("{:#?}, <----------> tx", tx);
     println!("<---- IGNORE ERRORS BELOW THIS LINE---->>>");
 
     // connect to the network

@@ -27,7 +27,6 @@ use std::{path::PathBuf, sync::Arc};
 use tracing::log::trace;
 
 //for zksync
-
 use crate::cmd::forge::zksync_deploy;
 
 /// CLI arguments for `forge create`.
