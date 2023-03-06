@@ -70,9 +70,23 @@ pub enum SendTxSubcommands {
     #[clap(name = "--zksync", about = "send to zksync contract")]
     ZkSync,
     #[clap(name = "--zksync-transfer", about = "Use for zksync L1 / L2 transfers")]
-    ZkSyncTransfer,
+    ZkSyncTransfer {
+        #[clap(help = "Address doing transfer.", value_name = "TO")]
+        to: String,
+        #[clap(help = "Transfer amount.", value_name = "AMOUNT")]
+        amount: i32,
+        #[clap(help = "Transfer token. Leave blank for ETH.", value_name = "TOKEN")]
+        token: Option<String>,
+    },
     #[clap(name = "--zksync-withdraw", about = "Use for zksync L2 / L1 withdrawals")]
-    ZkSyncWithdraw,
+    ZkSyncWithdraw {
+        #[clap(help = "Address doing withdraw.", value_name = "TO")]
+        to: String,
+        #[clap(help = "Withdraw amount.", value_name = "AMOUNT")]
+        amount: i32,
+        #[clap(help = "Withdraw token. Leave blank for ETH.", value_name = "TOKEN")]
+        token: Option<String>,
+    },
 }
 
 impl SendTxArgs {
@@ -92,13 +106,26 @@ impl SendTxArgs {
                     .await?;
                     return Ok(());
                 }
-                SendTxSubcommands::ZkSyncTransfer => {
+                SendTxSubcommands::ZkSyncTransfer { to, amount, token } => {
                     transfer_zksync::transfer_zksync(
-                        &self.to,
-                        &self.args,
-                        &self.sig,
+                        to,
+                        amount,
+                        token,
                         &self.eth.rpc_url,
                         &self.eth.wallet.private_key,
+                        false,
+                    )
+                    .await?;
+                    return Ok(());
+                }
+                SendTxSubcommands::ZkSyncWithdraw { to, amount, token } => {
+                    transfer_zksync::transfer_zksync(
+                        to,
+                        amount,
+                        token,
+                        &self.eth.rpc_url,
+                        &self.eth.wallet.private_key,
+                        true,
                     )
                     .await?;
                     return Ok(());

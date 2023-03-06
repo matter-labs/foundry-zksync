@@ -1,18 +1,18 @@
-use ethers::types::NameOrAddress;
 use std::io::Result;
 use zksync;
-use zksync::types::H256;
+use zksync::types::{Address, H256};
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{signer, wallet};
 use zksync_types::L2_ETH_TOKEN_ADDRESS;
 
 pub async fn transfer_zksync(
-    to: &Option<NameOrAddress>,
-    args: &Vec<String>,
-    sig: &Option<String>,
+    to: &String,
+    amount: &i32,
+    token: &Option<String>,
     rpc: &Option<String>,
     p_key: &Option<String>,
+    withdraw: bool,
 ) -> Result<()> {
     //rpc url
     let mut rpc_str: &str = "";
@@ -34,47 +34,85 @@ pub async fn transfer_zksync(
     println!("{:#?}, _signer ---->>>", _signer);
 
     let wallet = wallet::Wallet::with_http_client(rpc_str, _signer);
-    match &wallet {
-        Ok(w) => {
-            // Build Transfer //
-            let estimate_fee = w
-                .start_transfer()
-                .to(signer_addy)
-                .amount(zksync_types::U256::from(1000000000))
-                .token(L2_ETH_TOKEN_ADDRESS)
-                .estimate_fee(None)
-                .await
-                .unwrap();
-            println!("{:#?}, <----------> estimate_fee", estimate_fee);
+    if !withdraw {
+        let token = match token {
+            Some(token_addy) => Address::from_slice(&decode_hex(token_addy).unwrap()),
+            None => L2_ETH_TOKEN_ADDRESS,
+        };
+        println!("{:#?}, token ---->>>", token);
+        match &wallet {
+            Ok(w) => {
+                // Build Transfer //
 
-            let tx = w
-                .start_transfer()
-                .to(signer_addy)
-                .amount(zksync_types::U256::from(1000000000))
-                .token(L2_ETH_TOKEN_ADDRESS)
-                .send()
-                .await
-                .unwrap();
-            println!("{:#?}, <----------> tx", tx);
-            let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-            println!("{:#?}, <----------> tx_rcpt_commit", tx_rcpt_commit);
-            // let tx_rcpt_finalize = tx.wait_for_finalize().await.unwrap();
-            // println!("{:#?}, <----------> tx_rcpt_finalize", tx_rcpt_finalize);
-        }
-        Err(e) => panic!("error wallet: {e:?}"),
-    };
+                // let estimate_fee = w
+                //     .start_transfer()
+                //     .str_to(to)
+                //     .unwrap()
+                //     .amount(zksync_types::U256::from(amount.clone()))
+                //     .token(token)
+                //     .estimate_fee(None)
+                //     .await
+                //     .unwrap();
+                // println!("{:#?}, <----------> estimate_fee", estimate_fee);
+
+                let tx = w
+                    .start_transfer()
+                    .str_to(to)
+                    .unwrap()
+                    .amount(zksync_types::U256::from(amount.clone()))
+                    .token(token)
+                    .send()
+                    .await
+                    .unwrap();
+                println!("{:#?}, <----------> tx", tx);
+                let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
+                println!("{:#?}, <----------> tx_rcpt_commit", tx_rcpt_commit);
+                // let tx_rcpt_finalize = tx.wait_for_finalize().await.unwrap();
+                // println!("{:#?}, <----------> tx_rcpt_finalize", tx_rcpt_finalize);
+            }
+            Err(e) => panic!("error wallet: {e:?}"),
+        };
+    } else {
+        let token = match token {
+            Some(token_addy) => Address::from_slice(&decode_hex(token_addy).unwrap()),
+            None => Address::zero(),
+        };
+        println!("{:#?}, token ---->>>", token);
+        match &wallet {
+            Ok(w) => {
+                // Build Transfer //
+
+                // let estimate_fee = w
+                //     .start_withdraw()
+                //     .str_to(to)
+                //     .unwrap()
+                //     .amount(zksync_types::U256::from(amount.clone()))
+                //     .token(token)
+                //     .estimate_fee(None)
+                //     .await
+                //     .unwrap();
+                // println!("{:#?}, <----------> estimate_fee", estimate_fee);
+
+                let tx = w
+                    .start_withdraw()
+                    .str_to(to)
+                    .unwrap()
+                    .amount(zksync_types::U256::from(amount.clone()))
+                    .token(token)
+                    .send()
+                    .await
+                    .unwrap();
+                println!("{:#?}, <----------> withdrawtx", tx);
+                let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
+                println!("{:#?}, <----------> withdraw tx_rcpt_commit", tx_rcpt_commit);
+                // let tx_rcpt_finalize = tx.wait_for_finalize().await.unwrap();
+                // println!("{:#?}, <----------> tx_rcpt_finalize", tx_rcpt_finalize);
+            }
+            Err(e) => panic!("error wallet: {e:?}"),
+        };
+    }
 
     // println!("{:#?}, wallet", wallet);
-    // let path = env::current_dir()?;
-    // println!("The current directory is {}", path.display());
-    // const KEY: &str = "KEY";
-    // // Our test environment variable.
-    // env::set_var(KEY, "123");
-    // assert_eq!(get_env(KEY), "123");
-    // assert_eq!(parse_env::<i32>(KEY), 123);
-
-    // let zkconfig: zksync_config::ZkSyncConfig = zksync_config::ZkSyncConfig::from_env();
-    // println!("{:#?}, <----------> zkconfig", zkconfig);
 
     println!("<---- IGNORE ERRORS BELOW THIS LINE---->>>");
 
