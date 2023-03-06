@@ -8,7 +8,7 @@ use foundry_config::{Chain, Config};
 use std::sync::Arc;
 
 //for zksync
-use crate::cmd::cast::send_zksync;
+use crate::cmd::cast::{send_zksync, transfer_zksync};
 
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
@@ -67,23 +67,46 @@ pub enum SendTxSubcommands {
         #[clap(help = "The arguments of the function to call.", value_name = "ARGS")]
         args: Vec<String>,
     },
-    #[clap(name = "--zksync", about = "Use to send to zksync")]
+    #[clap(name = "--zksync", about = "send to zksync contract")]
     ZkSync,
+    #[clap(name = "--zksync-transfer", about = "Use for zksync L1 / L2 transfers")]
+    ZkSyncTransfer,
+    #[clap(name = "--zksync-withdraw", about = "Use for zksync L2 / L1 withdrawals")]
+    ZkSyncWithdraw,
 }
 
 impl SendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        println!("{:#?}, sendTxArgs", self);
-        if let Some(T) = &self.command {
-            send_zksync::send_zksync(
-                &self.to,
-                &self.args,
-                &self.sig,
-                &self.eth.rpc_url,
-                &self.eth.wallet.private_key,
-            )
-            .await?;
+        // println!("{:#?}, sendTxArgs", self);
+        if let Some(t) = &self.command {
+            println!("{:#?}, <------> t", t);
+            match t {
+                SendTxSubcommands::ZkSync => {
+                    send_zksync::send_zksync(
+                        &self.to,
+                        &self.args,
+                        &self.sig,
+                        &self.eth.rpc_url,
+                        &self.eth.wallet.private_key,
+                    )
+                    .await?;
+                    return Ok(());
+                }
+                SendTxSubcommands::ZkSyncTransfer => {
+                    transfer_zksync::transfer_zksync(
+                        &self.to,
+                        &self.args,
+                        &self.sig,
+                        &self.eth.rpc_url,
+                        &self.eth.wallet.private_key,
+                    )
+                    .await?;
+                    return Ok(());
+                }
+                _ => (),
+            }
         }
+
         let SendTxArgs {
             eth,
             to,

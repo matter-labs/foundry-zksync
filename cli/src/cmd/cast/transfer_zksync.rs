@@ -1,18 +1,13 @@
-use ethers::abi::{encode, Token};
 use ethers::types::NameOrAddress;
-use sha2::Digest;
-use std::env;
 use std::io::Result;
 use zksync;
 use zksync::types::H256;
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{signer, wallet};
-use zksync_config;
-use zksync_types::zk_evm::sha3::Keccak256;
-use zksync_utils::{get_env, parse_env};
+use zksync_types::L2_ETH_TOKEN_ADDRESS;
 
-pub async fn send_zksync(
+pub async fn transfer_zksync(
     to: &Option<NameOrAddress>,
     args: &Vec<String>,
     sig: &Option<String>,
@@ -38,44 +33,25 @@ pub async fn send_zksync(
     let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(280));
     println!("{:#?}, _signer ---->>>", _signer);
 
-    //SUCCESSFULLY DEPLOYED AND MANUALLY VERIFIED GREETER CONTRACT TO ZKSYNC
-    // 0x8059F965610FaD505E4e51c7b1462cBc7049ed10
-
-    let deployed_contract = to.as_ref().unwrap().as_address().unwrap().clone();
-    let deployed_contract = deployed_contract.as_bytes();
-    let deployed_contract = zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap();
-    let function_signature: &str = &sig.as_ref().unwrap();
-
-    let mut arg_tokens: Vec<Token> = Vec::new();
-    for arg in args {
-        arg_tokens.push(Token::String(arg.clone()));
-    }
-
-    let mut signed = [0u8; 4];
-    let digest = &Keccak256::digest(function_signature)[..signed.len()];
-    signed.copy_from_slice(digest);
-
-    let encoded = encode(&arg_tokens);
-    let encoded_function_call: Vec<u8> = signed.into_iter().chain(encoded.into_iter()).collect();
-    // println!("{:#?}, encoded_function_call", encoded_function_call);
-
     let wallet = wallet::Wallet::with_http_client(rpc_str, _signer);
     match &wallet {
         Ok(w) => {
-            // Build Executor //
-            // let estimate_fee = w
-            //     .start_execute_contract()
-            //     .contract_address(deployed_contract)
-            //     .calldata(encoded_function_call)
-            //     .estimate_fee(None)
-            //     .await
-            //     .unwrap();
-            // println!("{:#?}, <----------> estimate_fee", estimate_fee);
+            // Build Transfer //
+            let estimate_fee = w
+                .start_transfer()
+                .to(signer_addy)
+                .amount(zksync_types::U256::from(1000000000))
+                .token(L2_ETH_TOKEN_ADDRESS)
+                .estimate_fee(None)
+                .await
+                .unwrap();
+            println!("{:#?}, <----------> estimate_fee", estimate_fee);
 
             let tx = w
-                .start_execute_contract()
-                .contract_address(deployed_contract)
-                .calldata(encoded_function_call)
+                .start_transfer()
+                .to(signer_addy)
+                .amount(zksync_types::U256::from(1000000000))
+                .token(L2_ETH_TOKEN_ADDRESS)
                 .send()
                 .await
                 .unwrap();
@@ -89,16 +65,16 @@ pub async fn send_zksync(
     };
 
     // println!("{:#?}, wallet", wallet);
-    let path = env::current_dir()?;
-    println!("The current directory is {}", path.display());
-    const KEY: &str = "KEY";
-    // Our test environment variable.
-    env::set_var(KEY, "123");
-    assert_eq!(get_env(KEY), "123");
-    assert_eq!(parse_env::<i32>(KEY), 123);
+    // let path = env::current_dir()?;
+    // println!("The current directory is {}", path.display());
+    // const KEY: &str = "KEY";
+    // // Our test environment variable.
+    // env::set_var(KEY, "123");
+    // assert_eq!(get_env(KEY), "123");
+    // assert_eq!(parse_env::<i32>(KEY), 123);
 
-    let zkconfig: zksync_config::ZkSyncConfig = zksync_config::ZkSyncConfig::from_env();
-    println!("{:#?}, <----------> zkconfig", zkconfig);
+    // let zkconfig: zksync_config::ZkSyncConfig = zksync_config::ZkSyncConfig::from_env();
+    // println!("{:#?}, <----------> zkconfig", zkconfig);
 
     println!("<---- IGNORE ERRORS BELOW THIS LINE---->>>");
 
