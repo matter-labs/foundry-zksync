@@ -3213,6 +3213,7 @@ dependencies = [
  "yansi",
  "zksync",
  "zksync_config",
+ "zksync_contracts",
  "zksync_types",
  "zksync_utils",
 ]

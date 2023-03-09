@@ -88,18 +88,6 @@ pub async fn send_zksync(
         Err(e) => panic!("error wallet: {e:?}"),
     };
 
-    // println!("{:#?}, wallet", wallet);
-    let path = env::current_dir()?;
-    println!("The current directory is {}", path.display());
-    const KEY: &str = "KEY";
-    // Our test environment variable.
-    env::set_var(KEY, "123");
-    assert_eq!(get_env(KEY), "123");
-    assert_eq!(parse_env::<i32>(KEY), 123);
-
-    let zkconfig: zksync_config::ZkSyncConfig = zksync_config::ZkSyncConfig::from_env();
-    println!("{:#?}, <----------> zkconfig", zkconfig);
-
     println!("<---- IGNORE ERRORS BELOW THIS LINE---->>>");
 
     Ok(())
