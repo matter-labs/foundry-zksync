@@ -89,7 +89,11 @@ which = "4.2.5"
 
 #zksync
 # zksync = {git = "https://github.com/matter-labs/zksync-era.git"}
-# zksync = {git = "https://github.com/sammyshakes/zksync-era.git"}
+# zksync_config = {git = "https://github.com/matter-labs/zksync-era.git"}
+# zksync_contracts = {git = "https://github.com/matter-labs/zksync-era.git"}
+# zksync_types = {git = "https://github.com/matter-labs/zksync-era.git"}
+# zksync_utils = {git = "https://github.com/matter-labs/zksync-era.git"}
+
 zksync = {path = "../../zksync-era/sdk/zksync-rs"}
 zksync_config = {path = "../../zksync-era/core/lib/config"}
 zksync_contracts = {path = "../../zksync-era/core/lib/contracts"}

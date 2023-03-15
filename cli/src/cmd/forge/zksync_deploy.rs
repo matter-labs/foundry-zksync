@@ -21,13 +21,16 @@ pub async fn deploy_zksync(
     constructor_params: Vec<Token>,
     contract_info: ContractInfo,
     abi: Abi,
+    contract_path: String,
 ) -> Result<()> {
     // println!("{:#?}, project ---->>>", project);
     // println!("{:#?}, config ---->>>", config);
     // println!("{:#?}, constructor_params ---->>>", constructor_params);
     println!("{:#?}, contract_info ---->>>", contract_info.path);
     let contract_name = contract_info.name;
+    let contract_path = format!("{}:{}", contract_path, contract_name);
 
+    println!("{:#?}, contract_path ---->>>", contract_path);
     //test env vars
     let path = env::current_dir()?;
     println!("The current directory is {}", path.display());
@@ -35,11 +38,14 @@ pub async fn deploy_zksync(
 
     //get abi and bytecode
     let output_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/combined.json");
+    // let output_path: &str =
+    //     &format!("{}{}", project.paths.artifacts.display(), "/zksolc/abis/abi.json");
     let data = fs::read_to_string(output_path).expect("Unable to read file");
     //convert to json
     let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
     // println!("{:#?}, combined.json ---->>>", res["contracts"]);
-    let contract = &res["contracts"]["src/Greeter.sol:Greeter"];
+    // let contract = &res["contracts"]["src/Greeter.sol:Greeter"];
+    let contract = &res["contracts"][&contract_path];
     println!("{:#?}, contract ---->>>", contract.as_object());
     // let contract = &res["contracts"]["src/Counter.sol:Counter"];
 
@@ -88,8 +94,10 @@ pub async fn deploy_zksync(
     };
     // let bytecode: Bytes =
     //     serde_json::from_value(res["contracts"]["src/Counter.sol:Counter"]["bin"].clone()).unwrap();
+    // let bytecode: Bytes =
+    //     serde_json::from_value(res["contracts"]["src/Greeter.sol:Greeter"]["bin"].clone()).unwrap();
     let bytecode: Bytes =
-        serde_json::from_value(res["contracts"]["src/Greeter.sol:Greeter"]["bin"].clone()).unwrap();
+        serde_json::from_value(res["contracts"][&contract_path]["bin"].clone()).unwrap();
     let bytecode_v = bytecode.to_vec();
     let bytecode_array: &[u8] = &bytecode_v;
 

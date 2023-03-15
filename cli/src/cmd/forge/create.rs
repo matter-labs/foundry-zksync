@@ -92,7 +92,21 @@ pub struct CreateArgs {
 
     #[clap(help_heading = "Compiler options", long, help = "Deploy with ZkSync.")]
     pub zksync: bool,
+    // #[clap(subcommand)]
+    // command: Option<CreateSubcommands>,
 }
+
+// #[derive(Debug, Parser, Clone)]
+// pub enum CreateSubcommands {
+//     #[clap(name = "--zksync", about = "Deploy to zkSync")]
+//     ZkSync {
+//         #[clap(
+//             help = "Contract path from project root. ex: 'src/Contract.sol:Contract'",
+//             value_name = "CONTRACT-PATH:CONTRACT-NAME"
+//         )]
+//         contract_path: String,
+//     },
+// }
 
 impl CreateArgs {
     /// Executes the command to create a contract
@@ -108,6 +122,8 @@ impl CreateArgs {
         } else {
             compile::compile(&project, false, false)
         }?;
+
+        let ctx_path = self.contract.path.clone();
 
         if let Some(ref mut path) = self.contract.path {
             // paths are absolute in the project's output
@@ -157,9 +173,28 @@ impl CreateArgs {
                 params.clone(),
                 self.contract.clone(),
                 abi.clone(),
+                ctx_path.unwrap(),
             )
             .await?;
         };
+
+        // if let Some(t) = &self.command {
+        //     println!("{:#?}, <------> t", t);
+        //     match t {
+        //         CreateSubcommands::ZkSync { contract_path } => {
+        //             zksync_deploy::deploy_zksync(
+        //                 &config,
+        //                 &project,
+        //                 params.clone(),
+        //                 self.contract.clone(),
+        //                 abi.clone(),
+        //             )
+        //             .await?;
+        //             return Ok(());
+        //         }
+        //         _ => (),
+        //     }
+        // }
 
         if self.unlocked {
             let sender = self.eth.wallet.from.expect("is required");

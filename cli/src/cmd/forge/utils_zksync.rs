@@ -15,7 +15,7 @@ pub fn load_contract(raw_abi_string: &str) -> ethabi::Contract {
 }
 
 pub fn download_zksolc_compiler(zksolc_path: &String, zkout_path: &String) {
-    let download: Download = Download::new("https://github.com/matter-labs/zksolc-bin/raw/main/linux-amd64/zksolc-linux-amd64-musl-v1.3.5");
+    let download: Download = Download::new("https://github.com/matter-labs/zksolc-bin/raw/main/linux-amd64/zksolc-linux-amd64-musl-v1.3.7");
     //get downloader builder
     let mut builder = Downloader::builder();
     //assign download folder

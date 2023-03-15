@@ -82,9 +82,23 @@ pub struct BuildArgs {
     #[serde(skip)]
     pub watch: WatchArgs,
 
-    #[clap(help_heading = "Compiler options", long, help = "Compile with ZkSync.")]
-    #[serde(skip)]
-    pub zksync: bool,
+    // #[clap(help_heading = "Compiler options", long, help = "Compile with ZkSync.")]
+    // #[serde(skip)]
+    // pub zksync: bool,
+    #[clap(subcommand)]
+    pub command: Option<BuildSubcommands>,
+}
+
+#[derive(Debug, Parser, Clone, Serialize)]
+pub enum BuildSubcommands {
+    #[clap(name = "--zksync", about = "Compile with zksolc - zkSync")]
+    ZkSync {
+        #[clap(
+            help = "Contract path from project root. ex: 'src/Contract.sol'",
+            value_name = "CONTRACT-PATH"
+        )]
+        contract_path: String,
+    },
 }
 
 impl Cmd for BuildArgs {
@@ -104,11 +118,28 @@ impl Cmd for BuildArgs {
 
         println!("{:#?}, BuildArgs ---->>>", self);
 
-        if self.zksync {
-            zksync_compile::compile_zksync(&config);
-        } else {
-            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
-            println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
+        // if self.zksync {
+        //     let compile_result = zksync_compile::compile_zksync(&config);
+        //     // match &compile_result {
+        //     //     // Ok(project_compile_output) => println!("{:#?}, error", project_compile_output),
+        //     //     Ok(project_compile_output) => {
+        //     //         println!("suuuccceeeesss");
+        //     //         // return compile_result;
+        //     //     }
+        //     //     Err(report) => panic!("{:#?}, compile error", report),
+        //     // }
+        // } else {
+        //     println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
+        //     println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
+        // }
+
+        if let Some(t) = &self.command {
+            println!("{:#?}, <------> t", t);
+            match t {
+                BuildSubcommands::ZkSync { contract_path } => {
+                    zksync_compile::compile_zksync(&config, contract_path);
+                }
+            }
         }
 
         let filters = self.skip.unwrap_or_default();
