@@ -94,8 +94,8 @@ pub enum BuildSubcommands {
     #[clap(name = "--zksync", about = "Compile with zksolc - zkSync")]
     ZkSync {
         #[clap(
-            help = "Contract path from project root. ex: 'src/Contract.sol'",
-            value_name = "CONTRACT-PATH"
+            help = "Contract filename from project src/ ex: 'Contract.sol'",
+            value_name = "CONTRACT FILENAME"
         )]
         contract_path: String,
     },
