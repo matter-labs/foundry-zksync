@@ -5,15 +5,13 @@ use ethers::types::Bytes;
 use foundry_config::Config;
 use rustc_hex::ToHex;
 use serde_json;
-use std::convert::TryFrom;
-use std::io::{Read, Result};
-use std::{env, fs};
+use std::fs;
+use std::io::Result;
 use zksync;
 use zksync::types::H256;
-use zksync::zksync_eth_signer::{EthereumSigner, PrivateKeySigner};
+use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
-use zksync::{ethereum, signer, wallet, EthereumProvider};
-use zksync_types::H160;
+use zksync::{signer, wallet};
 
 pub async fn deploy_zksync(
     config: &Config,
@@ -26,64 +24,40 @@ pub async fn deploy_zksync(
     // println!("{:#?}, project ---->>>", project);
     // println!("{:#?}, config ---->>>", config);
     // println!("{:#?}, constructor_params ---->>>", constructor_params);
-    println!("{:#?}, contract_info ---->>>", contract_info.path);
+    // println!("{:#?}, contract full path ---->>>", contract_info.path);
+
     let contract_name = contract_info.name;
     let contract_path = format!("{}:{}", contract_path, contract_name);
+    let mut filename = contract_path.split('/');
+    let splits = filename.clone().count();
+    let file = filename.nth(splits - 1).unwrap().split(":").nth(0).unwrap();
 
-    println!("{:#?}, contract_path ---->>>", contract_path);
-    //test env vars
-    let path = env::current_dir()?;
-    println!("The current directory is {}", path.display());
-    // panic!();
-
-    //get abi and bytecode
-    let output_path: &str = &format!("{}{}", project.paths.root.display(), "/zksolc/combined.json");
-    // let output_path: &str =
-    //     &format!("{}{}", project.paths.artifacts.display(), "/zksolc/abis/abi.json");
+    //get bytecode
+    let output_path: &str =
+        &format!("{}/zksolc/{}/combined.json", project.paths.artifacts.display(), file);
     let data = fs::read_to_string(output_path).expect("Unable to read file");
-    //convert to json
+    //convert to json Value
     let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
-    // println!("{:#?}, combined.json ---->>>", res["contracts"]);
-    // let contract = &res["contracts"]["src/Greeter.sol:Greeter"];
     let contract = &res["contracts"][&contract_path];
     println!("{:#?}, contract ---->>>", contract.as_object());
-    // let contract = &res["contracts"]["src/Counter.sol:Counter"];
 
-    // let contract_json = serde_json::from_str::<ethers::abi::JsonAbi>(contract).unwrap();
-    // println!("{:#?}, contract_json ---->>>", contract_json.get("bin") );
-
-    // //get abi
-    // let abi_path = &format!("{}{}", project.paths.artifacts.display(), "/Greeter.sol/Greeter.json");
-    // // println!("{:#?}, abi_path ---->>>", abi_path);
-    // let abi_data = fs::read_to_string(abi_path).expect("Unable to read file");
-    // // println!("{:#?}, abi_data ---->>>", abi_data);
-    // let res1: serde_json::Value = serde_json::from_str(&abi_data).expect("Unable to parse");
-    // let rawabi = res1["abi"].clone();
-    // // println!("{:#?}, res1 ---->>>", res1["abi"]);
-    // let abi: ethers::abi::Abi = serde_json::from_value(rawabi.clone())?;
-    // println!("{:#?}, rawabi ---->>>", rawabi[0]);
-
-    // let abi_string = rawabi[0].as_object();
-    // let abi_string = match abi_string {
-    //     Some(value) => value,
-    //     None => panic!("error abi_string"),
-    // };
-    // println!("{:#?}, abi_string ---->>>", abi_string);
-
-    //------------------------------------------//
-
-    let pk = "d5b54c3da4bd2722bb9dd3df5aa86e71b8db43560be88b1a271feb4df3268b54";
+    // let pk = "d5b54c3da4bd2722bb9dd3df5aa86e71b8db43560be88b1a271feb4df3268b54";
+    //rich wallet
+    let pk = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
     let private_key = H256::from_slice(&decode_hex(pk).unwrap());
 
+    //signer
     let eth_signer = PrivateKeySigner::new(private_key);
     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
         .expect("Can't get an address from the private key");
-    let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(280));
+    let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(270));
     // println!("{:#?}, _signer ---->>>", _signer);
 
+    // TODO: make rpc-urls an input arg
+    // https://zksync2-testnet.zksync.dev:443
+
     let deployer_builder;
-    let wallet =
-        wallet::Wallet::with_http_client("https://zksync2-testnet.zksync.dev:443", _signer);
+    let wallet = wallet::Wallet::with_http_client("http://localhost:3050", _signer);
     match &wallet {
         Ok(w) => {
             // Build Deployer //
@@ -92,10 +66,7 @@ pub async fn deploy_zksync(
         }
         Err(e) => panic!("error wallet: {e:?}"),
     };
-    // let bytecode: Bytes =
-    //     serde_json::from_value(res["contracts"]["src/Counter.sol:Counter"]["bin"].clone()).unwrap();
-    // let bytecode: Bytes =
-    //     serde_json::from_value(res["contracts"]["src/Greeter.sol:Greeter"]["bin"].clone()).unwrap();
+
     let bytecode: Bytes =
         serde_json::from_value(res["contracts"][&contract_path]["bin"].clone()).unwrap();
     let bytecode_v = bytecode.to_vec();
@@ -110,8 +81,8 @@ pub async fn deploy_zksync(
     //get bytecode hash,
     // this may or may not be needed to retrieve
     // contract address from ContractDeployed Event
-    // let bytecode_hash = zksync_utils::bytecode::hash_bytecode(bytecode_array);
-    // println!("{:#?}, bytecode_hash ---->>>", bytecode_hash);
+    let bytecode_hash = zksync_utils::bytecode::hash_bytecode(bytecode_array);
+    println!("{:#?}, bytecode_hash ---->>>", bytecode_hash);
 
     //get and encode constructor args
     let encoded_args = encode(constructor_params.as_slice());
@@ -145,17 +116,17 @@ pub async fn deploy_zksync(
     println!("<---- IGNORE ERRORS BELOW THIS LINE---->>>");
 
     // connect to the network
-    // let zk_client = Provider::<Http>::try_from("https://zksync2-testnet.zksync.dev").unwrap();
+    let zk_client = Provider::<Http>::try_from("https://zksync2-testnet.zksync.dev").unwrap();
     let eth_client =
         Provider::<Http>::try_from("https://goerli.infura.io/v3/332aa765e52d4f219b8408485be193c1")
             .unwrap();
 
     let client = std::sync::Arc::new(eth_client);
-    // println!("{:#?}, client url---->>>", client.url());
+    println!("{:#?}, client url---->>>", client.url());
 
     // create a factory which will be used to deploy instances of the contract
-    // let factory = ContractFactory::new(abi, bytecode_counter, client);
-    // println!("{:#?}, factory ---->>>", factory);
+    let factory = ContractFactory::new(abi, bytecode, client);
+    println!("{:#?}, factory ---->>>", factory);
 
     Ok(())
 }

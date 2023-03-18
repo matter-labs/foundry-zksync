@@ -18,10 +18,8 @@ use super::utils_zksync;
 // pub fn compile_zksync(config: &Config) -> eyre::Result<ProjectCompileOutput> {
 pub fn compile_zksync(config: &Config, contract_path: &String) {
     let project = config.project().unwrap();
-    let root_path = project.paths.root.display();
-    let artifacts_path = project.paths.artifacts.display();
-    // let zkout_path = &format!("{}{}", root_path, "/zksolc");
-    let zkout_path = &format!("{}{}", artifacts_path, "/zksolc");
+    let contract_full_path = &format!("{}/{}", project.paths.sources.display(), contract_path);
+    let zkout_path = &format!("{}{}", project.paths.artifacts.display(), "/zksolc");
     let build_path = &format!("{}/{}", zkout_path, contract_path);
 
     match fs::create_dir_all(std::path::Path::new(zkout_path)) {
@@ -37,8 +35,6 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
         utils_zksync::download_zksolc_compiler(zksolc_path, zkout_path);
     }
 
-    let contract_full_path = &format!("{}/{}", project.paths.sources.display(), contract_path);
-
     //-------------------------------------------//
     // THIS is all working for combined-json output
     //compile using combined-json flag
@@ -50,7 +46,6 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
             "abi,bin,hashes",
             "--output-dir",
             build_path,
-            // zkout_path,
             "--overwrite",
         ])
         // .stdin(Stdio::piped())
