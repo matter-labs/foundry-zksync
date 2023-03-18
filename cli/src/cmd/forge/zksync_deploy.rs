@@ -1,5 +1,5 @@
 use ethers::abi::{encode, Abi, Token};
-use ethers::prelude::{ContractFactory, Http, Project, Provider};
+use ethers::prelude::Project;
 use ethers::solc::info::ContractInfo;
 use ethers::types::Bytes;
 use foundry_config::Config;
@@ -114,19 +114,6 @@ pub async fn deploy_zksync(
     }
 
     println!("<---- IGNORE ERRORS BELOW THIS LINE---->>>");
-
-    // connect to the network
-    let zk_client = Provider::<Http>::try_from("https://zksync2-testnet.zksync.dev").unwrap();
-    let eth_client =
-        Provider::<Http>::try_from("https://goerli.infura.io/v3/332aa765e52d4f219b8408485be193c1")
-            .unwrap();
-
-    let client = std::sync::Arc::new(eth_client);
-    println!("{:#?}, client url---->>>", client.url());
-
-    // create a factory which will be used to deploy instances of the contract
-    let factory = ContractFactory::new(abi, bytecode, client);
-    println!("{:#?}, factory ---->>>", factory);
 
     Ok(())
 }
