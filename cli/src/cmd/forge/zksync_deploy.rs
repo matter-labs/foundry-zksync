@@ -7,22 +7,21 @@ use rustc_hex::ToHex;
 use serde_json;
 use std::fs;
 use std::io::Result;
-use zksync;
 use zksync::types::H256;
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
-use zksync::{signer, wallet};
+use zksync::{self, signer, wallet};
 
 pub async fn deploy_zksync(
-    config: &Config,
+    _config: &Config,
     project: &Project,
     constructor_params: Vec<Token>,
     contract_info: ContractInfo,
-    abi: Abi,
+    _abi: Abi,
     contract_path: String,
 ) -> Result<()> {
     // println!("{:#?}, project ---->>>", project);
-    // println!("{:#?}, config ---->>>", config);
+    // println!("{:#?}, config ---->>>", _config);
     // println!("{:#?}, constructor_params ---->>>", constructor_params);
     // println!("{:#?}, contract full path ---->>>", contract_info.path);
 
@@ -40,13 +39,22 @@ pub async fn deploy_zksync(
     let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
     let contract = &res["contracts"][&contract_path];
     println!("{:#?}, contract ---->>>", contract.as_object());
+    let bytecode: Bytes =
+        serde_json::from_value(res["contracts"][&contract_path]["bin"].clone()).unwrap();
+    let bytecode_v = bytecode.to_vec();
+    let bytecode_array: &[u8] = &bytecode_v;
 
+    //validate bytecode
+    match zksync_utils::bytecode::validate_bytecode(bytecode_array) {
+        Ok(_success) => println!("bytecode isValid"),
+        Err(e) => println!("{e:#?} bytecode not valid"),
+    }
+
+    // get signer
     // let pk = "d5b54c3da4bd2722bb9dd3df5aa86e71b8db43560be88b1a271feb4df3268b54";
     //rich wallet
     let pk = "7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
     let private_key = H256::from_slice(&decode_hex(pk).unwrap());
-
-    //signer
     let eth_signer = PrivateKeySigner::new(private_key);
     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
         .expect("Can't get an address from the private key");
@@ -67,17 +75,6 @@ pub async fn deploy_zksync(
         Err(e) => panic!("error wallet: {e:?}"),
     };
 
-    let bytecode: Bytes =
-        serde_json::from_value(res["contracts"][&contract_path]["bin"].clone()).unwrap();
-    let bytecode_v = bytecode.to_vec();
-    let bytecode_array: &[u8] = &bytecode_v;
-
-    //validate bytecode
-    match zksync_utils::bytecode::validate_bytecode(bytecode_array) {
-        Ok(_success) => println!("bytecode isValid"),
-        Err(e) => println!("{e:#?} bytecode not valid"),
-    }
-
     //get bytecode hash,
     // this may or may not be needed to retrieve
     // contract address from ContractDeployed Event
@@ -86,10 +83,9 @@ pub async fn deploy_zksync(
 
     //get and encode constructor args
     let encoded_args = encode(constructor_params.as_slice());
-    let hex_args = &encoded_args.to_hex::<String>();
-
+    let _hex_args = &encoded_args.to_hex::<String>();
     // println!("{:#?}, encoded_args ---->>>", encoded_args);
-    // println!("{:#?}, hex_args ---->>>", hex_args);
+    // println!("{:#?}, hex_args ---->>>", _hex_args);
 
     //factory deps
     let factory_deps = vec![bytecode_v.clone()];

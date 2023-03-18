@@ -10,17 +10,13 @@ use crate::{
 use cast::SimpleCast;
 use clap::{Parser, ValueHint};
 use ethers::{
-    abi::{Abi, AbiObject, Constructor, Token},
+    abi::{Abi, Constructor, Token},
     prelude::{artifacts::BytecodeObject, ContractFactory, Middleware},
-    solc::{
-        info::ContractInfo,
-        utils::{canonicalized, read_json_file},
-    },
+    solc::{info::ContractInfo, utils::canonicalized},
     types::{transaction::eip2718::TypedTransaction, Chain},
 };
 use eyre::Context;
 use foundry_common::{abi::parse_tokens, compile, estimate_eip1559_fees, try_get_http_provider};
-use foundry_config::Config;
 use rustc_hex::ToHex;
 use serde_json::json;
 use std::{path::PathBuf, sync::Arc};
@@ -116,6 +112,7 @@ impl CreateArgs {
 
         // Compile Project
         // println!("{:#?}, project ---->>>", project);
+        println!("{:#?}, CreateArgs ---->>>", self);
         let mut output = if self.json || self.opts.silent {
             // Suppress compile stdout messages when printing json output or when silent
             compile::suppress_compile(&project)

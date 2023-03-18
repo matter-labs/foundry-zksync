@@ -1,16 +1,13 @@
 use ethers::abi::{encode, Token};
 use ethers::types::NameOrAddress;
 use sha2::Digest;
-use std::env;
 use std::io::Result;
 use zksync;
 use zksync::types::H256;
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{signer, wallet};
-use zksync_config;
 use zksync_types::zk_evm::sha3::Keccak256;
-use zksync_utils::{get_env, parse_env};
 
 pub async fn send_zksync(
     to: &Option<NameOrAddress>,
