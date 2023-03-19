@@ -173,6 +173,11 @@ impl TestArgs {
             .with_test_options(test_options)
             .build(project.paths.root, output, env, evm_opts)?;
 
+        // println!("{:#?}, <-------> runner", runner.contracts);
+        // let (_contract, _bytes, _bytes_v) = runner.contracts.clone().into_iter().nth(0).unwrap().1;
+        // println!("{:#?}, <-------> _contract", _contract);
+        // println!("{:#?}, <-------> _bytes", _bytes);
+
         if self.debug.is_some() {
             filter.args_mut().test_pattern = self.debug;
 

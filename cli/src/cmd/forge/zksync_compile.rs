@@ -105,12 +105,25 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
     //     "--standard-json",
     // ]);
 
+    // project.solc = Solc::new(zksolc_path).args([
+    //     "--combined-json",
+    //     "abi,bin,hashes",
+    //     "--output-dir",
+    //     build_path,
+    //     "--overwrite",
+    // ]);
+
     // println!("{:#?} project solc", project.solc);
     // println!("{:#?} project.solc_config", project.solc_config);
 
     // let zk_compiler = ProjectCompiler::new(true, true);
-    // let compile_out = zk_compiler.compile(&project);
-    // println!("{:#?} compile_out", compile_out);
+    // let compile_out = zk_compiler.compile(&project).unwrap();
+    // // println!("{:#?} compile_out", compile_out);
+    // let mut artifacts = compile_out.artifacts();
+    // let compile_artifacts = artifacts.for_each(|(x, y)| println!("{:#?}/{:#?} _name", x, y.id));
+    // let (_name, compile_artifacts) = artifacts.nth(26).unwrap();
+    // println!("{:#?} _name", _name);
+    // println!("{:#?} compile_artifacts", compile_artifacts);
 
     // let mut standard_json = project.standard_json_input(contract_full_path).unwrap();
     // println!("{:#?} standard_json", standard_json.settings);
@@ -135,6 +148,7 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
     //     // println!("{:#?} abi", abi);
     //     println!("CONTRACT: {:#?}", name);
     //     // println!("ARTIFACT: {:#?}, artifact", artifact);
+    //     let a = artifact.
 
     //     let path = &format!("{}/{}.json", zk_abi_path, name);
     //     let path = Path::new(path);
