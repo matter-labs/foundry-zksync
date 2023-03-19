@@ -86,23 +86,20 @@ pub struct CreateArgs {
     #[clap(flatten)]
     retry: RetryArgs,
 
-    #[clap(help_heading = "Compiler options", long, help = "Deploy with ZkSync.")]
-    pub zksync: bool,
-    // #[clap(subcommand)]
-    // command: Option<CreateSubcommands>,
+    // #[clap(help_heading = "Compiler options", long, help = "Deploy with ZkSync.")]
+    // pub zksync: bool,
+    #[clap(subcommand)]
+    command: Option<CreateSubcommands>,
 }
 
-// #[derive(Debug, Parser, Clone)]
-// pub enum CreateSubcommands {
-//     #[clap(name = "--zksync", about = "Deploy to zkSync")]
-//     ZkSync {
-//         #[clap(
-//             help = "Contract path from project root. ex: 'src/Contract.sol:Contract'",
-//             value_name = "CONTRACT-PATH:CONTRACT-NAME"
-//         )]
-//         contract_path: String,
-//     },
-// }
+#[derive(Debug, Parser, Clone)]
+pub enum CreateSubcommands {
+    #[clap(name = "--zksync", about = "Deploy to ZkSync with Chain Id")]
+    ZkSync {
+        #[clap(help = "Chain id testnet: 280, local: 270", value_name = "CHAIN-ID")]
+        chain_id: u16,
+    },
+}
 
 impl CreateArgs {
     /// Executes the command to create a contract
@@ -147,7 +144,7 @@ impl CreateArgs {
         // Add arguments to constructor
         let config = self.eth.try_load_config_emit_warnings()?;
 
-        // println!("{:#?}, config ---->>>", config);
+        println!("{:#?}, config ---->>>", config);
         let provider = Arc::new(try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?);
         let params = match abi.constructor {
             Some(ref v) => {
@@ -162,36 +159,41 @@ impl CreateArgs {
             None => vec![],
         };
 
-        // println!("{:#?}, self.zksync ---->>>", self.zksync);
-        if self.zksync {
-            let _deployed = zksync_deploy::deploy_zksync(
-                &config,
-                &project,
-                params.clone(),
-                self.contract.clone(),
-                abi.clone(),
-                ctx_path.unwrap(),
-            )
-            .await?;
-        };
+        let pk = self.clone().eth.wallet.private_key.unwrap();
 
-        // if let Some(t) = &self.command {
-        //     println!("{:#?}, <------> t", t);
-        //     match t {
-        //         CreateSubcommands::ZkSync { contract_path } => {
-        //             zksync_deploy::deploy_zksync(
-        //                 &config,
-        //                 &project,
-        //                 params.clone(),
-        //                 self.contract.clone(),
-        //                 abi.clone(),
-        //             )
-        //             .await?;
-        //             return Ok(());
-        //         }
-        //         _ => (),
-        //     }
-        // }
+        // println!("{:#?}, self.zksync ---->>>", self.zksync);
+        // if self.zksync {
+        //     let _deployed = zksync_deploy::deploy_zksync(
+        //         &config,
+        //         &project,
+        //         params.clone(),
+        //         self.contract.clone(),
+        //         pk,
+        //         ctx_path.unwrap(),
+        //     )
+        //     .await?;
+        // };
+
+        if let Some(t) = &self.command {
+            println!("{:#?}, <------> t", t);
+            match t {
+                CreateSubcommands::ZkSync { chain_id } => {
+                    zksync_deploy::deploy_zksync(
+                        &config,
+                        &project,
+                        params.clone(),
+                        self.contract.clone(),
+                        pk,
+                        self.eth.rpc_url.unwrap(),
+                        ctx_path.unwrap(),
+                        *chain_id,
+                    )
+                    .await?;
+                    return Ok(());
+                }
+                _ => (),
+            }
+        }
 
         if self.unlocked {
             let sender = self.eth.wallet.from.expect("is required");

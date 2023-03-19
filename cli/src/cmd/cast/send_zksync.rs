@@ -32,7 +32,7 @@ pub async fn send_zksync(
     let eth_signer = PrivateKeySigner::new(private_key);
     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
         .expect("Can't get an address from the private key");
-    let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(280));
+    let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(270));
     println!("{:#?}, _signer ---->>>", _signer);
 
     //SUCCESSFULLY DEPLOYED AND MANUALLY VERIFIED GREETER CONTRACT TO ZKSYNC

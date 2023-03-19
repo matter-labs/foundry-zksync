@@ -31,6 +31,7 @@ use std::{collections::BTreeMap, path::PathBuf, sync::mpsc::channel, thread, tim
 use tracing::trace;
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
+use zksync_types::zk_evm;
 mod filter;
 use crate::cmd::forge::test::filter::ProjectPathsAwareFilter;
 pub use filter::FilterArgs;
@@ -173,7 +174,7 @@ impl TestArgs {
             .with_test_options(test_options)
             .build(project.paths.root, output, env, evm_opts)?;
 
-        // println!("{:#?}, <-------> runner", runner.contracts);
+        println!("{:#?}, <-------> runner fork", runner.fork);
         // let (_contract, _bytes, _bytes_v) = runner.contracts.clone().into_iter().nth(0).unwrap().1;
         // println!("{:#?}, <-------> _contract", _contract);
         // println!("{:#?}, <-------> _bytes", _bytes);
