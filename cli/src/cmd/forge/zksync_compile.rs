@@ -91,7 +91,7 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
     // println!("{:#?} project.solc_config", project.solc_config);
     // println!("{:#?} output_selection", solc_config.settings);
 
-    let mut standard_json = project.standard_json_input(contract_full_path).unwrap();
+    let standard_json = project.standard_json_input(contract_full_path).unwrap();
     println!("{:#?} standard_json", standard_json);
 
     // compile project
