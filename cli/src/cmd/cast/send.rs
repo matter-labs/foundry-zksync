@@ -69,9 +69,11 @@ pub enum SendTxSubcommands {
     },
     #[clap(name = "--zksync", about = "send to zksync contract")]
     ZkSync,
-    #[clap(name = "--zksync-transfer", about = "Use for zksync L1 / L2 transfers")]
-    ZkSyncTransfer {
-        #[clap(help = "Address doing transfer.", value_name = "TO")]
+    #[clap(name = "--zksync-deposit", about = "Use for zksync L1 / L2 deposits")]
+    ZkSyncDeposit {
+        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
+        chain_id: u16,
+        #[clap(help = "Deposit TO Address.", value_name = "TO")]
         to: String,
         #[clap(help = "Transfer amount.", value_name = "AMOUNT")]
         amount: i32,
@@ -80,7 +82,9 @@ pub enum SendTxSubcommands {
     },
     #[clap(name = "--zksync-withdraw", about = "Use for zksync L2 / L1 withdrawals")]
     ZkSyncWithdraw {
-        #[clap(help = "Address doing withdraw.", value_name = "TO")]
+        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
+        chain_id: u16,
+        #[clap(help = "Withdraw TO Address.", value_name = "TO")]
         to: String,
         #[clap(help = "Withdraw amount.", value_name = "AMOUNT")]
         amount: i32,
@@ -106,25 +110,27 @@ impl SendTxArgs {
                     .await?;
                     return Ok(());
                 }
-                SendTxSubcommands::ZkSyncTransfer { to, amount, token } => {
+                SendTxSubcommands::ZkSyncDeposit { to, amount, token, chain_id } => {
                     transfer_zksync::transfer_zksync(
                         to,
                         amount,
                         token,
                         &self.eth.rpc_url,
                         &self.eth.wallet.private_key,
+                        chain_id.clone(),
                         false,
                     )
                     .await?;
                     return Ok(());
                 }
-                SendTxSubcommands::ZkSyncWithdraw { to, amount, token } => {
+                SendTxSubcommands::ZkSyncWithdraw { to, amount, token, chain_id } => {
                     transfer_zksync::transfer_zksync(
                         to,
                         amount,
                         token,
                         &self.eth.rpc_url,
                         &self.eth.wallet.private_key,
+                        chain_id.clone(),
                         true,
                     )
                     .await?;

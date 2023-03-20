@@ -8,7 +8,11 @@ use crate::{
 };
 use cast::fuzz::CounterExample;
 use clap::Parser;
-use ethers::{solc::utils::RuntimeOrHandle, types::U256};
+use ethers::{
+    abi::Abi,
+    solc::{utils::RuntimeOrHandle, ArtifactId},
+    types::U256,
+};
 use forge::{
     decode::decode_console_logs,
     executor::inspector::CheatsConfig,
@@ -23,11 +27,11 @@ use forge::{
 use foundry_common::{
     compile::{self, ProjectCompiler},
     evm::EvmArgs,
-    get_contract_name, get_file_name,
+    get_contract_name, get_file_name, ContractsByArtifact,
 };
 use foundry_config::{figment, Config};
 use regex::Regex;
-use std::{collections::BTreeMap, path::PathBuf, sync::mpsc::channel, thread, time::Duration};
+use std::{collections::BTreeMap, fs, path::PathBuf, sync::mpsc::channel, thread, time::Duration};
 use tracing::trace;
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
@@ -40,6 +44,8 @@ use foundry_config::figment::{
     value::{Dict, Map},
     Metadata, Profile, Provider,
 };
+
+use ethers::types::Bytes;
 
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
@@ -178,6 +184,8 @@ impl TestArgs {
         // let (_contract, _bytes, _bytes_v) = runner.contracts.clone().into_iter().nth(0).unwrap().1;
         // println!("{:#?}, <-------> _contract", _contract);
         // println!("{:#?}, <-------> _bytes", _bytes);
+
+        // zk_evm::
 
         if self.debug.is_some() {
             filter.args_mut().test_pattern = self.debug;
@@ -484,6 +492,31 @@ fn test(
     test_options: TestOptions,
     gas_reporting: bool,
 ) -> eyre::Result<TestOutcome> {
+    let project = config.project().unwrap();
+
+    //get bytecode
+    let contract_path = "src/Greeter.sol:Greeter";
+    let output_path: &str =
+        &format!("{}/zksolc/{}/combined.json", project.paths.artifacts.display(), "Greeter.sol");
+    let data = fs::read_to_string(output_path).expect("Unable to read file");
+    //convert to json Value
+    let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
+    let bytecode: Bytes =
+        serde_json::from_value(res["contracts"][&contract_path]["bin"].clone()).unwrap();
+    let bytecode_v = bytecode.to_vec();
+    //get abi
+    let abi: Abi = serde_json::from_value(res["contracts"][&contract_path]["abi"].clone()).unwrap();
+    let a = runner.known_contracts.clone().0.into_iter();
+    for (art, ctx) in a {
+        if &art.name == "Greeter" {
+            // println!(
+            //     "{:#?}, before contracts",
+            //     runner.known_contracts.0.get_key_value(&art).unwrap().1
+            // );
+            runner.known_contracts.0.insert(art, (abi.clone(), bytecode_v.clone()));
+        }
+    }
+
     trace!(target: "forge::test", "running all tests");
     if runner.count_filtered_tests(&filter) == 0 {
         let filter_str = filter.to_string();
@@ -513,6 +546,8 @@ fn test(
         // Set up identifiers
         let mut local_identifier = LocalTraceIdentifier::new(&runner.known_contracts);
         let remote_chain_id = runner.evm_opts.get_remote_chain_id();
+        // let env = runner.evm_opts.env.chain_id;
+        // println!("{:#?}, env", env);
         // Do not re-query etherscan for contracts that you've already queried today.
         let mut etherscan_identifier = EtherscanIdentifier::new(&config, remote_chain_id)?;
 
@@ -528,7 +563,12 @@ fn test(
             SignaturesIdentifier::new(Config::foundry_cache_dir(), config.offline)?;
 
         for (contract_name, suite_result) in rx {
+            println!("{:#?}, contract_name", contract_name);
+            // println!("{:#?}, suite_result", suite_result);
             let mut tests = suite_result.test_results.clone();
+            // println!("{:#?}, tests", tests);
+
+            println!("{:#?}, remote_chain_id", remote_chain_id);
             println!();
             for warning in suite_result.warnings.iter() {
                 eprintln!("{} {warning}", Paint::yellow("Warning:").bold());

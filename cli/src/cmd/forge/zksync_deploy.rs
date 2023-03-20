@@ -35,13 +35,18 @@ pub async fn deploy_zksync(
     let splits = filename.clone().count();
     let file = filename.nth(splits - 1).unwrap().split(":").nth(0).unwrap();
 
-    //get bytecode
+    //get combined json output
     let output_path: &str =
         &format!("{}/zksolc/{}/combined.json", project.paths.artifacts.display(), file);
     let data = fs::read_to_string(output_path).expect("Unable to read file");
     //convert to json Value
     let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
 
+    let mut _contracts = res["contracts"].clone();
+    let iter = _contracts.as_object().into_iter();
+    let z = iter.len();
+    println!("{:#?}, _contracts ---->>>", _contracts.as_object().into_iter());
+    println!("{:#?}, size ---->>>", z);
     let bytecode: Bytes =
         serde_json::from_value(res["contracts"][&contract_path]["bin"].clone()).unwrap();
     let bytecode_v = bytecode.to_vec();

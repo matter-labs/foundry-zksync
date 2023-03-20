@@ -4,6 +4,7 @@ use serde_json;
 use std::fs::set_permissions;
 use std::os::unix::prelude::PermissionsExt;
 use std::str::FromStr;
+use std::time::Duration;
 
 pub fn load_contract(raw_abi_string: &str) -> ethabi::Contract {
     let abi_string = serde_json::Value::from_str(raw_abi_string)
@@ -20,6 +21,7 @@ pub fn download_zksolc_compiler(zksolc_path: &String, zkout_path: &String) {
     let mut builder = Downloader::builder();
     //assign download folder
     builder.download_folder(std::path::Path::new(zkout_path));
+    builder.connect_timeout(Duration::from_secs(240));
     //build downloader
     let mut d_loader = builder.build().unwrap();
 
@@ -30,7 +32,12 @@ pub fn download_zksolc_compiler(zksolc_path: &String, zkout_path: &String) {
         Err(error) => panic!("problem d_load: {:#?}", error),
     };
 
-    let perm = set_permissions(std::path::Path::new(zksolc_path), PermissionsExt::from_mode(0o755));
+    set_zksolc_permissions(zksolc_path);
+}
+
+pub fn set_zksolc_permissions(zksolc_path: &String) {
+    let perm =
+        set_permissions(std::path::Path::new(&zksolc_path), PermissionsExt::from_mode(0o755));
     match perm {
         Ok(success) => println!("{:#?}, set permissions success", success),
         Err(error) => panic!("problem setting permissions: {:#?}", error),

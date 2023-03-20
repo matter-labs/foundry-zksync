@@ -27,7 +27,6 @@ pub async fn send_zksync(
         pk = val;
     }
 
-    // let pk = "d5b54c3da4bd2722bb9dd3df5aa86e71b8db43560be88b1a271feb4df3268b54";
     let private_key = H256::from_slice(&decode_hex(pk).unwrap());
     let eth_signer = PrivateKeySigner::new(private_key);
     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
@@ -49,8 +48,8 @@ pub async fn send_zksync(
     }
 
     let mut signed = [0u8; 4];
-    let digest = &Keccak256::digest(function_signature)[..signed.len()];
-    signed.copy_from_slice(digest);
+    let hashed_sig = &Keccak256::digest(function_signature)[..signed.len()];
+    signed.copy_from_slice(hashed_sig);
 
     let encoded = encode(&arg_tokens);
     let encoded_function_call: Vec<u8> = signed.into_iter().chain(encoded.into_iter()).collect();

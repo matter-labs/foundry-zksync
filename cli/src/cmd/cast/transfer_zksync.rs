@@ -12,6 +12,7 @@ pub async fn transfer_zksync(
     token: &Option<String>,
     rpc: &Option<String>,
     p_key: &Option<String>,
+    chain_id: u16,
     withdraw: bool,
 ) -> Result<()> {
     //rpc url
@@ -30,7 +31,7 @@ pub async fn transfer_zksync(
     let eth_signer = PrivateKeySigner::new(private_key);
     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
         .expect("Can't get an address from the private key");
-    let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(280));
+    let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(chain_id));
     println!("{:#?}, _signer ---->>>", _signer);
 
     let wallet = wallet::Wallet::with_http_client(rpc_str, _signer);
