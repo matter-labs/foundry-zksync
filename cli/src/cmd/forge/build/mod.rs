@@ -91,7 +91,7 @@ pub struct BuildArgs {
 
 #[derive(Debug, Parser, Clone, Serialize)]
 pub enum BuildSubcommands {
-    #[clap(name = "--zksync", about = "Compile with zksolc - zkSync")]
+    #[clap(name = "--zksync", about = "Compile for zkSync")]
     ZkSync {
         #[clap(
             help = "Contract filename from project src/ ex: 'Contract.sol'",
@@ -116,25 +116,8 @@ impl Cmd for BuildArgs {
             project = config.project()?;
         }
 
-        println!("{:#?}, BuildArgs ---->>>", self);
-
-        // if self.zksync {
-        //     let compile_result = zksync_compile::compile_zksync(&config);
-        //     // match &compile_result {
-        //     //     // Ok(project_compile_output) => println!("{:#?}, error", project_compile_output),
-        //     //     Ok(project_compile_output) => {
-        //     //         println!("suuuccceeeesss");
-        //     //         // return compile_result;
-        //     //     }
-        //     //     Err(report) => panic!("{:#?}, compile error", report),
-        //     // }
-        // } else {
-        //     println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
-        //     println!("Morty, Morty, Morty, Morty, Morty, Morty, Morty, Morty, ");
-        // }
-
+        // ZkSync
         if let Some(t) = &self.command {
-            println!("{:#?}, <------> t", t);
             match t {
                 BuildSubcommands::ZkSync { contract_path } => {
                     zksync_compile::compile_zksync(&config, contract_path);
