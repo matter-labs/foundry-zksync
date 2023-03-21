@@ -20,22 +20,23 @@ pub fn download_zksolc_compiler(zksolc_path: &String, zkout_path: &String) {
     //get downloader builder
     let mut builder = Downloader::builder();
     //assign download folder
-    builder.download_folder(std::path::Path::new(zkout_path));
-    builder.connect_timeout(Duration::from_secs(240));
+    builder
+        .download_folder(std::path::Path::new(zkout_path))
+        .connect_timeout(Duration::from_secs(240));
     //build downloader
     let mut d_loader = builder.build().unwrap();
 
     //download compiler
     let d_load = d_loader.download(&[download]);
     match d_load {
-        Ok(success) => println!("{:#?},  d_load success", success),
-        Err(error) => panic!("problem d_load: {:#?}", error),
+        Ok(success) => println!("{:#?},  compiler download success", success),
+        Err(error) => panic!("problem downloading compiler: {:#?}", error),
     };
 
     set_zksolc_permissions(zksolc_path);
 }
 
-pub fn set_zksolc_permissions(zksolc_path: &String) {
+fn set_zksolc_permissions(zksolc_path: &String) {
     let perm =
         set_permissions(std::path::Path::new(&zksolc_path), PermissionsExt::from_mode(0o755));
     match perm {

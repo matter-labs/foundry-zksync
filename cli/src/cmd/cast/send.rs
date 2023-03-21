@@ -68,7 +68,10 @@ pub enum SendTxSubcommands {
         args: Vec<String>,
     },
     #[clap(name = "--zksync", about = "send to zksync contract")]
-    ZkSync,
+    ZkSync {
+        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
+        chain_id: u16,
+    },
     #[clap(name = "--zksync-deposit", about = "Use for zksync L1 / L2 deposits")]
     ZkSyncDeposit {
         #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
@@ -99,12 +102,13 @@ impl SendTxArgs {
         if let Some(t) = &self.command {
             println!("{:#?}, <------> t", t);
             match t {
-                SendTxSubcommands::ZkSync => {
+                SendTxSubcommands::ZkSync { chain_id } => {
                     send_zksync::send_zksync(
                         &self.to,
                         &self.args,
                         &self.sig,
                         &self.eth.rpc_url,
+                        chain_id,
                         &self.eth.wallet.private_key,
                     )
                     .await?;

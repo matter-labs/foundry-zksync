@@ -94,7 +94,7 @@ pub struct CreateArgs {
 
 #[derive(Debug, Parser, Clone)]
 pub enum CreateSubcommands {
-    #[clap(name = "--zksync", about = "Deploy to ZkSync with Chain Id")]
+    #[clap(name = "--zksync", about = "Deploy to ZkSync with Chain Id. Ex. --zksync 280")]
     ZkSync {
         #[clap(help = "Chain id testnet: 280, local: 270", value_name = "CHAIN-ID")]
         chain_id: u16,
@@ -109,7 +109,7 @@ impl CreateArgs {
 
         // Compile Project
         // println!("{:#?}, project ---->>>", project);
-        println!("{:#?}, CreateArgs ---->>>", self);
+        // println!("{:#?}, CreateArgs ---->>>", self);
         let mut output = if self.json || self.opts.silent {
             // Suppress compile stdout messages when printing json output or when silent
             compile::suppress_compile(&project)
@@ -144,7 +144,7 @@ impl CreateArgs {
         // Add arguments to constructor
         let config = self.eth.try_load_config_emit_warnings()?;
 
-        println!("{:#?}, config ---->>>", config);
+        // println!("{:#?}, config ---->>>", config);
         let provider = Arc::new(try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?);
         let params = match abi.constructor {
             Some(ref v) => {
@@ -161,21 +161,8 @@ impl CreateArgs {
 
         let pk = self.clone().eth.wallet.private_key.unwrap();
 
-        // println!("{:#?}, self.zksync ---->>>", self.zksync);
-        // if self.zksync {
-        //     let _deployed = zksync_deploy::deploy_zksync(
-        //         &config,
-        //         &project,
-        //         params.clone(),
-        //         self.contract.clone(),
-        //         pk,
-        //         ctx_path.unwrap(),
-        //     )
-        //     .await?;
-        // };
-
         if let Some(t) = &self.command {
-            println!("{:#?}, <------> t", t);
+            // println!("{:#?}, <------> CreateSubcommands", t);
             match t {
                 CreateSubcommands::ZkSync { chain_id } => {
                     zksync_deploy::deploy_zksync(

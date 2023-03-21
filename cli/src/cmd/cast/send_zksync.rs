@@ -13,14 +13,36 @@ pub async fn send_zksync(
     to: &Option<NameOrAddress>,
     args: &Vec<String>,
     sig: &Option<String>,
-    rpc: &Option<String>,
+    _rpc: &Option<String>,
+    chain_id: &u16,
     p_key: &Option<String>,
 ) -> Result<()> {
-    //rpc url
-    let mut rpc_str: &str = "";
-    if let Some(val) = rpc {
-        rpc_str = val;
+    // //rpc url
+    let rpc_str;
+    //in case we want to set rpc-url from cmd line
+    // if let Some(val) = rpc {
+    //     rpc_str = val;
+    // }
+
+    //chain id
+    let chain;
+    match chain_id {
+        270 => {
+            chain = 270;
+            rpc_str = "http://localhost:3050";
+        }
+        280 => {
+            chain = 280;
+            rpc_str = "https://zksync2-testnet.zksync.dev:443";
+        }
+        _ => {
+            chain = 0;
+            rpc_str = "";
+        }
     }
+    // if let Some(val) = chain_id {
+    //     chain = val;
+    // }
     //private key
     let mut pk: &str = "";
     if let Some(val) = p_key {
@@ -31,7 +53,7 @@ pub async fn send_zksync(
     let eth_signer = PrivateKeySigner::new(private_key);
     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
         .expect("Can't get an address from the private key");
-    let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(270));
+    let _signer = signer::Signer::new(eth_signer, signer_addy, L2ChainId(chain));
     println!("{:#?}, _signer ---->>>", _signer);
 
     //SUCCESSFULLY DEPLOYED AND MANUALLY VERIFIED GREETER CONTRACT TO ZKSYNC
