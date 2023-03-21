@@ -13,19 +13,15 @@ pub async fn send_zksync(
     to: &Option<NameOrAddress>,
     args: &Vec<String>,
     sig: &Option<String>,
-    _rpc: &Option<String>,
+    rpc: &Option<String>,
     chain_id: &u16,
     p_key: &Option<String>,
 ) -> Result<()> {
     // //rpc url
-    let rpc_str;
-    //in case we want to set rpc-url from cmd line
-    // if let Some(val) = rpc {
-    //     rpc_str = val;
-    // }
+    let mut rpc_str = "";
+    let mut chain = 0;
 
     //chain id
-    let chain;
     match chain_id {
         270 => {
             chain = 270;
@@ -35,14 +31,14 @@ pub async fn send_zksync(
             chain = 280;
             rpc_str = "https://zksync2-testnet.zksync.dev:443";
         }
-        _ => {
-            chain = 0;
-            rpc_str = "";
-        }
+        _ => {}
     }
-    // if let Some(val) = chain_id {
-    //     chain = val;
-    // }
+
+    //in case we want to override rpc-url from cmd line
+    if let Some(val) = rpc {
+        rpc_str = val;
+    }
+
     //private key
     let mut pk: &str = "";
     if let Some(val) = p_key {
