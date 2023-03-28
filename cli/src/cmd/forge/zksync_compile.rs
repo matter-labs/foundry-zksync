@@ -31,10 +31,6 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
     let graph = Graph::resolve_sources(&project.paths, project.sources().expect("REASON")).unwrap();
     let (versions, edges) = graph.into_sources_by_version(project.offline).unwrap();
 
-    let solc_version = versions.get(&project).unwrap();
-    let solc_v_path = Some(&solc_version.first_key_value().unwrap().0.solc);
-    println!("{:#?}, solc_v", solc_v_path);
-
     let mut file_output_selection: FileOutputSelection = BTreeMap::default();
     file_output_selection
         .insert("*".to_string(), vec!["abi".to_string(), "evm.methodIdentifiers".to_string()]);
@@ -61,7 +57,11 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
     std::fs::write(path, serde_json::to_string_pretty(&stdjson).unwrap()).unwrap();
 
     //detect solc
+    let solc_version = versions.get(&project).unwrap();
+    let solc_v_path = Some(&solc_version.first_key_value().unwrap().0.solc);
+    println!("{:#?}, solc_v", solc_v_path);
 
+    //build output paths
     let path = &format!("{}/{}", build_path, "artifacts.json");
     let path = Path::new(path);
     let display = path.display();
@@ -87,7 +87,7 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
         let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
         serde_json::to_writer(stdin, &standard_json).unwrap();
         let output = child.unwrap().wait_with_output();
-        // println!("{:#?}, output", output);
+
         file.write_all(&output.unwrap().stdout).unwrap();
     } else {
         // compile project

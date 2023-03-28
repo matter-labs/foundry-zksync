@@ -98,6 +98,8 @@ pub enum BuildSubcommands {
             value_name = "CONTRACT FILENAME"
         )]
         contract_path: String,
+        #[clap(help = "isSystem flag ", value_name = "IS_SYSTEM", long = "isSystem")]
+        is_system: bool,
     },
 }
 
@@ -119,7 +121,7 @@ impl Cmd for BuildArgs {
         // ZkSync
         if let Some(t) = &self.command {
             match t {
-                BuildSubcommands::ZkSync { contract_path } => {
+                BuildSubcommands::ZkSync { contract_path, is_system } => {
                     zksync_compile::compile_zksync(&config, contract_path);
                 }
             }

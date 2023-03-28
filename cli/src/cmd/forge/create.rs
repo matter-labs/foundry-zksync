@@ -159,7 +159,10 @@ impl CreateArgs {
             None => vec![],
         };
 
-        let pk = self.clone().eth.wallet.private_key.unwrap();
+        let pk = self.clone().eth.wallet.private_key;
+        if let None = pk {
+            panic!("Please provide Private Key with --private-key flag")
+        }
 
         if let Some(t) = &self.command {
             // println!("{:#?}, <------> CreateSubcommands", t);
@@ -170,7 +173,7 @@ impl CreateArgs {
                         &project,
                         params.clone(),
                         self.contract.clone(),
-                        pk,
+                        pk.unwrap(),
                         self.eth.rpc_url.unwrap(),
                         ctx_path.unwrap(),
                         *chain_id,
