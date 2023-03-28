@@ -1,5 +1,6 @@
 use super::utils_zksync;
 use ethers::solc::artifacts::output_selection::FileOutputSelection;
+use ethers::solc::Graph;
 use foundry_config::Config;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -27,6 +28,13 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
         utils_zksync::download_zksolc_compiler(zksolc_path, zkout_path);
     }
 
+    let graph = Graph::resolve_sources(&project.paths, project.sources().expect("REASON")).unwrap();
+    let (versions, edges) = graph.into_sources_by_version(project.offline).unwrap();
+
+    let solc_version = versions.get(&project).unwrap();
+    let solc_v_path = Some(&solc_version.first_key_value().unwrap().0.solc);
+    println!("{:#?}, solc_v", solc_v_path);
+
     let mut file_output_selection: FileOutputSelection = BTreeMap::default();
     file_output_selection
         .insert("*".to_string(), vec!["abi".to_string(), "evm.methodIdentifiers".to_string()]);
@@ -52,18 +60,7 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
     };
     std::fs::write(path, serde_json::to_string_pretty(&stdjson).unwrap()).unwrap();
 
-    // compile project
-    let mut cmd = Command::new(zksolc_path);
-    let mut child = cmd
-        .args([contract_full_path, "--standard-json"])
-        .stdin(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn();
-    let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
-    serde_json::to_writer(stdin, &standard_json).unwrap();
-    let output = child.unwrap().wait_with_output();
-    // println!("{:#?}, output", output);
+    //detect solc
 
     let path = &format!("{}/{}", build_path, "artifacts.json");
     let path = Path::new(path);
@@ -73,7 +70,40 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
         Ok(file) => file,
     };
 
-    file.write_all(&output.unwrap().stdout).unwrap();
+    if let Some(path) = solc_v_path {
+        // compile project
+        let mut cmd = Command::new(zksolc_path);
+        let mut child = cmd
+            .args([
+                contract_full_path,
+                "--standard-json",
+                "--solc",
+                solc_v_path.unwrap().to_str().unwrap(),
+            ])
+            .stdin(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn();
+        let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+        serde_json::to_writer(stdin, &standard_json).unwrap();
+        let output = child.unwrap().wait_with_output();
+        // println!("{:#?}, output", output);
+        file.write_all(&output.unwrap().stdout).unwrap();
+    } else {
+        // compile project
+        let mut cmd = Command::new(zksolc_path);
+        let mut child = cmd
+            .args([contract_full_path, "--standard-json"])
+            .stdin(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn();
+        let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+        serde_json::to_writer(stdin, &standard_json).unwrap();
+        let output = child.unwrap().wait_with_output();
+        // println!("{:#?}, output", output);
+        file.write_all(&output.unwrap().stdout).unwrap();
+    }
 
     // println!("{:#?} output", &output);
     // ----------------------------------------------//
