@@ -8,7 +8,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-pub fn compile_zksync(config: &Config, contract_path: &String) {
+pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool) {
     let mut project = config.project().unwrap();
     project.auto_detect = false;
     let contract_full_path = &format!("{}/{}", project.paths.sources.display(), contract_path);
@@ -28,9 +28,7 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
         utils_zksync::download_zksolc_compiler(zksolc_path, zkout_path);
     }
 
-    let graph = Graph::resolve_sources(&project.paths, project.sources().expect("REASON")).unwrap();
-    let (versions, edges) = graph.into_sources_by_version(project.offline).unwrap();
-
+    // Get output selection
     let mut file_output_selection: FileOutputSelection = BTreeMap::default();
     file_output_selection
         .insert("*".to_string(), vec!["abi".to_string(), "evm.methodIdentifiers".to_string()]);
@@ -44,7 +42,7 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
         .insert("*".to_string(), file_output_selection.clone());
 
     let standard_json = project.standard_json_input(contract_full_path).unwrap();
-    println!("{:#?} standard_json", standard_json);
+    // println!("{:#?} standard_json", standard_json);
 
     // Save the JSON input to build folder.
     let stdjson = serde_json::to_value(&standard_json).unwrap();
@@ -57,6 +55,8 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
     std::fs::write(path, serde_json::to_string_pretty(&stdjson).unwrap()).unwrap();
 
     //detect solc
+    let graph = Graph::resolve_sources(&project.paths, project.sources().expect("REASON")).unwrap();
+    let (versions, _edges) = graph.into_sources_by_version(project.offline).unwrap();
     let solc_version = versions.get(&project).unwrap();
     let solc_v_path = Some(&solc_version.first_key_value().unwrap().0.solc);
     println!("{:#?}, solc_v", solc_v_path);
@@ -70,40 +70,32 @@ pub fn compile_zksync(config: &Config, contract_path: &String) {
         Ok(file) => file,
     };
 
-    if let Some(path) = solc_v_path {
-        // compile project
-        let mut cmd = Command::new(zksolc_path);
-        let mut child = cmd
-            .args([
-                contract_full_path,
-                "--standard-json",
-                "--solc",
-                solc_v_path.unwrap().to_str().unwrap(),
-            ])
-            .stdin(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
-        let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
-        serde_json::to_writer(stdin, &standard_json).unwrap();
-        let output = child.unwrap().wait_with_output();
+    //build args
+    let mut comp_args = vec![contract_full_path.clone(), "--standard-json".to_string()];
 
-        file.write_all(&output.unwrap().stdout).unwrap();
-    } else {
-        // compile project
-        let mut cmd = Command::new(zksolc_path);
-        let mut child = cmd
-            .args([contract_full_path, "--standard-json"])
-            .stdin(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
-        let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
-        serde_json::to_writer(stdin, &standard_json).unwrap();
-        let output = child.unwrap().wait_with_output();
-        // println!("{:#?}, output", output);
-        file.write_all(&output.unwrap().stdout).unwrap();
+    if let Some(path) = solc_v_path {
+        comp_args.push("--solc".to_string());
+        comp_args.push(solc_v_path.unwrap().to_str().unwrap().to_string());
     }
+
+    //TODO: also check --use build command for changing solc version
+
+    if is_system {
+        comp_args.push("--system-mode".to_string());
+    }
+
+    let mut cmd = Command::new(zksolc_path);
+    let mut child = cmd
+        .args(comp_args)
+        .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn();
+    let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+    serde_json::to_writer(stdin, &standard_json).unwrap();
+    let output = child.unwrap().wait_with_output();
+
+    file.write_all(&output.unwrap().stdout).unwrap();
 
     // println!("{:#?} output", &output);
     // ----------------------------------------------//
