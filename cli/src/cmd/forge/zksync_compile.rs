@@ -9,6 +9,11 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool) {
+    // let zk_account = utils_zksync::get_test_account();
+    // println!("{:#?}, zk_account", zk_account);
+
+    // utils_zksync::check_testing();
+
     let mut project = config.project().unwrap();
     project.auto_detect = false;
     let contract_full_path = &format!("{}/{}", project.paths.sources.display(), contract_path);

@@ -5,6 +5,17 @@ use std::fs::set_permissions;
 use std::os::unix::prelude::PermissionsExt;
 use std::str::FromStr;
 use std::time::Duration;
+use tempfile::TempDir;
+use vm::vm_with_bootloader::BlockContext;
+use zksync::utils;
+use zksync_storage::db;
+use zksync_types::{FAIR_L2_GAS_PRICE, H160};
+
+use zksync_core::api_server::execution_sandbox;
+use zksync_state::secondary_storage;
+use zksync_test_account::ZkSyncAccount;
+
+use zk_evm;
 
 pub fn load_contract(raw_abi_string: &str) -> ethabi::Contract {
     let abi_string = serde_json::Value::from_str(raw_abi_string)
@@ -43,4 +54,43 @@ fn set_zksolc_permissions(zksolc_path: &String) {
         Ok(success) => println!("{:#?}, set permissions success", success),
         Err(error) => panic!("problem setting permissions: {:#?}", error),
     };
+}
+
+pub fn get_test_account() -> ZkSyncAccount {
+    ZkSyncAccount::rand()
+}
+
+pub fn get_def_block_context() -> BlockContext {
+    BlockContext {
+        block_number: 1u32,
+        block_timestamp: 1000,
+        l1_gas_price: 50_000_000_000, // 50 gwei
+        fair_l2_gas_price: FAIR_L2_GAS_PRICE,
+        operator_address: H160::zero(),
+    }
+}
+
+pub fn check_testing() {
+    let context = get_def_block_context();
+    println!("{:#?}, context", context);
+
+    let temp_dir = TempDir::new().expect("failed get temporary directory for RocksDB");
+    let db = db::RocksDB::new(db::Database::StateKeeper, temp_dir.as_ref(), false);
+    println!("{:#?}, db", db);
+    // let mut raw_storage = secondary_storage::SecondaryStateStorage::new(db);
+    // println!("{:#?}, raw_storage", raw_storage);
+    // vm::utils::insert_system_contracts(&mut raw_storage);
+
+    let tools = zk_evm::testing::create_default_testing_tools();
+    // println!("{:#?}, tools.decommittment_processor", tools.decommittment_processor);
+    // println!("{:#?}, tools.event_sink", tools.event_sink);
+    // println!("{:#?}, tools.storage", tools.storage);
+    // println!("{:#?}, tools.memory", tools.memory);
+    // println!("{:#?}, tools.witness_tracer", tools.witness_tracer);
+    // println!("{:#?}, tools.precompiles_processor", tools.precompiles_processor);
+
+    // let exec = execution_sandbox::execute_tx_eth_call(
+    //     ConnectionPool::new(Some(50), true),
+
+    // );
 }

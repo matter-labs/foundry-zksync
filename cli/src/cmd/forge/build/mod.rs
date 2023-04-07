@@ -82,7 +82,7 @@ pub struct BuildArgs {
     #[serde(skip)]
     pub watch: WatchArgs,
 
-    // #[clap(help_heading = "Compiler options", long, help = "Compile with ZkSync.")]
+    // #[clap(help_heading = "ZkSync compiler options", long, help = "Compile with ZkSync.")]
     // #[serde(skip)]
     // pub zksync: bool,
     #[clap(subcommand)]
@@ -106,7 +106,7 @@ pub enum BuildSubcommands {
 impl Cmd for BuildArgs {
     type Output = ProjectCompileOutput;
     fn run(self) -> eyre::Result<Self::Output> {
-        println!("{:#?}", self);
+        // println!("{:#?}", self);
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
 

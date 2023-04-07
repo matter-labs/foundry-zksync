@@ -94,11 +94,18 @@ which = "4.2.5"
 # zksync_types = {git = "https://github.com/matter-labs/zksync-era.git"}
 # zksync_utils = {git = "https://github.com/matter-labs/zksync-era.git"}
 
+vm = {path = "../../zksync-era/core/lib/vm"}
 zksync = {path = "../../zksync-era/sdk/zksync-rs"}
 zksync_config = {path = "../../zksync-era/core/lib/config"}
 zksync_contracts = {path = "../../zksync-era/core/lib/contracts"}
+zksync_core = {path = "../../zksync-era/core/bin/zksync_core/"}
+zksync_state = {path = "../../zksync-era/core/lib/state"}
+zksync_storage = {path = "../../zksync-era/core/lib/storage"}
+zksync_test_account = {path = "../../zksync-era/core/tests/test_account"}
 zksync_types = {path = "../../zksync-era/core/lib/types"}
 zksync_utils = {path = "../../zksync-era/core/lib/utils"}
+
+zk_evm = {git = "https://github.com/matter-labs/era-zk_evm.git"}
 
 [dev-dependencies]
 anvil = {path = "../anvil"}
