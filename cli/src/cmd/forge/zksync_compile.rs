@@ -30,9 +30,7 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, 
 
     //check for compiler
     let zksolc_path = &format!("{}{}", zkout_path, compiler_filename);
-    let b = std::path::Path::new(zksolc_path).exists();
-
-    if !b {
+    if !std::path::Path::new(zksolc_path).exists() {
         utils_zksync::download_zksolc_compiler(zksolc_path, zkout_path, compiler_filename);
     }
 
