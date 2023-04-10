@@ -100,6 +100,12 @@ pub enum BuildSubcommands {
         contract_path: String,
         #[clap(help = "System mode flag ", value_name = "SYSTEM_MODE", long = "system-mode")]
         system_mode: bool,
+        #[clap(
+            help = "Sets the EVM legacy assembly pipeline forcibly",
+            value_name = "FORCE_EVMLA",
+            long = "force_evmla"
+        )]
+        force_evmla: bool,
     },
 }
 
@@ -121,8 +127,13 @@ impl Cmd for BuildArgs {
         // ZkSync
         if let Some(t) = &self.command {
             match t {
-                BuildSubcommands::ZkSync { contract_path, system_mode } => {
-                    zksync_compile::compile_zksync(&config, contract_path, *system_mode);
+                BuildSubcommands::ZkSync { contract_path, system_mode, force_evmla } => {
+                    zksync_compile::compile_zksync(
+                        &config,
+                        contract_path,
+                        *system_mode,
+                        *force_evmla,
+                    );
                 }
             }
         }

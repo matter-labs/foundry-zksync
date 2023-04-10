@@ -3,13 +3,12 @@ use ethers::solc::artifacts::output_selection::FileOutputSelection;
 use ethers::solc::Graph;
 use foundry_config::Config;
 use std::collections::BTreeMap;
-use std::env;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool) {
+pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, force_evmla: bool) {
     // let zk_account = utils_zksync::get_test_account();
     // println!("{:#?}, zk_account", zk_account);
 
