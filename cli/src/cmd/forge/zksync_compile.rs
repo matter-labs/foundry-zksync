@@ -3,6 +3,7 @@ use ethers::solc::artifacts::output_selection::FileOutputSelection;
 use ethers::solc::Graph;
 use foundry_config::Config;
 use std::collections::BTreeMap;
+use std::env;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
@@ -13,6 +14,9 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool) 
     // println!("{:#?}, zk_account", zk_account);
 
     // utils_zksync::check_testing();
+
+    let abc = env::current_dir().unwrap();
+    println!("{:#?}, current dir -->", abc);
 
     let mut project = config.project().unwrap();
     project.auto_detect = false;
