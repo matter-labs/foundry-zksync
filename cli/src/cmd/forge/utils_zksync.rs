@@ -1,6 +1,7 @@
 use downloader::{Download, Downloader};
 use ethers::abi::ethabi;
 use serde_json;
+use std::env;
 use std::fs::set_permissions;
 use std::os::unix::prelude::PermissionsExt;
 use std::str::FromStr;
@@ -24,6 +25,57 @@ pub fn load_contract(raw_abi_string: &str) -> ethabi::Contract {
         .expect("Malformed contract abi file")
         .to_string();
     ethabi::Contract::load(abi_string.as_bytes()).unwrap()
+}
+
+pub fn get_zksolc_filename() -> String {
+    //get compiler filename
+    let mut compiler_filename = String::from("/zksolc-");
+    let mut extension = String::new();
+    let mut toolchain = String::new();
+    let mut architecture = String::new();
+    let key = "OS";
+    match env::var(key) {
+        Ok(val) => {
+            compiler_filename.push_str(&val);
+            compiler_filename.push('-');
+            println!("{key}: {val:?}");
+            if val.eq("linux") {
+                toolchain.push_str("musl-");
+                architecture.push_str("amd64-");
+            }
+            if val.eq("macosx") {
+                match env::var("ARCH") {
+                    Ok(val) => {
+                        architecture.push_str(&val);
+                        architecture.push('-');
+                        println!("{key}: {val:?}");
+                    }
+                    Err(e) => println!("couldn't interpret {key}: {e}"),
+                }
+            }
+            if val.eq("windows") {
+                extension.push_str(".exe");
+                toolchain.push_str("gnu");
+                architecture.push_str("amd64");
+            }
+        }
+        Err(e) => println!("couldn't interpret {key}: {e}"),
+    }
+
+    compiler_filename.push_str(&architecture);
+    compiler_filename.push_str(&toolchain);
+
+    let key = "COMPILER_VERSION";
+    match env::var(key) {
+        Ok(val) => {
+            compiler_filename.push('v');
+            compiler_filename.push_str(&val);
+            println!("{key}: {val:?}");
+        }
+        Err(e) => println!("couldn't interpret {key}: {e}"),
+    }
+    println!("{:#?}, compiler_filename", compiler_filename);
+    compiler_filename
 }
 
 pub fn download_zksolc_compiler(
