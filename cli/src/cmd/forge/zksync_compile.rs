@@ -15,8 +15,53 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool) 
 
     // utils_zksync::check_testing();
 
-    let abc = env::current_dir().unwrap();
-    println!("{:#?}, current dir -->", abc);
+    //get compiler filename
+    let mut compiler_filename = String::from("/zksolc-");
+    let mut extension = String::new();
+    let mut toolchain = String::new();
+    let mut architecture = String::new();
+    let key = "OS";
+    match env::var(key) {
+        Ok(val) => {
+            compiler_filename.push_str(&val);
+            compiler_filename.push('-');
+            println!("{key}: {val:?}");
+            if val.eq("linux") {
+                toolchain.push_str("musl-");
+                architecture.push_str("amd64-");
+            }
+            if val.eq("macosx") {
+                match env::var("ARCH") {
+                    Ok(val) => {
+                        architecture.push_str(&val);
+                        architecture.push('-');
+                        println!("{key}: {val:?}");
+                    }
+                    Err(e) => println!("couldn't interpret {key}: {e}"),
+                }
+            }
+            if val.eq("windows") {
+                extension.push_str(".exe");
+                toolchain.push_str("gnu");
+                architecture.push_str("amd64");
+            }
+        }
+        Err(e) => println!("couldn't interpret {key}: {e}"),
+    }
+
+    compiler_filename.push_str(&architecture);
+    compiler_filename.push_str(&toolchain);
+
+    let key = "COMPILER_VERSION";
+    match env::var(key) {
+        Ok(val) => {
+            compiler_filename.push('v');
+            compiler_filename.push_str(&val);
+            println!("{key}: {val:?}");
+        }
+        Err(e) => println!("couldn't interpret {key}: {e}"),
+    }
+    println!("{:#?}, compiler_filename", compiler_filename);
 
     let mut project = config.project().unwrap();
     project.auto_detect = false;
@@ -30,11 +75,12 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool) 
     };
 
     //check for compiler
-    let zksolc_path = &format!("{}{}", zkout_path, "/zksolc-linux-amd64-musl-v1.3.7");
+    // let zksolc_path = &format!("{}{}", zkout_path, "/zksolc-linux-amd64-musl-v1.3.7");
+    let zksolc_path = &format!("{}{}", zkout_path, compiler_filename);
     let b = std::path::Path::new(zksolc_path).exists();
 
     if !b {
-        utils_zksync::download_zksolc_compiler(zksolc_path, zkout_path);
+        utils_zksync::download_zksolc_compiler(zksolc_path, zkout_path, compiler_filename);
     }
 
     // Get output selection
