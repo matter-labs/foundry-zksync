@@ -7,6 +7,9 @@ use foundry_common::try_get_http_provider;
 use foundry_config::{Chain, Config};
 use std::sync::Arc;
 
+//for zksync
+use crate::cmd::cast::{send_zksync, transfer_zksync};
+
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
 pub struct SendTxArgs {
@@ -64,10 +67,83 @@ pub enum SendTxSubcommands {
         #[clap(help = "The arguments of the function to call.", value_name = "ARGS")]
         args: Vec<String>,
     },
+    #[clap(name = "--zksync", about = "send to zksync contract")]
+    ZkSync {
+        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
+        chain_id: u16,
+    },
+    #[clap(name = "--zksync-deposit", about = "Use for zksync L1 / L2 deposits")]
+    ZkSyncDeposit {
+        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
+        chain_id: u16,
+        #[clap(help = "Deposit TO Address.", value_name = "TO")]
+        to: String,
+        #[clap(help = "Transfer amount.", value_name = "AMOUNT")]
+        amount: i32,
+        #[clap(help = "Transfer token. Leave blank for ETH.", value_name = "TOKEN")]
+        token: Option<String>,
+    },
+    #[clap(name = "--zksync-withdraw", about = "Use for zksync L2 / L1 withdrawals")]
+    ZkSyncWithdraw {
+        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
+        chain_id: u16,
+        #[clap(help = "Withdraw TO Address.", value_name = "TO")]
+        to: String,
+        #[clap(help = "Withdraw amount.", value_name = "AMOUNT")]
+        amount: i32,
+        #[clap(help = "Withdraw token. Leave blank for ETH.", value_name = "TOKEN")]
+        token: Option<String>,
+    },
 }
 
 impl SendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
+        // println!("{:#?}, sendTxArgs", self);
+        if let Some(t) = &self.command {
+            println!("{:#?}, <------> t", t);
+            match t {
+                SendTxSubcommands::ZkSync { chain_id } => {
+                    send_zksync::send_zksync(
+                        &self.to,
+                        &self.args,
+                        &self.sig,
+                        &self.eth.rpc_url,
+                        chain_id,
+                        &self.eth.wallet.private_key,
+                    )
+                    .await?;
+                    return Ok(());
+                }
+                SendTxSubcommands::ZkSyncDeposit { to, amount, token, chain_id } => {
+                    transfer_zksync::transfer_zksync(
+                        to,
+                        amount,
+                        token,
+                        &self.eth.rpc_url,
+                        &self.eth.wallet.private_key,
+                        chain_id.clone(),
+                        false,
+                    )
+                    .await?;
+                    return Ok(());
+                }
+                SendTxSubcommands::ZkSyncWithdraw { to, amount, token, chain_id } => {
+                    transfer_zksync::transfer_zksync(
+                        to,
+                        amount,
+                        token,
+                        &self.eth.rpc_url,
+                        &self.eth.wallet.private_key,
+                        chain_id.clone(),
+                        true,
+                    )
+                    .await?;
+                    return Ok(());
+                }
+                _ => (),
+            }
+        }
+
         let SendTxArgs {
             eth,
             to,

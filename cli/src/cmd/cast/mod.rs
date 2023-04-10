@@ -13,5 +13,7 @@ pub mod interface;
 pub mod rpc;
 pub mod run;
 pub mod send;
+pub mod send_zksync;
 pub mod storage;
+pub mod transfer_zksync;
 pub mod wallet;

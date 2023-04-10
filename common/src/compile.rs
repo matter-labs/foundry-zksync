@@ -388,7 +388,7 @@ pub fn compile_target_with_filter(
         if verify {
             eyre::bail!("You can only verify deployments from inside a project! Make sure it exists with `forge tree`.");
         }
-        return compile_files(project, vec![target_path.to_path_buf()], silent)
+        return compile_files(project, vec![target_path.to_path_buf()], silent);
     }
 
     if silent {
