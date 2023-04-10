@@ -8,12 +8,9 @@ use std::str::FromStr;
 use std::time::Duration;
 use tempfile::TempDir;
 use vm::vm_with_bootloader::BlockContext;
-use zksync::utils;
 use zksync_storage::db;
 use zksync_types::{FAIR_L2_GAS_PRICE, H160};
 
-use zksync_core::api_server::execution_sandbox;
-use zksync_state::secondary_storage;
 use zksync_test_account::ZkSyncAccount;
 
 use zk_evm;
@@ -65,7 +62,7 @@ pub fn get_zksolc_filename() -> String {
     compiler_filename.push_str(&architecture);
     compiler_filename.push_str(&toolchain);
 
-    let key = "COMPILER_VERSION";
+    let key = "ZKSOLC_COMPILER_VERSION";
     match env::var(key) {
         Ok(val) => {
             compiler_filename.push('v');
@@ -138,6 +135,9 @@ pub fn get_def_block_context() -> BlockContext {
         operator_address: H160::zero(),
     }
 }
+
+// use zksync_core::api_server::execution_sandbox;
+// use zksync_state::secondary_storage;
 
 pub fn check_testing() {
     let context = get_def_block_context();
