@@ -93,6 +93,10 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool) 
         comp_args.push("--system-mode".to_string());
     }
 
+    if force_evmla {
+        comp_args.push("--force-evmla".to_string());
+    }
+
     let mut cmd = Command::new(zksolc_path);
     let mut child = cmd
         .args(comp_args)
