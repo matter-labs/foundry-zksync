@@ -142,8 +142,6 @@ Interact with deployed contracts in the native foundry/forge fashion using the C
 
 - Retrieving and interacting with chain data, for example, block numbers and gas estimates
 - Interact with deployed contracts on (zkSync Testnet or Local Docker Node)
-- Bridging assets L1 ↔ L2 with `--zksync-deposit` and `--zksync-withdraw`
-- Use proper configuration techniques describe above
 
 ***v0.0*** ***Commands***:
 
@@ -158,6 +156,8 @@ Interact with deployed contracts in the native foundry/forge fashion using the C
 
 
 ## Bridging Assets
+
+Bridge assets L1 ↔ L2 with `--zksync-deposit` and `--zksync-withdraw`
 
 ***L1 → L2 deposits:***
 
