@@ -34,7 +34,7 @@ $ cargo build -p foundry-cli
 
 We need to establish the functionality we want for release v0.0 of this implementation. Below we will specify the exact features to accomplish our v0.0 release.
 
-## Feature Sets
+### Feature Set
 
 - ***Compile smart contracts with zksolc compiler***
 - ***Deploy smart contracts to zkSync Testnet or Local Test Node***
@@ -43,13 +43,16 @@ We need to establish the functionality we want for release v0.0 of this implemen
 - ***Send transactions to deployed contracts on zkSync Testnet or Local Test Node***
 - ***Spin up Local Test Node***
 
+NOTE: All commands are entered from the project root folder
+
 ## Compilation
 
+***v0.0*** ***Command***:
 ## `forge build`
 
 Compile smart contracts to zkEvm bytecode using the `--zksync` flag and store compile output files into a logical directory structure `out/zksync/` for easy retrieval to other components of the application.
 
-***v0.0*** ***Command***:
+
 For the `forge build` help screen:
 ```
 ../foundry-zksync/target/debug/forge build --zksync --help
@@ -81,6 +84,13 @@ OS = "linux"                            # OPERATING SYSTEM: linux, windows, maco
 ARCH = "amd64"                          # ARCHITIECTURE: amd64, arm64
 
 ```
+
+###Output
+`zksolc` compiler artifacts as well as standard-json input file can be found in the folder:
+```
+<PROJECT-ROOT>/out/zksolc/<CONTRACT_FILENAME>
+```
+![image](https://user-images.githubusercontent.com/76663878/231275745-4d33cb52-9a2a-4bc1-a48d-e9b5e48030c1.png)
 
 ## Deployment
 
