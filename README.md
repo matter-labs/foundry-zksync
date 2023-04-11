@@ -129,7 +129,7 @@ To Deploy `src/Greeter.sol` to zksync local node:
 ../foundry-zksync/target/debug/forge create src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --zksync 270
 ```
 
-###Output
+### Output
 ```
 0x5fe58d975604e6af62328d9e505181b94fc0718c, <---- Deployed contract address
 ```
