@@ -1,4 +1,10 @@
-## Installation / Quick Start
+## ZkSync Smart Contract Testing, Deployment and Interaction Tooling Framework with Foundry
+### About
+Currently the industry standard Solidity smart contract test and deploy frameworks are Hardhat and Truffle. They both use JavaScript to test and deploy solidity smart contracts. Another smart contract testing platform by the name of Foundry. The  advantage that Foundry provides is that all tests are also written solidity creating a smoother developer experience. With Foundry, the engineer does not need to switch languages to write tests and deploy contracts.. 
+
+Currently only Hardhat has developed functionality for zkSync. The purpose of this repository is to create functionality with Foundry to fully test, compile and deploy smart contracts on zkSync using only Solidity, as well as interact with those contracts once deployed.
+
+## Quick Start
 
 Clone these three repos to the same directory:
 
@@ -7,7 +13,7 @@ Clone these three repos to the same directory:
 - [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project) - this is the sample project that contains the smart contract to be compiled
 
 
-### Quick Start
+### Installation
 
 ```bash
 # make working directory and cd anywhere on filesystem
@@ -20,12 +26,9 @@ $ git clone https://github.com/sammyshakes/zksync-era.git
 $ git clone https://github.com/sammyshakes/sample-fzksync-project.git
 # cd into foundry-zksync, swap branch, and build
 $ cd foundry-zksync
-$ git checkout -b explore
-$ git pull origin explore
 $ cargo build -p foundry-cli
 ```
 ---
-# Compile
 
 # Version 0.0
 
@@ -39,20 +42,45 @@ We need to establish the functionality we want for release v0.0 of this implemen
 - ***Make contract calls to deployed contracts on zkSync Testnet or Local Test Node***
 - ***Send transactions to deployed contracts on zkSync Testnet or Local Test Node***
 - ***Spin up Local Test Node***
-- *********************************Run either unit tests or integration tests*********************************
 
 ## Compilation
 
-Compile smart contracts to zkEvm bytecode and store compile output files into a logical directory structure `out/zksync/` for easy retrieval to other components of the application.
+## `forge build`
 
-- Configuration/CLI
-    - Support Command line input arguments that currently exist for `forge build` plus newly built zkSync specific command line arguments to support different compiler versions and operating systems via the standard configuration files and CLI flag overrides
-- Managing Contracts for both networks
-    - Currently we compile both EVM and zkEVM smart contracts when using the `--zksync` flag thus creating artifacts for both networks, keeping them separate yet organized in the output directory.
+Compile smart contracts to zkEvm bytecode using the `--zksync` flag and store compile output files into a logical directory structure `out/zksync/` for easy retrieval to other components of the application.
 
 ***v0.0*** ***Command***:
+For the `forge build` help screen:
+```
+../foundry-zksync/target/debug/forge build --zksync --help
+```
+```
+Compiler subcommands for zkSync
 
-`forge build --zksync <CONTRACT_PATH>`
+Usage: forge build --zksync [OPTIONS] <CONTRACT FILENAME>
+
+Arguments:
+  <CONTRACT FILENAME>  Contract filename from project src/ ex: 'Contract.sol'
+
+Options:
+      --system-mode  System mode flag
+      --force-evmla  Sets the EVM legacy assembly pipeline forcibly
+  -h, --help         Print help
+```
+### Example Usage
+To compile `src/Greeter.sol` with only default compiler options:
+```
+../foundry-zksync/target/debug/forge build --zksync "Greeter.sol" 
+```
+
+### Compiler Settings
+`zksolc` compiler can be configured using `.env` file in project root
+```
+ZKSOLC_COMPILER_VERSION = "1.3.8"       # zksolc compiler version
+OS = "linux"                            # OPERATING SYSTEM: linux, windows, macosx
+ARCH = "amd64"                          # ARCHITIECTURE: amd64, arm64
+
+```
 
 ## Deployment
 
