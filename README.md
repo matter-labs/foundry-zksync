@@ -94,14 +94,16 @@ ARCH = "amd64"                          # ARCHITIECTURE: amd64, arm64
 
 ## Deployment
 
-Manage deployments in the native foundry/forge fashion, using the `forge create` command.
+***v0.0*** ***Command***:
+## `forge create`
 
-- Prepare deployment transaction according to zkSync specifications using CL/Configuration files.
+Manage deployments in the native foundry/forge fashion, using the `forge create` command with the `--zksync` flag.
+
+
 - Deploy to zkSync specified networks (zkSync Testnet or Local Docker Node)  via `--rpc-url` and `--chain-id` flags
 - Configuration/CLI
     - Support Command line input arguments that currently exist for `forge create` plus newly built zkSync specific command line arguments for a more seamless user experience. Examples: `--rpc-url`, `--chain-id`, `--private-key`, `--zksync` and more via the standard configuration files and CLI flag overrides
 
-***v0.0*** ***Command***:
 
 `forge create <CONTRACT_PATH> --constructor-args [CONSTRUCTOR_ARGS] --rpc-url <http://localhost:3050> --private-key <PRIVATE_KEY> --zksync <CHAIN_ID>`
 
