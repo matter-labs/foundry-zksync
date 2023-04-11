@@ -85,7 +85,7 @@ ARCH = "amd64"                          # ARCHITIECTURE: amd64, arm64
 
 ```
 
-###Output
+### Output
 `zksolc` compiler artifacts as well as standard-json input file can be found in the folder:
 ```
 <PROJECT-ROOT>/out/zksolc/<CONTRACT_FILENAME>
