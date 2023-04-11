@@ -5,13 +5,13 @@ use foundry_config::Config;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::Path;
 use std::process::{Command, Stdio};
+
+// use compiler-solidity;
 
 pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, force_evmla: bool) {
     // let zk_account = utils_zksync::get_test_account();
     // println!("{:#?}, zk_account", zk_account);
-
     // utils_zksync::check_testing();
 
     // get compiler filename
@@ -19,19 +19,19 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, 
 
     let mut project = config.project().unwrap();
     project.auto_detect = false;
-    let contract_full_path = &format!("{}/{}", project.paths.sources.display(), contract_path);
-    let zkout_path = &format!("{}{}", project.paths.artifacts.display(), "/zksolc");
-    let build_path = &format!("{}/{}", zkout_path, contract_path);
+    let contract_full_path = project.paths.sources.join(contract_path);
+    let zkout_path = project.paths.artifacts.join("zksolc");
+    let build_path = zkout_path.join(contract_path);
 
-    match fs::create_dir_all(std::path::Path::new(build_path)) {
+    match fs::create_dir_all(&build_path) {
         Ok(()) => println!(" create build_path folder success"),
         Err(error) => panic!("problem creating build_path folder: {:#?}", error),
     };
 
     //check for compiler
-    let zksolc_path = &format!("{}{}", zkout_path, compiler_filename);
-    if !std::path::Path::new(zksolc_path).exists() {
-        utils_zksync::download_zksolc_compiler(zksolc_path, zkout_path, compiler_filename);
+    let zksolc_path = zkout_path.join(&compiler_filename);
+    if !zksolc_path.exists() {
+        utils_zksync::download_zksolc_compiler(zksolc_path.clone(), zkout_path, &compiler_filename);
     }
 
     // Get output selection
@@ -47,14 +47,13 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, 
         .0
         .insert("*".to_string(), file_output_selection.clone());
 
-    let standard_json = project.standard_json_input(contract_full_path).unwrap();
+    let standard_json = project.standard_json_input(&contract_full_path).unwrap();
     // println!("{:#?} standard_json", standard_json);
 
     // Save the JSON input to build folder.
     let stdjson = serde_json::to_value(&standard_json).unwrap();
-    let path = &format!("{}/{}", build_path, "json_input.json");
-    let path = Path::new(path);
-    match File::create(path) {
+    let path = build_path.join("json_input.json");
+    match File::create(&path) {
         Err(why) => panic!("couldn't create : {}", why),
         Ok(file) => file,
     };
@@ -68,16 +67,17 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, 
     println!("{:#?}, solc_v", solc_v_path);
 
     //build output paths
-    let path = &format!("{}/{}", build_path, "artifacts.json");
-    let path = Path::new(path);
+    let path = build_path.join("artifacts.json");
     let display = path.display();
-    let mut file = match File::create(path) {
+    let mut file = match File::create(&path) {
         Err(e) => panic!("couldn't create {}: {}", display, e),
         Ok(file) => file,
     };
 
     //build args
-    let mut comp_args = vec![contract_full_path.clone(), "--standard-json".to_string()];
+    let mut comp_args: Vec<String> = vec![contract_full_path.to_str().unwrap().to_string()];
+
+    comp_args.push("--standard-json".to_string());
 
     if let Some(_path) = solc_v_path {
         comp_args.push("--solc".to_string());

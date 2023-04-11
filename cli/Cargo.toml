@@ -107,6 +107,8 @@ zksync_utils = {path = "../../zksync-era/core/lib/utils"}
 
 zk_evm = {git = "https://github.com/matter-labs/era-zk_evm.git"}
 
+# compiler-solidity = {git = "https://github.com/matter-labs/era-compiler-solidity.git"}
+
 [dev-dependencies]
 anvil = {path = "../anvil"}
 criterion = "0.4.0"

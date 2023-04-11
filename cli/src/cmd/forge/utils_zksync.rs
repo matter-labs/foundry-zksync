@@ -1,11 +1,11 @@
 use downloader::{Download, Downloader};
 use ethers::abi::ethabi;
 use serde_json;
-use std::env;
 use std::fs::set_permissions;
 use std::os::unix::prelude::PermissionsExt;
 use std::str::FromStr;
 use std::time::Duration;
+use std::{env, path::PathBuf};
 use tempfile::TempDir;
 use vm::vm_with_bootloader::BlockContext;
 use zksync_storage::db;
@@ -26,7 +26,7 @@ pub fn load_contract(raw_abi_string: &str) -> ethabi::Contract {
 
 pub fn get_zksolc_filename() -> String {
     //get compiler filename
-    let mut compiler_filename = String::from("/zksolc-");
+    let mut compiler_filename = String::from("zksolc-");
     let mut extension = String::new();
     let mut toolchain = String::new();
     let mut architecture = String::new();
@@ -76,29 +76,26 @@ pub fn get_zksolc_filename() -> String {
 }
 
 pub fn download_zksolc_compiler(
-    zksolc_path: &String,
-    zkout_path: &String,
-    compiler_filename: String,
+    zksolc_path: PathBuf,
+    zkout_path: PathBuf,
+    compiler_filename: &String,
 ) {
-    let zksolc_path = &format!("{}{}", zkout_path, compiler_filename);
-
     //get download folder
     let parts: Vec<&str> = compiler_filename.split("-").collect();
     let mut download_folder = String::from(parts[1]);
     download_folder.push('-');
     download_folder.push_str(parts[2]);
-    println!("{:#?} download_folder", download_folder);
 
-    let download_url = &format!(
-        "{}{}{}",
-        "https://github.com/matter-labs/zksolc-bin/raw/main/", download_folder, compiler_filename
-    );
-    let download: Download = Download::new(download_url);
+    let download_url = std::path::Path::new("https://github.com/matter-labs/zksolc-bin/raw/main/")
+        .join(download_folder)
+        .join(compiler_filename);
+
+    let download: Download = Download::new(download_url.to_str().unwrap());
     //get downloader builder
     let mut builder = Downloader::builder();
     //assign download folder
     builder
-        .download_folder(std::path::Path::new(zkout_path))
+        .download_folder(std::path::Path::new(&zkout_path))
         .connect_timeout(Duration::from_secs(240));
     //build downloader
     let mut d_loader = builder.build().unwrap();
@@ -113,9 +110,8 @@ pub fn download_zksolc_compiler(
     set_zksolc_permissions(zksolc_path);
 }
 
-fn set_zksolc_permissions(zksolc_path: &String) {
-    let perm =
-        set_permissions(std::path::Path::new(&zksolc_path), PermissionsExt::from_mode(0o755));
+fn set_zksolc_permissions(zksolc_path: PathBuf) {
+    let perm = set_permissions(&zksolc_path, PermissionsExt::from_mode(0o755));
     match perm {
         Ok(success) => println!("{:#?}, set permissions success", success),
         Err(error) => panic!("problem setting permissions: {:#?}", error),
