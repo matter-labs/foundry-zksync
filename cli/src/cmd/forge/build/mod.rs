@@ -91,7 +91,7 @@ pub struct BuildArgs {
 
 #[derive(Debug, Parser, Clone, Serialize)]
 pub enum BuildSubcommands {
-    #[clap(name = "--zksync", about = "Compile for zkSync")]
+    #[clap(name = "--zksync", about = "Compiler subcommands for zkSync")]
     ZkSync {
         #[clap(
             help = "Contract filename from project src/ ex: 'Contract.sol'",
@@ -103,7 +103,7 @@ pub enum BuildSubcommands {
         #[clap(
             help = "Sets the EVM legacy assembly pipeline forcibly",
             value_name = "FORCE_EVMLA",
-            long = "force_evmla"
+            long = "force-evmla"
         )]
         force_evmla: bool,
     },
