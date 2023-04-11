@@ -155,6 +155,10 @@ Interact with deployed contracts in the native foundry/forge fashion using the C
 
 `cast send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url zk-sync --private-key <PRIVATE-KEY> --zksync`
 
+
+
+## Bridging Assets
+
 ***L1 → L2 deposits:***
 
 `cast send --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --zksync-deposit <TO> <AMOUNT> <TOKEN>`
@@ -162,5 +166,3 @@ Interact with deployed contracts in the native foundry/forge fashion using the C
 ***L2 → L1 withdrawals:***
 
 `cast send --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --zksync-withdraw <TO> <AMOUNT> <TOKEN>`
-
-
