@@ -7,9 +7,15 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-// use compiler-solidity;
-
-pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, force_evmla: bool) {
+pub fn compile_zksync(
+    config: &Config,
+    contract_path: &String,
+    is_system: bool,
+    force_evmla: bool,
+    overwrite: bool,
+    bin: bool,
+    asm: bool,
+) {
     // let zk_account = utils_zksync::get_test_account();
     // println!("{:#?}, zk_account", zk_account);
     // utils_zksync::check_testing();
@@ -92,6 +98,18 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, 
 
     if force_evmla {
         comp_args.push("--force-evmla".to_string());
+    }
+
+    if overwrite {
+        comp_args.push("--overwrite".to_string());
+    }
+
+    if bin {
+        comp_args.push("--bin".to_string());
+    }
+
+    if asm {
+        comp_args.push("--asm".to_string());
     }
 
     let mut cmd = Command::new(zksolc_path);

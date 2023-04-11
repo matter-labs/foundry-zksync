@@ -106,6 +106,16 @@ pub enum BuildSubcommands {
             long = "force-evmla"
         )]
         force_evmla: bool,
+        #[clap(
+            help = "Overwrite existing files (used together with -o)",
+            value_name = "OVERWRITE",
+            long = "overwrite"
+        )]
+        overwrite: bool,
+        #[clap(help = "Output zkEVM bytecode of the contracts", value_name = "BIN", long = "bin")]
+        overwrite: bool,
+        #[clap(help = "Output zkEVM assembly of the contracts", value_name = "ASM", long = "asm")]
+        asm: bool,
     },
 }
 
@@ -127,12 +137,22 @@ impl Cmd for BuildArgs {
         // ZkSync
         if let Some(t) = &self.command {
             match t {
-                BuildSubcommands::ZkSync { contract_path, system_mode, force_evmla } => {
+                BuildSubcommands::ZkSync {
+                    contract_path,
+                    system_mode,
+                    force_evmla,
+                    overwrite,
+                    bin,
+                    asm,
+                } => {
                     zksync_compile::compile_zksync(
                         &config,
                         contract_path,
                         *system_mode,
                         *force_evmla,
+                        *overwrite,
+                        *bin,
+                        *asm,
                     );
                 }
             }
