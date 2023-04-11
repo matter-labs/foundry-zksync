@@ -57,6 +57,7 @@ For the `forge build` help screen:
 ```
 ../foundry-zksync/target/debug/forge build --zksync --help
 ```
+help screen:
 ```
 Compiler subcommands for zkSync
 
@@ -106,7 +107,7 @@ For the `forge create` help screen:
 ```
 ../foundry-zksync/target/debug/forge create --zksync --help
 ```
-
+help screen:
 ```
 Deploy to ZkSync with Chain Id. Ex. --zksync 280
 
