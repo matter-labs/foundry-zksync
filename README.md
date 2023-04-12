@@ -1,10 +1,10 @@
-## ZkSync Smart Contract Testing, Deployment and Interaction Tooling Framework with Foundry
+# ZkSync Smart Contract Testing, Deployment and Interaction Tooling Framework with Foundry
 ### About
 Currently the industry standard Solidity smart contract test and deploy frameworks are Hardhat and Truffle. They both use JavaScript to test and deploy solidity smart contracts. Another smart contract testing platform by the name of Foundry. The  advantage that Foundry provides is that all tests are also written solidity creating a smoother developer experience. With Foundry, the engineer does not need to switch languages to write tests and deploy contracts.. 
 
 Currently only Hardhat has developed functionality for zkSync. The purpose of this repository is to create functionality with Foundry to fully test, compile and deploy smart contracts on zkSync using only Solidity, as well as interact with those contracts once deployed.
 
-## Quick Start
+### Quick Start / Installation
 
 Clone these three repos to the same directory:
 
@@ -12,8 +12,6 @@ Clone these three repos to the same directory:
 - [**zksync-era**](https://github.com/sammyshakes/zksync-era) - this is the SDK repo, we need to pull this locally to repair broken dependencies
 - [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project) - this is the sample project that contains the smart contract to be compiled
 
-
-### Installation
 
 ```bash
 # make working directory and cd anywhere on filesystem
@@ -30,7 +28,7 @@ $ cargo build -p foundry-cli
 ```
 ---
 
-# Version 0.0
+## Version 0.0
 
 We need to establish the functionality we want for release v0.0 of this implementation. Below we will specify the exact features to accomplish our v0.0 release.
 
@@ -45,6 +43,7 @@ We need to establish the functionality we want for release v0.0 of this implemen
 
 NOTE: All commands are entered from the project root folder
 
+---
 ## Compilation
 
 ***v0.0*** ***Command***:
@@ -93,15 +92,13 @@ ARCH = "amd64"                          # ARCHITIECTURE: amd64, arm64
 ```
 ![image](https://user-images.githubusercontent.com/76663878/231275745-4d33cb52-9a2a-4bc1-a48d-e9b5e48030c1.png)
 
+---
 ## Deployment
 
 ***v0.0*** ***Command***:
 ## `forge create`
 
 Manage deployments in the native foundry/forge fashion, using the `forge create` command with the `--zksync` flag.
-
-- Deploy to zkSync specified networks (zkSync Testnet or Local Docker Node)  via `--rpc-url` and `--chain-id` flags
-- Support Command line input arguments that currently exist for `forge create` plus newly built zkSync specific command line arguments for a more seamless user experience. Examples: `--rpc-url`, `--chain-id`, `--private-key`
 
 For the `forge create` help screen:
 ```
@@ -136,7 +133,7 @@ To Deploy `src/Greeter.sol` to zksync local node:
 ```
 
 
-
+---
 ## Interaction
 
 Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast call` and `cast send` commands>
@@ -155,7 +152,7 @@ Interact with deployed contracts in the native foundry/forge fashion using the C
 `cast send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url zk-sync --private-key <PRIVATE-KEY> --zksync`
 
 
-
+---
 ## Bridging Assets
 
 Bridge assets L1 ↔ L2 with `--zksync-deposit` and `--zksync-withdraw`
