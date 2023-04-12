@@ -64,6 +64,7 @@ walkdir = "2.3.2"
 bytes = "1.1.0"
 color-eyre = "0.6"
 data-encoding = "2.3.3"
+dirs = "5.0.0"
 downloader = "0.2.7"
 eyre = "0.6"
 hex = "0.4.3"
@@ -108,6 +109,8 @@ zksync_utils = {path = "../../zksync-era/core/lib/utils"}
 zk_evm = {git = "https://github.com/matter-labs/era-zk_evm.git"}
 
 # compiler-solidity = {git = "https://github.com/matter-labs/era-compiler-solidity.git"}
+
+anyhow = {version = "1.0.70"}
 
 [dev-dependencies]
 anvil = {path = "../anvil"}
