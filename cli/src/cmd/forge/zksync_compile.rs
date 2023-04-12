@@ -7,15 +7,21 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-pub fn compile_zksync(
-    config: &Config,
-    contract_path: &String,
-    is_system: bool,
-    force_evmla: bool,
-    overwrite: bool,
-    bin: bool,
-    asm: bool,
-) {
+pub struct CombilerArgs {
+    pub contract_path: &String,
+    pub force_evmla: bool,
+    pub system_mode: bool,
+    pub llvm_debug_logging: bool,
+    pub llvm_ir: bool,
+    pub llvm_verify_each: bool,
+    pub asm: bool,
+    pub bin: bool,
+    pub overwrite: bool,
+    pub standard_json: bool,
+    pub yul: bool,
+}
+
+pub fn compile_zksync(config: &Config, args: CombilerArgs) {
     // let zk_account = utils_zksync::get_test_account();
     // println!("{:#?}, zk_account", zk_account);
     // utils_zksync::check_testing();
@@ -92,24 +98,35 @@ pub fn compile_zksync(
 
     //TODO: also check --use build command for changing solc version
 
-    if is_system {
-        comp_args.push("--system-mode".to_string());
-    }
-
-    if force_evmla {
+    if args.force_evmla {
         comp_args.push("--force-evmla".to_string());
     }
-
-    if overwrite {
-        comp_args.push("--overwrite".to_string());
+    if args.system_mode {
+        comp_args.push("--system-mode".to_string());
     }
-
-    if bin {
+    if args.llvm_debug_logging {
+        comp_args.push("--llvm-debug-logging".to_string());
+    }
+    if args.llvm_ir {
+        comp_args.push("--llvm-ir".to_string());
+    }
+    if ars.llvm_verify_each {
+        comp_args.push("--llvm-verify-each".to_string());
+    }
+    if args.asm {
+        comp_args.push("--asm".to_string());
+    }
+    if args.bin {
         comp_args.push("--bin".to_string());
     }
-
-    if asm {
-        comp_args.push("--asm".to_string());
+    if args.overwrite {
+        comp_args.push("--overwrite".to_string());
+    }
+    if args.standard_json {
+        comp_args.push("--standard-json".to_string());
+    }
+    if args.yul {
+        comp_args.push("--yul".to_string());
     }
 
     let mut cmd = Command::new(zksolc_path);

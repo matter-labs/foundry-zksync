@@ -98,24 +98,56 @@ pub enum BuildSubcommands {
             value_name = "CONTRACT FILENAME"
         )]
         contract_path: String,
-        #[clap(help = "System mode flag ", value_name = "SYSTEM_MODE", long = "system-mode")]
-        system_mode: bool,
+
         #[clap(
             help = "Sets the EVM legacy assembly pipeline forcibly",
             value_name = "FORCE_EVMLA",
             long = "force-evmla"
         )]
         force_evmla: bool,
+
+        #[clap(help = "System mode flag ", value_name = "SYSTEM_MODE", long = "system-mode")]
+        system_mode: bool,
+
+        #[clap(
+            help = "Sets the `debug logging` option in LLVM",
+            value_name = "LLVM_DEBUG_LOGGING",
+            long = "llvm-debug-logging"
+        )]
+        llvm_debug_logging: bool,
+
+        #[clap(help = "Switch to the LLVM IR mode", value_name = "LLVM_IR", long = "llvm-ir")]
+        llvm_ir: bool,
+
+        #[clap(
+            help = "Sets the `verify each` option in LLVM",
+            value_name = "LLVM_VERIFY_EACH",
+            long = "llvm-verify-each"
+        )]
+        llvm_verify_each: bool,
+
+        #[clap(help = "Output zkEVM assembly of the contracts", value_name = "ASM", long = "asm")]
+        asm: bool,
+
+        #[clap(help = "Output zkEVM bytecode of the contracts", value_name = "BIN", long = "bin")]
+        bin: bool,
+
         #[clap(
             help = "Overwrite existing files (used together with -o)",
             value_name = "OVERWRITE",
             long = "overwrite"
         )]
         overwrite: bool,
-        #[clap(help = "Output zkEVM bytecode of the contracts", value_name = "BIN", long = "bin")]
-        overwrite: bool,
-        #[clap(help = "Output zkEVM assembly of the contracts", value_name = "ASM", long = "asm")]
-        asm: bool,
+
+        #[clap(
+            help = "Switch to the Standard JSON input / output mode. Reads from stdin, result is written to stdout",
+            value_name = "STANDARD_JSON",
+            long = "standard-json"
+        )]
+        standard_json: bool,
+
+        #[clap(help = "Switch to the Yul mode", value_name = "yul", long = "yul")]
+        yul: bool,
     },
 }
 
@@ -139,21 +171,31 @@ impl Cmd for BuildArgs {
             match t {
                 BuildSubcommands::ZkSync {
                     contract_path,
-                    system_mode,
                     force_evmla,
-                    overwrite,
-                    bin,
+                    system_mode,
+                    llvm_debug_logging,
+                    llvm_ir,
+                    llvm_verify_each,
                     asm,
+                    bin,
+                    overwrite,
+                    standard_json,
+                    yul,
                 } => {
-                    zksync_compile::compile_zksync(
-                        &config,
-                        contract_path,
-                        *system_mode,
-                        *force_evmla,
-                        *overwrite,
-                        *bin,
-                        *asm,
-                    );
+                    let args = zksync_compile::CombilerArgs {
+                        contract_path: &contract_path.clone(),
+                        force_evmla: *force_evmla,
+                        system_mode: *system_mode,
+                        llvm_debug_logging: *llvm_debug_logging,
+                        llvm_ir: *llvm_ir,
+                        llvm_verify_each: *llvm_verify_each,
+                        asm: *asm,
+                        bin: *bin,
+                        overwrite: *overwrite,
+                        standard_json: *standard_json,
+                        yul: *yul,
+                    };
+                    zksync_compile::compile_zksync(&config, args);
                 }
             }
         }
