@@ -25,7 +25,7 @@ web3 = "0.18"
 
 # eth
 ethers = {git = "https://github.com/gakonst/ethers-rs", default-features = false, features = ["rustls"]}
-solang-parser = "=0.2.1"
+solang-parser = "=0.2.4"
 
 # cli
 atty = "0.2.14"
