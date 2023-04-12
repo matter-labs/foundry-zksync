@@ -2391,7 +2391,7 @@ dependencies = [
 [[package]]
 name = "cs_derive"
 version = "0.1.0"
-source = "git+https://github.com/sammyshakes/era-sync_vm.git?branch=main#ec2c094b0778695464a482beffd98b91e78de92d"
+source = "git+https://github.com/matter-labs/era-sync_vm.git?branch=main#5aedffa442134d6e4d879566aac5434c7ae683cf"
 dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.50",
@@ -9376,7 +9376,7 @@ dependencies = [
 [[package]]
 name = "sync_vm"
 version = "1.3.1"
-source = "git+https://github.com/sammyshakes/era-sync_vm.git?branch=main#ec2c094b0778695464a482beffd98b91e78de92d"
+source = "git+https://github.com/matter-labs/era-sync_vm.git?branch=main#5aedffa442134d6e4d879566aac5434c7ae683cf"
 dependencies = [
  "arrayvec 0.7.2",
  "cs_derive",
@@ -10977,7 +10977,7 @@ dependencies = [
 [[package]]
 name = "zkevm_test_harness"
 version = "1.3.1"
-source = "git+https://github.com/sammyshakes/era-zkevm_test_harness.git?branch=main#ba318b4c13d5a6e8cea8010912bb53595e42130d"
+source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=main#cfac36a36833cd5708642ed1142eea69681138b5"
 dependencies = [
  "bincode",
  "blake2 0.10.6",
@@ -10985,7 +10985,7 @@ dependencies = [
  "codegen 0.2.0",
  "crossbeam 0.8.2",
  "derivative",
- "env_logger 0.10.0",
+ "env_logger 0.9.3",
  "hex",
  "num-bigint 0.4.3",
  "num-integer",
@@ -11371,7 +11371,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
- "zkevm_opcode_defs",
+ "zk_evm 1.3.1 (git+https://github.com/matter-labs/era-zk_evm.git?branch=main)",
  "zksync_basic_types",
 ]
 
