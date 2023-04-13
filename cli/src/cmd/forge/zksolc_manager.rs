@@ -2,7 +2,7 @@ use dirs;
 use anyhow::{Result, Error};
 use downloader::{Downloader, Download};
 use serde::Serialize;
-use std::{fs, os::{unix::prelude::PermissionsExt}, path::PathBuf, time::Duration};
+use std::{fmt, fs, os::{unix::prelude::PermissionsExt}, path::PathBuf, time::Duration};
 use url::Url;
 
 #[derive(Debug, Clone, Serialize)]
@@ -36,19 +36,10 @@ impl ZkSolcOS {
 }
 
 fn get_operating_system() -> Result<ZkSolcOS> {
-    if let Some(os) = std::env::var_os("CARGO_CFG_TARGET_OS") {
-        if let Some(os_str) = os.to_str() {
-            match os_str {
-                "linux" => Ok(ZkSolcOS::Linux),
-                "macos" | "darwin" => Ok(ZkSolcOS::Mac),
-                _ => Err(Error::msg("Unsupported opeating system")),
-            }
-        }
-        else {
-            Err(Error::msg("Could not determine target operating system"))
-        }
-    } else {
-        Err(Error::msg("Could not get target operating system"))
+    match std::env::consts::OS {
+        "linux" => Ok(ZkSolcOS::Linux),
+        "macos" | "darwin" => Ok(ZkSolcOS::Mac),
+        _ => Err(Error::msg("Unsupported opeating system")),
     }
 }
 
@@ -65,14 +56,6 @@ pub struct ZkSolcManagerBuilder {
     pub download_url: Url,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct ZkSolcManager {
-    pub compilers_path: PathBuf,
-    pub version: String,
-    pub compiler: String,
-    pub download_url: Url,
-}
-
 impl ZkSolcManagerBuilder {
     pub fn new(opts: ZkSolcManagerOpts) -> Self {
         Self { 
@@ -83,7 +66,7 @@ impl ZkSolcManagerBuilder {
         }
     }
 
-    fn get_compiler(self, version: &String) -> Result<String> {
+    fn get_compiler(self) -> Result<String> {
         if let Ok(zk_solc_os) = get_operating_system() {
             let compiler = zk_solc_os.get_compiler().to_string();
             Ok(compiler)
@@ -94,12 +77,10 @@ impl ZkSolcManagerBuilder {
 
     pub fn build(self) -> Result<ZkSolcManager> {
         if let Some(mut home_path) = dirs::home_dir() {
-            print!("{}", home_path.display());
-
-            home_path.push("/.zksync");
+            home_path.push(".zksync");
             let version = self.version.to_string();
             let download_url = self.download_url.to_owned();
-            let compiler = self.get_compiler(&version)?;
+            let compiler = self.get_compiler()?;
             let compilers_path = home_path.to_owned();
 
             return Ok(ZkSolcManager {
@@ -113,9 +94,48 @@ impl ZkSolcManagerBuilder {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ZkSolcManager {
+    pub compilers_path: PathBuf,
+    pub version: String,
+    pub compiler: String,
+    pub download_url: Url,
+}
+
+impl fmt::Display for ZkSolcManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, 
+            "ZkSolcManager (
+                compilers_path: {}, 
+                version: {}, 
+                compiler: {}, 
+                download_url: {}, 
+                compiler_name: {}, 
+                full_download_url: {}
+                exists: {}
+            )", 
+            self.compilers_path.display(), 
+            self.version, 
+            self.compiler, 
+            self.download_url, 
+            self.clone().get_full_compiler(), 
+            self.clone().get_full_download_url(),
+            self.clone().exists(),
+        )
+    }
+}
+
 impl ZkSolcManager {
-    pub fn exists(self) -> bool {
-        let compiler_path = self.compilers_path.join(self.compiler);
+    pub fn get_full_compiler(self) -> String {
+        return format!("{}{}", self.compiler, self.version);
+    }
+
+    pub fn get_full_download_url(&self) -> String {
+        return format!("{}{}", self.download_url, self.clone().get_full_compiler());
+    }
+
+    pub fn exists(&self) -> bool {
+        let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
         if let Ok(metadata) = fs::metadata(compiler_path) {
             if metadata.is_file() && metadata.permissions().mode() & 0o755 != 0 {
                 return true;
@@ -126,8 +146,7 @@ impl ZkSolcManager {
 
     pub async fn download(self) -> Result<()> {
         let base_url = Url::parse(&self.download_url.to_string())?;
-        let url = base_url.join(&self.compiler)?;
-        url.join(&self.version);
+        let url = base_url.join(&self.clone().get_full_compiler())?;
 
         let download: Download = Download::new(&url.to_string());
         let mut builder = Downloader::builder();
@@ -141,7 +160,7 @@ impl ZkSolcManager {
         downloader.download(&[download])
             .map_err(|e| Error::msg(format!("Could not download zksolc compiler: {e}")));
 
-        let compiler_path = self.compilers_path.join(self.compiler);
+        let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
         fs::set_permissions(&compiler_path, PermissionsExt::from_mode(0o755))
             .map_err(|e| Error::msg(format!("failed to set zksync compiler permissions: {e}")));
 
