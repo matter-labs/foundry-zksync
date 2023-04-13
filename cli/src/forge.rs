@@ -119,6 +119,9 @@ fn main() -> eyre::Result<()> {
         Subcommands::Doc(cmd) => {
             cmd.run()?;
         }
+        Subcommands::ZkBuild(cmd) => {
+            cmd.run()?;
+        }
     }
 
     Ok(())
