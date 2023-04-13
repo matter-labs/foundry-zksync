@@ -1,9 +1,11 @@
 use dirs;
 use anyhow::{Result, Error};
 use downloader::{Downloader, Download};
+use serde::Serialize;
 use std::{fs, os::{unix::prelude::PermissionsExt}, path::PathBuf, time::Duration};
 use url::Url;
 
+#[derive(Debug, Clone, Serialize)]
 enum ZkSolcVersion {
     V000,
     V001,
@@ -18,6 +20,7 @@ impl ZkSolcVersion {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
 enum ZkSolcOS {
     Linux,
     Mac,
@@ -49,26 +52,29 @@ fn get_operating_system() -> Result<ZkSolcOS> {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManagerOpts {
-    version: String,
+    pub version: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManagerBuilder {
     compilers_path: Option<PathBuf>,
-    version: String,
+    pub version: String,
     compiler: Option<String>,
-    download_url: Url,
+    pub download_url: Url,
 }
 
+#[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManager {
-    compilers_path: PathBuf,
-    version: String,
-    compiler: String,
-    download_url: Url,
+    pub compilers_path: PathBuf,
+    pub version: String,
+    pub compiler: String,
+    pub download_url: Url,
 }
 
 impl ZkSolcManagerBuilder {
-    pub fn new(mut self, opts: ZkSolcManagerOpts) -> Self {
+    pub fn new(opts: ZkSolcManagerOpts) -> Self {
         Self { 
             compilers_path: None, 
             version: opts.version, 
@@ -88,11 +94,14 @@ impl ZkSolcManagerBuilder {
 
     pub fn build(self) -> Result<ZkSolcManager> {
         if let Some(mut home_path) = dirs::home_dir() {
+            print!("{}", home_path.display());
+
             home_path.push("/.zksync");
             let version = self.version.to_string();
             let download_url = self.download_url.to_owned();
             let compiler = self.get_compiler(&version)?;
             let compilers_path = home_path.to_owned();
+
             return Ok(ZkSolcManager {
                 compilers_path,
                 version,

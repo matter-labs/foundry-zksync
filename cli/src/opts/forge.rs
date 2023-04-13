@@ -18,6 +18,7 @@ use crate::cmd::forge::{
     script::ScriptArgs,
     snapshot, test, tree, update,
     verify::{VerifyArgs, VerifyCheckArgs},
+    zk_build::ZkBuildArgs,
 };
 use clap::{Parser, Subcommand, ValueHint};
 use ethers::solc::{artifacts::output_selection::ContractOutputSelection, EvmVersion};
@@ -153,6 +154,9 @@ pub enum Subcommands {
 
     #[clap(about = "Generate documentation for the project.")]
     Doc(DocArgs),
+
+    #[clap(visible_aliases = ["zkb", "zk-compile"], about = "Build the project's smart contracts for zksync.")]
+    ZkBuild(ZkBuildArgs),
 }
 
 // A set of solc compiler settings that can be set via command line arguments, which are intended

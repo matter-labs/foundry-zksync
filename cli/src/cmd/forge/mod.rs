@@ -65,5 +65,6 @@ pub mod verify;
 pub mod watch;
 pub mod utils_zksync;
 pub mod zksolc_manager;
+pub mod zk_build;
 pub mod zksync_compile;
 pub mod zksync_deploy;
