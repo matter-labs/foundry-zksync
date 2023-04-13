@@ -7,7 +7,6 @@ use url::Url;
 use std::fs::File;
 use std::io::copy;
 use reqwest::blocking::Client;
-use std::thread;
 
 #[derive(Debug, Clone, Serialize)]
 pub enum ZkSolcVersion {
@@ -190,6 +189,11 @@ impl ZkSolcManager {
     }
 
     pub fn download(self) -> Result<()> {
+        if self.exists() {
+            // TODO: figure out better don't download if compiler is downloaded
+            return Ok(())
+        }
+        
         let url = self.get_full_download_url()
             .map_err(|e| Error::msg(format!("Could not get full download url: {}", e)))?;
 
