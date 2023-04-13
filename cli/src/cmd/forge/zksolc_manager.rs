@@ -10,16 +10,34 @@ use reqwest::blocking::Client;
 use std::thread;
 
 #[derive(Debug, Clone, Serialize)]
-enum ZkSolcVersion {
-    V000,
-    V001,
+pub enum ZkSolcVersion {
+    V135,
+    V136,
+    V137,
+    V138,
+}
+
+fn parse_version(version: &str) -> Result<ZkSolcVersion> {
+    match version {
+        "v1.3.5" => Ok(ZkSolcVersion::V135),
+        "v1.3.6" => Ok(ZkSolcVersion::V136),
+        "v1.3.7" => Ok(ZkSolcVersion::V137),
+        "v1.3.8" => Ok(ZkSolcVersion::V138),
+        _ => {
+            print!("Unsupported verison");
+            Err(Error::msg("Unsupported version"))
+        },
+    }
 }
 
 impl ZkSolcVersion {
-    fn get_version(&self) -> &str {
+    fn get_version(&self) -> Result<&str> {
         match self {
-            ZkSolcVersion::V000 => "v0.0.0",
-            ZkSolcVersion::V001 => "v0.0.1",
+            ZkSolcVersion::V135 => Ok("v1.3.5"),
+            ZkSolcVersion::V136 => Ok("v1.3.6"),
+            ZkSolcVersion::V137 => Ok("v1.3.7"),
+            ZkSolcVersion::V138 => Ok("v1.3.8"),
+            _ => Err(Error::msg("ZkSolc compiler version not supported")),
         }
     }
 }
@@ -28,6 +46,14 @@ impl ZkSolcVersion {
 enum ZkSolcOS {
     Linux,
     Mac,
+}
+
+fn get_operating_system() -> Result<ZkSolcOS> {
+    match std::env::consts::OS {
+        "linux" => Ok(ZkSolcOS::Linux),
+        "macos" | "darwin" => Ok(ZkSolcOS::Mac),
+        _ => Err(Error::msg("Unsupported opeating system")),
+    }
 }
 
 impl ZkSolcOS {
@@ -43,14 +69,6 @@ impl ZkSolcOS {
             ZkSolcOS::Linux => "linux-amd64",
             ZkSolcOS::Mac => "macosx-amd64",
         }
-    }
-}
-
-fn get_operating_system() -> Result<ZkSolcOS> {
-    match std::env::consts::OS {
-        "linux" => Ok(ZkSolcOS::Linux),
-        "macos" | "darwin" => Ok(ZkSolcOS::Mac),
-        _ => Err(Error::msg("Unsupported opeating system")),
     }
 }
 
@@ -94,12 +112,14 @@ impl ZkSolcManagerBuilder {
             let compiler = self.get_compiler()?;
             let compilers_path = home_path.to_owned();
 
-            return Ok(ZkSolcManager {
-                compilers_path,
-                version,
-                compiler,
-                download_url,
-            });
+            if let Ok(solc_version) = parse_version(&version) {
+                return Ok(ZkSolcManager {
+                    compilers_path,
+                    version: solc_version,
+                    compiler,
+                    download_url,
+                });
+            }
         }
         Err(Error::msg("Could not build ZkSolcManager"))
     }
@@ -108,7 +128,7 @@ impl ZkSolcManagerBuilder {
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManager {
     pub compilers_path: PathBuf,
-    pub version: String,
+    pub version: ZkSolcVersion,
     pub compiler: String,
     pub download_url: Url,
 }
@@ -126,7 +146,7 @@ impl fmt::Display for ZkSolcManager {
                 exists: {}
             )", 
             self.compilers_path.display(), 
-            self.version, 
+            self.version.get_version().unwrap(), 
             self.compiler, 
             self.download_url, 
             self.clone().get_full_compiler(), 
@@ -138,7 +158,7 @@ impl fmt::Display for ZkSolcManager {
 
 impl ZkSolcManager {
     pub fn get_full_compiler(self) -> String {
-        return format!("{}{}", self.compiler, self.version);
+        return format!("{}{}", self.compiler, self.version.get_version().unwrap());
     }
 
     pub fn get_full_download_url(&self) -> Result<Url> {
@@ -156,8 +176,7 @@ impl ZkSolcManager {
     }
 
     pub fn get_full_compiler_path(&self) -> PathBuf {
-        let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
-        compiler_path
+        self.compilers_path.join(self.clone().get_full_compiler())
     }
 
     pub fn exists(&self) -> bool {
@@ -171,7 +190,7 @@ impl ZkSolcManager {
     }
 
     pub fn download(self) -> Result<()> {
-        let url = self.clone().get_full_download_url()
+        let url = self.get_full_download_url()
             .map_err(|e| Error::msg(format!("Could not get full download url: {}", e)))?;
 
         let client = Client::new();
@@ -179,14 +198,14 @@ impl ZkSolcManager {
             .send()
             .map_err(|e| Error::msg(format!("Failed to download file: {}", e)))?;
 
-        let mut output_file = File::create(self.clone().get_full_compiler_path())
+        let mut output_file = File::create(self.get_full_compiler_path())
             .map_err(|e| Error::msg(format!("Failed to create output file: {}", e)))?;
 
         copy(&mut response, &mut output_file)
             .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
 
         let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
-        fs::set_permissions(&compiler_path, PermissionsExt::from_mode(0o755))
+        let _ = fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755))
             .map_err(|e| Error::msg(format!("failed to set zksync compiler permissions: {e}")));
 
         Ok(())
