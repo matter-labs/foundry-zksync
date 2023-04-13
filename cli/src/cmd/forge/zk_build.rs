@@ -1,5 +1,7 @@
 use tokio;
 use tokio::sync::oneshot;
+use std::time::Duration;
+use std::thread::sleep;
 use clap::Parser;
 use serde::Serialize;
 use crate::cmd::{
@@ -23,27 +25,10 @@ impl Cmd for ZkBuildArgs {
         let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts); 
         let zksolc_manager = zksolc_manager_builder.build().unwrap();
 
-        // let (tx, mut rx) = oneshot::channel();
-        //     tokio::spawn(async move {
-        //     let result = zksolc_manager.clone().download().await;
-        //     let _ = tx.send(result);
-        // });
-        // match rx.try_recv() {
-        //     Ok(result) => {
-        //         println!("Downloaded");
-        //     }
-        //     Err(e) => {
-        //         println!("Error: {}", e);
-        //     }
-        // }
-
-        // let download = tokio::runtime::Builder::new_current_thread()
-        //     .enable_all()
-        //     .build()
-        //     .unwrap()
-        //     .block_on(zksolc_manager.clone().download());
-
-        // println!("{}", zksolc_manager);
+        match zksolc_manager.download() {
+            Ok(_) => println!("File downloaded successfully."),
+            Err(e) => println!("Failed to download the file: {}", e),
+        }
         
         Ok("".to_owned())
     }

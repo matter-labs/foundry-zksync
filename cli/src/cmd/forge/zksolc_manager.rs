@@ -4,6 +4,10 @@ use downloader::{Downloader, Download};
 use serde::Serialize;
 use std::{fmt, fs, os::{unix::prelude::PermissionsExt}, path::PathBuf, time::Duration};
 use url::Url;
+use std::fs::File;
+use std::io::copy;
+use reqwest::blocking::Client;
+use std::thread;
 
 #[derive(Debug, Clone, Serialize)]
 enum ZkSolcVersion {
@@ -31,6 +35,13 @@ impl ZkSolcOS {
         match self {
             ZkSolcOS::Linux => "zksolc-linux-amd64-musl-",
             ZkSolcOS::Mac => "zksolc-macosx-arm64-",
+        }
+    }
+
+    fn get_download_uri(&self) -> &str {
+        match self {
+            ZkSolcOS::Linux => "linux-amd64",
+            ZkSolcOS::Mac => "macosx-amd64",
         }
     }
 }
@@ -62,7 +73,7 @@ impl ZkSolcManagerBuilder {
             compilers_path: None, 
             version: opts.version, 
             compiler: None, 
-            download_url: Url::parse("https://github.com/matter-labs/zksolc-bin/raw/main/").unwrap(),
+            download_url: Url::parse("https://github.com/matter-labs/zksolc-bin/raw/main").unwrap(),
         }
     }
 
@@ -119,7 +130,7 @@ impl fmt::Display for ZkSolcManager {
             self.compiler, 
             self.download_url, 
             self.clone().get_full_compiler(), 
-            self.clone().get_full_download_url(),
+            self.clone().get_full_download_url().unwrap(),
             self.clone().exists(),
         )
     }
@@ -130,8 +141,23 @@ impl ZkSolcManager {
         return format!("{}{}", self.compiler, self.version);
     }
 
-    pub fn get_full_download_url(&self) -> String {
-        return format!("{}{}", self.download_url, self.clone().get_full_compiler());
+    pub fn get_full_download_url(&self) -> Result<Url> {
+        if let Ok(zk_solc_os) = get_operating_system() {
+            let download_uri = zk_solc_os.get_download_uri().to_string();
+            let full_download_url = format!("{}/{}/{}", self.download_url, download_uri, self.clone().get_full_compiler());
+            if let Ok(url) = Url::parse(&full_download_url) {
+                Ok(url)
+            } else {
+                Err(Error::msg("Could not parse full download url"))
+            }
+        } else {
+            Err(Error::msg("Could not determine full download url"))
+        }
+    }
+
+    pub fn get_full_compiler_path(&self) -> PathBuf {
+        let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
+        compiler_path
     }
 
     pub fn exists(&self) -> bool {
@@ -144,21 +170,20 @@ impl ZkSolcManager {
         false
     }
 
-    pub async fn download(self) -> Result<()> {
-        let base_url = Url::parse(&self.download_url.to_string())?;
-        let url = base_url.join(&self.clone().get_full_compiler())?;
+    pub fn download(self) -> Result<()> {
+        let url = self.clone().get_full_download_url()
+            .map_err(|e| Error::msg(format!("Could not get full download url: {}", e)))?;
 
-        let download: Download = Download::new(&url.to_string());
-        let mut builder = Downloader::builder();
-        builder
-            .download_folder(std::path::Path::new(&self.compilers_path))
-            .connect_timeout(Duration::from_secs(240));
+        let client = Client::new();
+        let mut response = client.get(url)
+            .send()
+            .map_err(|e| Error::msg(format!("Failed to download file: {}", e)))?;
 
-        let mut downloader = builder.build()
-            .map_err(|e| Error::msg(format!("Could not build downloader: {e}")))?;
+        let mut output_file = File::create(self.clone().get_full_compiler_path())
+            .map_err(|e| Error::msg(format!("Failed to create output file: {}", e)))?;
 
-        downloader.download(&[download])
-            .map_err(|e| Error::msg(format!("Could not download zksolc compiler: {e}")));
+        copy(&mut response, &mut output_file)
+            .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
 
         let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
         fs::set_permissions(&compiler_path, PermissionsExt::from_mode(0o755))
@@ -167,3 +192,6 @@ impl ZkSolcManager {
         Ok(())
     }
 }
+
+// https://github.com/matter-labs/zksolc-bin/raw/main/linux-amd64/zksolc-linux-amd64-musl-v1.3.0
+// https://github.com/matter-labs/zksolc-bin/raw/main/zksolc-linux-amd64-musl-v1.3.8
