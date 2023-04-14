@@ -59,7 +59,7 @@ impl ZkSolcOS {
     fn get_compiler(&self) -> &str {
         match self {
             ZkSolcOS::Linux => "zksolc-linux-amd64-musl-",
-            ZkSolcOS::Mac => "zksolc-macosx-arm64-",
+            ZkSolcOS::Mac => "zksolc-macosx-amd64-",
         }
     }
 
