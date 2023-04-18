@@ -372,7 +372,7 @@ pub struct Config {
 
     /// zksync specific stuff
     /// 
-    pub zksolc: Option<String>,
+    pub zksolc: String,
 }
 
 /// Mapping of fallback standalone sections. See [`FallbackProfileProvider`]
@@ -1756,6 +1756,7 @@ impl Default for Config {
             doc: Default::default(),
             __non_exhaustive: (),
             __warnings: vec![],
+            zksolc: "zksync".into(),
         }
     }
 }

@@ -206,7 +206,7 @@ impl ZkSolcManager {
 
         let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
         let _ = fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755))
-            .map_err(|e| Error::msg(format!("failed to set zksync compiler permissions: {e}")));
+            .map_err(|e| Error::msg(format!("Failed to set zksync compiler permissions: {e}")));
 
         Ok(())
     }
