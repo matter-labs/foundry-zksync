@@ -34,6 +34,8 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, 
         utils_zksync::download_zksolc_compiler(zksolc_path.clone(), zkout_path, &compiler_filename);
     }
 
+    ////////////////////////////////////////////////////
+
     // Get output selection
     let mut file_output_selection: FileOutputSelection = BTreeMap::default();
     file_output_selection
@@ -59,12 +61,16 @@ pub fn compile_zksync(config: &Config, contract_path: &String, is_system: bool, 
     };
     std::fs::write(path, serde_json::to_string_pretty(&stdjson).unwrap()).unwrap();
 
+    //////////////////////////////////////////////////////
+
     //detect solc
     let graph = Graph::resolve_sources(&project.paths, project.sources().expect("REASON")).unwrap();
     let (versions, _edges) = graph.into_sources_by_version(project.offline).unwrap();
     let solc_version = versions.get(&project).unwrap();
     let solc_v_path = Some(&solc_version.first_key_value().unwrap().0.solc);
     println!("{:#?}, solc_v", solc_v_path);
+
+    //////////////////////////////////////////////////////
 
     //build output paths
     let path = build_path.join("artifacts.json");
