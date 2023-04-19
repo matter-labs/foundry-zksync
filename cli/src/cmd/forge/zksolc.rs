@@ -10,6 +10,7 @@ pub struct ZkSolcOpts<'a> {
     pub config: &'a Config,
     pub project: &'a Project,
     pub compiler_path: PathBuf,
+    pub contract_name: String,
     // pub contracts_path: PathBuf,
     // pub is_system: bool,
     // pub force_evmla: bool,
@@ -65,7 +66,7 @@ impl <'a>ZkSolc<'a> {
             project: opts.project,
             compiler_path: opts.compiler_path,
             output_path: opts.project.paths.artifacts.to_owned().join("zksolc"),
-            contracts_path: opts.project.paths.sources.to_owned().join("Counter.sol"),
+            contracts_path: opts.project.paths.sources.to_owned().join(opts.contract_name),
             artifacts_path: opts.project.paths.artifacts.to_owned().join("artifacts.json"),
             // is_system: todo!(),
             // force_evmla: todo!(),
@@ -87,7 +88,7 @@ impl <'a>ZkSolc<'a> {
         // TODO: configure vars appropriately, this is a happy path to compilation
         let mut comp_args: Vec<String> = vec![self.clone().contracts_path.into_os_string().into_string().unwrap()];
         comp_args.push("--solc".to_string());
-        comp_args.push(solc_path.into_os_string().into_string().unwrap());
+        comp_args.push(solc_path.clone().into_os_string().into_string().unwrap());
         comp_args.push("--system-mode".to_string());
         comp_args.push("--force-evmla".to_string());
         comp_args.push("--bin".to_string());
@@ -111,6 +112,7 @@ impl <'a>ZkSolc<'a> {
             .map_err(|e| Error::msg(format!("Could create artifacts file: {}", e)))?;
 
         println!("=========================");
+        println!("{:?}", solc_path.clone().display());
         println!("{:?}", String::from_utf8(output.to_owned().stderr.to_vec()));
         println!("{:?}", &output.to_owned().stdout);
         println!("=========================");
@@ -119,15 +121,6 @@ impl <'a>ZkSolc<'a> {
             .map_err(|e| Error::msg(format!("Could not write artifacts file: {}", e)))?;
 
         Ok(())
-
-        // let output = Command::new(binary).output()?;
-        // if output.status.success() {
-        //     let stdout = String::from_utf8_lossy(&output.stdout);
-        //     println!("Output: {}", stdout);
-        // } else {
-        //     let stderr = String::from_utf8_lossy(&output.stderr);
-        //     eprintln!("Error: {}", stderr);
-        // }
     }
 
     fn parse_json_input(mut self) -> Result<()> {
@@ -177,6 +170,10 @@ impl <'a>ZkSolc<'a> {
 
         let solc_version = versions.get(&self.project)
             .map_err(|e| Error::msg(format!("Could not get solc: {}", e)))?;
+
+        println!("+++++++++++++++++++++++++++");
+        println!("{:?}", solc_version);
+        println!("+++++++++++++++++++++++++++");
 
         if let Some(solc_first_key) = &solc_version.first_key_value() {
 

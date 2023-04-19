@@ -29,7 +29,13 @@ pub struct ZkBuildArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub args: CoreBuildArgs,
-    
+
+    #[clap(
+        help = "Contract filename from project src/ ex: 'Contract.sol'",
+        long = "contract_name",
+        value_name = "CONTRACT_FILENAME",
+    )]
+    pub contract_name: String,    
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
@@ -72,6 +78,7 @@ impl Cmd for ZkBuildArgs {
                     // force_evmla: todo!(),
                     project: &project,
                     config: &config,
+                    contract_name: self.contract_name
                     // contracts_path: todo!(),
                 };
 
