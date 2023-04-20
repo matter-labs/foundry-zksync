@@ -1,9 +1,18 @@
-use std::{fmt, process::{Command, Stdio}, collections::BTreeMap, fs::File, io::Write};
-use anyhow::{Result, Error};
+use anyhow::{Error, Result};
+use ethers::solc::{
+    artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
+    Graph, Project,
+};
+use foundry_config::Config;
 use serde::Serialize;
 use std::path::PathBuf;
-use foundry_config::Config;
-use ethers::solc::{Project, artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput}, Graph};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    fs::File,
+    io::Write,
+    process::{Command, Stdio},
+};
 
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts<'a> {
@@ -41,25 +50,25 @@ pub struct ZkSolc<'a> {
     pub standard_json: Option<StandardJsonCompilerInput>,
 }
 
-
 impl fmt::Display for ZkSolc<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, 
+        write!(
+            f,
             "ZkSolc (
                 compiler_path: {},   
                 output_path: {},
                 contracts_path: {},
                 artifacts_path: {}, 
-            )", 
-            self.compiler_path.display(), 
-            self.output_path.display(), 
-            self.contracts_path.display(), 
-            self.artifacts_path.display(), 
+            )",
+            self.compiler_path.display(),
+            self.output_path.display(),
+            self.contracts_path.display(),
+            self.artifacts_path.display(),
         )
     }
 }
 
-impl <'a>ZkSolc<'a> {
+impl<'a> ZkSolc<'a> {
     pub fn new(opts: ZkSolcOpts<'a>) -> Self {
         Self {
             // config: todo!(),
@@ -73,25 +82,31 @@ impl <'a>ZkSolc<'a> {
             standard_json: None,
         }
     }
-    
+
     // TODO: hander errs instead of unwraps
     pub fn compile(&self) -> Result<()> {
-        self.clone().parse_json_input()
+        self.clone()
+            .parse_json_input()
             .map_err(|e| Error::msg(format!("Could not parse_json_input: {}", e)))?;
 
         // self.clone().build_artifacts_path()
         //     .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))?;
 
-        let solc_path = self.clone().configure_solc()
+        let solc_path = self
+            .clone()
+            .configure_solc()
             .map_err(|e| Error::msg(format!("Could not configure solc: {}", e)))?;
 
         // TODO: configure vars appropriately, this is a happy path to compilation
-        let mut comp_args: Vec<String> = vec![self.clone().contracts_path.into_os_string().into_string().unwrap()];
+        let mut comp_args: Vec<String> =
+            vec![self.clone().contracts_path.into_os_string().into_string().unwrap()];
         comp_args.push("--solc".to_string());
         comp_args.push(solc_path.clone().into_os_string().into_string().unwrap());
-        comp_args.push("--system-mode".to_string());
-        comp_args.push("--force-evmla".to_string());
-        comp_args.push("--bin".to_string());
+        // comp_args.push("--system-mode".to_string());
+        // comp_args.push("--force-evmla".to_string());
+        // comp_args.push("--bin".to_string());
+        comp_args.push("--combined-json".to_string());
+        comp_args.push("abi,bin,hashes".to_string());
 
         let mut cmd = Command::new(self.clone().compiler_path);
         let mut child = cmd
@@ -101,14 +116,18 @@ impl <'a>ZkSolc<'a> {
             .stdout(Stdio::piped())
             .spawn();
         let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
-        
+
         serde_json::to_writer(stdin, &self.standard_json)
             .map_err(|e| Error::msg(format!("Could not assign standard_json to writer: {}", e)))?;
-        
-        let output = child.unwrap().wait_with_output()
+
+        let output = child
+            .unwrap()
+            .wait_with_output()
             .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
 
-        let mut artifacts_file = self.clone().build_artifacts_file()
+        let mut artifacts_file = self
+            .clone()
+            .build_artifacts_file()
             .map_err(|e| Error::msg(format!("Could create artifacts file: {}", e)))?;
 
         println!("=========================");
@@ -117,7 +136,8 @@ impl <'a>ZkSolc<'a> {
         println!("{:?}", &output.to_owned().stdout);
         println!("=========================");
 
-        artifacts_file.write_all(&output.stdout)
+        artifacts_file
+            .write_all(&output.stdout)
             .map_err(|e| Error::msg(format!("Could not write artifacts file: {}", e)))?;
 
         Ok(())
@@ -137,7 +157,9 @@ impl <'a>ZkSolc<'a> {
             .to_owned()
             .insert("*".to_string(), file_output_selection.clone());
 
-        let standard_json = self.project.standard_json_input(&self.contracts_path)
+        let standard_json = self
+            .project
+            .standard_json_input(&self.contracts_path)
             .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
         self.standard_json = Some(standard_json.to_owned());
 
@@ -152,23 +174,28 @@ impl <'a>ZkSolc<'a> {
         let file_contents = serde_json::to_string_pretty(&stdjson)
             .map_err(|e| Error::msg(format!("Could parse input json file contents: {}", e)))?;
 
-        let _io_result = std::fs::write(json_input, file_contents)
-            .map_err(|e| Error::msg(format!("Could not write input json contents to file: {}", e)))?;
+        let _io_result = std::fs::write(json_input, file_contents).map_err(|e| {
+            Error::msg(format!("Could not write input json contents to file: {}", e))
+        })?;
 
         Ok(())
     }
 
     fn configure_solc(self) -> Result<(PathBuf)> {
-        let sources = self.project.sources()
+        let sources = self
+            .project
+            .sources()
             .map_err(|e| Error::msg(format!("Could not get project sources: {}", e)))?;
 
         let graph = Graph::resolve_sources(&self.project.paths, sources)
             .map_err(|e| Error::msg(format!("Could not create graph: {}", e)))?;
 
-        let (versions, edges) = graph.into_sources_by_version(self.project.offline)
+        let (versions, edges) = graph
+            .into_sources_by_version(self.project.offline)
             .map_err(|e| Error::msg(format!("Could not get versions & edges: {}", e)))?;
 
-        let solc_version = versions.get(&self.project)
+        let solc_version = versions
+            .get(&self.project)
             .map_err(|e| Error::msg(format!("Could not get solc: {}", e)))?;
 
         println!("+++++++++++++++++++++++++++");
@@ -176,7 +203,6 @@ impl <'a>ZkSolc<'a> {
         println!("+++++++++++++++++++++++++++");
 
         if let Some(solc_first_key) = &solc_version.first_key_value() {
-
             // TODO: understand and handle solc versions and the edge cases here
 
             Ok(solc_first_key.0.solc.to_owned())
