@@ -1,8 +1,7 @@
 use dirs;
 use anyhow::{Result, Error};
-use downloader::{Downloader, Download};
 use serde::Serialize;
-use std::{fmt, fs, os::{unix::prelude::PermissionsExt}, path::PathBuf, time::Duration};
+use std::{fmt, fs, os::{unix::prelude::PermissionsExt}, path::PathBuf};
 use url::Url;
 use std::fs::File;
 use std::io::copy;
@@ -22,10 +21,7 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.6" => Ok(ZkSolcVersion::V136),
         "v1.3.7" => Ok(ZkSolcVersion::V137),
         "v1.3.8" => Ok(ZkSolcVersion::V138),
-        _ => {
-            print!("Unsupported verison");
-            Err(Error::msg("Unsupported version"))
-        },
+        _ => Err(Error::msg("Unsupported version")),
     }
 }
 
@@ -210,7 +206,7 @@ impl ZkSolcManager {
 
         let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
         let _ = fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755))
-            .map_err(|e| Error::msg(format!("failed to set zksync compiler permissions: {e}")));
+            .map_err(|e| Error::msg(format!("Failed to set zksync compiler permissions: {e}")));
 
         Ok(())
     }
