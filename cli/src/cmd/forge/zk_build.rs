@@ -1,16 +1,13 @@
 use std::fmt::Debug;
 
-use clap::Parser;
-use serde::Serialize;
 use super::build::CoreBuildArgs;
-use super::zksolc_manager::{ZkSolcManagerOpts, ZkSolcManagerBuilder};
-use super::zksolc::{ZkSolcOpts, ZkSolc};
+use super::zksolc::{ZkSolc, ZkSolcOpts};
+use super::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
 use crate::cmd::{
-    forge::{
-        install::{self},
-    },
+    forge::install::{self},
     Cmd, LoadConfig,
 };
+use clap::Parser;
 use foundry_config::{
     figment::{
         self,
@@ -20,11 +17,12 @@ use foundry_config::{
     },
     Config,
 };
+use serde::Serialize;
 
 foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 
 #[derive(Debug, Clone, Parser, Serialize, Default)]
-#[clap(next_help_heading = "ZkBuild options", about = None)] 
+#[clap(next_help_heading = "ZkBuild options", about = None)]
 pub struct ZkBuildArgs {
     #[clap(flatten)]
     #[serde(flatten)]
@@ -33,9 +31,9 @@ pub struct ZkBuildArgs {
     #[clap(
         help = "Contract filename from project src/ ex: 'Contract.sol'",
         long = "contract_name",
-        value_name = "CONTRACT_FILENAME",
+        value_name = "CONTRACT_FILENAME"
     )]
-    pub contract_name: String,    
+    pub contract_name: String,
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
@@ -51,18 +49,16 @@ impl Cmd for ZkBuildArgs {
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
 
-        let zksolc_manager_opts = ZkSolcManagerOpts {
-            version: self.use_zksolc.unwrap(),
-        };
-        
-        let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts); 
+        let zksolc_manager_opts = ZkSolcManagerOpts { version: self.use_zksolc.unwrap() };
+
+        let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
         let zksolc_manager = zksolc_manager_builder.build();
 
         match zksolc_manager {
             Ok(zksolc_manager) => {
                 if !zksolc_manager.exists() {
                     println!("Downloading zksolc compiler");
-                    
+
                     match zksolc_manager.clone().download() {
                         Ok(zksolc_manager) => zksolc_manager,
                         Err(e) => println!("Failed to download the file: {}", e),
@@ -78,21 +74,22 @@ impl Cmd for ZkBuildArgs {
                     // force_evmla: todo!(),
                     project: &project,
                     config: &config,
-                    contract_name: self.contract_name
-                    // contracts_path: todo!(),
+                    contract_name: self.contract_name, // contracts_path: todo!(),
                 };
 
-                let zksolc = ZkSolc::new(zksolc_opts);
+                let mut zksolc = ZkSolc::new(zksolc_opts);
                 println!("{}", zksolc);
+
+                zksolc.parse_json_input();
 
                 match zksolc.compile() {
                     Ok(_) => println!("Compiled Successfully"),
                     Err(err) => println!("{}", err.to_string()),
                 }
-            },
+            }
             Err(e) => println!("Error building zksolc_manager: {}", e),
         }
-        
+
         Ok("".to_owned())
     }
 }
