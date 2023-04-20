@@ -4,7 +4,8 @@ use ethers::solc::{
     Graph, Project,
 };
 use foundry_config::Config;
-use serde::Serialize;
+use serde:: Serialize;
+use serde_json::{Value};
 use std::path::{self, PathBuf};
 use std::{
     collections::BTreeMap,
@@ -136,14 +137,14 @@ impl<'a> ZkSolc<'a> {
             .build_artifacts_file()
             .map_err(|e| Error::msg(format!("Could create artifacts file: {}", e)))?;
 
-        println!("=========================");
-        println!("{:?}", solc_path.display());
-        println!("{:?}", String::from_utf8(output.to_owned().stderr.to_vec()));
-        // println!("{:?}", &output.to_owned().stdout);
-        println!("=========================");
+        let output_json: Value = serde_json::from_slice(&output.clone().stdout)
+            .map_err(|e| Error::msg(format!("Could to parse zksolc compiler output: {}", e)))?;
+
+        let output_json_pretty = serde_json::to_string_pretty(&output_json)
+            .map_err(|e| Error::msg(format!("Could to beautify zksolc compiler output: {}", e)))?;
 
         artifacts_file
-            .write_all(&output.stdout)
+            .write_all(output_json_pretty.as_bytes())
             .map_err(|e| Error::msg(format!("Could not write artifacts file: {}", e)))?;
 
         Ok(())
