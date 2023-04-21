@@ -106,12 +106,12 @@ impl<'a> ZkSolc<'a> {
         // TODO: configure vars appropriately, this is a happy path to compilation
         let mut comp_args: Vec<String> =
             vec![self.clone().contracts_path.into_os_string().into_string().unwrap()];
-        comp_args.push("--solc".to_string());
-        comp_args.push(solc_path.clone().into_os_string().into_string().unwrap());
         comp_args.push("--standard-json".to_string());
         if self.is_system {
             comp_args.push("--system-mode".to_string());
         }
+        comp_args.push("--solc".to_string());
+        comp_args.push(solc_path.clone().into_os_string().into_string().unwrap());
         // comp_args.push("--force-evmla".to_string());
         // comp_args.push("--bin".to_string());
         // comp_args.push("--combined-json".to_string());
