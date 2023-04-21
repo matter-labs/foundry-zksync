@@ -96,11 +96,11 @@ impl ZkCreateArgs {
         // set out folder path
         project.paths.artifacts = project.paths.root.join("zkout");
 
-        // get initial factory deps (main contract bytecode)
-        let mut factory_deps =
-            self.get_factory_dependencies(&project, Vec::new(), vec![self.contract.clone()]);
+        // get  contract bytecode
+        let mut bytecode = Self::get_bytecode_from_contract(&project, &self.contract).unwrap();
 
         //check for additional factory deps
+        let mut factory_deps = Vec::new();
         if let Some(fdep_contract_info) = self.factory_deps.clone() {
             factory_deps =
                 self.get_factory_dependencies(&project, factory_deps, fdep_contract_info);
@@ -114,11 +114,39 @@ impl ZkCreateArgs {
         let contract: Abi = serde_json::from_value(abi).unwrap();
         println!("{:#?}, contract ---->>>", contract);
 
-        let constructor_args = self.get_constructor_args(&contract);
-
         // encode constructor args
-        let encoded_args = encode(constructor_args.as_slice());
-        // let _hex_args = &encoded_args.to_hex::<String>();
+        let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
+
+        let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
+        let deployer_builder = match &wallet {
+            Ok(w) => w.start_deploy_contract(),
+            Err(e) => panic!("error wallet: {e:?}"),
+        };
+
+        let deployer = deployer_builder
+            .bytecode(bytecode.to_vec())
+            .factory_deps(factory_deps)
+            .constructor_calldata(encoded_args);
+
+        let est_gas = deployer.estimate_fee(None).await;
+        println!("{:#?}, est_gas", est_gas);
+
+        let tx = deployer.send().await;
+        match tx {
+            Ok(dep) => {
+                let rcpt = dep.wait_for_commit().await;
+                println!("{dep:#?}, deploy success");
+                let logs = rcpt.unwrap().logs;
+                for log in logs {
+                    if log.address == CONTRACT_DEPLOYER_ADDRESS {
+                        let deployed_address = log.topics.get(3).unwrap();
+                        let deployed_address = Address::from(deployed_address.clone());
+                        println!("{:#?}, <---- Deployed contract address:", deployed_address);
+                    }
+                }
+            }
+            Err(e) => println!("{:#?}, error", e),
+        }
 
         Ok(())
     }
@@ -151,6 +179,19 @@ impl ZkCreateArgs {
         )
     }
 
+    fn get_bytecode_from_contract(
+        project: &Project,
+        contract_info: &ContractInfo,
+    ) -> Result<Bytes, serde_json::Error> {
+        let output_path = Self::get_path_for_contract_output(project, contract_info);
+        let contract_output = Self::get_contract_output(output_path);
+        serde_json::from_value(
+            contract_output[contract_info.path.as_ref().unwrap()][&contract_info.name]["evm"]
+                ["bytecode"]["object"]
+                .clone(),
+        )
+    }
+
     fn get_contract_output(output_path: PathBuf) -> Value {
         let data = fs::read_to_string(output_path).expect("Unable to read file");
         let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
@@ -172,7 +213,7 @@ impl ZkCreateArgs {
         for dep in fdep_contract_info.iter() {
             let mut output_path = Self::get_path_for_contract_output(&project, dep);
             let output = Self::get_contract_output(output_path);
-            let dep_bytecode = get_bytecode_from_contract(dep, output).unwrap();
+            let dep_bytecode = Self::get_bytecode_from_contract(&project, dep).unwrap();
             factory_dep_vector.push(dep_bytecode.to_vec());
         }
         factory_dep_vector
@@ -207,28 +248,6 @@ impl ZkCreateArgs {
         parse_tokens(params, true)
     }
 }
-
-fn get_bytecode_from_contract(
-    contract_info: &ContractInfo,
-    contract_out: Value,
-) -> Result<Bytes, serde_json::Error> {
-    // get bytecode
-    serde_json::from_value(
-        contract_out[contract_info.path.as_ref().unwrap()][&contract_info.name]["evm"]["bytecode"]
-            ["object"]
-            .clone(),
-    )
-}
-
-// fn get_abi_from_contract(
-//     contract_info: &ContractInfo,
-//     contract_out: Value,
-// ) -> Result<Value, serde_json::Error> {
-//     // get bytecode
-//     serde_json::from_value(
-//         contract_out[contract_info.path.as_ref().unwrap()][&contract_info.name]["abi"].clone(),
-//     )
-// }
 
 use std::{fmt::Write, num::ParseIntError};
 
