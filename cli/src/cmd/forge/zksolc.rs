@@ -76,7 +76,7 @@ impl<'a> ZkSolc<'a> {
 
         Self {
             // config: todo!(),
-            project: opts.project.clone(),
+            project: opts.project,
             compiler_path: opts.compiler_path,
             output_path: opts.project.paths.root.to_owned().join("zkout"),
             contracts_path: opts.project.paths.sources.to_owned().join(opts.contract_name.clone()),
