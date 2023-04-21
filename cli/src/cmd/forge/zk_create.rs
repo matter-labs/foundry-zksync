@@ -113,15 +113,6 @@ impl ZkCreateArgs {
         res["contracts"].clone()
     }
 
-    fn get_bytecode(&self, contract_out: Value) -> Result<Bytes, serde_json::Error> {
-        // get bytecode
-        serde_json::from_value(
-            contract_out[&self.contract.path.clone().unwrap()][&self.contract.name]["evm"]
-                ["bytecode"]["object"]
-                .clone(),
-        )
-    }
-    //do this
     fn get_path_for_contract_output(project: &Project, contract_info: &ContractInfo) -> PathBuf {
         let mut filename = contract_info.path.clone().unwrap();
         let abc = filename.split('/').last().unwrap();
@@ -158,7 +149,7 @@ impl ZkCreateArgs {
     }
 }
 
-pub fn get_bytecode_from_contract(
+fn get_bytecode_from_contract(
     contract_info: &ContractInfo,
     contract_out: Value,
 ) -> Result<Bytes, serde_json::Error> {
