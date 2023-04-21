@@ -114,9 +114,9 @@ impl ZkCreateArgs {
     }
 
     fn get_path_for_contract_output(project: &Project, contract_info: &ContractInfo) -> PathBuf {
-        let mut filename = contract_info.path.clone().unwrap();
-        let abc = filename.split('/').last().unwrap();
-        project.paths.artifacts.join(abc).join("artifacts.json")
+        let mut filepath = contract_info.path.clone().unwrap();
+        let filename = filepath.split('/').last().unwrap();
+        project.paths.artifacts.join(filename).join("artifacts.json")
     }
 
     fn get_factory_dependencies(
