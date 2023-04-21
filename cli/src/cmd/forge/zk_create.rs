@@ -9,14 +9,20 @@ use crate::{
 };
 use clap::{Parser, ValueHint};
 use ethers::{
-    abi::{Abi, Constructor, Token},
+    abi::{encode, Abi, Constructor, Token},
     prelude::{artifacts::BytecodeObject, ContractFactory, Middleware},
     solc::{info::ContractInfo, utils::canonicalized, Project},
     types::{transaction::eip2718::TypedTransaction, Bytes, Chain},
 };
 use rustc_hex::ToHex;
 use serde_json::{json, Value};
-use std::{fs, path::PathBuf, sync::Arc};
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::{
+    fs::{self, File},
+    path::PathBuf,
+    sync::Arc,
+};
 use tracing::log::trace;
 use zk_evm::k256::pkcs8::Error;
 
@@ -102,10 +108,22 @@ impl ZkCreateArgs {
         // get signer
         let signer = self.get_signer();
 
+        let co =
+            self.get_contract_output(Self::get_path_for_contract_output(&project, &self.contract));
+
+        let abi = get_abi_from_contract(&self.contract, co).unwrap();
+
+        let contract: Abi = serde_json::from_value(abi).unwrap();
+        println!("{:#?}, contract ---->>>", contract);
+
+        // encode constructor args
+        // let encoded_args = encode(self.constructor_args.as_slice());
+        // let _hex_args = &encoded_args.to_hex::<String>();
+
         Ok(())
     }
 
-    pub fn get_contract_output(&self, output_path: PathBuf) -> Value {
+    fn get_contract_output(&self, output_path: PathBuf) -> Value {
         let data = fs::read_to_string(output_path).expect("Unable to read file");
         let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
         res["contracts"].clone()
@@ -156,6 +174,16 @@ fn get_bytecode_from_contract(
         contract_out[contract_info.path.as_ref().unwrap()][&contract_info.name]["evm"]["bytecode"]
             ["object"]
             .clone(),
+    )
+}
+
+fn get_abi_from_contract(
+    contract_info: &ContractInfo,
+    contract_out: Value,
+) -> Result<Value, serde_json::Error> {
+    // get bytecode
+    serde_json::from_value(
+        contract_out[contract_info.path.as_ref().unwrap()][&contract_info.name]["abi"].clone(),
     )
 }
 
