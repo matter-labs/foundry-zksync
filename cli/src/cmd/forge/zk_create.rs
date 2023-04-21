@@ -14,6 +14,7 @@ use ethers::{
     solc::{info::ContractInfo, utils::canonicalized, Project},
     types::{transaction::eip2718::TypedTransaction, Bytes, Chain},
 };
+use foundry_common::abi::parse_tokens;
 use rustc_hex::ToHex;
 use serde_json::{json, Value};
 use std::io::prelude::*;
@@ -108,22 +109,49 @@ impl ZkCreateArgs {
         // get signer
         let signer = self.get_signer();
 
-        let co =
-            self.get_contract_output(Self::get_path_for_contract_output(&project, &self.contract));
-
-        let abi = get_abi_from_contract(&self.contract, co).unwrap();
-
+        // get abi
+        let abi = Self::get_abi_from_contract(&project, &self.contract).unwrap();
         let contract: Abi = serde_json::from_value(abi).unwrap();
         println!("{:#?}, contract ---->>>", contract);
 
+        let constructor_args = self.get_constructor_args(&contract);
+
         // encode constructor args
-        // let encoded_args = encode(self.constructor_args.as_slice());
+        let encoded_args = encode(constructor_args.as_slice());
         // let _hex_args = &encoded_args.to_hex::<String>();
 
         Ok(())
     }
 
-    fn get_contract_output(&self, output_path: PathBuf) -> Value {
+    fn get_constructor_args(&self, abi: &Abi) -> Vec<Token> {
+        let params = match abi.constructor {
+            Some(ref v) => {
+                let constructor_args =
+                    if let Some(ref constructor_args_path) = self.constructor_args_path {
+                        read_constructor_args_file(constructor_args_path.to_path_buf()).unwrap()
+                    } else {
+                        self.constructor_args.clone()
+                    };
+                self.parse_constructor_args(v, &constructor_args).unwrap()
+            }
+            None => vec![],
+        };
+        params
+    }
+
+    fn get_abi_from_contract(
+        project: &Project,
+        contract_info: &ContractInfo,
+    ) -> Result<Value, serde_json::Error> {
+        let output_path = Self::get_path_for_contract_output(project, contract_info);
+        let contract_output = Self::get_contract_output(output_path);
+        serde_json::from_value(
+            contract_output[contract_info.path.as_ref().unwrap()][&contract_info.name]["abi"]
+                .clone(),
+        )
+    }
+
+    fn get_contract_output(output_path: PathBuf) -> Value {
         let data = fs::read_to_string(output_path).expect("Unable to read file");
         let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
         res["contracts"].clone()
@@ -143,7 +171,7 @@ impl ZkCreateArgs {
     ) -> Vec<Vec<u8>> {
         for dep in fdep_contract_info.iter() {
             let mut output_path = Self::get_path_for_contract_output(&project, dep);
-            let output = self.get_contract_output(output_path);
+            let output = Self::get_contract_output(output_path);
             let dep_bytecode = get_bytecode_from_contract(dep, output).unwrap();
             factory_dep_vector.push(dep_bytecode.to_vec());
         }
@@ -163,6 +191,21 @@ impl ZkCreateArgs {
             L2ChainId(self.eth.chain.unwrap().id().try_into().unwrap()),
         )
     }
+
+    fn parse_constructor_args(
+        &self,
+        constructor: &Constructor,
+        constructor_args: &[String],
+    ) -> eyre::Result<Vec<Token>> {
+        let params = constructor
+            .inputs
+            .iter()
+            .zip(constructor_args)
+            .map(|(input, arg)| (&input.kind, arg.as_str()))
+            .collect::<Vec<_>>();
+
+        parse_tokens(params, true)
+    }
 }
 
 fn get_bytecode_from_contract(
@@ -177,15 +220,15 @@ fn get_bytecode_from_contract(
     )
 }
 
-fn get_abi_from_contract(
-    contract_info: &ContractInfo,
-    contract_out: Value,
-) -> Result<Value, serde_json::Error> {
-    // get bytecode
-    serde_json::from_value(
-        contract_out[contract_info.path.as_ref().unwrap()][&contract_info.name]["abi"].clone(),
-    )
-}
+// fn get_abi_from_contract(
+//     contract_info: &ContractInfo,
+//     contract_out: Value,
+// ) -> Result<Value, serde_json::Error> {
+//     // get bytecode
+//     serde_json::from_value(
+//         contract_out[contract_info.path.as_ref().unwrap()][&contract_info.name]["abi"].clone(),
+//     )
+// }
 
 use std::{fmt::Write, num::ParseIntError};
 
