@@ -82,34 +82,24 @@ impl ZkCreateArgs {
     pub async fn run(mut self) -> eyre::Result<()> {
         println!("{:#?}, ZkCreateArgs ---->>>", self);
 
-        // get project and set paths
+        // get project
         let mut project = self.opts.project()?;
-        project.paths.artifacts = project.paths.root.join("zkout");
-
-        let mut output_path = Self::get_path_for_contract_output(&project, &self.contract);
-
         println!("{:#?}, project ---->>>", project);
 
-        let contracts_ouput = self.get_contract_output(output_path);
-        // let bytecode = self.get_bytecode(contracts_ouput.clone()).unwrap();
-        let bytecode = get_bytecode_from_contract(&self.contract, contracts_ouput.clone()).unwrap();
+        // set out folder path
+        project.paths.artifacts = project.paths.root.join("zkout");
 
-        println!("{:#?}, bytecode", bytecode);
-        //-----------------------//
-        // initial factory dep
-        let mut factory_deps = vec![bytecode.to_vec()];
+        // get initial factory deps (main contract bytecode)
+        let mut factory_deps =
+            self.get_factory_dependencies(&project, Vec::new(), vec![self.contract.clone()]);
 
-        // //check for additional factory deps
+        //check for additional factory deps
         if let Some(fdep_contract_info) = self.factory_deps.clone() {
-            self.get_additional_factory_dependencies(
-                &project,
-                &mut factory_deps,
-                fdep_contract_info,
-            );
+            factory_deps =
+                self.get_factory_dependencies(&project, factory_deps, fdep_contract_info);
         }
 
-        println!("{:#?}, factory_deps", factory_deps);
-
+        // get signer
         let signer = self.get_signer();
 
         Ok(())
@@ -138,18 +128,19 @@ impl ZkCreateArgs {
         project.paths.artifacts.join(abc).join("artifacts.json")
     }
 
-    fn get_additional_factory_dependencies(
+    fn get_factory_dependencies(
         &self,
         project: &Project,
-        factory_dep_vector: &mut Vec<Vec<u8>>,
+        mut factory_dep_vector: Vec<Vec<u8>>,
         fdep_contract_info: Vec<ContractInfo>,
-    ) {
+    ) -> Vec<Vec<u8>> {
         for dep in fdep_contract_info.iter() {
             let mut output_path = Self::get_path_for_contract_output(&project, dep);
             let output = self.get_contract_output(output_path);
             let dep_bytecode = get_bytecode_from_contract(dep, output).unwrap();
             factory_dep_vector.push(dep_bytecode.to_vec());
         }
+        factory_dep_vector
     }
 
     fn get_signer(&self) -> Signer<PrivateKeySigner> {
