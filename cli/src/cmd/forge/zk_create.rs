@@ -130,7 +130,11 @@ impl ZkCreateArgs {
         let eth_signer = PrivateKeySigner::new(private_key);
         let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
             .expect("Can't get an address from the private key");
-        Signer::new(eth_signer, signer_addy, L2ChainId(self.chain_id))
+        Signer::new(
+            eth_signer,
+            signer_addy,
+            L2ChainId(self.eth.chain.unwrap().id().try_into().unwrap()),
+        )
     }
 }
 
