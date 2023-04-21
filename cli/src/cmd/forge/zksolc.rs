@@ -21,7 +21,7 @@ pub struct ZkSolcOpts<'a> {
     pub compiler_path: PathBuf,
     pub contract_name: String,
     // pub contracts_path: PathBuf,
-    // pub is_system: bool,
+    pub is_system: bool,
     // pub force_evmla: bool,
 }
 
@@ -45,7 +45,7 @@ pub struct ZkSolc<'a> {
     pub output_path: PathBuf,
     pub contracts_path: PathBuf,
     pub artifacts_path: PathBuf,
-    // pub is_system: bool,
+    pub is_system: bool,
     // pub force_evmla: bool,
     pub standard_json: Option<StandardJsonCompilerInput>,
 }
@@ -86,7 +86,7 @@ impl<'a> ZkSolc<'a> {
                 .to_owned()
                 .join("zkout")
                 .join(opts.contract_name.clone()),
-            // is_system: todo!(),
+            is_system: opts.is_system,
             // force_evmla: todo!(),
             standard_json: None,
         }
@@ -108,12 +108,14 @@ impl<'a> ZkSolc<'a> {
             vec![self.clone().contracts_path.into_os_string().into_string().unwrap()];
         comp_args.push("--solc".to_string());
         comp_args.push(solc_path.clone().into_os_string().into_string().unwrap());
-        // comp_args.push("--system-mode".to_string());
+        comp_args.push("--standard-json".to_string());
+        if self.is_system {
+            comp_args.push("--system-mode".to_string());
+        }
         // comp_args.push("--force-evmla".to_string());
         // comp_args.push("--bin".to_string());
         // comp_args.push("--combined-json".to_string());
         // comp_args.push("abi,bin,hashes".to_string());
-        comp_args.push("--standard-json".to_string());
 
         let mut cmd = Command::new(self.clone().compiler_path);
         let mut child = cmd
