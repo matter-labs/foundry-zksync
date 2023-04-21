@@ -71,16 +71,17 @@ impl fmt::Display for ZkSolc<'_> {
 
 impl<'a> ZkSolc<'a> {
     pub fn new(opts: ZkSolcOpts<'a>) -> Self {
-        let mut project = Config::load().project().unwrap();
-        let contracts_path = project.paths.sources.to_owned().join(opts.contract_name.clone());
+        // let mut project = Config::load().project().unwrap();
+        // let contracts_path = opts.project.paths.sources.to_owned().join(opts.contract_name.clone());
 
         Self {
             // config: todo!(),
             project: opts.project.clone(),
             compiler_path: opts.compiler_path,
-            output_path: project.paths.root.to_owned().join("zkout"),
-            contracts_path: contracts_path.clone(),
-            artifacts_path: project
+            output_path: opts.project.paths.root.to_owned().join("zkout"),
+            contracts_path: opts.project.paths.sources.to_owned().join(opts.contract_name.clone()),
+            artifacts_path: opts
+                .project
                 .paths
                 .root
                 .to_owned()

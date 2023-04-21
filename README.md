@@ -164,3 +164,15 @@ Bridge assets L1 ↔ L2 with `--zksync-deposit` and `--zksync-withdraw`
 ***L2 → L1 withdrawals:***
 
 `cast send --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --zksync-withdraw <TO> <AMOUNT> <TOKEN>`
+
+---
+## UPDATE 4/20
+New build command with refactored code `forge zk-build`
+
+```bash
+# command line using forge zk-build:
+../foundry-zksync/target/debug/forge zk-build --contract_name Greeter.sol --use_zksolc v1.3.8
+```
+
+zk-build commands saves compiled artifacts to `<PROJECT_ROOT>/zkout/` folder, adjacent to Foundry's native `/out/` folder
+
