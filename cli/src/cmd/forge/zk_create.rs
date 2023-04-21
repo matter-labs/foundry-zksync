@@ -106,9 +106,7 @@ impl ZkCreateArgs {
     }
 
     pub fn get_contract_output(&self, output_path: PathBuf) -> Value {
-        //get standard json output
         let data = fs::read_to_string(output_path).expect("Unable to read file");
-        //convert to json Value
         let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
         res["contracts"].clone()
     }
