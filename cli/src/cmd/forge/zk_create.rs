@@ -11,7 +11,7 @@ use clap::{Parser, ValueHint};
 use ethers::{
     abi::{Abi, Constructor, Token},
     prelude::{artifacts::BytecodeObject, ContractFactory, Middleware},
-    solc::{info::ContractInfo, utils::canonicalized},
+    solc::{info::ContractInfo, utils::canonicalized, Project},
     types::{transaction::eip2718::TypedTransaction, Bytes, Chain},
 };
 use rustc_hex::ToHex;
@@ -68,11 +68,9 @@ pub struct ZkCreateArgs {
     #[clap(flatten)]
     eth: EthereumOpts,
 
-    #[clap(long, help = "Chain id testnet: 280, local: 270", value_name = "CHAIN-ID")]
-    chain_id: u16,
-
     #[clap(
         long,
+        num_args(1..),
         help = "The factory dependencies in the form `<path>:<contractname>`.",
         value_name = "FACTORY-DEPS"
     )]
@@ -87,26 +85,37 @@ impl ZkCreateArgs {
         // get project and set paths
         let mut project = self.opts.project()?;
         project.paths.artifacts = project.paths.root.join("zkout");
-        let mut filename = self.contract.path.as_mut().unwrap().split('/').last().unwrap();
-        let output_path = project.paths.artifacts.join(filename).join("artifacts.json");
+
+        let mut output_path = Self::get_path_for_contract_output(&project, &self.contract);
 
         println!("{:#?}, project ---->>>", project);
 
-        let contracts_ouput = self.get_contracts(output_path);
-        let bytecode = self.get_bytecode(contracts_ouput.clone()).unwrap();
+        let contracts_ouput = self.get_contract_output(output_path);
+        // let bytecode = self.get_bytecode(contracts_ouput.clone()).unwrap();
+        let bytecode = get_bytecode_from_contract(&self.contract, contracts_ouput.clone()).unwrap();
 
+        println!("{:#?}, bytecode", bytecode);
         //-----------------------//
         // initial factory dep
         let mut factory_deps = vec![bytecode.to_vec()];
 
         // //check for additional factory deps
+        if let Some(fdep_contract_info) = self.factory_deps.clone() {
+            self.get_additional_factory_dependencies(
+                &project,
+                &mut factory_deps,
+                fdep_contract_info,
+            );
+        }
+
+        println!("{:#?}, factory_deps", factory_deps);
 
         let signer = self.get_signer();
 
         Ok(())
     }
 
-    fn get_contracts(&self, output_path: PathBuf) -> Value {
+    pub fn get_contract_output(&self, output_path: PathBuf) -> Value {
         //get standard json output
         let data = fs::read_to_string(output_path).expect("Unable to read file");
         //convert to json Value
@@ -122,6 +131,26 @@ impl ZkCreateArgs {
                 .clone(),
         )
     }
+    //do this
+    fn get_path_for_contract_output(project: &Project, contract_info: &ContractInfo) -> PathBuf {
+        let mut filename = contract_info.path.clone().unwrap();
+        let abc = filename.split('/').last().unwrap();
+        project.paths.artifacts.join(abc).join("artifacts.json")
+    }
+
+    fn get_additional_factory_dependencies(
+        &self,
+        project: &Project,
+        factory_dep_vector: &mut Vec<Vec<u8>>,
+        fdep_contract_info: Vec<ContractInfo>,
+    ) {
+        for dep in fdep_contract_info.iter() {
+            let mut output_path = Self::get_path_for_contract_output(&project, dep);
+            let output = self.get_contract_output(output_path);
+            let dep_bytecode = get_bytecode_from_contract(dep, output).unwrap();
+            factory_dep_vector.push(dep_bytecode.to_vec());
+        }
+    }
 
     fn get_signer(&self) -> Signer<PrivateKeySigner> {
         // get signer
@@ -136,6 +165,18 @@ impl ZkCreateArgs {
             L2ChainId(self.eth.chain.unwrap().id().try_into().unwrap()),
         )
     }
+}
+
+pub fn get_bytecode_from_contract(
+    contract_info: &ContractInfo,
+    contract_out: Value,
+) -> Result<Bytes, serde_json::Error> {
+    // get bytecode
+    serde_json::from_value(
+        contract_out[contract_info.path.as_ref().unwrap()][&contract_info.name]["evm"]["bytecode"]
+            ["object"]
+            .clone(),
+    )
 }
 
 use std::{fmt::Write, num::ParseIntError};
