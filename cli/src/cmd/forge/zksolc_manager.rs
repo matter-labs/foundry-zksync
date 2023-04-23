@@ -1,11 +1,11 @@
+use anyhow::{Error, Result};
 use dirs;
-use anyhow::{Result, Error};
+use reqwest::blocking::Client;
 use serde::Serialize;
-use std::{fmt, fs, os::{unix::prelude::PermissionsExt}, path::PathBuf};
-use url::Url;
 use std::fs::File;
 use std::io::copy;
-use reqwest::blocking::Client;
+use std::{fmt, fs, os::unix::prelude::PermissionsExt, path::PathBuf};
+use url::Url;
 
 #[derive(Debug, Clone, Serialize)]
 pub enum ZkSolcVersion {
@@ -13,6 +13,7 @@ pub enum ZkSolcVersion {
     V136,
     V137,
     V138,
+    V139,
 }
 
 fn parse_version(version: &str) -> Result<ZkSolcVersion> {
@@ -21,6 +22,7 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.6" => Ok(ZkSolcVersion::V136),
         "v1.3.7" => Ok(ZkSolcVersion::V137),
         "v1.3.8" => Ok(ZkSolcVersion::V138),
+        "v1.3.9" => Ok(ZkSolcVersion::V139),
         _ => Err(Error::msg("Unsupported version")),
     }
 }
@@ -32,6 +34,7 @@ impl ZkSolcVersion {
             ZkSolcVersion::V136 => Ok("v1.3.6"),
             ZkSolcVersion::V137 => Ok("v1.3.7"),
             ZkSolcVersion::V138 => Ok("v1.3.8"),
+            ZkSolcVersion::V139 => Ok("v1.3.9"),
             _ => Err(Error::msg("ZkSolc compiler version not supported")),
         }
     }
@@ -82,10 +85,10 @@ pub struct ZkSolcManagerBuilder {
 
 impl ZkSolcManagerBuilder {
     pub fn new(opts: ZkSolcManagerOpts) -> Self {
-        Self { 
-            compilers_path: None, 
-            version: opts.version, 
-            compiler: None, 
+        Self {
+            compilers_path: None,
+            version: opts.version,
+            compiler: None,
             download_url: Url::parse("https://github.com/matter-labs/zksolc-bin/raw/main").unwrap(),
         }
     }
@@ -130,7 +133,8 @@ pub struct ZkSolcManager {
 
 impl fmt::Display for ZkSolcManager {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, 
+        write!(
+            f,
             "ZkSolcManager (
                 compilers_path: {}, 
                 version: {}, 
@@ -139,12 +143,12 @@ impl fmt::Display for ZkSolcManager {
                 compiler_name: {}, 
                 full_download_url: {}
                 exists: {}
-            )", 
-            self.compilers_path.display(), 
-            self.version.get_version().unwrap(), 
-            self.compiler, 
-            self.download_url, 
-            self.clone().get_full_compiler(), 
+            )",
+            self.compilers_path.display(),
+            self.version.get_version().unwrap(),
+            self.compiler,
+            self.download_url,
+            self.clone().get_full_compiler(),
             self.clone().get_full_download_url().unwrap(),
             self.clone().exists(),
         )
@@ -159,7 +163,12 @@ impl ZkSolcManager {
     pub fn get_full_download_url(&self) -> Result<Url> {
         if let Ok(zk_solc_os) = get_operating_system() {
             let download_uri = zk_solc_os.get_download_uri().to_string();
-            let full_download_url = format!("{}/{}/{}", self.download_url, download_uri, self.clone().get_full_compiler());
+            let full_download_url = format!(
+                "{}/{}/{}",
+                self.download_url,
+                download_uri,
+                self.clone().get_full_compiler()
+            );
             if let Ok(url) = Url::parse(&full_download_url) {
                 Ok(url)
             } else {
@@ -187,14 +196,16 @@ impl ZkSolcManager {
     pub fn download(self) -> Result<()> {
         if self.exists() {
             // TODO: figure out better don't download if compiler is downloaded
-            return Ok(())
+            return Ok(());
         }
-        
-        let url = self.get_full_download_url()
+
+        let url = self
+            .get_full_download_url()
             .map_err(|e| Error::msg(format!("Could not get full download url: {}", e)))?;
 
         let client = Client::new();
-        let mut response = client.get(url)
+        let mut response = client
+            .get(url)
             .send()
             .map_err(|e| Error::msg(format!("Failed to download file: {}", e)))?;
 
