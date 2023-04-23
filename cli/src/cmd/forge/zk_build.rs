@@ -30,14 +30,19 @@ pub struct ZkBuildArgs {
 
     #[clap(
         help = "Contract filename from project src/ ex: 'Contract.sol'",
-        long = "contract-name",
+        // long = "contract-name",
         value_name = "CONTRACT_FILENAME"
     )]
     pub contract_name: String,
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
-    #[clap(help_heading = "Compiler options", value_name = "ZK_SOLC_VERSION", long = "use-zksolc")]
+    #[clap(
+        help_heading = "Compiler options",
+        value_name = "ZK_SOLC_VERSION",
+        long = "use-zksolc",
+        default_value = Some("v1.3.9")
+    )]
     #[serde(skip)]
     pub use_zksolc: Option<String>,
 

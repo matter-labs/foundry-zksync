@@ -4,8 +4,8 @@ use ethers::solc::{
     Graph, Project,
 };
 use foundry_config::Config;
-use serde:: Serialize;
-use serde_json::{Value};
+use serde::Serialize;
+use serde_json::Value;
 use std::path::{self, PathBuf};
 use std::{
     collections::BTreeMap,
@@ -176,6 +176,9 @@ impl<'a> ZkSolc<'a> {
                 "irOptimized".to_string(),
             ],
         );
+
+        // set metadata to None
+        project.solc_config.settings.metadata = None;
 
         project
             .solc_config
