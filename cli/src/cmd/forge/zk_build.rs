@@ -30,16 +30,23 @@ pub struct ZkBuildArgs {
 
     #[clap(
         help = "Contract filename from project src/ ex: 'Contract.sol'",
-        long = "contract_name",
+        long = "contract-name",
         value_name = "CONTRACT_FILENAME"
     )]
     pub contract_name: String,
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
-    #[clap(help_heading = "Compiler options", value_name = "ZK_SOLC_VERSION", long = "use_zksolc")]
+    #[clap(help_heading = "Compiler options", value_name = "ZK_SOLC_VERSION", long = "use-zksolc")]
     #[serde(skip)]
     pub use_zksolc: Option<String>,
+
+    #[clap(
+        help = "Compile contract with in system mode",
+        long = "is-system",
+        value_name = "SYSTEM_MODE"
+    )]
+    pub is_system: bool,
 }
 
 impl Cmd for ZkBuildArgs {
@@ -70,7 +77,7 @@ impl Cmd for ZkBuildArgs {
                 let zksolc_opts = ZkSolcOpts {
                     compiler_path: zksolc_manager.get_full_compiler_path(),
                     // config: &config,
-                    // is_system: todo!(),
+                    is_system: self.is_system,
                     // force_evmla: todo!(),
                     project: &project,
                     config: &config,

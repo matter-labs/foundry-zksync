@@ -4,7 +4,7 @@ use ethers::solc::info::ContractInfo;
 use ethers::types::Bytes;
 use foundry_config::Config;
 use rustc_hex::ToHex;
-use serde_json;
+use serde_json::{self, error, Value};
 use std::fs;
 use std::io::Result;
 use zksync::types::H256;
@@ -24,24 +24,22 @@ pub async fn deploy_zksync(
     chain_id: u16,
 ) -> Result<()> {
     let contract_name = contract_info.name;
-    let mut filename = contract_path.split('/');
-    let splits = filename.clone().count();
-    let file = filename.nth(splits - 1).unwrap().split(":").nth(0).unwrap();
+    let mut filename = contract_path.split('/').last().unwrap();
 
     //get standard json output
-    let output_path: &str =
-        &format!("{}/zksolc/{}/artifacts.json", project.paths.artifacts.display(), file);
+    let output_path = project.paths.artifacts.join("zksolc").join(filename).join("artifacts.json");
     let data = fs::read_to_string(output_path).expect("Unable to read file");
+
     //convert to json Value
     let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
+
     // get bytecode
     let bytecode: Bytes = serde_json::from_value(
-        res["contracts"][&contract_path][contract_name]["evm"]["bytecode"]["object"].clone(),
+        res["contracts"][&contract_path][&contract_name]["evm"]["bytecode"]["object"].clone(),
     )
     .unwrap();
-    let bytecode_v = bytecode.to_vec();
 
-    //---------------------------------//
+    //---------------------------------//NOT NECESSARY
     // //validate bytecode
     // let bytecode_array: &[u8] = &bytecode_v;
     // match zksync_utils::bytecode::validate_bytecode(bytecode_array) {
@@ -52,6 +50,40 @@ pub async fn deploy_zksync(
     // let bytecode_hash = zksync_utils::bytecode::hash_bytecode(bytecode_array);
     //---------------------------------//
 
+    //-----------------------//
+    // initial factory dep
+    let mut factory_deps = vec![bytecode.to_vec()];
+
+    //check for additional factory deps
+    let raw_factory_deps =
+        res["contracts"][contract_path][contract_name]["factoryDependencies"].clone();
+
+    let mut factory_deps_contract_names_and_paths =
+        raw_factory_deps.as_object().expect("factory dep error").values().into_iter();
+
+    for dep in factory_deps_contract_names_and_paths {
+        match dep {
+            Value::String(string) => {
+                // split dependency path and name
+                let mut parts = string.split(":");
+                let dep_bytecode: serde_json::Result<Bytes> = serde_json::from_value(
+                    res["contracts"][parts.next().unwrap()][parts.next().unwrap()]["evm"]
+                        ["bytecode"]["object"]
+                        .clone(),
+                );
+
+                match dep_bytecode {
+                    Ok(b) => {
+                        println!("{:#?} factory dependency bytecode", b);
+                        factory_deps.push(b.to_vec());
+                    }
+                    Err(e) => println!("{:#?} error dep_bytecode", e),
+                }
+            }
+            _ => println!("{:#?} error getting factory dependencies", dep),
+        }
+    }
+
     // get signer
     let private_key = H256::from_slice(&decode_hex(&priv_key).unwrap());
     let eth_signer = PrivateKeySigner::new(private_key);
@@ -61,30 +93,25 @@ pub async fn deploy_zksync(
 
     // encode constructor args
     let encoded_args = encode(constructor_params.as_slice());
-    let _hex_args = &encoded_args.to_hex::<String>();
+    // let _hex_args = &encoded_args.to_hex::<String>();
 
-    //factory deps
-    let factory_deps = vec![bytecode_v.clone()];
-
-    let deployer_builder;
     let wallet = wallet::Wallet::with_http_client(&rpc_url, _signer);
-    match &wallet {
-        Ok(w) => {
-            deployer_builder = w.start_deploy_contract();
-        }
+    let deployer_builder = match &wallet {
+        Ok(w) => w.start_deploy_contract(),
         Err(e) => panic!("error wallet: {e:?}"),
     };
 
     let deployer = deployer_builder
-        .bytecode(bytecode_v)
+        .bytecode(bytecode.to_vec())
         .factory_deps(factory_deps)
         .constructor_calldata(encoded_args);
 
     let est_gas = deployer.estimate_fee(None).await;
-    match est_gas {
-        Ok(fee) => println!("{:#?}, est fee success", fee),
-        Err(c) => println!("{:#?}, error", c),
-    }
+    println!("{:#?}, est_gas", est_gas);
+    // match est_gas {
+    //     Ok(fee) => println!("{:#?}, est fee success", fee),
+    //     Err(c) => println!("{:#?}, error", c),
+    // }
 
     let tx = deployer.send().await;
     match tx {
