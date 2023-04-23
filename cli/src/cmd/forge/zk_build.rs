@@ -30,7 +30,6 @@ pub struct ZkBuildArgs {
 
     #[clap(
         help = "Contract filename from project src/ ex: 'Contract.sol'",
-        // long = "contract-name",
         value_name = "CONTRACT_FILENAME"
     )]
     pub contract_name: String,
