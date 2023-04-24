@@ -98,14 +98,11 @@ impl Cmd for ZkBuildArgs {
                 };
 
                 let mut zksolc = ZkSolc::new(zksolc_opts);
-                println!("{}", zksolc);
 
-                // if let Err(err) = zksolc.parse_json_input() {
-                //     eprintln!("Failed to parse json input for zksolc compiler: {}", err);
-                //     process::exit(1);
-                // }
-
-                zksolc.parse_json_input();
+                if let Err(err) = zksolc.parse_json_input() {
+                    eprintln!("Failed to parse json input for zksolc compiler: {}", err);
+                    process::exit(1);
+                }
 
                 match zksolc.compile() {
                     Ok(_) => println!("Compiled Successfully"),
