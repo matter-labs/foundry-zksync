@@ -96,6 +96,13 @@ impl ZkCreateArgs {
         // set out folder path
         project.paths.artifacts = project.paths.root.join("zkout");
 
+        // get abi
+        let abi = Self::get_abi_from_contract(&project, &self.contract).unwrap();
+        println!("{:#?}, contract ---->>>", abi);
+
+        // encode constructor args
+        let encoded_args = encode(self.get_constructor_args(&abi).as_slice());
+
         // get  contract bytecode
         let mut bytecode = Self::get_bytecode_from_contract(&project, &self.contract).unwrap();
 
@@ -108,14 +115,6 @@ impl ZkCreateArgs {
 
         // get signer
         let signer = self.get_signer();
-
-        // get abi
-        let abi = Self::get_abi_from_contract(&project, &self.contract).unwrap();
-        println!("{:#?}, contract ---->>>", abi);
-
-        // encode constructor args
-        let encoded_args = encode(self.get_constructor_args(&abi).as_slice());
-
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         let deployer_builder = match &wallet {
             Ok(w) => w.start_deploy_contract(),
