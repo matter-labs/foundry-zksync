@@ -97,7 +97,10 @@ impl ZkCreateArgs {
         project.paths.artifacts = project.paths.root.join("zkout");
 
         // get abi
-        let abi = Self::get_abi_from_contract(&project, &self.contract).unwrap();
+        let abi = match Self::get_abi_from_contract(&project, &self.contract) {
+            Ok(_abi) => _abi,
+            Err(_) => panic!("Error retrieving Abi, try compiling first using 'forge zkbuild'"),
+        };
         println!("{:#?}, contract ---->>>", abi);
 
         // encode constructor args
