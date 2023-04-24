@@ -111,11 +111,10 @@ impl ZkCreateArgs {
 
         // get abi
         let abi = Self::get_abi_from_contract(&project, &self.contract).unwrap();
-        let contract: Abi = serde_json::from_value(abi).unwrap();
-        println!("{:#?}, contract ---->>>", contract);
+        println!("{:#?}, contract ---->>>", abi);
 
         // encode constructor args
-        let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
+        let encoded_args = encode(self.get_constructor_args(&abi).as_slice());
 
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         let deployer_builder = match &wallet {
@@ -170,7 +169,7 @@ impl ZkCreateArgs {
     fn get_abi_from_contract(
         project: &Project,
         contract_info: &ContractInfo,
-    ) -> Result<Value, serde_json::Error> {
+    ) -> Result<Abi, serde_json::Error> {
         let output_path = Self::get_path_for_contract_output(project, contract_info);
         let contract_output = Self::get_contract_output(output_path);
         serde_json::from_value(
