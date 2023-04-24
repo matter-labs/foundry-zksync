@@ -17,3 +17,4 @@ pub mod send_zksync;
 pub mod storage;
 pub mod transfer_zksync;
 pub mod wallet;
+pub mod zk_send;
