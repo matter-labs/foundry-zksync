@@ -179,7 +179,6 @@ impl<'a> ZkSolc<'a> {
             ],
         );
 
-        // set metadata to None
         project.solc_config.settings.metadata = None;
 
         project
@@ -194,24 +193,6 @@ impl<'a> ZkSolc<'a> {
             .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
         self.standard_json = Some(standard_json.to_owned());
 
-        // let stdjson = serde_json::to_value(&standard_json)
-        //     .map_err(|e| Error::msg(format!("Could not parse standard json input: {}", e)))?;
-
-        // let json_input = self.artifacts_path.join("json_input.json");
-
-        // println!("==============================");
-        // println!("{:?}", self.artifacts_path);
-        // println!("==============================");
-
-        // let _file = File::create(&json_input)
-        //     .map_err(|e| Error::msg(format!("Could create input json file: {}", e)))?;
-
-        // let file_contents = serde_json::to_string_pretty(&stdjson)
-        //     .map_err(|e| Error::msg(format!("Could parse input json file contents: {}", e)))?;
-
-        // let _io_result = std::fs::write(json_input, file_contents).map_err(|e| {
-        //     Error::msg(format!("Could not write input json contents to file: {}", e))
-        // })?;
         Ok(())
     }
 
