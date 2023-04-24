@@ -145,7 +145,11 @@ impl ZkCreateArgs {
             Ok(dep) => {
                 let rcpt = dep.wait_for_commit().await;
                 println!("{dep:#?}, deploy success");
-                let logs = rcpt.unwrap().logs;
+                let logs = match rcpt {
+                    Ok(_rcpt) => _rcpt.logs,
+                    Err(e) => panic!("{:#?}, Error retrieving tx logs, ", e),
+                };
+
                 for log in logs {
                     if log.address == CONTRACT_DEPLOYER_ADDRESS {
                         let deployed_address = log.topics.get(3).unwrap();
