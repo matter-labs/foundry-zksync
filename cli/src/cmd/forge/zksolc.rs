@@ -154,7 +154,9 @@ impl<'a> ZkSolc<'a> {
     }
 
     pub fn parse_json_input(&mut self) -> Result<()> {
-        let mut project = Config::load().project().unwrap();
+        // TODO: this feels goofy to me
+        let mut project = Config::load().project()
+            .map_err(|e| Error::msg(format!("Could not load project from config: {}", e)))?;
 
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
         file_output_selection.insert(
@@ -192,20 +194,24 @@ impl<'a> ZkSolc<'a> {
             .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
         self.standard_json = Some(standard_json.to_owned());
 
-        let stdjson = serde_json::to_value(&standard_json)
-            .map_err(|e| Error::msg(format!("Could not parse standard json input: {}", e)))?;
+        // let stdjson = serde_json::to_value(&standard_json)
+        //     .map_err(|e| Error::msg(format!("Could not parse standard json input: {}", e)))?;
 
-        let json_input = self.artifacts_path.join("json_input.json");
+        // let json_input = self.artifacts_path.join("json_input.json");
 
-        let _file = File::create(&json_input)
-            .map_err(|e| Error::msg(format!("Could create input json file: {}", e)))?;
+        // println!("==============================");
+        // println!("{:?}", self.artifacts_path);
+        // println!("==============================");
 
-        let file_contents = serde_json::to_string_pretty(&stdjson)
-            .map_err(|e| Error::msg(format!("Could parse input json file contents: {}", e)))?;
+        // let _file = File::create(&json_input)
+        //     .map_err(|e| Error::msg(format!("Could create input json file: {}", e)))?;
 
-        let _io_result = std::fs::write(json_input, file_contents).map_err(|e| {
-            Error::msg(format!("Could not write input json contents to file: {}", e))
-        })?;
+        // let file_contents = serde_json::to_string_pretty(&stdjson)
+        //     .map_err(|e| Error::msg(format!("Could parse input json file contents: {}", e)))?;
+
+        // let _io_result = std::fs::write(json_input, file_contents).map_err(|e| {
+        //     Error::msg(format!("Could not write input json contents to file: {}", e))
+        // })?;
         Ok(())
     }
 
