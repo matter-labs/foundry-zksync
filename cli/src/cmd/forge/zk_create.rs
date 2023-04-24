@@ -99,7 +99,9 @@ impl ZkCreateArgs {
         // get abi
         let abi = match Self::get_abi_from_contract(&project, &self.contract) {
             Ok(_abi) => _abi,
-            Err(_) => panic!("Error retrieving Abi, try compiling first using 'forge zkbuild'"),
+            Err(e) => {
+                panic!("{:#?}, Error retrieving Abi, try compiling first using 'forge zkbuild'", e)
+            }
         };
         println!("{:#?}, contract ---->>>", abi);
 
@@ -107,7 +109,13 @@ impl ZkCreateArgs {
         let encoded_args = encode(self.get_constructor_args(&abi).as_slice());
 
         // get  contract bytecode
-        let mut bytecode = Self::get_bytecode_from_contract(&project, &self.contract).unwrap();
+        let mut bytecode = match Self::get_bytecode_from_contract(&project, &self.contract) {
+            Ok(_bytecode) => _bytecode,
+            Err(e) => panic!(
+                "{:#?}, Error retrieving bytecode, try compiling first using 'forge zkbuild'",
+                e
+            ),
+        };
 
         //check for additional factory deps
         let mut factory_deps = Vec::new();
