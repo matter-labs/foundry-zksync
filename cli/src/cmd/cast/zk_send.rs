@@ -320,7 +320,6 @@ pub fn encode_hex(bytes: &[u8]) -> String {
 }
 
 use ethabi::{ParamType, Token};
-use uint::U256;
 
 fn convert_args_to_tokens(
     args: &[String],
@@ -335,7 +334,7 @@ fn convert_args_to_tokens(
         let token = match &input_types[i] {
             ParamType::String => Token::String(arg.clone()),
             ParamType::Uint(_) => Token::Uint(
-                U256::from_dec_str_radix(arg, 10)
+                U256::from_dec_str(arg)
                     .map_err(|_| format!("Failed to parse argument at index {}", i))?,
             ),
             // Add more cases for other parameter types if needed
