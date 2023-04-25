@@ -18,6 +18,9 @@ use zksync_types::zk_evm::sha3::Keccak256;
 
 use ethers::types::{Address, U256};
 
+use ethabi::{ParamType, Token};
+use std::str::FromStr;
+
 use ethers::abi::token::Tokenizer;
 
 /// CLI arguments for `cast send`.
@@ -200,63 +203,6 @@ impl ZkSendTxArgs {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn cast_send<M: Middleware, F: Into<NameOrAddress>, T: Into<NameOrAddress>>(
-    provider: M,
-    from: F,
-    to: Option<T>,
-    code: Option<String>,
-    args: (String, Vec<String>),
-    tx: TransactionOpts,
-    chain: Chain,
-    etherscan_api_key: Option<String>,
-    cast_async: bool,
-    confs: usize,
-    to_json: bool,
-) -> eyre::Result<()>
-where
-    M::Error: 'static,
-{
-    let (sig, params) = args;
-    let params = if !sig.is_empty() { Some((&sig[..], params)) } else { None };
-    let mut builder = TxBuilder::new(&provider, from, to, chain, tx.legacy).await?;
-    builder
-        .etherscan_api_key(etherscan_api_key)
-        .gas(tx.gas_limit)
-        .gas_price(tx.gas_price)
-        .priority_gas_price(tx.priority_gas_price)
-        .value(tx.value)
-        .nonce(tx.nonce);
-
-    if let Some(code) = code {
-        let mut data = hex::decode(code.strip_prefix("0x").unwrap_or(&code))?;
-
-        if let Some((sig, args)) = params {
-            let (mut sigdata, _) = builder.create_args(sig, args).await?;
-            data.append(&mut sigdata);
-        }
-
-        builder.set_data(data);
-    } else {
-        builder.args(params).await?;
-    };
-    let builder_output = builder.build();
-
-    let cast = Cast::new(provider);
-
-    let pending_tx = cast.send(builder_output).await?;
-    let tx_hash = *pending_tx;
-
-    if cast_async {
-        println!("{tx_hash:#x}");
-    } else {
-        let receipt = cast.receipt(format!("{tx_hash:#x}"), None, confs, false, to_json).await?;
-        println!("{receipt}");
-    }
-
-    Ok(())
-}
-
 use std::{fmt::Write, num::ParseIntError};
 
 pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
@@ -270,9 +216,6 @@ pub fn encode_hex(bytes: &[u8]) -> String {
     }
     s
 }
-
-use ethabi::{ParamType, Token};
-use std::str::FromStr;
 
 fn convert_args_to_tokens(
     args: &[String],
