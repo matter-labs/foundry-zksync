@@ -16,7 +16,7 @@ use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
 use zksync_types::zk_evm::sha3::Keccak256;
 
-use ethers::types::U256;
+use ethers::types::{Address, U256};
 
 use ethers::abi::token::Tokenizer;
 
@@ -110,42 +110,16 @@ impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
         // println!("{:#?}, ZksendTxArgs", self);
         let mut config = Config::load();
-        // println!("{:#?}, config", config);
 
         // get signer
         let signer = self.get_signer();
-        let to_address = self.get_to_address();
-        let function_signature: &str = &self.sig.as_ref().unwrap();
-
-        println!("{:#?}, self.args", self.args);
-
-        let mut arg_tokens: Vec<Token> = Vec::new();
-        for arg in &self.args {
-            arg_tokens.push(Token::String(arg.clone()));
-        }
-
-        let mut signed = [0u8; 4];
-        let hashed_sig = &Keccak256::digest(function_signature)[..signed.len()];
-        signed.copy_from_slice(hashed_sig);
-
-        let encoded = encode(&arg_tokens);
-        let encoded_function_call: Vec<u8> =
-            signed.into_iter().chain(encoded.into_iter()).collect();
-        // println!("{:#?}, encoded_function_call", encoded_function_call);
-
-        // let provider = Provider::<Http>::try_from(
-        //     "https://mainnet.infura.io/v3/c60b0bb42f8a4c6481ecd229eddaca27",
-        // )
-        // .expect("could not instantiate HTTP Provider");
-
         let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
         let chain: Chain = if let Some(chain) = self.eth.chain {
             chain
         } else {
             provider.get_chainid().await?.into()
         };
-        println!("{:#?}, provider", provider);
-        println!("{:#?}, chain", chain);
+        let to_address = self.get_to_address();
 
         let sig = match self.sig {
             Some(sig) => sig,
@@ -154,13 +128,10 @@ impl ZkSendTxArgs {
 
         let params = if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
         let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
-
-        println!("{:#?}, params", params);
         builder.args(params).await?;
         let (tx, func) = builder.build();
 
         // Define the function signature and input types
-
         let function = func.unwrap();
         let arguments = self.args.clone();
         let input_types = function.inputs.clone();
@@ -168,28 +139,18 @@ impl ZkSendTxArgs {
         let input_param_types =
             input_types.iter().map(|param| param.kind.clone()).collect::<Vec<ParamType>>();
 
-        println!("{:#?}, input_param_types", input_param_types);
-
         let tokens = convert_args_to_tokens(arguments.as_slice(), &input_param_types).unwrap();
         println!("Tokens: {:?}", tokens);
 
         // // Encode the input parameters as a byte array
-        let encoded_input = function.encode_input(tokens.as_slice()).unwrap();
+        let encoded_function_call = function.encode_input(tokens.as_slice()).unwrap();
+        println!("{:?}, encoded_function_call", encoded_function_call);
 
-        // Calculate the function selector
-        // let selector = keccak256(function.signature().as_bytes()).as_fixed_bytes();
-
-        // Combine the selector and the encoded input arguments into a single Vec<u8>
-        // let encoded = [selector, tokens].concat();
-
-        println!("{:?}, encoded_input", encoded_input);
-
-        // Encode the function call data using the input tokens
-        // let encoded_data = function.encode_input(&tokens.unwrap().as_slice()).unwrap();
+        // let encoded_function_call = self.get_encoded_function_call().await;
 
         // println!("{:#?}, tx", tx);
         // println!("{:#?}, inputs", inputs);
-        println!("{:#?}, function", function);
+        // println!("{:#?}, function", function);
 
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         match &wallet {
@@ -222,6 +183,50 @@ impl ZkSendTxArgs {
 
         Ok(())
     }
+
+    // async fn get_encoded_function_call(&self) -> Result<Vec<u8>, ProviderError> {
+    //     let mut config = Config::load();
+    //     // println!("{:#?}, config", config);
+
+    //     // get signer
+    //     let signer = self.get_signer();
+    //     let to_address = self.get_to_address();
+
+    //     let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
+    //     let chain: Chain = if let Some(chain) = self.eth.chain {
+    //         chain
+    //     } else {
+    //         provider.get_chainid().await?.into()
+    //     };
+    //     println!("{:#?}, provider", provider);
+    //     println!("{:#?}, chain", chain);
+    //     let sig = match self.sig {
+    //         Some(sig) => sig,
+    //         None => "".to_string(),
+    //     };
+
+    //     let params = if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
+    //     let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
+
+    //     println!("{:#?}, params", params);
+    //     builder.args(params).await?;
+    //     let (tx, func) = builder.build();
+
+    //     // Define the function signature and input types
+    //     let function = func.unwrap();
+    //     let arguments = self.args.clone();
+    //     let input_types = function.inputs.clone();
+    //     // Define the input parameter types as a Vec<ParamType>
+    //     let input_param_types =
+    //         input_types.iter().map(|param| param.kind.clone()).collect::<Vec<ParamType>>();
+
+    //     let tokens = convert_args_to_tokens(arguments.as_slice(), &input_param_types).unwrap();
+    //     println!("Tokens: {:?}", tokens);
+
+    //     // // Encode the input parameters as a byte array
+    //     function.encode_input(tokens.as_slice())
+    //     // println!("{:?}, encoded_function_call", encoded_function_call);
+    // }
 
     fn get_signer(&self) -> Signer<PrivateKeySigner> {
         // get signer
@@ -320,6 +325,7 @@ pub fn encode_hex(bytes: &[u8]) -> String {
 }
 
 use ethabi::{ParamType, Token};
+use std::str::FromStr;
 
 fn convert_args_to_tokens(
     args: &[String],
@@ -332,11 +338,59 @@ fn convert_args_to_tokens(
     let mut tokens = Vec::with_capacity(args.len());
     for (i, arg) in args.iter().enumerate() {
         let token = match &input_types[i] {
-            ParamType::String => Token::String(arg.clone()),
+            ParamType::Address => Token::Address(
+                Address::from_str(arg)
+                    .map_err(|_| format!("Failed to parse argument at index {}", i))?,
+            ),
+            ParamType::Bytes => Token::Bytes(arg.as_bytes().to_vec()),
+            ParamType::Int(size) => {
+                let value = U256::from_dec_str(arg)
+                    .map_err(|_| format!("Failed to parse argument at index {}", i))?;
+                let max_value = U256::MAX >> (256 - size - 1);
+                let min_value = !max_value + U256::one();
+                if value > max_value || value < min_value {
+                    return Err(format!(
+                        "Argument at index {} is out of range for int{} type",
+                        i, size
+                    ));
+                }
+                Token::Int(value)
+            }
             ParamType::Uint(_) => Token::Uint(
                 U256::from_dec_str(arg)
                     .map_err(|_| format!("Failed to parse argument at index {}", i))?,
             ),
+            ParamType::Bool => Token::Bool(
+                bool::from_str(arg)
+                    .map_err(|_| format!("Failed to parse argument at index {}", i))?,
+            ),
+            ParamType::String => Token::String(arg.clone()),
+            ParamType::Array(inner_type) => {
+                let inner_args = arg.split(",").map(|s| s.trim().to_owned()).collect::<Vec<_>>();
+                let inner_tokens =
+                    convert_args_to_tokens(&inner_args, std::slice::from_ref(inner_type))?;
+                Token::Array(inner_tokens)
+            }
+            ParamType::FixedBytes(size) => Token::FixedBytes(arg.as_bytes().to_vec()),
+            ParamType::FixedArray(inner_type, length) => {
+                let inner_args = arg.split(",").map(|s| s.trim().to_owned()).collect::<Vec<_>>();
+                if inner_args.len() != *length as usize {
+                    return Err(format!(
+                        "Invalid number of arguments for fixed array of length {} at index {}",
+                        length, i
+                    ));
+                }
+                let inner_tokens = convert_args_to_tokens(&inner_args, &[*inner_type.clone()])?;
+                Token::FixedArray(inner_tokens)
+            }
+            ParamType::Tuple(inner_types) => {
+                let inner_args = arg.split(",").map(|s| s.trim().to_owned()).collect::<Vec<_>>();
+                if inner_args.len() != inner_types.len() {
+                    return Err(format!("Invalid number of arguments for tuple at index {}", i));
+                }
+                let inner_tokens = convert_args_to_tokens(&inner_args, &inner_types[..])?;
+                Token::Tuple(inner_tokens)
+            }
             // Add more cases for other parameter types if needed
             _ => return Err(format!("Unsupported input type: {:?}", input_types[i])),
         };
