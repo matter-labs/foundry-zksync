@@ -2,11 +2,7 @@
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts, WalletType};
 use cast::{Cast, TxBuilder};
 use clap::Parser;
-use ethers::{
-    abi::{encode, ParamType, Token},
-    providers::Middleware,
-    types::NameOrAddress,
-};
+use ethers::{abi::encode, providers::Middleware, types::NameOrAddress};
 use foundry_common::try_get_http_provider;
 use foundry_config::{Chain, Config};
 use std::sync::Arc;
@@ -19,6 +15,10 @@ use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
 use zksync_types::zk_evm::sha3::Keccak256;
+
+use ethers::types::U256;
+
+use ethers::abi::token::Tokenizer;
 
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
@@ -117,6 +117,8 @@ impl ZkSendTxArgs {
         let to_address = self.get_to_address();
         let function_signature: &str = &self.sig.as_ref().unwrap();
 
+        println!("{:#?}, self.args", self.args);
+
         let mut arg_tokens: Vec<Token> = Vec::new();
         for arg in &self.args {
             arg_tokens.push(Token::String(arg.clone()));
@@ -150,20 +152,41 @@ impl ZkSendTxArgs {
             None => "".to_string(),
         };
 
-        let params = if !sig.is_empty() { Some((&sig[..], self.args)) } else { None };
+        let params = if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
         let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
 
         println!("{:#?}, params", params);
         builder.args(params).await?;
         let (tx, func) = builder.build();
-        let inputs = func.as_ref().unwrap().inputs.clone();
-        let input_params = inputs.into_iter();
-        for input in input_params {
-            let abc: Token = input.try_into().unwrap();
-            println!("{:#?}, input", input);
-        }
+
+        // Define the function signature and input types
 
         let function = func.unwrap();
+        let arguments = self.args.clone();
+        let input_types = function.inputs.clone();
+        // Define the input parameter types as a Vec<ParamType>
+        let input_param_types =
+            input_types.iter().map(|param| param.kind.clone()).collect::<Vec<ParamType>>();
+
+        println!("{:#?}, input_param_types", input_param_types);
+
+        let tokens = convert_args_to_tokens(arguments.as_slice(), &input_param_types).unwrap();
+        println!("Tokens: {:?}", tokens);
+
+        // // Encode the input parameters as a byte array
+        let encoded_input = function.encode_input(tokens.as_slice()).unwrap();
+
+        // Calculate the function selector
+        // let selector = keccak256(function.signature().as_bytes()).as_fixed_bytes();
+
+        // Combine the selector and the encoded input arguments into a single Vec<u8>
+        // let encoded = [selector, tokens].concat();
+
+        println!("{:?}, encoded_input", encoded_input);
+
+        // Encode the function call data using the input tokens
+        // let encoded_data = function.encode_input(&tokens.unwrap().as_slice()).unwrap();
+
         // println!("{:#?}, tx", tx);
         // println!("{:#?}, inputs", inputs);
         println!("{:#?}, function", function);
@@ -294,4 +317,32 @@ pub fn encode_hex(bytes: &[u8]) -> String {
         write!(&mut s, "{:02x}", b).unwrap();
     }
     s
+}
+
+use ethabi::{ParamType, Token};
+use uint::U256;
+
+fn convert_args_to_tokens(
+    args: &[String],
+    input_types: &[ParamType],
+) -> Result<Vec<Token>, String> {
+    if args.len() != input_types.len() {
+        return Err("The number of arguments does not match the number of input types".to_owned());
+    }
+
+    let mut tokens = Vec::with_capacity(args.len());
+    for (i, arg) in args.iter().enumerate() {
+        let token = match &input_types[i] {
+            ParamType::String => Token::String(arg.clone()),
+            ParamType::Uint(_) => Token::Uint(
+                U256::from_dec_str_radix(arg, 10)
+                    .map_err(|_| format!("Failed to parse argument at index {}", i))?,
+            ),
+            // Add more cases for other parameter types if needed
+            _ => return Err(format!("Unsupported input type: {:?}", input_types[i])),
+        };
+        tokens.push(token);
+    }
+
+    Ok(tokens)
 }
