@@ -193,6 +193,14 @@ impl ZkSolcManager {
         false
     }
 
+    pub fn check_setup_compilers_dir(self) -> Result<()> {
+        if !self.compilers_path.exists() {
+            fs::create_dir_all(&self.compilers_path)
+                .map_err(|e| Error::msg(format!("Could not create compilers path: {}", e)))?;
+        }
+        Ok(())
+    }
+
     pub fn download(self) -> Result<()> {
         if self.exists() {
             // TODO: figure out better don't download if compiler is downloaded

@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::process;
 
 use super::build::CoreBuildArgs;
 use super::zksolc::{ZkSolc, ZkSolcOpts};
@@ -67,12 +68,20 @@ impl Cmd for ZkBuildArgs {
 
         match zksolc_manager {
             Ok(zksolc_manager) => {
+                if let Err(err) = zksolc_manager.clone().check_setup_compilers_dir() {
+                    eprintln!("Failed to setup compilers directory: {}", err);
+                    process::exit(1);
+                }
+
                 if !zksolc_manager.exists() {
                     println!("Downloading zksolc compiler");
 
                     match zksolc_manager.clone().download() {
                         Ok(zksolc_manager) => zksolc_manager,
-                        Err(e) => println!("Failed to download the file: {}", e),
+                        Err(err) => {
+                            eprintln!("Failed to download the file: {}", err);
+                            process::exit(1);
+                        }
                     }
                 }
 
@@ -89,16 +98,21 @@ impl Cmd for ZkBuildArgs {
                 };
 
                 let mut zksolc = ZkSolc::new(zksolc_opts);
-                println!("{}", zksolc);
 
-                zksolc.parse_json_input();
+                if let Err(err) = zksolc.parse_json_input() {
+                    eprintln!("Failed to parse json input for zksolc compiler: {}", err);
+                    process::exit(1);
+                }
 
                 match zksolc.compile() {
                     Ok(_) => println!("Compiled Successfully"),
-                    Err(err) => println!("{}", err.to_string()),
+                    Err(err) => {
+                        eprintln!("Failed to compile smart contracts with zksolc: {}", err);
+                        process::exit(1);
+                    }
                 }
             }
-            Err(e) => println!("Error building zksolc_manager: {}", e),
+            Err(e) => eprintln!("Error building zksolc_manager: {}", e),
         }
 
         Ok("".to_owned())
