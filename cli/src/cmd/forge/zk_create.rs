@@ -27,9 +27,6 @@ use std::{
 use tracing::log::trace;
 use zk_evm::k256::pkcs8::Error;
 
-//for zksync
-use crate::cmd::forge::zksync_deploy;
-
 use zksync::types::H256;
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};

@@ -213,10 +213,6 @@ impl<'a> ZkSolc<'a> {
             .get(&self.project)
             .map_err(|e| Error::msg(format!("Could not get solc: {}", e)))?;
 
-        println!("+++++++++++++++++++++++++++");
-        // println!("{:?}", solc_version);
-        println!("+++++++++++++++++++++++++++");
-
         if let Some(solc_first_key) = &solc_version.first_key_value() {
             // TODO: understand and handle solc versions and the edge cases here
 
@@ -226,14 +222,7 @@ impl<'a> ZkSolc<'a> {
         }
     }
 
-    // fn build_artifacts_path(mut self) -> Result<()> {
-    //     let artifacts_path = self.output_path.join("artifacts.json");
-    //     self.artifacts_path = artifacts_path;
-
-    //     Ok(())
-    // }
-
-    fn build_artifacts_path(mut self) -> Result<()> {
+    fn build_artifacts_path(self) -> Result<()> {
         match fs::create_dir_all(&self.artifacts_path) {
             Ok(()) => println!(" create build_path folder success"),
             Err(error) => panic!("problem creating build_path folder: {:#?}", error),
