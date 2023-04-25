@@ -47,48 +47,49 @@ NOTE: All commands are entered from the project root folder
 ## Compilation
 
 ***v0.0*** ***Command***:
-## `forge build`
+## `forge zk-build`
+### aliases: `forge zk-compile`, `forge zkb`
 
-Compile smart contracts to zkEvm bytecode using the `--zksync` flag and store compile output files into a logical directory structure `out/zksync/` for easy retrieval to other components of the application.
+Compile smart contracts to zkEvm bytecode and store compile output files into a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval for other components of the application.
 
 
-For the `forge build` help screen:
-```
-../foundry-zksync/target/debug/forge build --zksync --help
-```
-help screen:
+
+
 ```
 Compiler subcommands for zkSync
 
-Usage: forge build --zksync [OPTIONS] <CONTRACT FILENAME>
+Usage: 
+forge zk-build <CONTRACT_FILENAME> [OPTIONS]
 
 Arguments:
-  <CONTRACT FILENAME>  Contract filename from project src/ ex: 'Contract.sol'
+  <CONTRACT FILENAME>  Contract filename from     project src/ ex: 'Contract.sol'
 
-Options:
+  Options:
+      --use-zksolc   Specify zksolc compiler version (default if left blank)
       --system-mode  System mode flag
       --force-evmla  Sets the EVM legacy assembly pipeline forcibly
   -h, --help         Print help
+
+  
+
+
 ```
 ### Example Usage
-To compile `src/Greeter.sol` with only default compiler options:
+To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
 ```
-../foundry-zksync/target/debug/forge build --zksync "Greeter.sol" 
+../foundry-zksync/target/debug/forge zk-build "Greeter.sol" 
 ```
 
 ### Compiler Settings
-`zksolc` compiler can be configured using `.env` file in project root
+`zksolc` compiler version can optionally be configured using `--use-zksolc` flag:
 ```
-ZKSOLC_COMPILER_VERSION = "1.3.8"       # zksolc compiler version
-OS = "linux"                            # OPERATING SYSTEM: linux, windows, macosx
-ARCH = "amd64"                          # ARCHITIECTURE: amd64, arm64
-
+../foundry-zksync/target/debug/forge zkb "Greeter.sol" --use-zksolc v1.3.8
 ```
 
 ### Output
-`zksolc` compiler artifacts as well as standard-json input file can be found in the folder:
+`zksolc` compiler artifacts can be found in the folder:
 ```
-<PROJECT-ROOT>/out/zksolc/<CONTRACT_FILENAME>
+<PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
 ```
 ![image](https://user-images.githubusercontent.com/76663878/231275745-4d33cb52-9a2a-4bc1-a48d-e9b5e48030c1.png)
 
@@ -96,35 +97,41 @@ ARCH = "amd64"                          # ARCHITIECTURE: amd64, arm64
 ## Deployment
 
 ***v0.0*** ***Command***:
-## `forge create`
+## `forge zk-create`
+### aliases: `forge zk-deploy`, `forge zkc`
 
-Manage deployments in the native foundry/forge fashion, using the `forge create` command with the `--zksync` flag.
+Manage deployments in the native foundry/forge fashion, using the `forge zk-create` command.
 
-For the `forge create` help screen:
-```
-../foundry-zksync/target/debug/forge create --zksync --help
-```
-help screen:
+
 ```
 Deploy to ZkSync with Chain Id. Ex. --zksync 280
 
-Usage: forge create <CONTRACT> --zksync <CHAIN-ID>
+Usage: forge zk-create <CONTRACT> [OPTIONS] <RPC-URL> <CHAIN-ID>
 
 Arguments:
-  <CHAIN-ID>  Chain id testnet: 280, local: 270
+  <CONTRACT>
+          The contract identifier in the form `<path>:<contractname>`.
+  <RPC-URL> '--rpc-url'
+  <CHAIN-ID>  `--chain 280' testnet, local: 270
 
 Options:
   -h, --help  Print help
+
+  --constructor-args <ARGS>...
+          The constructor arguments.
+
+  --factory-deps <FACTORY-DEPS>...
+          The factory dependencies in the form `<path>:<contractname>`
 ```
 Command Line:
 ```
-`forge create <CONTRACT_PATH> --constructor-args [CONSTRUCTOR_ARGS] --rpc-url <http://localhost:3050> --private-key <PRIVATE_KEY> --zksync <CHAIN_ID>`
+`forge create <CONTRACT> --constructor-args [CONSTRUCTOR_ARGS] --rpc-url <http://localhost:3050> --private-key <PRIVATE_KEY> --chain <CHAIN_ID>`
 ```
 
 ### Example Usage
-To Deploy `src/Greeter.sol` to zksync local node:
+To Deploy `src/Counter.sol` to zksync local node:
 ```
-../foundry-zksync/target/debug/forge create src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --zksync 270
+../foundry-zksync/target/debug/forge zkc src/Counter.sol:Counter --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
 ### Output
