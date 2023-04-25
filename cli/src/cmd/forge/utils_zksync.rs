@@ -146,7 +146,7 @@ pub fn check_testing() {
     // println!("{:#?}, raw_storage", raw_storage);
     // vm::utils::insert_system_contracts(&mut raw_storage);
 
-    let tools = zk_evm::testing::create_default_testing_tools();
+    let _tools = zk_evm::testing::create_default_testing_tools();
     // println!("{:#?}, tools.decommittment_processor", tools.decommittment_processor);
     // println!("{:#?}, tools.event_sink", tools.event_sink);
     // println!("{:#?}, tools.storage", tools.storage);

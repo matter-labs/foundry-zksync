@@ -1,31 +1,27 @@
 //! Create command
-use super::verify;
+
 use crate::{
     cmd::{
-        forge::build::CoreBuildArgs, read_constructor_args_file, remove_contract, retry::RetryArgs,
-        LoadConfig,
+        forge::build::CoreBuildArgs, read_constructor_args_file,
     },
-    opts::{EthereumOpts, TransactionOpts, WalletType},
+    opts::{EthereumOpts, TransactionOpts},
 };
 use clap::{Parser, ValueHint};
 use ethers::{
     abi::{encode, Abi, Constructor, Token},
-    prelude::{artifacts::BytecodeObject, ContractFactory, Middleware},
-    solc::{info::ContractInfo, utils::canonicalized, Project},
-    types::{transaction::eip2718::TypedTransaction, Bytes, Chain},
+    solc::{info::ContractInfo, Project},
+    types::{Bytes},
 };
 use foundry_common::abi::parse_tokens;
-use rustc_hex::ToHex;
-use serde_json::{json, Value};
-use std::io::prelude::*;
-use std::io::BufReader;
+
+use serde_json::{Value};
+
 use std::{
-    fs::{self, File},
+    fs::{self},
     path::PathBuf,
-    sync::Arc,
 };
-use tracing::log::trace;
-use zk_evm::k256::pkcs8::Error;
+
+
 
 use zksync::types::H256;
 use zksync::zksync_eth_signer::PrivateKeySigner;
@@ -83,7 +79,7 @@ pub struct ZkCreateArgs {
 
 impl ZkCreateArgs {
     /// Executes the command to create a contract
-    pub async fn run(mut self) -> eyre::Result<()> {
+    pub async fn run(self) -> eyre::Result<()> {
         println!("{:#?}, ZkCreateArgs ---->>>", self);
 
         // get project
@@ -94,7 +90,7 @@ impl ZkCreateArgs {
         project.paths.artifacts = project.paths.root.join("zkout");
 
         // get  contract bytecode
-        let mut bytecode = Self::get_bytecode_from_contract(&project, &self.contract).unwrap();
+        let bytecode = Self::get_bytecode_from_contract(&project, &self.contract).unwrap();
 
         //check for additional factory deps
         let mut factory_deps = Vec::new();
@@ -196,7 +192,7 @@ impl ZkCreateArgs {
     }
 
     fn get_path_for_contract_output(project: &Project, contract_info: &ContractInfo) -> PathBuf {
-        let mut filepath = contract_info.path.clone().unwrap();
+        let filepath = contract_info.path.clone().unwrap();
         let filename = filepath.split('/').last().unwrap();
         project.paths.artifacts.join(filename).join("artifacts.json")
     }
@@ -208,8 +204,8 @@ impl ZkCreateArgs {
         fdep_contract_info: Vec<ContractInfo>,
     ) -> Vec<Vec<u8>> {
         for dep in fdep_contract_info.iter() {
-            let mut output_path = Self::get_path_for_contract_output(&project, dep);
-            let output = Self::get_contract_output(output_path);
+            let output_path = Self::get_path_for_contract_output(&project, dep);
+            let _output = Self::get_contract_output(output_path);
             let dep_bytecode = Self::get_bytecode_from_contract(&project, dep).unwrap();
             factory_dep_vector.push(dep_bytecode.to_vec());
         }

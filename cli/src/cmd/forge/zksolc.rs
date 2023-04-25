@@ -4,9 +4,9 @@ use ethers::solc::{
     Graph, Project,
 };
 use foundry_config::Config;
-use serde::Serialize;
+
 use serde_json::Value;
-use std::path::{self, PathBuf};
+use std::path::{PathBuf};
 use std::{
     collections::BTreeMap,
     fmt, fs,
@@ -205,7 +205,7 @@ impl<'a> ZkSolc<'a> {
         let graph = Graph::resolve_sources(&self.project.paths, sources)
             .map_err(|e| Error::msg(format!("Could not create graph: {}", e)))?;
 
-        let (versions, edges) = graph
+        let (versions, _edges) = graph
             .into_sources_by_version(self.project.offline)
             .map_err(|e| Error::msg(format!("Could not get versions & edges: {}", e)))?;
 
