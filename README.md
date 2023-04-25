@@ -91,7 +91,7 @@ To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
 ```
 <PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
 ```
-![image](https://user-images.githubusercontent.com/76663878/231275745-4d33cb52-9a2a-4bc1-a48d-e9b5e48030c1.png)
+![image](https://user-images.githubusercontent.com/76663878/234152279-e144e489-41ab-4cbd-8321-8ccd9b0aa6ef.png)
 
 ---
 ## Deployment
