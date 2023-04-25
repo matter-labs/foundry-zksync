@@ -3,7 +3,7 @@ use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts, Wa
 use cast::{Cast, TxBuilder};
 use clap::Parser;
 use ethers::{
-    abi::{encode, Token},
+    abi::{encode, ParamType, Token},
     providers::Middleware,
     types::NameOrAddress,
 };
@@ -108,55 +108,13 @@ pub enum ZkSendTxSubcommands {
 
 impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        // println!("{:#?}, sendTxArgs", self);
-        // if let Some(t) = &self.command {
-        //     println!("{:#?}, <------> t", t);
-        //     match t {
-        //         ZkSendTxSubcommands::ZkSync { chain_id } => {
-        //             send_zksync::send_zksync(
-        //                 &self.to,
-        //                 &self.args,
-        //                 &self.sig,
-        //                 &self.eth.rpc_url,
-        //                 chain_id,
-        //                 &self.eth.wallet.private_key,
-        //             )
-        //             .await?;
-        //             return Ok(());
-        //         }
-        //         ZkSendTxSubcommands::ZkSyncDeposit { to, amount, token, chain_id } => {
-        //             transfer_zksync::transfer_zksync(
-        //                 to,
-        //                 amount,
-        //                 token,
-        //                 &self.eth.rpc_url,
-        //                 &self.eth.wallet.private_key,
-        //                 chain_id.clone(),
-        //                 false,
-        //             )
-        //             .await?;
-        //             return Ok(());
-        //         }
-        //         ZkSendTxSubcommands::ZkSyncWithdraw { to, amount, token, chain_id } => {
-        //             transfer_zksync::transfer_zksync(
-        //                 to,
-        //                 amount,
-        //                 token,
-        //                 &self.eth.rpc_url,
-        //                 &self.eth.wallet.private_key,
-        //                 chain_id.clone(),
-        //                 true,
-        //             )
-        //             .await?;
-        //             return Ok(());
-        //         }
-        //         _ => (),
-        //     }
-        // }
+        // println!("{:#?}, ZksendTxArgs", self);
+        let mut config = Config::load();
+        // println!("{:#?}, config", config);
 
         // get signer
         let signer = self.get_signer();
-        let deployed_contract = self.get_to_address();
+        let to_address = self.get_to_address();
         let function_signature: &str = &self.sig.as_ref().unwrap();
 
         let mut arg_tokens: Vec<Token> = Vec::new();
@@ -173,6 +131,43 @@ impl ZkSendTxArgs {
             signed.into_iter().chain(encoded.into_iter()).collect();
         // println!("{:#?}, encoded_function_call", encoded_function_call);
 
+        // let provider = Provider::<Http>::try_from(
+        //     "https://mainnet.infura.io/v3/c60b0bb42f8a4c6481ecd229eddaca27",
+        // )
+        // .expect("could not instantiate HTTP Provider");
+
+        let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
+        let chain: Chain = if let Some(chain) = self.eth.chain {
+            chain
+        } else {
+            provider.get_chainid().await?.into()
+        };
+        println!("{:#?}, provider", provider);
+        println!("{:#?}, chain", chain);
+
+        let sig = match self.sig {
+            Some(sig) => sig,
+            None => "".to_string(),
+        };
+
+        let params = if !sig.is_empty() { Some((&sig[..], self.args)) } else { None };
+        let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
+
+        println!("{:#?}, params", params);
+        builder.args(params).await?;
+        let (tx, func) = builder.build();
+        let inputs = func.as_ref().unwrap().inputs.clone();
+        let input_params = inputs.into_iter();
+        for input in input_params {
+            let abc: Token = input.try_into().unwrap();
+            println!("{:#?}, input", input);
+        }
+
+        let function = func.unwrap();
+        // println!("{:#?}, tx", tx);
+        // println!("{:#?}, inputs", inputs);
+        println!("{:#?}, function", function);
+
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         match &wallet {
             Ok(w) => {
@@ -188,7 +183,7 @@ impl ZkSendTxArgs {
 
                 let tx = w
                     .start_execute_contract()
-                    .contract_address(deployed_contract)
+                    .contract_address(to_address)
                     .calldata(encoded_function_call)
                     .send()
                     .await
