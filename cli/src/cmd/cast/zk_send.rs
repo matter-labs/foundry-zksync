@@ -138,19 +138,10 @@ impl ZkSendTxArgs {
         // Define the input parameter types as a Vec<ParamType>
         let input_param_types =
             input_types.iter().map(|param| param.kind.clone()).collect::<Vec<ParamType>>();
-
+        // Convert to Tokens
         let tokens = convert_args_to_tokens(arguments.as_slice(), &input_param_types).unwrap();
-        println!("Tokens: {:?}", tokens);
-
-        // // Encode the input parameters as a byte array
+        // Encode the input parameters (Tokens) as a byte array
         let encoded_function_call = function.encode_input(tokens.as_slice()).unwrap();
-        println!("{:?}, encoded_function_call", encoded_function_call);
-
-        // let encoded_function_call = self.get_encoded_function_call().await;
-
-        // println!("{:#?}, tx", tx);
-        // println!("{:#?}, inputs", inputs);
-        // println!("{:#?}, function", function);
 
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         match &wallet {
@@ -183,50 +174,6 @@ impl ZkSendTxArgs {
 
         Ok(())
     }
-
-    // async fn get_encoded_function_call(&self) -> Result<Vec<u8>, ProviderError> {
-    //     let mut config = Config::load();
-    //     // println!("{:#?}, config", config);
-
-    //     // get signer
-    //     let signer = self.get_signer();
-    //     let to_address = self.get_to_address();
-
-    //     let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
-    //     let chain: Chain = if let Some(chain) = self.eth.chain {
-    //         chain
-    //     } else {
-    //         provider.get_chainid().await?.into()
-    //     };
-    //     println!("{:#?}, provider", provider);
-    //     println!("{:#?}, chain", chain);
-    //     let sig = match self.sig {
-    //         Some(sig) => sig,
-    //         None => "".to_string(),
-    //     };
-
-    //     let params = if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
-    //     let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
-
-    //     println!("{:#?}, params", params);
-    //     builder.args(params).await?;
-    //     let (tx, func) = builder.build();
-
-    //     // Define the function signature and input types
-    //     let function = func.unwrap();
-    //     let arguments = self.args.clone();
-    //     let input_types = function.inputs.clone();
-    //     // Define the input parameter types as a Vec<ParamType>
-    //     let input_param_types =
-    //         input_types.iter().map(|param| param.kind.clone()).collect::<Vec<ParamType>>();
-
-    //     let tokens = convert_args_to_tokens(arguments.as_slice(), &input_param_types).unwrap();
-    //     println!("Tokens: {:?}", tokens);
-
-    //     // // Encode the input parameters as a byte array
-    //     function.encode_input(tokens.as_slice())
-    //     // println!("{:?}, encoded_function_call", encoded_function_call);
-    // }
 
     fn get_signer(&self) -> Signer<PrivateKeySigner> {
         // get signer
