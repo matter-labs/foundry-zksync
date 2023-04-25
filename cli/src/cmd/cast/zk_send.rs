@@ -1,27 +1,21 @@
 // cast send subcommands
-use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts, WalletType};
-use cast::{Cast, TxBuilder};
+use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
+use cast::TxBuilder;
 use clap::Parser;
-use ethers::{abi::encode, providers::Middleware, types::NameOrAddress};
+use ethers::{providers::Middleware, types::NameOrAddress};
 use foundry_common::try_get_http_provider;
 use foundry_config::{Chain, Config};
-use std::sync::Arc;
 
 //for zksync
-use crate::cmd::cast::{send_zksync, transfer_zksync};
-use sha2::Digest;
 use zksync::types::{H160, H256};
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
-use zksync_types::zk_evm::sha3::Keccak256;
 
 use ethers::types::{Address, U256};
 
 use ethabi::{ParamType, Token};
 use std::str::FromStr;
-
-use ethers::abi::token::Tokenizer;
 
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
@@ -112,7 +106,7 @@ pub enum ZkSendTxSubcommands {
 impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
         // println!("{:#?}, ZksendTxArgs", self);
-        let mut config = Config::load();
+        let config = Config::load();
 
         // get signer
         let signer = self.get_signer();
@@ -132,7 +126,7 @@ impl ZkSendTxArgs {
         let params = if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
         let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
         builder.args(params).await?;
-        let (tx, func) = builder.build();
+        let (_tx, func) = builder.build();
 
         // Define the function signature and input types
         let function = func.unwrap();
@@ -261,7 +255,7 @@ fn convert_args_to_tokens(
                     convert_args_to_tokens(&inner_args, std::slice::from_ref(inner_type))?;
                 Token::Array(inner_tokens)
             }
-            ParamType::FixedBytes(size) => Token::FixedBytes(arg.as_bytes().to_vec()),
+            ParamType::FixedBytes(_size) => Token::FixedBytes(arg.as_bytes().to_vec()),
             ParamType::FixedArray(inner_type, length) => {
                 let inner_args = arg.split(",").map(|s| s.trim().to_owned()).collect::<Vec<_>>();
                 if inner_args.len() != *length as usize {
@@ -281,8 +275,6 @@ fn convert_args_to_tokens(
                 let inner_tokens = convert_args_to_tokens(&inner_args, &inner_types[..])?;
                 Token::Tuple(inner_tokens)
             }
-            // Add more cases for other parameter types if needed
-            _ => return Err(format!("Unsupported input type: {:?}", input_types[i])),
         };
         tokens.push(token);
     }
