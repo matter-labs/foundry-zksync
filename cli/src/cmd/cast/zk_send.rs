@@ -83,14 +83,17 @@ impl ZkSendTxArgs {
         println!("{:#?}, ZksendTxArgs", self);
         let config = Config::load();
 
-        // get signer
-        let signer = self.get_signer();
-        let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
-        let chain: Chain = if let Some(chain) = self.eth.chain {
-            chain
-        } else {
-            provider.get_chainid().await?.into()
+        //get chain
+        let chain = match self.eth.chain {
+            Some(chain) => chain,
+            None => {
+                panic!("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN' (ex.'CHAIN=270')");
+            }
         };
+
+        // get signer
+        let signer = self.get_signer(&chain);
+        let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
         let to_address = self.get_to_address();
 
         // IF BRIDGING
@@ -151,18 +154,14 @@ impl ZkSendTxArgs {
         Ok(())
     }
 
-    fn get_signer(&self) -> Signer<PrivateKeySigner> {
+    fn get_signer(&self, chain: &Chain) -> Signer<PrivateKeySigner> {
         // get signer
         let private_key =
             H256::from_slice(&decode_hex(&self.eth.wallet.private_key.clone().unwrap()).unwrap());
         let eth_signer = PrivateKeySigner::new(private_key);
         let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
             .expect("Can't get an address from the private key");
-        Signer::new(
-            eth_signer,
-            signer_addy,
-            L2ChainId(self.eth.chain.unwrap().id().try_into().unwrap()),
-        )
+        Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
     fn get_to_address(&self) -> H160 {
         let deployed_contract = match &self.to {
