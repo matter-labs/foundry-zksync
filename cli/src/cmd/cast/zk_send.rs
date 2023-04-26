@@ -105,7 +105,7 @@ pub enum ZkSendTxSubcommands {
 
 impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        // println!("{:#?}, ZksendTxArgs", self);
+        println!("{:#?}, ZksendTxArgs", self);
         let config = Config::load();
 
         // get signer
@@ -126,19 +126,8 @@ impl ZkSendTxArgs {
         let params = if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
         let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
         builder.args(params).await?;
-        let (_tx, func) = builder.build();
-
-        // Define the function signature and input types
-        let function = func.unwrap();
-        let arguments = self.args.clone();
-        let input_types = function.inputs.clone();
-        // Define the input parameter types as a Vec<ParamType>
-        let input_param_types =
-            input_types.iter().map(|param| param.kind.clone()).collect::<Vec<ParamType>>();
-        // Convert to Tokens
-        let tokens = convert_args_to_tokens(arguments.as_slice(), &input_param_types).unwrap();
-        // Encode the input parameters (Tokens) as a byte array
-        let encoded_function_call = function.encode_input(tokens.as_slice()).unwrap();
+        let (tx, func) = builder.build();
+        let encoded_function_call = tx.data().unwrap().to_vec();
 
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         match &wallet {
@@ -209,75 +198,4 @@ pub fn encode_hex(bytes: &[u8]) -> String {
         write!(&mut s, "{:02x}", b).unwrap();
     }
     s
-}
-
-fn convert_args_to_tokens(
-    args: &[String],
-    input_types: &[ParamType],
-) -> Result<Vec<Token>, String> {
-    if args.len() != input_types.len() {
-        return Err("The number of arguments does not match the number of input types".to_owned());
-    }
-
-    let mut tokens = Vec::with_capacity(args.len());
-    for (i, arg) in args.iter().enumerate() {
-        let token = match &input_types[i] {
-            ParamType::Address => Token::Address(
-                Address::from_str(arg)
-                    .map_err(|_| format!("Failed to parse argument at index {}", i))?,
-            ),
-            ParamType::Bytes => Token::Bytes(arg.as_bytes().to_vec()),
-            ParamType::Int(size) => {
-                let value = U256::from_dec_str(arg)
-                    .map_err(|_| format!("Failed to parse argument at index {}", i))?;
-                let max_value = U256::MAX >> (256 - size - 1);
-                let min_value = !max_value + U256::one();
-                if value > max_value || value < min_value {
-                    return Err(format!(
-                        "Argument at index {} is out of range for int{} type",
-                        i, size
-                    ));
-                }
-                Token::Int(value)
-            }
-            ParamType::Uint(_) => Token::Uint(
-                U256::from_dec_str(arg)
-                    .map_err(|_| format!("Failed to parse argument at index {}", i))?,
-            ),
-            ParamType::Bool => Token::Bool(
-                bool::from_str(arg)
-                    .map_err(|_| format!("Failed to parse argument at index {}", i))?,
-            ),
-            ParamType::String => Token::String(arg.clone()),
-            ParamType::Array(inner_type) => {
-                let inner_args = arg.split(",").map(|s| s.trim().to_owned()).collect::<Vec<_>>();
-                let inner_tokens =
-                    convert_args_to_tokens(&inner_args, std::slice::from_ref(inner_type))?;
-                Token::Array(inner_tokens)
-            }
-            ParamType::FixedBytes(_size) => Token::FixedBytes(arg.as_bytes().to_vec()),
-            ParamType::FixedArray(inner_type, length) => {
-                let inner_args = arg.split(",").map(|s| s.trim().to_owned()).collect::<Vec<_>>();
-                if inner_args.len() != *length as usize {
-                    return Err(format!(
-                        "Invalid number of arguments for fixed array of length {} at index {}",
-                        length, i
-                    ));
-                }
-                let inner_tokens = convert_args_to_tokens(&inner_args, &[*inner_type.clone()])?;
-                Token::FixedArray(inner_tokens)
-            }
-            ParamType::Tuple(inner_types) => {
-                let inner_args = arg.split(",").map(|s| s.trim().to_owned()).collect::<Vec<_>>();
-                if inner_args.len() != inner_types.len() {
-                    return Err(format!("Invalid number of arguments for tuple at index {}", i));
-                }
-                let inner_tokens = convert_args_to_tokens(&inner_args, &inner_types[..])?;
-                Token::Tuple(inner_tokens)
-            }
-        };
-        tokens.push(token);
-    }
-
-    Ok(tokens)
 }
