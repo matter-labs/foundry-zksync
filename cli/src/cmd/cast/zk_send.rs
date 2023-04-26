@@ -5,9 +5,10 @@ use clap::Parser;
 use ethers::{providers::Middleware, types::NameOrAddress};
 use foundry_common::try_get_http_provider;
 use foundry_config::{Chain, Config};
+use zksync::types::{Address, H160, H256};
+use zksync_types::L2_ETH_TOKEN_ADDRESS;
 
-//for zksync
-use zksync::types::{H160, H256};
+use crate::cmd::cast::{send_zksync, transfer_zksync};
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
@@ -21,18 +22,44 @@ pub struct ZkSendTxArgs {
             value_name = "TO"
         )]
     to: Option<NameOrAddress>,
+
     #[clap(help = "The signature of the function to call.", value_name = "SIG")]
     sig: Option<String>,
+
     #[clap(help = "The arguments of the function to call.", value_name = "ARGS")]
     args: Vec<String>,
-    #[clap(long, short, help = "For L1 -> L2 deposits.")]
+
+    #[clap(
+        long,
+        short,
+        help_heading = "Bridging options",
+        help = "For L1 -> L2 deposits.",
+        conflicts_with = "withdraw"
+    )]
     deposit: bool,
-    #[clap(long, short, help = "For L2 -> L1 withdrawals.")]
+
+    #[clap(
+        long,
+        short,
+        help_heading = "Bridging options",
+        help = "For L2 -> L1 withdrawals.",
+        conflicts_with = "deposit"
+    )]
     withdraw: bool,
+
+    #[clap(
+        long,
+        help_heading = "Bridging options",
+        help = "Token to bridge. Leave blank for ETH."
+    )]
+    token: Option<String>,
+
     #[clap(flatten)]
     tx: TransactionOpts,
+
     #[clap(flatten)]
     eth: EthereumOpts,
+
     #[clap(
         short,
         long,
@@ -65,6 +92,21 @@ impl ZkSendTxArgs {
             provider.get_chainid().await?.into()
         };
         let to_address = self.get_to_address();
+
+        // IF BRIDGING
+        let token_address;
+        if self.deposit {
+            token_address = match &self.token {
+                Some(token_addy) => Address::from_slice(&decode_hex(token_addy).unwrap()),
+                None => L2_ETH_TOKEN_ADDRESS,
+            };
+        } else if self.withdraw {
+            token_address = match &self.token {
+                Some(token_addy) => Address::from_slice(&decode_hex(token_addy).unwrap()),
+                None => Address::zero(),
+            };
+        }
+        println!("{:#?}, self.token ---->>>", self.token);
 
         let sig = match self.sig {
             Some(sig) => sig,
