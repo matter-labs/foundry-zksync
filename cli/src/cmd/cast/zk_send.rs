@@ -12,16 +12,11 @@ use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
 
-use ethers::types::{Address, U256};
-
-use ethabi::{ParamType, Token};
-use std::str::FromStr;
-
-/// CLI arguments for `cast send`.
+/// CLI arguments for `cast zk-send`.
 #[derive(Debug, Parser)]
 pub struct ZkSendTxArgs {
     #[clap(
-            help = "The destination of the transaction. If not provided, you must use cast zksend --create.",
+            help = "The destination of the transaction.",
              value_parser = parse_name_or_address,
             value_name = "TO"
         )]
@@ -30,19 +25,10 @@ pub struct ZkSendTxArgs {
     sig: Option<String>,
     #[clap(help = "The arguments of the function to call.", value_name = "ARGS")]
     args: Vec<String>,
-    #[clap(
-        long = "async",
-        env = "CAST_ASYNC",
-        name = "async",
-        alias = "cast-async",
-        help = "Only print the transaction hash and exit immediately."
-    )]
-    #[clap(long, help_heading = "Transfer options", help = "For L1 -> L2 deposits.")]
+    #[clap(long, short, help = "For L1 -> L2 deposits.")]
     deposit: bool,
-    #[clap(long, help_heading = "Transfer options", help = "For L2 -> L1 withdrawals.")]
+    #[clap(long, short, help = "For L2 -> L1 withdrawals.")]
     withdraw: bool,
-
-    cast_async: bool,
     #[clap(flatten)]
     tx: TransactionOpts,
     #[clap(flatten)]
@@ -63,49 +49,6 @@ pub struct ZkSendTxArgs {
         conflicts_with = "nonce"
     )]
     resend: bool,
-
-    #[clap(subcommand)]
-    command: Option<ZkSendTxSubcommands>,
-}
-
-#[derive(Debug, Parser)]
-pub enum ZkSendTxSubcommands {
-    #[clap(name = "--create", about = "Use to deploy raw contract bytecode")]
-    Create {
-        #[clap(help = "Bytecode of contract.", value_name = "CODE")]
-        code: String,
-        #[clap(help = "The signature of the function to call.", value_name = "SIG")]
-        sig: Option<String>,
-        #[clap(help = "The arguments of the function to call.", value_name = "ARGS")]
-        args: Vec<String>,
-    },
-    #[clap(name = "--zksync", about = "send to zksync contract")]
-    ZkSync {
-        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
-        chain_id: u16,
-    },
-    #[clap(name = "--zksync-deposit", about = "Use for zksync L1 / L2 deposits")]
-    ZkSyncDeposit {
-        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
-        chain_id: u16,
-        #[clap(help = "Deposit TO Address.", value_name = "TO")]
-        to: String,
-        #[clap(help = "Transfer amount.", value_name = "AMOUNT")]
-        amount: i32,
-        #[clap(help = "Transfer token. Leave blank for ETH.", value_name = "TOKEN")]
-        token: Option<String>,
-    },
-    #[clap(name = "--zksync-withdraw", about = "Use for zksync L2 / L1 withdrawals")]
-    ZkSyncWithdraw {
-        #[clap(help = "Chain Id. Local: 270, Testnet: 280.", value_name = "CHAIN-ID")]
-        chain_id: u16,
-        #[clap(help = "Withdraw TO Address.", value_name = "TO")]
-        to: String,
-        #[clap(help = "Withdraw amount.", value_name = "AMOUNT")]
-        amount: i32,
-        #[clap(help = "Withdraw token. Leave blank for ETH.", value_name = "TOKEN")]
-        token: Option<String>,
-    },
 }
 
 impl ZkSendTxArgs {

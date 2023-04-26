@@ -382,7 +382,7 @@ Examples:
     #[clap(about = "Sign and publish a transaction.")]
     SendTx(SendTxArgs),
     #[clap(name = "zk-send")]
-    #[clap(visible_alias = "zks")]
+    #[clap(visible_aliases = ["zks", "zksend"])]
     #[clap(about = "Sign and publish a zksync transaction.")]
     ZkSendTx(ZkSendTxArgs),
     #[clap(name = "publish")]
