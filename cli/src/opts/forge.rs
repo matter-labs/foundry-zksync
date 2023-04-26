@@ -156,10 +156,10 @@ pub enum Subcommands {
     #[clap(about = "Generate documentation for the project.")]
     Doc(DocArgs),
 
-    #[clap(visible_aliases = ["zkb", "zk-compile"], about = "Build the project's smart contracts for zksync.")]
+    #[clap(visible_aliases = ["zkb", "zkbuild", "zk-compile"], about = "Build the project's smart contracts for zksync.")]
     ZkBuild(ZkBuildArgs),
 
-    #[clap(visible_aliases = ["zkc", "zk-deploy"], about = "Deploy smart contracts to zksync.")]
+    #[clap(visible_aliases = ["zkc", "zkcreate", "zk-deploy"], about = "Deploy smart contracts to zksync.")]
     ZkCreate(ZkCreateArgs),
 }
 

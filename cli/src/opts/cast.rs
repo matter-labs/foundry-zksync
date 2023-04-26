@@ -3,7 +3,7 @@ use crate::{
     cmd::cast::{
         call::CallArgs, create2::Create2Args, estimate::EstimateArgs, find_block::FindBlockArgs,
         interface::InterfaceArgs, rpc::RpcArgs, run::RunArgs, send::SendTxArgs,
-        storage::StorageArgs, wallet::WalletSubcommands,
+        storage::StorageArgs, wallet::WalletSubcommands, zk_send::ZkSendTxArgs,
     },
     utils::parse_u256,
 };
@@ -381,6 +381,10 @@ Examples:
     #[clap(visible_alias = "s")]
     #[clap(about = "Sign and publish a transaction.")]
     SendTx(SendTxArgs),
+    #[clap(name = "zk-send")]
+    #[clap(visible_aliases = ["zks", "zksend"])]
+    #[clap(about = "Sign and publish a zksync transaction.")]
+    ZkSendTx(ZkSendTxArgs),
     #[clap(name = "publish")]
     #[clap(visible_alias = "p")]
     #[clap(about = "Publish a raw transaction to the network.")]

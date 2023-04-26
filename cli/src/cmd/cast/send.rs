@@ -98,7 +98,7 @@ pub enum SendTxSubcommands {
 
 impl SendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        // println!("{:#?}, sendTxArgs", self);
+        println!("{:#?}, sendTxArgs", self);
         if let Some(t) = &self.command {
             println!("{:#?}, <------> t", t);
             match t {
