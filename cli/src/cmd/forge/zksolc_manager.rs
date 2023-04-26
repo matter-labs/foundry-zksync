@@ -109,13 +109,18 @@ impl ZkSolcManagerBuilder {
             let compiler = self.get_compiler()?;
             let compilers_path = home_path.to_owned();
 
-            if let Ok(solc_version) = parse_version(&version) {
-                return Ok(ZkSolcManager {
-                    compilers_path,
-                    version: solc_version,
-                    compiler,
-                    download_url,
-                });
+            match parse_version(&version) {
+                Ok(solc_version) => {
+                    return Ok(ZkSolcManager {
+                        compilers_path,
+                        version: solc_version,
+                        compiler,
+                        download_url,
+                    });
+                }
+                Err(e) => {
+                    return Err(e);
+                }
             }
         }
         Err(Error::msg("Could not build ZkSolcManager"))
