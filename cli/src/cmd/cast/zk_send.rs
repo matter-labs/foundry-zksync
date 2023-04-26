@@ -94,18 +94,22 @@ impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
         println!("{:#?}, ZksendTxArgs", self);
         let config = Config::load();
-        println!("{:#?}, config", config);
 
         //verify private key has been populated
         if let None = &self.eth.wallet.private_key {
             panic!("Private key was not provided. Try using --private-key flag");
         }
 
+        //verify rpc url has been populated
+        if let None = &self.eth.rpc_url {
+            panic!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+        }
+
         //get chain
         let chain = match self.eth.chain {
             Some(chain) => chain,
             None => {
-                panic!("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN' (ex.'CHAIN=270')");
+                panic!("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
             }
         };
 
@@ -117,8 +121,16 @@ impl ZkSendTxArgs {
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         if self.deposit || self.withdraw {
             // IF BRIDGING
-            let token_address = match &self.token {
-                Some(token_addy) => Address::from_slice(&decode_hex(token_addy).unwrap()),
+            let token_address: Address = match &self.token {
+                Some(token_addy) => {
+                    let decoded = match decode_hex(token_addy) {
+                        Ok(addy) => addy,
+                        Err(e) => {
+                            panic!("Error parsing token address: {e}, try removing the '0x'")
+                        }
+                    };
+                    Address::from_slice(decoded.as_slice())
+                }
                 None => {
                     if self.deposit {
                         L2_ETH_TOKEN_ADDRESS
