@@ -2,13 +2,12 @@
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;
 use clap::Parser;
-use ethers::{providers::Middleware, types::NameOrAddress};
+use ethers::types::NameOrAddress;
 use foundry_common::try_get_http_provider;
 use foundry_config::{Chain, Config};
-use zksync::types::{Address, H160, H256};
+use zksync::types::{Address, H160, H256, U256};
 use zksync_types::L2_ETH_TOKEN_ADDRESS;
 
-use crate::cmd::cast::{send_zksync, transfer_zksync};
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
@@ -34,7 +33,8 @@ pub struct ZkSendTxArgs {
         short,
         help_heading = "Bridging options",
         help = "For L1 -> L2 deposits.",
-        conflicts_with = "withdraw"
+        conflicts_with = "withdraw",
+        group = "bridging"
     )]
     deposit: bool,
 
@@ -43,16 +43,28 @@ pub struct ZkSendTxArgs {
         short,
         help_heading = "Bridging options",
         help = "For L2 -> L1 withdrawals.",
-        conflicts_with = "deposit"
+        conflicts_with = "deposit",
+        group = "bridging"
     )]
     withdraw: bool,
 
     #[clap(
         long,
         help_heading = "Bridging options",
-        help = "Token to bridge. Leave blank for ETH."
+        help = "Token to bridge. Leave blank for ETH.",
+        value_name = "TOKEN"
     )]
     token: Option<String>,
+
+    #[clap(
+        long,
+        short,
+        help_heading = "Bridging options",
+        help = "Amount of token to bridge. Required value when bridging",
+        value_name = "AMOUNT",
+        requires = "bridging"
+    )]
+    amount: Option<U256>,
 
     #[clap(flatten)]
     tx: TransactionOpts,
@@ -96,60 +108,76 @@ impl ZkSendTxArgs {
         let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
         let to_address = self.get_to_address();
 
-        // IF BRIDGING
-        let token_address;
-        if self.deposit {
-            token_address = match &self.token {
+        let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
+        if self.deposit || self.withdraw {
+            // IF BRIDGING
+            let token_address = match &self.token {
                 Some(token_addy) => Address::from_slice(&decode_hex(token_addy).unwrap()),
-                None => L2_ETH_TOKEN_ADDRESS,
+                None => {
+                    if self.deposit {
+                        L2_ETH_TOKEN_ADDRESS
+                    } else {
+                        Address::zero()
+                    }
+                }
             };
-        } else if self.withdraw {
-            token_address = match &self.token {
-                Some(token_addy) => Address::from_slice(&decode_hex(token_addy).unwrap()),
-                None => Address::zero(),
+
+            //get amount
+            let amount = match self.amount {
+                Some(amt) => amt,
+                None => {
+                    panic!("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )")
+                }
+            };
+
+            match &wallet {
+                Ok(w) => {
+                    // Build Transfer //
+                    let tx = w
+                        .start_transfer()
+                        .to(to_address)
+                        .amount(amount)
+                        .token(token_address)
+                        .send()
+                        .await
+                        .unwrap();
+                    println!("{:#?}, <----------> tx", tx);
+                    let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
+                    println!("{:#?}, <----------> tx_rcpt_commit", tx_rcpt_commit);
+                }
+                Err(e) => panic!("error wallet: {e:?}"),
+            };
+        } else {
+            match &wallet {
+                Ok(w) => {
+                    // Build Executor //
+                    let sig = match self.sig {
+                        Some(sig) => sig,
+                        None => "".to_string(),
+                    };
+
+                    let params =
+                        if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
+                    let mut builder =
+                        TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
+                    builder.args(params).await?;
+                    let (tx, _func) = builder.build();
+                    let encoded_function_call = tx.data().unwrap().to_vec();
+
+                    let tx = w
+                        .start_execute_contract()
+                        .contract_address(to_address)
+                        .calldata(encoded_function_call)
+                        .send()
+                        .await
+                        .unwrap();
+                    println!("{:#?}, <----------> tx", tx);
+                    let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
+                    println!("{:#?}, <----------> tx_rcpt_commit", tx_rcpt_commit);
+                }
+                Err(e) => panic!("error wallet: {e:?}"),
             };
         }
-        println!("{:#?}, self.token ---->>>", self.token);
-
-        let sig = match self.sig {
-            Some(sig) => sig,
-            None => "".to_string(),
-        };
-
-        let params = if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
-        let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
-        builder.args(params).await?;
-        let (tx, _func) = builder.build();
-        let encoded_function_call = tx.data().unwrap().to_vec();
-
-        let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
-        match &wallet {
-            Ok(w) => {
-                // Build Executor //
-                // let estimate_fee = w
-                //     .start_execute_contract()
-                //     .contract_address(deployed_contract)
-                //     .calldata(encoded_function_call)
-                //     .estimate_fee(None)
-                //     .await
-                //     .unwrap();
-                // println!("{:#?}, <----------> estimate_fee", estimate_fee);
-
-                let tx = w
-                    .start_execute_contract()
-                    .contract_address(to_address)
-                    .calldata(encoded_function_call)
-                    .send()
-                    .await
-                    .unwrap();
-                println!("{:#?}, <----------> tx", tx);
-                let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                println!("{:#?}, <----------> tx_rcpt_commit", tx_rcpt_commit);
-                // let tx_rcpt_finalize = tx.wait_for_finalize().await.unwrap();
-                // println!("{:#?}, <----------> tx_rcpt_finalize", tx_rcpt_finalize);
-            }
-            Err(e) => panic!("error wallet: {e:?}"),
-        };
 
         Ok(())
     }
