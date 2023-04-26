@@ -37,6 +37,11 @@ pub struct ZkSendTxArgs {
         alias = "cast-async",
         help = "Only print the transaction hash and exit immediately."
     )]
+    #[clap(long, help_heading = "Transfer options", help = "For L1 -> L2 deposits.")]
+    deposit: bool,
+    #[clap(long, help_heading = "Transfer options", help = "For L2 -> L1 withdrawals.")]
+    withdraw: bool,
+
     cast_async: bool,
     #[clap(flatten)]
     tx: TransactionOpts,
@@ -126,7 +131,7 @@ impl ZkSendTxArgs {
         let params = if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
         let mut builder = TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
         builder.args(params).await?;
-        let (tx, func) = builder.build();
+        let (tx, _func) = builder.build();
         let encoded_function_call = tx.data().unwrap().to_vec();
 
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
