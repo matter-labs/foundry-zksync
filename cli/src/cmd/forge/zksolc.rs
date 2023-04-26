@@ -4,9 +4,9 @@ use ethers::solc::{
     Graph, Project,
 };
 use foundry_config::Config;
-use serde::Serialize;
+
 use serde_json::Value;
-use std::path::{self, PathBuf};
+use std::path::{PathBuf};
 use std::{
     collections::BTreeMap,
     fmt, fs,
@@ -205,17 +205,13 @@ impl<'a> ZkSolc<'a> {
         let graph = Graph::resolve_sources(&self.project.paths, sources)
             .map_err(|e| Error::msg(format!("Could not create graph: {}", e)))?;
 
-        let (versions, edges) = graph
+        let (versions, _edges) = graph
             .into_sources_by_version(self.project.offline)
             .map_err(|e| Error::msg(format!("Could not get versions & edges: {}", e)))?;
 
         let solc_version = versions
             .get(&self.project)
             .map_err(|e| Error::msg(format!("Could not get solc: {}", e)))?;
-
-        println!("+++++++++++++++++++++++++++");
-        // println!("{:?}", solc_version);
-        println!("+++++++++++++++++++++++++++");
 
         if let Some(solc_first_key) = &solc_version.first_key_value() {
             // TODO: understand and handle solc versions and the edge cases here
@@ -226,14 +222,7 @@ impl<'a> ZkSolc<'a> {
         }
     }
 
-    // fn build_artifacts_path(mut self) -> Result<()> {
-    //     let artifacts_path = self.output_path.join("artifacts.json");
-    //     self.artifacts_path = artifacts_path;
-
-    //     Ok(())
-    // }
-
-    fn build_artifacts_path(mut self) -> Result<()> {
+    fn build_artifacts_path(self) -> Result<()> {
         match fs::create_dir_all(&self.artifacts_path) {
             Ok(()) => println!(" create build_path folder success"),
             Err(error) => panic!("problem creating build_path folder: {:#?}", error),

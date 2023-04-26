@@ -68,5 +68,3 @@ pub mod zk_build;
 pub mod zk_create;
 pub mod zksolc;
 pub mod zksolc_manager;
-pub mod zksync_compile;
-pub mod zksync_deploy;

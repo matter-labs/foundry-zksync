@@ -5,7 +5,6 @@ use super::build::CoreBuildArgs;
 use super::zksolc::{ZkSolc, ZkSolcOpts};
 use super::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
 use crate::cmd::{
-    forge::install::{self},
     Cmd, LoadConfig,
 };
 use clap::Parser;
@@ -58,8 +57,8 @@ impl Cmd for ZkBuildArgs {
     type Output = String;
 
     fn run(self) -> eyre::Result<String> {
-        let mut config = self.try_load_config_emit_warnings()?;
-        let mut project = config.project()?;
+        let config = self.try_load_config_emit_warnings()?;
+        let project = config.project()?;
 
         let zksolc_manager_opts = ZkSolcManagerOpts { version: self.use_zksolc.unwrap() };
 
@@ -128,7 +127,7 @@ impl Provider for ZkBuildArgs {
     fn data(&self) -> Result<Map<Profile, Dict>, figment::Error> {
         let value = Value::serialize(self)?;
         let error = InvalidType(value.to_actual(), "map".into());
-        let mut dict = value.into_dict().ok_or(error)?;
+        let dict = value.into_dict().ok_or(error)?;
 
         // if self.names {
         //     dict.insert("names".to_string(), true.into());

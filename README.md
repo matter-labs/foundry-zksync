@@ -77,13 +77,13 @@ Arguments:
 ### Example Usage
 To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
 ```
-../foundry-zksync/target/debug/forge zk-build "Greeter.sol" 
+../foundry-zksync/target/debug/forge zk-build "Counter.sol" 
 ```
 
 ### Compiler Settings
 `zksolc` compiler version can optionally be configured using `--use-zksolc` flag:
 ```
-../foundry-zksync/target/debug/forge zkb "Greeter.sol" --use-zksolc v1.3.8
+../foundry-zksync/target/debug/forge zkb "Counter.sol" --use-zksolc v1.3.8
 ```
 
 ### Output
