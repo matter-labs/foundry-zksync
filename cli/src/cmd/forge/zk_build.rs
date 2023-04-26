@@ -4,9 +4,7 @@ use std::process;
 use super::build::CoreBuildArgs;
 use super::zksolc::{ZkSolc, ZkSolcOpts};
 use super::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
-use crate::cmd::{
-    Cmd, LoadConfig,
-};
+use crate::cmd::{Cmd, LoadConfig};
 use clap::Parser;
 use foundry_config::{
     figment::{
@@ -24,11 +22,9 @@ foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 #[derive(Debug, Clone, Parser, Serialize, Default)]
 #[clap(next_help_heading = "ZkBuild options", about = None)]
 pub struct ZkBuildArgs {
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub args: CoreBuildArgs,
-
+    /// Contract filename from project src/ ex: 'Contract.sol'
     #[clap(
+        help_heading = "Contract Name",
         help = "Contract filename from project src/ ex: 'Contract.sol'",
         value_name = "CONTRACT_FILENAME"
     )]
@@ -37,7 +33,7 @@ pub struct ZkBuildArgs {
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
     #[clap(
-        help_heading = "Compiler options",
+        help_heading = "ZkSync Compiler options",
         value_name = "ZK_SOLC_VERSION",
         long = "use-zksolc",
         default_value = Some("v1.3.9")
@@ -46,11 +42,16 @@ pub struct ZkBuildArgs {
     pub use_zksolc: Option<String>,
 
     #[clap(
+        help_heading = "ZkSync Compiler options",
         help = "Compile contract with in system mode",
         long = "is-system",
         value_name = "SYSTEM_MODE"
     )]
     pub is_system: bool,
+
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub args: CoreBuildArgs,
 }
 
 impl Cmd for ZkBuildArgs {
