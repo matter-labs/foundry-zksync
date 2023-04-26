@@ -94,6 +94,12 @@ impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
         println!("{:#?}, ZksendTxArgs", self);
         let config = Config::load();
+        println!("{:#?}, config", config);
+
+        //verify private key has been populated
+        if let None = &self.eth.wallet.private_key {
+            panic!("Private key was not provided. Try using --private-key flag");
+        }
 
         //get chain
         let chain = match self.eth.chain {
