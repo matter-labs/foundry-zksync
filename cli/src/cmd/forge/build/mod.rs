@@ -1,10 +1,8 @@
 //! Build command
-
 use crate::cmd::{
     forge::{
         install::{self},
         watch::WatchArgs,
-        zksync_compile,
     },
     Cmd, LoadConfig,
 };
@@ -81,64 +79,24 @@ pub struct BuildArgs {
     #[clap(flatten)]
     #[serde(skip)]
     pub watch: WatchArgs,
-
-    // #[clap(help_heading = "ZkSync compiler options", long, help = "Compile with ZkSync.")]
-    // #[serde(skip)]
-    // pub zksync: bool,
-    #[clap(subcommand)]
-    pub command: Option<BuildSubcommands>,
-}
-
-#[derive(Debug, Parser, Clone, Serialize)]
-pub enum BuildSubcommands {
-    #[clap(name = "--zksync", about = "Compiler subcommands for zkSync")]
-    ZkSync {
-        #[clap(
-            help = "Contract filename from project src/ ex: 'Contract.sol'",
-            value_name = "CONTRACT FILENAME"
-        )]
-        contract_path: String,
-        #[clap(help = "System mode flag ", value_name = "SYSTEM_MODE", long = "system-mode")]
-        system_mode: bool,
-        #[clap(
-            help = "Sets the EVM legacy assembly pipeline forcibly",
-            value_name = "FORCE_EVMLA",
-            long = "force-evmla"
-        )]
-        force_evmla: bool,
-    },
 }
 
 impl Cmd for BuildArgs {
     type Output = ProjectCompileOutput;
     fn run(self) -> eyre::Result<Self::Output> {
-        // println!("{:#?}", self);
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
 
-        if install::install_missing_dependencies(&mut config, &project, self.args.silent)
-            && config.auto_detect_remappings
+        if install::install_missing_dependencies(&mut config, &project, self.args.silent) &&
+            config.auto_detect_remappings
         {
             // need to re-configure here to also catch additional remappings
             config = self.load_config();
             project = config.project()?;
         }
 
-        // ZkSync
-        if let Some(t) = &self.command {
-            match t {
-                BuildSubcommands::ZkSync { contract_path, system_mode, force_evmla } => {
-                    zksync_compile::compile_zksync(
-                        &config,
-                        contract_path,
-                        *system_mode,
-                        *force_evmla,
-                    );
-                }
-            }
-        }
-
         let filters = self.skip.unwrap_or_default();
+
         if self.args.silent {
             compile::suppress_compile_with_filter(&project, filters)
         } else {

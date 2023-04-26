@@ -22,9 +22,6 @@ use serde_json::json;
 use std::{path::PathBuf, sync::Arc};
 use tracing::log::trace;
 
-//for zksync
-use crate::cmd::forge::zksync_deploy;
-
 /// CLI arguments for `forge create`.
 #[derive(Debug, Clone, Parser)]
 pub struct CreateArgs {
@@ -85,39 +82,19 @@ pub struct CreateArgs {
 
     #[clap(flatten)]
     retry: RetryArgs,
-
-    // #[clap(help_heading = "Compiler options", long, help = "Deploy with ZkSync.")]
-    // pub zksync: bool,
-    #[clap(subcommand)]
-    command: Option<CreateSubcommands>,
-}
-
-#[derive(Debug, Parser, Clone)]
-pub enum CreateSubcommands {
-    #[clap(name = "--zksync", about = "Deploy to ZkSync with Chain Id. Ex. --zksync 280")]
-    ZkSync {
-        #[clap(help = "Chain id testnet: 280, local: 270", value_name = "CHAIN-ID")]
-        chain_id: u16,
-    },
 }
 
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> eyre::Result<()> {
-        // Find Project
+        // Find Project & Compile
         let project = self.opts.project()?;
-
-        // Compile Project
-        // println!("{:#?}, project ---->>>", project);
-        // println!("{:#?}, CreateArgs ---->>>", self);
         let mut output = if self.json || self.opts.silent {
             // Suppress compile stdout messages when printing json output or when silent
             compile::suppress_compile(&project)
         } else {
             compile::compile(&project, false, false)
         }?;
-
-        let ctx_path = self.contract.path.clone();
 
         if let Some(ref mut path) = self.contract.path {
             // paths are absolute in the project's output
@@ -143,8 +120,6 @@ impl CreateArgs {
 
         // Add arguments to constructor
         let config = self.eth.try_load_config_emit_warnings()?;
-
-        // println!("{:#?}, config ---->>>", config);
         let provider = Arc::new(try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?);
         let params = match abi.constructor {
             Some(ref v) => {
@@ -159,32 +134,6 @@ impl CreateArgs {
             None => vec![],
         };
 
-        let pk = self.clone().eth.wallet.private_key;
-        if let None = pk {
-            panic!("Please provide Private Key with --private-key flag")
-        }
-
-        if let Some(t) = &self.command {
-            // println!("{:#?}, <------> CreateSubcommands", t);
-            match t {
-                CreateSubcommands::ZkSync { chain_id } => {
-                    zksync_deploy::deploy_zksync(
-                        &config,
-                        &project,
-                        params.clone(),
-                        self.contract.clone(),
-                        pk.unwrap(),
-                        self.eth.rpc_url.unwrap(),
-                        ctx_path.unwrap(),
-                        *chain_id,
-                    )
-                    .await?;
-                    return Ok(());
-                }
-                _ => (),
-            }
-        }
-
         if self.unlocked {
             let sender = self.eth.wallet.from.expect("is required");
             trace!("creating with unlocked account={:?}", sender);
@@ -192,7 +141,7 @@ impl CreateArgs {
             let provider =
                 Arc::try_unwrap(provider).expect("Only one ref; qed.").with_sender(sender);
             self.deploy(abi, bin, params, provider).await?;
-            return Ok(());
+            return Ok(())
         }
 
         // Deploy with signer
@@ -271,8 +220,8 @@ impl CreateArgs {
                     e
                 }
             })?;
-        let is_legacy = self.tx.legacy
-            || Chain::try_from(chain).map(|x| Chain::is_legacy(&x)).unwrap_or_default();
+        let is_legacy = self.tx.legacy ||
+            Chain::try_from(chain).map(|x| Chain::is_legacy(&x)).unwrap_or_default();
         let mut deployer = if is_legacy { deployer.legacy() } else { deployer };
 
         // set tx value if specified
@@ -361,7 +310,7 @@ impl CreateArgs {
         };
 
         if !self.verify {
-            return Ok(());
+            return Ok(())
         }
 
         println!("Starting contract verification...");

@@ -23,7 +23,7 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.7" => Ok(ZkSolcVersion::V137),
         "v1.3.8" => Ok(ZkSolcVersion::V138),
         "v1.3.9" => Ok(ZkSolcVersion::V139),
-        _ => Err(Error::msg("Unsupported version")),
+        _ => Err(Error::msg("ZkSolc compiler version not supported")),
     }
 }
 
@@ -35,7 +35,6 @@ impl ZkSolcVersion {
             ZkSolcVersion::V137 => Ok("v1.3.7"),
             ZkSolcVersion::V138 => Ok("v1.3.8"),
             ZkSolcVersion::V139 => Ok("v1.3.9"),
-            _ => Err(Error::msg("ZkSolc compiler version not supported")),
         }
     }
 }
@@ -230,6 +229,3 @@ impl ZkSolcManager {
         Ok(())
     }
 }
-
-// https://github.com/matter-labs/zksolc-bin/raw/main/linux-amd64/zksolc-linux-amd64-musl-v1.3.0
-// https://github.com/matter-labs/zksolc-bin/raw/main/zksolc-linux-amd64-musl-v1.3.8

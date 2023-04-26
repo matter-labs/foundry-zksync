@@ -10,7 +10,7 @@ use cast::fuzz::CounterExample;
 use clap::Parser;
 use ethers::{
     abi::Abi,
-    solc::{utils::RuntimeOrHandle, ArtifactId},
+    solc::{utils::RuntimeOrHandle},
     types::U256,
 };
 use forge::{
@@ -27,7 +27,7 @@ use forge::{
 use foundry_common::{
     compile::{self, ProjectCompiler},
     evm::EvmArgs,
-    get_contract_name, get_file_name, ContractsByArtifact,
+    get_contract_name, get_file_name,
 };
 use foundry_config::{figment, Config};
 use regex::Regex;
@@ -35,7 +35,7 @@ use std::{collections::BTreeMap, fs, path::PathBuf, sync::mpsc::channel, thread,
 use tracing::trace;
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
-use zksync_types::zk_evm;
+
 mod filter;
 use crate::cmd::forge::test::filter::ProjectPathsAwareFilter;
 pub use filter::FilterArgs;
@@ -507,7 +507,7 @@ fn test(
     //get abi
     let abi: Abi = serde_json::from_value(res["contracts"][&contract_path]["abi"].clone()).unwrap();
     let a = runner.known_contracts.clone().0.into_iter();
-    for (art, ctx) in a {
+    for (art, _ctx) in a {
         if &art.name == "Greeter" {
             // println!(
             //     "{:#?}, before contracts",
