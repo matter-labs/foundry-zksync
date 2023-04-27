@@ -72,6 +72,10 @@ CHAIN=270
 ```
 
 ---
+### Spin up local docker node
+[Follow these instructions to set up local docker node](https://era.zksync.io/docs/api/hardhat/testing.html)
+
+---
 ## Compilation
 
 ***v0.0*** ***Command***:
