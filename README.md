@@ -158,7 +158,7 @@ cast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url <RPC-URL>
 ZkSync + Pineapple
 ```
 
-### Send transactions:
+## Send transactions:
 
 ```
 cast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --chain <CHAIN-ID>
@@ -167,7 +167,7 @@ cast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-UR
 ```js
 ../foundry-zksync/target/debug/cast zk-send 0x97b985951fd3e0c1d996421cc783d46c12d00082 "setGreeting(string)" "Killer combo!"  --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
-### Output
+#### Output
 ```js
 Sending transaction....
 Transaction Hash: 0x7651fba8ddeb624cca93f89da493675ccbc5c6d36ee25ed620b07424ce338552
@@ -177,7 +177,7 @@ Transaction Hash: 0x7651fba8ddeb624cca93f89da493675ccbc5c6d36ee25ed620b07424ce33
 ```js
 ../foundry-zksync/target/debug/cast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
 ```
-### Output
+#### Output
 ```
 Killer combo!
 ```
