@@ -92,13 +92,24 @@ pub struct ZkSendTxArgs {
 
 impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        println!("{:#?}, ZksendTxArgs", self);
+        // println!("{:#?}, ZksendTxArgs", self);
         let config = Config::load();
 
-        //verify private key has been populated
-        if let None = &self.eth.wallet.private_key {
-            panic!("Private key was not provided. Try using --private-key flag");
-        }
+        //get private key
+        let private_key = match &self.eth.wallet.private_key {
+            Some(pkey) => {
+                let decoded = match decode_hex(pkey) {
+                    Ok(val) => H256::from_slice(&val),
+                    Err(e) => {
+                        panic!("Error parsing private key {e}, make sure it is valid.")
+                    }
+                };
+                decoded
+            }
+            None => {
+                panic!("Private key was not provided. Try using --private-key flag");
+            }
+        };
 
         //verify rpc url has been populated
         if let None = &self.eth.rpc_url {
@@ -114,7 +125,7 @@ impl ZkSendTxArgs {
         };
 
         // get signer
-        let signer = self.get_signer(&chain);
+        let signer = Self::get_signer(private_key, &chain);
         let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
         let to_address = self.get_to_address();
 
@@ -150,6 +161,7 @@ impl ZkSendTxArgs {
 
             match &wallet {
                 Ok(w) => {
+                    println!("Bridging assets....");
                     // Build Transfer //
                     let tx = w
                         .start_transfer()
@@ -159,20 +171,24 @@ impl ZkSendTxArgs {
                         .send()
                         .await
                         .unwrap();
-                    println!("{:#?}, <----------> tx", tx);
                     let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                    println!("{:#?}, <----------> tx_rcpt_commit", tx_rcpt_commit);
+                    println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
                 }
                 Err(e) => panic!("error wallet: {e:?}"),
             };
         } else {
             match &wallet {
                 Ok(w) => {
+                    println!("Sending transaction....");
                     // Build Executor //
                     let sig = match self.sig {
                         Some(sig) => sig,
-                        None => "".to_string(),
+                        None => panic!("Error: Function Signature is empty"),
                     };
+
+                    if self.args.is_empty() {
+                        panic!("Error: Function arguments are empty")
+                    }
 
                     let params =
                         if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
@@ -189,9 +205,8 @@ impl ZkSendTxArgs {
                         .send()
                         .await
                         .unwrap();
-                    println!("{:#?}, <----------> tx", tx);
                     let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                    println!("{:#?}, <----------> tx_rcpt_commit", tx_rcpt_commit);
+                    println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
                 }
                 Err(e) => panic!("error wallet: {e:?}"),
             };
@@ -200,15 +215,22 @@ impl ZkSendTxArgs {
         Ok(())
     }
 
-    fn get_signer(&self, chain: &Chain) -> Signer<PrivateKeySigner> {
-        // get signer
-        let private_key =
-            H256::from_slice(&decode_hex(&self.eth.wallet.private_key.clone().unwrap()).unwrap());
+    fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
         let eth_signer = PrivateKeySigner::new(private_key);
         let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
             .expect("Can't get an address from the private key");
         Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
+
+    // fn get_signer(&self, chain: &Chain) -> Signer<PrivateKeySigner> {
+    //     // get signer
+    //     let private_key =
+    //         H256::from_slice(&decode_hex(&self.eth.wallet.private_key.clone().unwrap()).unwrap());
+    //     let eth_signer = PrivateKeySigner::new(private_key);
+    //     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
+    //         .expect("Can't get an address from the private key");
+    //     Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
+    // }
     fn get_to_address(&self) -> H160 {
         let deployed_contract = match &self.to {
             Some(to) => match to.as_address() {

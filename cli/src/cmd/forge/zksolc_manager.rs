@@ -23,7 +23,9 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.7" => Ok(ZkSolcVersion::V137),
         "v1.3.8" => Ok(ZkSolcVersion::V138),
         "v1.3.9" => Ok(ZkSolcVersion::V139),
-        _ => Err(Error::msg("ZkSolc compiler version not supported")),
+        _ => {
+            Err(Error::msg("ZkSolc compiler version not supported. Proper version format: '1.3.x'"))
+        }
     }
 }
 
@@ -109,13 +111,18 @@ impl ZkSolcManagerBuilder {
             let compiler = self.get_compiler()?;
             let compilers_path = home_path.to_owned();
 
-            if let Ok(solc_version) = parse_version(&version) {
-                return Ok(ZkSolcManager {
-                    compilers_path,
-                    version: solc_version,
-                    compiler,
-                    download_url,
-                });
+            match parse_version(&version) {
+                Ok(solc_version) => {
+                    return Ok(ZkSolcManager {
+                        compilers_path,
+                        version: solc_version,
+                        compiler,
+                        download_url,
+                    });
+                }
+                Err(e) => {
+                    return Err(e);
+                }
             }
         }
         Err(Error::msg("Could not build ZkSolcManager"))
