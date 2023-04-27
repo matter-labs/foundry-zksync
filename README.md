@@ -80,7 +80,7 @@ CHAIN=270
 
 ***v0.0*** ***Command***:
 ## `forge zk-build`
-### aliases: `forge zk-compile`, `forge zkb`
+### aliases: `forge zkbuild`, `forge zk-compile`, `forge zkb`
 
 Compile smart contracts to zkEvm bytecode and store compile output files into a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval for other components of the application.
 
@@ -128,7 +128,7 @@ To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
 
 ***v0.0*** ***Command***:
 ## `forge zk-create`
-### aliases: `forge zk-deploy`, `forge zkc`
+### aliases: `forge zkcreate`, `forge zk-deploy`, `forge zkc`
 
 Manage deployments in the native foundry/forge fashion, using the `forge zk-create` command.
 
@@ -170,7 +170,8 @@ Transaction Hash: 0xf8cc268c48f80ba30ab4b05ebc600b5ae044404efc3916d3e7b7c02fe017
 ---
 ## Contract Interaction
 ***v0.0*** ***Commands***:
-## `cast zk-send` and `cast call`
+## `cast zk-send`
+### aliases: `cast zks`, `cast zksend`
 Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast call` and `cast zk-send` commands>
 
 - Retrieving and interacting with chain data, for example, block numbers and gas estimates
