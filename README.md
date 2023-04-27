@@ -4,6 +4,19 @@ Currently the industry standard Solidity smart contract test and deploy framewor
 
 Currently only Hardhat has developed functionality for zkSync. The purpose of this repository is to create functionality with Foundry to fully test, compile and deploy smart contracts on zkSync using only Solidity, as well as interact with those contracts once deployed.
 
+---
+## Contents
+
+- Quick Start / Installation
+- Feature Set
+- Environment Variables
+- Compilation
+- Deployment
+- Interaction
+- Bridging Assets
+- Deploy and Interact with `SimpleFactory.sol`
+
+
 ### Quick Start / Installation
 
 Clone these three repos to the same directory:
