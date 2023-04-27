@@ -23,7 +23,9 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.7" => Ok(ZkSolcVersion::V137),
         "v1.3.8" => Ok(ZkSolcVersion::V138),
         "v1.3.9" => Ok(ZkSolcVersion::V139),
-        _ => Err(Error::msg("ZkSolc compiler version not supported")),
+        _ => {
+            Err(Error::msg("ZkSolc compiler version not supported. Proper version format: '1.3.x'"))
+        }
     }
 }
 

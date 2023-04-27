@@ -1,27 +1,24 @@
 //! Create command
 
 use crate::{
-    cmd::{
-        forge::build::CoreBuildArgs, read_constructor_args_file,
-    },
+    cmd::{forge::build::CoreBuildArgs, read_constructor_args_file},
     opts::{EthereumOpts, TransactionOpts},
 };
 use clap::{Parser, ValueHint};
 use ethers::{
     abi::{encode, Abi, Constructor, Token},
     solc::{info::ContractInfo, Project},
-    types::{Bytes},
+    types::Bytes,
 };
 use foundry_common::abi::parse_tokens;
+use foundry_config::Chain;
 
-use serde_json::{Value};
+use serde_json::Value;
 
 use std::{
     fs::{self},
     path::PathBuf,
 };
-
-
 
 use zksync::types::H256;
 use zksync::zksync_eth_signer::PrivateKeySigner;
@@ -59,6 +56,15 @@ pub struct ZkCreateArgs {
     )]
     constructor_args_path: Option<PathBuf>,
 
+    #[clap(
+        long,
+        num_args(1..),
+        help_heading = "ZkSync Features",
+        help = "The factory dependencies in the form `<path>:<contractname>`.",
+        value_name = "FACTORY-DEPS"
+    )]
+    factory_deps: Option<Vec<ContractInfo>>,
+
     #[clap(flatten)]
     opts: CoreBuildArgs,
 
@@ -67,25 +73,44 @@ pub struct ZkCreateArgs {
 
     #[clap(flatten)]
     eth: EthereumOpts,
-
-    #[clap(
-        long,
-        num_args(1..),
-        help = "The factory dependencies in the form `<path>:<contractname>`.",
-        value_name = "FACTORY-DEPS"
-    )]
-    factory_deps: Option<Vec<ContractInfo>>,
 }
 
 impl ZkCreateArgs {
     /// Executes the command to create a contract
     pub async fn run(self) -> eyre::Result<()> {
-        println!("{:#?}, ZkCreateArgs ---->>>", self);
+        // println!("{:#?}, ZkCreateArgs ---->>>", self);
+
+        //get private key
+        let private_key = match &self.eth.wallet.private_key {
+            Some(pkey) => {
+                let decoded = match decode_hex(pkey) {
+                    Ok(val) => H256::from_slice(&val),
+                    Err(e) => {
+                        panic!("Error parsing private key {e}, make sure it is valid.")
+                    }
+                };
+                decoded
+            }
+            None => {
+                panic!("Private key was not provided. Try using --private-key flag");
+            }
+        };
+
+        //verify rpc url has been populated
+        if let None = &self.eth.rpc_url {
+            panic!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+        }
+
+        //get chain
+        let chain = match self.eth.chain {
+            Some(chain) => chain,
+            None => {
+                panic!("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
+            }
+        };
 
         // get project
         let mut project = self.opts.project()?;
-        println!("{:#?}, project ---->>>", project);
-
         // set out folder path
         project.paths.artifacts = project.paths.root.join("zkout");
 
@@ -100,12 +125,11 @@ impl ZkCreateArgs {
         }
 
         // get signer
-        let signer = self.get_signer();
+        let signer = Self::get_signer(private_key, &chain);
 
         // get abi
         let abi = Self::get_abi_from_contract(&project, &self.contract).unwrap();
         let contract: Abi = serde_json::from_value(abi).unwrap();
-        println!("{:#?}, contract ---->>>", contract);
 
         // encode constructor args
         let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
@@ -121,20 +145,24 @@ impl ZkCreateArgs {
             .factory_deps(factory_deps)
             .constructor_calldata(encoded_args);
 
-        let est_gas = deployer.estimate_fee(None).await;
-        println!("{:#?}, est_gas", est_gas);
+        // TODO: could be useful as a flag --estimate-gas
+        // let est_gas = deployer.estimate_fee(None).await;
+        // println!("{:#?}, est_gas", est_gas);
 
         let tx = deployer.send().await;
         match tx {
-            Ok(dep) => {
-                let rcpt = dep.wait_for_commit().await;
-                println!("{dep:#?}, deploy success");
+            Ok(deploy) => {
+                let rcpt = deploy.wait_for_commit().await;
                 let logs = rcpt.unwrap().logs;
                 for log in logs {
                     if log.address == CONTRACT_DEPLOYER_ADDRESS {
                         let deployed_address = log.topics.get(3).unwrap();
                         let deployed_address = Address::from(deployed_address.clone());
-                        println!("{:#?}, <---- Deployed contract address:", deployed_address);
+                        println!(
+                            "Contract successfully deployed to address: {:#?}",
+                            deployed_address
+                        );
+                        println!("Transaction Hash: {:#?}", deploy.hash());
                     }
                 }
             }
@@ -212,18 +240,11 @@ impl ZkCreateArgs {
         factory_dep_vector
     }
 
-    fn get_signer(&self) -> Signer<PrivateKeySigner> {
-        // get signer
-        let private_key =
-            H256::from_slice(&decode_hex(&self.eth.wallet.private_key.clone().unwrap()).unwrap());
+    fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
         let eth_signer = PrivateKeySigner::new(private_key);
         let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
             .expect("Can't get an address from the private key");
-        Signer::new(
-            eth_signer,
-            signer_addy,
-            L2ChainId(self.eth.chain.unwrap().id().try_into().unwrap()),
-        )
+        Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
 
     fn parse_constructor_args(

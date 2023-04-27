@@ -85,7 +85,7 @@ impl Cmd for ZkBuildArgs {
                     }
                 }
 
-                println!("Compiling smart contracts");
+                println!("Compiling smart contracts...");
 
                 let zksolc_opts = ZkSolcOpts {
                     compiler_path: zksolc_manager.get_full_compiler_path(),
