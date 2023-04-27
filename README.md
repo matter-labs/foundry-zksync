@@ -8,14 +8,13 @@ Currently only Hardhat has developed functionality for zkSync. The purpose of th
 ## Contents
 
 - [**Quick Start / Installation**](https://github.com/matter-labs/foundry-zksync#quick-start--installation)
-- Feature Set
-- Environment Variables
-- Compilation
-- Deployment
-- Interaction
-- Bridging Assets
-- Deploy and Interact with `SimpleFactory.sol`
-
+- [**Feature Set**](https://github.com/matter-labs/foundry-zksync#feature-set)
+- [**Environment Variables**](https://github.com/matter-labs/foundry-zksync#environment-variables)
+- [**Compilation**](https://github.com/matter-labs/foundry-zksync#compilation)
+- [**Deployment**](https://github.com/matter-labs/foundry-zksync#deployment)
+- [**Contract Interaction**](https://github.com/matter-labs/foundry-zksync#interaction)
+- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-with-cast-zk-send)
+- [**Deploy and Interact with `SimpleFactory.sol`**](https://github.com/matter-labs/foundry-zksync#usage-example-simplefactorysol)
 
 ### Quick Start / Installation
 
