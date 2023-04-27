@@ -6,7 +6,7 @@ use ethers::solc::{
 use foundry_config::Config;
 
 use serde_json::Value;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::{
     collections::BTreeMap,
     fmt, fs,
@@ -155,7 +155,8 @@ impl<'a> ZkSolc<'a> {
 
     pub fn parse_json_input(&mut self) -> Result<()> {
         // TODO: this feels goofy to me
-        let mut project = Config::load().project()
+        let mut project = Config::load()
+            .project()
             .map_err(|e| Error::msg(format!("Could not load project from config: {}", e)))?;
 
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
@@ -192,6 +193,17 @@ impl<'a> ZkSolc<'a> {
             .standard_json_input(&self.contracts_path)
             .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
         self.standard_json = Some(standard_json.to_owned());
+
+        println!("{:#?} ZkSolc", self);
+
+        // Save the JSON input to build folder.
+        let stdjson = serde_json::to_value(&standard_json).unwrap();
+        let path = self.artifacts_path.join("json_input.json");
+        match File::create(&path) {
+            Err(why) => panic!("couldn't create : {}", why),
+            Ok(file) => file,
+        };
+        std::fs::write(path, serde_json::to_string_pretty(&stdjson).unwrap()).unwrap();
 
         Ok(())
     }
