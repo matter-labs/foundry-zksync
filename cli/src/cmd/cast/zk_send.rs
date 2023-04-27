@@ -162,17 +162,31 @@ impl ZkSendTxArgs {
             match &wallet {
                 Ok(w) => {
                     println!("Bridging assets....");
-                    // Build Transfer //
-                    let tx = w
-                        .start_transfer()
-                        .to(to_address)
-                        .amount(amount)
-                        .token(token_address)
-                        .send()
-                        .await
-                        .unwrap();
-                    let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                    println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
+                    if self.deposit {
+                        // Build Transfer //
+                        let tx = w
+                            .start_transfer()
+                            .to(to_address)
+                            .amount(amount)
+                            .token(token_address)
+                            .send()
+                            .await
+                            .unwrap();
+                        let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
+                        println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
+                    } else {
+                        // Build Withdraw //
+                        let tx = w
+                            .start_withdraw()
+                            .to(to_address)
+                            .amount(amount)
+                            .token(token_address)
+                            .send()
+                            .await
+                            .unwrap();
+                        let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
+                        println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
+                    }
                 }
                 Err(e) => panic!("error wallet: {e:?}"),
             };
