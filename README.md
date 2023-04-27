@@ -46,7 +46,7 @@ NOTE: All commands are entered from the project root folder
 ---
 ## Environment Variables
 
-By providing the following environment variables in the `.env` file at the <PROJECT-ROOT> folder, the `--rpc-url` and `--chain` flags can be ommitted in command lines.
+By providing the following environment variables in the `.env` file at the `PROJECT-ROOT` folder, the `--rpc-url` and `--chain` flags can be ommitted in command lines.
 ```bash
 # ETH_RPC_URL can be used to replace --rpc-url in command line 
 ETH_RPC_URL=http://localhost:3050
