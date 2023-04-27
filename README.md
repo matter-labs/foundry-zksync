@@ -217,7 +217,7 @@ Killer combo!
 
 ### ***L1 → L2 deposits:***
 
-```
+```bash
 cast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
 ```
 NOTE: Leave <TOKEN> blank to bridge ETH
