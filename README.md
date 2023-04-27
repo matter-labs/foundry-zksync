@@ -249,4 +249,25 @@ Contract successfully deployed to address: 0x23cee3fb585b1e5092b7cfb222e8e873b05
 Transaction Hash: 0x498066df55979cbe182d4cea4487eb8e5acff2433094fe2f7317590957095028
 ```
 
+### Deploy `StepChlid.sol` via `SimpleFactory.sol`
+```bash
+../foundry-zksync/target/debug/cast zk-send 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519 "newStepChild()" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+
+#### Output:
+```bash
+Sending transaction....
+Transaction Hash: 0xa82a0636b71af058d4916d81868eebc41173ca07b78d30fe57f4b74e9294ef25
+```
+
+### Interact with `SimpleFactory.sol`
+```bash
+../foundry-zksync/target/debug/cast call 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519 "stepChildren(uint256)(address)" 0 --rpc-url http://localhost:3050
+```
+
+#### Output:
+StepChild deployed address:
+```js
+0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96
+```
 
