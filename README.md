@@ -16,6 +16,9 @@ Currently only Hardhat has developed functionality for zkSync. The purpose of th
 - [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-with-cast-zk-send)
 - [**Deploy and Interact with `SimpleFactory.sol`**](https://github.com/matter-labs/foundry-zksync#usage-example-simplefactorysol)
 
+---
+---
+
 ### Quick Start / Installation
 
 Clone these three repos to the same directory:
