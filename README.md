@@ -266,8 +266,41 @@ Transaction Hash: 0xa82a0636b71af058d4916d81868eebc41173ca07b78d30fe57f4b74e9294
 ```
 
 #### Output:
-StepChild deployed address:
+`StepChild.sol` deployed address:
 ```js
 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96
+```
+
+### Interact with `StepChild.sol`
+Use `cast call` to check initial state:
+```bash
+../foundry-zksync/target/debug/cast call 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "isEnabled()(bool)" --rpc-url http://localhost:3050
+```
+
+#### Output:
+```js
+false
+```
+
+Use `cast zk-send` to modify state:
+```bash
+../foundry-zksync/target/debug/cast zk-send 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "enable()" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+
+#### Output:
+```bash
+Sending transaction....
+Transaction Hash: 0xe005e15e9f58b7dcdcc7b16a9d5c706ddef7a4c9cab82216ea944d5344ba01ae
+```
+
+
+Use `cast call` to check modified state:
+```bash
+../foundry-zksync/target/debug/cast call 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "isEnabled()(bool)" --rpc-url http://localhost:3050
+```
+
+#### Output:
+```js
+true
 ```
 
