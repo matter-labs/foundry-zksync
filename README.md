@@ -1,4 +1,4 @@
-# ZkSync Smart Contract Testing, Deployment and Interaction Tooling Framework with Foundry
+# ZkSync Smart Contract Testing, Deployment and Interaction Framework with Foundry
 ### About
 Currently the industry standard Solidity smart contract test and deploy frameworks are Hardhat and Truffle. They both use JavaScript to test and deploy solidity smart contracts. Another smart contract testing platform by the name of Foundry. The  advantage that Foundry provides is that all tests are also written solidity creating a smoother developer experience. With Foundry, the engineer does not need to switch languages to write tests and deploy contracts.. 
 
