@@ -8,7 +8,7 @@ Currently only Hardhat has developed functionality for zkSync. The purpose of th
 ## Contents
 
 - [**Quick Start / Installation**](https://github.com/matter-labs/foundry-zksync#quick-start--installation)
-- [**Feature Set**](https://github.com/matter-labs/foundry-zksync#feature-set)
+- [**v0.0 Feature Set**](https://github.com/matter-labs/foundry-zksync#feature-set)
 - [**Environment Variables**](https://github.com/matter-labs/foundry-zksync#environment-variables)
 - [**Compilation**](https://github.com/matter-labs/foundry-zksync#compilation)
 - [**Deployment**](https://github.com/matter-labs/foundry-zksync#deployment)
