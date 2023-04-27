@@ -137,14 +137,12 @@ Transaction Hash: 0xf8cc268c48f80ba30ab4b05ebc600b5ae044404efc3916d3e7b7c02fe017
 
 ---
 ## Interaction
-
+***v0.0*** ***Commands***:
+## `cast zk-send` and `cast call`
 Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast call` and `cast zk-send` commands>
-## `cast zk-send`
 
 - Retrieving and interacting with chain data, for example, block numbers and gas estimates
 - Interact with deployed contracts on (zkSync Testnet or Local Docker Node)
-
-***v0.0*** ***Commands***:
 
 ***Non-state changing calls:***
 
@@ -160,7 +158,7 @@ cast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url <RPC-URL>
 ZkSync + Pineapple
 ```
 
-***Send transactions:***
+### Send transactions:
 
 ```
 cast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --chain <CHAIN-ID>
