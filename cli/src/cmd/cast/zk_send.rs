@@ -186,10 +186,6 @@ impl ZkSendTxArgs {
                         None => panic!("Error: Function Signature is empty"),
                     };
 
-                    if self.args.is_empty() {
-                        panic!("Error: Function arguments are empty")
-                    }
-
                     let params =
                         if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
                     let mut builder =
@@ -222,15 +218,6 @@ impl ZkSendTxArgs {
         Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
 
-    // fn get_signer(&self, chain: &Chain) -> Signer<PrivateKeySigner> {
-    //     // get signer
-    //     let private_key =
-    //         H256::from_slice(&decode_hex(&self.eth.wallet.private_key.clone().unwrap()).unwrap());
-    //     let eth_signer = PrivateKeySigner::new(private_key);
-    //     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
-    //         .expect("Can't get an address from the private key");
-    //     Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
-    // }
     fn get_to_address(&self) -> H160 {
         let deployed_contract = match &self.to {
             Some(to) => match to.as_address() {

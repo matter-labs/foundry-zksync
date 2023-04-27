@@ -218,5 +218,35 @@ cast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --pri
 Bridging assets....
 Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d6317
 ```
+---
+
+## Usage Example: `SimpleFactory.sol`
+### Deploying and Interacting with `SimpleFactory.sol`
+
+#### Compile contracts:
+`SimpleFactory.sol`
+```
+../foundry-zksync/target/debug/forge zk-build "SimpleFactory.sol" 
+```
+`Child.sol`
+```
+../foundry-zksync/target/debug/forge zk-build "Child.sol"
+```
+`StepChild.sol`
+```
+../foundry-zksync/target/debug/forge zk-build "StepChild.sol"
+```
+
+### Deploy `SimpleFactory.sol`
+
+```bash
+../foundry-zksync/target/debug/forge zkc src/SimpleFactory.sol:SimpleFactory --constructor-args 01000041691510d85ddfc6047cba6643748dc028636d276f09a546ab330697ef 010000238a587670be26087b7812eab86eca61e7c4014522bdceda86adb2e82f --factory-deps src/Child.sol:Child src/StepChild.sol:StepChild --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+```
+
+#### Output:
+```bash
+Contract successfully deployed to address: 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519
+Transaction Hash: 0x498066df55979cbe182d4cea4487eb8e5acff2433094fe2f7317590957095028
+```
 
 
