@@ -7,7 +7,7 @@ Currently only Hardhat has developed functionality for zkSync. The purpose of th
 ---
 ## Contents
 
-- Quick Start / Installation
+- [**Quick Start / Installation**](https://github.com/matter-labs/foundry-zksync#quick-start--installation)
 - Feature Set
 - Environment Variables
 - Compilation
