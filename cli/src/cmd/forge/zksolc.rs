@@ -194,8 +194,6 @@ impl<'a> ZkSolc<'a> {
             .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
         self.standard_json = Some(standard_json.to_owned());
 
-        println!("{:#?} ZkSolc", self);
-
         // Save the JSON input to build folder.
         let stdjson = serde_json::to_value(&standard_json).unwrap();
         let path = self.artifacts_path.join("json_input.json");
