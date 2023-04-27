@@ -71,8 +71,6 @@ Arguments:
   -h, --help         Print help
 
   
-
-
 ```
 ### Example Usage
 To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
@@ -141,6 +139,7 @@ Transaction Hash: 0xf8cc268c48f80ba30ab4b05ebc600b5ae044404efc3916d3e7b7c02fe017
 ## Interaction
 
 Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast call` and `cast zk-send` commands>
+## `cast zk-send`
 
 - Retrieving and interacting with chain data, for example, block numbers and gas estimates
 - Interact with deployed contracts on (zkSync Testnet or Local Docker Node)
