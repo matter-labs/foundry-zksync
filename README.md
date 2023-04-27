@@ -77,17 +77,17 @@ Arguments:
 ### Example Usage
 To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
 ```
-../foundry-zksync/target/debug/forge zk-build "Counter.sol" 
+../foundry-zksync/target/debug/forge zk-build "Greeter.sol" 
 ```
 
 ### Compiler Settings
 `zksolc` compiler version can optionally be configured using `--use-zksolc` flag:
 ```
-../foundry-zksync/target/debug/forge zkb "Counter.sol" --use-zksolc v1.3.8
+../foundry-zksync/target/debug/forge zkb "Greeter.sol" --use-zksolc v1.3.8
 ```
 
 ### Output
-`zksolc` compiler artifacts can be found in the folder:
+`zksolc` compiler artifacts can be found in the output folder:
 ```
 <PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
 ```
@@ -104,9 +104,9 @@ Manage deployments in the native foundry/forge fashion, using the `forge zk-crea
 
 
 ```
-Deploy to ZkSync with Chain Id. Ex. --zksync 280
+Deploy to ZkSync with Chain Id.
 
-Usage: forge zk-create <CONTRACT> [OPTIONS] <RPC-URL> <CHAIN-ID>
+Usage: forge zk-create <CONTRACT> [OPTIONS] --rpc-url <RPC-URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
 
 Arguments:
   <CONTRACT>
@@ -123,27 +123,24 @@ Options:
   --factory-deps <FACTORY-DEPS>...
           The factory dependencies in the form `<path>:<contractname>`
 ```
-Command Line:
-```
-`forge create <CONTRACT> --constructor-args [CONSTRUCTOR_ARGS] --rpc-url <http://localhost:3050> --private-key <PRIVATE_KEY> --chain <CHAIN_ID>`
-```
 
 ### Example Usage
-To Deploy `src/Counter.sol` to zksync local node:
+To Deploy `src/Greeter.sol` to zksync local node:
 ```
-../foundry-zksync/target/debug/forge zkc src/Counter.sol:Counter --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+../foundry-zksync/target/debug/forge zkc src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
 ### Output
-```
-0x5fe58d975604e6af62328d9e505181b94fc0718c, <---- Deployed contract address
+```js
+Contract successfully deployed to address: 0x97b985951fd3e0c1d996421cc783d46c12d00082
+Transaction Hash: 0xf8cc268c48f80ba30ab4b05ebc600b5ae044404efc3916d3e7b7c02fe0179710
 ```
 
 
 ---
 ## Interaction
 
-Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast call` and `cast send` commands>
+Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast call` and `cast zk-send` commands>
 
 - Retrieving and interacting with chain data, for example, block numbers and gas estimates
 - Interact with deployed contracts on (zkSync Testnet or Local Docker Node)
@@ -152,34 +149,77 @@ Interact with deployed contracts in the native foundry/forge fashion using the C
 
 ***Non-state changing calls:***
 
-`cast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url zk-rpc`
+```
+cast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url <RPC-URL>
+```
+### Example Usage
+```js
+../foundry-zksync/target/debug/cast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
+```
+### Output
+```js
+ZkSync + Pineapple
+```
 
 ***Send transactions:***
 
-`cast send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url zk-sync --private-key <PRIVATE-KEY> --zksync`
+```
+cast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --chain <CHAIN-ID>
+```
+### Example Usage
+```js
+../foundry-zksync/target/debug/cast zk-send 0x97b985951fd3e0c1d996421cc783d46c12d00082 "setGreeting(string)" "Killer combo!"  --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+### Output
+```js
+Sending transaction....
+Transaction Hash: 0x7651fba8ddeb624cca93f89da493675ccbc5c6d36ee25ed620b07424ce338552
+```
 
-
+#### Verify output
+```js
+../foundry-zksync/target/debug/cast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
+```
+### Output
+```
+Killer combo!
+```
 ---
-## Bridging Assets
 
-Bridge assets L1 ↔ L2 with `--zksync-deposit` and `--zksync-withdraw`
+## Bridging Assets with `cast zk-send`
+
+#### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
 
 ***L1 → L2 deposits:***
 
-`cast send --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --zksync-deposit <TO> <AMOUNT> <TOKEN>`
+```
+cast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+```
+NOTE: Leave <TOKEN> blank to bridge ETH
+
+### Example Usage
+```js
+../foundry-zksync/target/debug/cast zk-send --deposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+### Output
+```js
+Bridging assets....
+Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
+```
 
 ***L2 → L1 withdrawals:***
 
-`cast send --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --zksync-withdraw <TO> <AMOUNT> <TOKEN>`
-
----
-## UPDATE 4/20
-New build command with refactored code `forge zk-build`
-
-```bash
-# command line using forge zk-build:
-../foundry-zksync/target/debug/forge zk-build --contract_name Greeter.sol --use_zksolc v1.3.8
+```
+cast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+```
+### Example Usage
+```js
+../foundry-zksync/target/debug/cast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+### Output
+```js
+Bridging assets....
+Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d6317
 ```
 
-zk-build commands saves compiled artifacts to `<PROJECT_ROOT>/zkout/` folder, adjacent to Foundry's native `/out/` folder
 
