@@ -83,7 +83,7 @@ Compile smart contracts to zkEvm bytecode and store compile output files into a 
 
 
 
-```
+```bash
 Compiler subcommands for zkSync
 
 Usage: 
@@ -100,21 +100,21 @@ Arguments:
 
   
 ```
-### Example Usage
+#### Example Usage
 To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
-```
+```bash
 ../foundry-zksync/target/debug/forge zk-build "Greeter.sol" 
 ```
 
-### Compiler Settings
+#### Compiler Settings
 `zksolc` compiler version can optionally be configured using `--use-zksolc` flag:
-```
+```bash
 ../foundry-zksync/target/debug/forge zkb "Greeter.sol" --use-zksolc v1.3.8
 ```
 
-### Output
+#### Output
 `zksolc` compiler artifacts can be found in the output folder:
-```
+```bash
 <PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
 ```
 ![image](https://user-images.githubusercontent.com/76663878/234152279-e144e489-41ab-4cbd-8321-8ccd9b0aa6ef.png)
@@ -129,7 +129,7 @@ To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
 Manage deployments in the native foundry/forge fashion, using the `forge zk-create` command.
 
 
-```
+```bash
 Deploy to ZkSync with Chain Id.
 
 Usage: forge zk-create <CONTRACT> [OPTIONS] --rpc-url <RPC-URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
@@ -150,13 +150,13 @@ Options:
           The factory dependencies in the form `<path>:<contractname>`
 ```
 
-### Example Usage
+#### Example Usage
 To Deploy `src/Greeter.sol` to zksync local node:
-```
+```bash
 ../foundry-zksync/target/debug/forge zkc src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
-### Output
+#### Output
 ```js
 Contract successfully deployed to address: 0x97b985951fd3e0c1d996421cc783d46c12d00082
 Transaction Hash: 0xf8cc268c48f80ba30ab4b05ebc600b5ae044404efc3916d3e7b7c02fe0179710
@@ -172,27 +172,27 @@ Interact with deployed contracts in the native foundry/forge fashion using the C
 - Retrieving and interacting with chain data, for example, block numbers and gas estimates
 - Interact with deployed contracts on (zkSync Testnet or Local Docker Node)
 
-***Non-state changing calls:***
+### ***Non-state changing calls:***
 
-```
+```bash
 cast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url <RPC-URL>
 ```
-### Example Usage
-```js
+#### Example Usage
+```bash
 ../foundry-zksync/target/debug/cast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
 ```
-### Output
+#### Output
 ```js
 ZkSync + Pineapple
 ```
 
 ## Send transactions:
 
-```
+```bash
 cast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --chain <CHAIN-ID>
 ```
 ### Example Usage
-```js
+```bash
 ../foundry-zksync/target/debug/cast zk-send 0x97b985951fd3e0c1d996421cc783d46c12d00082 "setGreeting(string)" "Killer combo!"  --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 #### Output
@@ -202,46 +202,46 @@ Transaction Hash: 0x7651fba8ddeb624cca93f89da493675ccbc5c6d36ee25ed620b07424ce33
 ```
 
 #### Verify output
-```js
+```bash
 ../foundry-zksync/target/debug/cast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
 ```
 #### Output
-```
+```js
 Killer combo!
 ```
 ---
 
 ## Bridging Assets with `cast zk-send`
 
-#### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
+### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
 
-***L1 → L2 deposits:***
+### ***L1 → L2 deposits:***
 
 ```
 cast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
 ```
 NOTE: Leave <TOKEN> blank to bridge ETH
 
-### Example Usage
-```js
+#### Example Usage
+```bash
 ../foundry-zksync/target/debug/cast zk-send --deposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
-### Output
+#### Output
 ```js
 Bridging assets....
 Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
 ```
 
-***L2 → L1 withdrawals:***
+### ***L2 → L1 withdrawals:***
 
-```
+```bash
 cast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
 ```
-### Example Usage
-```js
+#### Example Usage
+```bash
 ../foundry-zksync/target/debug/cast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
-### Output
+#### Output
 ```js
 Bridging assets....
 Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d6317
@@ -253,15 +253,15 @@ Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d
 
 #### Compile contracts:
 `SimpleFactory.sol`
-```
+```bash
 ../foundry-zksync/target/debug/forge zk-build "SimpleFactory.sol" 
 ```
 `Child.sol`
-```
+```bash
 ../foundry-zksync/target/debug/forge zk-build "Child.sol"
 ```
 `StepChild.sol`
-```
+```bash
 ../foundry-zksync/target/debug/forge zk-build "StepChild.sol"
 ```
 
