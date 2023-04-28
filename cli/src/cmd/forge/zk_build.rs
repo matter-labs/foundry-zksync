@@ -43,11 +43,21 @@ pub struct ZkBuildArgs {
 
     #[clap(
         help_heading = "ZkSync Compiler options",
-        help = "Compile contract with in system mode",
+        help = "Enable the system contract compilation mode. In this mode zkEVM extensions are enabled. For example, calls
+        to addresses `0xFFFF` and below are substituted by special zkEVM instructions.",
         long = "is-system",
         value_name = "SYSTEM_MODE"
     )]
     pub is_system: bool,
+
+    #[clap(
+        help_heading = "ZkSync Compiler options",
+        help = "Forcibly switch to the EVM legacy assembly pipeline. It is useful for older revisions of `solc` 0.8, where
+        Yul was considered highly experimental and contained more bugs than today",
+        long = "force-evmla",
+        value_name = "FORCE_EVMLA"
+    )]
+    pub force_evmla: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -91,7 +101,7 @@ impl Cmd for ZkBuildArgs {
                     compiler_path: zksolc_manager.get_full_compiler_path(),
                     // config: &config,
                     is_system: self.is_system,
-                    // force_evmla: todo!(),
+                    force_evmla: self.force_evmla,
                     config: &config,
                     contract_name: self.contract_name, // contracts_path: todo!(),
                 };

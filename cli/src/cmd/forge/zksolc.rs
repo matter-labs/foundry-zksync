@@ -18,19 +18,16 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts<'a> {
     pub config: &'a Config,
-    // pub project: &'a Project,
     pub compiler_path: PathBuf,
     pub contract_name: String,
-    // pub contracts_path: PathBuf,
     pub is_system: bool,
-    // pub force_evmla: bool,
+    pub force_evmla: bool,
 }
 
 // impl<'a> Default for ZkSolcOpts<'a> {
 //     fn default() -> Self {
 //         Self {
 //             config: &Config::default(),
-//             project: &Project::default(),
 //             compiler_path: PathBuf::new(),
 //             is_system: false,
 //             force_evmla: false,
@@ -40,14 +37,12 @@ pub struct ZkSolcOpts<'a> {
 
 #[derive(Debug)]
 pub struct ZkSolc {
-    // pub config: &'a Config,
     pub project: Project,
     pub compiler_path: PathBuf,
-    // pub output_path: PathBuf,
     pub contracts_path: PathBuf,
     pub artifacts_path: PathBuf,
     pub is_system: bool,
-    // pub force_evmla: bool,
+    pub force_evmla: bool,
     pub standard_json: Option<StandardJsonCompilerInput>,
 }
 
@@ -92,17 +87,13 @@ impl<'a> ZkSolc {
             contracts_path,
             artifacts_path,
             is_system: opts.is_system,
-            // force_evmla: todo!(),
+            force_evmla: opts.force_evmla,
             standard_json: None,
         }
     }
 
     // TODO: hander errs instead of unwraps
     pub fn compile(mut self) -> Result<()> {
-        // let _ = &self
-        //     .build_artifacts_path()
-        //     .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))?;
-
         let solc_path = &self
             .configure_solc()
             .map_err(|e| Error::msg(format!("Could not configure solc: {}", e)))?;
@@ -113,6 +104,9 @@ impl<'a> ZkSolc {
         comp_args.push("--standard-json".to_string());
         if self.is_system {
             comp_args.push("--system-mode".to_string());
+        }
+        if self.force_evmla {
+            comp_args.push("--force-evmla".to_string());
         }
         comp_args.push("--solc".to_string());
         comp_args.push(solc_path.clone().into_os_string().into_string().unwrap());
