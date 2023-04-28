@@ -284,8 +284,14 @@ Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d
 
 #### Output:
 ```bash
-Contract successfully deployed to address: 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519
-Transaction Hash: 0x498066df55979cbe182d4cea4487eb8e5acff2433094fe2f7317590957095028
+Deploying contract...
++-------------------------------------------------+
+Contract successfully deployed to address: 0xa1b809005e589f81de6ef9f48d67e35606c05fc3
+Transaction Hash: 0x34782985ba7c70b6bc4a8eb2b95787baec29356171fdbb18608037a2fcd7eda8
+Gas used: 168141
+Effective gas price: 250000000
+Block Number: 249
++-------------------------------------------------+
 ```
 
 ### Deploy `StepChlid.sol` via `SimpleFactory.sol`
