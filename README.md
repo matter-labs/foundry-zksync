@@ -162,8 +162,14 @@ To Deploy `src/Greeter.sol` to zksync local node:
 
 #### Output
 ```js
-Contract successfully deployed to address: 0x97b985951fd3e0c1d996421cc783d46c12d00082
-Transaction Hash: 0xf8cc268c48f80ba30ab4b05ebc600b5ae044404efc3916d3e7b7c02fe0179710
+Deploying contract...
++-------------------------------------------------+
+Contract successfully deployed to address: 0xa1b809005e589f81de6ef9f48d67e35606c05fc3
+Transaction Hash: 0x34782985ba7c70b6bc4a8eb2b95787baec29356171fdbb18608037a2fcd7eda8
+Gas used: 168141
+Effective gas price: 250000000
+Block Number: 249
++-------------------------------------------------+
 ```
 
 
