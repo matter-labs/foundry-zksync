@@ -11,6 +11,7 @@ use zksync_types::L2_ETH_TOKEN_ADDRESS;
 use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
+use zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
 /// CLI arguments for `cast zk-send`.
 #[derive(Debug, Parser)]
@@ -217,6 +218,14 @@ impl ZkSendTxArgs {
                         .unwrap();
                     let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
                     println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
+
+                    for log in tx_rcpt_commit.logs {
+                        if log.address == CONTRACT_DEPLOYER_ADDRESS {
+                            let deployed_address = log.topics.get(3).unwrap();
+                            let deployed_address = Address::from(deployed_address.clone());
+                            println!("{:#?}, <---- Deployed contract address:", deployed_address);
+                        }
+                    }
                 }
                 Err(e) => panic!("error wallet: {e:?}"),
             };
