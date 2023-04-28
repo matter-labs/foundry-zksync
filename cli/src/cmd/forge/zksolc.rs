@@ -70,9 +70,34 @@ impl<'a> ZkSolc {
     }
 
     pub fn compile(self) -> Result<()> {
-        let solc_path = &self
+        let (contract_path, comp_args) = self.build_compiler_args();
+        let mut cmd = Command::new(&self.compiler_path);
+        let mut child = cmd
+            .arg(contract_path)
+            .args(comp_args)
+            .stdin(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn();
+        let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+
+        serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
+            .map_err(|e| Error::msg(format!("Could not assign standard_json to writer: {}", e)))?;
+
+        let output = child
+            .unwrap()
+            .wait_with_output()
+            .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
+
+        self.write_artifacts(output);
+
+        Ok(())
+    }
+
+    fn build_compiler_args(&self) -> (String, Vec<String>) {
+        let solc_path = self
             .configure_solc()
-            .map_err(|e| Error::msg(format!("Could not configure solc: {}", e)))?
+            .unwrap_or_else(|e| panic!("Could not configure solc: {}", e))
             .to_str()
             .unwrap_or_else(|| panic!("Error configuring solc compiler."))
             .to_string();
@@ -96,28 +121,7 @@ impl<'a> ZkSolc {
         if self.force_evmla {
             comp_args.push("--force-evmla".to_string());
         }
-
-        let mut cmd = Command::new(&self.compiler_path);
-        let mut child = cmd
-            .arg(contracts_path)
-            .args(comp_args)
-            .stdin(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
-        let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
-
-        serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
-            .map_err(|e| Error::msg(format!("Could not assign standard_json to writer: {}", e)))?;
-
-        let output = child
-            .unwrap()
-            .wait_with_output()
-            .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
-
-        self.write_artifacts(output);
-
-        Ok(())
+        (contracts_path, comp_args)
     }
 
     fn write_artifacts(&self, output: std::process::Output) {
