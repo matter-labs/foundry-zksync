@@ -3,7 +3,6 @@ use ethers::solc::{
     artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
     Graph, Project,
 };
-use foundry_config::Config;
 
 use serde_json::Value;
 use std::path::PathBuf;
@@ -142,11 +141,6 @@ impl<'a> ZkSolc {
     }
 
     pub fn parse_json_input(&mut self) -> Result<()> {
-        // TODO: this feels goofy to me
-        let mut project = Config::load()
-            .project()
-            .map_err(|e| Error::msg(format!("Could not load project from config: {}", e)))?;
-
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
         file_output_selection.insert(
             "*".to_string(),
@@ -168,16 +162,17 @@ impl<'a> ZkSolc {
             ],
         );
 
-        project.solc_config.settings.metadata = None;
+        self.project.solc_config.settings.metadata = None;
 
-        project
+        self.project
             .solc_config
             .settings
             .output_selection
             .0
             .insert("*".to_string(), file_output_selection.clone());
 
-        let standard_json = project
+        let standard_json = self
+            .project
             .standard_json_input(&self.contracts_path)
             .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
         self.standard_json = Some(standard_json.to_owned());
