@@ -61,7 +61,6 @@ pub mod snapshot;
 pub mod test;
 pub mod tree;
 pub mod update;
-pub mod utils_zksync;
 pub mod verify;
 pub mod watch;
 pub mod zk_build;
