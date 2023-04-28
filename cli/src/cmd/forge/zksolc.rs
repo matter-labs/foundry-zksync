@@ -52,20 +52,11 @@ impl fmt::Display for ZkSolc {
 }
 
 impl<'a> ZkSolc {
-    pub fn new(opts: ZkSolcOpts, project: Project) -> Self {
-        // get a mutable project
-        let mut project = project;
+    pub fn new(opts: ZkSolcOpts, mut project: Project) -> Self {
         let zk_out_path = project.paths.root.to_owned().join("zkout");
         let contracts_path = project.paths.sources.to_owned().join(opts.contract_name.clone());
         let artifacts_path = zk_out_path.to_owned().join(opts.contract_name.clone());
-        let cache_path = zk_out_path.to_owned().join("cache").join("solidity-files-cache.json");
-        let build_info_path =
-            project.paths.root.to_owned().join(zk_out_path.to_owned()).join("build-info");
-
-        //save paths to project
         project.paths.artifacts = zk_out_path;
-        project.paths.cache = cache_path;
-        project.paths.build_infos = build_info_path;
 
         Self {
             project,
@@ -78,36 +69,37 @@ impl<'a> ZkSolc {
         }
     }
 
-    // TODO: hander errs instead of unwraps
-    pub fn compile(mut self) -> Result<()> {
+    pub fn compile(self) -> Result<()> {
         let solc_path = &self
             .configure_solc()
-            .map_err(|e| Error::msg(format!("Could not configure solc: {}", e)))?;
+            .map_err(|e| Error::msg(format!("Could not configure solc: {}", e)))?
+            .to_str()
+            .unwrap_or_else(|| panic!("Error configuring solc compiler."))
+            .to_string();
 
-        // TODO: configure vars appropriately, this is a happy path to compilation
+        let contracts_path = self
+            .contracts_path
+            .to_str()
+            .unwrap_or_else(|| panic!("No contracts path found."))
+            .to_string();
+
+        // Build compiler arguments
         let mut comp_args = Vec::<String>::new();
-
         comp_args.push("--standard-json".to_string());
+        comp_args.push("--solc".to_string());
+        comp_args.push(solc_path.to_owned());
+
         if self.is_system {
             comp_args.push("--system-mode".to_string());
         }
+
         if self.force_evmla {
             comp_args.push("--force-evmla".to_string());
         }
-        comp_args.push("--solc".to_string());
-        comp_args.push(solc_path.clone().into_os_string().into_string().unwrap());
-        // comp_args.push("--force-evmla".to_string());
-        // comp_args.push("--bin".to_string());
-        // comp_args.push("--combined-json".to_string());
-        // comp_args.push("abi,bin,hashes".to_string());
-
-        //Can configure project solidity settings here for future compatibility
-        self.project.solc = self.project.solc.args(&comp_args);
-        self.project.solc.solc = self.compiler_path.to_owned();
 
         let mut cmd = Command::new(&self.compiler_path);
         let mut child = cmd
-            .arg(self.contracts_path.to_owned().into_os_string().into_string().unwrap())
+            .arg(contracts_path)
             .args(comp_args)
             .stdin(Stdio::piped())
             .stderr(Stdio::piped())
@@ -162,6 +154,7 @@ impl<'a> ZkSolc {
             ],
         );
 
+        //zksolc requires metadata to be 'None'
         self.project.solc_config.settings.metadata = None;
 
         self.project
