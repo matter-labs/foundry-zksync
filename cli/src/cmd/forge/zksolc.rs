@@ -127,21 +127,17 @@ impl<'a> ZkSolc {
     fn write_artifacts(&self, output: std::process::Output) {
         let mut artifacts_file = self
             .build_artifacts_file()
-            .map_err(|e| Error::msg(format!("Could create artifacts file: {}", e)))
-            .unwrap();
+            .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));
 
         let output_json: Value = serde_json::from_slice(&output.clone().stdout)
-            .map_err(|e| Error::msg(format!("Could to parse zksolc compiler output: {}", e)))
-            .unwrap();
+            .unwrap_or_else(|e| panic!("Could to parse zksolc compiler output: {}", e));
 
         let output_json_pretty = serde_json::to_string_pretty(&output_json)
-            .map_err(|e| Error::msg(format!("Could to beautify zksolc compiler output: {}", e)))
-            .unwrap();
+            .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
 
         artifacts_file
             .write_all(output_json_pretty.as_bytes())
-            .map_err(|e| Error::msg(format!("Could not write artifacts file: {}", e)))
-            .unwrap();
+            .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
     }
 
     pub fn parse_json_input(&mut self) -> Result<()> {
