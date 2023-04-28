@@ -99,10 +99,8 @@ impl Cmd for ZkBuildArgs {
 
                 let zksolc_opts = ZkSolcOpts {
                     compiler_path: zksolc_manager.get_full_compiler_path(),
-                    // config: &config,
                     is_system: self.is_system,
                     force_evmla: self.force_evmla,
-                    config: &config,
                     contract_name: self.contract_name, // contracts_path: todo!(),
                 };
 

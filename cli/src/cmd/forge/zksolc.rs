@@ -16,24 +16,12 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
-pub struct ZkSolcOpts<'a> {
-    pub config: &'a Config,
+pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
     pub contract_name: String,
     pub is_system: bool,
     pub force_evmla: bool,
 }
-
-// impl<'a> Default for ZkSolcOpts<'a> {
-//     fn default() -> Self {
-//         Self {
-//             config: &Config::default(),
-//             compiler_path: PathBuf::new(),
-//             is_system: false,
-//             force_evmla: false,
-//         }
-//     }
-// }
 
 #[derive(Debug)]
 pub struct ZkSolc {
@@ -65,7 +53,7 @@ impl fmt::Display for ZkSolc {
 }
 
 impl<'a> ZkSolc {
-    pub fn new(opts: ZkSolcOpts<'a>, project: Project) -> Self {
+    pub fn new(opts: ZkSolcOpts, project: Project) -> Self {
         // get a mutable project
         let mut project = project;
         let zk_out_path = project.paths.root.to_owned().join("zkout");
@@ -81,7 +69,6 @@ impl<'a> ZkSolc {
         project.paths.build_infos = build_info_path;
 
         Self {
-            // config: todo!(),
             project,
             compiler_path: opts.compiler_path,
             contracts_path,
@@ -237,11 +224,9 @@ impl<'a> ZkSolc {
         }
     }
 
-    fn build_artifacts_path(&self) -> Result<()> {
-        match fs::create_dir_all(&self.artifacts_path) {
-            Ok(()) => println!(" create build_path folder success"),
-            Err(error) => panic!("problem creating build_path folder: {:#?}", error),
-        };
+    fn build_artifacts_path(&self) -> Result<(), anyhow::Error> {
+        fs::create_dir_all(&self.artifacts_path)
+            .map_err(|e| Error::msg(format!("Could not create artifacts directory: {}", e)))?;
         Ok(())
     }
 
