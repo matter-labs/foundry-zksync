@@ -43,11 +43,21 @@ pub struct ZkBuildArgs {
 
     #[clap(
         help_heading = "ZkSync Compiler options",
-        help = "Compile contract with in system mode",
+        help = "Enable the system contract compilation mode. In this mode zkEVM extensions are enabled. For example, calls
+        to addresses `0xFFFF` and below are substituted by special zkEVM instructions.",
         long = "is-system",
         value_name = "SYSTEM_MODE"
     )]
     pub is_system: bool,
+
+    #[clap(
+        help_heading = "ZkSync Compiler options",
+        help = "Forcibly switch to the EVM legacy assembly pipeline. It is useful for older revisions of `solc` 0.8, where
+        Yul was considered highly experimental and contained more bugs than today",
+        long = "force-evmla",
+        value_name = "FORCE_EVMLA"
+    )]
+    pub force_evmla: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -89,15 +99,12 @@ impl Cmd for ZkBuildArgs {
 
                 let zksolc_opts = ZkSolcOpts {
                     compiler_path: zksolc_manager.get_full_compiler_path(),
-                    // config: &config,
                     is_system: self.is_system,
-                    // force_evmla: todo!(),
-                    project: &project,
-                    config: &config,
+                    force_evmla: self.force_evmla,
                     contract_name: self.contract_name, // contracts_path: todo!(),
                 };
 
-                let mut zksolc = ZkSolc::new(zksolc_opts);
+                let mut zksolc = ZkSolc::new(zksolc_opts, project);
 
                 if let Err(err) = zksolc.parse_json_input() {
                     eprintln!("Failed to parse json input for zksolc compiler: {}", err);
