@@ -98,7 +98,7 @@ Arguments:
 
   Options:
       --use-zksolc   Specify zksolc compiler version (default if left blank)
-      --system-mode  System mode flag
+      --is-system    System mode flag
       --force-evmla  Sets the EVM legacy assembly pipeline forcibly
   -h, --help         Print help
 
@@ -257,9 +257,9 @@ Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d
 ### Deploying and Interacting with `SimpleFactory.sol`
 
 #### Compile contracts:
-`SimpleFactory.sol`
+`SimpleFactory.sol` must be compiled with the `is-system` flag
 ```bash
-../foundry-zksync/target/debug/forge zk-build "SimpleFactory.sol" 
+../foundry-zksync/target/debug/forge zk-build "SimpleFactory.sol" --is-system
 ```
 `Child.sol`
 ```bash
