@@ -18,7 +18,7 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts<'a> {
     pub config: &'a Config,
-    pub project: &'a Project,
+    // pub project: &'a Project,
     pub compiler_path: PathBuf,
     pub contract_name: String,
     // pub contracts_path: PathBuf,
@@ -38,12 +38,12 @@ pub struct ZkSolcOpts<'a> {
 //     }
 // }
 
-#[derive(Debug, Clone)]
-pub struct ZkSolc<'a> {
+#[derive(Debug)]
+pub struct ZkSolc {
     // pub config: &'a Config,
-    pub project: &'a Project,
+    pub project: Project,
     pub compiler_path: PathBuf,
-    pub output_path: PathBuf,
+    // pub output_path: PathBuf,
     pub contracts_path: PathBuf,
     pub artifacts_path: PathBuf,
     pub is_system: bool,
@@ -51,7 +51,7 @@ pub struct ZkSolc<'a> {
     pub standard_json: Option<StandardJsonCompilerInput>,
 }
 
-impl fmt::Display for ZkSolc<'_> {
+impl fmt::Display for ZkSolc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -62,31 +62,35 @@ impl fmt::Display for ZkSolc<'_> {
                 artifacts_path: {}, 
             )",
             self.compiler_path.display(),
-            self.output_path.display(),
+            self.project.paths.artifacts.display(),
             self.contracts_path.display(),
             self.artifacts_path.display(),
         )
     }
 }
 
-impl<'a> ZkSolc<'a> {
-    pub fn new(opts: ZkSolcOpts<'a>) -> Self {
-        // let mut project = Config::load().project().unwrap();
-        // let contracts_path = opts.project.paths.sources.to_owned().join(opts.contract_name.clone());
+impl<'a> ZkSolc {
+    pub fn new(opts: ZkSolcOpts<'a>, project: Project) -> Self {
+        // get a mutable project
+        let mut project = project;
+        let zk_out_path = project.paths.root.to_owned().join("zkout");
+        let contracts_path = project.paths.sources.to_owned().join(opts.contract_name.clone());
+        let artifacts_path = zk_out_path.to_owned().join(opts.contract_name.clone());
+        let cache_path = zk_out_path.to_owned().join("cache").join("solidity-files-cache.json");
+        let build_info_path =
+            project.paths.root.to_owned().join(zk_out_path.to_owned()).join("build-info");
+
+        //save paths to project
+        project.paths.artifacts = zk_out_path;
+        project.paths.cache = cache_path;
+        project.paths.build_infos = build_info_path;
 
         Self {
             // config: todo!(),
-            project: opts.project,
+            project,
             compiler_path: opts.compiler_path,
-            output_path: opts.project.paths.root.to_owned().join("zkout"),
-            contracts_path: opts.project.paths.sources.to_owned().join(opts.contract_name.clone()),
-            artifacts_path: opts
-                .project
-                .paths
-                .root
-                .to_owned()
-                .join("zkout")
-                .join(opts.contract_name.clone()),
+            contracts_path,
+            artifacts_path,
             is_system: opts.is_system,
             // force_evmla: todo!(),
             standard_json: None,
@@ -94,19 +98,18 @@ impl<'a> ZkSolc<'a> {
     }
 
     // TODO: hander errs instead of unwraps
-    pub fn compile(&self) -> Result<()> {
-        self.clone()
-            .build_artifacts_path()
-            .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))?;
+    pub fn compile(mut self) -> Result<()> {
+        // let _ = &self
+        //     .build_artifacts_path()
+        //     .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))?;
 
-        let solc_path = self
-            .clone()
+        let solc_path = &self
             .configure_solc()
             .map_err(|e| Error::msg(format!("Could not configure solc: {}", e)))?;
 
         // TODO: configure vars appropriately, this is a happy path to compilation
-        let mut comp_args: Vec<String> =
-            vec![self.clone().contracts_path.into_os_string().into_string().unwrap()];
+        let mut comp_args = Vec::<String>::new();
+
         comp_args.push("--standard-json".to_string());
         if self.is_system {
             comp_args.push("--system-mode".to_string());
@@ -118,8 +121,13 @@ impl<'a> ZkSolc<'a> {
         // comp_args.push("--combined-json".to_string());
         // comp_args.push("abi,bin,hashes".to_string());
 
-        let mut cmd = Command::new(self.clone().compiler_path);
+        //Can configure project solidity settings here for future compatibility
+        self.project.solc = self.project.solc.args(&comp_args);
+        self.project.solc.solc = self.compiler_path.to_owned();
+
+        let mut cmd = Command::new(&self.compiler_path);
         let mut child = cmd
+            .arg(self.contracts_path.to_owned().into_os_string().into_string().unwrap())
             .args(comp_args)
             .stdin(Stdio::piped())
             .stderr(Stdio::piped())
@@ -136,7 +144,6 @@ impl<'a> ZkSolc<'a> {
             .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
 
         let mut artifacts_file = self
-            .clone()
             .build_artifacts_file()
             .map_err(|e| Error::msg(format!("Could create artifacts file: {}", e)))?;
 
@@ -194,24 +201,23 @@ impl<'a> ZkSolc<'a> {
             .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
         self.standard_json = Some(standard_json.to_owned());
 
-        match fs::create_dir_all(&self.artifacts_path) {
-            Ok(()) => println!(" create build_path folder success"),
-            Err(error) => panic!("problem creating build_path folder: {:#?}", error),
-        };
+        let _ = &self
+            .build_artifacts_path()
+            .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))?;
 
-        // Save the JSON input to build folder.
-        let stdjson = serde_json::to_value(&standard_json).unwrap();
         let path = self.artifacts_path.join("json_input.json");
         match File::create(&path) {
             Err(why) => panic!("couldn't create : {}", why),
             Ok(file) => file,
         };
+        // Save the JSON input to build folder.
+        let stdjson = serde_json::to_value(&standard_json).unwrap();
         std::fs::write(path, serde_json::to_string_pretty(&stdjson).unwrap()).unwrap();
 
         Ok(())
     }
 
-    fn configure_solc(self) -> Result<PathBuf> {
+    fn configure_solc(&self) -> Result<PathBuf> {
         let sources = self
             .project
             .sources()
@@ -237,7 +243,7 @@ impl<'a> ZkSolc<'a> {
         }
     }
 
-    fn build_artifacts_path(self) -> Result<()> {
+    fn build_artifacts_path(&self) -> Result<()> {
         match fs::create_dir_all(&self.artifacts_path) {
             Ok(()) => println!(" create build_path folder success"),
             Err(error) => panic!("problem creating build_path folder: {:#?}", error),
@@ -245,8 +251,8 @@ impl<'a> ZkSolc<'a> {
         Ok(())
     }
 
-    fn build_artifacts_file(self) -> Result<File> {
-        let artifacts_file = File::create(&self.artifacts_path.join("artifacts.json"))
+    fn build_artifacts_file(&self) -> Result<File> {
+        let artifacts_file = File::create(self.artifacts_path.join("artifacts.json"))
             .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))?;
 
         Ok(artifacts_file)

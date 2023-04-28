@@ -92,12 +92,11 @@ impl Cmd for ZkBuildArgs {
                     // config: &config,
                     is_system: self.is_system,
                     // force_evmla: todo!(),
-                    project: &project,
                     config: &config,
                     contract_name: self.contract_name, // contracts_path: todo!(),
                 };
 
-                let mut zksolc = ZkSolc::new(zksolc_opts);
+                let mut zksolc = ZkSolc::new(zksolc_opts, project);
 
                 if let Err(err) = zksolc.parse_json_input() {
                     eprintln!("Failed to parse json input for zksolc compiler: {}", err);
