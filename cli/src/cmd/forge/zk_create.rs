@@ -115,7 +115,8 @@ impl ZkCreateArgs {
         project.paths.artifacts = project.paths.root.join("zkout");
 
         // get  contract bytecode
-        let bytecode = Self::get_bytecode_from_contract(&project, &self.contract).unwrap();
+        let bytecode = Self::get_bytecode_from_contract(&project, &self.contract)
+            .unwrap_or_else(|e| panic!("Error getting bytecode from contract: {}", e));
 
         //check for additional factory deps
         let mut factory_deps = Vec::new();
@@ -128,8 +129,10 @@ impl ZkCreateArgs {
         let signer = Self::get_signer(private_key, &chain);
 
         // get abi
-        let abi = Self::get_abi_from_contract(&project, &self.contract).unwrap();
-        let contract: Abi = serde_json::from_value(abi).unwrap();
+        let abi = Self::get_abi_from_contract(&project, &self.contract)
+            .unwrap_or_else(|e| panic!("Error gettting ABI from contract: {}", e));
+        let contract: Abi = serde_json::from_value(abi)
+            .unwrap_or_else(|e| panic!("Error converting json abi to Contract ABI: {}", e));
 
         // encode constructor args
         let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
@@ -149,22 +152,30 @@ impl ZkCreateArgs {
         // let est_gas = deployer.estimate_fee(None).await;
         // println!("{:#?}, est_gas", est_gas);
 
+        println!("Deploying contract...");
         let tx = deployer.send().await;
         match tx {
             Ok(deploy) => {
-                let rcpt = deploy.wait_for_commit().await;
-                let logs = rcpt.unwrap().logs;
-                for log in logs {
-                    if log.address == CONTRACT_DEPLOYER_ADDRESS {
-                        let deployed_address = log.topics.get(3).unwrap();
-                        let deployed_address = Address::from(deployed_address.clone());
-                        println!(
-                            "Contract successfully deployed to address: {:#?}",
-                            deployed_address
-                        );
-                        println!("Transaction Hash: {:#?}", deploy.hash());
-                    }
-                }
+                let rcpt = deploy
+                    .wait_for_commit()
+                    .await
+                    .unwrap_or_else(|e| panic!("Transaction Error: {}", e));
+                let deployed_address = rcpt
+                    .contract_address
+                    .unwrap_or_else(|| panic!("Error retrieving deployed address"));
+                let gas_used = rcpt.gas_used.unwrap_or_else(|| panic!("Error retrieving gas used"));
+                let gas_price = rcpt
+                    .effective_gas_price
+                    .unwrap_or_else(|| panic!("Error retrieving gas price"));
+                let block_number =
+                    rcpt.block_number.unwrap_or_else(|| panic!("Error retrieving block number"));
+                println!("+-------------------------------------------------+");
+                println!("Contract successfully deployed to address: {:#?}", deployed_address);
+                println!("Transaction Hash: {:#?}", deploy.hash());
+                println!("Gas used: {:#?}", gas_used);
+                println!("Effective gas price: {:#?}", gas_price);
+                println!("Block Number: {:#?}", block_number);
+                println!("+-------------------------------------------------+");
             }
             Err(e) => println!("{:#?}, error", e),
         }
