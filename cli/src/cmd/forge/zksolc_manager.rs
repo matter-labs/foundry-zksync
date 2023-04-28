@@ -169,13 +169,14 @@ impl ZkSolcManager {
     pub fn get_full_download_url(&self) -> Result<Url> {
         if let Ok(zk_solc_os) = get_operating_system() {
             let download_uri = zk_solc_os.get_download_uri().to_string();
-            let full_download_url = format!(
-                "{}/{}/{}",
-                self.download_url,
-                download_uri,
-                self.clone().get_full_compiler()
-            );
-            if let Ok(url) = Url::parse(&full_download_url) {
+            let full_download_url = self
+                .download_url
+                .clone()
+                .join(&download_uri)
+                .unwrap_or_else(|e| panic!("Could to parse zksolc compiler output: {}", e))
+                .join(&self.clone().get_full_compiler());
+
+            if let Ok(url) = full_download_url {
                 Ok(url)
             } else {
                 Err(Error::msg("Could not parse full download url"))
