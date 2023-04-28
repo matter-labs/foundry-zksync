@@ -161,7 +161,7 @@ To Deploy `src/Greeter.sol` to zksync local node:
 ```
 
 #### Output
-```json
+```js
 Deploying contract...
 +-------------------------------------------------+
 Contract successfully deployed to address: 0xa1b809005e589f81de6ef9f48d67e35606c05fc3
@@ -207,7 +207,7 @@ cast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-UR
 ../foundry-zksync/target/debug/cast zk-send 0x97b985951fd3e0c1d996421cc783d46c12d00082 "setGreeting(string)" "Killer combo!"  --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 #### Output
-```json
+```js
 Sending transaction....
 Transaction Hash: 0x7651fba8ddeb624cca93f89da493675ccbc5c6d36ee25ed620b07424ce338552
 ```
@@ -238,7 +238,7 @@ NOTE: Leave <TOKEN> blank to bridge ETH
 ../foundry-zksync/target/debug/cast zk-send --deposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 #### Output
-```json
+```js
 Bridging assets....
 Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
 ```
@@ -253,7 +253,7 @@ cast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --pri
 ../foundry-zksync/target/debug/cast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 #### Output
-```json
+```js
 Bridging assets....
 Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d6317
 ```
@@ -283,7 +283,7 @@ Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d
 ```
 
 #### Output:
-```json
+```js
 Deploying contract...
 +-------------------------------------------------+
 Contract successfully deployed to address: 0xa1b809005e589f81de6ef9f48d67e35606c05fc3
