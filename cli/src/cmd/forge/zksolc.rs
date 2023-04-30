@@ -147,18 +147,18 @@ impl<'a> ZkSolc {
             vec![
                 "abi".to_string(),
                 "evm.methodIdentifiers".to_string(),
-                "evm.legacyAssembly".to_string(),
+                // "evm.legacyAssembly".to_string(),
             ],
         );
         file_output_selection.insert(
             "".to_string(),
             vec![
-                "ast".to_string(),
+                // "ast".to_string(),
                 "metadata".to_string(),
-                "userdoc".to_string(),
-                "devdoc".to_string(),
-                "storageLayout".to_string(),
-                "irOptimized".to_string(),
+                // "userdoc".to_string(),
+                // "devdoc".to_string(),
+                // "storageLayout".to_string(),
+                // "irOptimized".to_string(),
             ],
         );
 
