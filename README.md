@@ -98,7 +98,7 @@ Arguments:
 
   Options:
       --use-zksolc   Specify zksolc compiler version (default if left blank)
-      --is-system    System mode flag
+      --is-system    Enable the system contract compilation mode.
       --force-evmla  Sets the EVM legacy assembly pipeline forcibly
   -h, --help         Print help
 
@@ -132,27 +132,30 @@ To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
 
 Manage deployments in the native foundry/forge fashion, using the `forge zk-create` command.
 
-
 ```bash
-Deploy to ZkSync with Chain Id.
+Deploy smart contracts to zksync.
 
 Usage: forge zk-create <CONTRACT> [OPTIONS] --rpc-url <RPC-URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
 
-Arguments:
-  <CONTRACT>
-          The contract identifier in the form `<path>:<contractname>`.
-  <RPC-URL> '--rpc-url'
-  <CHAIN-ID>  `--chain 280' testnet, local: 270
-
 Options:
-  -h, --help  Print help
+  -h, --help
+          Print help (see a summary with '-h')
 
-  --constructor-args <ARGS>...
+ZkCreate options:
+      --constructor-args <ARGS>...
           The constructor arguments.
 
-  --factory-deps <FACTORY-DEPS>...
-          The factory dependencies in the form `<path>:<contractname>`
+      --constructor-args-path <FILE>
+          The path to a file containing the constructor arguments.
+
+  <CONTRACT>
+          The contract identifier in the form `<path>:<contractname>`.
+
+ZkSync Features:
+      --factory-deps <FACTORY-DEPS>...
+          The factory dependencies in the form `<path>:<contractname>`.
 ```
+
 
 #### Example Usage
 To Deploy `src/Greeter.sol` to zksync local node:
@@ -178,7 +181,31 @@ Block Number: 249
 ***v0.0*** ***Commands***:
 ## `cast zk-send`
 ### aliases: `cast zks`, `cast zksend`
-Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast call` and `cast zk-send` commands>
+Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast zk-send` command:
+```bash
+Sign and publish a zksync transaction.
+
+Usage: cast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
+
+Arguments:
+  [TO]        The destination of the transaction.
+
+  [SIG]       The signature of the function to call.
+
+  [ARGS]...   The arguments of the function to call.
+
+Options:
+  -h, --help   Print help (see a summary with '-h')
+
+Bridging options:
+  -d, --deposit         For L1 -> L2 deposits.
+
+  -w, --withdraw        For L2 -> L1 withdrawals.
+
+      --token <TOKEN>   Token to bridge. Leave blank for ETH.
+
+  -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
+```
 
 - Retrieving and interacting with chain data, for example, block numbers and gas estimates
 - Interact with deployed contracts on (zkSync Testnet or Local Docker Node)
