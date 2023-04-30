@@ -218,6 +218,7 @@ impl ZkCreateArgs {
         println!("{:#?}, output_path", output_path);
         let contract_output = Self::get_contract_output(output_path);
         // println!("{:#?}, contract_output", contract_output);
+        println!("{:#?}, contract_info", contract_info);
         let temp = serde_json::from_value(
             contract_output[contract_info.path.as_ref().unwrap()][&contract_info.name]["evm"]
                 ["bytecode"]["object"]
@@ -246,8 +247,6 @@ impl ZkCreateArgs {
         fdep_contract_info: Vec<ContractInfo>,
     ) -> Vec<Vec<u8>> {
         for dep in fdep_contract_info.iter() {
-            let output_path = Self::get_path_for_contract_output(&project, dep);
-            let _output = Self::get_contract_output(output_path);
             println!("{:#?}, dep", dep);
             let dep_bytecode = Self::get_bytecode_from_contract(&project, dep).unwrap();
             factory_dep_vector.push(dep_bytecode.to_vec());

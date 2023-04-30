@@ -63,7 +63,8 @@ pub struct ZkSendTxArgs {
         help_heading = "Bridging options",
         help = "Amount of token to bridge. Required value when bridging",
         value_name = "AMOUNT",
-        requires = "bridging"
+        requires = "bridging",
+        value_parser = parse_decimal_u256
     )]
     amount: Option<U256>,
 
@@ -250,6 +251,13 @@ impl ZkSendTxArgs {
             None => panic!("Enter TO: Address"),
         };
         zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
+    }
+}
+
+fn parse_decimal_u256(s: &str) -> Result<U256, String> {
+    match U256::from_dec_str(s) {
+        Ok(value) => Ok(value),
+        Err(e) => Err(format!("Failed to parse decimal number: {}", e)),
     }
 }
 
