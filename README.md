@@ -376,3 +376,31 @@ Use `cast call` to check modified state:
 true
 ```
 
+---
+
+# Account abstraction multisig
+
+
+### This section compiles, deploys and interacts with the contracts from the zkSync Era [**Account Abstraction Multisig example**](https://era.zksync.io/docs/dev/tutorials/custom-aa-tutorial.html)
+
+Contracts:
+- [**AAFactory.sol**](https://era.zksync.io/docs/dev/tutorials/custom-aa-tutorial.html)
+- [**TwoUserMultiSig.sol**](https://github.com/sammyshakes/sample-fzksync-project/blob/main/src/TwoUserMultiSig.sol)
+
+## Compile Factory:
+`AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
+```bash
+../foundry-zksync/target/debug/forge zk-build "AAFactory.sol" --is-system
+```
+
+## Compile MultiSig:
+```bash
+../foundry-zksync/target/debug/forge zk-build "TwoUserMultiSig.sol"
+```
+
+
+## Deploy Factory:
+```bash
+../foundry-zksync/target/debug/forge zk-create src/AAFactory.sol:AAFactory --constructor-args 010009c56cef30f401141c8793bbfe8bdd58f691bbcb6219b9f5b7576e2c373b --factory-deps src/TwoUserMultiSig.sol:TwoUserMultiSig --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+```
+

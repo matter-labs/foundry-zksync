@@ -132,6 +132,22 @@ impl<'a> ZkSolc {
         let output_json: Value = serde_json::from_slice(&output.clone().stdout)
             .unwrap_or_else(|e| panic!("Could to parse zksolc compiler output: {}", e));
 
+        // get bytecode hash(es) to return to user
+        let output_obj = output_json["contracts"].as_object().unwrap();
+        let keys = output_obj.keys();
+        let ctx_filename = self.contracts_path.to_str().unwrap().split("/").last().unwrap();
+        for key in keys {
+            if key.contains(ctx_filename) {
+                let b_code = output_obj[key].clone();
+                let b_code_obj = b_code.as_object().unwrap();
+                let b_code_keys = b_code_obj.keys();
+                for hash in b_code_keys {
+                    let bcode_hash = b_code_obj[hash]["hash"].clone();
+                    println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
+                }
+            }
+        }
+
         let output_json_pretty = serde_json::to_string_pretty(&output_json)
             .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
 
