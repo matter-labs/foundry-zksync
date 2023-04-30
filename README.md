@@ -387,20 +387,109 @@ Contracts:
 - [**AAFactory.sol**](https://era.zksync.io/docs/dev/tutorials/custom-aa-tutorial.html)
 - [**TwoUserMultiSig.sol**](https://github.com/sammyshakes/sample-fzksync-project/blob/main/src/TwoUserMultiSig.sol)
 
-## Compile Factory:
-`AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
+## Compile `AAFactory.sol`:
+> `AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
 ```bash
+# command line using forge zk-build
 ../foundry-zksync/target/debug/forge zk-build "AAFactory.sol" --is-system
 ```
-
-## Compile MultiSig:
+#### Output:
 ```bash
+AAFactory -> Bytecode Hash: "010000791703a54dbe2502b00ee470989c267d0f6c0d12a9009a947715683744" 
+Compiled Successfully
+```
+
+## Compile `TwoUserMultiSig.sol`:
+```bash
+# command line using forge zk-build
 ../foundry-zksync/target/debug/forge zk-build "TwoUserMultiSig.sol"
 ```
 
-
-## Deploy Factory:
+#### Output:
 ```bash
-../foundry-zksync/target/debug/forge zk-create src/AAFactory.sol:AAFactory --constructor-args 010009c56cef30f401141c8793bbfe8bdd58f691bbcb6219b9f5b7576e2c373b --factory-deps src/TwoUserMultiSig.sol:TwoUserMultiSig --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+TwoUserMultisig -> Bytecode Hash: "010007572230f4df5b4e855ff48d4cdfffc9405522117d7e020ee42650223460" 
+Compiled Successfully
 ```
 
+
+## Deploy `AAFactory.sol`:
+
+To deploy the factory we need the `Bytecode Hash` of the `TwoUserMultiSig.sol` contract to provide to the constructor of `AAFactory.sol`:
+
+```bash
+constructor(bytes32 _aaBytecodeHash) {
+        aaBytecodeHash = _aaBytecodeHash;
+    }
+```
+`Note: `aaBytecodeHash` = BytecodeHash of "TwoUserMultiSig.sol"`
+
+> To deploy a contract that deploys other contracts it is necessary to provide the bytecodes of the children contracts in the `factory-deps` field of the transaction. This can be accomplished by using the `--factory-deps` flag and providing the full contract path in the format: `<path>:<contractname>`
+
+```bash
+# command line using forge zk-create
+../foundry-zksync/target/debug/forge zkc src/AAFactory.sol:AAFactory --constructor-args 010007572230f4df5b4e855ff48d4cdfffc9405522117d7e020ee42650223460 --factory-deps src/TwoUserMultiSig.sol:TwoUserMultisig --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+```
+
+#### Output:
+```bash
+Deploying contract...
++-------------------------------------------------+
+Contract successfully deployed to address: 0xd5608cec132ed4875d19f8d815ec2ac58498b4e5
+Transaction Hash: 0x0e6f55ff1619af8b3277853a8f2941d0481635880358316f03ae264e2de059ed
+Gas used: 154379
+Effective gas price: 250000000
+Block Number: 291
++-------------------------------------------------+
+```
+
+Now that we have the `AAFactory.sol` contract address we can call `deployAccount` function to deploy a new `TwoUserMultiSig.sol` instance.
+
+Here is the interface of `deployAccount`:
+```bash
+function deployAccount(bytes32 salt, address owner1, address owner2) external returns (address accountAddress)
+```
+
+we need to provide the two owner addresses for the newly deployed multisig:
+```js
+owner1 = 0xa61464658AfeAf65CccaaFD3a512b69A83B77618
+owner2 = 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
+```
+
+We are also just using a `0x00` value for the ***salt*** parameter.
+```bash
+# command line using cast zk-send
+../foundry-zksync/target/debug/cast zk-send 0xd5608cec132ed4875d19f8d815ec2ac58498b4e5 "deployAccount(bytes32,address,address)(address)" 0x00 0xa61464658AfeAf65CccaaFD3a512b69A83B77618 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+
+#### Output:
+```bash
+Sending transaction....
+Transaction Hash: 0x43a4dded84a12891dfae4124b42b9f091750e953193bd779a7e5e4d422909e73
+0x03e50ec034f1d363de0add752c33d4831a2731bf, <---- Deployed contract address
+```
+Viola! The new `TwoUserMultiSig.sol` contract has been deployed to:
+```js
+0x03e50ec034f1d363de0add752c33d4831a2731bf
+```
+
+We can verify by using `cast call` to call the public variables 'owner1' and 'owner2' on the newly deployed `TwoUserMultiSig.sol` contract:
+
+Verify `owner1`:
+```bash
+# command line using cast call
+../foundry-zksync/target/debug/cast call 0x03e50ec034f1d363de0add752c33d4831a2731bf "owner1()(address)" --rpc-url http://localhost:3050
+```
+#### Output:
+```js
+0xa61464658AfeAf65CccaaFD3a512b69A83B77618
+```
+
+Verify `owner2`:
+```bash
+# command line using cast call
+../foundry-zksync/target/debug/cast call 0x03e50ec034f1d363de0add752c33d4831a2731bf "owner2()(address)" --rpc-url http://localhost:3050
+```
+#### Output:
+```js
+0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
+```
