@@ -418,7 +418,7 @@ Compiled Successfully
 
 To deploy the factory we need the `Bytecode Hash` of the `TwoUserMultiSig.sol` contract to provide to the constructor of `AAFactory.sol`:
 
-```bash
+```js
 constructor(bytes32 _aaBytecodeHash) {
         aaBytecodeHash = _aaBytecodeHash;
     }
@@ -447,7 +447,7 @@ Block Number: 291
 Now that we have the `AAFactory.sol` contract address we can call `deployAccount` function to deploy a new `TwoUserMultiSig.sol` instance.
 
 Here is the interface of `deployAccount`:
-```bash
+```js
 function deployAccount(bytes32 salt, address owner1, address owner2) external returns (address accountAddress)
 ```
 
