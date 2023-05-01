@@ -260,7 +260,7 @@ Killer combo!
 ```bash
 cast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
 ```
-NOTE: Leave <TOKEN> blank to bridge ETH
+NOTE: Leave `<TOKEN>` blank to bridge ETH
 
 #### Example Usage
 ```bash
