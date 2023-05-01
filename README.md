@@ -11,10 +11,10 @@ Currently only Hardhat has developed functionality for zkSync. The purpose of th
 - [**v0.0 Feature Set**](https://github.com/matter-labs/foundry-zksync#feature-set)
 - [**Environment Variables**](https://github.com/matter-labs/foundry-zksync#environment-variables)
 - [**Blockchain Interaction**](https://github.com/matter-labs/foundry-zksync/blob/main/README.md#blockchain-interaction)
+- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-with-cast-zk-send)
 - [**Compilation**](https://github.com/matter-labs/foundry-zksync#compilation)
 - [**Deployment**](https://github.com/matter-labs/foundry-zksync#deployment)
 - [**Contract Interaction**](https://github.com/matter-labs/foundry-zksync#contract-interaction)
-- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-with-cast-zk-send)
 - [**Deploy and Interact with `SimpleFactory.sol`**](https://github.com/matter-labs/foundry-zksync#usage-example-simplefactorysol)
 - [**Account Abstraction Multisig example**](https://github.com/matter-labs/foundry-zksync#account-abstraction-multisig)
 
@@ -61,6 +61,7 @@ We need to establish the functionality we want for release v0.0 of this implemen
 NOTE: All commands are entered from the project root folder
 
 ---
+
 ## Environment Variables
 
 By providing the following environment variables in the `.env` file at the `PROJECT-ROOT` folder, the `--rpc-url` and `--chain` flags can be ommitted in command lines.
@@ -74,6 +75,7 @@ CHAIN=270
 ```
 
 ---
+
 ### Spin up local docker node
 [Follow these instructions to set up local docker node](https://era.zksync.io/docs/api/hardhat/testing.html)
 
