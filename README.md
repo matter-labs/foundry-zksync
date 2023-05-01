@@ -255,6 +255,31 @@ Killer combo!
 
 ### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
 
+```bash
+Sign and publish a zksync transaction.
+
+Usage: cast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
+
+Arguments:
+  [TO]                  The destination of the transaction.
+
+  [SIG]                 The signature of the function to call.
+
+  [ARGS]...             The arguments of the function to call.
+
+Options:
+  -h, --help            Print help (see a summary with '-h')
+
+Bridging options:
+  -d, --deposit         For L1 -> L2 deposits.
+
+  -w, --withdraw        For L2 -> L1 withdrawals.
+
+      --token <TOKEN>   Token to bridge. Leave blank for ETH.
+
+  -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
+```
+
 ### ***L1 → L2 deposits:***
 
 ```bash
