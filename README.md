@@ -136,6 +136,74 @@ l1BatchTimestamp     null
 ```
 
 ---
+
+## Bridging Assets with `cast zk-send`
+
+### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
+
+```bash
+../foundry-zksync/target/debug/cast zk-send --help
+```
+
+```bash
+Sign and publish a zksync transaction.
+
+Usage: cast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
+
+Arguments:
+  [TO]                  The destination of the transaction.
+
+  [SIG]                 The signature of the function to call.
+
+  [ARGS]...             The arguments of the function to call.
+
+Options:
+  -h, --help            Print help (see a summary with '-h')
+
+Bridging options:
+  -d, --deposit         For L1 -> L2 deposits.
+
+  -w, --withdraw        For L2 -> L1 withdrawals.
+
+      --token <TOKEN>   Token to bridge. Leave blank for ETH.
+
+  -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
+```
+
+### ***L1 → L2 deposits:***
+
+```bash
+cast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+```
+NOTE: Leave `<TOKEN>` blank to bridge ETH
+
+#### Example Usage
+```bash
+../foundry-zksync/target/debug/cast zk-send --deposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+#### Output
+```js
+Bridging assets....
+Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
+```
+
+### ***L2 → L1 withdrawals:***
+
+```bash
+cast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+```
+#### Example Usage
+```bash
+../foundry-zksync/target/debug/cast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+#### Output
+```js
+Bridging assets....
+Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d6317
+```
+
+---
+
 ## Compilation
 
 ***v0.0*** ***Command***:
@@ -307,72 +375,7 @@ Transaction Hash: 0x7651fba8ddeb624cca93f89da493675ccbc5c6d36ee25ed620b07424ce33
 ```js
 Killer combo!
 ```
----
 
-## Bridging Assets with `cast zk-send`
-
-### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
-
-```bash
-../foundry-zksync/target/debug/cast zk-send --help
-```
-
-```bash
-Sign and publish a zksync transaction.
-
-Usage: cast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
-
-Arguments:
-  [TO]                  The destination of the transaction.
-
-  [SIG]                 The signature of the function to call.
-
-  [ARGS]...             The arguments of the function to call.
-
-Options:
-  -h, --help            Print help (see a summary with '-h')
-
-Bridging options:
-  -d, --deposit         For L1 -> L2 deposits.
-
-  -w, --withdraw        For L2 -> L1 withdrawals.
-
-      --token <TOKEN>   Token to bridge. Leave blank for ETH.
-
-  -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
-```
-
-### ***L1 → L2 deposits:***
-
-```bash
-cast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
-```
-NOTE: Leave `<TOKEN>` blank to bridge ETH
-
-#### Example Usage
-```bash
-../foundry-zksync/target/debug/cast zk-send --deposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
-```
-#### Output
-```js
-Bridging assets....
-Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
-```
-
-### ***L2 → L1 withdrawals:***
-
-```bash
-cast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
-```
-#### Example Usage
-```bash
-../foundry-zksync/target/debug/cast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
-```
-#### Output
-```js
-Bridging assets....
-Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d6317
-```
 ---
 
 ## Usage Example: `SimpleFactory.sol`
