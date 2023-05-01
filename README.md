@@ -390,7 +390,7 @@ Contracts:
 - [**TwoUserMultiSig.sol**](https://github.com/sammyshakes/sample-fzksync-project/blob/main/src/TwoUserMultiSig.sol)
 
 ## Compile `AAFactory.sol`:
-> `AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
+#### `AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
 ```bash
 # command line using forge zk-build
 ../foundry-zksync/target/debug/forge zk-build "AAFactory.sol" --is-system
@@ -425,7 +425,7 @@ constructor(bytes32 _aaBytecodeHash) {
 ```
 `Note: `aaBytecodeHash` = BytecodeHash of "TwoUserMultiSig.sol"`
 
-> To deploy a contract that deploys other contracts it is necessary to provide the bytecodes of the children contracts in the `factory-deps` field of the transaction. This can be accomplished by using the `--factory-deps` flag and providing the full contract path in the format: `<path>:<contractname>`
+#### To deploy a contract that deploys other contracts it is necessary to provide the bytecodes of the children contracts in the `factory-deps` field of the transaction. This can be accomplished by using the `--factory-deps` flag and providing the full contract path in the format: `<path>:<contractname>`
 
 ```bash
 # command line using forge zk-create
