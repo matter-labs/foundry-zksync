@@ -474,6 +474,31 @@ Viola! The new `TwoUserMultiSig.sol` contract has been deployed to:
 0x03e50ec034f1d363de0add752c33d4831a2731bf
 ```
 
+We can check the tx receipt using `cast tx <TX-HASH>`
+```bash
+../foundry-zksync/target/debug/cast tx 0x22364a3e191ad10013c5f20036e9696e743a4f686bc58a0106ef0b9e7592347c --rpc-url http://localhost:3050
+```
+
+### Output:
+```bash
+blockHash            0x2f3e2be46a7cb9f9e9df503903990e6670e88224e52232c988b5a730c82d98c0
+blockNumber          297
+from                 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049
+gas                  217367
+gasPrice             250000000
+hash                 0x43a4dded84a12891dfae4124b42b9f091750e953193bd779a7e5e4d422909e73
+input                0x76fb8b650000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a61464658afeaf65cccaafd3a512b69a83b776180000000000000000000000000d43eb5b8a47ba8900d84aa36656c92024e9772e
+nonce                147
+r                    0x16385d99ccaaa5e84bb97d76a0afb310350c2ca4165ed41d458efa80cd76d3bd
+s                    0x3ec55287f223e760b7dd82a676feece939832e4c5a3d73f3aa979bd2cd48801c
+to                   0xd5608cEC132ED4875D19f8d815EC2ac58498B4E5
+transactionIndex     0
+v                    1
+value                0
+l1BatchNumber        149
+l1BatchTxIndex       0
+```
+
 We can verify by using `cast call` to call the public variables 'owner1' and 'owner2' on the newly deployed `TwoUserMultiSig.sol` contract:
 
 Verify `owner1`:
