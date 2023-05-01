@@ -56,7 +56,6 @@ We need to establish the functionality we want for release v0.0 of this implemen
 - ***Bridge assets L1 <-> L2***
 - ***Make contract calls to deployed contracts on zkSync Testnet or Local Test Node***
 - ***Send transactions to deployed contracts on zkSync Testnet or Local Test Node***
-- ***Spin up Local Test Node***
 
 NOTE: All commands are entered from the project root folder
 
@@ -76,6 +75,64 @@ CHAIN=270
 ---
 ### Spin up local docker node
 [Follow these instructions to set up local docker node](https://era.zksync.io/docs/api/hardhat/testing.html)
+
+---
+
+## Blockchain Interaction
+
+### Use the `cast` command to get blockchain data:
+```bash
+# chain id local node
+../foundry-zksync/target/debug/cast chain-id --rpc-url http://localhost:3050
+# output:
+270
+
+#TESTNET
+# chain id testnet
+../foundry-zksync/target/debug/cast chain-id --rpc-url https://zksync2-testnet.zksync.dev:443
+# output:
+280
+
+# client
+../foundry-zksync/target/debug/cast client --rpc-url https://zksync2-testnet.zksync.dev:443
+# output:
+zkSync/v2.0
+
+# gas price
+../foundry-zksync/target/debug/cast gas-price --rpc-url https://zksync2-testnet.zksync.dev:443
+# output:
+250000000
+
+# timestamp of latest block
+../foundry-zksync/target/debug/cast age --block latest --rpc-url https://zksync2-testnet.zksync.dev:443
+# output:
+Mon May  1 16:11:07 2023
+
+# get latest block:
+../foundry-zksync/target/debug/cast block latest --rpc-url https://zksync2-testnet.zksync.dev:443
+# output:
+baseFeePerGas        250000000
+difficulty           0
+extraData            0x
+gasLimit             4294967295
+gasUsed              40277767
+hash                 0x6c5b7c9b82b48bd77c0f506d74ed32aec6ab5c52e6c9c604ee8825a0b4a68289
+logsBloom            0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+miner                0x0000000000000000000000000000000000000000
+mixHash              0x0000000000000000000000000000000000000000000000000000000000000000
+nonce                0x0000000000000000
+number               5024177
+parentHash           0x9fbb3c9e5ef3b7807152367eeab5759cce14c290118de0e9011777a640cd7068
+receiptsRoot         0x0000000000000000000000000000000000000000000000000000000000000000
+sealFields           []
+sha3Uncles           0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347
+size                 0
+stateRoot            0x0000000000000000000000000000000000000000000000000000000000000000
+timestamp            1682957640
+totalDifficulty      0
+l1BatchNumber        null
+l1BatchTimestamp     null
+```
 
 ---
 ## Compilation
