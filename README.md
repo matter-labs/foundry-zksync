@@ -256,6 +256,10 @@ Killer combo!
 ### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
 
 ```bash
+../foundry-zksync/target/debug/cast zk-send --help
+```
+
+```bash
 Sign and publish a zksync transaction.
 
 Usage: cast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
