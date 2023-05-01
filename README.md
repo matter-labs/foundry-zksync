@@ -40,7 +40,7 @@ $ git clone https://github.com/matter-labs/foundry-zksync.git
 $ git clone https://github.com/sammyshakes/zksync-era.git
 # clone fzksync-project
 $ git clone https://github.com/sammyshakes/sample-fzksync-project.git
-# cd into foundry-zksync, swap branch, and build
+# cd into foundry-zksync and build
 $ cd foundry-zksync
 $ cargo build -p foundry-cli
 ```
