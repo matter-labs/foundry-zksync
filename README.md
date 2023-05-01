@@ -101,6 +101,11 @@ CHAIN=270
 # output:
 zkSync/v2.0
 
+# get account L2 eth balance
+../foundry-zksync/target/debug/cast balance 0x42C7eF198f8aC9888E2B1b73e5B71f1D4535194A --rpc-url https://zksync2-testnet.zksync.dev:443
+# output:
+447551277794355871
+
 # gas price
 ../foundry-zksync/target/debug/cast gas-price --rpc-url https://zksync2-testnet.zksync.dev:443
 # output:
