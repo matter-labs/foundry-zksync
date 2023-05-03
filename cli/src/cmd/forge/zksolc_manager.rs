@@ -23,9 +23,9 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.7" => Ok(ZkSolcVersion::V137),
         "v1.3.8" => Ok(ZkSolcVersion::V138),
         "v1.3.9" => Ok(ZkSolcVersion::V139),
-        _ => {
-            Err(Error::msg("ZkSolc compiler version not supported. Proper version format: '1.3.x'"))
-        }
+        _ => Err(Error::msg(
+            "ZkSolc compiler version not supported. Proper version format: 'v1.3.x'",
+        )),
     }
 }
 
@@ -169,14 +169,15 @@ impl ZkSolcManager {
     pub fn get_full_download_url(&self) -> Result<Url> {
         if let Ok(zk_solc_os) = get_operating_system() {
             let download_uri = zk_solc_os.get_download_uri().to_string();
-            let full_download_url = self
-                .download_url
-                .clone()
-                .join(&download_uri)
-                .unwrap_or_else(|e| panic!("Could to parse zksolc compiler output: {}", e))
-                .join(&self.clone().get_full_compiler());
 
-            if let Ok(url) = full_download_url {
+            let full_download_url = format!(
+                "{}/{}/{}",
+                self.download_url,
+                download_uri,
+                self.clone().get_full_compiler()
+            );
+
+            if let Ok(url) = Url::parse(&full_download_url) {
                 Ok(url)
             } else {
                 Err(Error::msg("Could not parse full download url"))
@@ -224,16 +225,22 @@ impl ZkSolcManager {
             .send()
             .map_err(|e| Error::msg(format!("Failed to download file: {}", e)))?;
 
-        let mut output_file = File::create(self.get_full_compiler_path())
-            .map_err(|e| Error::msg(format!("Failed to create output file: {}", e)))?;
+        if response.status().is_success() {
+            let mut output_file = File::create(self.get_full_compiler_path())
+                .map_err(|e| Error::msg(format!("Failed to create output file: {}", e)))?;
 
-        copy(&mut response, &mut output_file)
-            .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
+            copy(&mut response, &mut output_file)
+                .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
 
-        let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
-        let _ = fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755))
-            .map_err(|e| Error::msg(format!("Failed to set zksync compiler permissions: {e}")));
-
+            let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
+            let _ = fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755))
+                .map_err(|e| Error::msg(format!("Failed to set zksync compiler permissions: {e}")));
+        } else {
+            return Err(Error::msg(format!(
+                "Failed to download file: status code {}",
+                response.status()
+            )));
+        }
         Ok(())
     }
 }
