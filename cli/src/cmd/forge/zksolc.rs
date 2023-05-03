@@ -17,7 +17,6 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
-    pub contract_name: String,
     pub is_system: bool,
     pub force_evmla: bool,
 }
@@ -26,11 +25,10 @@ pub struct ZkSolcOpts {
 pub struct ZkSolc {
     pub project: Project,
     pub compiler_path: PathBuf,
-    pub contracts_path: PathBuf,
-    pub artifacts_path: PathBuf,
     pub is_system: bool,
     pub force_evmla: bool,
     pub standard_json: Option<StandardJsonCompilerInput>,
+    pub sources: Option<Vec<PathBuf>>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -40,13 +38,9 @@ impl fmt::Display for ZkSolc {
             "ZkSolc (
                 compiler_path: {},   
                 output_path: {},
-                contracts_path: {},
-                artifacts_path: {}, 
             )",
             self.compiler_path.display(),
             self.project.paths.artifacts.display(),
-            self.contracts_path.display(),
-            self.artifacts_path.display(),
         )
     }
 }
@@ -54,58 +48,69 @@ impl fmt::Display for ZkSolc {
 impl<'a> ZkSolc {
     pub fn new(opts: ZkSolcOpts, mut project: Project) -> Self {
         let zk_out_path = project.paths.root.to_owned().join("zkout");
-        let contracts_path = project.paths.sources.to_owned().join(opts.contract_name.clone());
-        let artifacts_path = zk_out_path.to_owned().join(opts.contract_name.clone());
         project.paths.artifacts = zk_out_path;
 
         Self {
             project,
             compiler_path: opts.compiler_path,
-            contracts_path,
-            artifacts_path,
             is_system: opts.is_system,
             force_evmla: opts.force_evmla,
             standard_json: None,
+            sources: None,
         }
     }
 
-    pub fn compile(self) -> Result<()> {
-        let (contract_path, comp_args) = self.build_compiler_args();
-        let mut cmd = Command::new(&self.compiler_path);
-        let mut child = cmd
-            .arg(contract_path)
-            .args(comp_args)
-            .stdin(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
-        let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+    pub fn compile(mut self) -> Result<()> {
+        let comp_args = self.build_compiler_args();
+        let sources = self.sources.clone().unwrap();
+        for source in sources.iter() {
+            if let Err(err) = self.parse_json_input(source.clone()) {
+                eprintln!("Failed to parse json input for zksolc compiler: {}", err);
+            }
 
-        serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
-            .map_err(|e| Error::msg(format!("Could not assign standard_json to writer: {}", e)))?;
+            let mut cmd = Command::new(&self.compiler_path);
+            let mut child = cmd
+                .arg(source.clone())
+                .args(&comp_args)
+                .stdin(Stdio::piped())
+                .stderr(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn();
+            let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
 
-        let output = child
-            .unwrap()
-            .wait_with_output()
-            .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
+            serde_json::to_writer(stdin, &self.standard_json.clone().unwrap()).map_err(|e| {
+                Error::msg(format!("Could not assign standard_json to writer: {}", e))
+            })?;
 
-        self.write_artifacts(output);
+            let output = child
+                .unwrap()
+                .wait_with_output()
+                .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
+
+            let source_str = source
+                .to_str()
+                .expect("Unable to convert source to string")
+                .split(
+                    self.project.paths.root.to_str().expect("Unable to convert source to string"),
+                )
+                .nth(1)
+                .unwrap()
+                .split("/")
+                .last()
+                .unwrap();
+
+            self.write_artifacts(output, source_str.to_string());
+        }
 
         Ok(())
     }
 
-    fn build_compiler_args(&self) -> (String, Vec<String>) {
+    fn build_compiler_args(&mut self) -> Vec<String> {
         let solc_path = self
             .configure_solc()
             .unwrap_or_else(|e| panic!("Could not configure solc: {}", e))
             .to_str()
             .unwrap_or_else(|| panic!("Error configuring solc compiler."))
-            .to_string();
-
-        let contracts_path = self
-            .contracts_path
-            .to_str()
-            .unwrap_or_else(|| panic!("No contracts path found."))
             .to_string();
 
         // Build compiler arguments
@@ -121,23 +126,22 @@ impl<'a> ZkSolc {
         if self.force_evmla {
             comp_args.push("--force-evmla".to_string());
         }
-        (contracts_path, comp_args)
+        comp_args
     }
 
-    fn write_artifacts(&self, output: std::process::Output) {
+    fn write_artifacts(&self, output: std::process::Output, source: String) {
         let mut artifacts_file = self
-            .build_artifacts_file()
+            .build_artifacts_file(source.clone())
             .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));
 
         let output_json: Value = serde_json::from_slice(&output.clone().stdout)
-            .unwrap_or_else(|e| panic!("Could to parse zksolc compiler output: {}", e));
+            .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
 
         // get bytecode hash(es) to return to user
         let output_obj = output_json["contracts"].as_object().unwrap();
-        let keys = output_obj.keys();
-        let ctx_filename = self.contracts_path.to_str().unwrap().split("/").last().unwrap();
-        for key in keys {
-            if key.contains(ctx_filename) {
+        // let keys = output_obj.keys();
+        for key in output_obj.keys() {
+            if key.contains(&source) {
                 let b_code = output_obj[key].clone();
                 let b_code_obj = b_code.as_object().unwrap();
                 let b_code_keys = b_code_obj.keys();
@@ -156,7 +160,7 @@ impl<'a> ZkSolc {
             .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
     }
 
-    pub fn parse_json_input(&mut self) -> Result<()> {
+    pub fn parse_json_input(&mut self, contract_path: PathBuf) -> Result<()> {
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
         file_output_selection.insert(
             "*".to_string(),
@@ -190,15 +194,15 @@ impl<'a> ZkSolc {
 
         let standard_json = self
             .project
-            .standard_json_input(&self.contracts_path)
+            .standard_json_input(&contract_path)
             .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
         self.standard_json = Some(standard_json.to_owned());
 
-        let _ = &self
-            .build_artifacts_path()
+        let artifact_path = &self
+            .build_artifacts_path(contract_path)
             .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))?;
 
-        let path = self.artifacts_path.join("json_input.json");
+        let path = artifact_path.join("json_input.json");
         match File::create(&path) {
             Err(why) => panic!("couldn't create : {}", why),
             Ok(file) => file,
@@ -210,11 +214,16 @@ impl<'a> ZkSolc {
         Ok(())
     }
 
-    fn configure_solc(&self) -> Result<PathBuf> {
+    fn configure_solc(&mut self) -> Result<PathBuf> {
         let sources = self
             .project
             .sources()
             .map_err(|e| Error::msg(format!("Could not get project sources: {}", e)))?;
+
+        let s = sources.clone();
+        let keys = s.into_keys();
+        let vec: Vec<PathBuf> = keys.collect();
+        self.sources = Some(vec);
 
         let graph = Graph::resolve_sources(&self.project.paths, sources)
             .map_err(|e| Error::msg(format!("Could not create graph: {}", e)))?;
@@ -236,15 +245,27 @@ impl<'a> ZkSolc {
         }
     }
 
-    fn build_artifacts_path(&self) -> Result<(), anyhow::Error> {
-        fs::create_dir_all(&self.artifacts_path)
+    fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
+        let source_str = source
+            .to_str()
+            .expect("Unable to convert source to string")
+            .split(self.project.paths.root.to_str().expect("Unable to convert source to string"))
+            .nth(1)
+            .unwrap()
+            .split("/")
+            .last()
+            .unwrap();
+
+        let path = self.project.paths.artifacts.join(source_str);
+        fs::create_dir_all(&path)
             .map_err(|e| Error::msg(format!("Could not create artifacts directory: {}", e)))?;
-        Ok(())
+        Ok(path)
     }
 
-    fn build_artifacts_file(&self) -> Result<File> {
-        let artifacts_file = File::create(self.artifacts_path.join("artifacts.json"))
-            .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))?;
+    fn build_artifacts_file(&self, source: String) -> Result<File> {
+        let artifacts_file =
+            File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
+                .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))?;
 
         Ok(artifacts_file)
     }

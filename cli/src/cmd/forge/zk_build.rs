@@ -22,13 +22,6 @@ foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 #[derive(Debug, Clone, Parser, Serialize, Default)]
 #[clap(next_help_heading = "ZkBuild options", about = None)]
 pub struct ZkBuildArgs {
-    /// Contract filename from project src/ ex: 'Contract.sol'
-    #[clap(
-        help_heading = "Contract Name",
-        help = "Contract filename from project src/ ex: 'Contract.sol'",
-        value_name = "CONTRACT_FILENAME"
-    )]
-    pub contract_name: String,
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
@@ -101,15 +94,9 @@ impl Cmd for ZkBuildArgs {
                     compiler_path: zksolc_manager.get_full_compiler_path(),
                     is_system: self.is_system,
                     force_evmla: self.force_evmla,
-                    contract_name: self.contract_name, // contracts_path: todo!(),
                 };
 
                 let mut zksolc = ZkSolc::new(zksolc_opts, project);
-
-                if let Err(err) = zksolc.parse_json_input() {
-                    eprintln!("Failed to parse json input for zksolc compiler: {}", err);
-                    process::exit(1);
-                }
 
                 match zksolc.compile() {
                     Ok(_) => println!("Compiled Successfully"),
