@@ -14,6 +14,9 @@ use std::{
     process::{Command, Stdio},
 };
 
+use rayon::prelude::*;
+use std::sync::{Arc, Mutex};
+
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
@@ -63,27 +66,33 @@ impl<'a> ZkSolc {
     pub fn compile(mut self) -> Result<()> {
         let comp_args = self.build_compiler_args();
         let sources = self.sources.clone().unwrap();
-        for source in sources.iter() {
-            if let Err(err) = self.parse_json_input(source.clone()) {
+
+        let self_arc = Arc::new(Mutex::new(self));
+
+        sources.par_iter().try_for_each(|source| -> Result<(), anyhow::Error> {
+            let mut self_locked = self_arc.lock().unwrap();
+
+            if let Err(err) = self_locked.parse_json_input(source.clone()) {
                 eprintln!("Failed to parse json input for zksolc compiler: {}", err);
             }
 
-            let mut cmd = Command::new(&self.compiler_path);
+            let mut cmd = Command::new(&self_locked.compiler_path);
             let mut child = cmd
                 .arg(source.clone())
                 .args(&comp_args)
                 .stdin(Stdio::piped())
                 .stderr(Stdio::piped())
                 .stdout(Stdio::piped())
-                .spawn();
-            let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+                .spawn()
+                .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
 
-            serde_json::to_writer(stdin, &self.standard_json.clone().unwrap()).map_err(|e| {
-                Error::msg(format!("Could not assign standard_json to writer: {}", e))
-            })?;
+            let stdin = child.stdin.take().expect("Stdin exists.");
+
+            serde_json::to_writer(stdin, &self_locked.standard_json.clone().unwrap()).map_err(
+                |e| Error::msg(format!("Could not assign standard_json to writer: {}", e)),
+            )?;
 
             let output = child
-                .unwrap()
                 .wait_with_output()
                 .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
 
@@ -91,7 +100,12 @@ impl<'a> ZkSolc {
                 .to_str()
                 .expect("Unable to convert source to string")
                 .split(
-                    self.project.paths.root.to_str().expect("Unable to convert source to string"),
+                    self_locked
+                        .project
+                        .paths
+                        .root
+                        .to_str()
+                        .expect("Unable to convert source to string"),
                 )
                 .nth(1)
                 .unwrap()
@@ -99,8 +113,9 @@ impl<'a> ZkSolc {
                 .last()
                 .unwrap();
 
-            self.write_artifacts(output, source_str.to_string());
-        }
+            self_locked.write_artifacts(output, source_str.to_string())?;
+            Ok(())
+        })?;
 
         Ok(())
     }
@@ -129,7 +144,11 @@ impl<'a> ZkSolc {
         comp_args
     }
 
-    fn write_artifacts(&self, output: std::process::Output, source: String) {
+    fn write_artifacts(
+        &self,
+        output: std::process::Output,
+        source: String,
+    ) -> Result<(), anyhow::Error> {
         let mut artifacts_file = self
             .build_artifacts_file(source.clone())
             .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));
@@ -158,6 +177,7 @@ impl<'a> ZkSolc {
         artifacts_file
             .write_all(output_json_pretty.as_bytes())
             .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+        Ok(())
     }
 
     pub fn parse_json_input(&mut self, contract_path: PathBuf) -> Result<()> {
