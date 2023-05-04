@@ -138,10 +138,10 @@ impl<'a> ZkSolc {
         comp_args.push("--solc".to_string());
         comp_args.push(solc_path.to_owned());
 
-        // if self.is_system || source.to_str().unwrap().contains("is-system") {
-        //     println!("{:#?}, is system source", source);
-        //     comp_args.push("--system-mode".to_string());
-        // }
+        if self.is_system || versioned_source.0.to_str().unwrap().contains("is-system") {
+            println!("{:#?}, is system source", versioned_source.0);
+            comp_args.push("--system-mode".to_string());
+        }
 
         if self.force_evmla {
             comp_args.push("--force-evmla".to_string());
