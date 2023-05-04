@@ -100,7 +100,7 @@ impl Cmd for ZkBuildArgs {
                     force_evmla: self.force_evmla,
                 };
 
-                let mut zksolc = ZkSolc::new(zksolc_opts, project);
+                let zksolc = ZkSolc::new(zksolc_opts, project);
 
                 match zksolc.compile() {
                     Ok(_) => println!("Compiled Successfully"),

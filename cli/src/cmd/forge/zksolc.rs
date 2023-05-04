@@ -1,14 +1,13 @@
-use ansi_term::Colour::Red;
+use ansi_term::Colour::{Red, Yellow};
 use anyhow::{Error, Result};
 use ethers::solc::{
     artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
     Graph, Project,
 };
-
 use serde_json::Value;
 use std::path::PathBuf;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt, fs,
     fs::File,
     io::Write,
@@ -51,7 +50,7 @@ impl fmt::Display for ZkSolc {
 }
 
 impl<'a> ZkSolc {
-    pub fn new(opts: ZkSolcOpts, mut project: Project) -> Self {
+    pub fn new(opts: ZkSolcOpts, project: Project) -> Self {
         Self {
             project,
             compiler_path: opts.compiler_path,
@@ -65,6 +64,7 @@ impl<'a> ZkSolc {
     pub fn compile(mut self) -> Result<()> {
         self.configure_solc();
         let sources = self.sources.clone().unwrap();
+        let mut displayed_warnings = HashSet::new();
         for (solc, version) in sources {
             //configure project solc for each solc version
             for source in version.1 {
@@ -111,7 +111,7 @@ impl<'a> ZkSolc {
                     .last()
                     .unwrap();
 
-                self.write_artifacts(output, source_str.to_string());
+                self.write_artifacts(output, source_str.to_string(), &mut displayed_warnings);
             }
         }
 
@@ -147,11 +147,16 @@ impl<'a> ZkSolc {
         comp_args
     }
 
-    fn write_artifacts(&self, output: std::process::Output, source: String) {
+    fn write_artifacts(
+        &self,
+        output: std::process::Output,
+        source: String,
+        displayed_warnings: &mut HashSet<String>,
+    ) {
         let output_json: Value = serde_json::from_slice(&output.clone().stdout)
             .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
 
-        self.handle_output_errors(&output_json);
+        self.handle_output_errors(&output_json, displayed_warnings);
 
         let mut artifacts_file = self
             .build_artifacts_file(source.clone())
@@ -165,11 +170,9 @@ impl<'a> ZkSolc {
                 let b_code_obj = b_code.as_object().unwrap();
                 let b_code_keys = b_code_obj.keys();
                 for hash in b_code_keys {
-                    let bcode_hash = b_code_obj[hash]["hash"].clone();
-                    println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
-                    // if bcode_hash != null {
-                    //     println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
-                    // }
+                    if let Some(bcode_hash) = b_code_obj[hash]["hash"].as_str() {
+                        println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
+                    }
                 }
             }
         }
@@ -182,20 +185,38 @@ impl<'a> ZkSolc {
             .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
     }
 
-    fn handle_output_errors(&self, output_json: &Value) {
+    fn handle_output_errors(&self, output_json: &Value, displayed_warnings: &mut HashSet<String>) {
         let errors = output_json
             .get("errors")
             .and_then(|v| v.as_array())
             .unwrap_or_else(|| panic!("Could not find 'errors' array in the output JSON"));
 
-        if !errors.is_empty() {
-            println!("{}", Red.paint("Compiler run failed"));
-            for (index, error) in errors.iter().enumerate() {
-                let error_code = error["errorCode"].as_str().unwrap_or("Unknown");
-                let message = error["formattedMessage"].as_str().unwrap_or("Unknown error");
-                println!("{}", Red.paint(format!("error[{}]: {}", error_code, message)));
+        let mut has_error = false;
+        let mut has_warning = false;
+
+        for error in errors {
+            let severity = error.get("severity").and_then(|v| v.as_str()).unwrap_or("Unknown");
+            let formatted_message =
+                error.get("formattedMessage").and_then(|v| v.as_str()).unwrap_or("");
+
+            let is_warning = severity.eq_ignore_ascii_case("warning");
+            if is_warning {
+                let main_message = formatted_message.lines().next().unwrap_or("").to_string();
+                if !displayed_warnings.contains(&main_message) {
+                    displayed_warnings.insert(main_message);
+                    println!("{}", Yellow.paint(formatted_message));
+                    has_warning = true;
+                }
+            } else {
+                println!("{}", Red.paint(formatted_message));
+                has_error = true;
             }
+        }
+
+        if has_error {
             exit(1);
+        } else if has_warning {
+            println!("Compiler run completed with warnings");
         }
     }
 
