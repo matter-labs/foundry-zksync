@@ -83,41 +83,41 @@ CHAIN=270
 
 ## Blockchain Interaction
 
-### Use the `cast` command to get blockchain data:
+### Use the `zkcast` command to get blockchain data:
 ```bash
 # chain id local node
-../foundry-zksync/target/debug/cast chain-id --rpc-url http://localhost:3050
+../foundry-zksync/target/debug/zkcast chain-id --rpc-url http://localhost:3050
 # output:
 270
 
 #TESTNET
 # chain id testnet
-../foundry-zksync/target/debug/cast chain-id --rpc-url https://zksync2-testnet.zksync.dev:443
+../foundry-zksync/target/debug/zkcast chain-id --rpc-url https://zksync2-testnet.zksync.dev:443
 # output:
 280
 
 # client
-../foundry-zksync/target/debug/cast client --rpc-url https://zksync2-testnet.zksync.dev:443
+../foundry-zksync/target/debug/zkcast client --rpc-url https://zksync2-testnet.zksync.dev:443
 # output:
 zkSync/v2.0
 
 # get account L2 eth balance
-../foundry-zksync/target/debug/cast balance 0x42C7eF198f8aC9888E2B1b73e5B71f1D4535194A --rpc-url https://zksync2-testnet.zksync.dev:443
+../foundry-zksync/target/debug/zkcast balance 0x42C7eF198f8aC9888E2B1b73e5B71f1D4535194A --rpc-url https://zksync2-testnet.zksync.dev:443
 # output:
 447551277794355871
 
 # gas price
-../foundry-zksync/target/debug/cast gas-price --rpc-url https://zksync2-testnet.zksync.dev:443
+../foundry-zksync/target/debug/zkcast gas-price --rpc-url https://zksync2-testnet.zksync.dev:443
 # output:
 250000000
 
 # timestamp of latest block
-../foundry-zksync/target/debug/cast age --block latest --rpc-url https://zksync2-testnet.zksync.dev:443
+../foundry-zksync/target/debug/zkcast age --block latest --rpc-url https://zksync2-testnet.zksync.dev:443
 # output:
 Mon May  1 16:11:07 2023
 
 # get latest block:
-../foundry-zksync/target/debug/cast block latest --rpc-url https://zksync2-testnet.zksync.dev:443
+../foundry-zksync/target/debug/zkcast block latest --rpc-url https://zksync2-testnet.zksync.dev:443
 # output:
 baseFeePerGas        250000000
 difficulty           0
@@ -144,18 +144,18 @@ l1BatchTimestamp     null
 
 ---
 
-## Bridging Assets with `cast zk-send`
+## Bridging Assets with `zkcast zk-send`
 
 ### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
 
 ```bash
-../foundry-zksync/target/debug/cast zk-send --help
+../foundry-zksync/target/debug/zkcast zk-send --help
 ```
 
 ```bash
 Sign and publish a zksync transaction.
 
-Usage: cast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
+Usage: zkcast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
 
 Arguments:
   [TO]                  The destination of the transaction.
@@ -180,13 +180,13 @@ Bridging options:
 ### ***L1 → L2 deposits:*** [Work In Progress]
 
 ```bash
-cast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+zkcast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
 ```
 NOTE: Leave `<TOKEN>` blank to bridge ETH
 
 #### Example Usage
 ```bash
-../foundry-zksync/target/debug/cast zk-send --deposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+../foundry-zksync/target/debug/zkcast zk-send --deposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 #### Output
 ```js
@@ -197,11 +197,11 @@ Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc
 ### ***L2 → L1 withdrawals:***
 
 ```bash
-cast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+zkcast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
 ```
 #### Example Usage
 ```bash
-../foundry-zksync/target/debug/cast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+../foundry-zksync/target/debug/zkcast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 #### Output
 ```js
@@ -214,8 +214,8 @@ Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d
 ## Compilation
 
 ***v0.0*** ***Command***:
-## `forge zk-build`
-### aliases: `forge zkbuild`, `forge zk-compile`, `forge zkb`
+## `zkforge zk-build`
+### aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`
 
 Compile smart contracts to zkEvm bytecode and store compile output files into a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval for other components of the application.
 
@@ -226,7 +226,7 @@ Compile smart contracts to zkEvm bytecode and store compile output files into a 
 Compiler subcommands for zkSync
 
 Usage: 
-forge zk-build [OPTIONS]
+zkforge zk-build [OPTIONS]
 
 
 Options:
@@ -246,13 +246,13 @@ It is necessary for some contracts, including those that deploy other contracts 
 #### Example Usage
 To compile with only default compiler options (v1.3.9):
 ```bash
-../foundry-zksync/target/debug/forge zk-build 
+../foundry-zksync/target/debug/zkforge zk-build 
 ```
 
 #### Compiler Settings
 `zksolc` compiler version can optionally be configured using `--use-zksolc` flag:
 ```bash
-../foundry-zksync/target/debug/forge zkb --use-zksolc v1.3.8
+../foundry-zksync/target/debug/zkforge zkb --use-zksolc v1.3.8
 ```
 
 #### Output
@@ -270,15 +270,15 @@ Example terminal output:
 ## Deployment
 
 ***v0.0*** ***Command***:
-## `forge zk-create`
-### aliases: `forge zkcreate`, `forge zk-deploy`, `forge zkc`
+## `zkforge zk-create`
+### aliases: `zkforge zkcreate`, `zkforge zk-deploy`, `zkforge zkc`
 
-Manage deployments in the native foundry/forge fashion, using the `forge zk-create` command.
+Manage deployments in the native foundry/zkforge fashion, using the `zkforge zk-create` command.
 
 ```bash
 Deploy smart contracts to zksync.
 
-Usage: forge zk-create <CONTRACT> [OPTIONS] --rpc-url <RPC-URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
+Usage: zkforge zk-create <CONTRACT> [OPTIONS] --rpc-url <RPC-URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
 
 Options:
   -h, --help
@@ -303,7 +303,7 @@ ZkSync Features:
 #### Example Usage
 To Deploy `src/Greeter.sol` to zksync local node:
 ```bash
-../foundry-zksync/target/debug/forge zkc src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+../foundry-zksync/target/debug/zkforge zkc src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
 #### Output
@@ -322,13 +322,13 @@ Block Number: 249
 ---
 ## Contract Interaction
 ***v0.0*** ***Commands***:
-## `cast zk-send`
-### aliases: `cast zks`, `cast zksend`
-Interact with deployed contracts in the native foundry/forge fashion using the CLI `cast zk-send` command:
+## `zkcast zk-send`
+### aliases: `zkcast zks`, `zkcast zksend`
+Interact with deployed contracts in the native foundry/zkforge fashion using the CLI `zkcast zk-send` command:
 ```bash
 Sign and publish a zksync transaction.
 
-Usage: cast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
+Usage: zkcast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
 
 Arguments:
   [TO]        The destination of the transaction.
@@ -356,11 +356,11 @@ Bridging options:
 ### ***Non-state changing calls:***
 
 ```bash
-cast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url <RPC-URL>
+zkcast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url <RPC-URL>
 ```
 #### Example Usage
 ```bash
-../foundry-zksync/target/debug/cast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
+../foundry-zksync/target/debug/zkcast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
 ```
 #### Output
 ```js
@@ -370,11 +370,11 @@ ZkSync + Pineapple
 ## Send transactions:
 
 ```bash
-cast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --chain <CHAIN-ID>
+zkcast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --chain <CHAIN-ID>
 ```
 ### Example Usage
 ```bash
-../foundry-zksync/target/debug/cast zk-send 0x97b985951fd3e0c1d996421cc783d46c12d00082 "setGreeting(string)" "Killer combo!"  --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+../foundry-zksync/target/debug/zkcast zk-send 0x97b985951fd3e0c1d996421cc783d46c12d00082 "setGreeting(string)" "Killer combo!"  --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 #### Output
 ```js
@@ -384,7 +384,7 @@ Transaction Hash: 0x7651fba8ddeb624cca93f89da493675ccbc5c6d36ee25ed620b07424ce33
 
 #### Verify output
 ```bash
-../foundry-zksync/target/debug/cast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
+../foundry-zksync/target/debug/zkcast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
 ```
 #### Output
 ```js
@@ -400,13 +400,13 @@ Killer combo!
 `SimpleFactory.sol` must be compiled with the `is-system` flag, so they need to be placed in the `src/is-sytem/` folder
 
 ```bash
-../foundry-zksync/target/debug/forge zk-build
+../foundry-zksync/target/debug/zkforge zk-build
 ```
 
 ### Deploy `SimpleFactory.sol`
 
 ```bash
-../foundry-zksync/target/debug/forge zkc src/SimpleFactory.sol:SimpleFactory --constructor-args 01000041691510d85ddfc6047cba6643748dc028636d276f09a546ab330697ef 010000238a587670be26087b7812eab86eca61e7c4014522bdceda86adb2e82f --factory-deps src/Child.sol:Child src/StepChild.sol:StepChild --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+../foundry-zksync/target/debug/zkforge zkc src/SimpleFactory.sol:SimpleFactory --constructor-args 01000041691510d85ddfc6047cba6643748dc028636d276f09a546ab330697ef 010000238a587670be26087b7812eab86eca61e7c4014522bdceda86adb2e82f --factory-deps src/Child.sol:Child src/StepChild.sol:StepChild --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
 #### Output:
@@ -423,7 +423,7 @@ Block Number: 249
 
 ### Deploy `StepChlid.sol` via `SimpleFactory.sol`
 ```bash
-../foundry-zksync/target/debug/cast zk-send 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519 "newStepChild()" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+../foundry-zksync/target/debug/zkcast zk-send 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519 "newStepChild()" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 
 #### Output:
@@ -434,7 +434,7 @@ Transaction Hash: 0xa82a0636b71af058d4916d81868eebc41173ca07b78d30fe57f4b74e9294
 
 ### Interact with `SimpleFactory.sol`
 ```bash
-../foundry-zksync/target/debug/cast call 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519 "stepChildren(uint256)(address)" 0 --rpc-url http://localhost:3050
+../foundry-zksync/target/debug/zkcast call 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519 "stepChildren(uint256)(address)" 0 --rpc-url http://localhost:3050
 ```
 
 #### Output:
@@ -444,9 +444,9 @@ Transaction Hash: 0xa82a0636b71af058d4916d81868eebc41173ca07b78d30fe57f4b74e9294
 ```
 
 ### Interact with `StepChild.sol`
-Use `cast call` to check initial state:
+Use `zkcast call` to check initial state:
 ```bash
-../foundry-zksync/target/debug/cast call 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "isEnabled()(bool)" --rpc-url http://localhost:3050
+../foundry-zksync/target/debug/zkcast call 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "isEnabled()(bool)" --rpc-url http://localhost:3050
 ```
 
 #### Output:
@@ -454,9 +454,9 @@ Use `cast call` to check initial state:
 false
 ```
 
-Use `cast zk-send` to modify state:
+Use `zkcast zk-send` to modify state:
 ```bash
-../foundry-zksync/target/debug/cast zk-send 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "enable()" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+../foundry-zksync/target/debug/zkcast zk-send 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "enable()" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 
 #### Output:
@@ -466,9 +466,9 @@ Transaction Hash: 0xe005e15e9f58b7dcdcc7b16a9d5c706ddef7a4c9cab82216ea944d5344ba
 ```
 
 
-Use `cast call` to check modified state:
+Use `zkcast call` to check modified state:
 ```bash
-../foundry-zksync/target/debug/cast call 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "isEnabled()(bool)" --rpc-url http://localhost:3050
+../foundry-zksync/target/debug/zkcast call 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "isEnabled()(bool)" --rpc-url http://localhost:3050
 ```
 
 #### Output:
@@ -492,8 +492,8 @@ Contracts:
 It needs to be placed in the `src/is-sytem/` folder
 
 ```bash
-# command line using forge zk-build
-../foundry-zksync/target/debug/forge zk-build
+# command line using zkforge zk-build
+../foundry-zksync/target/debug/zkforge zk-build
 ```
 #### Output:
 ```bash
@@ -515,8 +515,8 @@ constructor(bytes32 _aaBytecodeHash) {
 #### To deploy a contract that deploys other contracts it is necessary to provide the bytecodes of the children contracts in the `factory-deps` field of the transaction. This can be accomplished by using the `--factory-deps` flag and providing the full contract path in the format: `<path>:<contractname>`
 
 ```bash
-# command line using forge zk-create
-../foundry-zksync/target/debug/forge zkc src/AAFactory.sol:AAFactory --constructor-args 010007572230f4df5b4e855ff48d4cdfffc9405522117d7e020ee42650223460 --factory-deps src/TwoUserMultiSig.sol:TwoUserMultisig --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+# command line using zkforge zk-create
+../foundry-zksync/target/debug/zkforge zkc src/AAFactory.sol:AAFactory --constructor-args 010007572230f4df5b4e855ff48d4cdfffc9405522117d7e020ee42650223460 --factory-deps src/TwoUserMultiSig.sol:TwoUserMultisig --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
 #### Output:
@@ -546,8 +546,8 @@ owner2 = 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
 
 We are also just using a `0x00` value for the ***salt*** parameter.
 ```bash
-# command line using cast zk-send
-../foundry-zksync/target/debug/cast zk-send 0xd5608cec132ed4875d19f8d815ec2ac58498b4e5 "deployAccount(bytes32,address,address)(address)" 0x00 0xa61464658AfeAf65CccaaFD3a512b69A83B77618 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+# command line using zkcast zk-send
+../foundry-zksync/target/debug/zkcast zk-send 0xd5608cec132ed4875d19f8d815ec2ac58498b4e5 "deployAccount(bytes32,address,address)(address)" 0x00 0xa61464658AfeAf65CccaaFD3a512b69A83B77618 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 
 #### Output:
@@ -561,9 +561,9 @@ Viola! The new `TwoUserMultiSig.sol` contract has been deployed to:
 0x03e50ec034f1d363de0add752c33d4831a2731bf
 ```
 
-We can check the tx receipt using `cast tx <TX-HASH>`
+We can check the tx receipt using `zkcast tx <TX-HASH>`
 ```bash
-../foundry-zksync/target/debug/cast tx 0x22364a3e191ad10013c5f20036e9696e743a4f686bc58a0106ef0b9e7592347c --rpc-url http://localhost:3050
+../foundry-zksync/target/debug/zkcast tx 0x22364a3e191ad10013c5f20036e9696e743a4f686bc58a0106ef0b9e7592347c --rpc-url http://localhost:3050
 ```
 
 ### Output:
@@ -586,12 +586,12 @@ l1BatchNumber        149
 l1BatchTxIndex       0
 ```
 
-We can verify by using `cast call` to call the public variables 'owner1' and 'owner2' on the newly deployed `TwoUserMultiSig.sol` contract:
+We can verify by using `zkcast call` to call the public variables 'owner1' and 'owner2' on the newly deployed `TwoUserMultiSig.sol` contract:
 
 Verify `owner1`:
 ```bash
-# command line using cast call
-../foundry-zksync/target/debug/cast call 0x03e50ec034f1d363de0add752c33d4831a2731bf "owner1()(address)" --rpc-url http://localhost:3050
+# command line using zkcast call
+../foundry-zksync/target/debug/zkcast call 0x03e50ec034f1d363de0add752c33d4831a2731bf "owner1()(address)" --rpc-url http://localhost:3050
 ```
 #### Output:
 ```js
@@ -600,8 +600,8 @@ Verify `owner1`:
 
 Verify `owner2`:
 ```bash
-# command line using cast call
-../foundry-zksync/target/debug/cast call 0x03e50ec034f1d363de0add752c33d4831a2731bf "owner2()(address)" --rpc-url http://localhost:3050
+# command line using zkcast call
+../foundry-zksync/target/debug/zkcast call 0x03e50ec034f1d363de0add752c33d4831a2731bf "owner2()(address)" --rpc-url http://localhost:3050
 ```
 #### Output:
 ```js
