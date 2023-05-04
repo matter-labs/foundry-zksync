@@ -137,12 +137,12 @@ external-integration-tests = []
 
 [[bin]]
 doc = false
-name = "cast"
+name = "zkcast"
 path = "src/cast.rs"
 
 [[bin]]
 doc = false
-name = "forge"
+name = "zkforge"
 path = "src/forge.rs"
 
 [[bench]]
