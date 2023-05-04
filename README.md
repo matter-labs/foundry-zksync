@@ -239,8 +239,9 @@ Options:
 ```
 
 ### Compiling with `--is-system` flag
-It is necessary for some contracts, including those that deploy other contracts (such as factory contracts), to be compiled using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder:
+It is necessary for some contracts, including those that deploy other contracts (such as factory contracts), to be compiled using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder, if the folder does not exist, manually create it:
 
+![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
 
 #### Example Usage
 To compile with only default compiler options (v1.3.9):
@@ -260,6 +261,10 @@ To compile with only default compiler options (v1.3.9):
 <PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
 ```
 ![image](https://user-images.githubusercontent.com/76663878/234152279-e144e489-41ab-4cbd-8321-8ccd9b0aa6ef.png)
+
+Example terminal output:
+
+![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
 
 ---
 ## Deployment
@@ -392,17 +397,10 @@ Killer combo!
 ### Deploying and Interacting with `SimpleFactory.sol`
 
 #### Compile contracts:
-`SimpleFactory.sol` must be compiled with the `is-system` flag
+`SimpleFactory.sol` must be compiled with the `is-system` flag, so they need to be placed in the `src/is-sytem/` folder
+
 ```bash
-../foundry-zksync/target/debug/forge zk-build "SimpleFactory.sol" --is-system
-```
-`Child.sol`
-```bash
-../foundry-zksync/target/debug/forge zk-build "Child.sol"
-```
-`StepChild.sol`
-```bash
-../foundry-zksync/target/debug/forge zk-build "StepChild.sol"
+../foundry-zksync/target/debug/forge zk-build
 ```
 
 ### Deploy `SimpleFactory.sol`
@@ -491,28 +489,17 @@ Contracts:
 
 ## Compile `AAFactory.sol`:
 #### `AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
+It needs to be placed in the `src/is-sytem/` folder
+
 ```bash
 # command line using forge zk-build
-../foundry-zksync/target/debug/forge zk-build "AAFactory.sol" --is-system
+../foundry-zksync/target/debug/forge zk-build
 ```
 #### Output:
 ```bash
 AAFactory -> Bytecode Hash: "010000791703a54dbe2502b00ee470989c267d0f6c0d12a9009a947715683744" 
 Compiled Successfully
 ```
-
-## Compile `TwoUserMultiSig.sol`:
-```bash
-# command line using forge zk-build
-../foundry-zksync/target/debug/forge zk-build "TwoUserMultiSig.sol"
-```
-
-#### Output:
-```bash
-TwoUserMultisig -> Bytecode Hash: "010007572230f4df5b4e855ff48d4cdfffc9405522117d7e020ee42650223460" 
-Compiled Successfully
-```
-
 
 ## Deploy `AAFactory.sol`:
 
