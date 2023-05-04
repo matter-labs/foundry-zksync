@@ -94,6 +94,7 @@ which = "4.2.5"
 # zksync_types = {git = "https://github.com/matter-labs/zksync-era.git"}
 # zksync_utils = {git = "https://github.com/matter-labs/zksync-era.git"}
 
+ansi_term = "0.12.1"
 anyhow = {version = "1.0.70"}
 dirs = {version = "5.0.0"}
 url = {version = "2.3.1"}

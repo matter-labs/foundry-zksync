@@ -3693,6 +3693,7 @@ dependencies = [
 name = "foundry-cli"
 version = "0.2.0"
 dependencies = [
+ "ansi_term",
  "anvil",
  "anyhow",
  "async-trait",

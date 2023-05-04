@@ -69,7 +69,6 @@ impl Cmd for ZkBuildArgs {
         project.paths.artifacts = zk_out_path;
 
         let zksolc_manager_opts = ZkSolcManagerOpts { version: self.use_zksolc.unwrap() };
-
         let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
         let zksolc_manager = zksolc_manager_builder.build();
 

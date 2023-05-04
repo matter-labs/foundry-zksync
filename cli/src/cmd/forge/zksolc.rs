@@ -1,3 +1,4 @@
+use ansi_term::Colour::Red;
 use anyhow::{Error, Result};
 use ethers::solc::{
     artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
@@ -11,7 +12,7 @@ use std::{
     fmt, fs,
     fs::File,
     io::Write,
-    process::{Command, Stdio},
+    process::{exit, Command, Stdio},
 };
 
 use ethers::prelude::artifacts::Source;
@@ -62,7 +63,6 @@ impl<'a> ZkSolc {
     }
 
     pub fn compile(mut self) -> Result<()> {
-        // let comp_args = self.build_compiler_args();
         self.configure_solc();
         let sources = self.sources.clone().unwrap();
         for (solc, version) in sources {
@@ -72,9 +72,6 @@ impl<'a> ZkSolc {
                 if let Err(err) = self.parse_json_input(contract_path.clone()) {
                     eprintln!("Failed to parse json input for zksolc compiler: {}", err);
                 }
-
-                //start thinking about contrract specific parameters like is-system flag and maybe solc versions
-                // println!("{:#?}, solc", solc);
 
                 let comp_args = self.build_compiler_args(source.clone(), solc.clone());
 
@@ -96,6 +93,7 @@ impl<'a> ZkSolc {
                     .unwrap()
                     .wait_with_output()
                     .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
+                // println!("{:#?}, output", output);
 
                 let source_str = contract_path
                     .to_str()
@@ -150,12 +148,14 @@ impl<'a> ZkSolc {
     }
 
     fn write_artifacts(&self, output: std::process::Output, source: String) {
+        let output_json: Value = serde_json::from_slice(&output.clone().stdout)
+            .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
+
+        self.handle_output_errors(&output_json);
+
         let mut artifacts_file = self
             .build_artifacts_file(source.clone())
             .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));
-
-        let output_json: Value = serde_json::from_slice(&output.clone().stdout)
-            .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
 
         // get bytecode hash(es) to return to user
         let output_obj = output_json["contracts"].as_object().unwrap();
@@ -167,6 +167,9 @@ impl<'a> ZkSolc {
                 for hash in b_code_keys {
                     let bcode_hash = b_code_obj[hash]["hash"].clone();
                     println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
+                    // if bcode_hash != null {
+                    //     println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
+                    // }
                 }
             }
         }
@@ -177,6 +180,23 @@ impl<'a> ZkSolc {
         artifacts_file
             .write_all(output_json_pretty.as_bytes())
             .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+    }
+
+    fn handle_output_errors(&self, output_json: &Value) {
+        let errors = output_json
+            .get("errors")
+            .and_then(|v| v.as_array())
+            .unwrap_or_else(|| panic!("Could not find 'errors' array in the output JSON"));
+
+        if !errors.is_empty() {
+            println!("{}", Red.paint("Compiler run failed"));
+            for (index, error) in errors.iter().enumerate() {
+                let error_code = error["errorCode"].as_str().unwrap_or("Unknown");
+                let message = error["formattedMessage"].as_str().unwrap_or("Unknown error");
+                println!("{}", Red.paint(format!("error[{}]: {}", error_code, message)));
+            }
+            exit(1);
+        }
     }
 
     pub fn parse_json_input(&mut self, contract_path: PathBuf) -> Result<()> {
@@ -237,16 +257,6 @@ impl<'a> ZkSolc {
 
     fn configure_solc(&mut self) {
         self.sources = Some(self.get_versioned_sources().unwrap());
-        // println!("{:#?}, solc_version", solc_version);
-        // println!("{:#?}, solc_version length", solc_version.len());
-
-        // if let Some(solc_first_key) = solc_version.first_key_value() {
-        //     // TODO: understand and handle solc versions and the edge cases here
-
-        //     Ok(solc_first_key.0.solc.to_owned())
-        // } else {
-        //     Err(Error::msg("Could not get solc path"))
-        // }
     }
 
     fn get_versioned_sources(
@@ -258,11 +268,6 @@ impl<'a> ZkSolc {
             .map_err(|e| Error::msg(format!("Could not get project sources: {}", e)))
             .unwrap();
 
-        // let s = sources.clone();
-        // let keys = s.into_keys();
-        // let vec: Vec<PathBuf> = keys.collect();
-        // self.sources = Some(vec);
-
         let graph = Graph::resolve_sources(&self.project.paths, sources)
             .map_err(|e| Error::msg(format!("Could not create graph: {}", e)))
             .unwrap();
@@ -271,11 +276,11 @@ impl<'a> ZkSolc {
             .into_sources_by_version(self.project.offline)
             .map_err(|e| Error::msg(format!("Could not get versions & edges: {}", e)))
             .unwrap();
-        println!("{:#?}, versions", versions);
+
         let solc_version = versions
             .get(&self.project)
             .map_err(|e| Error::msg(format!("Could not get solc: {}", e)));
-        println!("{:#?}, solc_version", solc_version);
+
         solc_version
     }
 
