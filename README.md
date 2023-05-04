@@ -177,7 +177,7 @@ Bridging options:
   -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
 ```
 
-### ***L1 → L2 deposits:***
+### ***L1 → L2 deposits:*** [Work In Progress]
 
 ```bash
 cast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
