@@ -22,13 +22,6 @@ foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 #[derive(Debug, Clone, Parser, Serialize, Default)]
 #[clap(next_help_heading = "ZkBuild options", about = None)]
 pub struct ZkBuildArgs {
-    /// Contract filename from project src/ ex: 'Contract.sol'
-    #[clap(
-        help_heading = "Contract Name",
-        help = "Contract filename from project src/ ex: 'Contract.sol'",
-        value_name = "CONTRACT_FILENAME"
-    )]
-    pub contract_name: String,
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
@@ -69,10 +62,13 @@ impl Cmd for ZkBuildArgs {
 
     fn run(self) -> eyre::Result<String> {
         let config = self.try_load_config_emit_warnings()?;
-        let project = config.project()?;
+        let mut project = config.project()?;
+
+        //set zk out path
+        let zk_out_path = project.paths.root.to_owned().join("zkout");
+        project.paths.artifacts = zk_out_path;
 
         let zksolc_manager_opts = ZkSolcManagerOpts { version: self.use_zksolc.unwrap() };
-
         let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
         let zksolc_manager = zksolc_manager_builder.build();
 
@@ -99,17 +95,12 @@ impl Cmd for ZkBuildArgs {
 
                 let zksolc_opts = ZkSolcOpts {
                     compiler_path: zksolc_manager.get_full_compiler_path(),
+                    //we may not add these yet as they may be file specific
                     is_system: self.is_system,
                     force_evmla: self.force_evmla,
-                    contract_name: self.contract_name, // contracts_path: todo!(),
                 };
 
-                let mut zksolc = ZkSolc::new(zksolc_opts, project);
-
-                if let Err(err) = zksolc.parse_json_input() {
-                    eprintln!("Failed to parse json input for zksolc compiler: {}", err);
-                    process::exit(1);
-                }
+                let zksolc = ZkSolc::new(zksolc_opts, project);
 
                 match zksolc.compile() {
                     Ok(_) => println!("Compiled Successfully"),

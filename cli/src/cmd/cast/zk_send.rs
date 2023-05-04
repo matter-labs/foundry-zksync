@@ -224,7 +224,7 @@ impl ZkSendTxArgs {
                         if log.address == CONTRACT_DEPLOYER_ADDRESS {
                             let deployed_address = log.topics.get(3).unwrap();
                             let deployed_address = Address::from(deployed_address.clone());
-                            println!("{:#?}, <---- Deployed contract address:", deployed_address);
+                            println!("Deployed contract address: {:#?}", deployed_address);
                         }
                     }
                 }
