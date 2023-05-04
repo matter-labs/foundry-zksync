@@ -69,6 +69,7 @@ impl<'a> ZkSolc {
             //configure project solc for each solc version
             for source in version.1 {
                 let contract_path = source.0.clone();
+
                 if let Err(err) = self.parse_json_input(contract_path.clone()) {
                     eprintln!("Failed to parse json input for zksolc compiler: {}", err);
                 }
@@ -93,9 +94,8 @@ impl<'a> ZkSolc {
                     .unwrap()
                     .wait_with_output()
                     .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
-                // println!("{:#?}, output", output);
 
-                let source_str = contract_path
+                let filename = contract_path
                     .to_str()
                     .expect("Unable to convert source to string")
                     .split(
@@ -106,12 +106,12 @@ impl<'a> ZkSolc {
                             .expect("Unable to convert source to string"),
                     )
                     .nth(1)
-                    .unwrap()
+                    .expect("Failed to get Contract relative path")
                     .split("/")
                     .last()
-                    .unwrap();
+                    .expect("Failed to get Contract filename.");
 
-                self.write_artifacts(output, source_str.to_string(), &mut displayed_warnings);
+                self.write_artifacts(output, filename.to_string(), &mut displayed_warnings);
             }
         }
 
@@ -136,7 +136,6 @@ impl<'a> ZkSolc {
         comp_args.push(solc_path.to_owned());
 
         if self.is_system || versioned_source.0.to_str().unwrap().contains("is-system") {
-            println!("{:#?}, is system source", versioned_source.0);
             comp_args.push("--system-mode".to_string());
         }
 
@@ -305,17 +304,9 @@ impl<'a> ZkSolc {
     }
 
     fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
-        let source_str = source
-            .to_str()
-            .expect("Unable to convert source to string")
-            .split(self.project.paths.root.to_str().expect("Unable to convert source to string"))
-            .nth(1)
-            .unwrap()
-            .split("/")
-            .last()
-            .unwrap();
+        let filename = source.file_name().expect("Failed to get Contract filename.");
 
-        let path = self.project.paths.artifacts.join(source_str);
+        let path = self.project.paths.artifacts.join(filename);
         fs::create_dir_all(&path)
             .map_err(|e| Error::msg(format!("Could not create artifacts directory: {}", e)))?;
         Ok(path)
