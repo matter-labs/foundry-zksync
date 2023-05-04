@@ -14,6 +14,10 @@ use std::{
     process::{Command, Stdio},
 };
 
+use ethers::prelude::artifacts::Source;
+use ethers::prelude::Solc;
+use semver::Version;
+
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
@@ -28,7 +32,7 @@ pub struct ZkSolc {
     pub is_system: bool,
     pub force_evmla: bool,
     pub standard_json: Option<StandardJsonCompilerInput>,
-    pub sources: Option<Vec<PathBuf>>,
+    pub sources: Option<BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -47,9 +51,6 @@ impl fmt::Display for ZkSolc {
 
 impl<'a> ZkSolc {
     pub fn new(opts: ZkSolcOpts, mut project: Project) -> Self {
-        let zk_out_path = project.paths.root.to_owned().join("zkout");
-        project.paths.artifacts = zk_out_path;
-
         Self {
             project,
             compiler_path: opts.compiler_path,
@@ -61,54 +62,72 @@ impl<'a> ZkSolc {
     }
 
     pub fn compile(mut self) -> Result<()> {
-        let comp_args = self.build_compiler_args();
+        // let comp_args = self.build_compiler_args();
+        self.configure_solc();
         let sources = self.sources.clone().unwrap();
-        for source in sources.iter() {
-            if let Err(err) = self.parse_json_input(source.clone()) {
-                eprintln!("Failed to parse json input for zksolc compiler: {}", err);
+        for (solc, version) in sources {
+            //configure project solc for each solc version
+            for source in version.1 {
+                let contract_path = source.0.clone();
+                if let Err(err) = self.parse_json_input(contract_path.clone()) {
+                    eprintln!("Failed to parse json input for zksolc compiler: {}", err);
+                }
+
+                //start thinking about contrract specific parameters like is-system flag and maybe solc versions
+                // println!("{:#?}, solc", solc);
+
+                let comp_args = self.build_compiler_args(source.clone(), solc.clone());
+
+                let mut cmd = Command::new(&self.compiler_path);
+                let mut child = cmd
+                    .arg(contract_path.clone())
+                    .args(&comp_args)
+                    .stdin(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    .spawn();
+                let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+
+                serde_json::to_writer(stdin, &self.standard_json.clone().unwrap()).map_err(
+                    |e| Error::msg(format!("Could not assign standard_json to writer: {}", e)),
+                )?;
+
+                let output = child
+                    .unwrap()
+                    .wait_with_output()
+                    .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
+
+                let source_str = contract_path
+                    .to_str()
+                    .expect("Unable to convert source to string")
+                    .split(
+                        self.project
+                            .paths
+                            .root
+                            .to_str()
+                            .expect("Unable to convert source to string"),
+                    )
+                    .nth(1)
+                    .unwrap()
+                    .split("/")
+                    .last()
+                    .unwrap();
+
+                self.write_artifacts(output, source_str.to_string());
             }
-
-            let mut cmd = Command::new(&self.compiler_path);
-            let mut child = cmd
-                .arg(source.clone())
-                .args(&comp_args)
-                .stdin(Stdio::piped())
-                .stderr(Stdio::piped())
-                .stdout(Stdio::piped())
-                .spawn();
-            let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
-
-            serde_json::to_writer(stdin, &self.standard_json.clone().unwrap()).map_err(|e| {
-                Error::msg(format!("Could not assign standard_json to writer: {}", e))
-            })?;
-
-            let output = child
-                .unwrap()
-                .wait_with_output()
-                .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
-
-            let source_str = source
-                .to_str()
-                .expect("Unable to convert source to string")
-                .split(
-                    self.project.paths.root.to_str().expect("Unable to convert source to string"),
-                )
-                .nth(1)
-                .unwrap()
-                .split("/")
-                .last()
-                .unwrap();
-
-            self.write_artifacts(output, source_str.to_string());
         }
 
         Ok(())
     }
 
-    fn build_compiler_args(&mut self) -> Vec<String> {
-        let solc_path = self
-            .configure_solc()
-            .unwrap_or_else(|e| panic!("Could not configure solc: {}", e))
+    //issues with async functions
+    fn build_compiler_args(
+        &mut self,
+        versioned_source: (PathBuf, Source),
+        solc: Solc,
+    ) -> Vec<String> {
+        let solc_path = solc
+            .solc
             .to_str()
             .unwrap_or_else(|| panic!("Error configuring solc compiler."))
             .to_string();
@@ -119,9 +138,10 @@ impl<'a> ZkSolc {
         comp_args.push("--solc".to_string());
         comp_args.push(solc_path.to_owned());
 
-        if self.is_system {
-            comp_args.push("--system-mode".to_string());
-        }
+        // if self.is_system || source.to_str().unwrap().contains("is-system") {
+        //     println!("{:#?}, is system source", source);
+        //     comp_args.push("--system-mode".to_string());
+        // }
 
         if self.force_evmla {
             comp_args.push("--force-evmla".to_string());
@@ -139,7 +159,6 @@ impl<'a> ZkSolc {
 
         // get bytecode hash(es) to return to user
         let output_obj = output_json["contracts"].as_object().unwrap();
-        // let keys = output_obj.keys();
         for key in output_obj.keys() {
             if key.contains(&source) {
                 let b_code = output_obj[key].clone();
@@ -195,12 +214,14 @@ impl<'a> ZkSolc {
         let standard_json = self
             .project
             .standard_json_input(&contract_path)
-            .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))?;
+            .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))
+            .unwrap();
         self.standard_json = Some(standard_json.to_owned());
 
         let artifact_path = &self
             .build_artifacts_path(contract_path)
-            .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))?;
+            .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))
+            .unwrap();
 
         let path = artifact_path.join("json_input.json");
         match File::create(&path) {
@@ -214,35 +235,48 @@ impl<'a> ZkSolc {
         Ok(())
     }
 
-    fn configure_solc(&mut self) -> Result<PathBuf> {
+    fn configure_solc(&mut self) {
+        self.sources = Some(self.get_versioned_sources().unwrap());
+        // println!("{:#?}, solc_version", solc_version);
+        // println!("{:#?}, solc_version length", solc_version.len());
+
+        // if let Some(solc_first_key) = solc_version.first_key_value() {
+        //     // TODO: understand and handle solc versions and the edge cases here
+
+        //     Ok(solc_first_key.0.solc.to_owned())
+        // } else {
+        //     Err(Error::msg("Could not get solc path"))
+        // }
+    }
+
+    fn get_versioned_sources(
+        &mut self,
+    ) -> Result<BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>> {
         let sources = self
             .project
             .sources()
-            .map_err(|e| Error::msg(format!("Could not get project sources: {}", e)))?;
+            .map_err(|e| Error::msg(format!("Could not get project sources: {}", e)))
+            .unwrap();
 
-        let s = sources.clone();
-        let keys = s.into_keys();
-        let vec: Vec<PathBuf> = keys.collect();
-        self.sources = Some(vec);
+        // let s = sources.clone();
+        // let keys = s.into_keys();
+        // let vec: Vec<PathBuf> = keys.collect();
+        // self.sources = Some(vec);
 
         let graph = Graph::resolve_sources(&self.project.paths, sources)
-            .map_err(|e| Error::msg(format!("Could not create graph: {}", e)))?;
+            .map_err(|e| Error::msg(format!("Could not create graph: {}", e)))
+            .unwrap();
 
         let (versions, _edges) = graph
             .into_sources_by_version(self.project.offline)
-            .map_err(|e| Error::msg(format!("Could not get versions & edges: {}", e)))?;
-
+            .map_err(|e| Error::msg(format!("Could not get versions & edges: {}", e)))
+            .unwrap();
+        println!("{:#?}, versions", versions);
         let solc_version = versions
             .get(&self.project)
-            .map_err(|e| Error::msg(format!("Could not get solc: {}", e)))?;
-
-        if let Some(solc_first_key) = &solc_version.first_key_value() {
-            // TODO: understand and handle solc versions and the edge cases here
-
-            Ok(solc_first_key.0.solc.to_owned())
-        } else {
-            Err(Error::msg("Could not get solc path"))
-        }
+            .map_err(|e| Error::msg(format!("Could not get solc: {}", e)));
+        println!("{:#?}, solc_version", solc_version);
+        solc_version
     }
 
     fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {

@@ -62,7 +62,11 @@ impl Cmd for ZkBuildArgs {
 
     fn run(self) -> eyre::Result<String> {
         let config = self.try_load_config_emit_warnings()?;
-        let project = config.project()?;
+        let mut project = config.project()?;
+
+        //set zk out path
+        let zk_out_path = project.paths.root.to_owned().join("zkout");
+        project.paths.artifacts = zk_out_path;
 
         let zksolc_manager_opts = ZkSolcManagerOpts { version: self.use_zksolc.unwrap() };
 
@@ -92,6 +96,7 @@ impl Cmd for ZkBuildArgs {
 
                 let zksolc_opts = ZkSolcOpts {
                     compiler_path: zksolc_manager.get_full_compiler_path(),
+                    //we may not add these yet as they may be file specific
                     is_system: self.is_system,
                     force_evmla: self.force_evmla,
                 };
