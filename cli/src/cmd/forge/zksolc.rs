@@ -118,7 +118,6 @@ impl<'a> ZkSolc {
         Ok(())
     }
 
-    //issues with async functions
     fn build_compiler_args(
         &mut self,
         versioned_source: (PathBuf, Source),

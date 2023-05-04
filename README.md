@@ -226,29 +226,32 @@ Compile smart contracts to zkEvm bytecode and store compile output files into a 
 Compiler subcommands for zkSync
 
 Usage: 
-forge zk-build <CONTRACT_FILENAME> [OPTIONS]
+forge zk-build [OPTIONS]
 
-Arguments:
-  <CONTRACT FILENAME>  Contract filename from     project src/ ex: 'Contract.sol'
 
-  Options:
+Options:
       --use-zksolc   Specify zksolc compiler version (default if left blank)
       --is-system    Enable the system contract compilation mode.
       --force-evmla  Sets the EVM legacy assembly pipeline forcibly
-  -h, --help         Print help
+      -h, --help         Print help
 
   
 ```
+
+### Compiling with `--is-system` flag
+It is necessary for some contracts, including those that deploy other contracts (such as factory contracts), to be compiled using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder:
+
+
 #### Example Usage
-To compile `src/Greeter.sol` with only default compiler options (v1.3.9):
+To compile with only default compiler options (v1.3.9):
 ```bash
-../foundry-zksync/target/debug/forge zk-build "Greeter.sol" 
+../foundry-zksync/target/debug/forge zk-build 
 ```
 
 #### Compiler Settings
 `zksolc` compiler version can optionally be configured using `--use-zksolc` flag:
 ```bash
-../foundry-zksync/target/debug/forge zkb "Greeter.sol" --use-zksolc v1.3.8
+../foundry-zksync/target/debug/forge zkb --use-zksolc v1.3.8
 ```
 
 #### Output
