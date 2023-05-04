@@ -8,9 +8,9 @@ use foundry_config::{Chain, Config};
 use zksync::types::{Address, H160, H256, U256};
 use zksync_types::L2_ETH_TOKEN_ADDRESS;
 
-use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
 /// CLI arguments for `cast zk-send`.

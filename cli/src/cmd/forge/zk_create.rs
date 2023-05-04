@@ -21,9 +21,9 @@ use std::{
 };
 
 use zksync::types::H256;
-use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
+use zksync_eth_signer::PrivateKeySigner;
 
 /// CLI arguments for `forge zk-create`.
 #[derive(Debug, Clone, Parser)]
