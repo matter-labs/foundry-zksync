@@ -97,20 +97,13 @@ impl ZkSendTxArgs {
         let config = Config::load();
 
         //get private key
-        let private_key = match &self.eth.wallet.private_key {
-            Some(pkey) => {
-                let decoded = match decode_hex(pkey) {
-                    Ok(val) => H256::from_slice(&val),
-                    Err(e) => {
-                        panic!("Error parsing private key {e}, make sure it is valid.")
-                    }
-                };
-                decoded
-            }
-            None => {
-                panic!("Private key was not provided. Try using --private-key flag");
-            }
-        };
+        let private_key = self.eth.wallet.private_key.as_ref().and_then(|pkey| {
+            decode_hex(pkey)
+                .map_err(|e| format!("Error parsing private key: {}", e))
+                .map(|val| H256::from_slice(&val))
+                .ok()
+        })
+        .expect("Private key was not provided. Try using --private-key flag");
 
         //verify rpc url has been populated
         if self.eth.rpc_url.is_none() {
@@ -118,12 +111,7 @@ impl ZkSendTxArgs {
         }
 
         //get chain
-        let chain = match self.eth.chain {
-            Some(chain) => chain,
-            None => {
-                panic!("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
-            }
-        };
+        let chain = self.eth.chain.expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
 
         // get signer
         let signer = Self::get_signer(private_key, &chain);
@@ -138,7 +126,7 @@ impl ZkSendTxArgs {
                     let decoded = match decode_hex(token_addy) {
                         Ok(addy) => addy,
                         Err(e) => {
-                            panic!("Error parsing token address: {e}, try removing the '0x'")
+                            eyre::bail!("Error parsing token address: {e}, try removing the '0x'")
                         }
                     };
                     Address::from_slice(decoded.as_slice())
@@ -153,12 +141,7 @@ impl ZkSendTxArgs {
             };
 
             //get amount
-            let amount = match self.amount {
-                Some(amt) => amt,
-                None => {
-                    panic!("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )")
-                }
-            };
+            let amount = self.amount.expect("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )");
 
             match &wallet {
                 Ok(w) => {
@@ -189,17 +172,15 @@ impl ZkSendTxArgs {
                         println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
                     }
                 }
-                Err(e) => panic!("error wallet: {e:?}"),
+                Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
         } else {
             match &wallet {
                 Ok(w) => {
                     println!("Sending transaction....");
                     // Build Executor //
-                    let sig = match self.sig {
-                        Some(sig) => sig,
-                        None => panic!("Error: Function Signature is empty"),
-                    };
+                    
+                    let sig = self.sig.expect("Error: Function Signature is empty");
 
                     let params =
                         if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
@@ -227,7 +208,7 @@ impl ZkSendTxArgs {
                         }
                     }
                 }
-                Err(e) => panic!("error wallet: {e:?}"),
+                Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
         }
 
