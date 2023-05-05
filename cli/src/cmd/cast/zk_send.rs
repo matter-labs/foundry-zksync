@@ -111,7 +111,8 @@ impl ZkSendTxArgs {
         }
 
         //get chain
-        let chain = self.eth.chain.expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
+        let chain = self.eth.chain
+            .expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
 
         // get signer
         let signer = Self::get_signer(private_key, &chain);
@@ -179,7 +180,7 @@ impl ZkSendTxArgs {
                 Ok(w) => {
                     println!("Sending transaction....");
                     // Build Executor //
-                    
+
                     let sig = self.sig.expect("Error: Function Signature is empty");
 
                     let params =

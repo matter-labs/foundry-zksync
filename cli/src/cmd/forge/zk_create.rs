@@ -77,43 +77,34 @@ pub struct ZkCreateArgs {
 impl ZkCreateArgs {
     /// Executes the command to create a contract
     pub async fn run(self) -> eyre::Result<()> {
-        //get private key
-        let private_key = match &self.eth.wallet.private_key {
-            Some(pkey) => {
-                let decoded = match decode_hex(pkey) {
-                    Ok(val) => H256::from_slice(&val),
-                    Err(e) => {
-                        panic!("Error parsing private key {e}, make sure it is valid.")
-                    }
-                };
-                decoded
-            }
-            None => {
-                panic!("Private key was not provided. Try using --private-key flag");
-            }
-        };
+        //get private key (this is redundant, could be a util perhaps)
+        let private_key = self.eth.wallet.private_key.as_ref().and_then(|pkey| {
+            decode_hex(pkey)
+                .map_err(|e| format!("Error parsing private key: {}", e))
+                .map(|val| H256::from_slice(&val))
+                .ok()
+        })
+        .expect("Private key was not provided. Try using --private-key flag");
 
         //verify rpc url has been populated
         if self.eth.rpc_url.is_none() {
             eyre::bail!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
         }
 
-        //get chain
-        let chain = match self.eth.chain {
-            Some(chain) => chain,
-            None => {
-                panic!("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
-            }
-        };
+        let chain = self.eth.chain
+            .expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
 
         // get project
         let mut project = self.opts.project()?;
         // set out folder path
         project.paths.artifacts = project.paths.root.join("zkout");
 
-        // get  contract bytecode
-        let bytecode = Self::get_bytecode_from_contract(&project, &self.contract)
-            .unwrap_or_else(|e| panic!("Error getting bytecode from contract: {}", e));
+        let bytecode = match Self::get_bytecode_from_contract(&project, &self.contract) {
+            Ok(bytecode) => bytecode,
+            Err(e) => {
+                eyre::bail!("Error getting bytecode from contract: {}", e);
+            }
+        };
 
         //check for additional factory deps
         let mut factory_deps = Vec::new();
@@ -126,10 +117,19 @@ impl ZkCreateArgs {
         let signer = Self::get_signer(private_key, &chain);
 
         // get abi
-        let abi = Self::get_abi_from_contract(&project, &self.contract)
-            .unwrap_or_else(|e| panic!("Error gettting ABI from contract: {}", e));
-        let contract: Abi = serde_json::from_value(abi)
-            .unwrap_or_else(|e| panic!("Error converting json abi to Contract ABI: {}", e));
+        let abi = match Self::get_abi_from_contract(&project, &self.contract) {
+            Ok(abi) => abi,
+            Err(e) => {
+                eyre::bail!("Error gettting ABI from contract: {}", e);
+            }
+        };
+
+        let contract = match serde_json::from_value(abi) {
+            Ok(contract) => contract,
+            Err(e) => {
+                eyre::bail!("Error converting json abi to Contract ABI: {}", e);
+            }
+        };
 
         // encode constructor args
         let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
@@ -137,7 +137,7 @@ impl ZkCreateArgs {
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         let deployer_builder = match &wallet {
             Ok(w) => w.start_deploy_contract(),
-            Err(e) => panic!("error wallet: {e:?}"),
+            Err(e) => eyre::bail!("error wallet: {e:?}"),
         };
 
         let deployer = deployer_builder
@@ -150,32 +150,28 @@ impl ZkCreateArgs {
         // println!("{:#?}, est_gas", est_gas);
 
         println!("Deploying contract...");
-        let tx = deployer.send().await;
-        match tx {
-            Ok(deploy) => {
-                let rcpt = deploy
-                    .wait_for_commit()
-                    .await
-                    .unwrap_or_else(|e| panic!("Transaction Error: {}", e));
-                let deployed_address = rcpt
-                    .contract_address
-                    .unwrap_or_else(|| panic!("Error retrieving deployed address"));
-                let gas_used = rcpt.gas_used.unwrap_or_else(|| panic!("Error retrieving gas used"));
-                let gas_price = rcpt
-                    .effective_gas_price
-                    .unwrap_or_else(|| panic!("Error retrieving gas price"));
-                let block_number =
-                    rcpt.block_number.unwrap_or_else(|| panic!("Error retrieving block number"));
+        match deployer.send().await {
+            Ok(txHandle) => {
+                let rcpt = match txHandle.wait_for_commit().await {
+                    Ok(rcpt) => rcpt,
+                    Err(e) => eyre::bail!("Transaction Error: {}", e),
+                };
+
+                let deployed_address = rcpt.contract_address.expect("Error retrieving deployed address");
+                let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
+                let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
+                let block_number = rcpt.block_number.expect("Error retrieving block number");
+
                 println!("+-------------------------------------------------+");
                 println!("Contract successfully deployed to address: {:#?}", deployed_address);
-                println!("Transaction Hash: {:#?}", deploy.hash());
+                println!("Transaction Hash: {:#?}", txHandle.hash());
                 println!("Gas used: {:#?}", gas_used);
                 println!("Effective gas price: {:#?}", gas_price);
                 println!("Block Number: {:#?}", block_number);
                 println!("+-------------------------------------------------+");
             }
             Err(e) => eyre::bail!("{:#?}, error", e),
-        }
+        };
 
         Ok(())
     }
