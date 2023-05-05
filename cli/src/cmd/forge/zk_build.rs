@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::process;
 
 use super::build::CoreBuildArgs;
 use super::zksolc::{ZkSolc, ZkSolcOpts};
@@ -65,27 +64,26 @@ impl Cmd for ZkBuildArgs {
         let mut project = config.project()?;
 
         //set zk out path
-        let zk_out_path = project.paths.root.to_owned().join("zkout");
+        let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
 
         let zksolc_manager_opts = ZkSolcManagerOpts { version: self.use_zksolc.unwrap() };
         let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
-        let zksolc_manager = zksolc_manager_builder.build();
+        let zksolc_manager = &zksolc_manager_builder.build();
 
         match zksolc_manager {
             Ok(zksolc_manager) => {
-                if let Err(err) = zksolc_manager.clone().check_setup_compilers_dir() {
+                if let Err(err) = zksolc_manager.check_setup_compilers_dir() {
                     eyre::bail!("Failed to setup compilers directory: {}", err);
                 }
 
                 if !zksolc_manager.exists() {
                     println!("Downloading zksolc compiler");
 
-                    match zksolc_manager.clone().download() {
+                    match zksolc_manager.download() {
                         Ok(zksolc_manager) => zksolc_manager,
                         Err(err) => {
-                            eprintln!("Failed to download the file: {}", err);
-                            process::exit(1);
+                            eyre::bail!("Failed to download the file: {}", err);
                         }
                     }
                 }
@@ -104,12 +102,11 @@ impl Cmd for ZkBuildArgs {
                 match zksolc.compile() {
                     Ok(_) => println!("Compiled Successfully"),
                     Err(err) => {
-                        eprintln!("Failed to compile smart contracts with zksolc: {}", err);
-                        process::exit(1);
+                        eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
                     }
                 }
             }
-            Err(e) => eprintln!("Error building zksolc_manager: {}", e),
+            Err(e) => eyre::bail!("Error building zksolc_manager: {}", e),
         }
 
         Ok(())
