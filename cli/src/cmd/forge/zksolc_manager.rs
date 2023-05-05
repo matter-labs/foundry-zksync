@@ -184,11 +184,11 @@ impl ZkSolcManager {
     }
 
     pub fn get_full_compiler_path(&self) -> PathBuf {
-        self.compilers_path.join(self.clone().get_full_compiler())
+        self.compilers_path.join(self.get_full_compiler())
     }
 
     pub fn exists(&self) -> bool {
-        let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
+        let compiler_path = self.get_full_compiler_path();
         if let Ok(metadata) = fs::metadata(compiler_path) {
             if metadata.is_file() && metadata.permissions().mode() & 0o755 != 0 {
                 return true;
@@ -228,7 +228,7 @@ impl ZkSolcManager {
             copy(&mut response, &mut output_file)
                 .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
 
-            let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
+            let compiler_path = self.compilers_path.join(self.get_full_compiler());
             let _ = fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755))
                 .map_err(|e| Error::msg(format!("Failed to set zksync compiler permissions: {e}")));
         } else {

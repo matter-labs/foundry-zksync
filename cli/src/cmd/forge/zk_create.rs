@@ -209,12 +209,12 @@ impl ZkCreateArgs {
     ) -> Result<Bytes, serde_json::Error> {
         let output_path = Self::get_path_for_contract_output(project, contract_info);
         let contract_output = Self::get_contract_output(output_path);
-        let temp = serde_json::from_value(
+        let byte_code = serde_json::from_value(
             contract_output[contract_info.path.as_ref().unwrap()][&contract_info.name]["evm"]
                 ["bytecode"]["object"]
                 .clone(),
         );
-        temp
+        byte_code
     }
 
     fn get_contract_output(output_path: PathBuf) -> Value {

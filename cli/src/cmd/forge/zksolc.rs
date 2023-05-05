@@ -49,7 +49,7 @@ impl fmt::Display for ZkSolc {
     }
 }
 
-impl<'a> ZkSolc {
+impl ZkSolc {
     pub fn new(opts: ZkSolcOpts, project: Project) -> Self {
         Self {
             project,

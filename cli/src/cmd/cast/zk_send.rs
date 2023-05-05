@@ -184,7 +184,7 @@ impl ZkSendTxArgs {
                     let sig = self.sig.expect("Error: Function Signature is empty");
 
                     let params =
-                        if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
+                        if !sig.is_empty() { Some((&sig[..], self.args)) } else { None };
                     let mut builder =
                         TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
                     builder.args(params).await?;
@@ -204,7 +204,7 @@ impl ZkSendTxArgs {
                     for log in tx_rcpt_commit.logs {
                         if log.address == CONTRACT_DEPLOYER_ADDRESS {
                             let deployed_address = log.topics.get(3).unwrap();
-                            let deployed_address = Address::from(deployed_address.clone());
+                            let deployed_address = Address::from(*deployed_address);
                             println!("Deployed contract address: {:#?}", deployed_address);
                         }
                     }
