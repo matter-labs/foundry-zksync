@@ -18,7 +18,7 @@ use zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 pub struct ZkSendTxArgs {
     #[clap(
             help = "The destination of the transaction.",
-             value_parser = parse_name_or_address,
+            value_parser = parse_name_or_address,
             value_name = "TO"
         )]
     to: Option<NameOrAddress>,
@@ -94,7 +94,6 @@ pub struct ZkSendTxArgs {
 
 impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        // println!("{:#?}, ZksendTxArgs", self);
         let config = Config::load();
 
         //get private key
@@ -114,8 +113,8 @@ impl ZkSendTxArgs {
         };
 
         //verify rpc url has been populated
-        if let None = &self.eth.rpc_url {
-            panic!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+        if self.eth.rpc_url.is_none() {
+            eyre::bail!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
         }
 
         //get chain
@@ -243,13 +242,8 @@ impl ZkSendTxArgs {
     }
 
     fn get_to_address(&self) -> H160 {
-        let deployed_contract = match &self.to {
-            Some(to) => match to.as_address() {
-                Some(addy) => addy.as_bytes(),
-                None => panic!("Invalid Address"),
-            },
-            None => panic!("Enter TO: Address"),
-        };
+        let to = self.to.expect("Enter TO: Address");
+        let deployed_contract = to.as_address().expect("Invalid address").as_bytes();
         zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
     }
 }

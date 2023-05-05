@@ -58,9 +58,9 @@ pub struct ZkBuildArgs {
 }
 
 impl Cmd for ZkBuildArgs {
-    type Output = String;
+    type Output = ();
 
-    fn run(self) -> eyre::Result<String> {
+    fn run(self) -> eyre::Result<()> {
         let config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
 
@@ -75,8 +75,7 @@ impl Cmd for ZkBuildArgs {
         match zksolc_manager {
             Ok(zksolc_manager) => {
                 if let Err(err) = zksolc_manager.clone().check_setup_compilers_dir() {
-                    eprintln!("Failed to setup compilers directory: {}", err);
-                    process::exit(1);
+                    eyre::bail!("Failed to setup compilers directory: {}", err);
                 }
 
                 if !zksolc_manager.exists() {
@@ -113,7 +112,7 @@ impl Cmd for ZkBuildArgs {
             Err(e) => eprintln!("Error building zksolc_manager: {}", e),
         }
 
-        Ok("".to_owned())
+        Ok(())
     }
 }
 

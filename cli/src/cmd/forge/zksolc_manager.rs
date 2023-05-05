@@ -30,13 +30,13 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
 }
 
 impl ZkSolcVersion {
-    fn get_version(&self) -> Result<&str> {
+    fn get_version(&self) -> &str {
         match self {
-            ZkSolcVersion::V135 => Ok("v1.3.5"),
-            ZkSolcVersion::V136 => Ok("v1.3.6"),
-            ZkSolcVersion::V137 => Ok("v1.3.7"),
-            ZkSolcVersion::V138 => Ok("v1.3.8"),
-            ZkSolcVersion::V139 => Ok("v1.3.9"),
+            ZkSolcVersion::V135 => "v1.3.5",
+            ZkSolcVersion::V136 => "v1.3.6",
+            ZkSolcVersion::V137 => "v1.3.7",
+            ZkSolcVersion::V138 => "v1.3.8",
+            ZkSolcVersion::V139 => "v1.3.9",
         }
     }
 }
@@ -51,7 +51,7 @@ fn get_operating_system() -> Result<ZkSolcOS> {
     match std::env::consts::OS {
         "linux" => Ok(ZkSolcOS::Linux),
         "macos" | "darwin" => Ok(ZkSolcOS::Mac),
-        _ => Err(Error::msg("Unsupported opeating system")),
+        _ => Err(Error::msg("Unsupported operating system")),
     }
 }
 
@@ -154,15 +154,15 @@ impl fmt::Display for ZkSolcManager {
             self.version.get_version().unwrap(),
             self.compiler,
             self.download_url,
-            self.clone().get_full_compiler(),
-            self.clone().get_full_download_url().unwrap(),
-            self.clone().exists(),
+            self.get_full_compiler(),
+            self.get_full_download_url().unwrap(),
+            self.exists(),
         )
     }
 }
 
 impl ZkSolcManager {
-    pub fn get_full_compiler(self) -> String {
+    pub fn get_full_compiler(&self) -> String {
         return format!("{}{}", self.compiler, self.version.get_version().unwrap());
     }
 
@@ -170,12 +170,8 @@ impl ZkSolcManager {
         if let Ok(zk_solc_os) = get_operating_system() {
             let download_uri = zk_solc_os.get_download_uri().to_string();
 
-            let full_download_url = format!(
-                "{}/{}/{}",
-                self.download_url,
-                download_uri,
-                self.clone().get_full_compiler()
-            );
+            let full_download_url =
+                format!("{}/{}/{}", self.download_url, download_uri, self.get_full_compiler());
 
             if let Ok(url) = Url::parse(&full_download_url) {
                 Ok(url)
@@ -201,7 +197,7 @@ impl ZkSolcManager {
         false
     }
 
-    pub fn check_setup_compilers_dir(self) -> Result<()> {
+    pub fn check_setup_compilers_dir(&self) -> Result<()> {
         if !self.compilers_path.exists() {
             fs::create_dir_all(&self.compilers_path)
                 .map_err(|e| Error::msg(format!("Could not create compilers path: {}", e)))?;
@@ -209,7 +205,7 @@ impl ZkSolcManager {
         Ok(())
     }
 
-    pub fn download(self) -> Result<()> {
+    pub fn download(&self) -> Result<()> {
         if self.exists() {
             // TODO: figure out better don't download if compiler is downloaded
             return Ok(());

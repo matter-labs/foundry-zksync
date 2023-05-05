@@ -77,8 +77,6 @@ pub struct ZkCreateArgs {
 impl ZkCreateArgs {
     /// Executes the command to create a contract
     pub async fn run(self) -> eyre::Result<()> {
-        // println!("{:#?}, ZkCreateArgs ---->>>", self);
-
         //get private key
         let private_key = match &self.eth.wallet.private_key {
             Some(pkey) => {
@@ -96,8 +94,8 @@ impl ZkCreateArgs {
         };
 
         //verify rpc url has been populated
-        if let None = &self.eth.rpc_url {
-            panic!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+        if self.eth.rpc_url.is_none() {
+            eyre::bail!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
         }
 
         //get chain
@@ -119,7 +117,7 @@ impl ZkCreateArgs {
 
         //check for additional factory deps
         let mut factory_deps = Vec::new();
-        if let Some(fdep_contract_info) = self.factory_deps.clone() {
+        if let Some(fdep_contract_info) = &self.factory_deps {
             factory_deps =
                 self.get_factory_dependencies(&project, factory_deps, fdep_contract_info);
         }
@@ -176,15 +174,15 @@ impl ZkCreateArgs {
                 println!("Block Number: {:#?}", block_number);
                 println!("+-------------------------------------------------+");
             }
-            Err(e) => println!("{:#?}, error", e),
+            Err(e) => eyre::bail!("{:#?}, error", e),
         }
 
         Ok(())
     }
 
     fn get_constructor_args(&self, abi: &Abi) -> Vec<Token> {
-        let params = match abi.constructor {
-            Some(ref v) => {
+        match &abi.constructor {
+            Some(v) => {
                 let constructor_args =
                     if let Some(ref constructor_args_path) = self.constructor_args_path {
                         read_constructor_args_file(constructor_args_path.to_path_buf()).unwrap()
@@ -194,8 +192,7 @@ impl ZkCreateArgs {
                 self.parse_constructor_args(v, &constructor_args).unwrap()
             }
             None => vec![],
-        };
-        params
+        }
     }
 
     fn get_abi_from_contract(
@@ -240,7 +237,7 @@ impl ZkCreateArgs {
         &self,
         project: &Project,
         mut factory_dep_vector: Vec<Vec<u8>>,
-        fdep_contract_info: Vec<ContractInfo>,
+        fdep_contract_info: &Vec<ContractInfo>,
     ) -> Vec<Vec<u8>> {
         for dep in fdep_contract_info.iter() {
             let dep_bytecode = Self::get_bytecode_from_contract(&project, dep).unwrap();
