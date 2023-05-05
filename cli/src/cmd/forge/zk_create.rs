@@ -151,8 +151,8 @@ impl ZkCreateArgs {
 
         println!("Deploying contract...");
         match deployer.send().await {
-            Ok(txHandle) => {
-                let rcpt = match txHandle.wait_for_commit().await {
+            Ok(tx_handle) => {
+                let rcpt = match tx_handle.wait_for_commit().await {
                     Ok(rcpt) => rcpt,
                     Err(e) => eyre::bail!("Transaction Error: {}", e),
                 };
@@ -164,7 +164,7 @@ impl ZkCreateArgs {
 
                 println!("+-------------------------------------------------+");
                 println!("Contract successfully deployed to address: {:#?}", deployed_address);
-                println!("Transaction Hash: {:#?}", txHandle.hash());
+                println!("Transaction Hash: {:#?}", tx_handle.hash());
                 println!("Gas used: {:#?}", gas_used);
                 println!("Effective gas price: {:#?}", gas_price);
                 println!("Block Number: {:#?}", block_number);
