@@ -4,9 +4,9 @@ use sha2::Digest;
 use std::io::Result;
 use zksync;
 use zksync::types::H256;
-use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{signer, wallet};
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::zk_evm::sha3::Keccak256;
 
 pub async fn send_zksync(

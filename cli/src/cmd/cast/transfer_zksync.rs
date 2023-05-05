@@ -1,9 +1,9 @@
 use std::io::Result;
 use zksync;
 use zksync::types::{Address, H256};
-use zksync::zksync_eth_signer::PrivateKeySigner;
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{signer, wallet};
+use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::L2_ETH_TOKEN_ADDRESS;
 
 pub async fn transfer_zksync(
