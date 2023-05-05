@@ -151,7 +151,7 @@ impl fmt::Display for ZkSolcManager {
                 exists: {}
             )",
             self.compilers_path.display(),
-            self.version.get_version().unwrap(),
+            self.version.get_version(),
             self.compiler,
             self.download_url,
             self.get_full_compiler(),
@@ -163,7 +163,7 @@ impl fmt::Display for ZkSolcManager {
 
 impl ZkSolcManager {
     pub fn get_full_compiler(&self) -> String {
-        return format!("{}{}", self.compiler, self.version.get_version().unwrap());
+        return format!("{}{}", self.compiler, self.version.get_version());
     }
 
     pub fn get_full_download_url(&self) -> Result<Url> {

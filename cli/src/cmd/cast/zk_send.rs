@@ -242,7 +242,7 @@ impl ZkSendTxArgs {
     }
 
     fn get_to_address(&self) -> H160 {
-        let to = self.to.expect("Enter TO: Address");
+        let to = self.to.as_ref().expect("Enter TO: Address");
         let deployed_contract = to.as_address().expect("Invalid address").as_bytes();
         zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
     }
