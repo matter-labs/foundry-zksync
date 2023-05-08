@@ -126,12 +126,18 @@ impl ZkSendTxArgs {
             }
         };
 
-        // get signer
-        let signer = Self::get_signer(private_key, &chain);
-        let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
         let to_address = self.get_to_address();
 
-        let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
+        let provider = try_get_http_provider(self.eth.rpc_url.as_ref().unwrap())?;
+        println!("{:#?},provider", provider);
+
+        // get signer
+        let signer = Self::get_signer(private_key, &chain);
+        // getting port error retrieving this wallet
+        let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.as_ref().unwrap(), signer);
+        // let wallet = wallet::Wallet::new(provider, signer);
+        println!("{:#?},wallet", wallet);
+
         if self.deposit || self.withdraw {
             // IF BRIDGING
             let token_address: Address = match &self.token {
@@ -146,7 +152,7 @@ impl ZkSendTxArgs {
                 }
                 None => {
                     if self.deposit {
-                        L2_ETH_TOKEN_ADDRESS
+                        Address::zero()
                     } else {
                         Address::zero()
                     }
@@ -161,21 +167,29 @@ impl ZkSendTxArgs {
                 }
             };
 
-            match &wallet {
+            match wallet {
                 Ok(w) => {
                     println!("Bridging assets....");
                     if self.deposit {
-                        // Build Transfer //
-                        let tx = w
-                            .start_transfer()
-                            .to(to_address)
-                            .amount(amount)
-                            .token(token_address)
-                            .send()
-                            .await
-                            .unwrap();
-                        let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                        println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
+                        // Build Deposit
+                        //need ethereum provider
+                        println!("{:#?}", w);
+                        let eth_signer =
+                            w.ethereum(&self.eth.rpc_url.unwrap()).await.map_err(|e| e)?;
+
+                        print!("{:#?}, eth_signer ", eth_signer);
+                        let tx_hash = eth_signer
+                            .deposit(
+                                token_address,
+                                self.amount.unwrap(),
+                                to_address,
+                                None,
+                                None,
+                                None,
+                            )
+                            .await?;
+
+                        println!("Transaction Hash: {:#?}", tx_hash);
                     } else {
                         // Build Withdraw //
                         let tx = w
