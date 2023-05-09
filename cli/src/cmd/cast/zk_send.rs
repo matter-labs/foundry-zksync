@@ -134,7 +134,8 @@ impl ZkSendTxArgs {
         // get signer
         let signer = Self::get_signer(private_key, &chain);
         // getting port error retrieving this wallet
-        let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.as_ref().unwrap(), signer);
+        let wallet =
+            wallet::Wallet::with_http_client("https://zksync2-testnet.zksync.dev:443", signer);
         // let wallet = wallet::Wallet::new(provider, signer);
         println!("{:#?},wallet", wallet);
 
@@ -174,8 +175,12 @@ impl ZkSendTxArgs {
                         // Build Deposit
                         //need ethereum provider
                         println!("{:#?}", w);
-                        let eth_signer =
-                            w.ethereum(&self.eth.rpc_url.unwrap()).await.map_err(|e| e)?;
+                        let eth_signer = w
+                            .ethereum(
+                                "https://goerli.infura.io/v3/33978c8e5245402d8c8388ddc806ef1d",
+                            )
+                            .await
+                            .map_err(|e| e)?;
 
                         print!("{:#?}, eth_signer ", eth_signer);
                         let tx_hash = eth_signer
