@@ -1,4 +1,4 @@
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use dirs;
 use reqwest::blocking::Client;
 use serde::Serialize;
@@ -79,6 +79,7 @@ pub struct ZkSolcManagerOpts {
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManagerBuilder {
     compilers_path: Option<PathBuf>,
+    // FIXME: do these really need to be public?
     pub version: String,
     compiler: Option<String>,
     pub download_url: Url,
@@ -90,10 +91,12 @@ impl ZkSolcManagerBuilder {
             compilers_path: None,
             version: opts.version,
             compiler: None,
+            // FIXME: for 'magic' strings, use constants at the top of the file.
             download_url: Url::parse("https://github.com/matter-labs/zksolc-bin/raw/main").unwrap(),
         }
     }
 
+    /// FIXME: do you really need to return a string (which is more like a 'mutable' object) - or would &str be enough?
     fn get_compiler(self) -> Result<String> {
         if let Ok(zk_solc_os) = get_operating_system() {
             let compiler = zk_solc_os.get_compiler().to_string();
@@ -104,28 +107,19 @@ impl ZkSolcManagerBuilder {
     }
 
     pub fn build(self) -> Result<ZkSolcManager> {
-        if let Some(mut home_path) = dirs::home_dir() {
-            home_path.push(".zksync");
-            let version = self.version.to_string();
-            let download_url = self.download_url.to_owned();
-            let compiler = self.get_compiler()?;
-            let compilers_path = home_path.to_owned();
+        // TODO: try catching & returning errors quickly (rather than doing 'long' if and return else at the end)
+        let mut home_path =
+            dirs::home_dir().ok_or(anyhow!("Could not build SolcManager - homedir not found"))?;
+        home_path.push(".zksync");
+        let version = self.version.to_string();
+        let download_url = self.download_url.to_owned();
+        let compiler = self.get_compiler()?;
+        // FIXME: PathBuf (like String) - is more like a builder.. so when you 'built' your compiler's path
+        // you might want it to be just a 'path'  (by calling 'as_path()')
+        let compilers_path = home_path.to_owned();
 
-            match parse_version(&version) {
-                Ok(solc_version) => {
-                    return Ok(ZkSolcManager {
-                        compilers_path,
-                        version: solc_version,
-                        compiler,
-                        download_url,
-                    });
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            }
-        }
-        Err(Error::msg("Could not build ZkSolcManager"))
+        let solc_version = parse_version(&version)?;
+        return Ok(ZkSolcManager { compilers_path, version: solc_version, compiler, download_url });
     }
 }
 
@@ -167,28 +161,26 @@ impl ZkSolcManager {
     }
 
     pub fn get_full_download_url(&self) -> Result<Url> {
-        if let Ok(zk_solc_os) = get_operating_system() {
-            let download_uri = zk_solc_os.get_download_uri().to_string();
+        // TODO: this is an example, of how you can 'propagate' the error from below, and add some local context information.
+        let zk_solc_os = get_operating_system()
+            .map_err(|err| anyhow!("Failed to determine OS to select the binary: {}", err))?;
 
-            let full_download_url =
-                format!("{}/{}/{}", self.download_url, download_uri, self.get_full_compiler());
+        let download_uri = zk_solc_os.get_download_uri();
 
-            if let Ok(url) = Url::parse(&full_download_url) {
-                Ok(url)
-            } else {
-                Err(Error::msg("Could not parse full download url"))
-            }
-        } else {
-            Err(Error::msg("Could not determine full download url"))
-        }
+        let full_download_url =
+            format!("{}/{}/{}", self.download_url, download_uri, self.get_full_compiler());
+
+        Url::parse(&full_download_url)
+            .map_err(|err| anyhow!("Could not parse URL for binary download: {}", err))
     }
 
     pub fn get_full_compiler_path(&self) -> PathBuf {
-        self.compilers_path.join(self.get_full_compiler())
+        self.compilers_path.join(self.clone().get_full_compiler())
     }
 
     pub fn exists(&self) -> bool {
-        let compiler_path = self.get_full_compiler_path();
+        let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
+        // FIXME: change it to more rusty (using 'map')
         if let Ok(metadata) = fs::metadata(compiler_path) {
             if metadata.is_file() && metadata.permissions().mode() & 0o755 != 0 {
                 return true;
@@ -228,7 +220,9 @@ impl ZkSolcManager {
             copy(&mut response, &mut output_file)
                 .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
 
-            let compiler_path = self.compilers_path.join(self.get_full_compiler());
+            // FIXME: there is a performance issue in the line below
+            let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
+            // FIXME: This is a bug - can you spot it? (usually if you need to use 'let _' - then something risky might be going on)
             let _ = fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755))
                 .map_err(|e| Error::msg(format!("Failed to set zksync compiler permissions: {e}")));
         } else {

@@ -1,5 +1,5 @@
 use ansi_term::Colour::{Red, Yellow};
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use ethers::solc::{
     artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
     Graph, Project,
@@ -25,6 +25,7 @@ pub struct ZkSolcOpts {
     pub force_evmla: bool,
 }
 
+// FIXME: let's add some more comments to the fields (and are you sure that all of them have to be public?)
 #[derive(Debug)]
 pub struct ZkSolc {
     pub project: Project,
@@ -61,13 +62,19 @@ impl ZkSolc {
         }
     }
 
-    pub fn compile(mut self) -> Result<()> {
+    //FIXME:  'mut self' without reference is quite strange.. are you sure?
+    pub fn compile(&mut self) -> Result<()> {
         self.configure_solc();
-        let sources = self.sources.clone().unwrap();
+        //FIXME: Check your clones - you can probably do just a reference..
+        // also - when you're already returning a result - maybe don't unwrap but '?' (with map_err to add more info if needed).
+        //  also - 'as_ref' allows you to 'access the reference' of the other object.
+        let sources =
+            self.sources.as_ref().ok_or(anyhow!("Missing sources?? TODO: what does it mean?"))?;
         let mut displayed_warnings = HashSet::new();
         for (solc, version) in sources {
             //configure project solc for each solc version
-            for source in version.1 {
+            // FIXME: and with the iterator - you can get access to the reference (so no copying needed)
+            for source in version.1.iter() {
                 let contract_path = source.0.clone();
 
                 if let Err(err) = self.parse_json_input(contract_path.clone()) {
@@ -122,7 +129,8 @@ impl ZkSolc {
         &mut self,
         versioned_source: (PathBuf, Source),
         solc: Solc,
-    ) -> Vec<String> {
+    ) -> Vec<&str> {
+        // FIXME: this is a 'path' - so you can use 'Path' object (rather than str)
         let solc_path = solc
             .solc
             .to_str()
@@ -130,21 +138,20 @@ impl ZkSolc {
             .to_string();
 
         // Build compiler arguments
-        let mut comp_args = Vec::<String>::new();
-        comp_args.push("--standard-json".to_string());
-        comp_args.push("--solc".to_string());
-        comp_args.push(solc_path.to_owned());
+        // FIXME: you can use 'vec!'
+        let mut comp_args = vec!["--stardard-json", "--solc", &solc_path];
 
         if self.is_system || versioned_source.0.to_str().unwrap().contains("is-system") {
-            comp_args.push("--system-mode".to_string());
+            comp_args.push("--system-mode");
         }
 
         if self.force_evmla {
-            comp_args.push("--force-evmla".to_string());
+            comp_args.push("--force-evmla");
         }
         comp_args
     }
 
+    // FIXME: please add comments to some functions.
     fn write_artifacts(
         &self,
         output: std::process::Output,
@@ -199,6 +206,7 @@ impl ZkSolc {
 
             let is_warning = severity.eq_ignore_ascii_case("warning");
             if is_warning {
+                // FIXME: you probably don't need a 'String' here -- str would be enough
                 let main_message = formatted_message.lines().next().unwrap_or("").to_string();
                 if !displayed_warnings.contains(&main_message) {
                     displayed_warnings.insert(main_message);
@@ -212,6 +220,7 @@ impl ZkSolc {
         }
 
         if has_error {
+            // FIXME: avoid 'exits' (that's like 'panic') - instead try to return an error -- allowing more flexibility.
             exit(1);
         } else if has_warning {
             println!("Compiler run completed with warnings");
@@ -304,6 +313,7 @@ impl ZkSolc {
     }
 
     fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
+        // FIXME: return error with anyhow! rather than failing (with expect)
         let filename = source.file_name().expect("Failed to get Contract filename.");
 
         let path = self.project.paths.artifacts.join(filename);
@@ -313,6 +323,7 @@ impl ZkSolc {
     }
 
     fn build_artifacts_file(&self, source: String) -> Result<File> {
+        // FIXME: No need  for this local variable
         let artifacts_file =
             File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
                 .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))?;
