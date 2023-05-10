@@ -97,13 +97,18 @@ impl ZkSendTxArgs {
         let config = Config::load();
 
         //get private key
-        let private_key = self.eth.wallet.private_key.as_ref().and_then(|pkey| {
-            decode_hex(pkey)
-                .map_err(|e| format!("Error parsing private key: {}", e))
-                .map(|val| H256::from_slice(&val))
-                .ok()
-        })
-        .expect("Private key was not provided. Try using --private-key flag");
+        let private_key = self
+            .eth
+            .wallet
+            .private_key
+            .as_ref()
+            .and_then(|pkey| {
+                decode_hex(pkey)
+                    .map_err(|e| format!("Error parsing private key: {}", e))
+                    .map(|val| H256::from_slice(&val))
+                    .ok()
+            })
+            .expect("Private key was not provided. Try using --private-key flag");
 
         //verify rpc url has been populated
         if self.eth.rpc_url.is_none() {
@@ -118,6 +123,7 @@ impl ZkSendTxArgs {
         let signer = Self::get_signer(private_key, &chain);
         let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
         let to_address = self.get_to_address();
+        let sender = self.eth.sender().await;
 
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         if self.deposit || self.withdraw {
@@ -142,7 +148,9 @@ impl ZkSendTxArgs {
             };
 
             //get amount
-            let amount = self.amount.expect("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )");
+            let amount = self
+                .amount
+                .expect("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )");
 
             match &wallet {
                 Ok(w) => {
@@ -183,10 +191,9 @@ impl ZkSendTxArgs {
 
                     let sig = self.sig.expect("Error: Function Signature is empty");
 
-                    let params =
-                        if !sig.is_empty() { Some((&sig[..], self.args)) } else { None };
+                    let params = if !sig.is_empty() { Some((&sig[..], self.args)) } else { None };
                     let mut builder =
-                        TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
+                        TxBuilder::new(&provider, sender, self.to, chain, true).await?;
                     builder.args(params).await?;
                     let (tx, _func) = builder.build();
                     let encoded_function_call = tx.data().unwrap().to_vec();
