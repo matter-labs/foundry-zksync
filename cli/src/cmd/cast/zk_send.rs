@@ -4,7 +4,7 @@ use cast::TxBuilder;
 use clap::Parser;
 use ethers::types::NameOrAddress;
 use foundry_common::try_get_http_provider;
-use foundry_config::{Chain, Config};
+use foundry_config::Chain;
 use zksync::types::{Address, H160, H256, U256};
 
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
@@ -22,10 +22,16 @@ pub struct ZkSendTxArgs {
         )]
     to: Option<NameOrAddress>,
 
-    #[clap(help = "The signature of the function to call.", value_name = "SIG")]
+    #[clap(
+        help = "The signature of the function to call.",
+        value_name = "SIG"
+    )]
     sig: Option<String>,
 
-    #[clap(help = "The arguments of the function to call.", value_name = "ARGS")]
+    #[clap(
+        help = "The arguments of the function to call.",
+        value_name = "ARGS"
+    )]
     args: Vec<String>,
 
     #[clap(
@@ -93,9 +99,6 @@ pub struct ZkSendTxArgs {
 
 impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        // println!("{:#?}, ZksendTxArgs", self);
-        let config = Config::load();
-
         //get private key
         let private_key = match &self.eth.wallet.private_key {
             Some(pkey) => {
@@ -112,31 +115,26 @@ impl ZkSendTxArgs {
             }
         };
 
-        //verify rpc url has been populated
-        if let None = &self.eth.rpc_url {
-            panic!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
-        }
+        let rpc_url = self.eth.rpc_url
+            .as_ref()
+            .expect("RPC URL was not provided. \nTry using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
 
-        //get chain
-        let chain = match self.eth.chain {
-            Some(chain) => chain,
-            None => {
-                panic!("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
-            }
-        };
+        let chain = self.eth.chain
+            .expect("Chain was not provided. \nTry using --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')");
 
-        let to_address = self.get_to_address();
-
-        let provider = try_get_http_provider(self.eth.rpc_url.as_ref().unwrap())?;
-        println!("{:#?},provider", provider);
-
-        // get signer
+        let provider = try_get_http_provider(rpc_url)?;
         let signer = Self::get_signer(private_key, &chain);
+
         // getting port error retrieving this wallet, if no port provided
-        let wallet =
-            wallet::Wallet::with_http_client("https://zksync2-testnet.zksync.dev:443", signer);
+        let wallet = wallet::Wallet::with_http_client(
+            "https://zksync2-testnet.zksync.dev:443",
+            signer,
+        );
+
+        // Alternative wallet instantiation method but having issues instantiating proper provider
         // let wallet = wallet::Wallet::new(provider, signer);
-        println!("{:#?},wallet", wallet);
+        let to_address = self.get_to_address();
+        let sender = self.eth.sender().await;
 
         if self.deposit || self.withdraw {
             // IF BRIDGING
@@ -153,13 +151,8 @@ impl ZkSendTxArgs {
                 None => Address::zero(),
             };
 
-            //get amount
-            let amount = match self.amount {
-                Some(amt) => amt,
-                None => {
-                    panic!("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )")
-                }
-            };
+            let amount = self.amount
+                .expect("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )");
 
             match wallet {
                 Ok(w) => {
@@ -167,10 +160,17 @@ impl ZkSendTxArgs {
                     if self.deposit {
                         // Build Deposit
                         let eth_provider =
-                            w.ethereum(self.eth.rpc_url.unwrap()).await.map_err(|e| e)?;
+                            w.ethereum(rpc_url).await.map_err(|e| e)?;
 
                         let tx_hash = eth_provider
-                            .deposit(token_address, amount, to_address, None, None, None)
+                            .deposit(
+                                token_address,
+                                amount,
+                                to_address,
+                                None,
+                                None,
+                                None,
+                            )
                             .await?;
 
                         println!("Transaction Hash: {:#?}", tx_hash);
@@ -184,8 +184,12 @@ impl ZkSendTxArgs {
                             .send()
                             .await
                             .unwrap();
-                        let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                        println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
+                        let tx_rcpt_commit =
+                            tx.wait_for_commit().await.unwrap();
+                        println!(
+                            "Transaction Hash: {:#?}",
+                            tx_rcpt_commit.transaction_hash
+                        );
                     }
                 }
                 Err(e) => panic!("error wallet: {e:?}"),
@@ -200,10 +204,14 @@ impl ZkSendTxArgs {
                         None => panic!("Error: Function Signature is empty"),
                     };
 
-                    let params =
-                        if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
+                    let params = if !sig.is_empty() {
+                        Some((&sig[..], self.args.clone()))
+                    } else {
+                        None
+                    };
                     let mut builder =
-                        TxBuilder::new(&provider, config.sender, self.to, chain, true).await?;
+                        TxBuilder::new(&provider, sender, self.to, chain, true)
+                            .await?;
                     builder.args(params).await?;
                     let (tx, _func) = builder.build();
                     let encoded_function_call = tx.data().unwrap().to_vec();
@@ -216,13 +224,20 @@ impl ZkSendTxArgs {
                         .await
                         .unwrap();
                     let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                    println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
+                    println!(
+                        "Transaction Hash: {:#?}",
+                        tx_rcpt_commit.transaction_hash
+                    );
 
                     for log in tx_rcpt_commit.logs {
                         if log.address == CONTRACT_DEPLOYER_ADDRESS {
                             let deployed_address = log.topics.get(3).unwrap();
-                            let deployed_address = Address::from(deployed_address.clone());
-                            println!("Deployed contract address: {:#?}", deployed_address);
+                            let deployed_address =
+                                Address::from(deployed_address.clone());
+                            println!(
+                                "Deployed contract address: {:#?}",
+                                deployed_address
+                            );
                         }
                     }
                 }
@@ -233,11 +248,19 @@ impl ZkSendTxArgs {
         Ok(())
     }
 
-    fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
+    fn get_signer(
+        private_key: H256,
+        chain: &Chain,
+    ) -> Signer<PrivateKeySigner> {
         let eth_signer = PrivateKeySigner::new(private_key);
-        let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
-            .expect("Can't get an address from the private key");
-        Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
+        let signer_addy =
+            PackedEthSignature::address_from_private_key(&private_key)
+                .expect("Can't get an address from the private key");
+        Signer::new(
+            eth_signer,
+            signer_addy,
+            L2ChainId(chain.id().try_into().unwrap()),
+        )
     }
 
     fn get_to_address(&self) -> H160 {
@@ -262,7 +285,10 @@ fn parse_decimal_u256(s: &str) -> Result<U256, String> {
 use std::{fmt::Write, num::ParseIntError};
 
 pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
 }
 
 pub fn encode_hex(bytes: &[u8]) -> String {
