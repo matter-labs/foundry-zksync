@@ -1,15 +1,12 @@
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
-use cast::TxBuilder;
 use clap::Parser;
 use ethers::types::NameOrAddress;
-use foundry_common::try_get_http_provider;
 use foundry_config::Chain;
 use zksync::types::{Address, H160, H256, U256};
 
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
 use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
 /// CLI arguments for `cast zk-deposit`.
 #[derive(Debug, Parser)]
@@ -60,23 +57,18 @@ pub struct ZkDepositTxArgs {
 
 impl ZkDepositTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        println!("{:#?}, ZkDepositTxArgs", self);
-
-        //get private key
-        let private_key = match &self.eth.wallet.private_key {
-            Some(pkey) => {
-                let decoded = match decode_hex(pkey) {
-                    Ok(val) => H256::from_slice(&val),
-                    Err(e) => {
-                        panic!("Error parsing private key {e}, make sure it is valid.")
-                    }
-                };
-                decoded
-            }
-            None => {
-                panic!("Private key was not provided. Try using --private-key flag");
-            }
-        };
+        let private_key = self
+            .eth
+            .wallet
+            .private_key
+            .as_ref()
+            .and_then(|pkey| {
+                decode_hex(pkey)
+                    .map_err(|e| format!("Error parsing private key: {}", e))
+                    .map(|val| H256::from_slice(&val))
+                    .ok()
+            })
+            .expect("Private key was not provided. Try using --private-key flag");
 
         let rpc_url = self
             .eth
@@ -89,7 +81,6 @@ impl ZkDepositTxArgs {
             .chain
             .expect("Chain was not provided. \nTry using --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')");
 
-        let provider = try_get_http_provider(rpc_url)?;
         let signer = Self::get_signer(private_key, &chain);
 
         // getting port error retrieving this wallet, if no port provided
@@ -98,7 +89,6 @@ impl ZkDepositTxArgs {
         // Alternative wallet instantiation method but having issues instantiating proper provider
         // let wallet = wallet::Wallet::new(provider, signer);
 
-        let sender = self.eth.sender().await;
         let to_address = self.get_to_address();
         let token_address: Address = match self.token {
             Some(token_addy) => token_addy,
@@ -149,7 +139,7 @@ fn parse_decimal_u256(s: &str) -> Result<U256, String> {
     }
 }
 
-use std::{fmt::Write, num::ParseIntError};
+use std::num::ParseIntError;
 
 pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()

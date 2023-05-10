@@ -33,18 +33,7 @@ pub struct ZkSendTxArgs {
         long,
         short,
         help_heading = "Bridging options",
-        help = "For L1 -> L2 deposits.",
-        conflicts_with = "withdraw",
-        group = "bridging"
-    )]
-    deposit: bool,
-
-    #[clap(
-        long,
-        short,
-        help_heading = "Bridging options",
         help = "For L2 -> L1 withdrawals.",
-        conflicts_with = "deposit",
         group = "bridging"
     )]
     withdraw: bool,
@@ -95,7 +84,6 @@ pub struct ZkSendTxArgs {
 impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
         let config = Config::load();
-
         //get private key
         let private_key = self
             .eth
@@ -126,7 +114,7 @@ impl ZkSendTxArgs {
         let sender = self.eth.sender().await;
 
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
-        if self.deposit || self.withdraw {
+        if self.withdraw {
             // IF BRIDGING
             let token_address: Address = match &self.token {
                 Some(token_addy) => {
@@ -138,13 +126,7 @@ impl ZkSendTxArgs {
                     };
                     Address::from_slice(decoded.as_slice())
                 }
-                None => {
-                    if self.deposit {
-                        L2_ETH_TOKEN_ADDRESS
-                    } else {
-                        Address::zero()
-                    }
-                }
+                None => Address::zero(),
             };
 
             //get amount
@@ -152,39 +134,25 @@ impl ZkSendTxArgs {
                 .amount
                 .expect("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )");
 
-            match &wallet {
+            match wallet {
                 Ok(w) => {
                     println!("Bridging assets....");
-                    if self.deposit {
-                        // Build Transfer //
-                        let tx = w
-                            .start_transfer()
-                            .to(to_address)
-                            .amount(amount)
-                            .token(token_address)
-                            .send()
-                            .await
-                            .unwrap();
-                        let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                        println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
-                    } else {
-                        // Build Withdraw //
-                        let tx = w
-                            .start_withdraw()
-                            .to(to_address)
-                            .amount(amount)
-                            .token(token_address)
-                            .send()
-                            .await
-                            .unwrap();
-                        let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                        println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
-                    }
+                    // Build Withdraw //
+                    let tx = w
+                        .start_withdraw()
+                        .to(to_address)
+                        .amount(amount)
+                        .token(token_address)
+                        .send()
+                        .await
+                        .unwrap();
+                    let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
+                    println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
         } else {
-            match &wallet {
+            match wallet {
                 Ok(w) => {
                     println!("Sending transaction....");
                     // Build Executor //
