@@ -6,7 +6,6 @@ use ethers::types::NameOrAddress;
 use foundry_common::try_get_http_provider;
 use foundry_config::{Chain, Config};
 use zksync::types::{Address, H160, H256, U256};
-use zksync_types::L2_ETH_TOKEN_ADDRESS;
 
 use zksync::zksync_types::{L2ChainId, PackedEthSignature};
 use zksync::{self, signer::Signer, wallet};
@@ -133,7 +132,7 @@ impl ZkSendTxArgs {
 
         // get signer
         let signer = Self::get_signer(private_key, &chain);
-        // getting port error retrieving this wallet
+        // getting port error retrieving this wallet, if no port provided
         let wallet =
             wallet::Wallet::with_http_client("https://zksync2-testnet.zksync.dev:443", signer);
         // let wallet = wallet::Wallet::new(provider, signer);
@@ -151,13 +150,7 @@ impl ZkSendTxArgs {
                     };
                     Address::from_slice(decoded.as_slice())
                 }
-                None => {
-                    if self.deposit {
-                        Address::zero()
-                    } else {
-                        Address::zero()
-                    }
-                }
+                None => Address::zero(),
             };
 
             //get amount
@@ -173,25 +166,11 @@ impl ZkSendTxArgs {
                     println!("Bridging assets....");
                     if self.deposit {
                         // Build Deposit
-                        //need ethereum provider
-                        println!("{:#?}", w);
-                        let eth_signer = w
-                            .ethereum(
-                                "https://goerli.infura.io/v3/33978c8e5245402d8c8388ddc806ef1d",
-                            )
-                            .await
-                            .map_err(|e| e)?;
+                        let eth_provider =
+                            w.ethereum(self.eth.rpc_url.unwrap()).await.map_err(|e| e)?;
 
-                        print!("{:#?}, eth_signer ", eth_signer);
-                        let tx_hash = eth_signer
-                            .deposit(
-                                token_address,
-                                self.amount.unwrap(),
-                                to_address,
-                                None,
-                                None,
-                                None,
-                            )
+                        let tx_hash = eth_provider
+                            .deposit(token_address, amount, to_address, None, None, None)
                             .await?;
 
                         println!("Transaction Hash: {:#?}", tx_hash);
