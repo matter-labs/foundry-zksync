@@ -328,6 +328,7 @@ async fn main() -> eyre::Result<()> {
         Subcommands::Run(cmd) => cmd.run()?,
         Subcommands::SendTx(cmd) => cmd.run().await?,
         Subcommands::ZkSendTx(cmd) => cmd.run().await?,
+        Subcommands::ZkDepositTx(cmd) => cmd.run().await?,
         Subcommands::Tx { rpc_url, tx_hash, field, to_json } => {
             let rpc_url = try_consume_config_rpc_url(rpc_url)?;
             let provider = try_get_http_provider(rpc_url)?;
