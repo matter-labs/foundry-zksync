@@ -73,14 +73,20 @@ impl ZkSolcOS {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManagerOpts {
-    pub version: String,
+    version: String,
+}
+
+impl ZkSolcManagerOpts {
+    pub fn new(version: String) -> Self {
+        Self { version }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManagerBuilder {
     compilers_path: Option<PathBuf>,
     // FIXME: do these really need to be public?
-    pub version: String,
+    version: String,
     compiler: Option<String>,
     pub download_url: Url,
 }

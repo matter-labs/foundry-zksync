@@ -28,10 +28,10 @@ pub struct ZkBuildArgs {
         help_heading = "ZkSync Compiler options",
         value_name = "ZK_SOLC_VERSION",
         long = "use-zksolc",
-        default_value = Some("v1.3.9")
+        default_value = "v1.3.9"
     )]
     #[serde(skip)]
-    pub use_zksolc: Option<String>,
+    pub use_zksolc: String,
 
     #[clap(
         help_heading = "ZkSync Compiler options",
@@ -67,7 +67,7 @@ impl Cmd for ZkBuildArgs {
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
 
-        let zksolc_manager_opts = ZkSolcManagerOpts { version: self.use_zksolc.unwrap() };
+        let zksolc_manager_opts = ZkSolcManagerOpts::new(self.use_zksolc);
         let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
         let zksolc_manager = &zksolc_manager_builder.build();
 
