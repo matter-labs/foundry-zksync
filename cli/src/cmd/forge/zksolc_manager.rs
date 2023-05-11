@@ -232,11 +232,10 @@ impl ZkSolcManager {
             copy(&mut response, &mut output_file)
                 .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
 
-            // FIXME: there is a performance issue in the line below
-            let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
-            // FIXME: This is a bug - can you spot it? (usually if you need to use 'let _' - then something risky might be going on)
-            let _ = fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755))
-                .map_err(|e| Error::msg(format!("Failed to set zksync compiler permissions: {e}")));
+            let compiler_path = self.compilers_path.join(self.get_full_compiler());
+            fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755)).map_err(|e| {
+                Error::msg(format!("Failed to set zksync compiler permissions: {e}"))
+            })?;
         } else {
             return Err(Error::msg(format!(
                 "Failed to download file: status code {}",
