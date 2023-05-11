@@ -88,7 +88,7 @@ pub struct ZkSolcManagerBuilder {
     // FIXME: do these really need to be public?
     version: String,
     compiler: Option<String>,
-    pub download_url: Url,
+    download_url: Url,
 }
 
 impl ZkSolcManagerBuilder {
