@@ -115,7 +115,6 @@ impl ZkSendTxArgs {
 
         let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
         if self.withdraw {
-            // IF BRIDGING
             let token_address: Address = match &self.token {
                 Some(token_addy) => {
                     let decoded = match decode_hex(token_addy) {
@@ -129,7 +128,6 @@ impl ZkSendTxArgs {
                 None => Address::zero(),
             };
 
-            //get amount
             let amount = self
                 .amount
                 .expect("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )");
@@ -159,14 +157,15 @@ impl ZkSendTxArgs {
             match wallet {
                 Ok(w) => {
                     println!("Sending transaction....");
-                    // Build Executor //
 
                     let sig = self.sig.expect("Error: Function Signature is empty");
-
                     let params = if !sig.is_empty() { Some((&sig[..], self.args)) } else { None };
+
                     let mut builder =
                         TxBuilder::new(&provider, sender, self.to, chain, true).await?;
+
                     builder.args(params).await?;
+
                     let (tx, _func) = builder.build();
                     let encoded_function_call = tx.data().unwrap().to_vec();
 
@@ -186,6 +185,7 @@ impl ZkSendTxArgs {
                     let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
                     let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
                     let block_number = rcpt.block_number.expect("Error retrieving block number");
+
                     println!("+-------------------------------------------------+");
                     println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
                     println!("Gas used: {:#?}", gas_used);
@@ -200,6 +200,8 @@ impl ZkSendTxArgs {
                             println!("Deployed contract address: {:#?}", deployed_address);
                         }
                     }
+
+                    println!("+-------------------------------------------------+");
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
@@ -233,12 +235,4 @@ use std::{fmt::Write, num::ParseIntError};
 
 pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
-}
-
-pub fn encode_hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        write!(&mut s, "{:02x}", b).unwrap();
-    }
-    s
 }
