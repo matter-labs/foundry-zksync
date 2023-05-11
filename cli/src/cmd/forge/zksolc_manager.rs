@@ -7,6 +7,8 @@ use std::io::copy;
 use std::{fmt, fs, os::unix::prelude::PermissionsExt, path::PathBuf};
 use url::Url;
 
+const ZKSOLC_DOWNLOAD_BASE_URL: &str = "https://github.com/matter-labs/zksolc-bin/raw/main";
+
 #[derive(Debug, Clone, Serialize)]
 pub enum ZkSolcVersion {
     V135,
@@ -85,7 +87,6 @@ impl ZkSolcManagerOpts {
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManagerBuilder {
     compilers_path: Option<PathBuf>,
-    // FIXME: do these really need to be public?
     version: String,
     compiler: Option<String>,
     download_url: Url,
@@ -97,8 +98,7 @@ impl ZkSolcManagerBuilder {
             compilers_path: None,
             version: opts.version,
             compiler: None,
-            // FIXME: for 'magic' strings, use constants at the top of the file.
-            download_url: Url::parse("https://github.com/matter-labs/zksolc-bin/raw/main").unwrap(),
+            download_url: Url::parse(ZKSOLC_DOWNLOAD_BASE_URL).unwrap(),
         }
     }
 
