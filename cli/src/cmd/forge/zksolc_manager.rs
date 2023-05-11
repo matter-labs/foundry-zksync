@@ -195,13 +195,10 @@ impl ZkSolcManager {
 
     pub fn exists(&self) -> bool {
         let compiler_path = self.compilers_path.join(self.clone().get_full_compiler());
-        // FIXME: change it to more rusty (using 'map')
-        if let Ok(metadata) = fs::metadata(compiler_path) {
-            if metadata.is_file() && metadata.permissions().mode() & 0o755 != 0 {
-                return true;
-            }
-        }
-        false
+
+        fs::metadata(compiler_path)
+            .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o755 != 0)
+            .unwrap_or(false)
     }
 
     pub fn check_setup_compilers_dir(&self) -> Result<()> {
