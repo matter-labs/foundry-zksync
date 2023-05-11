@@ -125,16 +125,16 @@ impl ZkSolcManagerBuilder {
         let compilers_path = home_path.to_owned();
 
         let solc_version = parse_version(&version)?;
-        return Ok(ZkSolcManager { compilers_path, version: solc_version, compiler, download_url });
+        return Ok(ZkSolcManager::new(compilers_path, solc_version, compiler, download_url));
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcManager {
-    pub compilers_path: PathBuf,
-    pub version: ZkSolcVersion,
-    pub compiler: String,
-    pub download_url: Url,
+    compilers_path: PathBuf,
+    version: ZkSolcVersion,
+    compiler: String,
+    download_url: Url,
 }
 
 impl fmt::Display for ZkSolcManager {
@@ -162,6 +162,15 @@ impl fmt::Display for ZkSolcManager {
 }
 
 impl ZkSolcManager {
+    pub fn new(
+        compilers_path: PathBuf,
+        version: ZkSolcVersion,
+        compiler: String,
+        download_url: Url,
+    ) -> Self {
+        Self { compilers_path, version, compiler, download_url }
+    }
+
     pub fn get_full_compiler(&self) -> String {
         return format!("{}{}", self.compiler, self.version.get_version());
     }
