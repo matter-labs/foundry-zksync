@@ -247,8 +247,8 @@ impl ZkSolc {
         file_output_selection.insert(
             "".to_string(),
             vec![
-                // "ast".to_string(),
                 "metadata".to_string(),
+                // "ast".to_string(),
                 // "userdoc".to_string(),
                 // "devdoc".to_string(),
                 // "storageLayout".to_string(),

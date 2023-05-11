@@ -146,8 +146,12 @@ impl ZkSendTxArgs {
                         .send()
                         .await
                         .unwrap();
-                    let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                    println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
+
+                    let rcpt = match tx.wait_for_commit().await {
+                        Ok(rcpt) => rcpt,
+                        Err(e) => eyre::bail!("Transaction Error: {}", e),
+                    };
+                    println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
@@ -173,10 +177,23 @@ impl ZkSendTxArgs {
                         .send()
                         .await
                         .unwrap();
-                    let tx_rcpt_commit = tx.wait_for_commit().await.unwrap();
-                    println!("Transaction Hash: {:#?}", tx_rcpt_commit.transaction_hash);
 
-                    for log in tx_rcpt_commit.logs {
+                    let rcpt = match tx.wait_for_commit().await {
+                        Ok(rcpt) => rcpt,
+                        Err(e) => eyre::bail!("Transaction Error: {}", e),
+                    };
+
+                    let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
+                    let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
+                    let block_number = rcpt.block_number.expect("Error retrieving block number");
+                    println!("+-------------------------------------------------+");
+                    println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
+                    println!("Gas used: {:#?}", gas_used);
+                    println!("Effective gas price: {:#?}", gas_price);
+                    println!("Block Number: {:#?}", block_number);
+                    println!("+-------------------------------------------------+");
+
+                    for log in rcpt.logs {
                         if log.address == CONTRACT_DEPLOYER_ADDRESS {
                             let deployed_address = log.topics.get(3).unwrap();
                             let deployed_address = Address::from(*deployed_address);

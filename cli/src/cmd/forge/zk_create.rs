@@ -78,18 +78,26 @@ impl ZkCreateArgs {
     /// Executes the command to create a contract
     pub async fn run(self) -> eyre::Result<()> {
         //get private key (this is redundant, could be a util perhaps)
-        let private_key = self.eth.wallet.private_key.as_ref().and_then(|pkey| {
-            decode_hex(pkey)
-                .map_err(|e| format!("Error parsing private key: {}", e))
-                .map(|val| H256::from_slice(&val))
-                .ok()
-        })
-        .expect("Private key was not provided. Try using --private-key flag");
+        let private_key = self
+            .eth
+            .wallet
+            .private_key
+            .as_ref()
+            .and_then(|pkey| {
+                decode_hex(pkey)
+                    .map_err(|e| format!("Error parsing private key: {}", e))
+                    .map(|val| H256::from_slice(&val))
+                    .ok()
+            })
+            .expect("Private key was not provided. Try using --private-key flag");
 
-        //verify rpc url has been populated
-        if self.eth.rpc_url.is_none() {
-            eyre::bail!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
-        }
+        // //verify rpc url has been populated
+        // if self.eth.rpc_url.is_none() {
+        //     eyre::bail!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+        // }
+
+        let rpc_url = self.eth.rpc_url.as_ref()
+            .expect("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
 
         let chain = self.eth.chain
             .expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
@@ -134,7 +142,7 @@ impl ZkCreateArgs {
         // encode constructor args
         let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
 
-        let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
+        let wallet = wallet::Wallet::with_http_client(rpc_url, signer);
         let deployer_builder = match &wallet {
             Ok(w) => w.start_deploy_contract(),
             Err(e) => eyre::bail!("error wallet: {e:?}"),
@@ -157,7 +165,8 @@ impl ZkCreateArgs {
                     Err(e) => eyre::bail!("Transaction Error: {}", e),
                 };
 
-                let deployed_address = rcpt.contract_address.expect("Error retrieving deployed address");
+                let deployed_address =
+                    rcpt.contract_address.expect("Error retrieving deployed address");
                 let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
                 let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
                 let block_number = rcpt.block_number.expect("Error retrieving block number");
