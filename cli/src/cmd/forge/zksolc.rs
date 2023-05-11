@@ -213,7 +213,6 @@ impl ZkSolc {
 
             let is_warning = severity.eq_ignore_ascii_case("warning");
             if is_warning {
-                // FIXME: you probably don't need a 'String' here -- str would be enough
                 let main_message = formatted_message.lines().next().unwrap_or("").to_string();
                 if !displayed_warnings.contains(&main_message) {
                     displayed_warnings.insert(main_message);
