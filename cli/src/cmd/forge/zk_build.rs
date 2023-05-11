@@ -124,6 +124,14 @@ impl Provider for ZkBuildArgs {
         let error = InvalidType(value.to_actual(), "map".into());
         let dict = value.into_dict().ok_or(error)?;
 
+        // if self.names {
+        //     dict.insert("names".to_string(), true.into());
+        // }
+
+        // if self.sizes {
+        //     dict.insert("sizes".to_string(), true.into());
+        // }
+
         Ok(Map::from([(Config::selected_profile(), dict)]))
     }
 }

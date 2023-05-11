@@ -112,7 +112,7 @@ impl ZkDepositTxArgs {
 
                 println!("Transaction Hash: {:#?}", tx_hash);
             }
-            Err(e) => panic!("error wallet: {e:?}"),
+            Err(e) => eyre::bail!("Failed to download the file: {}", e),
         }
 
         Ok(())

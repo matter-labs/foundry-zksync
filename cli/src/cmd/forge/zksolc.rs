@@ -63,18 +63,19 @@ impl ZkSolc {
     }
 
     //FIXME:  'mut self' without reference is quite strange.. are you sure?
-    pub fn compile(&mut self) -> Result<()> {
+    pub fn compile(mut self) -> Result<()> {
         self.configure_solc();
         //FIXME: Check your clones - you can probably do just a reference..
         // also - when you're already returning a result - maybe don't unwrap but '?' (with map_err to add more info if needed).
         //  also - 'as_ref' allows you to 'access the reference' of the other object.
-        let sources =
-            self.sources.as_ref().ok_or(anyhow!("Missing sources?? TODO: what does it mean?"))?;
+        let sources = self.sources.clone().unwrap();
+        // let sources =
+        //     self.sources.as_ref().ok_or(anyhow!("Missing sources?? TODO: what does it mean?"))?;
         let mut displayed_warnings = HashSet::new();
         for (solc, version) in sources {
             //configure project solc for each solc version
             // FIXME: and with the iterator - you can get access to the reference (so no copying needed)
-            for source in version.1.iter() {
+            for source in version.1 {
                 let contract_path = source.0.clone();
 
                 if let Err(err) = self.parse_json_input(contract_path.clone()) {
@@ -118,7 +119,7 @@ impl ZkSolc {
                     .last()
                     .expect("Failed to get Contract filename.");
 
-                self.write_artifacts(output, filename.to_string(), &mut displayed_warnings);
+                self.handle_output(output, filename.to_string(), &mut displayed_warnings);
             }
         }
 
@@ -129,7 +130,7 @@ impl ZkSolc {
         &mut self,
         versioned_source: (PathBuf, Source),
         solc: Solc,
-    ) -> Vec<&str> {
+    ) -> Vec<String> {
         // FIXME: this is a 'path' - so you can use 'Path' object (rather than str)
         let solc_path = solc
             .solc
@@ -139,20 +140,26 @@ impl ZkSolc {
 
         // Build compiler arguments
         // FIXME: you can use 'vec!'
-        let mut comp_args = vec!["--stardard-json", "--solc", &solc_path];
+        let mut comp_args = Vec::<String>::new();
+        comp_args.push("--standard-json".to_string());
+        comp_args.push("--solc".to_string());
+        comp_args.push(solc_path.to_owned());
+        // let mut comp_args = vec!["--stardard-json".to_string(), "--solc".to_string(), solc_path];
 
         if self.is_system || versioned_source.0.to_str().unwrap().contains("is-system") {
-            comp_args.push("--system-mode");
+            comp_args.push("--system-mode".to_string());
         }
 
         if self.force_evmla {
-            comp_args.push("--force-evmla");
+            comp_args.push("--force-evmla".to_string());
         }
         comp_args
     }
 
     // FIXME: please add comments to some functions.
-    fn write_artifacts(
+    // Handles compiler output
+    // Artifacts
+    fn handle_output(
         &self,
         output: std::process::Output,
         source: String,
