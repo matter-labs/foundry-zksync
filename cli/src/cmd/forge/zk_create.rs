@@ -1,7 +1,10 @@
 //! Create command
 
 use crate::{
-    cmd::{forge::build::CoreBuildArgs, read_constructor_args_file},
+    cmd::{
+        cast::zk_deposit::get_url_with_port, forge::build::CoreBuildArgs,
+        read_constructor_args_file,
+    },
     opts::{EthereumOpts, TransactionOpts},
 };
 use clap::{Parser, ValueHint};
@@ -91,13 +94,15 @@ impl ZkCreateArgs {
             })
             .expect("Private key was not provided. Try using --private-key flag");
 
-        // //verify rpc url has been populated
-        // if self.eth.rpc_url.is_none() {
-        //     eyre::bail!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
-        // }
+        let rpc_url = self
+            .eth
+            .rpc_url()
+            .expect("RPC URL was not provided. \nTry using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
 
-        let rpc_url = self.eth.rpc_url.as_ref()
-            .expect("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+        let rpc_url = get_url_with_port(rpc_url).expect("Invalid RPC_URL");
+
+        // let rpc_url = self.eth.rpc_url.as_ref()
+        //     .expect("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
 
         let chain = self.eth.chain
             .expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
@@ -142,7 +147,7 @@ impl ZkCreateArgs {
         // encode constructor args
         let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
 
-        let wallet = wallet::Wallet::with_http_client(rpc_url, signer);
+        let wallet = wallet::Wallet::with_http_client(&rpc_url, signer);
         let deployer_builder = match &wallet {
             Ok(w) => w.start_deploy_contract(),
             Err(e) => eyre::bail!("error wallet: {e:?}"),
