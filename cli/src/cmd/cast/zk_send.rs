@@ -85,6 +85,17 @@ pub struct ZkSendTxArgs {
 }
 
 impl ZkSendTxArgs {
+    /// Executes the arguments passed through the CLI.
+    ///
+    /// This function processes all the arguments and options passed through the CLI.
+    /// It loads the configuration, retrieves the private key and RPC URL, prepares the transaction
+    /// and sends it. It also handles the withdraw functionality.
+    ///
+    /// # Returns
+    ///
+    /// An `eyre::Result` which is:
+    /// - Ok: If the transaction or withdraw operation is successful.
+    /// - Err: If any error occurs during the operation.
     pub async fn run(self) -> eyre::Result<()> {
         let config = Config::load();
 
@@ -146,10 +157,12 @@ impl ZkSendTxArgs {
                 Ok(w) => {
                     println!("Sending transaction....");
 
+                    // Here we are constructing the parameters for the transaction
                     let sig = self.sig.as_ref().expect("Error: Function Signature is empty");
                     let params =
                         if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
 
+                    // Creating a new transaction builder
                     let mut builder =
                         TxBuilder::new(&provider, sender, self.to.clone(), chain, true).await?;
 
@@ -180,6 +193,14 @@ impl ZkSendTxArgs {
         Ok(())
     }
 
+    /// Prints the receipt of the transaction.
+    ///
+    /// This function extracts the transaction hash, gas used, effective gas price, and block number
+    /// from the receipt and prints them. It also prints the address of the deployed contract, if any.
+    ///
+    /// # Arguments
+    ///
+    /// * `rcpt` - A reference to the `TransactionReceipt`.
     fn print_receipt(&self, rcpt: &TransactionReceipt) {
         let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
         let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
@@ -202,6 +223,15 @@ impl ZkSendTxArgs {
         }
     }
 
+    /// This function gets the RPC URL for Ethereum.
+    ///
+    /// If the `eth.rpc_url` is `None`, an error is returned.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is:
+    /// - Ok: Contains the RPC URL as a String.
+    /// - Err: Contains an error message indicating that the RPC URL was not provided.
     fn get_rpc_url(&self) -> eyre::Result<String> {
         match &self.eth.rpc_url {
             Some(url) => {
@@ -213,6 +243,15 @@ impl ZkSendTxArgs {
         }
     }
 
+    /// Gets the private key from the Ethereum options.
+    ///
+    /// If the `eth.wallet.private_key` is `None`, an error is returned.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is:
+    /// - Ok: Contains the private key as `H256`.
+    /// - Err: Contains an error message indicating that the private key was not provided.
     fn get_private_key(&self) -> eyre::Result<H256> {
         match &self.eth.wallet.private_key {
             Some(pkey) => {
@@ -226,6 +265,15 @@ impl ZkSendTxArgs {
         }
     }
 
+    /// Gets the chain from the Ethereum options.
+    ///
+    /// If the `eth.chain` is `None`, an error is returned.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is:
+    /// - Ok: Contains the chain as `Chain`.
+    /// - Err: Contains an error message indicating that the chain was not provided.
     fn get_chain(&self) -> eyre::Result<Chain> {
         match &self.eth.chain {
             Some(chain) => Ok(chain.clone()),
@@ -233,6 +281,16 @@ impl ZkSendTxArgs {
         }
     }
 
+    /// Creates a signer from the private key and the chain.
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key` - A `H256` that represents the private key.
+    /// * `chain` - A reference to `Chain` that represents the chain.
+    ///
+    /// # Returns
+    ///
+    /// A `Signer` object that can be used to sign transactions.
     fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
         let eth_signer = PrivateKeySigner::new(private_key);
         let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
@@ -240,6 +298,13 @@ impl ZkSendTxArgs {
         Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
 
+    /// Gets the recipient address of the transaction.
+    ///
+    /// If the `to` field is `None`, it will panic with the message "Enter TO: Address".
+    ///
+    /// # Returns
+    ///
+    /// A `H160` object that represents the recipient's address.
     fn get_to_address(&self) -> H160 {
         let to = self.to.as_ref().expect("Enter TO: Address");
         let deployed_contract = to.as_address().expect("Invalid address").as_bytes();
@@ -247,6 +312,19 @@ impl ZkSendTxArgs {
     }
 }
 
+/// Parses a decimal string into a U256 number.
+///
+/// If the string cannot be parsed into a U256, an error message is returned.
+///
+/// # Arguments
+///
+/// * `s` - A string that represents a decimal number.
+///
+/// # Returns
+///
+/// A `Result` which is:
+/// - Ok: Contains the parsed U256 number.
+/// - Err: Contains an error message indicating that the parsing failed.
 fn parse_decimal_u256(s: &str) -> Result<U256, String> {
     match U256::from_dec_str(s) {
         Ok(value) => Ok(value),

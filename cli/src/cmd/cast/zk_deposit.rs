@@ -71,14 +71,10 @@ impl ZkDepositTxArgs {
 
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
 
-        let chain = self
-            .eth
-            .chain
-            .expect("Chain was not provided. \nTry using --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')");
+        let chain = self.get_chain()?;
 
         let signer = Self::get_signer(private_key, &chain);
 
-        // getting port error retrieving this wallet, if no port provided
         let wallet = wallet::Wallet::with_http_client(&l2_url, signer);
 
         let to_address = self.get_to_address();
@@ -120,6 +116,13 @@ impl ZkDepositTxArgs {
             None => {
                 Err(eyre::Report::msg("Private key was not provided. Try using --private-key flag"))
             }
+        }
+    }
+
+    fn get_chain(&self) -> eyre::Result<Chain> {
+        match &self.eth.chain {
+            Some(chain) => Ok(chain.clone()),
+            None => Err(eyre::Report::msg("Chain was not provided. Use --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')")),
         }
     }
 
