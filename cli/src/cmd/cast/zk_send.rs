@@ -9,7 +9,7 @@ use foundry_config::{Chain, Config};
 use zksync::{
     self,
     signer::Signer,
-    types::{Address, H160, H256, U256},
+    types::{Address, TransactionReceipt, H160, H256, U256},
     wallet,
     zksync_types::{L2ChainId, PackedEthSignature},
 };
@@ -94,17 +94,13 @@ impl ZkSendTxArgs {
 
         let chain = self.get_chain()?;
 
-        // //get chain
-        // let chain = self.eth.chain
-        //     .expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
-
-        // get signer
         let signer = Self::get_signer(private_key, &chain);
         let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
         let to_address = self.get_to_address();
         let sender = self.eth.sender().await;
 
         let wallet = wallet::Wallet::with_http_client(&rpc_url, signer);
+
         if self.withdraw {
             let token_address: Address = match &self.token {
                 Some(token_addy) => {
@@ -140,7 +136,8 @@ impl ZkSendTxArgs {
                         Ok(rcpt) => rcpt,
                         Err(e) => eyre::bail!("Transaction Error: {}", e),
                     };
-                    println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
+
+                    self.print_receipt(&rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
@@ -149,11 +146,12 @@ impl ZkSendTxArgs {
                 Ok(w) => {
                     println!("Sending transaction....");
 
-                    let sig = self.sig.expect("Error: Function Signature is empty");
-                    let params = if !sig.is_empty() { Some((&sig[..], self.args)) } else { None };
+                    let sig = self.sig.as_ref().expect("Error: Function Signature is empty");
+                    let params =
+                        if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
 
                     let mut builder =
-                        TxBuilder::new(&provider, sender, self.to, chain, true).await?;
+                        TxBuilder::new(&provider, sender, self.to.clone(), chain, true).await?;
 
                     builder.args(params).await?;
 
@@ -173,32 +171,35 @@ impl ZkSendTxArgs {
                         Err(e) => eyre::bail!("Transaction Error: {}", e),
                     };
 
-                    let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
-                    let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
-                    let block_number = rcpt.block_number.expect("Error retrieving block number");
-
-                    println!("+-------------------------------------------------+");
-                    println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
-                    println!("Gas used: {:#?}", gas_used);
-                    println!("Effective gas price: {:#?}", gas_price);
-                    println!("Block Number: {:#?}", block_number);
-                    println!("+-------------------------------------------------+");
-
-                    for log in rcpt.logs {
-                        if log.address == CONTRACT_DEPLOYER_ADDRESS {
-                            let deployed_address = log.topics.get(3).unwrap();
-                            let deployed_address = Address::from(*deployed_address);
-                            println!("Deployed contract address: {:#?}", deployed_address);
-                        }
-                    }
-
-                    println!("+-------------------------------------------------+");
+                    self.print_receipt(&rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
         }
 
         Ok(())
+    }
+
+    fn print_receipt(&self, rcpt: &TransactionReceipt) {
+        let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
+        let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
+        let block_number = rcpt.block_number.expect("Error retrieving block number");
+
+        println!("+-------------------------------------------------+");
+        println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
+        println!("Gas used: {:#?}", gas_used);
+        println!("Effective gas price: {:#?}", gas_price);
+        println!("Block Number: {:#?}", block_number);
+        println!("+-------------------------------------------------+");
+
+        for log in &rcpt.logs {
+            if log.address == CONTRACT_DEPLOYER_ADDRESS {
+                let deployed_address = log.topics.get(3).unwrap();
+                let deployed_address = Address::from(*deployed_address);
+                println!("Deployed contract address: {:#?}", deployed_address);
+                println!("+-------------------------------------------------+");
+            }
+        }
     }
 
     fn get_rpc_url(&self) -> eyre::Result<String> {
