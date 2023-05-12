@@ -79,7 +79,7 @@ impl ZkDepositTxArgs {
             .rpc_url()
             .expect("RPC URL was not provided. \nTry using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
 
-        let rpc_url = get_url_with_port(rpc_url).expect("Invalid RPC_URL");
+        let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
 
         let chain = self
             .eth
@@ -89,10 +89,7 @@ impl ZkDepositTxArgs {
         let signer = Self::get_signer(private_key, &chain);
 
         // getting port error retrieving this wallet, if no port provided
-        let wallet = wallet::Wallet::with_http_client(&self.l2_url, signer);
-
-        // Alternative wallet instantiation method but having issues instantiating proper provider
-        // let wallet = wallet::Wallet::new(provider, signer);
+        let wallet = wallet::Wallet::with_http_client(&l2_url, signer);
 
         let to_address = self.get_to_address();
         let token_address: Address = match self.token {
@@ -139,8 +136,8 @@ impl ZkDepositTxArgs {
 
 /// This function includes a default port to
 /// be compatible with jsonrpsee wallet
-fn get_url_with_port(url_string: &str) -> Option<String> {
-    let url = Url::parse(url_string).ok()?;
+pub fn get_url_with_port(url_str: &str) -> Option<String> {
+    let url = Url::parse(url_str).ok()?;
     let default_port = url.scheme() == "https" && url.port().is_none();
     let port = url.port().unwrap_or_else(|| if default_port { 443 } else { 80 });
     Some(format!("{}://{}:{}{}", url.scheme(), url.host_str()?, port, url.path()))

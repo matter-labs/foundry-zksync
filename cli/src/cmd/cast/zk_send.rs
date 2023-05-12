@@ -1,15 +1,18 @@
 // cast send subcommands
+use crate::cmd::cast::zk_deposit::get_url_with_port;
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;
 use clap::Parser;
 use ethers::types::NameOrAddress;
 use foundry_common::try_get_http_provider;
 use foundry_config::{Chain, Config};
-use zksync::types::{Address, H160, H256, U256};
-use zksync_types::L2_ETH_TOKEN_ADDRESS;
-
-use zksync::zksync_types::{L2ChainId, PackedEthSignature};
-use zksync::{self, signer::Signer, wallet};
+use zksync::{
+    self,
+    signer::Signer,
+    types::{Address, H160, H256, U256},
+    wallet,
+    zksync_types::{L2ChainId, PackedEthSignature},
+};
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
@@ -103,6 +106,13 @@ impl ZkSendTxArgs {
             eyre::bail!("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
         }
 
+        let rpc_url = self
+            .eth
+            .rpc_url()
+            .expect("RPC URL was not provided. \nTry using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+
+        let rpc_url = get_url_with_port(rpc_url).expect("Invalid RPC_URL");
+
         //get chain
         let chain = self.eth.chain
             .expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
@@ -113,7 +123,7 @@ impl ZkSendTxArgs {
         let to_address = self.get_to_address();
         let sender = self.eth.sender().await;
 
-        let wallet = wallet::Wallet::with_http_client(&self.eth.rpc_url.unwrap(), signer);
+        let wallet = wallet::Wallet::with_http_client(&rpc_url, signer);
         if self.withdraw {
             let token_address: Address = match &self.token {
                 Some(token_addy) => {
