@@ -1,4 +1,4 @@
-// cast send subcommands
+// cast zk-send subcommands
 use crate::cmd::cast::zk_deposit::get_url_with_port;
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;
@@ -16,9 +16,16 @@ use zksync::{
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
-/// CLI arguments for `cast zk-send`.
+/// CLI arguments for the `cast zk-send` subcommand.
+///
+/// This struct contains all the arguments and options that can be passed to the `zk-send` subcommand.
+/// It has methods to run the subcommand and to print the receipt of the transaction.
 #[derive(Debug, Parser)]
 pub struct ZkSendTxArgs {
+    /// The destination of the transaction.
+    ///
+    /// This field can be populated using the value parser `parse_name_or_address`.
+    /// If not provided, the value is `None`.
     #[clap(
             help = "The destination of the transaction.",
             value_parser = parse_name_or_address,
@@ -26,12 +33,17 @@ pub struct ZkSendTxArgs {
         )]
     to: Option<NameOrAddress>,
 
+    /// Signature of the function to call.
+    /// This is used when the transaction involves calling a function on a contract.
     #[clap(help = "The signature of the function to call.", value_name = "SIG")]
     sig: Option<String>,
 
+    /// Arguments for the function being called.
+    /// These are passed in order to the function specified by `sig`.
     #[clap(help = "The arguments of the function to call.", value_name = "ARGS")]
     args: Vec<String>,
 
+    /// Flag indicating whether the transaction is a Layer 2 to Layer 1 withdrawal.
     #[clap(
         long,
         short,
@@ -41,6 +53,8 @@ pub struct ZkSendTxArgs {
     )]
     withdraw: bool,
 
+    /// Token to bridge in case of L2 to L1 withdrawal.
+    /// If left blank, it will be treated as ETH.
     #[clap(
         long,
         help_heading = "Bridging options",
@@ -49,6 +63,8 @@ pub struct ZkSendTxArgs {
     )]
     token: Option<String>,
 
+    /// Amount of token to bridge in case of L2 to L1 withdrawal.
+    /// This is required when the `withdraw` flag is set.
     #[clap(
         long,
         short,
@@ -60,28 +76,13 @@ pub struct ZkSendTxArgs {
     )]
     amount: Option<U256>,
 
+    /// Options for the transaction such as gas price, nonce etc.
     #[clap(flatten)]
     tx: TransactionOpts,
 
+    /// Ethereum related options such as sender's address, private key, etc.
     #[clap(flatten)]
     eth: EthereumOpts,
-
-    #[clap(
-        short,
-        long,
-        help = "The number of confirmations until the receipt is fetched.",
-        default_value = "1",
-        value_name = "CONFIRMATIONS"
-    )]
-    confirmations: usize,
-    #[clap(long = "json", short = 'j', help_heading = "Display options")]
-    to_json: bool,
-    #[clap(
-        long = "resend",
-        help = "Reuse the latest nonce for the sender account.",
-        conflicts_with = "nonce"
-    )]
-    resend: bool,
 }
 
 impl ZkSendTxArgs {
