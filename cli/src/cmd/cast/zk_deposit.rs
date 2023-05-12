@@ -2,10 +2,14 @@ use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use clap::Parser;
 use ethers::types::NameOrAddress;
 use foundry_config::Chain;
-use zksync::types::{Address, H160, H256, U256};
-
-use zksync::zksync_types::{L2ChainId, PackedEthSignature};
-use zksync::{self, signer::Signer, wallet};
+use url::Url;
+use zksync::{
+    self,
+    signer::Signer,
+    types::{Address, H160, H256, U256},
+    wallet,
+    zksync_types::{L2ChainId, PackedEthSignature},
+};
 use zksync_eth_signer::PrivateKeySigner;
 
 /// CLI arguments for `cast zk-deposit`.
@@ -72,9 +76,10 @@ impl ZkDepositTxArgs {
 
         let rpc_url = self
             .eth
-            .rpc_url
-            .as_ref()
+            .rpc_url()
             .expect("RPC URL was not provided. \nTry using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+
+        let rpc_url = get_url_with_port(rpc_url).expect("Invalid RPC_URL");
 
         let chain = self
             .eth
@@ -132,6 +137,15 @@ impl ZkDepositTxArgs {
     }
 }
 
+/// This function includes a default port to
+/// be compatible with jsonrpsee wallet
+fn get_url_with_port(url_string: &str) -> Option<String> {
+    let url = Url::parse(url_string).ok()?;
+    let default_port = url.scheme() == "https" && url.port().is_none();
+    let port = url.port().unwrap_or_else(|| if default_port { 443 } else { 80 });
+    Some(format!("{}://{}:{}{}", url.scheme(), url.host_str()?, port, url.path()))
+}
+
 fn parse_decimal_u256(s: &str) -> Result<U256, String> {
     match U256::from_dec_str(s) {
         Ok(value) => Ok(value),
@@ -140,7 +154,6 @@ fn parse_decimal_u256(s: &str) -> Result<U256, String> {
 }
 
 use std::num::ParseIntError;
-
 pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
 }
