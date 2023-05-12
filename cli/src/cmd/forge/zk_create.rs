@@ -80,19 +80,8 @@ pub struct ZkCreateArgs {
 impl ZkCreateArgs {
     /// Executes the command to create a contract
     pub async fn run(self) -> eyre::Result<()> {
-        //get private key (this is redundant, could be a util perhaps)
-        let private_key = self
-            .eth
-            .wallet
-            .private_key
-            .as_ref()
-            .and_then(|pkey| {
-                decode_hex(pkey)
-                    .map_err(|e| format!("Error parsing private key: {}", e))
-                    .map(|val| H256::from_slice(&val))
-                    .ok()
-            })
-            .expect("Private key was not provided. Try using --private-key flag");
+        //get private key
+        let private_key = self.get_private_key()?;
 
         let rpc_url = self
             .eth
@@ -188,6 +177,19 @@ impl ZkCreateArgs {
         };
 
         Ok(())
+    }
+
+    fn get_private_key(&self) -> eyre::Result<H256> {
+        match &self.eth.wallet.private_key {
+            Some(pkey) => {
+                let val = decode_hex(pkey)
+                    .map_err(|e| eyre::Report::msg(format!("Error parsing private key: {}", e)))?;
+                Ok(H256::from_slice(&val))
+            }
+            None => {
+                Err(eyre::Report::msg("Private key was not provided. Try using --private-key flag"))
+            }
+        }
     }
 
     fn get_constructor_args(&self, abi: &Abi) -> Vec<Token> {
