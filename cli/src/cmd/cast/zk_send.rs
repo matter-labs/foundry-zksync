@@ -1,4 +1,8 @@
-// cast zk-send subcommands
+/*
+This module is responsible for handling transactions related to ZkSync. It defines the
+CLI arguments for the `cast zk-send` command and provides functionality for sending
+transactions and withdrawing from Layer 2 to Layer 1.
+*/
 use crate::cmd::cast::zk_deposit::get_url_with_port;
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;

@@ -170,6 +170,15 @@ impl ZkCreateArgs {
         Ok(())
     }
 
+    /// This function gets the RPC URL for Ethereum.
+    ///
+    /// If the `eth.rpc_url` is `None`, an error is returned.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is:
+    /// - Ok: Contains the RPC URL as a String.
+    /// - Err: Contains an error message indicating that the RPC URL was not provided.
     fn get_rpc_url(&self) -> eyre::Result<String> {
         match &self.eth.rpc_url {
             Some(url) => {
@@ -181,6 +190,15 @@ impl ZkCreateArgs {
         }
     }
 
+    /// Gets the private key from the Ethereum options.
+    ///
+    /// If the `eth.wallet.private_key` is `None`, an error is returned.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is:
+    /// - Ok: Contains the private key as `H256`.
+    /// - Err: Contains an error message indicating that the private key was not provided.
     fn get_private_key(&self) -> eyre::Result<H256> {
         match &self.eth.wallet.private_key {
             Some(pkey) => {
@@ -194,6 +212,15 @@ impl ZkCreateArgs {
         }
     }
 
+    /// Gets the chain from the Ethereum options.
+    ///
+    /// If the `eth.chain` is `None`, an error is returned.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is:
+    /// - Ok: Contains the chain as `Chain`.
+    /// - Err: Contains an error message indicating that the chain was not provided.
     fn get_chain(&self) -> eyre::Result<Chain> {
         match &self.eth.chain {
             Some(chain) => Ok(chain.clone()),
