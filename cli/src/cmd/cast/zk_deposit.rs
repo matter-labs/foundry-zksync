@@ -108,6 +108,7 @@ impl ZkDepositTxArgs {
         let wallet = wallet::Wallet::with_http_client(&l2_url, signer);
 
         let to_address = self.get_to_address();
+
         let token_address: Address = match self.token {
             Some(token_addy) => token_addy,
             None => Address::zero(),

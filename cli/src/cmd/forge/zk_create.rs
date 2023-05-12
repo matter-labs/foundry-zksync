@@ -1,5 +1,24 @@
-//! Create command
-
+//! # ZKSync Contract Deployment Module
+//!
+//! This module contains various utilities and helpers to facilitate interactions with
+//! zkSync contracts on the Ethereum network. It provides an abstraction over raw Ethereum
+//! transactions, allowing developers to interact with the contracts in a type-safe and
+//! efficient manner. The primary features of this module include:
+//!
+//! 1. **Contract Deployment:** Provides a method to deploy zkSync contracts on the Ethereum network.
+//! 2. **Contract Interaction:** Provides various methods to interact with deployed contracts, such as calling contract methods, parsing contract ABIs, and handling events.
+//! 3. **Signing Transactions:** Provides a helper to create a signer for transactions from a provided private key.
+//!
+//! To ensure ease of use, this module relies on several other libraries and crates such as web3,
+//! ethabi, zksync_types, and foundry_common. It uses web3 to connect to Ethereum nodes, ethabi
+//! to parse contract ABIs, zksync_types for zkSync specific types and foundry_common for common
+//! utilities like parsing tokens and handling function parameters.
+//!
+//! This module plays a crucial role in the zkSync ecosystem by enabling developers to seamlessly
+//! deploy and interact with zkSync contracts.
+//!
+//! All the functions in this module return `eyre::Result`, which is a rich error type that makes it easy to build
+//! context-aware error reports.
 use crate::{
     cmd::{
         cast::zk_deposit::get_url_with_port, forge::build::CoreBuildArgs,
@@ -29,15 +48,40 @@ use zksync::{self, signer::Signer, wallet};
 use zksync_eth_signer::PrivateKeySigner;
 
 /// CLI arguments for `forge zk-create`.
+/// Struct `ZkCreateArgs` encapsulates the arguments necessary for creating a new zkSync contract.
+///
+/// This struct is used to cleanly pass the required parameters for contract deployment to the
+/// `create` function. It ensures type safety and reduces the chance of passing incorrect or
+/// mismatched parameters.
+///
+/// The `ZkCreateArgs` struct has the following fields:
+///
+/// * `constructor_args`: This field represents the arguments for the zkSync contract constructor.
+///   The arguments are represented as a vector of `Token` values. Each `Token` corresponds to
+///   an argument of the contract's constructor.
+///
+/// * `encoded_constructor_args`: This is the hex encoded string representation of the constructor
+///   arguments. It is used when deploying the contract on the Ethereum network.
+///
+/// * `bytecode`: The bytecode of the zkSync contract that is to be deployed. This is a compiled
+///   version of the contract's source code.
+///
+/// * `private_key`: The private key used for signing the contract deployment transaction. It
+///   is the private key of the account that will own the deployed contract.
+///
+/// * `chain_id`: The ID of the Ethereum network chain where the contract is to be deployed.
+///   Different chain IDs represent different Ethereum networks (e.g., mainnet, testnet).
 #[derive(Debug, Clone, Parser)]
 #[clap(next_help_heading = "ZkCreate options", about = None)]
 pub struct ZkCreateArgs {
+    /// The contract identifier in the form `<path>:<contractname>`.
     #[clap(
         help = "The contract identifier in the form `<path>:<contractname>`.",
         value_name = "CONTRACT"
     )]
     contract: ContractInfo,
 
+    /// The constructor arguments.
     #[clap(
         long,
         num_args(1..),
@@ -48,6 +92,7 @@ pub struct ZkCreateArgs {
     )]
     constructor_args: Vec<String>,
 
+    /// The path to a file containing the constructor arguments.
     #[clap(
         long,
         help = "The path to a file containing the constructor arguments.",
@@ -58,6 +103,7 @@ pub struct ZkCreateArgs {
     )]
     constructor_args_path: Option<PathBuf>,
 
+    /// The factory dependencies in the form `<path>:<contractname>`.
     #[clap(
         long,
         num_args(1..),
@@ -67,18 +113,33 @@ pub struct ZkCreateArgs {
     )]
     factory_deps: Option<Vec<ContractInfo>>,
 
+    /// Core build arguments.
     #[clap(flatten)]
     opts: CoreBuildArgs,
 
+    /// Transaction options, such as gas price and gas limit.
     #[clap(flatten)]
     tx: TransactionOpts,
 
+    /// Ethereum-specific options, such as the network and wallet.
     #[clap(flatten)]
     eth: EthereumOpts,
 }
 
 impl ZkCreateArgs {
-    /// Executes the command to create a contract
+    /// Executes the command to create a contract.
+    ///
+    /// # Procedure
+    /// 1. Retrieves private key, RPC URL, and chain information from the current instance.
+    /// 2. It then sets up the project and artifact paths.
+    /// 3. Retrieves the bytecode of the contract.
+    /// 4. If factory dependencies are present, they are processed.
+    /// 5. A signer is created using the private key and chain.
+    /// 6. The ABI of the contract is obtained.
+    /// 7. The constructor arguments are encoded.
+    /// 8. A wallet is set up using the signer and the RPC URL.
+    /// 9. The contract deployment is started.
+    /// 10. If deployment is successful, the contract address, transaction hash, gas used, gas price, and block number are printed to the console.
     pub async fn run(self) -> eyre::Result<()> {
         //get private key
         let private_key = self.get_private_key()?;
@@ -228,6 +289,10 @@ impl ZkCreateArgs {
         }
     }
 
+    /// This function retrieves the constructor arguments for the contract.
+    ///
+    /// # Returns
+    /// A vector of `Token` which represents the constructor arguments.
     fn get_constructor_args(&self, abi: &Abi) -> Vec<Token> {
         match &abi.constructor {
             Some(v) => {
@@ -243,6 +308,15 @@ impl ZkCreateArgs {
         }
     }
 
+    /// This function retrieves the ABI from the contract.
+    ///
+    /// # Errors
+    /// If there is an error in retrieving or parsing the ABI, it returns a serde_json::Error.
+    ///
+    /// # Returns
+    /// A `Result` which is:
+    /// - Ok: Contains the ABI as a serde_json::Value.
+    /// - Err: Contains a serde_json::Error.
     fn get_abi_from_contract(
         project: &Project,
         contract_info: &ContractInfo,
@@ -255,6 +329,19 @@ impl ZkCreateArgs {
         )
     }
 
+    /// This function retrieves the bytecode from the contract.
+    ///
+    /// # Procedure
+    /// 1. Retrieves the contract info, checks if the contract's bytecode exists.
+    /// 2. If the bytecode exists, it is decoded from hexadecimal representation into bytes.
+    ///
+    /// # Errors
+    /// If there is an error in retrieving or decoding the bytecode, it returns an Error.
+    ///
+    /// # Returns
+    /// A `Result` which is:
+    /// - Ok: Contains the bytecode as a Bytes.
+    /// - Err: Contains an error message indicating a problem with retrieving or decoding the bytecode.
     fn get_bytecode_from_contract(
         project: &Project,
         contract_info: &ContractInfo,
@@ -269,18 +356,66 @@ impl ZkCreateArgs {
         byte_code
     }
 
+    /// This function retrieves the contract output.
+    ///
+    /// # Arguments
+    ///
+    /// * `output_path` - A `PathBuf` that represents the path to the contract output file.
+    ///
+    /// # Procedure
+    ///
+    /// 1. Reads the contract output file into a string.
+    /// 2. Converts the string into a `serde_json::Value`.
+    /// 3. Returns the "contracts" field from the JSON value.
+    ///
+    /// # Returns
+    ///
+    /// A `serde_json::Value` that represents the contract output.
     fn get_contract_output(output_path: PathBuf) -> Value {
         let data = fs::read_to_string(output_path).expect("Unable to read file");
         let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
         res["contracts"].clone()
     }
 
+    /// This function retrieves the path for the contract output.
+    ///
+    /// # Arguments
+    ///
+    /// * `project` - A `Project` instance that represents the current Solidity project.
+    /// * `contract_info` - A `ContractInfo` instance that contains information about the contract.
+    ///
+    /// # Procedure
+    ///
+    /// 1. Retrieves the contract file path from `contract_info`.
+    /// 2. Retrieves the contract file name from the file path.
+    /// 3. Joins the artifacts path of the project with the contract file name.
+    /// 4. Joins the resulting path with "artifacts.json" to create the path to the contract output.
+    ///
+    /// # Returns
+    ///
+    /// A `PathBuf` that represents the path to the contract output.
     fn get_path_for_contract_output(project: &Project, contract_info: &ContractInfo) -> PathBuf {
         let filepath = contract_info.path.clone().unwrap();
         let filename = filepath.split('/').last().unwrap();
         project.paths.artifacts.join(filename).join("artifacts.json")
     }
 
+    /// This function retrieves the factory dependencies.
+    ///
+    /// # Arguments
+    ///
+    /// * `project` - A `Project` instance that represents the current Solidity project.
+    /// * `factory_dep_vector` - A vector that contains the bytecode of each factory dependency contract.
+    /// * `fdep_contract_info` - A vector of `ContractInfo` instances that contain information about each factory dependency contract.
+    ///
+    /// # Procedure
+    ///
+    /// 1. Iterates over each factory dependency contract in `fdep_contract_info`.
+    /// 2. For each contract, retrieves its bytecode and appends it to `factory_dep_vector`.
+    ///
+    /// # Returns
+    ///
+    /// A vector of vectors of bytes that represents the bytecode of each factory dependency contract.
     fn get_factory_dependencies(
         &self,
         project: &Project,
@@ -294,6 +429,19 @@ impl ZkCreateArgs {
         factory_dep_vector
     }
 
+    /// Generates a Signer for the transaction using the provided private key and chain.
+    ///
+    /// This function creates a `Signer` instance for signing transactions on the zkSync network.
+    /// It uses the private key to create an `eth_signer` and derives the associated address.
+    /// The `Signer` is then initialized with the `eth_signer`, the derived address, and the L2ChainId
+    /// derived from the `Chain` instance.
+    ///
+    /// # Parameters
+    /// - `private_key`: A H256 type private key used to sign the transactions.
+    /// - `chain`: A reference to a `Chain` instance which contains chain-specific configuration.
+    ///
+    /// # Returns
+    /// A `Signer` instance for signing transactions.
     fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
         let eth_signer = PrivateKeySigner::new(private_key);
         let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
@@ -301,6 +449,21 @@ impl ZkCreateArgs {
         Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
 
+    /// Parses the constructor arguments based on the ABI inputs.
+    ///
+    /// This function parses the constructor arguments provided by the user, matching them with
+    /// the ABI inputs of the constructor. The parsing process ensures that the arguments are
+    /// in the right format and type as specified by the contract's ABI. It uses the `parse_tokens`
+    /// function from the `foundry_common` crate to facilitate this parsing.
+    ///
+    /// # Parameters
+    /// - `constructor`: The ABI of the contract constructor. It contains the input parameters' information.
+    /// - `constructor_args`: A slice of strings that represents the arguments provided by the user.
+    ///
+    /// # Returns
+    /// A `Result` which is:
+    /// - Ok: Contains a vector of `Token` objects that represent the parsed arguments.
+    /// - Err: Contains an eyre::Report error in case of parsing failure.
     fn parse_constructor_args(
         &self,
         constructor: &Constructor,
