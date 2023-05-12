@@ -83,18 +83,9 @@ impl ZkCreateArgs {
         //get private key
         let private_key = self.get_private_key()?;
 
-        let rpc_url = self
-            .eth
-            .rpc_url()
-            .expect("RPC URL was not provided. \nTry using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
+        let rpc_url = self.get_rpc_url()?;
 
-        let rpc_url = get_url_with_port(rpc_url).expect("Invalid RPC_URL");
-
-        // let rpc_url = self.eth.rpc_url.as_ref()
-        //     .expect("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
-
-        let chain = self.eth.chain
-            .expect("Chain was not provided. Use --chain flag (ex. --chain 270 ) or environment variable 'CHAIN= ' (ex.'CHAIN=270')");
+        let chain = self.get_chain()?;
 
         // get project
         let mut project = self.opts.project()?;
@@ -179,6 +170,17 @@ impl ZkCreateArgs {
         Ok(())
     }
 
+    fn get_rpc_url(&self) -> eyre::Result<String> {
+        match &self.eth.rpc_url {
+            Some(url) => {
+                let rpc_url = get_url_with_port(url)
+                    .ok_or_else(|| eyre::Report::msg("Invalid RPC_URL"))?;
+                Ok(rpc_url)
+            },
+            None => Err(eyre::Report::msg("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '")),
+        }
+    }
+
     fn get_private_key(&self) -> eyre::Result<H256> {
         match &self.eth.wallet.private_key {
             Some(pkey) => {
@@ -189,6 +191,13 @@ impl ZkCreateArgs {
             None => {
                 Err(eyre::Report::msg("Private key was not provided. Try using --private-key flag"))
             }
+        }
+    }
+
+    fn get_chain(&self) -> eyre::Result<Chain> {
+        match &self.eth.chain {
+            Some(chain) => Ok(chain.clone()),
+            None => Err(eyre::Report::msg("Chain was not provided. Use --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')")),
         }
     }
 
