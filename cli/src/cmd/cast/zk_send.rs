@@ -218,6 +218,7 @@ impl ZkSendTxArgs {
         println!("Block Number: {:#?}", block_number);
         println!("+-------------------------------------------------+");
 
+        // This will display a deployed contract address if one was deployed via zksend
         for log in &rcpt.logs {
             if log.address == CONTRACT_DEPLOYER_ADDRESS {
                 let deployed_address = log.topics.get(3).unwrap();
