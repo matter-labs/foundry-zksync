@@ -1,22 +1,38 @@
+/// This module contains the implementation of the `ZkSolc` struct and related types, which provide functionalities for compiling Solidity contracts using the zkSync compiler (`zksolc`).
+/// The `ZkSolc` struct wraps the `Project` struct from the `ethers` crate, which manages the project's configuration, paths, and settings.
+/// It utilizes the `solc` crate for interacting with the `zksolc` compiler and handling compilation tasks.
+///
+/// The `ZkSolc` struct represents a zkSync compiler instance and holds the following data:
+///
+/// * `project`: An instance of the `Project` struct, which manages the project's configuration, paths, and settings.
+/// * `compiler_path`: The path to the `zksolc` compiler executable.
+/// * `is_system`: A boolean flag indicating whether the compiler is a system-level installation.
+/// * `force_evmla`: A boolean flag indicating whether to force EVMLA code generation.
+/// * `standard_json`: An optional `StandardJsonCompilerInput` representing the standard JSON input for the compiler.
+/// * `sources`: An optional `BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>` containing versioned sources for the project.
+///
+/// The `ZkSolc` struct provides methods for compiling Solidity contracts, handling compiler output, and configuring the compiler.
+/// It utilizes the `ethers` and `solc` crates for interacting with the `zksolc` compiler and managing compilation tasks.
+///
+/// This module also includes the `ZkSolcOpts` struct, which represents the options for initializing a `ZkSolc` instance,
+/// and the `fmt::Display` implementation for the `ZkSolc` struct, which allows displaying a human-readable representation of the `ZkSolc` instance.
 use ansi_term::Colour::{Red, Yellow};
 use anyhow::{anyhow, Error, Result};
+use ethers::prelude::{artifacts::Source, Solc};
 use ethers::solc::{
     artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
     Graph, Project,
 };
+use semver::Version;
 use serde_json::Value;
-use std::path::PathBuf;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt, fs,
     fs::File,
     io::Write,
+    path::PathBuf,
     process::{exit, Command, Stdio},
 };
-
-use ethers::prelude::artifacts::Source;
-use ethers::prelude::Solc;
-use semver::Version;
 
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts {
@@ -25,15 +41,57 @@ pub struct ZkSolcOpts {
     pub force_evmla: bool,
 }
 
+/// The `ZkSolc` struct represents a zkSync compiler instance and provides functionalities for compiling Solidity contracts using the `zksolc` compiler.
+/// It wraps the `Project` struct from the `ethers` crate, which manages the project's configuration, paths, and settings.
+///
+/// The `ZkSolc` struct holds the following data:
+///
+/// * `project`: An instance of the `Project` struct from the `ethers` crate, which manages the project's configuration, paths, and settings.
+/// * `compiler_path`: A `PathBuf` representing the path to the `zksolc` compiler executable.
+/// * `is_system`: A boolean indicating whether the `zksolc` compiler is a system-level installation.
+/// * `force_evmla`: A boolean indicating whether to force EVMLA code generation during compilation.
+/// * `standard_json`: An optional `StandardJsonCompilerInput` representing the standard JSON input for the compiler.
+/// * `sources`: An optional `BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>` containing versioned sources for the project.
+///
+/// The `ZkSolc` struct provides methods for compiling Solidity contracts, handling compiler output, and configuring the compiler.
+/// It utilizes the `ethers` and `solc` crates for interacting with the `zksolc` compiler and managing compilation tasks.
+///
+/// The `ZkSolc` struct implements the `fmt::Display` trait to allow displaying a human-readable representation of the `ZkSolc` instance.
+/// Use `println!("{}", zk_solc)` to display the `ZkSolc` instance.
+///
+/// # Example
+///
+/// ```
+/// use std::path::PathBuf;
+/// use ethers::solc::Project;
+/// use semver::Version;
+///
+/// let project = Project::new("/path/to/project").unwrap();
+/// let compiler_path = PathBuf::from("/path/to/zksolc");
+///
+/// let zk_solc_opts = ZkSolcOpts {
+///     compiler_path,
+///     is_system: true,
+///     force_evmla: false,
+/// };
+///
+/// let zk_solc = ZkSolc::new(zk_solc_opts, project);
+///
+/// println!("ZkSolc instance: {}", zk_solc);
+/// ```
+///
+/// The example above demonstrates the usage of the `ZkSolc` struct. It creates a `Project` instance for a project located at `/path/to/project`,
+/// specifies the path to the `zksolc` compiler executable, and initializes a `ZkSolc` instance using the `ZkSolcOpts` options.
+/// It then displays the `ZkSolc` instance using the `fmt::Display` implementation.
 // FIXME: let's add some more comments to the fields (and are you sure that all of them have to be public?)
 #[derive(Debug)]
 pub struct ZkSolc {
-    pub project: Project,
-    pub compiler_path: PathBuf,
-    pub is_system: bool,
-    pub force_evmla: bool,
-    pub standard_json: Option<StandardJsonCompilerInput>,
-    pub sources: Option<BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>>,
+    project: Project,
+    compiler_path: PathBuf,
+    is_system: bool,
+    force_evmla: bool,
+    standard_json: Option<StandardJsonCompilerInput>,
+    sources: Option<BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -62,19 +120,46 @@ impl ZkSolc {
         }
     }
 
-    //FIXME:  'mut self' without reference is quite strange.. are you sure?
+    /// Compiles the Solidity contracts in the project using the configured `zksolc` compiler.
+    ///
+    /// This function performs the compilation process for the Solidity contracts in the project.
+    /// It configures the `zksolc` compiler, parses the JSON input for each contract, and runs the compilation command.
+    /// The compiler output is then handled to display any errors or warnings, and the artifacts are saved to the appropriate files.
+    ///
+    /// # Errors
+    ///
+    /// This function can return an `Error` if any of the compilation steps fail or encounter an error.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::path::PathBuf;
+    /// use ethers::solc::Project;
+    ///
+    /// let project = Project::new("/path/to/project").unwrap();
+    /// let compiler_path = PathBuf::from("/path/to/zksolc");
+    ///
+    /// let zk_solc_opts = ZkSolcOpts {
+    ///     compiler_path,
+    ///     is_system: true,
+    ///     force_evmla: false,
+    /// };
+    ///
+    /// let zk_solc = ZkSolc::new(zk_solc_opts, project);
+    ///
+    /// // Compile the Solidity contracts
+    /// zk_solc.compile().expect("Failed to compile contracts");
+    /// ```
+    ///
+    /// The example above demonstrates the usage of the `compile` function. It creates a `Project` instance for a project located at `/path/to/project`,
+    /// specifies the path to the `zksolc` compiler executable, and initializes a `ZkSolc` instance using the `ZkSolcOpts` options.
+    /// It then calls the `compile` function to perform the compilation of Solidity contracts in the project.
     pub fn compile(mut self) -> Result<()> {
         self.configure_solc();
-        //FIXME: Check your clones - you can probably do just a reference..
-        // also - when you're already returning a result - maybe don't unwrap but '?' (with map_err to add more info if needed).
-        //  also - 'as_ref' allows you to 'access the reference' of the other object.
         let sources = self.sources.clone().unwrap();
-        // let sources =
-        //     self.sources.as_ref().ok_or(anyhow!("Missing sources?? TODO: what does it mean?"))?;
         let mut displayed_warnings = HashSet::new();
         for (solc, version) in sources {
             //configure project solc for each solc version
-            // FIXME: and with the iterator - you can get access to the reference (so no copying needed)
             for source in version.1 {
                 let contract_path = source.0.clone();
 
@@ -126,12 +211,25 @@ impl ZkSolc {
         Ok(())
     }
 
+    /// Builds the compiler arguments for the specified versioned source and solc version.
+    ///
+    /// This function constructs the compiler arguments based on the provided versioned source and solc version.
+    /// It sets the necessary arguments such as `--standard-json` and `--solc`, and includes additional options
+    /// like `--system-mode` and `--force-evmla` if applicable.
+    ///
+    /// # Parameters
+    ///
+    /// * `versioned_source`: A tuple containing the path to the versioned source file and the corresponding source object.
+    /// * `solc`: The `Solc` object representing the solc version to be used.
+    ///
+    /// # Returns
+    ///
+    /// A vector of strings representing the compiler arguments.
     fn build_compiler_args(
         &mut self,
         versioned_source: (PathBuf, Source),
         solc: Solc,
     ) -> Vec<String> {
-        // FIXME: this is a 'path' - so you can use 'Path' object (rather than str)
         let solc_path = solc
             .solc
             .to_str()
@@ -139,12 +237,10 @@ impl ZkSolc {
             .to_string();
 
         // Build compiler arguments
-        // FIXME: you can use 'vec!'
         let mut comp_args = Vec::<String>::new();
         comp_args.push("--standard-json".to_string());
         comp_args.push("--solc".to_string());
         comp_args.push(solc_path.to_owned());
-        // let mut comp_args = vec!["--stardard-json".to_string(), "--solc".to_string(), solc_path];
 
         if self.is_system || versioned_source.0.to_str().unwrap().contains("is-system") {
             comp_args.push("--system-mode".to_string());
@@ -156,9 +252,28 @@ impl ZkSolc {
         comp_args
     }
 
-    // FIXME: please add comments to some functions.
-    // Handles compiler output
-    // Artifacts
+    /// Handles the output of the compiler and performs necessary processing.
+    ///
+    /// This function takes the output of the compiler as a `std::process::Output` struct,
+    /// the name of the source file, and a mutable set of displayed warnings.
+    /// It processes the compiler output, extracts bytecode hashes, and handles errors and warnings.
+    ///
+    /// The function parses the output as JSON and checks for any errors or warnings.
+    /// If errors are found, they are printed in red. If warnings are found, they are printed in yellow.
+    ///
+    /// Additionally, the function extracts bytecode hashes from the output and prints them.
+    /// It looks for the matching source file in the output JSON and retrieves the bytecode hashes.
+    /// The bytecode hashes are then printed along with their corresponding contract names.
+    ///
+    /// The function also writes the pretty-printed output JSON to the artifacts file.
+    ///
+    /// # Parameters
+    ///
+    /// * `output`: The output of the compiler as a `std::process::Output` struct.
+    /// * `source`: The name of the source file.
+    /// * `displayed_warnings`: A mutable set of displayed warnings to avoid duplicate printing.
+    ///
+    /// Note: This function is used internally by the `compile` function and is not intended to be called directly.
     fn handle_output(
         &self,
         output: std::process::Output,
@@ -197,6 +312,27 @@ impl ZkSolc {
             .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
     }
 
+    /// Handles the errors and warnings in the compiler output.
+    ///
+    /// This function takes the parsed JSON output as a reference and a mutable set of displayed warnings.
+    /// It processes the errors and warnings in the output and prints them in the appropriate color.
+    ///
+    /// The function iterates over the errors in the output JSON and extracts the severity and formatted message for each error.
+    /// If the severity is "warning", it checks if the warning has already been displayed to avoid duplicates.
+    /// If it's a new warning, it prints the formatted message in yellow using the `ansi_term` crate.
+    ///
+    /// If the severity is "error", it prints the formatted message in red using the `ansi_term` crate.
+    ///
+    /// The function tracks whether there are any errors or warnings and handles them accordingly.
+    /// If there are errors, the function exits the program with a non-zero status code.
+    /// If there are warnings, it prints a message indicating that the compilation completed with warnings.
+    ///
+    /// # Parameters
+    ///
+    /// * `output_json`: A reference to the parsed JSON output.
+    /// * `displayed_warnings`: A mutable set of displayed warnings to avoid duplicate printing.
+    ///
+    /// Note: This function is used internally by the `handle_output` function and is not intended to be called directly.
     fn handle_output_errors(&self, output_json: &Value, displayed_warnings: &mut HashSet<String>) {
         let errors = output_json
             .get("errors")
@@ -233,6 +369,25 @@ impl ZkSolc {
         }
     }
 
+    /// Parses the JSON input for the contract and performs necessary configuration.
+    ///
+    /// This function takes a mutable reference to `self` and the path to the contract file as a `PathBuf`.
+    /// It reads the standard JSON input for the contract using the `standard_json_input` method of the project.
+    /// The standard JSON input contains the necessary information for compiling the contract.
+    ///
+    /// The function sets the `standard_json` field of `self` to the parsed standard JSON input.
+    ///
+    /// Additionally, the function creates the artifacts directory and saves the JSON input to a file in the artifacts directory.
+    ///
+    /// # Parameters
+    ///
+    /// * `contract_path`: The path to the contract file as a `PathBuf`.
+    ///
+    /// # Errors
+    ///
+    /// This function can return an error if there is any issue with reading or writing files.
+    ///
+    /// Note: This function is used internally by the `compile` function and is not intended to be called directly.
     pub fn parse_json_input(&mut self, contract_path: PathBuf) -> Result<()> {
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
         file_output_selection.insert(
@@ -293,6 +448,29 @@ impl ZkSolc {
         self.sources = Some(self.get_versioned_sources().unwrap());
     }
 
+    /// Retrieves the versioned sources for the project.
+    ///
+    /// This function retrieves the versioned sources for the project by resolving the project sources using a graph.
+    /// It first retrieves the sources using the `sources` method of the project.
+    /// Then, it creates a graph and resolves the sources by calling `Graph::resolve_sources` with the project paths and sources.
+    ///
+    /// The function returns a `Result` containing a `BTreeMap` of solc versions to a tuple of version and source map.
+    /// The source map is a `BTreeMap` where the keys are paths to source files and the values are `Source` objects.
+    ///
+    /// # Errors
+    ///
+    /// This function can return an error if there is any issue with retrieving or resolving the project sources.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let versioned_sources = zk_solc.get_versioned_sources()?;
+    /// ```
+    ///
+    /// The example above demonstrates the usage of the `get_versioned_sources` function.
+    /// It calls the `get_versioned_sources` function to retrieve the versioned sources for the project.
+    ///
+    /// Note: This function is used internally by the `configure_solc` function and is not intended to be called directly.
     fn get_versioned_sources(
         &mut self,
     ) -> Result<BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>> {
@@ -318,6 +496,20 @@ impl ZkSolc {
         solc_version
     }
 
+    /// Builds the artifacts path for a given source file.
+    ///
+    /// This function takes a source file path and constructs the artifacts path where the compiled artifacts
+    /// will be stored. It appends the filename of the source file to the artifacts directory and creates the
+    /// directory structure if it doesn't exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `source`: A `PathBuf` representing the path to the source file.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the `PathBuf` of the artifacts path if successful, or an `anyhow::Error` if there
+    /// is an issue creating the artifacts directory.
     fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
         // FIXME: return error with anyhow! rather than failing (with expect)
         let filename = source.file_name().expect("Failed to get Contract filename.");
@@ -328,6 +520,19 @@ impl ZkSolc {
         Ok(path)
     }
 
+    /// Builds the artifacts file for a given source file.
+    ///
+    /// This function takes a source file path and constructs the path to the artifacts file where the compiled
+    /// artifacts will be stored. It appends the source file path to the artifacts directory and creates the file.
+    ///
+    /// # Arguments
+    ///
+    /// * `source`: A `String` representing the source file path.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `File` object representing the artifacts file if successful,
+    /// or an `anyhow::Error` if there is an issue creating the artifacts file.
     fn build_artifacts_file(&self, source: String) -> Result<File> {
         // FIXME: No need  for this local variable
         let artifacts_file =
