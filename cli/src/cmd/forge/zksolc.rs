@@ -17,7 +17,7 @@
 /// This module also includes the `ZkSolcOpts` struct, which represents the options for initializing a `ZkSolc` instance,
 /// and the `fmt::Display` implementation for the `ZkSolc` struct, which allows displaying a human-readable representation of the `ZkSolc` instance.
 use ansi_term::Colour::{Red, Yellow};
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result};
 use ethers::prelude::{artifacts::Source, Solc};
 use ethers::solc::{
     artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},

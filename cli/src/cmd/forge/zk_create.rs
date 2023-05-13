@@ -34,17 +34,18 @@ use ethers::{
 };
 use foundry_common::abi::parse_tokens;
 use foundry_config::Chain;
-
 use serde_json::Value;
-
 use std::{
     fs::{self},
     path::PathBuf,
 };
-
-use zksync::types::H256;
-use zksync::zksync_types::{L2ChainId, PackedEthSignature};
-use zksync::{self, signer::Signer, wallet};
+use zksync::{
+    self,
+    signer::Signer,
+    types::H256,
+    wallet,
+    zksync_types::{L2ChainId, PackedEthSignature},
+};
 use zksync_eth_signer::PrivateKeySigner;
 
 /// CLI arguments for `forge zk-create`.
