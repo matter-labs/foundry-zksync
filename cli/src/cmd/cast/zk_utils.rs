@@ -15,13 +15,13 @@
 ///     - `decode_hex`: Decodes a hexadecimal string into a byte vector.
 
 pub mod zk_utils {
-    use eyre::{eyre, Result};
-    use foundry_config::{Chain, Config};
+    use eyre::Result;
+    use foundry_config::Chain;
     use std::num::ParseIntError;
     use url::Url;
-    use zksync::types::{H256, U256};
+    use zksync::{signer::Signer, types::H256};
     use zksync_eth_signer::PrivateKeySigner;
-    use zksync_types::PackedEthSignature;
+    use zksync_types::{L2ChainId, PackedEthSignature};
     /// Gets the RPC URL for Ethereum.
     ///
     /// If the `eth.rpc_url` is `None`, an error is returned.
@@ -102,6 +102,26 @@ pub mod zk_utils {
                 "Chain was not provided. Use --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')",
             )),
         }
+    }
+
+    /// Creates a signer from the private key and the chain.
+    ///
+    /// /// The function uses the provided private key to create an instance of `PrivateKeySigner`.
+    /// It then uses this signer and the address derived from the private key to create a new `Signer`.
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key` - A `H256` that represents the private key.
+    /// * `chain` - A reference to `Chain` that represents the chain.
+    ///
+    /// # Returns
+    ///
+    /// A `Signer<PrivateKeySigner>` instance.
+    pub fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
+        let eth_signer = PrivateKeySigner::new(private_key);
+        let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
+            .expect("Can't get an address from the private key");
+        Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
 
     /// Decodes a hexadecimal string into a byte vector.

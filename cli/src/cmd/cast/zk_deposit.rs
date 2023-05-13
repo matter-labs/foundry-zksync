@@ -13,21 +13,16 @@
 ///     - `parse_decimal_u256`: Converts a string to a `U256` number.
 ///
 use crate::{
-    cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
+    cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_signer, get_url_with_port},
     opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts},
 };
 use clap::Parser;
 use ethers::types::NameOrAddress;
-use foundry_config::Chain;
-use url::Url;
 use zksync::{
     self,
-    signer::Signer,
-    types::{Address, H160, H256, U256},
+    types::{Address, H160, U256},
     wallet,
-    zksync_types::{L2ChainId, PackedEthSignature},
 };
-use zksync_eth_signer::PrivateKeySigner;
 
 /// Struct to represent the command line arguments for the `cast zk-deposit` command.
 ///
@@ -115,7 +110,7 @@ impl ZkDepositTxArgs {
 
         let chain = get_chain(self.eth.chain)?;
 
-        let signer = Self::get_signer(private_key, &chain);
+        let signer = get_signer(private_key, &chain);
 
         let wallet = wallet::Wallet::with_http_client(&l2_url, signer);
 
@@ -147,26 +142,6 @@ impl ZkDepositTxArgs {
         }
 
         Ok(())
-    }
-
-    /// Creates a new signer using the given private key and chain.
-    ///
-    /// The function uses the provided private key to create an instance of `PrivateKeySigner`.
-    /// It then uses this signer and the address derived from the private key to create a new `Signer`.
-    ///
-    /// # Parameters
-    ///
-    /// - `private_key`: The private key used to sign transactions.
-    /// - `chain`: The chain associated with the signer.
-    ///
-    /// # Returns
-    ///
-    /// A `Signer<PrivateKeySigner>` instance.
-    fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
-        let eth_signer = PrivateKeySigner::new(private_key);
-        let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
-            .expect("Can't get an address from the private key");
-        Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
 
     /// Retrieves the 'to' address from the command line arguments.

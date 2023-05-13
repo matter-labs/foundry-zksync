@@ -36,23 +36,18 @@
 ///
 /// The `print_receipt` method extracts relevant information from the transaction receipt and prints it to the console.
 /// This includes the transaction hash, gas used, effective gas price, block number, and deployed contract address, if applicable.
-///
-/// The helper functions `get_url_with_port`, `get_chain`, `get_private_key`, and `get_rpc_url` retrieve the URL
-use crate::cmd::cast::zk_utils::zk_utils::{
-    get_chain, get_private_key, get_rpc_url, get_url_with_port,
-};
+use crate::cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_signer};
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;
 use clap::Parser;
 use ethers::types::NameOrAddress;
 use foundry_common::try_get_http_provider;
-use foundry_config::{Chain, Config};
+use foundry_config::Config;
 use zksync::{
     self,
     signer::Signer,
-    types::{Address, TransactionReceipt, H160, H256, U256},
+    types::{Address, TransactionReceipt, H160, U256},
     wallet,
-    zksync_types::{L2ChainId, PackedEthSignature},
 };
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::CONTRACT_DEPLOYER_ADDRESS;
@@ -147,7 +142,7 @@ impl ZkSendTxArgs {
 
         let chain = get_chain(self.eth.chain)?;
 
-        let signer = Self::get_signer(private_key, &chain);
+        let signer: Signer<PrivateKeySigner> = get_signer(private_key, &chain);
         let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
         let to_address = self.get_to_address();
         let sender = self.eth.sender().await;
@@ -266,22 +261,22 @@ impl ZkSendTxArgs {
         }
     }
 
-    /// Creates a signer from the private key and the chain.
-    ///
-    /// # Arguments
-    ///
-    /// * `private_key` - A `H256` that represents the private key.
-    /// * `chain` - A reference to `Chain` that represents the chain.
-    ///
-    /// # Returns
-    ///
-    /// A `Signer` object that can be used to sign transactions.
-    fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
-        let eth_signer = PrivateKeySigner::new(private_key);
-        let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
-            .expect("Can't get an address from the private key");
-        Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
-    }
+    // /// Creates a signer from the private key and the chain.
+    // ///
+    // /// # Arguments
+    // ///
+    // /// * `private_key` - A `H256` that represents the private key.
+    // /// * `chain` - A reference to `Chain` that represents the chain.
+    // ///
+    // /// # Returns
+    // ///
+    // /// A `Signer` object that can be used to sign transactions.
+    // fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
+    //     let eth_signer = PrivateKeySigner::new(private_key);
+    //     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
+    //         .expect("Can't get an address from the private key");
+    //     Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
+    // }
 
     /// Gets the recipient address of the transaction.
     ///

@@ -43,7 +43,7 @@
 /// - `zksync`
 use crate::{
     cmd::{
-        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
+        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url},
         forge::build::CoreBuildArgs,
         read_constructor_args_file,
     },
