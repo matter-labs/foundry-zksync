@@ -1,8 +1,27 @@
-/*
-This module is responsible for handling transactions related to ZkSync. It defines the
-CLI arguments for the `cast zk-send` command and provides functionality for sending
-transactions and withdrawing from Layer 2 to Layer 1.
-*/
+/// This module handles transactions related to ZkSync. It defines the
+/// CLI arguments for the `cast zk-send` command and provides functionality for sending
+/// transactions and withdrawing from Layer 2 to Layer 1.
+///
+/// The module contains the following components:
+/// - `ZkSendTxArgs`: Struct representing the command line arguments for the `cast zk-send` subcommand.
+///     It includes parameters such as the destination address, function signature, function arguments,
+///     withdraw flag, token to bridge, amount to bridge, transaction options, and Ethereum options.
+/// - `ZkSendTxArgs` implementation: Defines methods to run the subcommand and print the transaction receipt.
+/// - Helper functions:
+///     - `print_receipt`: Prints the receipt of the transaction, including transaction hash, gas used,
+///         effective gas price, block number, and deployed contract address.
+///     - `get_rpc_url`: Retrieves the RPC URL for Ethereum from the options.
+///     - `get_private_key`: Retrieves the private key from the Ethereum options.
+///     - `get_chain`: Retrieves the chain from the Ethereum options.
+///     - `get_signer`: Creates a signer from the private key and chain.
+///     - `get_to_address`: Retrieves the recipient address of the transaction.
+///     - `parse_decimal_u256`: Parses a decimal string into a U256 number.
+///     - `decode_hex`: Decodes a hexadecimal string into a byte vector.
+///
+/// Usage:
+/// The `ZkSendTxArgs` struct is used to define and parse command line arguments for the `cast zk-send` command.
+/// It also provides the `run` method for executing the transaction and the `print_receipt` method for printing
+/// the transaction receipt.
 use crate::cmd::cast::zk_deposit::get_url_with_port;
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;
