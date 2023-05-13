@@ -21,7 +21,7 @@
 //! context-aware error reports.
 use crate::{
     cmd::{
-        cast::zk_deposit::get_url_with_port, forge::build::CoreBuildArgs,
+        cast::zk_utils::zk_utils::get_url_with_port, forge::build::CoreBuildArgs,
         read_constructor_args_file,
     },
     opts::{EthereumOpts, TransactionOpts},

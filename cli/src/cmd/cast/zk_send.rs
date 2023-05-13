@@ -1,28 +1,46 @@
-/// This module handles transactions related to ZkSync. It defines the
-/// CLI arguments for the `cast zk-send` command and provides functionality for sending
-/// transactions and withdrawing from Layer 2 to Layer 1.
+/// This module handles transactions related to ZkSync. It provides functionality for sending transactions
+/// and withdrawing from Layer 2 to Layer 1. The module also defines the command-line arguments for the
+/// `cast zk-send` subcommand.
 ///
-/// The module contains the following components:
-/// - `ZkSendTxArgs`: Struct representing the command line arguments for the `cast zk-send` subcommand.
-///     It includes parameters such as the destination address, function signature, function arguments,
-///     withdraw flag, token to bridge, amount to bridge, transaction options, and Ethereum options.
-/// - `ZkSendTxArgs` implementation: Defines methods to run the subcommand and print the transaction receipt.
+/// The module consists of the following components:
+/// - Helper functions for interacting with ZkSync and Ethereum:
+///   - `get_url_with_port`: Retrieves the URL with port from the `zk_deposit` module.
+///   - `get_chain`, `get_private_key`, `get_rpc_url`: Retrieves chain, private key, and RPC URL from the `zk_utils` module.
+/// - Struct `ZkSendTxArgs` representing the command-line arguments for the `cast zk-send` subcommand:
+///   - `to`: The destination of the transaction. Accepts address or name.
+///   - `sig`: Signature of the function to call when interacting with a contract.
+///   - `args`: Arguments for the function being called.
+///   - `withdraw`: Flag indicating if the transaction is a Layer 2 to Layer 1 withdrawal.
+///   - `token`: Token to bridge in case of withdrawal. Defaults to ETH if not provided.
+///   - `amount`: Amount of token to bridge in case of withdrawal.
+///   - `tx`: Transaction options such as gas price, nonce, etc.
+///   - `eth`: Ethereum options such as sender's address, private key, etc.
+/// - Implementation of the `ZkSendTxArgs` struct with methods:
+///   - `run`: Executes the command-line arguments, loads the configuration, retrieves private key and RPC URL,
+///     prepares and sends the transaction, and handles withdrawals.
+///   - `print_receipt`: Prints the receipt of the transaction, including transaction hash, gas used, effective gas price,
+///     block number, and deployed contract address.
+///   - `get_signer`: Creates a signer from the private key and chain.
+///   - `get_to_address`: Retrieves the recipient address of the transaction.
 /// - Helper functions:
-///     - `print_receipt`: Prints the receipt of the transaction, including transaction hash, gas used,
-///         effective gas price, block number, and deployed contract address.
-///     - `get_rpc_url`: Retrieves the RPC URL for Ethereum from the options.
-///     - `get_private_key`: Retrieves the private key from the Ethereum options.
-///     - `get_chain`: Retrieves the chain from the Ethereum options.
-///     - `get_signer`: Creates a signer from the private key and chain.
-///     - `get_to_address`: Retrieves the recipient address of the transaction.
-///     - `parse_decimal_u256`: Parses a decimal string into a U256 number.
-///     - `decode_hex`: Decodes a hexadecimal string into a byte vector.
+///   - `parse_decimal_u256`: Parses a decimal string into a `U256` number.
+///   - `decode_hex`: Decodes a hexadecimal string into a byte vector.
 ///
 /// Usage:
-/// The `ZkSendTxArgs` struct is used to define and parse command line arguments for the `cast zk-send` command.
-/// It also provides the `run` method for executing the transaction and the `print_receipt` method for printing
-/// the transaction receipt.
-use crate::cmd::cast::zk_deposit::get_url_with_port;
+/// The `ZkSendTxArgs` struct is used to define and parse command-line arguments for the `cast zk-send` command.
+/// It provides the `run` method to execute the transaction and the `print_receipt` method to print the transaction receipt.
+///
+/// The `run` method processes the command-line arguments, loads the configuration, retrieves the private key and RPC URL,
+/// prepares the transaction, and sends it. If the transaction is a Layer 2 to Layer 1 withdrawal, it handles the withdrawal operation.
+/// The method returns an `eyre::Result` indicating the success or failure of the transaction.
+///
+/// The `print_receipt` method extracts relevant information from the transaction receipt and prints it to the console.
+/// This includes the transaction hash, gas used, effective gas price, block number, and deployed contract address, if applicable.
+///
+/// The helper functions `get_url_with_port`, `get_chain`, `get_private_key`, and `get_rpc_url` retrieve the URL
+use crate::cmd::cast::zk_utils::zk_utils::{
+    get_chain, get_private_key, get_rpc_url, get_url_with_port,
+};
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;
 use clap::Parser;
@@ -123,11 +141,11 @@ impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
         let config = Config::load();
 
-        let private_key = self.get_private_key()?;
+        let private_key = get_private_key(&self.eth.wallet.private_key)?;
 
-        let rpc_url = self.get_rpc_url()?;
+        let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
 
-        let chain = self.get_chain()?;
+        let chain = get_chain(self.eth.chain)?;
 
         let signer = Self::get_signer(private_key, &chain);
         let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
@@ -245,64 +263,6 @@ impl ZkSendTxArgs {
                 println!("Deployed contract address: {:#?}", deployed_address);
                 println!("+-------------------------------------------------+");
             }
-        }
-    }
-
-    /// This function gets the RPC URL for Ethereum.
-    ///
-    /// If the `eth.rpc_url` is `None`, an error is returned.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` which is:
-    /// - Ok: Contains the RPC URL as a String.
-    /// - Err: Contains an error message indicating that the RPC URL was not provided.
-    fn get_rpc_url(&self) -> eyre::Result<String> {
-        match &self.eth.rpc_url {
-            Some(url) => {
-                let rpc_url = get_url_with_port(url)
-                    .ok_or_else(|| eyre::Report::msg("Invalid RPC_URL"))?;
-                Ok(rpc_url)
-            },
-            None => Err(eyre::Report::msg("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '")),
-        }
-    }
-
-    /// Gets the private key from the Ethereum options.
-    ///
-    /// If the `eth.wallet.private_key` is `None`, an error is returned.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` which is:
-    /// - Ok: Contains the private key as `H256`.
-    /// - Err: Contains an error message indicating that the private key was not provided.
-    fn get_private_key(&self) -> eyre::Result<H256> {
-        match &self.eth.wallet.private_key {
-            Some(pkey) => {
-                let val = decode_hex(pkey)
-                    .map_err(|e| eyre::Report::msg(format!("Error parsing private key: {}", e)))?;
-                Ok(H256::from_slice(&val))
-            }
-            None => {
-                Err(eyre::Report::msg("Private key was not provided. Try using --private-key flag"))
-            }
-        }
-    }
-
-    /// Gets the chain from the Ethereum options.
-    ///
-    /// If the `eth.chain` is `None`, an error is returned.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` which is:
-    /// - Ok: Contains the chain as `Chain`.
-    /// - Err: Contains an error message indicating that the chain was not provided.
-    fn get_chain(&self) -> eyre::Result<Chain> {
-        match &self.eth.chain {
-            Some(chain) => Ok(chain.clone()),
-            None => Err(eyre::Report::msg("Chain was not provided. Use --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')")),
         }
     }
 

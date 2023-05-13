@@ -11,9 +11,11 @@
 /// - Helper functions:
 ///     - `get_url_with_port`: Parses a URL string and attaches a default port if one is not specified.
 ///     - `parse_decimal_u256`: Converts a string to a `U256` number.
-///     - `decode_hex`: Decodes a hexadecimal string into a byte vector.
 ///
-use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
+use crate::{
+    cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
+    opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts},
+};
 use clap::Parser;
 use ethers::types::NameOrAddress;
 use foundry_config::Chain;
@@ -102,7 +104,7 @@ impl ZkDepositTxArgs {
     /// - Err: If an error occurred during the execution of the deposit transaction.
     pub async fn run(self) -> eyre::Result<()> {
         //get private key
-        let private_key = self.get_private_key()?;
+        let private_key = get_private_key(&self.eth.wallet.private_key)?;
 
         let rpc_url = self
             .eth
@@ -111,7 +113,7 @@ impl ZkDepositTxArgs {
 
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
 
-        let chain = self.get_chain()?;
+        let chain = get_chain(self.eth.chain)?;
 
         let signer = Self::get_signer(private_key, &chain);
 
@@ -145,44 +147,6 @@ impl ZkDepositTxArgs {
         }
 
         Ok(())
-    }
-
-    /// Gets the private key from the Ethereum options.
-    ///
-    /// If the `eth.wallet.private_key` is `None`, an error is returned.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` which is:
-    /// - Ok: Contains the private key as `H256`.
-    /// - Err: Contains an error message indicating that the private key was not provided.
-    fn get_private_key(&self) -> eyre::Result<H256> {
-        match &self.eth.wallet.private_key {
-            Some(pkey) => {
-                let val = decode_hex(pkey)
-                    .map_err(|e| eyre::Report::msg(format!("Error parsing private key: {}", e)))?;
-                Ok(H256::from_slice(&val))
-            }
-            None => {
-                Err(eyre::Report::msg("Private key was not provided. Try using --private-key flag"))
-            }
-        }
-    }
-
-    /// Gets the chain from the Ethereum options.
-    ///
-    /// If the `eth.chain` is `None`, an error is returned.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` which is:
-    /// - Ok: Contains the chain as `Chain`.
-    /// - Err: Contains an error message indicating that the chain was not provided.
-    fn get_chain(&self) -> eyre::Result<Chain> {
-        match &self.eth.chain {
-            Some(chain) => Ok(chain.clone()),
-            None => Err(eyre::Report::msg("Chain was not provided. Use --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')")),
-        }
     }
 
     /// Creates a new signer using the given private key and chain.
@@ -220,28 +184,6 @@ impl ZkDepositTxArgs {
     }
 }
 
-/// Parses a URL string and attaches a default port if one is not specified.
-///
-/// This function takes a URL string as input and attempts to parse it.
-/// If the URL string is not a valid URL, the function returns `None`.
-/// If the URL is valid and has a specified port, the function returns the URL as is.
-/// If the URL is valid but does not have a specified port, the function attaches a default port.
-/// The default port is 443 if the URL uses the HTTPS scheme, and 80 otherwise.
-///
-/// # Parameters
-///
-/// - `url_str`: The URL string to parse.
-///
-/// # Returns
-///
-/// An `Option` which contains a String with the parsed URL if successful, or `None` if the input was not a valid URL.
-pub fn get_url_with_port(url_str: &str) -> Option<String> {
-    let url = Url::parse(url_str).ok()?;
-    let default_port = url.scheme() == "https" && url.port().is_none();
-    let port = url.port().unwrap_or_else(|| if default_port { 443 } else { 80 });
-    Some(format!("{}://{}:{}{}", url.scheme(), url.host_str()?, port, url.path()))
-}
-
 /// Converts a string to a `U256` number.
 ///
 /// The function takes a string as input and attempts to parse it as a decimal `U256` number.
@@ -261,9 +203,4 @@ fn parse_decimal_u256(s: &str) -> Result<U256, String> {
         Ok(value) => Ok(value),
         Err(e) => Err(format!("Failed to parse decimal number: {}", e)),
     }
-}
-
-use std::num::ParseIntError;
-pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
 }
