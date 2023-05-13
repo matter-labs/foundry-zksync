@@ -165,16 +165,10 @@ impl ZkCreateArgs {
     /// 9. The contract deployment is started.
     /// 10. If deployment is successful, the contract address, transaction hash, gas used, gas price, and block number are printed to the console.
     pub async fn run(self) -> eyre::Result<()> {
-        //get private key
         let private_key = get_private_key(&self.eth.wallet.private_key)?;
-
         let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
-
         let chain = get_chain(self.eth.chain)?;
-
-        // get project
         let mut project = self.opts.project()?;
-        // set out folder path
         project.paths.artifacts = project.paths.root.join("zkout");
 
         let bytecode = match Self::get_bytecode_from_contract(&project, &self.contract) {

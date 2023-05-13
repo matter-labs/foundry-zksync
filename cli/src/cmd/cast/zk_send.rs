@@ -261,23 +261,6 @@ impl ZkSendTxArgs {
         }
     }
 
-    // /// Creates a signer from the private key and the chain.
-    // ///
-    // /// # Arguments
-    // ///
-    // /// * `private_key` - A `H256` that represents the private key.
-    // /// * `chain` - A reference to `Chain` that represents the chain.
-    // ///
-    // /// # Returns
-    // ///
-    // /// A `Signer` object that can be used to sign transactions.
-    // fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
-    //     let eth_signer = PrivateKeySigner::new(private_key);
-    //     let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
-    //         .expect("Can't get an address from the private key");
-    //     Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
-    // }
-
     /// Gets the recipient address of the transaction.
     ///
     /// If the `to` field is `None`, it will panic with the message "Enter TO: Address".
