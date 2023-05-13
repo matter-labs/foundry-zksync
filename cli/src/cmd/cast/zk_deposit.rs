@@ -1,8 +1,18 @@
-/*
-This module is responsible for handling transactions related to ZkSync.
-It defines the CLI arguments for the `cast zk-deposit` command and provides functionality
-for depositing assets into a zkSync contract.
-*/
+/// This module handles Bridging assets to ZkSync from Layer 1.
+/// It defines the CLI arguments for the `cast zk-deposit` command and provides functionality
+/// for depositing assets onto zkSync.
+///
+/// The module contains the following components:
+/// - `ZkDepositTxArgs`: Struct representing the command line arguments for the `cast zk-deposit` command.
+///     It includes parameters such as the destination address, amount to deposit, bridge address,
+///     operator tip, zkSync RPC endpoint, and token to bridge.
+/// - `ZkDepositTxArgs` implementation: Defines methods for executing the deposit transaction based on the provided
+///     command line arguments.
+/// - Helper functions:
+///     - `get_url_with_port`: Parses a URL string and attaches a default port if one is not specified.
+///     - `parse_decimal_u256`: Converts a string to a `U256` number.
+///     - `decode_hex`: Decodes a hexadecimal string into a byte vector.
+///
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use clap::Parser;
 use ethers::types::NameOrAddress;
