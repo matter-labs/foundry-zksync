@@ -1,28 +1,34 @@
-/// The `zkbuild` module provides functionalities to build zkSync contracts with a specified Solidity compiler version.
+/// The `zkbuild` module provides comprehensive functionality for the compilation of zkSync
+/// smart contracts with a specified Solidity compiler version.
 ///
-/// This module consists of several important structures and their corresponding implementations:
+/// This module consists of the following key structures and their corresponding implementations:
 ///
-/// * `ZkBuildArgs`: This structure encapsulates the parameters required for building zkSync contracts, including the
-///   Solidity compiler version, whether to enable the system contract compilation mode, and whether to forcibly switch
-///   to the EVM legacy assembly pipeline. It also includes core build arguments defined in the `CoreBuildArgs` structure.
+/// * `ZkBuildArgs`: This structure encapsulates the parameters necessary for building zkSync
+///   contracts. These parameters include the Solidity compiler version, an option to enable the
+///   system contract compilation mode, and an option to forcibly switch to the EVM legacy assembly
+///   pipeline. Additionally, it includes core build arguments defined in the `CoreBuildArgs`
+///   structure.
 ///
-/// * This implementation includes a `run` function, which triggers the
-///   compilation process of zkSync contracts. It handles the downloading of the zksolc compiler,
-///   setting up the compiler directory, and invoking the compilation process.
+/// * `Cmd` Implementation for `ZkBuildArgs`: This implementation includes a `run` function, which
+///   initiates the zkSync contract compilation process. The `run` function takes care of the
+///   various steps involved in the process, including downloading the zksolc compiler, setting up
+///   the compiler directory, and invoking the compilation process.
 ///
-/// This module facilitates the zkSync contract compilation process. It provides a way for
-/// developers to specify the compiler version and compilation options, and it handles the underlying tasks necessary
-/// to compile the contracts. This includes downloading the specified compiler version if it's not already present,
-/// preparing the compiler's directory, and finally invoking the compilation process with the specified options.
+/// This module serves as a facilitator for the zkSync contract compilation process. It allows
+/// developers to specify the compiler version and compilation options and handles the intricate
+/// tasks necessary for contract compilation. This includes downloading the specified compiler
+/// version if it's not already available, preparing the compiler's directory, and finally, invoking
+/// the compilation process with the provided options.
 ///
-/// This module is part of a larger framework for managing and interacting with zkSync contracts.
-use std::fmt::Debug;
-
+/// The `zkbuild` module is part of a larger framework aimed at managing and interacting with zkSync
+/// contracts. It is designed to provide a seamless experience for developers, providing an
+/// easy-to-use interface for contract compilation while taking care of the underlying complexities.
 use super::build::CoreBuildArgs;
 use super::zksolc::{ZkSolc, ZkSolcOpts};
-use super::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
+use super::zksolc_manager::{ZkSolcManager, ZkSolcManagerBuilder, ZkSolcManagerOpts};
 use crate::cmd::{Cmd, LoadConfig};
 use clap::Parser;
+use ethers::prelude::Project;
 use foundry_config::{
     figment::{
         self,
@@ -33,6 +39,7 @@ use foundry_config::{
     Config,
 };
 use serde::Serialize;
+use std::fmt::Debug;
 
 foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 
@@ -40,12 +47,19 @@ foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 ///
 /// This includes:
 /// * `use_zksolc`: The version of the Solidity compiler (solc) to be used for compilation, or the path to a local solc.
-///   The values can be in the format `x.y.z`, `solc:x.y.z`, or `path/to/solc`.
+///   The values can be in the format `x.y.z`, `solc:x.y.z`, or `path/to/solc`. It is used to specify the compiler
+///   version or location, which is crucial for the contract building process.
+///
 /// * `is_system`: A boolean flag indicating whether to enable the system contract compilation mode. In this mode,
-///   zkEVM extensions are enabled, for example, calls to addresses `0xFFFF` and below are substituted by special zkEVM instructions.
+///   zkEVM extensions are enabled, for example, calls to addresses `0xFFFF` and below are substituted by special
+///   zkEVM instructions. This option is used when we want to compile system contracts.
+///
 /// * `force_evmla`: A boolean flag indicating whether to forcibly switch to the EVM legacy assembly pipeline. This is
-///   useful for older revisions of `solc` 0.8, where Yul was considered highly experimental and contained more bugs than today.
-/// * `args`: Core build arguments encapsulated in the `CoreBuildArgs` struct.
+///   useful for older revisions of `solc` 0.8, where Yul was considered highly experimental and contained more bugs
+///   than today. This flag allows us to use the EVM legacy assembly pipeline, which can be beneficial in certain situations.
+///
+/// * `args`: Core build arguments encapsulated in the `CoreBuildArgs` struct. These include additional parameters
+///   required for building the contract, such as optimization level, output directory etc.
 ///
 /// This struct is used as input to the `ZkSolc` compiler, which will use these arguments to configure the compilation process.
 /// It implements the `Cmd` trait, which triggers the compilation process when the `run` function is called. The struct also
@@ -65,6 +79,7 @@ pub struct ZkBuildArgs {
     #[serde(skip)]
     pub use_zksolc: String,
 
+    /// A flag indicating whether to enable the system contract compilation mode.
     #[clap(
         help_heading = "ZkSync Compiler options",
         help = "Enable the system contract compilation mode. In this mode zkEVM extensions are enabled. For example, calls
@@ -74,6 +89,7 @@ pub struct ZkBuildArgs {
     )]
     pub is_system: bool,
 
+    /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
     #[clap(
         help_heading = "ZkSync Compiler options",
         help = "Forcibly switch to the EVM legacy assembly pipeline. It is useful for older revisions of `solc` 0.8, where
@@ -83,6 +99,7 @@ pub struct ZkBuildArgs {
     )]
     pub force_evmla: bool,
 
+    /// Core build arguments encapsulated in the `CoreBuildArgs` struct.
     #[clap(flatten)]
     #[serde(flatten)]
     pub args: CoreBuildArgs,
@@ -106,7 +123,6 @@ impl Cmd for ZkBuildArgs {
     /// The method returns `Ok(())` if the entire process completes successfully, or an error if any step in the process fails.
     /// The purpose of this function is to consolidate all steps involved in the zkSync contract compilation process in a single method,
     /// allowing for easy invocation of the process with a single function call.
-
     fn run(self) -> eyre::Result<()> {
         let config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
@@ -115,49 +131,74 @@ impl Cmd for ZkBuildArgs {
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
 
-        let zksolc_manager_opts = ZkSolcManagerOpts::new(self.use_zksolc);
+        let zksolc_manager = self.setup_zksolc_manager()?;
+
+        println!("Compiling smart contracts...");
+        self.compile_smart_contracts(zksolc_manager, project)
+    }
+}
+
+impl ZkBuildArgs {
+    /// The `setup_zksolc_manager` function creates and prepares an instance of `ZkSolcManager`.
+    ///
+    /// It follows these steps:
+    /// 1. Instantiate `ZkSolcManagerOpts` and `ZkSolcManagerBuilder` with the specified zkSync Solidity compiler.
+    /// 2. Create a `ZkSolcManager` using the builder.
+    /// 3. Check if the setup compilers directory is properly set up. If not, it raises an error.
+    /// 4. If the zkSync Solidity compiler does not exist in the compilers directory, it triggers its download.
+    ///
+    /// The function returns the `ZkSolcManager` if all steps are successful, or an error if any step fails.
+    fn setup_zksolc_manager(&self) -> eyre::Result<ZkSolcManager> {
+        let zksolc_manager_opts = ZkSolcManagerOpts::new(self.use_zksolc.clone());
         let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
-        let zksolc_manager = &zksolc_manager_builder.build();
+        let zksolc_manager = zksolc_manager_builder
+            .build()
+            .map_err(|e| eyre::eyre!("Error building zksolc_manager: {}", e))?;
 
-        match zksolc_manager {
-            Ok(zksolc_manager) => {
-                if let Err(err) = zksolc_manager.check_setup_compilers_dir() {
-                    eyre::bail!("Failed to setup compilers directory: {}", err);
-                }
-
-                if !zksolc_manager.exists() {
-                    println!("Downloading zksolc compiler");
-
-                    match zksolc_manager.download() {
-                        Ok(zksolc_manager) => zksolc_manager,
-                        Err(err) => {
-                            eyre::bail!("Failed to download the file: {}", err);
-                        }
-                    }
-                }
-
-                println!("Compiling smart contracts...");
-
-                let zksolc_opts = ZkSolcOpts {
-                    compiler_path: zksolc_manager.get_full_compiler_path(),
-                    //we may not add these yet as they may be file specific
-                    is_system: self.is_system,
-                    force_evmla: self.force_evmla,
-                };
-
-                let zksolc = ZkSolc::new(zksolc_opts, project);
-
-                match zksolc.compile() {
-                    Ok(_) => println!("Compiled Successfully"),
-                    Err(err) => {
-                        eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
-                    }
-                }
-            }
-            Err(e) => eyre::bail!("Error building zksolc_manager: {}", e),
+        if let Err(err) = zksolc_manager.check_setup_compilers_dir() {
+            eyre::bail!("Failed to setup compilers directory: {}", err);
         }
 
-        Ok(())
+        if !zksolc_manager.exists() {
+            println!("Downloading zksolc compiler");
+            zksolc_manager
+                .download()
+                .map_err(|err| eyre::eyre!("Failed to download the file: {}", err))?;
+        }
+
+        Ok(zksolc_manager)
+    }
+
+    /// The `compile_smart_contracts` function initiates the contract compilation process.
+    ///
+    /// It follows these steps:
+    /// 1. Create an instance of `ZkSolcOpts` with the appropriate options.
+    /// 2. Instantiate `ZkSolc` with the created options and the project.
+    /// 3. Initiate the contract compilation process.
+    ///
+    /// The function returns `Ok(())` if the compilation process completes successfully, or an error if it fails.
+    fn compile_smart_contracts(
+        &self,
+        zksolc_manager: ZkSolcManager,
+        project: Project,
+    ) -> eyre::Result<()> {
+        let zksolc_opts = ZkSolcOpts {
+            compiler_path: zksolc_manager.get_full_compiler_path(),
+            is_system: self.is_system,
+            force_evmla: self.force_evmla,
+        };
+
+        let zksolc = ZkSolc::new(zksolc_opts, project);
+
+        match zksolc.compile() {
+            Ok(_) => {
+                println!("Compiled Successfully");
+                Ok(())
+            }
+            Err(err) => {
+                eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
+            }
+        }
     }
 }
 
