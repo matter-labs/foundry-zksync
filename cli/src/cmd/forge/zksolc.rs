@@ -535,10 +535,8 @@ impl ZkSolc {
     /// or an `anyhow::Error` if there is an issue creating the artifacts file.
     fn build_artifacts_file(&self, source: String) -> Result<File> {
         // FIXME: No need  for this local variable
-        let artifacts_file =
-            File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
-                .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))?;
 
-        Ok(artifacts_file)
+        File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
+            .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))
     }
 }
