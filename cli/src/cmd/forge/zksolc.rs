@@ -511,9 +511,7 @@ impl ZkSolc {
     /// A `Result` containing the `PathBuf` of the artifacts path if successful, or an `anyhow::Error` if there
     /// is an issue creating the artifacts directory.
     fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
-        // FIXME: return error with anyhow! rather than failing (with expect)
         let filename = source.file_name().expect("Failed to get Contract filename.");
-
         let path = self.project.paths.artifacts.join(filename);
         fs::create_dir_all(&path)
             .map_err(|e| Error::msg(format!("Could not create artifacts directory: {}", e)))?;
@@ -534,8 +532,6 @@ impl ZkSolc {
     /// A `Result` containing a `File` object representing the artifacts file if successful,
     /// or an `anyhow::Error` if there is an issue creating the artifacts file.
     fn build_artifacts_file(&self, source: String) -> Result<File> {
-        // FIXME: No need  for this local variable
-
         File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
             .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))
     }
