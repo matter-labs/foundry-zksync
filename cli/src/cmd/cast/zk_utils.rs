@@ -106,8 +106,10 @@ pub mod zk_utils {
 
     /// Creates a signer from the private key and the chain.
     ///
-    /// /// The function uses the provided private key to create an instance of `PrivateKeySigner`.
-    /// It then uses this signer and the address derived from the private key to create a new `Signer`.
+    /// This function creates a `Signer` instance for signing transactions on the zkSync network.
+    /// It uses the private key to create an `pk_signer` and derives the associated address.
+    /// The `Signer` is then initialized with the `pk_signer`, the derived address, and the L2ChainId
+    /// derived from the `Chain` instance.
     ///
     /// # Arguments
     ///
@@ -118,10 +120,10 @@ pub mod zk_utils {
     ///
     /// A `Signer<PrivateKeySigner>` instance.
     pub fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
-        let eth_signer = PrivateKeySigner::new(private_key);
+        let pk_signer = PrivateKeySigner::new(private_key);
         let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
             .expect("Can't get an address from the private key");
-        Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
+        Signer::new(pk_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
 
     /// Decodes a hexadecimal string into a byte vector.

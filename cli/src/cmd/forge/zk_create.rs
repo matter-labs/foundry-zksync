@@ -43,7 +43,7 @@
 /// - `zksync`
 use crate::{
     cmd::{
-        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url},
+        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_signer},
         forge::build::CoreBuildArgs,
         read_constructor_args_file,
     },
@@ -56,20 +56,9 @@ use ethers::{
     types::Bytes,
 };
 use foundry_common::abi::parse_tokens;
-use foundry_config::Chain;
 use serde_json::Value;
-use std::{
-    fs::{self},
-    path::PathBuf,
-};
-use zksync::{
-    self,
-    signer::Signer,
-    types::H256,
-    wallet,
-    zksync_types::{L2ChainId, PackedEthSignature},
-};
-use zksync_eth_signer::PrivateKeySigner;
+use std::{fs, path::PathBuf};
+use zksync::wallet;
 
 /// CLI arguments for `forge zk-create`.
 /// Struct `ZkCreateArgs` encapsulates the arguments necessary for creating a new zkSync contract.
@@ -186,7 +175,7 @@ impl ZkCreateArgs {
         }
 
         // get signer
-        let signer = Self::get_signer(private_key, &chain);
+        let signer = get_signer(private_key, &chain);
 
         // get abi
         let abi = match Self::get_abi_from_contract(&project, &self.contract) {
@@ -387,26 +376,6 @@ impl ZkCreateArgs {
             factory_dep_vector.push(dep_bytecode.to_vec());
         }
         factory_dep_vector
-    }
-
-    /// Generates a Signer for the transaction using the provided private key and chain.
-    ///
-    /// This function creates a `Signer` instance for signing transactions on the zkSync network.
-    /// It uses the private key to create an `eth_signer` and derives the associated address.
-    /// The `Signer` is then initialized with the `eth_signer`, the derived address, and the L2ChainId
-    /// derived from the `Chain` instance.
-    ///
-    /// # Parameters
-    /// - `private_key`: A H256 type private key used to sign the transactions.
-    /// - `chain`: A reference to a `Chain` instance which contains chain-specific configuration.
-    ///
-    /// # Returns
-    /// A `Signer` instance for signing transactions.
-    fn get_signer(private_key: H256, chain: &Chain) -> Signer<PrivateKeySigner> {
-        let eth_signer = PrivateKeySigner::new(private_key);
-        let signer_addy = PackedEthSignature::address_from_private_key(&private_key)
-            .expect("Can't get an address from the private key");
-        Signer::new(eth_signer, signer_addy, L2ChainId(chain.id().try_into().unwrap()))
     }
 
     /// Parses the constructor arguments based on the ABI inputs.

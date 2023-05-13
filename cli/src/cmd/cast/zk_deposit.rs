@@ -13,7 +13,9 @@
 ///     - `parse_decimal_u256`: Converts a string to a `U256` number.
 ///
 use crate::{
-    cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_signer, get_url_with_port},
+    cmd::cast::zk_utils::zk_utils::{
+        get_chain, get_private_key, get_rpc_url, get_signer, get_url_with_port,
+    },
     opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts},
 };
 use clap::Parser;
@@ -101,24 +103,13 @@ impl ZkDepositTxArgs {
     /// - Ok: If the deposit transaction is successfully completed.
     /// - Err: If an error occurred during the execution of the deposit transaction.
     pub async fn run(self) -> eyre::Result<()> {
-        //get private key
         let private_key = get_private_key(&self.eth.wallet.private_key)?;
-
-        let rpc_url = self
-            .eth
-            .rpc_url()
-            .expect("RPC URL was not provided. \nTry using --rpc-url flag or environment variable 'ETH_RPC_URL= '");
-
+        let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
-
         let chain = get_chain(self.eth.chain)?;
-
         let signer = get_signer(private_key, &chain);
-
         let wallet = wallet::Wallet::with_http_client(&l2_url, signer);
-
         let to_address = self.get_to_address();
-
         let token_address: Address = match self.token {
             Some(token_addy) => token_addy,
             None => Address::zero(),
