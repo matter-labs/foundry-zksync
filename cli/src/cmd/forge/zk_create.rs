@@ -1,27 +1,50 @@
-//! # ZKSync Contract Deployment Module
-//!
-//! This module contains various utilities and helpers to facilitate interactions with
-//! zkSync contracts on the Ethereum network. It provides an abstraction over raw Ethereum
-//! transactions, allowing developers to interact with the contracts in a type-safe and
-//! efficient manner. The primary features of this module include:
-//!
-//! 1. **Contract Deployment:** Provides a method to deploy zkSync contracts on the Ethereum network.
-//! 2. **Contract Interaction:** Provides various methods to interact with deployed contracts, such as calling contract methods, parsing contract ABIs, and handling events.
-//! 3. **Signing Transactions:** Provides a helper to create a signer for transactions from a provided private key.
-//!
-//! To ensure ease of use, this module relies on several other libraries and crates such as web3,
-//! ethabi, zksync_types, and foundry_common. It uses web3 to connect to Ethereum nodes, ethabi
-//! to parse contract ABIs, zksync_types for zkSync specific types and foundry_common for common
-//! utilities like parsing tokens and handling function parameters.
-//!
-//! This module plays a crucial role in the zkSync ecosystem by enabling developers to seamlessly
-//! deploy and interact with zkSync contracts.
-//!
-//! All the functions in this module return `eyre::Result`, which is a rich error type that makes it easy to build
-//! context-aware error reports.
+/// ZKSync Contract Deployment Module
+/// This module encapsulates the logic required for contract deployment, including:
+/// - Retrieving the contract bytecode and ABI from the Solidity project
+/// - Encoding the constructor arguments
+/// - Signing the deployment transaction
+/// - Handling the deployment process
+///
+/// This module plays a crucial role in the zkSync ecosystem by enabling developers to seamlessly
+/// deploy and interact with zkSync contracts.
+///
+/// The main struct in this module is `ZkCreateArgs`, which represents the command-line arguments
+/// for the `forge zk-create` command. It contains fields such as:
+/// - The contract identifier
+/// - Constructor arguments
+/// - Transaction options
+/// - Ethereum-specific options
+///
+/// The `ZkCreateArgs` struct implements methods to:
+/// - Execute the deployment process
+/// - Deploy the contract on the Ethereum network
+///
+/// Additionally, this module provides several helper functions to assist with the contract deployment, including:
+/// - Retrieving the bytecode and ABI of the contract from the Solidity project
+/// - Parsing and encoding the constructor arguments
+/// - Creating a signer for transaction signing
+/// - Handling factory dependencies, if any
+///
+/// The contract deployment process involves:
+/// 1. Setting up the project
+/// 2. Retrieving the contract bytecode and ABI
+/// 3. Parsing and encoding the constructor arguments
+/// 4. Creating a signer with the provided private key and chain information
+/// 5. Initializing a wallet for deployment
+/// 6. Sending the deployment transaction to the Ethereum network
+/// 7. Printing contract address, transaction hash, gas used, gas price, and block number if the deployment is successful
+///
+/// To use the `forge zk-create` command:
+/// 1. Parse the command-line arguments using the `ZkCreateArgs::parse()` method
+/// 2. Execute the deployment process by calling the `run()` method on the parsed arguments
+///
+/// It's worth noting that this module relies on the following crates for interacting with Ethereum and zkSync:
+/// - `ethers`
+/// - `zksync`
 use crate::{
     cmd::{
-        cast::zk_utils::zk_utils::get_url_with_port, forge::build::CoreBuildArgs,
+        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
+        forge::build::CoreBuildArgs,
         read_constructor_args_file,
     },
     opts::{EthereumOpts, TransactionOpts},
@@ -143,11 +166,11 @@ impl ZkCreateArgs {
     /// 10. If deployment is successful, the contract address, transaction hash, gas used, gas price, and block number are printed to the console.
     pub async fn run(self) -> eyre::Result<()> {
         //get private key
-        let private_key = self.get_private_key()?;
+        let private_key = get_private_key(&self.eth.wallet.private_key)?;
 
-        let rpc_url = self.get_rpc_url()?;
+        let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
 
-        let chain = self.get_chain()?;
+        let chain = get_chain(self.eth.chain)?;
 
         // get project
         let mut project = self.opts.project()?;
@@ -230,64 +253,6 @@ impl ZkCreateArgs {
         };
 
         Ok(())
-    }
-
-    /// This function gets the RPC URL for Ethereum.
-    ///
-    /// If the `eth.rpc_url` is `None`, an error is returned.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` which is:
-    /// - Ok: Contains the RPC URL as a String.
-    /// - Err: Contains an error message indicating that the RPC URL was not provided.
-    fn get_rpc_url(&self) -> eyre::Result<String> {
-        match &self.eth.rpc_url {
-            Some(url) => {
-                let rpc_url = get_url_with_port(url)
-                    .ok_or_else(|| eyre::Report::msg("Invalid RPC_URL"))?;
-                Ok(rpc_url)
-            },
-            None => Err(eyre::Report::msg("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '")),
-        }
-    }
-
-    /// Gets the private key from the Ethereum options.
-    ///
-    /// If the `eth.wallet.private_key` is `None`, an error is returned.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` which is:
-    /// - Ok: Contains the private key as `H256`.
-    /// - Err: Contains an error message indicating that the private key was not provided.
-    fn get_private_key(&self) -> eyre::Result<H256> {
-        match &self.eth.wallet.private_key {
-            Some(pkey) => {
-                let val = decode_hex(pkey)
-                    .map_err(|e| eyre::Report::msg(format!("Error parsing private key: {}", e)))?;
-                Ok(H256::from_slice(&val))
-            }
-            None => {
-                Err(eyre::Report::msg("Private key was not provided. Try using --private-key flag"))
-            }
-        }
-    }
-
-    /// Gets the chain from the Ethereum options.
-    ///
-    /// If the `eth.chain` is `None`, an error is returned.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` which is:
-    /// - Ok: Contains the chain as `Chain`.
-    /// - Err: Contains an error message indicating that the chain was not provided.
-    fn get_chain(&self) -> eyre::Result<Chain> {
-        match &self.eth.chain {
-            Some(chain) => Ok(chain.clone()),
-            None => Err(eyre::Report::msg("Chain was not provided. Use --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')")),
-        }
     }
 
     /// This function retrieves the constructor arguments for the contract.
@@ -479,18 +444,4 @@ impl ZkCreateArgs {
 
         parse_tokens(params, true)
     }
-}
-
-use std::{fmt::Write, num::ParseIntError};
-
-pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
-}
-
-pub fn encode_hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        write!(&mut s, "{:02x}", b).unwrap();
-    }
-    s
 }
