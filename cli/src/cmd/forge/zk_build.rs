@@ -1,3 +1,21 @@
+/// The `zkbuild` module provides functionalities to build zkSync contracts with a specified Solidity compiler version.
+///
+/// This module consists of several important structures and their corresponding implementations:
+///
+/// * `ZkBuildArgs`: This structure encapsulates the parameters required for building zkSync contracts, including the
+///   Solidity compiler version, whether to enable the system contract compilation mode, and whether to forcibly switch
+///   to the EVM legacy assembly pipeline. It also includes core build arguments defined in the `CoreBuildArgs` structure.
+///
+/// * This implementation includes a `run` function, which triggers the
+///   compilation process of zkSync contracts. It handles the downloading of the zksolc compiler,
+///   setting up the compiler directory, and invoking the compilation process.
+///
+/// This module facilitates the zkSync contract compilation process. It provides a way for
+/// developers to specify the compiler version and compilation options, and it handles the underlying tasks necessary
+/// to compile the contracts. This includes downloading the specified compiler version if it's not already present,
+/// preparing the compiler's directory, and finally invoking the compilation process with the specified options.
+///
+/// This module is part of a larger framework for managing and interacting with zkSync contracts.
 use std::fmt::Debug;
 
 use super::build::CoreBuildArgs;
@@ -18,6 +36,20 @@ use serde::Serialize;
 
 foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 
+/// The `ZkBuildArgs` struct encapsulates the parameters required for the zkSync contract compilation process.
+///
+/// This includes:
+/// * `use_zksolc`: The version of the Solidity compiler (solc) to be used for compilation, or the path to a local solc.
+///   The values can be in the format `x.y.z`, `solc:x.y.z`, or `path/to/solc`.
+/// * `is_system`: A boolean flag indicating whether to enable the system contract compilation mode. In this mode,
+///   zkEVM extensions are enabled, for example, calls to addresses `0xFFFF` and below are substituted by special zkEVM instructions.
+/// * `force_evmla`: A boolean flag indicating whether to forcibly switch to the EVM legacy assembly pipeline. This is
+///   useful for older revisions of `solc` 0.8, where Yul was considered highly experimental and contained more bugs than today.
+/// * `args`: Core build arguments encapsulated in the `CoreBuildArgs` struct.
+///
+/// This struct is used as input to the `ZkSolc` compiler, which will use these arguments to configure the compilation process.
+/// It implements the `Cmd` trait, which triggers the compilation process when the `run` function is called. The struct also
+/// implements the `Provider` trait, allowing it to be converted into a form that can be merged into the application's configuration object.
 #[derive(Debug, Clone, Parser, Serialize, Default)]
 #[clap(next_help_heading = "ZkBuild options", about = None)]
 pub struct ZkBuildArgs {
@@ -58,6 +90,22 @@ pub struct ZkBuildArgs {
 
 impl Cmd for ZkBuildArgs {
     type Output = ();
+
+    /// Executes the zkSync contract compilation process based on the parameters encapsulated in the `ZkBuildArgs` instance.
+    ///
+    /// This method performs the following steps:
+    /// 1. Tries to load the application's configuration, emitting warnings if any issues are encountered.
+    /// 2. Modifies the project's artifact path to be the "zkout" directory in the project's root directory.
+    /// 3. Creates a `ZkSolcManager` instance based on the specified zkSync Solidity compiler (`use_zksolc` field in `ZkBuildArgs`).
+    /// 4. Checks if the setup compilers directory is properly set up. If not, it raises an error and halts execution.
+    /// 5. If the zkSync Solidity compiler does not exist in the compilers directory, it triggers its download.
+    /// 6. Initiates the contract compilation process using the `ZkSolc` compiler. This process is configured with the
+    ///    `is_system` and `force_evmla` parameters from the `ZkBuildArgs` instance, and the path to the zkSync Solidity compiler.
+    /// 7. If the compilation process fails, it raises an error and halts execution.
+    ///
+    /// The method returns `Ok(())` if the entire process completes successfully, or an error if any step in the process fails.
+    /// The purpose of this function is to consolidate all steps involved in the zkSync contract compilation process in a single method,
+    /// allowing for easy invocation of the process with a single function call.
 
     fn run(self) -> eyre::Result<()> {
         let config = self.try_load_config_emit_warnings()?;
