@@ -48,6 +48,52 @@ pub struct ZkSolcOpts {
     pub force_evmla: bool,
 }
 
+/// This struct represents the ZkSolc compiler for compiling Solidity contracts.
+///
+/// Key Components:
+/// - Manages project details, including paths and configurations.
+/// - Stores the compiler path.
+/// - Provides a comprehensive interface for compiling Solidity contracts using the ZkSolc compiler.
+///
+/// Struct Members:
+/// - `project`: Represents the project details and configurations.
+/// - `compiler_path`: The path to the ZkSolc compiler executable.
+/// - `is_system`: A flag indicating whether the compiler is in system mode.
+/// - `force_evmla`: A flag indicating whether to force EVMLA optimization.
+/// - `standard_json`: An optional field to store the parsed standard JSON input for the contracts.
+/// - `sources`: An optional field to store the versioned sources for the contracts.
+///
+/// Functionality:
+/// - `new`: Constructs a new `ZkSolc` instance using the provided compiler path, project
+///   configurations, and options.
+/// - `compile`: Responsible for compiling the contracts in the project's 'sources' directory
+///   and its subdirectories.
+///
+/// Error Handling:
+/// - The methods in this struct return the `Result` type from the `anyhow` crate for flexible
+///   and easy-to-use error handling.
+///
+/// Example Usage:
+/// ```rust
+/// use zk_solc::{ZkSolc, Project};
+///
+/// // Set the compiler path and other options
+/// let compiler_path = "/path/to/zksolc";
+/// let project = Project::new(...);
+///
+/// // Initialize the ZkSolc compiler
+/// let zksolc = ZkSolc::new(compiler_path, project);
+///
+/// // Compile the contracts
+/// if let Err(err) = zksolc.compile() {
+///     eprintln!("Failed to compile contracts: {}", err);
+///     // Handle the error
+/// }
+/// ```
+///
+/// In this example, the `ZkSolc` compiler is initialized with the provided compiler path and
+/// project configurations. The `compile` method is then invoked to compile the contracts, and any
+/// resulting errors are handled accordingly.
 // FIXME: let's add some more comments to the fields (and are you sure that all of them have to be public?)
 #[derive(Debug)]
 pub struct ZkSolc {
@@ -613,6 +659,36 @@ impl ZkSolc {
         solc_version
     }
 
+    /// Builds the path for saving the artifacts (compiler output) of a contract based on the contract's source file.
+    /// The function performs the following steps to construct the artifacts path:
+    ///
+    /// # Workflow:
+    /// 1. Extract Filename:
+    ///    - The function extracts the filename from the provided contract source path using the `file_name` method.
+    ///    - If the extraction of the filename fails, an error is returned.
+    ///
+    /// 2. Build Artifacts Path:
+    ///    - The function constructs the artifacts path by joining the extracted filename with the project's artifacts directory path.
+    ///    - The `join` method is used on the `artifacts` directory path, passing the extracted filename.
+    ///
+    /// 3. Create Artifacts Directory:
+    ///    - The function creates the artifacts directory and all its parent directories using the `create_dir_all` method from the `fs` module.
+    ///    - If the creation of the artifacts directory fails, an error is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `ZkSolc` instance.
+    /// * `source` - The contract source path represented as a `PathBuf`.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the constructed artifacts path (`PathBuf`) on success, or an `anyhow::Error` on failure.
+    ///
+    /// # Errors
+    ///
+    /// This function can return an error if any of the following occurs:
+    /// - The extraction of the filename from the contract source path fails.
+    /// - The creation of the artifacts directory fails.
     fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
         let filename = source.file_name().expect("Failed to get Contract filename.");
         let path = self.project.paths.artifacts.join(filename);
@@ -621,6 +697,30 @@ impl ZkSolc {
         Ok(path)
     }
 
+    /// Builds the file path for the artifacts (compiler output) of a contract based on the contract's source file and the project's artifacts directory.
+    /// The function performs the following steps to construct the artifacts file path:
+    ///
+    /// # Workflow:
+    /// 1. Build Artifacts File Path:
+    ///    - The function constructs the file path for the artifacts file by joining the project's artifacts directory path, the contract's source file path, and the "artifacts.json" filename.
+    ///    - The `join` method is used on the artifacts directory path, passing the contract's source file path joined with the "artifacts.json" filename.
+    ///
+    /// 2. Create Artifacts File:
+    ///    - The function creates the artifacts file at the constructed file path using the `create` method from the `File` struct.
+    ///    - If the creation of the artifacts file fails, an error is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A reference to the `ZkSolc` instance.
+    /// * `source` - The contract source file represented as a `String`.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the created `File` object on success, or an `anyhow::Error` on failure.
+    ///
+    /// # Errors
+    ///
+    /// This function can return an error if the creation of the artifacts file fails.
     fn build_artifacts_file(&self, source: String) -> Result<File> {
         File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
             .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))
