@@ -36,7 +36,9 @@
 ///
 /// The `print_receipt` method extracts relevant information from the transaction receipt and prints it to the console.
 /// This includes the transaction hash, gas used, effective gas price, block number, and deployed contract address, if applicable.
-use crate::cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_signer};
+use crate::cmd::cast::zk_utils::zk_utils::{
+    decode_hex, get_chain, get_private_key, get_rpc_url, get_signer,
+};
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;
 use clap::Parser;
@@ -293,9 +295,4 @@ fn parse_decimal_u256(s: &str) -> Result<U256, String> {
         Ok(value) => Ok(value),
         Err(e) => Err(format!("Failed to parse decimal number: {}", e)),
     }
-}
-
-use std::num::ParseIntError;
-pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
 }
