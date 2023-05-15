@@ -44,8 +44,6 @@ pub struct ZkDepositTxArgs {
 
     /// The amount of the token to deposit.
     #[clap(
-        long,
-        short,
         help = "Amount of token to deposit.",
         value_name = "AMOUNT",
         value_parser = parse_decimal_u256

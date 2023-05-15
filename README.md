@@ -24,10 +24,9 @@ Currently only Hardhat has developed functionality for zkSync. The purpose of th
 
 ### Quick Start / Installation
 
-Clone these three repos to the same directory:
+Clone these two repos to the same directory:
 
 - [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync) - this is our application, we will be building this in the following steps
-- [**zksync-era**](https://github.com/sammyshakes/zksync-era) - this is the SDK repo, we need to pull this locally to repair broken dependencies
 - [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project) - this is the sample project that contains the smart contract to be compiled
 
 
@@ -36,8 +35,6 @@ Clone these three repos to the same directory:
 $ mkdir fzksync && cd fzksync
 # clone foundry-zksync
 $ git clone https://github.com/matter-labs/foundry-zksync.git 
-# clone zksync-era
-$ git clone https://github.com/sammyshakes/zksync-era.git
 # clone fzksync-project
 $ git clone https://github.com/sammyshakes/sample-fzksync-project.git
 # cd into foundry-zksync and build
@@ -144,32 +141,71 @@ l1BatchTimestamp     null
 
 ---
 
-## Bridging Assets with `zkcast zk-send`
+## Bridging Assets L1 ↔ L2 
 
-### Bridge assets L1 ↔ L2 with `--deposit` and `---withdraw`
+### Bridge assets L1 ↔ L2 with `zkcast zk-send` and `zkcast zk-deposit`
+
+
+### ***L1 → L2 deposits:*** 
 
 ```bash
-../foundry-zksync/target/debug/zkcast zk-send --help
+zkcast zk-deposit --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
 ```
+NOTE: Leave `<TOKEN>` blank to bridge ETH
 
 ```bash
-Sign and publish a zksync transaction.
-
-Usage: zkcast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
+Usage: zkcast zk-deposit  <TO> <AMOUNT> --rpc-url <ETH_RPC_URL> --l2-url <L2URL> [OPTIONS] [BRIDGE] [TIP]
 
 Arguments:
-  [TO]                  The destination of the transaction.
+  <TO>
+          The destination of the transaction.
 
-  [SIG]                 The signature of the function to call.
+  <AMOUNT>
+          Amount of token to deposit.
 
-  [ARGS]...             The arguments of the function to call.
+  [BRIDGE]
+          The address of a custom bridge to call.
+
+  [TIP]
+          Optional fee that the user can choose to pay in addition to the regular transaction fee.
 
 Options:
-  -h, --help            Print help (see a summary with '-h')
+  -z, --l2-url <L2URL>
+          The zkSync RPC Layer 2 endpoint. Can be provided via the env var ZKSYNC_RPC_URL or --l2-url from the command line.
+          
+          NOTE: For Deposits, ETH_RPC_URL, or --rpc-url should be set to the Layer 1 RPC URL
+          
+          [env: ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev]
+
+      --token <TOKEN>
+          Token to bridge. Leave blank for ETH.
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+#### Example Usage
+```bash
+../foundry-zksync/target/debug/zkcast zkdeposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+#### Output
+```js
+Bridging assets....
+Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
+```
+---
+
+### ***L2 → L1 withdrawals:***
+
+```bash
+zkcast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+
+
+Arguments:
+  [TO]                  The withdraw recipient.
+
 
 Bridging options:
-  -d, --deposit         For L1 -> L2 deposits.
-
   -w, --withdraw        For L2 -> L1 withdrawals.
 
       --token <TOKEN>   Token to bridge. Leave blank for ETH.
@@ -177,27 +213,6 @@ Bridging options:
   -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
 ```
 
-### ***L1 → L2 deposits:*** [Work In Progress]
-
-```bash
-zkcast zk-send --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
-```
-NOTE: Leave `<TOKEN>` blank to bridge ETH
-
-#### Example Usage
-```bash
-../foundry-zksync/target/debug/zkcast zk-send --deposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
-```
-#### Output
-```js
-Bridging assets....
-Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
-```
-
-### ***L2 → L1 withdrawals:***
-
-```bash
-zkcast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
 ```
 #### Example Usage
 ```bash
@@ -516,7 +531,7 @@ constructor(bytes32 _aaBytecodeHash) {
 
 ```bash
 # command line using zkforge zk-create
-../foundry-zksync/target/debug/zkforge zkc src/AAFactory.sol:AAFactory --constructor-args 010007572230f4df5b4e855ff48d4cdfffc9405522117d7e020ee42650223460 --factory-deps src/TwoUserMultiSig.sol:TwoUserMultisig --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+../foundry-zksync/target/debug/zkforge zkc src/is-system/AAFactory.sol:AAFactory --constructor-args 010007572230f4df5b4e855ff48d4cdfffc9405522117d7e020ee42650223460 --factory-deps src/TwoUserMultiSig.sol:TwoUserMultisig --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
 #### Output:
@@ -544,7 +559,7 @@ owner1 = 0xa61464658AfeAf65CccaaFD3a512b69A83B77618
 owner2 = 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
 ```
 
-We are also just using a `0x00` value for the ***salt*** parameter.
+We are also just using a `0x00` value for the ***salt*** parameter. (you will need a unique value for salt for each instance that uses same owner wallets)
 ```bash
 # command line using zkcast zk-send
 ../foundry-zksync/target/debug/zkcast zk-send 0xd5608cec132ed4875d19f8d815ec2ac58498b4e5 "deployAccount(bytes32,address,address)(address)" 0x00 0xa61464658AfeAf65CccaaFD3a512b69A83B77618 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
