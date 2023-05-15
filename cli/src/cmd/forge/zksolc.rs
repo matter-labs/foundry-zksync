@@ -31,7 +31,6 @@ use ethers::solc::{
 };
 use semver::Version;
 use serde_json::Value;
-use std::path::Path;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt, fs,
