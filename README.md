@@ -66,6 +66,9 @@ By providing the following environment variables in the `.env` file at the `PROJ
 # ETH_RPC_URL can be used to replace --rpc-url in command line 
 ETH_RPC_URL=http://localhost:3050
 
+# ZKSYNC_RPC_URL can be used to replace --l2-url in command line 
+ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev
+
 # CHAIN can be used to replace --chain in command line  
 # Local: 270, Testnet: 280
 CHAIN=270
@@ -149,7 +152,7 @@ l1BatchTimestamp     null
 ### ***L1 → L2 deposits:*** 
 
 ```bash
-zkcast zk-deposit --deposit <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+zkcast zk-deposit <TO> <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --l2-url <L2URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
 ```
 NOTE: Leave `<TOKEN>` blank to bridge ETH
 
