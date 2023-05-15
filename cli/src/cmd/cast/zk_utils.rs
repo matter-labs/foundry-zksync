@@ -1,19 +1,29 @@
-/// This module handles transactions related to ZkSync. It defines the
-/// CLI arguments for the `cast zk-send` command and provides functionality for sending
-/// transactions and withdrawing from Layer 2 to Layer 1.
+/// The `zk_utils` module provides utility functions specifically designed for interacting with zkSync,
+/// an Ethereum layer 2 scaling solution.
 ///
-/// The module contains the following components:
-/// - `ZkSendTxArgs`: Struct representing the command line arguments for the `cast zk-send` subcommand.
-///     It includes parameters such as the destination address, function signature, function arguments,
-///     withdraw flag, token to bridge, amount to bridge, transaction options, and Ethereum options.
-/// - `ZkSendTxArgs` implementation: Defines methods to run the subcommand and print the transaction receipt.
-/// - Helper functions:
-///     - `print_receipt`: Prints the receipt of the transaction, including transaction hash, gas used,
-///         effective gas price, block number, and deployed contract address.
-///     - `get_to_address`: Retrieves the recipient address of the transaction.
-///     - `parse_decimal_u256`: Parses a decimal string into a U256 number.
-///     - `decode_hex`: Decodes a hexadecimal string into a byte vector.
-
+/// This module encapsulates various functionalities related to zkSync, including retrieving the RPC URL for Ethereum,
+/// parsing and attaching a default port to a URL string, obtaining the private key, retrieving the chain configuration,
+/// and creating a signer for zkSync transactions.
+///
+/// Functions in this module:
+///
+/// - `get_rpc_url`: Retrieves the RPC URL for Ethereum. Returns `Result<String>` with the RPC URL if successful, or an error
+///   message if the RPC URL was not provided.
+///
+/// - `get_url_with_port`: Parses a URL string and attaches a default port if one is not specified. Returns an `Option<String>`
+///   with the parsed URL if successful, or `None` if the input was not a valid URL.
+///
+/// - `get_private_key`: Gets the private key from the Ethereum options. Returns `Result<H256>` with the private key as `H256`
+///   if successful, or an error message if the private key was not provided.
+///
+/// - `get_chain`: Gets the chain from the Ethereum options. Returns `Result<Chain>` with the chain configuration if successful,
+///   or an error message if the chain was not provided.
+///
+/// - `get_signer`: Creates a signer from the private key and the chain. Returns a `Signer<PrivateKeySigner>` instance for signing
+///   transactions on the zkSync network.
+///
+/// - `decode_hex`: Decodes a hexadecimal string into a byte vector. Returns `Result<Vec<u8>>` with the decoded byte vector
+///   if successful, or a `ParseIntError` if the decoding fails.
 pub mod zk_utils {
     use eyre::Result;
     use foundry_config::Chain;

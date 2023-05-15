@@ -270,8 +270,6 @@ impl ZkSolcManagerBuilder {
         let version = self.version.to_string();
         let download_url = self.download_url.to_owned();
         let compiler = self.get_compiler()?;
-        // FIXME: PathBuf (like String) - is more like a builder.. so when you 'built' your compiler's path
-        // you might want it to be just a 'path'  (by calling 'as_path()')
         let compilers_path = home_path.to_owned();
 
         let solc_version = parse_version(&version)?;

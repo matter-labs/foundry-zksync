@@ -93,7 +93,6 @@ pub struct ZkSolcOpts {
 /// In this example, the `ZkSolc` compiler is initialized with the provided compiler path and
 /// project configurations. The `compile` method is then invoked to compile the contracts, and any
 /// resulting errors are handled accordingly.
-// FIXME: let's add some more comments to the fields (and are you sure that all of them have to be public?)
 #[derive(Debug)]
 pub struct ZkSolc {
     project: Project,
