@@ -43,7 +43,7 @@ $ cargo build -p foundry-cli
 ```
 ---
 
-## Version 0.0
+## Version 0.0 (Linux & Mac)
 
 We need to establish the functionality we want for release v0.0 of this implementation. Below we will specify the exact features to accomplish our v0.0 release.
 
@@ -66,7 +66,7 @@ By providing the following environment variables in the `.env` file at the `PROJ
 # ETH_RPC_URL can be used to replace --rpc-url in command line 
 ETH_RPC_URL=http://localhost:3050
 
-# ZKSYNC_RPC_URL can be used to replace --l2-url in command line 
+# ZKSYNC_RPC_URL can be used to replace --l2-url in command line for zk-deposit
 ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev
 
 # CHAIN can be used to replace --chain in command line  
@@ -216,8 +216,8 @@ Bridging options:
   -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
 ```
 
-```
-#### Example Usage
+
+#### Example Usage:
 ```bash
 ../foundry-zksync/target/debug/zkcast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
@@ -284,7 +284,10 @@ Example terminal output:
 
 ![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
 
+NOTE: Currently, until `forge remappings` are implemented, import paths must be relative to the contract importing it:
+
 ---
+
 ## Deployment
 
 ***v0.0*** ***Command***:
