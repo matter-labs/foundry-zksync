@@ -10,8 +10,8 @@ Currently only Hardhat has developed functionality for zkSync. The purpose of th
 - [**Quick Start / Installation**](https://github.com/matter-labs/foundry-zksync#quick-start--installation)
 - [**v0.0 Feature Set**](https://github.com/matter-labs/foundry-zksync#feature-set)
 - [**Environment Variables**](https://github.com/matter-labs/foundry-zksync#environment-variables)
-- [**Blockchain Interaction**](https://github.com/matter-labs/foundry-zksync/blob/main/README.md#blockchain-interaction)
-- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-with-cast-zk-send)
+- [**Blockchain Interaction**](https://github.com/matter-labs/foundry-zksync#blockchain-interaction)
+- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-l1--l2)
 - [**Compilation**](https://github.com/matter-labs/foundry-zksync#compilation)
 - [**Deployment**](https://github.com/matter-labs/foundry-zksync#deployment)
 - [**Contract Interaction**](https://github.com/matter-labs/foundry-zksync#contract-interaction)
@@ -43,7 +43,7 @@ $ cargo build -p foundry-cli
 ```
 ---
 
-## Version 0.0
+## Version 0.0 (Linux & Mac)
 
 We need to establish the functionality we want for release v0.0 of this implementation. Below we will specify the exact features to accomplish our v0.0 release.
 
@@ -66,7 +66,7 @@ By providing the following environment variables in the `.env` file at the `PROJ
 # ETH_RPC_URL can be used to replace --rpc-url in command line 
 ETH_RPC_URL=http://localhost:3050
 
-# ZKSYNC_RPC_URL can be used to replace --l2-url in command line 
+# ZKSYNC_RPC_URL can be used to replace --l2-url in command line for zk-deposit
 ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev
 
 # CHAIN can be used to replace --chain in command line  
@@ -216,8 +216,8 @@ Bridging options:
   -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
 ```
 
-```
-#### Example Usage
+
+#### Example Usage:
 ```bash
 ../foundry-zksync/target/debug/zkcast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
@@ -284,7 +284,13 @@ Example terminal output:
 
 ![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
 
+NOTE: Currently, until `forge remappings` are implemented, import paths must be relative to the contract importing it:
+![image](https://github.com/matter-labs/foundry-zksync/assets/76663878/490b34f4-e286-42a7-8570-d4b228ec10c7)
+
+In this example, `SimpleFactory.sol` is in the `src/is-system/` folder.
+
 ---
+
 ## Deployment
 
 ***v0.0*** ***Command***:
@@ -528,7 +534,7 @@ constructor(bytes32 _aaBytecodeHash) {
         aaBytecodeHash = _aaBytecodeHash;
     }
 ```
-`Note: `aaBytecodeHash` = BytecodeHash of "TwoUserMultiSig.sol"`
+Note: `aaBytecodeHash` = Bytecode hash of `TwoUserMultiSig.sol`
 
 #### To deploy a contract that deploys other contracts it is necessary to provide the bytecodes of the children contracts in the `factory-deps` field of the transaction. This can be accomplished by using the `--factory-deps` flag and providing the full contract path in the format: `<path>:<contractname>`
 
