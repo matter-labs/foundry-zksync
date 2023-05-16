@@ -321,8 +321,10 @@ impl ZkCreateArgs {
     ///
     /// A `serde_json::Value` that represents the contract output.
     fn get_contract_output(output_path: PathBuf) -> Value {
-        let data = fs::read_to_string(output_path).expect("Unable to read file");
-        let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
+        let data = fs::read_to_string(&output_path)
+            .expect(&format!("Unable to read contract output file at {}", output_path.display()));
+        let res: serde_json::Value = serde_json::from_str(&data)
+            .expect(&format!("Unable to read contract output file at {}", output_path.display()));
         res["contracts"].clone()
     }
 
