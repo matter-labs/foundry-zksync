@@ -10,8 +10,8 @@ Currently only Hardhat has developed functionality for zkSync. The purpose of th
 - [**Quick Start / Installation**](https://github.com/matter-labs/foundry-zksync#quick-start--installation)
 - [**v0.0 Feature Set**](https://github.com/matter-labs/foundry-zksync#feature-set)
 - [**Environment Variables**](https://github.com/matter-labs/foundry-zksync#environment-variables)
-- [**Blockchain Interaction**](https://github.com/matter-labs/foundry-zksync/blob/main/README.md#blockchain-interaction)
-- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-with-cast-zk-send)
+- [**Blockchain Interaction**](https://github.com/matter-labs/foundry-zksync#blockchain-interaction)
+- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-l1--l2)
 - [**Compilation**](https://github.com/matter-labs/foundry-zksync#compilation)
 - [**Deployment**](https://github.com/matter-labs/foundry-zksync#deployment)
 - [**Contract Interaction**](https://github.com/matter-labs/foundry-zksync#contract-interaction)
@@ -531,7 +531,7 @@ constructor(bytes32 _aaBytecodeHash) {
         aaBytecodeHash = _aaBytecodeHash;
     }
 ```
-`Note: `aaBytecodeHash` = BytecodeHash of "TwoUserMultiSig.sol"`
+Note: `aaBytecodeHash` = Bytecode hash of `TwoUserMultiSig.sol`
 
 #### To deploy a contract that deploys other contracts it is necessary to provide the bytecodes of the children contracts in the `factory-deps` field of the transaction. This can be accomplished by using the `--factory-deps` flag and providing the full contract path in the format: `<path>:<contractname>`
 
