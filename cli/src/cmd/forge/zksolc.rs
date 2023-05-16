@@ -1,27 +1,29 @@
-/// This module provides a comprehensive interface for compiling Solidity contracts using the ZkSolc
-/// compiler. The ZkSolc compiler is designed for zero-knowledge proofs, making it an invaluable tool
-/// for privacy-focused smart contracts.
+/// This module provides the implementation of the ZkSolc compiler for Solidity contracts.
+/// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart contracts.
 ///
-/// # Key Components:
-/// - `ZkSolc`: Represents the main entity in this module.
-///     - Manages project details, including paths and configurations.
-///     - Stores the compiler path.
-///     - Contains the `compile` method which compiles contracts in the project's 'sources' directory
-///       and its subdirectories.
-/// - `ZkSolcOpts`: A utility struct that allows users to specify options for creating `ZkSolc`.
+/// The `ZkSolc` struct represents an instance of the compiler, and it is responsible for compiling
+/// Solidity contracts and handling the output. It uses the `solc` library to interact with the Solidity compiler.
 ///
-/// # Functionality:
-/// - `ZkSolc::new`: Constructs a new `ZkSolc` instance using the provided `ZkSolcOpts` and project
-///   configurations.
-/// - `ZkSolc::compile`: Responsible for compiling the contracts. It performs the following operations:
-///     - Configures the Solidity compiler.
-///     - Parses JSON input.
-///     - Builds compiler arguments.
-///     - Handles the output of the compiler, including errors and warnings.
+/// The `ZkSolc` struct provides the following functionality:
 ///
-/// # Error Handling:
-/// - The methods in this module return the `Result` type from the `anyhow` crate.
-/// - This allows for flexible and easy-to-use error handling.
+/// - Configuration: It allows configuring the compiler path, system mode, and force-evmla options through
+///   the `ZkSolcOpts` struct.
+///
+/// - Compilation: The `compile` method initiates the compilation process. It collects the source files,
+///   parses the JSON input, builds compiler arguments, runs the compiler, and handles the output.
+///
+/// - Error and Warning Handling: The compiler output is checked for errors and warnings, and they are
+///   displayed appropriately. If errors are encountered, the process will exit with a non-zero status code.
+///
+/// - JSON Input Generation: The `parse_json_input` method generates the JSON input required by the compiler
+///   for each contract. It configures the Solidity compiler, saves the input to the artifacts directory, and
+///   handles the output.
+///
+/// - Source Management: The `get_versioned_sources` method retrieves the project sources, resolves the graph
+///   of sources and versions, and returns the sources grouped by Solc version.
+///
+/// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods construct the
+///   path and file for saving the compiler output artifacts.
 use ansi_term::Colour::{Red, Yellow};
 use anyhow::{Error, Result};
 use ethers::prelude::{artifacts::Source, Solc};
@@ -445,7 +447,6 @@ impl ZkSolc {
         }
 
         if has_error {
-            // FIXME: avoid 'exits' (that's like 'panic') - instead try to return an error -- allowing more flexibility.
             exit(1);
         } else if has_warning {
             println!("Compiler run completed with warnings");
