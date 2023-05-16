@@ -285,6 +285,9 @@ Example terminal output:
 ![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
 
 NOTE: Currently, until `forge remappings` are implemented, import paths must be relative to the contract importing it:
+![image](https://github.com/matter-labs/foundry-zksync/assets/76663878/490b34f4-e286-42a7-8570-d4b228ec10c7)
+
+In this example, `SimpleFactory.sol` is in the `src/is-system/` folder.
 
 ---
 
