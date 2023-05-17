@@ -189,7 +189,7 @@ Options:
 
 #### Example Usage
 ```bash
-../foundry-zksync/target/debug/zkcast zkdeposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+../foundry-zksync/target/debug/zkcast zkdeposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 1000000 --rpc-url http://localhost:8545 --l2-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 #### Output
 ```js
@@ -631,3 +631,17 @@ Verify `owner2`:
 ```js
 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
 ```
+
+## Troubleshooting
+
+### Verify arguments
+
+Make sure that:
+* you are using zksync specific methods (`zkcreate` not `create`, `zksend` not `send`)
+* that you've set the correct `--rpc-url`
+* that you have the proper contract address - the bytecodes in zkSync are different than in EVM - so the resulting contracts will be deployed at different addresses
+
+### 'Method not found' when calling 'send'
+
+If you get errors like `(code: -32601, message: Method not found, data: None)` - you are probably using a `send` method instead of `zksend`.
+
