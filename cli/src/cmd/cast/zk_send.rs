@@ -43,6 +43,7 @@ use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use cast::TxBuilder;
 use clap::Parser;
 use ethers::types::NameOrAddress;
+use eyre::Context;
 use foundry_common::try_get_http_provider;
 use foundry_config::Config;
 use zksync::{
@@ -216,7 +217,7 @@ impl ZkSendTxArgs {
                         .calldata(encoded_function_call)
                         .send()
                         .await
-                        .unwrap();
+                        .wrap_err("Failed to execute transaction")?;
 
                     let rcpt = match tx.wait_for_commit().await {
                         Ok(rcpt) => rcpt,
