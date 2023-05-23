@@ -55,6 +55,7 @@ use ethers::{
     solc::{info::ContractInfo, Project},
     types::Bytes,
 };
+use eyre::Context;
 use foundry_common::abi::parse_tokens;
 use serde_json::Value;
 use std::{fs, path::PathBuf};
@@ -269,13 +270,17 @@ impl ZkCreateArgs {
     fn get_abi_from_contract(
         project: &Project,
         contract_info: &ContractInfo,
-    ) -> Result<Value, serde_json::Error> {
+    ) -> eyre::Result<Value> {
         let output_path = Self::get_path_for_contract_output(project, contract_info);
-        let contract_output = Self::get_contract_output(output_path);
+        let contract_output = Self::get_contract_output(output_path)?;
         serde_json::from_value(
             contract_output[contract_info.path.as_ref().unwrap()][&contract_info.name]["abi"]
                 .clone(),
         )
+        .wrap_err(format!(
+            "Failed to find ABI for {} - is it the right contract name?",
+            contract_info.name
+        ))
     }
 
     /// This function retrieves the bytecode from the contract.
@@ -294,15 +299,17 @@ impl ZkCreateArgs {
     fn get_bytecode_from_contract(
         project: &Project,
         contract_info: &ContractInfo,
-    ) -> Result<Bytes, serde_json::Error> {
+    ) -> eyre::Result<Bytes> {
         let output_path = Self::get_path_for_contract_output(project, contract_info);
-        let contract_output = Self::get_contract_output(output_path);
-        let byte_code = serde_json::from_value(
-            contract_output[contract_info.path.as_ref().unwrap()][&contract_info.name]["evm"]
-                ["bytecode"]["object"]
-                .clone(),
-        );
-        byte_code
+        let contract_output = Self::get_contract_output(output_path)?;
+        let contract_file_codes = &contract_output[contract_info.path.as_ref().unwrap()];
+        serde_json::from_value(
+            contract_file_codes[&contract_info.name]["evm"]["bytecode"]["object"].clone(),
+        )
+        .wrap_err(format!(
+            "Failed to find evm bytecode for {} - is this the correct contract name?",
+            contract_info.name
+        ))
     }
 
     /// This function retrieves the contract output.
@@ -320,12 +327,14 @@ impl ZkCreateArgs {
     /// # Returns
     ///
     /// A `serde_json::Value` that represents the contract output.
-    fn get_contract_output(output_path: PathBuf) -> Value {
-        let data = fs::read_to_string(&output_path)
-            .expect(&format!("Unable to read contract output file at {}", output_path.display()));
+    fn get_contract_output(output_path: PathBuf) -> eyre::Result<Value> {
+        let data = fs::read_to_string(&output_path).wrap_err(format!(
+            "Unable to read contract output file at {} - did you run zk-build",
+            output_path.display()
+        ))?;
         let res: serde_json::Value = serde_json::from_str(&data)
-            .expect(&format!("Unable to read contract output file at {}", output_path.display()));
-        res["contracts"].clone()
+            .wrap_err(format!("Unable to parse JSON contract from {}", output_path.display()))?;
+        Ok(res["contracts"].clone())
     }
 
     /// This function retrieves the path for the contract output.
