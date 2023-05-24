@@ -9113,7 +9113,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vlog"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "chrono",
  "opentelemetry",
@@ -9707,7 +9707,7 @@ dependencies = [
 [[package]]
 name = "zksync"
 version = "0.4.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "num 0.3.1",
  "serde_json",
@@ -9723,7 +9723,7 @@ dependencies = [
 [[package]]
 name = "zksync_basic_types"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "serde",
  "web3",
@@ -9732,7 +9732,7 @@ dependencies = [
 [[package]]
 name = "zksync_config"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "bigdecimal",
  "envy",
@@ -9748,7 +9748,7 @@ dependencies = [
 [[package]]
 name = "zksync_contracts"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "ethabi 16.0.0",
  "hex",
@@ -9761,7 +9761,7 @@ dependencies = [
 [[package]]
 name = "zksync_crypto"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "base64 0.13.1",
  "blake2 0.10.6",
@@ -9777,7 +9777,7 @@ dependencies = [
 [[package]]
 name = "zksync_eth_client"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9798,7 +9798,7 @@ dependencies = [
 [[package]]
 name = "zksync_eth_signer"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "async-trait",
  "hex",
@@ -9817,7 +9817,7 @@ dependencies = [
 [[package]]
 name = "zksync_mini_merkle_tree"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "once_cell",
  "rayon",
@@ -9828,7 +9828,7 @@ dependencies = [
 [[package]]
 name = "zksync_types"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "bigdecimal",
  "blake2 0.10.6",
@@ -9861,7 +9861,7 @@ dependencies = [
 [[package]]
 name = "zksync_utils"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -9881,7 +9881,7 @@ dependencies = [
 [[package]]
 name = "zksync_web3_decl"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/zksync-era.git#48fe6e27110c1fe1a438c5375fb256890e8017b1"
+source = "git+https://github.com/matter-labs/zksync-era.git#44b265bd0ca4ac1eefda1eaee4bea912063db6e8"
 dependencies = [
  "bigdecimal",
  "chrono",
