@@ -40,6 +40,9 @@ $ git clone https://github.com/sammyshakes/sample-fzksync-project.git
 # cd into foundry-zksync and build
 $ cd foundry-zksync
 $ cargo build -p foundry-cli
+# cd into fzksync-project and update the submodules
+$ cd ../sample-fzksync-project
+$ git submodule update --init --recursive
 ```
 ---
 
