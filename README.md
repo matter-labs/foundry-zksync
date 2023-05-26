@@ -649,6 +649,8 @@ If you get errors like `(code: -32601, message: Method not found, data: None)` -
 
 Try providing the older solidity version to use by setting ``--use 0.8.17`` for example and remove the `zkout` directory to make sure that all artifacts are recreated. 
 
+The other option, is to download the right versions of solc manually and then run with `--offline` mode.
+
 
 Under the hood, we're downloading 2 compilers:
 
