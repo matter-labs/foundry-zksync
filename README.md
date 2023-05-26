@@ -663,3 +663,5 @@ You can get the lastest compiler version for MacOs AARCH here: https://github.co
 This means that our zksync compiler doesn't support that version of solidity yet.
 
 In such case, please remove the artifacts (by removing `zkout` directory) and re-run with the older version of solidity (`--use 0.8.19`) for example.
+
+You might also have to remove `~/.svm/0.8.20/solc-0.8.20` file too.
