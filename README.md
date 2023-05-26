@@ -647,15 +647,10 @@ If you get errors like `(code: -32601, message: Method not found, data: None)` -
 
 ### 'Could not get solc: Unknown version provided', 'checksum not found'
 
-Try providing the older solidity version to use by setting ``--use 0.8.17`` for example and remove the `zkout` directory to make sure that all artifacts are recreated. 
+These errors might show up on the Mac with ARM chip (M1, M2) - due to the fact that most recent solc compilers are not auto-downloaded there.
 
-The other option, is to download the right versions of solc manually and then run with `--offline` mode.
+There are 2 workarounds:
+ - use the older compiler - by adding `--use 0.8.17` flag to your zk-build command
+ - download the compiler manually - and then use `--offline` mode (you can download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20 )
 
-
-Under the hood, we're downloading 2 compilers:
-
-* solidity (solc) - usually into ~/.svm
-* zkCompiler (zksolcs) - usually into ~./zksync
-
-The errors above usually come from solidity compiler download manager. It downloads the list of versions from one place (that is often udpated), but the list of binary 
-packages is downloaded from another location (that is often hardcoded). 
+You can get the lastest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
