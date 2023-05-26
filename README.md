@@ -645,3 +645,12 @@ Make sure that:
 
 If you get errors like `(code: -32601, message: Method not found, data: None)` - you are probably using a `send` method instead of `zksend`.
 
+### 'Could not get solc: Unknown version provided', 'checksum not found'
+
+These errors might show up on the Mac with ARM chip (M1, M2) - due to the fact that most recent solc compilers are not auto-downloaded there.
+
+There are 2 workarounds:
+ - use the older compiler - by adding `--use 0.8.17` flag to your zk-build command
+ - download the compiler manually - and then use `--offline` mode (you can download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20 )
+
+You can get the lastest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64

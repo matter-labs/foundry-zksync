@@ -21,7 +21,7 @@
 /// This module abstracts the details of managing the zksolc compiler, making it easier for developers to use
 /// different versions of the compiler without dealing with the details of downloading, setting up, and switching
 /// between versions. It is part of a larger framework for managing and interacting with zkSync contracts.
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Error, Result, Context};
 use dirs;
 use reqwest::blocking::Client;
 use serde::Serialize;
@@ -94,7 +94,8 @@ impl ZkSolcVersion {
 #[derive(Debug, Clone, Serialize)]
 enum ZkSolcOS {
     Linux,
-    Mac,
+    MacAMD,
+    MacARM
 }
 
 /// `get_operating_system` identifies the current operating system and returns the corresponding `ZkSolcOS` variant.
@@ -109,8 +110,11 @@ enum ZkSolcOS {
 fn get_operating_system() -> Result<ZkSolcOS> {
     match std::env::consts::OS {
         "linux" => Ok(ZkSolcOS::Linux),
-        "macos" | "darwin" => Ok(ZkSolcOS::Mac),
-        _ => Err(Error::msg("Unsupported operating system")),
+        "macos" | "darwin" => match std::env::consts::ARCH {
+            "aarch64" => Ok(ZkSolcOS::MacARM),
+            _ => Ok(ZkSolcOS::MacAMD),
+        },
+        _ => Err(Error::msg(format!("Unsupported operating system {}", std::env::consts::OS))),
     }
 }
 
@@ -127,7 +131,8 @@ impl ZkSolcOS {
     fn get_compiler(&self) -> &str {
         match self {
             ZkSolcOS::Linux => "zksolc-linux-amd64-musl-",
-            ZkSolcOS::Mac => "zksolc-macosx-amd64-",
+            ZkSolcOS::MacAMD => "zksolc-macosx-amd64-",
+            ZkSolcOS::MacARM => "zksolc-macosx-arm64-",
         }
     }
 
@@ -143,7 +148,8 @@ impl ZkSolcOS {
     fn get_download_uri(&self) -> &str {
         match self {
             ZkSolcOS::Linux => "linux-amd64",
-            ZkSolcOS::Mac => "macosx-amd64",
+            ZkSolcOS::MacAMD => "macosx-amd64",
+            ZkSolcOS::MacARM => "macosx-arm64",
         }
     }
 }
@@ -233,12 +239,7 @@ impl ZkSolcManagerBuilder {
     ///
     /// This function can return an `Err` if the operating system cannot be determined using `get_operating_system`.
     fn get_compiler(self) -> Result<String> {
-        if let Ok(zk_solc_os) = get_operating_system() {
-            let compiler = zk_solc_os.get_compiler().to_string();
-            Ok(compiler)
-        } else {
-            Err(Error::msg("Could not determine compiler"))
-        }
+        get_operating_system().with_context(|| "Failed to determine OS for compiler").map(|it| it.get_compiler().to_string())
     }
 
     /// `build` constructs and returns a `ZkSolcManager` instance based on the provided configuration options.
@@ -406,7 +407,6 @@ impl ZkSolcManager {
     ///
     /// This function can return an `Err` if the full download URL cannot be parsed into a valid `Url`.
     pub fn get_full_download_url(&self) -> Result<Url> {
-        // TODO: this is an example, of how you can 'propagate' the error from below, and add some local context information.
         let zk_solc_os = get_operating_system()
             .map_err(|err| anyhow!("Failed to determine OS to select the binary: {}", err))?;
 
