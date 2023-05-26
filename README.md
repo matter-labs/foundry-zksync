@@ -654,3 +654,9 @@ There are 2 workarounds:
  - download the compiler manually - and then use `--offline` mode (you can download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20 )
 
 You can get the lastest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
+
+### `solc` versions >0.8.19 are not supported, found 0.8.20
+
+This means that our zksync compiler doesn't support that version of solidity yet.
+
+In such case, please remove the artifacts (by removing `zkout` directory) and re-run with the older version of solidity (`--use 0.8.19`) for example.
