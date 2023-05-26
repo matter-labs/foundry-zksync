@@ -645,3 +645,15 @@ Make sure that:
 
 If you get errors like `(code: -32601, message: Method not found, data: None)` - you are probably using a `send` method instead of `zksend`.
 
+### 'Could not get solc: Unknown version provided', 'checksum not found'
+
+Try providing the older solidity version to use by setting ``--use 0.8.17`` for example and remove the `zkout` directory to make sure that all artifacts are recreated. 
+
+
+Under the hood, we're downloading 2 compilers:
+
+* solidity (solc) - usually into ~/.svm
+* zkCompiler (zksolcs) - usually into ~./zksync
+
+The errors above usually come from solidity compiler download manager. It downloads the list of versions from one place (that is often udpated), but the list of binary 
+packages is downloaded from another location (that is often hardcoded). 
