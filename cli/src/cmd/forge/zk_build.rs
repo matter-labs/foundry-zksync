@@ -160,7 +160,7 @@ impl ZkBuildArgs {
         }
 
         if !zksolc_manager.exists() {
-            println!("Downloading zksolc compiler");
+            println!("Downloading zksolc compiler from {:?}", zksolc_manager.get_full_download_url().unwrap().to_string());
             zksolc_manager
                 .download()
                 .map_err(|err| eyre::eyre!("Failed to download the file: {}", err))?;
