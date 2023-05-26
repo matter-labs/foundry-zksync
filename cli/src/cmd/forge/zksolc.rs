@@ -247,6 +247,16 @@ impl ZkSolc {
                     .wait_with_output()
                     .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
 
+                if !output.status.success() {
+                    return Err(Error::msg(format!(
+                        "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
+                        String::from_utf8(output.stderr).unwrap_or_default(),
+                        self.compiler_path,
+                        contract_path,
+                        &comp_args
+                    )));
+                }
+
                 let filename = contract_path
                     .to_str()
                     .expect("Unable to convert source to string")
