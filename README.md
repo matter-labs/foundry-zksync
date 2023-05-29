@@ -1,35 +1,45 @@
-# ZkSync Smart Contract Testing, Deployment and Interaction Framework with Foundry
-### About
-Currently the industry standard Solidity smart contract test and deploy frameworks are Hardhat and Truffle. They both use JavaScript to test and deploy solidity smart contracts. Another smart contract testing platform by the name of Foundry. The  advantage that Foundry provides is that all tests are also written solidity creating a smoother developer experience. With Foundry, the engineer does not need to switch languages to write tests and deploy contracts.. 
+# Foundry with zkSync Era v0.0
 
-Currently only Hardhat has developed functionality for zkSync. The purpose of this repository is to create functionality with Foundry to fully test, compile and deploy smart contracts on zkSync using only Solidity, as well as interact with those contracts once deployed.
+This repository provides [Foundry](https://github.com/foundry-rs/foundry) functionality in Solidity for compiling, deploying, testing, and interacting with smart contracts on zkSync Era.
+
+Currently, the industry standard frameworks are Hardhat and Truffle which both use JavaScript to test and deploy Solidity smart contracts. Foundry only uses Solidity for testing. This creates a much smoother developer experience as an engineer does not need to switch from one language to another.
+
+### Supported features
+
+- Compile smart contracts with the [zksolc compiler](https://github.com/matter-labs/zksolc-bin).
+- Deploy smart contracts to zkSync Era testnet or local test node.
+- Bridge assets L1 <-> L2.
+- Call deployed contracts on zkSync Era testnet or local test node.
+- Send transactions to deployed contracts on zkSync Era testnet or local test node.
 
 ---
+
 ## Contents
 
-- [**Quick Start / Installation**](https://github.com/matter-labs/foundry-zksync#quick-start--installation)
-- [**v0.0 Feature Set**](https://github.com/matter-labs/foundry-zksync#feature-set)
-- [**Environment Variables**](https://github.com/matter-labs/foundry-zksync#environment-variables)
-- [**Blockchain Interaction**](https://github.com/matter-labs/foundry-zksync#blockchain-interaction)
-- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-l1--l2)
-- [**Compilation**](https://github.com/matter-labs/foundry-zksync#compilation)
-- [**Deployment**](https://github.com/matter-labs/foundry-zksync#deployment)
-- [**Contract Interaction**](https://github.com/matter-labs/foundry-zksync#contract-interaction)
-- [**Deploy and Interact with `SimpleFactory.sol`**](https://github.com/matter-labs/foundry-zksync#usage-example-simplefactorysol)
-- [**Account Abstraction Multisig example**](https://github.com/matter-labs/foundry-zksync#account-abstraction-multisig)
-
+- [Set up](https://github.com/matter-labs/foundry-zksync#set-up)
+- [Interact with blockchain](https://github.com/matter-labs/foundry-zksync#interact-with-blockchain)
+- [Compile](https://github.com/matter-labs/foundry-zksync#compile)
+- [Deploy](https://github.com/matter-labs/foundry-zksync#deploy)
+- [Bridge assets](https://github.com/matter-labs/foundry-zksync#bridge-assets-l1--l2)
+- [Interact with contract](https://github.com/matter-labs/foundry-zksync#interact-with-contract)
+- [Deploy and interact with `SimpleFactory.sol`](https://github.com/matter-labs/foundry-zksync#deploy-and-interact-with-simplefactorysol)
+- [Account abstraction multisig example](https://github.com/matter-labs/foundry-zksync#account-abstraction-multisig)
 
 ---
----
 
-### Quick Start / Installation
+## Set up
 
-Clone these two repos to the same directory:
+### Prerequisites
 
-- [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync) - this is our application, we will be building this in the following steps
-- [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project) - this is the sample project that contains the smart contract to be compiled
+Check you have the zkSync Era [dev dependencies](https://github.com/matter-labs/zksync-era/blob/main/docs/setup-dev.md).
 
+### Installation
 
+> :grey_exclamation: Installation steps include cloning the zkSync Era application, [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync), and the example project, [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project).
+
+1. Create a top-level directory and `cd` into it.
+
+<<<<<<< Updated upstream
 ```bash
 # make working directory and cd anywhere on filesystem
 $ mkdir fzksync && cd fzksync
@@ -43,85 +53,132 @@ $ cargo build -p foundry-cli
 # cd into fzksync-project and update the submodules
 $ cd ../sample-fzksync-project
 $ git submodule update --init --recursive
+=======
+>>>>>>> Stashed changes
 ```
----
+mkdir fzksync && cd fzksync
+```
 
-## Version 0.0 (Linux & Mac)
+2. Clone the repos into the same directory.
 
-We need to establish the functionality we want for release v0.0 of this implementation. Below we will specify the exact features to accomplish our v0.0 release.
+```sh
+git clone https://github.com/matter-labs/foundry-zksync.git 
+git clone https://github.com/sammyshakes/sample-fzksync-project.git
+```
 
-### Feature Set
+3. `cd` into the `foundry-zksync` and build the application.
 
-- ***Compile smart contracts with zksolc compiler***
-- ***Deploy smart contracts to zkSync Testnet or Local Test Node***
-- ***Bridge assets L1 <-> L2***
-- ***Make contract calls to deployed contracts on zkSync Testnet or Local Test Node***
-- ***Send transactions to deployed contracts on zkSync Testnet or Local Test Node***
+```sh
+cd foundry-zksync
+cargo build -p foundry-cli
+```
 
-NOTE: All commands are entered from the project root folder
+### Environment variables
 
----
+Create a new file `.env` at the `PROJECT-ROOT` and copy/paste the following environment variables. 
 
-## Environment Variables
-
-By providing the following environment variables in the `.env` file at the `PROJECT-ROOT` folder, the `--rpc-url` and `--chain` flags can be ommitted in command lines.
-```bash
-# ETH_RPC_URL can be used to replace --rpc-url in command line 
+```txt
+# ETH_RPC_URL replaces --rpc-url on the command line 
 ETH_RPC_URL=http://localhost:3050
 
-# ZKSYNC_RPC_URL can be used to replace --l2-url in command line for zk-deposit
+# ZKSYNC_RPC_URL replaces --l2-url on the command line for zk-deposit
 ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev
 
-# CHAIN can be used to replace --chain in command line  
+# CHAIN replaces --chain in command line  
 # Local: 270, Testnet: 280
 CHAIN=270
 ```
 
+### Spin up local Docker node
+
+[Follow these instructions to set up local docker node.](https://era.zksync.io/docs/api/hardhat/testing.html)
 ---
 
-### Spin up local docker node
-[Follow these instructions to set up local docker node](https://era.zksync.io/docs/api/hardhat/testing.html)
+## Interact with blockchain
 
----
+> :exclamation: Enter all commands from the `sample-fzksync-project` project root.
 
-## Blockchain Interaction
+### Use the `zkcast` command
 
-### Use the `zkcast` command to get blockchain data:
-```bash
-# chain id local node
+1. Get chain id of local node
+
+```sh
 ../foundry-zksync/target/debug/zkcast chain-id --rpc-url http://localhost:3050
-# output:
+```
+
+**Output**
+
 270
 
-#TESTNET
-# chain id testnet
+2. Get chain id of testnet 
+
+```sh
 ../foundry-zksync/target/debug/zkcast chain-id --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Output**
+
+```sh
 280
+```
 
-# client
+3. Get client 
+
+```sh
 ../foundry-zksync/target/debug/zkcast client --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Output**
+
+```sh
 zkSync/v2.0
+```
 
-# get account L2 eth balance
+4. Get account's L2 ETH balance
+
+```sh 
 ../foundry-zksync/target/debug/zkcast balance 0x42C7eF198f8aC9888E2B1b73e5B71f1D4535194A --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Output**
+
+```sh
 447551277794355871
+```
 
-# gas price
+5. Get gas price
+
+```sh
 ../foundry-zksync/target/debug/zkcast gas-price --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Example output**
+
+```sh
 250000000
+```
 
-# timestamp of latest block
+6. Get timestamp of latest block
+
+```sh
 ../foundry-zksync/target/debug/zkcast age --block latest --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
-Mon May  1 16:11:07 2023
+```
 
-# get latest block:
+**Example output**
+
+```sh
+Mon May  1 16:11:07 2023
+```
+
+7. Get latest block
+
+```sh
 ../foundry-zksync/target/debug/zkcast block latest --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Example output**
+
+```sh
 baseFeePerGas        250000000
 difficulty           0
 extraData            0x
@@ -144,13 +201,124 @@ totalDifficulty      0
 l1BatchNumber        null
 l1BatchTimestamp     null
 ```
+---
+
+## Compile with `zkforge zk-build`
+
+> :exclamation: Aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`.
+
+Compile smart contracts to zkEvm bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval by other components of the application.
+
+```sh
+Compiler subcommands for zkSync
+
+Usage: 
+zkforge zk-build [OPTIONS]
+
+Options:
+      --use-zksolc   Specify zksolc compiler version (default if left blank)
+      --is-system    Enable the system contract compilation mode.
+      --force-evmla  Sets the EVM legacy assembly pipeline forcibly
+      -h, --help         Print help
+```
+
+> :important: `--is-system` flag
+
+        It is necessary to compile some contracts, including those that deploy other contracts (such as factory contracts), using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder. If the folder does not exist, manually create it.
+
+![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
+
+### Example usage
+
+To compile with default compiler options (v1.3.9).
+
+```sh
+../foundry-zksync/target/debug/zkforge zk-build 
+```
+
+### Compiler settings
+
+Configure the `zksolc` compiler version using the optional `--use-zksolc` flag.
+
+```bash
+../foundry-zksync/target/debug/zkforge zkb --use-zksolc v1.3.8
+```
+
+**Example output**
+
+`zksolc` compiler artifacts can be found in the output folder:
+```bash
+<PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
+```
+![image](https://user-images.githubusercontent.com/76663878/234152279-e144e489-41ab-4cbd-8321-8ccd9b0aa6ef.png)
+
+Example terminal output:
+
+![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
+
+NOTE: Currently, until `forge remappings` are implemented, import paths must be relative to the contract importing it:
+![image](https://github.com/matter-labs/foundry-zksync/assets/76663878/490b34f4-e286-42a7-8570-d4b228ec10c7)
+
+In this example, `SimpleFactory.sol` is in the `src/is-system/` folder.
 
 ---
 
-## Bridging Assets L1 ↔ L2 
+## Deploy
+
+***v0.0*** ***Command***:
+## `zkforge zk-create`
+### aliases: `zkforge zkcreate`, `zkforge zk-deploy`, `zkforge zkc`
+
+Manage deployments in the native foundry/zkforge fashion, using the `zkforge zk-create` command.
+
+```bash
+Deploy smart contracts to zksync.
+
+Usage: zkforge zk-create <CONTRACT> [OPTIONS] --rpc-url <RPC-URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+ZkCreate options:
+      --constructor-args <ARGS>...
+          The constructor arguments.
+
+      --constructor-args-path <FILE>
+          The path to a file containing the constructor arguments.
+
+  <CONTRACT>
+          The contract identifier in the form `<path>:<contractname>`.
+
+ZkSync Features:
+      --factory-deps <FACTORY-DEPS>...
+          The factory dependencies in the form `<path>:<contractname>`.
+```
+
+
+#### Example Usage
+To Deploy `src/Greeter.sol` to zksync local node:
+```bash
+../foundry-zksync/target/debug/zkforge zkc src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+```
+
+#### Output
+```js
+Deploying contract...
++-------------------------------------------------+
+Contract successfully deployed to address: 0xa1b809005e589f81de6ef9f48d67e35606c05fc3
+Transaction Hash: 0x34782985ba7c70b6bc4a8eb2b95787baec29356171fdbb18608037a2fcd7eda8
+Gas used: 168141
+Effective gas price: 250000000
+Block Number: 249
++-------------------------------------------------+
+```
+
+---
+
+## Bridge assets L1 ↔ L2 
 
 ### Bridge assets L1 ↔ L2 with `zkcast zk-send` and `zkcast zk-deposit`
-
 
 ### ***L1 → L2 deposits:*** 
 
@@ -232,122 +400,8 @@ Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d
 
 ---
 
-## Compilation
+## Interact with contract
 
-***v0.0*** ***Command***:
-## `zkforge zk-build`
-### aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`
-
-Compile smart contracts to zkEvm bytecode and store compile output files into a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval for other components of the application.
-
-
-
-
-```bash
-Compiler subcommands for zkSync
-
-Usage: 
-zkforge zk-build [OPTIONS]
-
-
-Options:
-      --use-zksolc   Specify zksolc compiler version (default if left blank)
-      --is-system    Enable the system contract compilation mode.
-      --force-evmla  Sets the EVM legacy assembly pipeline forcibly
-      -h, --help         Print help
-
-  
-```
-
-### Compiling with `--is-system` flag
-It is necessary for some contracts, including those that deploy other contracts (such as factory contracts), to be compiled using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder, if the folder does not exist, manually create it:
-
-![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
-
-#### Example Usage
-To compile with only default compiler options (v1.3.9):
-```bash
-../foundry-zksync/target/debug/zkforge zk-build 
-```
-
-#### Compiler Settings
-`zksolc` compiler version can optionally be configured using `--use-zksolc` flag:
-```bash
-../foundry-zksync/target/debug/zkforge zkb --use-zksolc v1.3.8
-```
-
-#### Output
-`zksolc` compiler artifacts can be found in the output folder:
-```bash
-<PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
-```
-![image](https://user-images.githubusercontent.com/76663878/234152279-e144e489-41ab-4cbd-8321-8ccd9b0aa6ef.png)
-
-Example terminal output:
-
-![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
-
-NOTE: Currently, until `forge remappings` are implemented, import paths must be relative to the contract importing it:
-![image](https://github.com/matter-labs/foundry-zksync/assets/76663878/490b34f4-e286-42a7-8570-d4b228ec10c7)
-
-In this example, `SimpleFactory.sol` is in the `src/is-system/` folder.
-
----
-
-## Deployment
-
-***v0.0*** ***Command***:
-## `zkforge zk-create`
-### aliases: `zkforge zkcreate`, `zkforge zk-deploy`, `zkforge zkc`
-
-Manage deployments in the native foundry/zkforge fashion, using the `zkforge zk-create` command.
-
-```bash
-Deploy smart contracts to zksync.
-
-Usage: zkforge zk-create <CONTRACT> [OPTIONS] --rpc-url <RPC-URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
-
-Options:
-  -h, --help
-          Print help (see a summary with '-h')
-
-ZkCreate options:
-      --constructor-args <ARGS>...
-          The constructor arguments.
-
-      --constructor-args-path <FILE>
-          The path to a file containing the constructor arguments.
-
-  <CONTRACT>
-          The contract identifier in the form `<path>:<contractname>`.
-
-ZkSync Features:
-      --factory-deps <FACTORY-DEPS>...
-          The factory dependencies in the form `<path>:<contractname>`.
-```
-
-
-#### Example Usage
-To Deploy `src/Greeter.sol` to zksync local node:
-```bash
-../foundry-zksync/target/debug/zkforge zkc src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
-```
-
-#### Output
-```js
-Deploying contract...
-+-------------------------------------------------+
-Contract successfully deployed to address: 0xa1b809005e589f81de6ef9f48d67e35606c05fc3
-Transaction Hash: 0x34782985ba7c70b6bc4a8eb2b95787baec29356171fdbb18608037a2fcd7eda8
-Gas used: 168141
-Effective gas price: 250000000
-Block Number: 249
-+-------------------------------------------------+
-```
-
-
----
-## Contract Interaction
 ***v0.0*** ***Commands***:
 ## `zkcast zk-send`
 ### aliases: `zkcast zks`, `zkcast zksend`
@@ -394,12 +448,12 @@ zkcast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url <RPC-URL>
 ZkSync + Pineapple
 ```
 
-## Send transactions:
+### Send transactions:
 
 ```bash
 zkcast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --chain <CHAIN-ID>
 ```
-### Example Usage
+#### Example Usage
 ```bash
 ../foundry-zksync/target/debug/zkcast zk-send 0x97b985951fd3e0c1d996421cc783d46c12d00082 "setGreeting(string)" "Killer combo!"  --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
@@ -420,8 +474,7 @@ Killer combo!
 
 ---
 
-## Usage Example: `SimpleFactory.sol`
-### Deploying and Interacting with `SimpleFactory.sol`
+## Deploy and interact with `SimpleFactory.sol`
 
 #### Compile contracts:
 `SimpleFactory.sol` must be compiled with the `is-system` flag, so they need to be placed in the `src/is-sytem/` folder
