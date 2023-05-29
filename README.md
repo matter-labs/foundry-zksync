@@ -34,32 +34,6 @@ Currently, the industry standard frameworks are Hardhat and Truffle which both u
 Check you have the zkSync Era [dev dependencies](https://github.com/matter-labs/zksync-era/blob/main/docs/setup-dev.md).
 
 ### Installation
-<<<<<<< Updated upstream
-
-> :grey_exclamation: Installation steps include cloning the zkSync Era application, [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync), and the example project, [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project).
-
-1. Create a top-level directory and `cd` into it.
-
-<<<<<<< Updated upstream
-```bash
-# make working directory and cd anywhere on filesystem
-$ mkdir fzksync && cd fzksync
-# clone foundry-zksync
-$ git clone https://github.com/matter-labs/foundry-zksync.git 
-# clone fzksync-project
-$ git clone https://github.com/sammyshakes/sample-fzksync-project.git
-# cd into foundry-zksync and build
-$ cd foundry-zksync
-$ cargo build -p foundry-cli
-# cd into fzksync-project and update the submodules
-$ cd ../sample-fzksync-project
-$ git submodule update --init --recursive
-=======
->>>>>>> Stashed changes
-```
-mkdir fzksync && cd fzksync
-```
-=======
 
 > :grey_exclamation: Installation steps include cloning the zkSync Era application, [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync), and the example project, [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project).
 
@@ -68,7 +42,6 @@ mkdir fzksync && cd fzksync
 ```
 mkdir fzksync && cd fzksync
 ```
->>>>>>> Stashed changes
 
 2. Clone the repos into the same directory.
 
