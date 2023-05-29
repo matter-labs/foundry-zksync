@@ -1179,7 +1179,7 @@ dependencies = [
  "once_cell",
  "strsim 0.10.0",
  "termcolor",
- "terminal_size 0.2.3",
+ "terminal_size",
  "textwrap 0.16.0",
  "unicase",
 ]
@@ -1197,7 +1197,7 @@ dependencies = [
  "once_cell",
  "strsim 0.10.0",
  "termcolor",
- "terminal_size 0.2.3",
+ "terminal_size",
  "unicase",
  "unicode-width",
 ]
@@ -1472,21 +1472,6 @@ dependencies = [
  "async-trait",
  "nix 0.26.1",
  "tokio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "console"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3993e6445baa160675931ec041a5e03ca84b9c6e32a056150d3aa2bdda0a1f45"
-dependencies = [
- "encode_unicode",
- "lazy_static",
- "libc",
- "regex",
- "terminal_size 0.1.17",
- "unicode-width",
  "winapi 0.3.9",
 ]
 
@@ -2119,23 +2104,11 @@ dependencies = [
 
 [[package]]
 name = "dialoguer"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9dd058f8b65922819fabb4a41e7d1964e56344042c26efbccd465202c23fa0c"
-dependencies = [
- "console 0.14.1",
- "lazy_static",
- "tempfile",
- "zeroize",
-]
-
-[[package]]
-name = "dialoguer"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af3c796f3b0b408d9fd581611b47fa850821fcb84aa640b83a3c1a5be2d691f2"
 dependencies = [
- "console 0.15.5",
+ "console",
  "shell-words",
 ]
 
@@ -2592,7 +2565,7 @@ dependencies = [
 [[package]]
 name = "ethers"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "ethers-addressbook",
  "ethers-contract",
@@ -2607,7 +2580,7 @@ dependencies = [
 [[package]]
 name = "ethers-addressbook"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "ethers-core",
  "once_cell",
@@ -2618,7 +2591,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-contract-derive",
@@ -2636,7 +2609,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-abigen"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "Inflector",
  "cfg-if 1.0.0",
@@ -2663,7 +2636,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-derive"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-core",
@@ -2677,7 +2650,7 @@ dependencies = [
 [[package]]
 name = "ethers-core"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "arrayvec 0.7.2",
  "bytes",
@@ -2708,7 +2681,7 @@ dependencies = [
 [[package]]
 name = "ethers-etherscan"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "ethers-core",
  "ethers-solc",
@@ -2725,7 +2698,7 @@ dependencies = [
 [[package]]
 name = "ethers-middleware"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "async-trait",
  "auto_impl 0.5.0",
@@ -2750,7 +2723,7 @@ dependencies = [
 [[package]]
 name = "ethers-providers"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "async-trait",
  "auto_impl 1.0.1",
@@ -2789,7 +2762,7 @@ dependencies = [
 [[package]]
 name = "ethers-signers"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -2816,7 +2789,7 @@ dependencies = [
 [[package]]
 name = "ethers-solc"
 version = "1.0.2"
-source = "git+https://github.com/gakonst/ethers-rs#09f8e3b5113201d570f3f1658cf4f7fa7cc9cc28"
+source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "cfg-if 1.0.0",
  "dunce",
@@ -3175,10 +3148,10 @@ dependencies = [
  "clap_complete_fig",
  "color-eyre",
  "comfy-table",
- "console 0.15.5",
+ "console",
  "criterion",
  "data-encoding",
- "dialoguer 0.10.3",
+ "dialoguer",
  "dirs 5.0.0",
  "dotenvy",
  "downloader",
@@ -3197,7 +3170,7 @@ dependencies = [
  "futures",
  "globset",
  "hex",
- "indicatif 0.17.3",
+ "indicatif",
  "itertools",
  "once_cell",
  "parking_lot 0.12.1",
@@ -4461,23 +4434,11 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d207dc617c7a380ab07ff572a6e52fa202a2a8f355860ac9c38e23f8196be1b"
-dependencies = [
- "console 0.15.5",
- "lazy_static",
- "number_prefix",
- "regex",
-]
-
-[[package]]
-name = "indicatif"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cef509aa9bc73864d6756f0d34d35504af3cf0844373afe9b8669a5b8005a729"
 dependencies = [
- "console 0.15.5",
+ "console",
  "number_prefix",
  "portable-atomic",
  "unicode-width",
@@ -7771,7 +7732,6 @@ dependencies = [
  "cpufeatures",
  "digest 0.9.0",
  "opaque-debug 0.3.0",
- "sha2-asm",
 ]
 
 [[package]]
@@ -8083,40 +8043,29 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "svm-rs"
-version = "0.2.19"
+version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e18bbb2b229a2cc0d8ba58603adb0e460ad49a3451b1540fd6f7a5d37fd03b80"
+checksum = "3a04fc4f5cd35c700153b233f5575ccb3237e0f941fa5049d9e98254d10bf2fe"
 dependencies = [
- "anyhow",
- "cfg-if 1.0.0",
- "clap 3.2.23",
- "console 0.14.1",
- "dialoguer 0.8.0",
  "fs2",
  "hex",
  "home",
- "indicatif 0.16.2",
- "itertools",
  "once_cell",
- "rand 0.8.5",
  "reqwest",
  "semver",
  "serde",
  "serde_json",
- "sha2 0.9.9",
- "tempfile",
+ "sha2 0.10.6",
  "thiserror",
- "tokio",
- "tracing",
  "url",
  "zip",
 ]
 
 [[package]]
 name = "svm-rs-builds"
-version = "0.1.11"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebf4cc09b0dd1cd78bc8ca82c5e22bbcd0cca126ad0d584e2fc47d4dc0a3dd73"
+checksum = "32deae08684d03d8a4ba99b8a3b0a1575364820339930f6fa2afdfa3a6d98c84"
 dependencies = [
  "build_const",
  "hex",
@@ -8245,16 +8194,6 @@ dependencies = [
 
 [[package]]
 name = "terminal_size"
-version = "0.1.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "633c1a546cee861a1a6d0dc69ebeca693bf4296661ba7852b9d21d159e0506df"
-dependencies = [
- "libc",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "terminal_size"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb20089a8ba2b69debd491f8d2d023761cbf196e999218c591fa1e7e15a21907"
@@ -8302,7 +8241,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
 dependencies = [
- "terminal_size 0.2.3",
+ "terminal_size",
  "unicode-width",
 ]
 
