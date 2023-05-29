@@ -191,13 +191,10 @@ l1BatchTimestamp     null
 
 > :exclamation: Aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`.
 
-<<<<<<< Updated upstream
 Compile smart contracts to zkEvm bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval by other components of the application.
-=======
-Compile smart contracts to zkEvm bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval for other components of the application.
->>>>>>> Stashed changes
 
 ```sh
+
 Compiler subcommands for zkSync
 
 Usage: 
@@ -698,6 +695,8 @@ There are 2 workarounds:
  - download the compiler manually - and then use `--offline` mode (you can download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20 )
 
 You can get the lastest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
+
+You might have to remove the `zkout` directory (that holds the compilation artifacts) - and in some rare scenarios also cleanup the installed solc versions (by removing `~/.svm/` directory)
 
 ### `solc` versions >0.8.19 are not supported, found 0.8.20
 

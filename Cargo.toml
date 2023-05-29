@@ -59,7 +59,7 @@ panic = "abort"
 strip = true
 
 # # Patch ethers-rs with a local checkout then run `cargo update -p ethers`
-# [patch."https://github.com/gakonst/ethers-rs"]
+# [patch."https://github.com/mm-zk/ethers-rs"]
 # ethers = { path = "../ethers-rs" }
 # ethers-addressbook = { path = "../ethers-rs/ethers-addressbook" }
 # ethers-core = { path = "../ethers-rs/ethers-core" }

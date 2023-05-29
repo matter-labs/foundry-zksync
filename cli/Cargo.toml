@@ -24,7 +24,7 @@ ui = {path = "../ui"}
 web3 = "0.18"
 
 # eth
-ethers = {git = "https://github.com/gakonst/ethers-rs", default-features = false, features = ["rustls"]}
+ethers = {git = "https://github.com/mm-zk/ethers-rs", branch = "foundry_zksync_fix",default-features = false, features = ["rustls"]}
 solang-parser = "=0.2.1"
 
 # cli
