@@ -63,12 +63,12 @@ pub struct ZkDepositTxArgs {
     operator_tip: Option<U256>,
 
     /// The zkSync RPC Layer 2 endpoint.
-    /// Can be provided via the env var ZKSYNC_RPC_URL
+    /// Can be provided via the env var L2_RPC_URL
     /// or --l2-url from the command line.
     ///
-    /// NOTE: For Deposits, ETH_RPC_URL, or --rpc-url should be set to the Layer 1 RPC URL
+    /// NOTE: For Deposits, L1_RPC_URL, or --l1-url should be set to the Layer 1 RPC URL
     #[clap(
-        env = "ZKSYNC_RPC_URL",
+        env = "L2_RPC_URL",
         long,
         short = 'z',
         help = "The zkSync RPC endpoint.",
