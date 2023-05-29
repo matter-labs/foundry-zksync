@@ -369,10 +369,6 @@ pub struct Config {
     /// Warnings gathered when loading the Config. See [`WarningsProvider`] for more information
     #[serde(default, skip_serializing)]
     pub __warnings: Vec<Warning>,
-
-    /// zksync specific stuff
-    /// 
-    pub zksolc: String,
 }
 
 /// Mapping of fallback standalone sections. See [`FallbackProfileProvider`]
@@ -1756,7 +1752,6 @@ impl Default for Config {
             doc: Default::default(),
             __non_exhaustive: (),
             __warnings: vec![],
-            zksolc: "zksync".into(),
         }
     }
 }
