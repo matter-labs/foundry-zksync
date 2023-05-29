@@ -34,6 +34,7 @@ Currently, the industry standard frameworks are Hardhat and Truffle which both u
 Check you have the zkSync Era [dev dependencies](https://github.com/matter-labs/zksync-era/blob/main/docs/setup-dev.md).
 
 ### Installation
+<<<<<<< Updated upstream
 
 > :grey_exclamation: Installation steps include cloning the zkSync Era application, [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync), and the example project, [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project).
 
@@ -58,6 +59,16 @@ $ git submodule update --init --recursive
 ```
 mkdir fzksync && cd fzksync
 ```
+=======
+
+> :grey_exclamation: Installation steps include cloning the zkSync Era application, [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync), and the example project, [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project).
+
+1. Create a top-level directory and `cd` into it.
+
+```
+mkdir fzksync && cd fzksync
+```
+>>>>>>> Stashed changes
 
 2. Clone the repos into the same directory.
 
@@ -207,7 +218,11 @@ l1BatchTimestamp     null
 
 > :exclamation: Aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`.
 
+<<<<<<< Updated upstream
 Compile smart contracts to zkEvm bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval by other components of the application.
+=======
+Compile smart contracts to zkEvm bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval for other components of the application.
+>>>>>>> Stashed changes
 
 ```sh
 Compiler subcommands for zkSync
