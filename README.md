@@ -46,7 +46,7 @@ $ git submodule update --init --recursive
 ```
 ---
 
-## Version 0.0 (Linux & Mac)
+## Version Alpha - 0.0 (Linux & Mac)
 
 We need to establish the functionality we want for release v0.0 of this implementation. Below we will specify the exact features to accomplish our v0.0 release.
 
@@ -59,6 +59,8 @@ We need to establish the functionality we want for release v0.0 of this implemen
 - ***Send transactions to deployed contracts on zkSync Testnet or Local Test Node***
 
 NOTE: All commands are entered from the project root folder
+
+NOTE: in this version we also have a dependency on our fork of ethers-rs, so that we can support the new solidity binaries on Apple Silicon. This dependency should be removed in a near future.
 
 ---
 
@@ -657,6 +659,8 @@ There are 2 workarounds:
  - download the compiler manually - and then use `--offline` mode (you can download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20 )
 
 You can get the lastest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
+
+You might have to remove the `zkout` directory (that holds the compilation artifacts) - and in some rare scenarios also cleanup the installed solc versions (by removing `~/.svm/` directory)
 
 ### `solc` versions >0.8.19 are not supported, found 0.8.20
 
