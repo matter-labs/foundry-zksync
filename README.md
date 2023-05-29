@@ -46,7 +46,7 @@ $ git submodule update --init --recursive
 ```
 ---
 
-## Version 0.0 (Linux & Mac)
+## Version Alpha - 0.0 (Linux & Mac)
 
 We need to establish the functionality we want for release v0.0 of this implementation. Below we will specify the exact features to accomplish our v0.0 release.
 
@@ -59,6 +59,8 @@ We need to establish the functionality we want for release v0.0 of this implemen
 - ***Send transactions to deployed contracts on zkSync Testnet or Local Test Node***
 
 NOTE: All commands are entered from the project root folder
+
+NOTE: in this version we also have a dependency on our fork of ethers-rs, so that we can support the new solidity binaries on Apple Silicon. This dependency should be removed in a near future.
 
 ---
 
