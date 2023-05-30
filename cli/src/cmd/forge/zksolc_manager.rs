@@ -21,7 +21,7 @@
 /// This module abstracts the details of managing the zksolc compiler, making it easier for developers to use
 /// different versions of the compiler without dealing with the details of downloading, setting up, and switching
 /// between versions. It is part of a larger framework for managing and interacting with zkSync contracts.
-use anyhow::{anyhow, Error, Result, Context};
+use anyhow::{anyhow, Context, Error, Result};
 use dirs;
 use reqwest::blocking::Client;
 use serde::Serialize;
@@ -49,7 +49,10 @@ pub enum ZkSolcVersion {
     V138,
     V139,
     V1310,
+    V1311,
 }
+
+pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.3.11";
 
 /// `parse_version` parses a string representation of a `zksolc` compiler version
 /// and returns the `ZkSolcVersion` enum variant if it matches a supported version.
@@ -70,6 +73,7 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.8" => Ok(ZkSolcVersion::V138),
         "v1.3.9" => Ok(ZkSolcVersion::V139),
         "v1.3.10" => Ok(ZkSolcVersion::V1310),
+        "v1.3.11" => Ok(ZkSolcVersion::V1311),
         _ => Err(Error::msg(
             "ZkSolc compiler version not supported. Proper version format: 'v1.3.x'",
         )),
@@ -90,6 +94,7 @@ impl ZkSolcVersion {
             ZkSolcVersion::V138 => "v1.3.8",
             ZkSolcVersion::V139 => "v1.3.9",
             ZkSolcVersion::V1310 => "v1.3.10",
+            ZkSolcVersion::V1311 => "v1.3.11",
         }
     }
 }
@@ -98,7 +103,7 @@ impl ZkSolcVersion {
 enum ZkSolcOS {
     Linux,
     MacAMD,
-    MacARM
+    MacARM,
 }
 
 /// `get_operating_system` identifies the current operating system and returns the corresponding `ZkSolcOS` variant.
@@ -242,7 +247,9 @@ impl ZkSolcManagerBuilder {
     ///
     /// This function can return an `Err` if the operating system cannot be determined using `get_operating_system`.
     fn get_compiler(self) -> Result<String> {
-        get_operating_system().with_context(|| "Failed to determine OS for compiler").map(|it| it.get_compiler().to_string())
+        get_operating_system()
+            .with_context(|| "Failed to determine OS for compiler")
+            .map(|it| it.get_compiler().to_string())
     }
 
     /// `build` constructs and returns a `ZkSolcManager` instance based on the provided configuration options.
