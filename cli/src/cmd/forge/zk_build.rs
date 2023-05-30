@@ -25,7 +25,9 @@
 /// easy-to-use interface for contract compilation while taking care of the underlying complexities.
 use super::build::CoreBuildArgs;
 use super::zksolc::{ZkSolc, ZkSolcOpts};
-use super::zksolc_manager::{ZkSolcManager, ZkSolcManagerBuilder, ZkSolcManagerOpts};
+use super::zksolc_manager::{
+    ZkSolcManager, ZkSolcManagerBuilder, ZkSolcManagerOpts, DEFAULT_ZKSOLC_VERSION,
+};
 use crate::cmd::{Cmd, LoadConfig};
 use clap::Parser;
 use ethers::prelude::Project;
@@ -74,7 +76,7 @@ pub struct ZkBuildArgs {
         help_heading = "ZkSync Compiler options",
         value_name = "ZK_SOLC_VERSION",
         long = "use-zksolc",
-        default_value = "v1.3.9"
+        default_value = DEFAULT_ZKSOLC_VERSION
     )]
     #[serde(skip)]
     pub use_zksolc: String,
@@ -160,7 +162,10 @@ impl ZkBuildArgs {
         }
 
         if !zksolc_manager.exists() {
-            println!("Downloading zksolc compiler from {:?}", zksolc_manager.get_full_download_url().unwrap().to_string());
+            println!(
+                "Downloading zksolc compiler from {:?}",
+                zksolc_manager.get_full_download_url().unwrap().to_string()
+            );
             zksolc_manager
                 .download()
                 .map_err(|err| eyre::eyre!("Failed to download the file: {}", err))?;
