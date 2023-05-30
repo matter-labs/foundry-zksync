@@ -16,10 +16,11 @@ use crate::{
     cmd::cast::zk_utils::zk_utils::{
         get_chain, get_private_key, get_rpc_url, get_signer, get_url_with_port,
     },
-    opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts},
+    opts::{cast::parse_name_or_address, TransactionOpts, Wallet},
 };
 use clap::Parser;
 use ethers::types::NameOrAddress;
+use foundry_config::Chain;
 use zksync::{
     self,
     types::{Address, H160, U256},
@@ -62,12 +63,12 @@ pub struct ZkDepositTxArgs {
     operator_tip: Option<U256>,
 
     /// The zkSync RPC Layer 2 endpoint.
-    /// Can be provided via the env var ZKSYNC_RPC_URL
+    /// Can be provided via the env var L2_RPC_URL
     /// or --l2-url from the command line.
     ///
-    /// NOTE: For Deposits, ETH_RPC_URL, or --rpc-url should be set to the Layer 1 RPC URL
+    /// NOTE: For Deposits, L1_RPC_URL, or --l1-url should be set to the Layer 1 RPC URL
     #[clap(
-        env = "ZKSYNC_RPC_URL",
+        env = "L2_RPC_URL",
         long,
         short = 'z',
         help = "The zkSync RPC endpoint.",
@@ -84,8 +85,16 @@ pub struct ZkDepositTxArgs {
     tx: TransactionOpts,
 
     /// Ethereum-specific options, such as the network and wallet.
+    /// We use the options directly, as we want to have a separate URL 
+    #[clap(env = "L1_RPC_URL", long = "l1-rpc-url", help = "The L1 RPC endpoint.", value_name = "L1_URL")]
+    pub l1_url: Option<String>,
+
+    #[clap(long, env = "CHAIN", value_name = "CHAIN_NAME")]
+    pub chain: Option<Chain>,
+
     #[clap(flatten)]
-    eth: EthereumOpts,
+    pub wallet: Wallet,
+
 }
 
 impl ZkDepositTxArgs {
@@ -101,10 +110,10 @@ impl ZkDepositTxArgs {
     /// - Ok: If the deposit transaction is successfully completed.
     /// - Err: If an error occurred during the execution of the deposit transaction.
     pub async fn run(self) -> eyre::Result<()> {
-        let private_key = get_private_key(&self.eth.wallet.private_key)?;
-        let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
+        let private_key = get_private_key(&self.wallet.private_key)?;
+        let l1_url = get_rpc_url(&self.l1_url)?;
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
-        let chain = get_chain(self.eth.chain)?;
+        let chain = get_chain(self.chain)?;
         let signer = get_signer(private_key, &chain);
         let wallet = wallet::Wallet::with_http_client(&l2_url, signer);
         let to_address = self.get_to_address();
@@ -116,7 +125,7 @@ impl ZkDepositTxArgs {
         match wallet {
             Ok(w) => {
                 println!("Bridging assets....");
-                let eth_provider = w.ethereum(rpc_url).await.map_err(|e| e)?;
+                let eth_provider = w.ethereum(l1_url).await.map_err(|e| e)?;
                 let tx_hash = eth_provider
                     .deposit(
                         token_address,

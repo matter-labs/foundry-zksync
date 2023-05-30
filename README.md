@@ -68,11 +68,14 @@ NOTE: in this version we also have a dependency on our fork of ethers-rs, so tha
 
 By providing the following environment variables in the `.env` file at the `PROJECT-ROOT` folder, the `--rpc-url` and `--chain` flags can be ommitted in command lines.
 ```bash
-# ETH_RPC_URL can be used to replace --rpc-url in command line 
+# ETH_RPC_URL can be used to replace --rpc-url in command line (used for most of the commands)
 ETH_RPC_URL=http://localhost:3050
 
-# ZKSYNC_RPC_URL can be used to replace --l2-url in command line for zk-deposit
-ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev
+
+## L1_RPC_URL and L2_RPC_URL are used only for the zk-deposit command.
+L1_RPC_URL=https://localhost:8545
+# L2_RPC_URL can be used to replace --l2-url in command line for zk-deposit
+L2_RPC_URL=https://localhost:3050
 
 # CHAIN can be used to replace --chain in command line  
 # Local: 270, Testnet: 280
@@ -157,12 +160,12 @@ l1BatchTimestamp     null
 ### ***L1 → L2 deposits:*** 
 
 ```bash
-zkcast zk-deposit <TO> <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --l2-url <L2URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
+zkcast zk-deposit <TO> <AMOUNT> <TOKEN> --l1-url <L1_RPC-URL> --l2-url <L2URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
 ```
 NOTE: Leave `<TOKEN>` blank to bridge ETH
 
 ```bash
-Usage: zkcast zk-deposit  <TO> <AMOUNT> --rpc-url <ETH_RPC_URL> --l2-url <L2URL> [OPTIONS] [BRIDGE] [TIP]
+Usage: zkcast zk-deposit  <TO> <AMOUNT> --l1-url <L1_RPC_URL> --l2-url <L2URL> [OPTIONS] [BRIDGE] [TIP]
 
 Arguments:
   <TO>
@@ -178,12 +181,12 @@ Arguments:
           Optional fee that the user can choose to pay in addition to the regular transaction fee.
 
 Options:
+  --l1-url <L1URL>
+          The address of the L1 network (Ethereum).
   -z, --l2-url <L2URL>
-          The zkSync RPC Layer 2 endpoint. Can be provided via the env var ZKSYNC_RPC_URL or --l2-url from the command line.
-          
-          NOTE: For Deposits, ETH_RPC_URL, or --rpc-url should be set to the Layer 1 RPC URL
-          
-          [env: ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev]
+          The zkSync RPC Layer 2 endpoint. Can be provided via the env var L2_RPC_URL or --l2-url from the command line.
+                    
+          [env: L2_RPC_URL=https://zksync2-testnet.zksync.dev]
 
       --token <TOKEN>
           Token to bridge. Leave blank for ETH.
