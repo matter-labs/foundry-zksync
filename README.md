@@ -33,7 +33,7 @@ Check you have the zkSync Era [dev dependencies](https://github.com/matter-labs/
 
 ### Installation
 
-> :grey_exclamation: Installation steps include cloning the zkSync Era application, [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync), and the example project, [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project).
+> Installation steps include cloning the zkSync Era application, [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync), and the example project, [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project).
 
 1. Create a top-level directory and `cd` into it.
 
@@ -73,16 +73,17 @@ CHAIN=270
 
 ### Spin up local Docker node
 
-[Follow these instructions to set up local docker node.](https://era.zksync.io/docs/api/hardhat/testing.html)
+Follow [these instructions]((https://era.zksync.io/docs/api/hardhat/testing.html)) to set up a local Docker node.
+
 ---
 
 ## Interact with blockchain
 
-> :exclamation: Enter all commands from the `sample-fzksync-project` project root.
+> Enter all commands from the `sample-fzksync-project` project root.
 
 ### Use the `zkcast` command
 
-1. Get chain id of local node
+#### Get chain id of local node
 
 ```sh
 ../foundry-zksync/target/debug/zkcast chain-id --rpc-url http://localhost:3050
@@ -92,7 +93,7 @@ CHAIN=270
 
 270
 
-2. Get chain id of testnet 
+#### Get chain id of testnet 
 
 ```sh
 ../foundry-zksync/target/debug/zkcast chain-id --rpc-url https://zksync2-testnet.zksync.dev:443
@@ -104,7 +105,7 @@ CHAIN=270
 280
 ```
 
-3. Get client 
+#### Get client 
 
 ```sh
 ../foundry-zksync/target/debug/zkcast client --rpc-url https://zksync2-testnet.zksync.dev:443
@@ -116,7 +117,7 @@ CHAIN=270
 zkSync/v2.0
 ```
 
-4. Get account's L2 ETH balance
+#### Get account's L2 ETH balance
 
 ```sh 
 ../foundry-zksync/target/debug/zkcast balance 0x42C7eF198f8aC9888E2B1b73e5B71f1D4535194A --rpc-url https://zksync2-testnet.zksync.dev:443
@@ -128,7 +129,7 @@ zkSync/v2.0
 447551277794355871
 ```
 
-5. Get gas price
+#### Get gas price
 
 ```sh
 ../foundry-zksync/target/debug/zkcast gas-price --rpc-url https://zksync2-testnet.zksync.dev:443
@@ -140,7 +141,7 @@ zkSync/v2.0
 250000000
 ```
 
-6. Get timestamp of latest block
+#### Get timestamp of latest block
 
 ```sh
 ../foundry-zksync/target/debug/zkcast age --block latest --rpc-url https://zksync2-testnet.zksync.dev:443
@@ -152,7 +153,7 @@ zkSync/v2.0
 Mon May  1 16:11:07 2023
 ```
 
-7. Get latest block
+#### Get latest block
 
 ```sh
 ../foundry-zksync/target/debug/zkcast block latest --rpc-url https://zksync2-testnet.zksync.dev:443
@@ -187,7 +188,7 @@ l1BatchTimestamp     null
 
 ## Compile with `zkforge zk-build`
 
-> :exclamation: Aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`.
+> Aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`.
 
 Compile smart contracts to zkEvm bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval by other components of the application.
 
@@ -205,11 +206,9 @@ Options:
       -h, --help         Print help
 ```
 
-> :important: `--is-system` flag
+> `--is-system` flag: It is necessary to compile some contracts, including those that deploy other contracts (such as factory contracts), using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder. If the folder does not exist, manually create it.
 
-        It is necessary to compile some contracts, including those that deploy other contracts (such as factory contracts), using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder. If the folder does not exist, manually create it.
-
-![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
+        ![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
 
 ### Example usage
 
