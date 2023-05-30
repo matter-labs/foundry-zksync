@@ -2,12 +2,10 @@
 
 This repository provides [Foundry](https://github.com/foundry-rs/foundry) functionality in Solidity for compiling, deploying, testing, and interacting with smart contracts on zkSync Era.
 
-Currently, the industry standard frameworks are Hardhat and Truffle which both use JavaScript to test and deploy Solidity smart contracts. Foundry only uses Solidity for testing. This creates a much smoother developer experience as an engineer does not need to switch from one language to another.
-
 ### Supported features
 
 - Compile smart contracts with the [zksolc compiler](https://github.com/matter-labs/zksolc-bin).
-- Deploy smart contracts to zkSync Era testnet or local test node.
+- Deploy smart contracts to zkSync Era mainnet, testnet, or local test node.
 - Bridge assets L1 <-> L2.
 - Call deployed contracts on zkSync Era testnet or local test node.
 - Send transactions to deployed contracts on zkSync Era testnet or local test node.
