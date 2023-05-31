@@ -1,132 +1,177 @@
-# ZkSync Smart Contract Testing, Deployment and Interaction Framework with Foundry
-### About
-Currently the industry standard Solidity smart contract test and deploy frameworks are Hardhat and Truffle. They both use JavaScript to test and deploy solidity smart contracts. Another smart contract testing platform by the name of Foundry. The  advantage that Foundry provides is that all tests are also written solidity creating a smoother developer experience. With Foundry, the engineer does not need to switch languages to write tests and deploy contracts.. 
+# Foundry with zkSync Era v0.0
 
-Currently only Hardhat has developed functionality for zkSync. The purpose of this repository is to create functionality with Foundry to fully test, compile and deploy smart contracts on zkSync using only Solidity, as well as interact with those contracts once deployed.
+This repository provides [Foundry](https://github.com/foundry-rs/foundry) functionality in Solidity for compiling, deploying, testing, and interacting with smart contracts on zkSync Era.
+
+### Supported features
+
+- Compile smart contracts with the [zksolc compiler](https://github.com/matter-labs/zksolc-bin).
+- Deploy smart contracts to zkSync Era mainnet, testnet, or local test node.
+- Bridge assets L1 <-> L2.
+- Call deployed contracts on zkSync Era testnet or local test node.
+- Send transactions to deployed contracts on zkSync Era testnet or local test node.
 
 ---
+
 ## Contents
 
-- [**Quick Start / Installation**](https://github.com/matter-labs/foundry-zksync#quick-start--installation)
-- [**v0.0 Feature Set**](https://github.com/matter-labs/foundry-zksync#feature-set)
-- [**Environment Variables**](https://github.com/matter-labs/foundry-zksync#environment-variables)
-- [**Blockchain Interaction**](https://github.com/matter-labs/foundry-zksync#blockchain-interaction)
-- [**Bridging Assets**](https://github.com/matter-labs/foundry-zksync#bridging-assets-l1--l2)
-- [**Compilation**](https://github.com/matter-labs/foundry-zksync#compilation)
-- [**Deployment**](https://github.com/matter-labs/foundry-zksync#deployment)
-- [**Contract Interaction**](https://github.com/matter-labs/foundry-zksync#contract-interaction)
-- [**Deploy and Interact with `SimpleFactory.sol`**](https://github.com/matter-labs/foundry-zksync#usage-example-simplefactorysol)
-- [**Account Abstraction Multisig example**](https://github.com/matter-labs/foundry-zksync#account-abstraction-multisig)
-
+- [Set up](https://github.com/matter-labs/foundry-zksync#set-up)
+- [Interact with blockchain](https://github.com/matter-labs/foundry-zksync#interact-with-blockchain)
+- [Compile](https://github.com/matter-labs/foundry-zksync#compile)
+- [Deploy](https://github.com/matter-labs/foundry-zksync#deploy)
+- [Bridge assets](https://github.com/matter-labs/foundry-zksync#bridge-assets-l1--l2)
+- [Interact with contract](https://github.com/matter-labs/foundry-zksync#interact-with-contract)
+- [Deploy and interact with `SimpleFactory.sol`](https://github.com/matter-labs/foundry-zksync#deploy-and-interact-with-simplefactorysol)
+- [Account abstraction multisig example](https://github.com/matter-labs/foundry-zksync#account-abstraction-multisig)
+- [Troubleshooting](https://github.com/matter-labs/foundry-zksync#troubleshooting)
 
 ---
----
 
-### Quick Start / Installation
+## Set up
 
-Clone these two repos to the same directory:
+### Prerequisites
 
-- [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync) - this is our application, we will be building this in the following steps
-- [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project) - this is the sample project that contains the smart contract to be compiled
+- [Rust compiler](https://www.rust-lang.org/tools/install).
 
+### Installation
 
-```bash
-# make working directory and cd anywhere on filesystem
-$ mkdir fzksync && cd fzksync
-# clone foundry-zksync
-$ git clone https://github.com/matter-labs/foundry-zksync.git 
-# clone fzksync-project
-$ git clone https://github.com/sammyshakes/sample-fzksync-project.git
-# cd into foundry-zksync and build
-$ cd foundry-zksync
-$ cargo build -p foundry-cli
-# cd into fzksync-project and update the submodules
-$ cd ../sample-fzksync-project
-$ git submodule update --init --recursive
+> Installation steps include cloning the zkSync Era application, [**foundry-zksync**](https://github.com/matter-labs/foundry-zksync), and the example project, [**sample-fzksync-project**](https://github.com/sammyshakes/sample-fzksync-project).
+
+1. Create a top-level directory and `cd` into it.
+
 ```
----
+mkdir fzksync && cd fzksync
+```
 
-## Version Alpha - 0.0 (Linux & Mac)
+2. Clone the repos into the same directory.
 
-We need to establish the functionality we want for release v0.0 of this implementation. Below we will specify the exact features to accomplish our v0.0 release.
+```sh
+git clone https://github.com/matter-labs/foundry-zksync.git 
+git clone https://github.com/sammyshakes/sample-fzksync-project.git
+```
 
-### Feature Set
+3. `cd` into the `foundry-zksync` and build the application.
 
-- ***Compile smart contracts with zksolc compiler***
-- ***Deploy smart contracts to zkSync Testnet or Local Test Node***
-- ***Bridge assets L1 <-> L2***
-- ***Make contract calls to deployed contracts on zkSync Testnet or Local Test Node***
-- ***Send transactions to deployed contracts on zkSync Testnet or Local Test Node***
+```sh
+cd foundry-zksync
+cargo build -p foundry-cli
+```
 
-NOTE: All commands are entered from the project root folder
+4. `cd` into the project folder and update the git submodules.
 
-NOTE: in this version we also have a dependency on our fork of ethers-rs, so that we can support the new solidity binaries on Apple Silicon. This dependency should be removed in a near future.
+```sh
+cd ../sample-fzksync-project
+git submodule update --init --recursive
+```
 
----
+### Environment variables
 
-## Environment Variables
+Create a new file `.env` at the `PROJECT-ROOT` and copy/paste the following environment variables. 
 
-By providing the following environment variables in the `.env` file at the `PROJECT-ROOT` folder, the `--rpc-url` and `--chain` flags can be ommitted in command lines.
-```bash
-# ETH_RPC_URL can be used to replace --rpc-url in command line (used for most of the commands)
+```txt
+# ETH_RPC_URL replaces --rpc-url on the command line 
 ETH_RPC_URL=http://localhost:3050
 
-
-## L1_RPC_URL and L2_RPC_URL are used only for the zk-deposit command.
+## L1_RPC_URL and L2_RPC_URL are only used for `zk-deposit`
 L1_RPC_URL=https://localhost:8545
-# L2_RPC_URL can be used to replace --l2-url in command line for zk-deposit
+# L2_RPC_URL can be used to replace --l2-url in command line for `zk-deposit`
 L2_RPC_URL=https://localhost:3050
 
-# CHAIN can be used to replace --chain in command line  
+# CHAIN replaces --chain in command line  
 # Local: 270, Testnet: 280
 CHAIN=270
 ```
 
+### Spin up local Docker node
+
+Follow [these instructions]((https://era.zksync.io/docs/api/hardhat/testing.html)) to set up a local Docker node.
+
 ---
 
-### Spin up local docker node
-[Follow these instructions to set up local docker node](https://era.zksync.io/docs/api/hardhat/testing.html)
+## Interact with blockchain
 
----
+> Enter all commands from the `sample-fzksync-project` project root.
 
-## Blockchain Interaction
+### Use the `zkcast` command
 
-### Use the `zkcast` command to get blockchain data:
-```bash
-# chain id local node
+#### Get chain id of local node
+
+```sh
 ../foundry-zksync/target/debug/zkcast chain-id --rpc-url http://localhost:3050
-# output:
+```
+
+**Output**
+
 270
 
-#TESTNET
-# chain id testnet
+#### Get chain id of testnet 
+
+```sh
 ../foundry-zksync/target/debug/zkcast chain-id --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Output**
+
+```sh
 280
+```
 
-# client
+#### Get client 
+
+```sh
 ../foundry-zksync/target/debug/zkcast client --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Output**
+
+```sh
 zkSync/v2.0
+```
 
-# get account L2 eth balance
+#### Get account's L2 ETH balance
+
+```sh 
 ../foundry-zksync/target/debug/zkcast balance 0x42C7eF198f8aC9888E2B1b73e5B71f1D4535194A --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Output**
+
+```sh
 447551277794355871
+```
 
-# gas price
+#### Get gas price
+
+```sh
 ../foundry-zksync/target/debug/zkcast gas-price --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Example output**
+
+```sh
 250000000
+```
 
-# timestamp of latest block
+#### Get timestamp of latest block
+
+```sh
 ../foundry-zksync/target/debug/zkcast age --block latest --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
-Mon May  1 16:11:07 2023
+```
 
-# get latest block:
+**Example output**
+
+```sh
+Mon May  1 16:11:07 2023
+```
+
+#### Get latest block
+
+```sh
 ../foundry-zksync/target/debug/zkcast block latest --rpc-url https://zksync2-testnet.zksync.dev:443
-# output:
+```
+
+**Example output**
+
+```sh
 baseFeePerGas        250000000
 difficulty           0
 extraData            0x
@@ -149,140 +194,52 @@ totalDifficulty      0
 l1BatchNumber        null
 l1BatchTimestamp     null
 ```
-
 ---
 
-## Bridging Assets L1 ↔ L2 
+## Compile with `zkforge zk-build`
 
-### Bridge assets L1 ↔ L2 with `zkcast zk-send` and `zkcast zk-deposit`
+> Aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`.
 
+Compile smart contracts to zkEvm bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval by other components of the application.
 
-### ***L1 → L2 deposits:*** 
+```sh
 
-```bash
-zkcast zk-deposit <TO> <AMOUNT> <TOKEN> --l1-url <L1_RPC-URL> --l2-url <L2URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
-```
-NOTE: Leave `<TOKEN>` blank to bridge ETH
-
-```bash
-Usage: zkcast zk-deposit  <TO> <AMOUNT> --l1-url <L1_RPC_URL> --l2-url <L2URL> [OPTIONS] [BRIDGE] [TIP]
-
-Arguments:
-  <TO>
-          The destination of the transaction.
-
-  <AMOUNT>
-          Amount of token to deposit.
-
-  [BRIDGE]
-          The address of a custom bridge to call.
-
-  [TIP]
-          Optional fee that the user can choose to pay in addition to the regular transaction fee.
-
-Options:
-  --l1-url <L1URL>
-          The address of the L1 network (Ethereum).
-  -z, --l2-url <L2URL>
-          The zkSync RPC Layer 2 endpoint. Can be provided via the env var L2_RPC_URL or --l2-url from the command line.
-                    
-          [env: L2_RPC_URL=https://zksync2-testnet.zksync.dev]
-
-      --token <TOKEN>
-          Token to bridge. Leave blank for ETH.
-
-  -h, --help
-          Print help (see a summary with '-h')
-```
-
-#### Example Usage
-```bash
-../foundry-zksync/target/debug/zkcast zkdeposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 1000000 --rpc-url http://localhost:8545 --l2-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
-```
-#### Output
-```js
-Bridging assets....
-Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
-```
----
-
-### ***L2 → L1 withdrawals:***
-
-```bash
-zkcast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
-
-
-Arguments:
-  [TO]                  The withdraw recipient.
-
-
-Bridging options:
-  -w, --withdraw        For L2 -> L1 withdrawals.
-
-      --token <TOKEN>   Token to bridge. Leave blank for ETH.
-
-  -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
-```
-
-
-#### Example Usage:
-```bash
-../foundry-zksync/target/debug/zkcast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
-```
-#### Output
-```js
-Bridging assets....
-Transaction Hash: 0x94ef9e2eed345dcfef6f0b4f953f431b8edc6760e29b598a7cf446dab18d6317
-```
-
----
-
-## Compilation
-
-***v0.0*** ***Command***:
-## `zkforge zk-build`
-### aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`
-
-Compile smart contracts to zkEvm bytecode and store compile output files into a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval for other components of the application.
-
-
-
-
-```bash
 Compiler subcommands for zkSync
 
 Usage: 
 zkforge zk-build [OPTIONS]
-
 
 Options:
       --use-zksolc   Specify zksolc compiler version (default if left blank)
       --is-system    Enable the system contract compilation mode.
       --force-evmla  Sets the EVM legacy assembly pipeline forcibly
       -h, --help         Print help
-
-  
 ```
 
-### Compiling with `--is-system` flag
-It is necessary for some contracts, including those that deploy other contracts (such as factory contracts), to be compiled using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder, if the folder does not exist, manually create it:
+> `--is-system` flag: It is necessary to compile some contracts, including those that deploy other contracts (such as factory contracts), using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder. If the folder does not exist, manually create it.
 
-![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
+        ![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
 
-#### Example Usage
-To compile with only default compiler options (v1.3.9):
-```bash
+### Example usage
+
+To compile with default compiler options (v1.3.9).
+
+```sh
 ../foundry-zksync/target/debug/zkforge zk-build 
 ```
 
-#### Compiler Settings
-`zksolc` compiler version can optionally be configured using `--use-zksolc` flag:
+### Compiler settings
+
+Configure the `zksolc` compiler version using the optional `--use` flag.
+
 ```bash
-../foundry-zksync/target/debug/zkforge zkb --use-zksolc v1.3.8
+../foundry-zksync/target/debug/zkforge zkb --use 0.8.19
 ```
 
-#### Output
+**Example output**
+
 `zksolc` compiler artifacts can be found in the output folder:
+
 ```bash
 <PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
 ```
@@ -293,21 +250,18 @@ Example terminal output:
 ![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
 
 NOTE: Currently, until `forge remappings` are implemented, import paths must be relative to the contract importing it:
+
 ![image](https://github.com/matter-labs/foundry-zksync/assets/76663878/490b34f4-e286-42a7-8570-d4b228ec10c7)
 
-In this example, `SimpleFactory.sol` is in the `src/is-system/` folder.
+`SimpleFactory.sol` and `AAFactory.sol` are in the `src/is-system/` folder.
 
 ---
 
-## Deployment
+## Deploy with `zkforge zk-create`
 
-***v0.0*** ***Command***:
-## `zkforge zk-create`
-### aliases: `zkforge zkcreate`, `zkforge zk-deploy`, `zkforge zkc`
+> Aliases: `zkforge zkcreate`, `zkforge zk-deploy`, `zkforge zkc`
 
-Manage deployments in the native foundry/zkforge fashion, using the `zkforge zk-create` command.
-
-```bash
+```sh
 Deploy smart contracts to zksync.
 
 Usage: zkforge zk-create <CONTRACT> [OPTIONS] --rpc-url <RPC-URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
@@ -331,33 +285,128 @@ ZkSync Features:
           The factory dependencies in the form `<path>:<contractname>`.
 ```
 
+#### Example
 
-#### Example Usage
-To Deploy `src/Greeter.sol` to zksync local node:
+To deploy `src/Greeter.sol` to zkSync testnet:
+
 ```bash
-../foundry-zksync/target/debug/zkforge zkc src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
+../foundry-zksync/target/debug/zkforge zkc src/Greeter.sol:Greeter --constructor-args "ZkSync + Pineapple" --private-key <"PRIVATE_KEY"> --rpc-url https://zksync2-testnet.zksync.dev:443 --chain 280
 ```
 
 #### Output
-```js
+
+```txt
 Deploying contract...
 +-------------------------------------------------+
-Contract successfully deployed to address: 0xa1b809005e589f81de6ef9f48d67e35606c05fc3
-Transaction Hash: 0x34782985ba7c70b6bc4a8eb2b95787baec29356171fdbb18608037a2fcd7eda8
-Gas used: 168141
+Contract successfully deployed to address: 0x07d485ff2df314b240ec392ed86b137a661ddd35
+Transaction Hash: 0xdb6864fe1d19572a3ff509c5c7ed43f033d2dab8261a843808ed46e6e6ee51be
+Gas used: 89879008
 Effective gas price: 250000000
-Block Number: 249
+Block Number: 6651906
 +-------------------------------------------------+
 ```
 
+---
+
+## Bridge assets L1 ↔ L2 with `zkcast zk-send` and `zkcast zk-deposit`
+
+### L1 → L2 deposits
+
+```sh
+zkcast zk-deposit <TO> <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --l2-url <L2URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
+```
+NOTE: Leave `<TOKEN>` blank to bridge ETH
+
+```bash
+Usage: zkcast zk-deposit  <TO> <AMOUNT> --rpc-url <ETH_RPC_URL> --l2-url <L2URL> [OPTIONS] [BRIDGE] [TIP]
+
+Arguments:
+  <TO>
+          The destination of the transaction.
+
+  <AMOUNT>
+          Amount of token to deposit.
+
+  [BRIDGE]
+          The address of a custom bridge to call.
+
+  [TIP]
+          Optional fee that the user can choose to pay in addition to the regular transaction fee.
+
+Options:
+  -z, --l2-url <L2URL>
+          The zkSync RPC Layer 2 endpoint. Can be provided via the env var ZKSYNC_RPC_URL or --l2-url from the command line.
+          
+          NOTE: For Deposits, ETH_RPC_URL, or --rpc-url should be set to the Layer 1 RPC URL
+          
+          [env: ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev]
+
+      --token <TOKEN>
+          Token to bridge. Leave blank for ETH.
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+#### Example - error on this one
+
+```sh
+../foundry-zksync/target/debug/zkcast zkdeposit 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 1000000 --rpc-url http://localhost:8545 --l2-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+
+#### Output
+
+```txt
+Bridging assets....
+Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
+```
+---
+
+### L2 → L1 withdrawals
+
+```sh
+zkcast zk-send --withdraw <TO> --amount <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY>
+
+
+Arguments:
+  [TO]                  The withdraw recipient.
+
+
+Bridging options:
+  -w, --withdraw        For L2 -> L1 withdrawals.
+
+      --token <TOKEN>   Token to bridge. Leave blank for ETH.
+
+  -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
+```
+
+#### Example
+
+```sh
+../foundry-zksync/target/debug/zkcast zk-send --withdraw 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049 --amount 1000000 --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
+```
+
+#### Output
+
+```text
+Bridging assets....
++-------------------------------------------------+
+Transaction Hash: 0x3562f47db61de149fb7266c3a65935c4e8324cceb5a1db8718390a8a5a210191
+Gas used: 10276475
+Effective gas price: 250000000
+Block Number: 6652714
++-------------------------------------------------+
+```
 
 ---
-## Contract Interaction
-***v0.0*** ***Commands***:
-## `zkcast zk-send`
-### aliases: `zkcast zks`, `zkcast zksend`
-Interact with deployed contracts in the native foundry/zkforge fashion using the CLI `zkcast zk-send` command:
-```bash
+
+## Interact with contract with `zkcast zk-send`
+
+> Aliases: `zkcast zks`, `zkcast zksend`
+
+Interact with deployed contracts in the native foundry/zkforge fashion using the CLI `zkcast zk-send` command.
+
+```sh
 Sign and publish a zksync transaction.
 
 Usage: zkcast zk-send [OPTIONS] [TO] [SIG] [ARGS]...
@@ -382,53 +431,64 @@ Bridging options:
   -a, --amount <AMOUNT> Amount of token to bridge. Required value when bridging
 ```
 
-- Retrieving and interacting with chain data, for example, block numbers and gas estimates
-- Interact with deployed contracts on (zkSync Testnet or Local Docker Node)
+- Retrieve and interact with chain data. For example, block numbers and gas estimates.
+- Interact with deployed contracts on (zkSync Era testnet or local Docker node).
 
-### ***Non-state changing calls:***
+### Non-state changing calls
 
-```bash
+```sh
 zkcast call <CONTRACT_ADDRESS> <FUNCTION_SIG> --rpc-url <RPC-URL>
 ```
-#### Example Usage
+
+#### Example
+
 ```bash
 ../foundry-zksync/target/debug/zkcast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
 ```
+
 #### Output
-```js
+
+```txt
 ZkSync + Pineapple
 ```
 
-## Send transactions:
+### Send transactions
 
-```bash
+```sh
 zkcast zk-send <CONTRACT_ADDRESS> <FUNCTION_SIG> <FUNCTION_ARGS> --rpc-url <RPC-URL> --private-key <PRIVATE-KEY> --chain <CHAIN-ID>
 ```
-### Example Usage
-```bash
+
+#### Example
+
+```sh
 ../foundry-zksync/target/debug/zkcast zk-send 0x97b985951fd3e0c1d996421cc783d46c12d00082 "setGreeting(string)" "Killer combo!"  --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
+
 #### Output
-```js
+
+```txt
 Sending transaction....
 Transaction Hash: 0x7651fba8ddeb624cca93f89da493675ccbc5c6d36ee25ed620b07424ce338552
 ```
 
 #### Verify output
-```bash
+
+```sh
 ../foundry-zksync/target/debug/zkcast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
 ```
+
 #### Output
-```js
+
+```txt
 Killer combo!
 ```
 
 ---
 
-## Usage Example: `SimpleFactory.sol`
-### Deploying and Interacting with `SimpleFactory.sol`
+## Deploy and interact with `SimpleFactory.sol`
 
-#### Compile contracts:
+### Compile contract
+
 `SimpleFactory.sol` must be compiled with the `is-system` flag, so they need to be placed in the `src/is-sytem/` folder
 
 ```bash
@@ -437,12 +497,13 @@ Killer combo!
 
 ### Deploy `SimpleFactory.sol`
 
-```bash
+```sh
 ../foundry-zksync/target/debug/zkforge zkc src/SimpleFactory.sol:SimpleFactory --constructor-args 01000041691510d85ddfc6047cba6643748dc028636d276f09a546ab330697ef 010000238a587670be26087b7812eab86eca61e7c4014522bdceda86adb2e82f --factory-deps src/Child.sol:Child src/StepChild.sol:StepChild --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
-#### Output:
-```js
+#### Output
+
+```txt
 Deploying contract...
 +-------------------------------------------------+
 Contract successfully deployed to address: 0xa1b809005e589f81de6ef9f48d67e35606c05fc3
@@ -453,106 +514,123 @@ Block Number: 249
 +-------------------------------------------------+
 ```
 
-### Deploy `StepChlid.sol` via `SimpleFactory.sol`
-```bash
+### Deploy `StepChild.sol` via `SimpleFactory.sol`
+
+```sh
 ../foundry-zksync/target/debug/zkcast zk-send 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519 "newStepChild()" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 
-#### Output:
-```bash
+#### Output
+
+```sh
 Sending transaction....
 Transaction Hash: 0xa82a0636b71af058d4916d81868eebc41173ca07b78d30fe57f4b74e9294ef25
 ```
 
 ### Interact with `SimpleFactory.sol`
-```bash
+
+```sh
 ../foundry-zksync/target/debug/zkcast call 0x23cee3fb585b1e5092b7cfb222e8e873b05e9519 "stepChildren(uint256)(address)" 0 --rpc-url http://localhost:3050
 ```
 
-#### Output:
+#### Output
+
 `StepChild.sol` deployed address:
-```js
+
+```txt
 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96
 ```
 
 ### Interact with `StepChild.sol`
+
 Use `zkcast call` to check initial state:
-```bash
+
+```sh
 ../foundry-zksync/target/debug/zkcast call 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "isEnabled()(bool)" --rpc-url http://localhost:3050
 ```
 
 #### Output:
-```js
+
+```txt
 false
 ```
 
 Use `zkcast zk-send` to modify state:
-```bash
+
+```sh
 ../foundry-zksync/target/debug/zkcast zk-send 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "enable()" --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 
-#### Output:
-```bash
+#### Output
+
+```sh
 Sending transaction....
 Transaction Hash: 0xe005e15e9f58b7dcdcc7b16a9d5c706ddef7a4c9cab82216ea944d5344ba01ae
 ```
 
+Use `zkcast call` to check modified state.
 
-Use `zkcast call` to check modified state:
-```bash
+```sh
 ../foundry-zksync/target/debug/zkcast call 0xbc88C5Cdfe2659ebDD5dbb7e1a695A4cb189Df96 "isEnabled()(bool)" --rpc-url http://localhost:3050
 ```
 
-#### Output:
-```js
+#### Output
+
+```txt
 true
 ```
 
 ---
 
-# Account abstraction multisig
+## Account abstraction multisig
 
-
-### This section compiles, deploys and interacts with the contracts from the zkSync Era [**Account Abstraction Multisig example**](https://era.zksync.io/docs/dev/tutorials/custom-aa-tutorial.html)
+This section compiles, deploys, and interacts with the contracts from the zkSync Era [**Account Abstraction Multisig example**](https://era.zksync.io/docs/dev/tutorials/custom-aa-tutorial.html)
 
 Contracts:
+
 - [**AAFactory.sol**](https://era.zksync.io/docs/dev/tutorials/custom-aa-tutorial.html)
 - [**TwoUserMultiSig.sol**](https://github.com/sammyshakes/sample-fzksync-project/blob/main/src/TwoUserMultiSig.sol)
 
-## Compile `AAFactory.sol`:
-#### `AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
-It needs to be placed in the `src/is-sytem/` folder
+### Compile `AAFactory.sol`
 
-```bash
+`AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
+
+Place the contract in the `src/is-sytem/` folder
+
+```sh
 # command line using zkforge zk-build
 ../foundry-zksync/target/debug/zkforge zk-build
 ```
-#### Output:
-```bash
+
+#### Output
+
+```sh
 AAFactory -> Bytecode Hash: "010000791703a54dbe2502b00ee470989c267d0f6c0d12a9009a947715683744" 
 Compiled Successfully
 ```
 
-## Deploy `AAFactory.sol`:
+### Deploy `AAFactory.sol`:
 
-To deploy the factory we need the `Bytecode Hash` of the `TwoUserMultiSig.sol` contract to provide to the constructor of `AAFactory.sol`:
+To deploy the factory we need the `Bytecode Hash` of the `TwoUserMultiSig.sol` contract to provide to the constructor of `AAFactory.sol`.
 
 ```js
 constructor(bytes32 _aaBytecodeHash) {
         aaBytecodeHash = _aaBytecodeHash;
     }
 ```
+
 Note: `aaBytecodeHash` = Bytecode hash of `TwoUserMultiSig.sol`
 
-#### To deploy a contract that deploys other contracts it is necessary to provide the bytecodes of the children contracts in the `factory-deps` field of the transaction. This can be accomplished by using the `--factory-deps` flag and providing the full contract path in the format: `<path>:<contractname>`
+To deploy a contract that deploys other contracts, it is necessary to provide the bytecodes of the child contracts in the `factory-deps` field of the transaction. This can be accomplished by using the `--factory-deps` flag and providing the full contract path in the format: `<path>:<contractname>`
 
-```bash
+```sh
 # command line using zkforge zk-create
 ../foundry-zksync/target/debug/zkforge zkc src/is-system/AAFactory.sol:AAFactory --constructor-args 010007572230f4df5b4e855ff48d4cdfffc9405522117d7e020ee42650223460 --factory-deps src/TwoUserMultiSig.sol:TwoUserMultisig --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --rpc-url http://localhost:3050 --chain 270
 ```
 
-#### Output:
-```bash
+#### Output
+
+```sh
 Deploying contract...
 +-------------------------------------------------+
 Contract successfully deployed to address: 0xd5608cec132ed4875d19f8d815ec2ac58498b4e5
@@ -565,41 +643,49 @@ Block Number: 291
 
 Now that we have the `AAFactory.sol` contract address we can call `deployAccount` function to deploy a new `TwoUserMultiSig.sol` instance.
 
-Here is the interface of `deployAccount`:
+Here is the interface of `deployAccount`.
+
 ```js
 function deployAccount(bytes32 salt, address owner1, address owner2) external returns (address accountAddress)
 ```
 
-we need to provide the two owner addresses for the newly deployed multisig:
+We need to provide the two owner addresses for the newly deployed multisig:
+
 ```js
 owner1 = 0xa61464658AfeAf65CccaaFD3a512b69A83B77618
 owner2 = 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
 ```
 
-We are also just using a `0x00` value for the ***salt*** parameter. (you will need a unique value for salt for each instance that uses same owner wallets)
-```bash
+We are also just using a `0x00` value for the ***salt*** parameter. (You will need a unique value for salt for each instance that uses same owner wallets).
+
+```sh
 # command line using zkcast zk-send
 ../foundry-zksync/target/debug/zkcast zk-send 0xd5608cec132ed4875d19f8d815ec2ac58498b4e5 "deployAccount(bytes32,address,address)(address)" 0x00 0xa61464658AfeAf65CccaaFD3a512b69A83B77618 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e --rpc-url http://localhost:3050 --private-key 7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110 --chain 270
 ```
 
-#### Output:
-```bash
+#### Output
+
+```sh
 Sending transaction....
 Transaction Hash: 0x43a4dded84a12891dfae4124b42b9f091750e953193bd779a7e5e4d422909e73
 0x03e50ec034f1d363de0add752c33d4831a2731bf, <---- Deployed contract address
 ```
-Viola! The new `TwoUserMultiSig.sol` contract has been deployed to:
-```js
+
+The new `TwoUserMultiSig.sol` contract has been deployed to:
+
+```txt
 0x03e50ec034f1d363de0add752c33d4831a2731bf
 ```
 
-We can check the tx receipt using `zkcast tx <TX-HASH>`
-```bash
+Check the tx receipt using `zkcast tx <TX-HASH>`
+
+```sh
 ../foundry-zksync/target/debug/zkcast tx 0x22364a3e191ad10013c5f20036e9696e743a4f686bc58a0106ef0b9e7592347c --rpc-url http://localhost:3050
 ```
 
-### Output:
-```bash
+#### Output
+
+```sh
 blockHash            0x2f3e2be46a7cb9f9e9df503903990e6670e88224e52232c988b5a730c82d98c0
 blockNumber          297
 from                 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049
@@ -618,25 +704,31 @@ l1BatchNumber        149
 l1BatchTxIndex       0
 ```
 
-We can verify by using `zkcast call` to call the public variables 'owner1' and 'owner2' on the newly deployed `TwoUserMultiSig.sol` contract:
+Verify with `zkcast call` to call the public variables 'owner1' and 'owner2' on the newly deployed `TwoUserMultiSig.sol` contract.
 
 Verify `owner1`:
-```bash
+
+```sh
 # command line using zkcast call
 ../foundry-zksync/target/debug/zkcast call 0x03e50ec034f1d363de0add752c33d4831a2731bf "owner1()(address)" --rpc-url http://localhost:3050
 ```
-#### Output:
-```js
+
+#### Output
+
+```txt
 0xa61464658AfeAf65CccaaFD3a512b69A83B77618
 ```
 
 Verify `owner2`:
-```bash
+
+```sh
 # command line using zkcast call
 ../foundry-zksync/target/debug/zkcast call 0x03e50ec034f1d363de0add752c33d4831a2731bf "owner2()(address)" --rpc-url http://localhost:3050
 ```
-#### Output:
-```js
+
+#### Output
+
+```txt
 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
 ```
 
@@ -645,9 +737,10 @@ Verify `owner2`:
 ### Verify arguments
 
 Make sure that:
-* you are using zksync specific methods (`zkcreate` not `create`, `zksend` not `send`)
-* that you've set the correct `--rpc-url`
-* that you have the proper contract address - the bytecodes in zkSync are different than in EVM - so the resulting contracts will be deployed at different addresses
+
+* You are using zksync specific methods (`zkcreate` not `create`, `zksend` not `send`).
+* You set the correct `--rpc-url`.
+* You have the proper contract address - the bytecodes in zkSync Era are different to in EVM - so the resulting contracts will be deployed at different addresses.
 
 ### 'Method not found' when calling 'send'
 
@@ -655,15 +748,16 @@ If you get errors like `(code: -32601, message: Method not found, data: None)` -
 
 ### 'Could not get solc: Unknown version provided', 'checksum not found'
 
-These errors might show up on the Mac with ARM chip (M1, M2) - due to the fact that most recent solc compilers are not auto-downloaded there.
+These errors might show up on the Mac with ARM chip (M1, M2) due to the fact that most recent solc compilers are not auto-downloaded there.
 
 There are 2 workarounds:
- - use the older compiler - by adding `--use 0.8.17` flag to your zk-build command
- - download the compiler manually - and then use `--offline` mode (you can download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20 )
 
-You can get the lastest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
+ - Use an older compiler by adding `--use 0.8.19` flag to the `zk-build` command.
+ - Download the compiler manually and then use the `--offline` mode. (Download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20).
 
-You might have to remove the `zkout` directory (that holds the compilation artifacts) - and in some rare scenarios also cleanup the installed solc versions (by removing `~/.svm/` directory)
+You can get the latest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
+
+You might have to remove the `zkout` directory (that holds the compilation artifacts) and in some rare scenarios also cleanup the installed solc versions (by removing `~/.svm/` directory)
 
 ### `solc` versions >0.8.19 are not supported, found 0.8.20
 
@@ -671,4 +765,4 @@ This means that our zksync compiler doesn't support that version of solidity yet
 
 In such case, please remove the artifacts (by removing `zkout` directory) and re-run with the older version of solidity (`--use 0.8.19`) for example.
 
-You might also have to remove `~/.svm/0.8.20/solc-0.8.20` file too.
+You might also have to remove the `~/.svm/0.8.20/solc-0.8.20` file.
