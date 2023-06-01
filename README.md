@@ -1,6 +1,6 @@
-# Foundry with zkSync Era v0.0
+# Foundry with zkSync Era v0.1
 
-This repository provides [Foundry](https://github.com/foundry-rs/foundry) functionality in Solidity for compiling, deploying, testing, and interacting with smart contracts on zkSync Era.
+This repository provides [Foundry](https://github.com/foundry-rs/foundry) functionality in Solidity for compiling, deploying, and interacting with smart contracts on zkSync Era.
 
 ### Supported features
 
@@ -77,7 +77,7 @@ L1_RPC_URL=https://localhost:8545
 L2_RPC_URL=https://localhost:3050
 
 # CHAIN replaces --chain in command line  
-# Local: 270, Testnet: 280
+# Local: 270, Testnet: 280, Mainnet: 324
 CHAIN=270
 ```
 
@@ -222,7 +222,7 @@ Options:
 
 ### Example usage
 
-To compile with default compiler options (v1.3.9).
+To compile with default compiler options (v1.3.11).
 
 ```sh
 ../foundry-zksync/target/debug/zkforge zk-build 
@@ -313,16 +313,16 @@ Block Number: 6651906
 ### L1 → L2 deposits
 
 ```sh
-zkcast zk-deposit <TO> <AMOUNT> <TOKEN> --rpc-url <RPC-URL> --l2-url <L2URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
+zkcast zk-deposit <TO> <AMOUNT> <TOKEN> --l1-rpc-url <L1-RPC-URL> --l2-url <L2URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
 ```
 NOTE: Leave `<TOKEN>` blank to bridge ETH
 
 ```bash
-Usage: zkcast zk-deposit  <TO> <AMOUNT> --rpc-url <ETH_RPC_URL> --l2-url <L2URL> [OPTIONS] [BRIDGE] [TIP]
+Usage: zkcast zk-deposit  <TO> <AMOUNT> --l1-rpc-url <ETH_RPC_URL> --l2-url <L2URL> [OPTIONS] [BRIDGE] [TIP]
 
 Arguments:
   <TO>
-          The destination of the transaction.
+          The L2 address that receives the tokens.
 
   <AMOUNT>
           Amount of token to deposit.
