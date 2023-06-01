@@ -200,7 +200,7 @@ l1BatchTimestamp     null
 
 > Aliases: `zkforge zkbuild`, `zkforge zk-compile`, `zkforge zkb`.
 
-Compile smart contracts to zkEvm bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval by other components of the application.
+Compile smart contracts to zkEVM bytecode and store the compiled output files in a logical directory structure `<PROJECT-ROOT>/zkout/` for easy retrieval by other components of the application.
 
 ```sh
 
