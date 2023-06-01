@@ -216,7 +216,7 @@ Options:
       -h, --help         Print help
 ```
 
-> `--is-system` flag: It is necessary to compile some contracts, including those that deploy other contracts (such as factory contracts), using the `--is-sytem` flag. These contracts should be placed in the `src/is-system/` folder. If the folder does not exist, manually create it.
+> `--is-system` flag: It is necessary to compile some contracts, including those that deploy other contracts (such as factory contracts), using the `--is-system` flag. These contracts should be placed in the `src/is-system/` folder. If the folder does not exist, manually create it.
 
         ![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
 
@@ -489,7 +489,7 @@ Killer combo!
 
 ### Compile contract
 
-`SimpleFactory.sol` must be compiled with the `is-system` flag, so they need to be placed in the `src/is-sytem/` folder
+`SimpleFactory.sol` must be compiled with the `is-system` flag, so they need to be placed in the `src/is-system/` folder
 
 ```bash
 ../foundry-zksync/target/debug/zkforge zk-build
@@ -595,7 +595,7 @@ Contracts:
 
 `AAFactory.sol` needs to be compiled with the `--is-system` flag because it will be interacting with system contracts to deploy the multisig wallets.
 
-Place the contract in the `src/is-sytem/` folder
+Place the contract in the `src/is-system/` folder
 
 ```sh
 # command line using zkforge zk-build
