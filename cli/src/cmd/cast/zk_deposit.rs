@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 /// This module handles Bridging assets to ZkSync from Layer 1.
 /// It defines the CLI arguments for the `cast zk-deposit` command and provides functionality
 /// for depositing assets onto zkSync.
@@ -19,13 +21,13 @@ use crate::{
     opts::{cast::parse_name_or_address, TransactionOpts, Wallet},
 };
 use clap::Parser;
-use ethers::types::NameOrAddress;
 use foundry_config::Chain;
-use zksync::{
-    self,
-    types::{Address, H160, U256},
-    wallet,
-};
+use zksync::{self, wallet};
+use zksync_web3_rs::providers::Middleware;
+use zksync_web3_rs::providers::{Http, Provider};
+use zksync_web3_rs::signers::{LocalWallet, Signer};
+use zksync_web3_rs::types::{Address, NameOrAddress, H160, U256};
+use zksync_web3_rs::ZKSWallet;
 
 /// Struct to represent the command line arguments for the `cast zk-deposit` command.
 ///
@@ -34,15 +36,14 @@ use zksync::{
 /// bridge address, an optional operator tip, the zkSync RPC endpoint, and the token to bridge.
 #[derive(Debug, Parser)]
 pub struct ZkDepositTxArgs {
-    /// The destination address of the transaction.
-    /// This can be either a name or an address.
-    #[clap(
-            help = "The destination of the transaction.",
-             value_parser = parse_name_or_address,
-            value_name = "TO"
-        )]
-    to: NameOrAddress,
-
+    // /// The destination address of the transaction.
+    // /// This can be either a name or an address.
+    // #[clap(
+    //         help = "The destination of the transaction.",
+    //          value_parser = parse_name_or_address,
+    //         value_name = "TO"
+    //     )]
+    // to: NameOrAddress,
     /// The amount of the token to deposit.
     #[clap(
         help = "Amount of token to deposit.",
@@ -85,8 +86,13 @@ pub struct ZkDepositTxArgs {
     tx: TransactionOpts,
 
     /// Ethereum-specific options, such as the network and wallet.
-    /// We use the options directly, as we want to have a separate URL 
-    #[clap(env = "L1_RPC_URL", long = "l1-rpc-url", help = "The L1 RPC endpoint.", value_name = "L1_URL")]
+    /// We use the options directly, as we want to have a separate URL
+    #[clap(
+        env = "L1_RPC_URL",
+        long = "l1-rpc-url",
+        help = "The L1 RPC endpoint.",
+        value_name = "L1_URL"
+    )]
     pub l1_url: Option<String>,
 
     #[clap(long, env = "CHAIN", value_name = "CHAIN_NAME")]
@@ -94,7 +100,6 @@ pub struct ZkDepositTxArgs {
 
     #[clap(flatten)]
     pub wallet: Wallet,
-
 }
 
 impl ZkDepositTxArgs {
@@ -110,54 +115,69 @@ impl ZkDepositTxArgs {
     /// - Ok: If the deposit transaction is successfully completed.
     /// - Err: If an error occurred during the execution of the deposit transaction.
     pub async fn run(self) -> eyre::Result<()> {
-        let private_key = get_private_key(&self.wallet.private_key)?;
+        let private_key = &self.wallet.private_key.unwrap();
         let l1_url = get_rpc_url(&self.l1_url)?;
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
         let chain = get_chain(self.chain)?;
-        let signer = get_signer(private_key, &chain);
-        let wallet = wallet::Wallet::with_http_client(&l2_url, signer);
-        let to_address = self.get_to_address();
-        let token_address: Address = match self.token {
-            Some(token_addy) => token_addy,
-            None => Address::zero(),
-        };
+        // let to_address = self.get_to_address();
+        // let token_address: Address = match self.token {
+        //     Some(token_addy) => token_addy,
+        //     None => Address::zero(),
+        // };
 
-        match wallet {
-            Ok(w) => {
-                println!("Bridging assets....");
-                let eth_provider = w.ethereum(l1_url).await.map_err(|e| e)?;
-                let tx_hash = eth_provider
-                    .deposit(
-                        token_address,
-                        self.amount,
-                        to_address,
-                        self.operator_tip,
-                        self.bridge_address,
-                        None,
-                    )
-                    .await?;
+        let l1_provider = Provider::try_from(l1_url)?;
+        let l2_provider = Provider::try_from(l2_url)?;
+        let wallet = LocalWallet::from_str(private_key).unwrap().with_chain_id(chain.id());
+        let zk_wallet =
+            ZKSWallet::new(wallet, Some(l2_provider.clone()), Some(l1_provider.clone())).unwrap();
 
-                println!("Transaction Hash: {:#?}", tx_hash);
-            }
-            Err(e) => eyre::bail!("Failed to download the file: {}", e),
-        }
+        let l1_receipt = zk_wallet.deposit(self.amount.into()).await.unwrap();
+        println!("l1 receipt: {:?}", l1_receipt);
+
+        let l2_receipt = l2_provider
+            .get_transaction_receipt(l1_receipt.transaction_hash)
+            .await
+            .unwrap()
+            .unwrap();
+        println!("l2 receipt: {:?}", l2_receipt);
+
+        // match wallet {
+        //     Ok(w) => {
+        //         println!("Bridging assets....");
+        //         let eth_provider = w.ethereum(l1_url).await.map_err(|e| e)?;
+        //         let tx_hash = eth_provider
+        //             .deposit(
+        //                 token_address,
+        //                 self.amount,
+        //                 to_address,
+        //                 self.operator_tip,
+        //                 self.bridge_address,
+        //                 None,
+        //             )
+        //             .await?;
+
+        //         println!("Transaction Hash: {:#?}", tx_hash);
+        //     }
+        //     Err(e) => eyre::bail!("Failed to download the file: {}", e),
+        // }
 
         Ok(())
     }
 
-    /// Retrieves the 'to' address from the command line arguments.
-    ///
-    /// The 'to' address is expected to be a command line argument (`to`).
-    /// If it is not provided, the function will return an error.
-    ///
-    /// # Returns
-    ///
-    /// A `H160` which represents the 'to' address.
-    fn get_to_address(&self) -> H160 {
-        let to = self.to.as_address().expect("Please enter TO address.");
-        let deployed_contract = to.as_bytes();
-        zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
-    }
+    // Retrieves the 'to' address from the command line arguments.
+    //
+    // The 'to' address is expected to be a command line argument (`to`).
+    // If it is not provided, the function will return an error.
+    //
+    // # Returns
+    //
+    // A `H160` which represents the 'to' address.
+    // FIXME
+    // fn get_to_address(&self) -> H160 {
+    //     let to = self.to.as_address().expect("Please enter TO address.");
+    //     let deployed_contract = to.as_bytes();
+    //     zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
+    // }
 }
 
 /// Converts a string to a `U256` number.

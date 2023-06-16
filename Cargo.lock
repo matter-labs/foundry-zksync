@@ -242,8 +242,8 @@ dependencies = [
  "crc 3.0.1",
  "ctrlc",
  "ethereum-forkid",
- "ethers",
- "ethers-solc",
+ "ethers 1.0.2",
+ "ethers-solc 1.0.2",
  "fdlimit",
  "forge",
  "foundry-common",
@@ -275,7 +275,7 @@ name = "anvil-core"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "ethers-core",
+ "ethers-core 1.0.2",
  "foundry-evm",
  "hash-db",
  "hash256-std-hasher",
@@ -620,6 +620,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349a06037c7bf932dd7e7d1f653678b2038b9ad46a74102f1fc7bd7872678cce"
 
 [[package]]
+name = "base16ct"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
+
+[[package]]
 name = "base58"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -906,6 +912,9 @@ name = "bs58"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+dependencies = [
+ "sha2 0.9.9",
+]
 
 [[package]]
 name = "bstr"
@@ -1032,11 +1041,11 @@ version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
- "ethers-contract",
- "ethers-core",
- "ethers-etherscan",
- "ethers-providers",
- "ethers-signers",
+ "ethers-contract 1.0.2",
+ "ethers-core 1.0.2",
+ "ethers-etherscan 1.0.2",
+ "ethers-providers 1.0.2",
+ "ethers-signers 1.0.2",
  "eyre",
  "foundry-common",
  "foundry-config",
@@ -1088,8 +1097,8 @@ dependencies = [
  "clap 4.3.2",
  "criterion",
  "dirs 4.0.0",
- "ethers",
- "ethers-solc",
+ "ethers 1.0.2",
+ "ethers-solc 1.0.2",
  "eyre",
  "forge",
  "forge-fmt",
@@ -1105,7 +1114,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
- "solang-parser",
+ "solang-parser 0.2.1",
  "strum",
  "time 0.3.22",
  "tokio",
@@ -1371,11 +1380,30 @@ checksum = "634c509653de24b439672164bbf56f5f582a2ab0e313d3b0f6af0b7345cf2560"
 dependencies = [
  "bincode",
  "bs58",
- "coins-core",
+ "coins-core 0.7.0",
  "digest 0.10.7",
  "getrandom 0.2.10",
  "hmac 0.12.1",
- "k256",
+ "k256 0.11.6",
+ "lazy_static",
+ "serde",
+ "sha2 0.10.6",
+ "thiserror",
+]
+
+[[package]]
+name = "coins-bip32"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b30a84aab436fcb256a2ab3c80663d8aec686e6bae12827bb05fef3e1e439c9f"
+dependencies = [
+ "bincode",
+ "bs58",
+ "coins-core 0.8.3",
+ "digest 0.10.7",
+ "getrandom 0.2.10",
+ "hmac 0.12.1",
+ "k256 0.13.1",
  "lazy_static",
  "serde",
  "sha2 0.10.6",
@@ -1389,11 +1417,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a11892bcac83b4c6e95ab84b5b06c76d9d70ad73548dd07418269c5c7977171"
 dependencies = [
  "bitvec 0.17.4",
- "coins-bip32",
+ "coins-bip32 0.7.0",
  "getrandom 0.2.10",
  "hex",
  "hmac 0.12.1",
  "pbkdf2 0.11.0",
+ "rand 0.8.5",
+ "sha2 0.10.6",
+ "thiserror",
+]
+
+[[package]]
+name = "coins-bip39"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84f4d04ee18e58356accd644896aeb2094ddeafb6a713e056cef0c0a8e468c15"
+dependencies = [
+ "bitvec 0.17.4",
+ "coins-bip32 0.8.3",
+ "getrandom 0.2.10",
+ "hmac 0.12.1",
+ "once_cell",
+ "pbkdf2 0.12.1",
  "rand 0.8.5",
  "sha2 0.10.6",
  "thiserror",
@@ -1409,6 +1454,26 @@ dependencies = [
  "base64 0.12.3",
  "bech32",
  "blake2 0.10.6",
+ "digest 0.10.7",
+ "generic-array 0.14.7",
+ "hex",
+ "ripemd",
+ "serde",
+ "serde_derive",
+ "sha2 0.10.6",
+ "sha3 0.10.6",
+ "thiserror",
+]
+
+[[package]]
+name = "coins-core"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b949a1c63fb7eb591eb7ba438746326aedf0ae843e51ec92ba6bec5bb382c4f"
+dependencies = [
+ "base64 0.21.2",
+ "bech32",
+ "bs58",
  "digest 0.10.7",
  "generic-array 0.14.7",
  "hex",
@@ -1872,6 +1937,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-bigint"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf4c2f4e1afd912bc40bfd6fed5d9dc1f288e0ba01bfcc835cc5bc3eb13efe15"
+dependencies = [
+ "generic-array 0.14.7",
+ "rand_core 0.6.4",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "crypto-common"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2074,6 +2151,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "der"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56acb310e15652100da43d130af8d97b509e95af61aab1c5a7939ef24337ee17"
+dependencies = [
+ "const-oid",
+ "zeroize",
+]
+
+[[package]]
 name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2138,6 +2225,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer 0.10.4",
+ "const-oid",
  "crypto-common",
  "subtle",
 ]
@@ -2235,10 +2323,24 @@ version = "0.14.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "413301934810f597c1d19ca71c8710e99a3f1ba28a0d2ebc01551a2daeea3c5c"
 dependencies = [
- "der",
- "elliptic-curve",
- "rfc6979",
- "signature",
+ "der 0.6.1",
+ "elliptic-curve 0.12.3",
+ "rfc6979 0.3.1",
+ "signature 1.6.4",
+]
+
+[[package]]
+name = "ecdsa"
+version = "0.16.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0997c976637b606099b9985693efa3581e84e41f5c11ba5255f88711058ad428"
+dependencies = [
+ "der 0.7.6",
+ "digest 0.10.7",
+ "elliptic-curve 0.13.5",
+ "rfc6979 0.4.0",
+ "signature 2.1.0",
+ "spki 0.7.2",
 ]
 
 [[package]]
@@ -2265,16 +2367,35 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7bb888ab5300a19b8e5bceef25ac745ad065f3c9f7efc6de1b91958110891d3"
 dependencies = [
- "base16ct",
- "crypto-bigint",
- "der",
+ "base16ct 0.1.1",
+ "crypto-bigint 0.4.9",
+ "der 0.6.1",
  "digest 0.10.7",
- "ff",
+ "ff 0.12.1",
  "generic-array 0.14.7",
- "group",
- "pkcs8",
+ "group 0.12.1",
+ "pkcs8 0.9.0",
  "rand_core 0.6.4",
- "sec1",
+ "sec1 0.3.0",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "elliptic-curve"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "968405c8fdc9b3bf4df0a6638858cc0b52462836ab6b1c87377785dd09cf1c0b"
+dependencies = [
+ "base16ct 0.2.0",
+ "crypto-bigint 0.5.2",
+ "digest 0.10.7",
+ "ff 0.13.0",
+ "generic-array 0.14.7",
+ "group 0.13.0",
+ "pkcs8 0.10.2",
+ "rand_core 0.6.4",
+ "sec1 0.7.2",
  "subtle",
  "zeroize",
 ]
@@ -2319,7 +2440,25 @@ dependencies = [
  "bs58",
  "bytes",
  "hex",
- "k256",
+ "k256 0.11.6",
+ "log",
+ "rand 0.8.5",
+ "rlp",
+ "serde",
+ "sha3 0.10.6",
+ "zeroize",
+]
+
+[[package]]
+name = "enr"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf56acd72bb22d2824e66ae8e9e5ada4d0de17a69c7fd35569dde2ada8ec9116"
+dependencies = [
+ "base64 0.13.1",
+ "bytes",
+ "hex",
+ "k256 0.13.1",
  "log",
  "rand 0.8.5",
  "rlp",
@@ -2540,14 +2679,30 @@ name = "ethers"
 version = "1.0.2"
 source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
- "ethers-addressbook",
- "ethers-contract",
- "ethers-core",
- "ethers-etherscan",
- "ethers-middleware",
- "ethers-providers",
- "ethers-signers",
- "ethers-solc",
+ "ethers-addressbook 1.0.2",
+ "ethers-contract 1.0.2",
+ "ethers-core 1.0.2",
+ "ethers-etherscan 1.0.2",
+ "ethers-middleware 1.0.2",
+ "ethers-providers 1.0.2",
+ "ethers-signers 1.0.2",
+ "ethers-solc 1.0.2",
+]
+
+[[package]]
+name = "ethers"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a58ce802c65cf3d0756dee5a61094a92cde53c1583b246e9ee5b37226c7fc15"
+dependencies = [
+ "ethers-addressbook 2.0.7",
+ "ethers-contract 2.0.7",
+ "ethers-core 2.0.7",
+ "ethers-etherscan 2.0.7",
+ "ethers-middleware 2.0.7",
+ "ethers-providers 2.0.7",
+ "ethers-signers 2.0.7",
+ "ethers-solc 2.0.7",
 ]
 
 [[package]]
@@ -2555,7 +2710,19 @@ name = "ethers-addressbook"
 version = "1.0.2"
 source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
- "ethers-core",
+ "ethers-core 1.0.2",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ethers-addressbook"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b856b7b8ff5c961093cb8efe151fbcce724b451941ce20781de11a531ccd578"
+dependencies = [
+ "ethers-core 2.0.7",
  "once_cell",
  "serde",
  "serde_json",
@@ -2566,10 +2733,29 @@ name = "ethers-contract"
 version = "1.0.2"
 source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
- "ethers-contract-abigen",
- "ethers-contract-derive",
- "ethers-core",
- "ethers-providers",
+ "ethers-contract-abigen 1.0.2",
+ "ethers-contract-derive 1.0.2",
+ "ethers-core 1.0.2",
+ "ethers-providers 1.0.2",
+ "futures-util",
+ "hex",
+ "once_cell",
+ "pin-project",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "ethers-contract"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e066a0d9cfc70c454672bf16bb433b0243427420076dc5b2f49c448fb5a10628"
+dependencies = [
+ "ethers-contract-abigen 2.0.7",
+ "ethers-contract-derive 2.0.7",
+ "ethers-core 2.0.7",
+ "ethers-providers 2.0.7",
  "futures-util",
  "hex",
  "once_cell",
@@ -2587,12 +2773,12 @@ dependencies = [
  "Inflector",
  "cfg-if 1.0.0",
  "dunce",
- "ethers-core",
- "ethers-etherscan",
+ "ethers-core 1.0.2",
+ "ethers-etherscan 1.0.2",
  "eyre",
  "getrandom 0.2.10",
  "hex",
- "prettyplease",
+ "prettyplease 0.1.25",
  "proc-macro2 1.0.60",
  "quote 1.0.28",
  "regex",
@@ -2607,17 +2793,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethers-contract-abigen"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c113e3e86b6bc16d98484b2c3bb2d01d6fed9f489fe2e592e5cc87c3024d616b"
+dependencies = [
+ "Inflector",
+ "dunce",
+ "ethers-core 2.0.7",
+ "ethers-etherscan 2.0.7",
+ "eyre",
+ "hex",
+ "prettyplease 0.2.6",
+ "proc-macro2 1.0.60",
+ "quote 1.0.28",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "syn 2.0.18",
+ "toml 0.7.4",
+ "walkdir",
+]
+
+[[package]]
 name = "ethers-contract-derive"
 version = "1.0.2"
 source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
- "ethers-contract-abigen",
- "ethers-core",
+ "ethers-contract-abigen 1.0.2",
+ "ethers-core 1.0.2",
  "hex",
  "proc-macro2 1.0.60",
  "quote 1.0.28",
  "serde_json",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "ethers-contract-derive"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c3fb5adee25701c79ec58fcf2c63594cd8829bc9ad6037ff862d5a111101ed2"
+dependencies = [
+ "Inflector",
+ "ethers-contract-abigen 2.0.7",
+ "ethers-core 2.0.7",
+ "hex",
+ "proc-macro2 1.0.60",
+ "quote 1.0.28",
+ "serde_json",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -2630,12 +2856,12 @@ dependencies = [
  "cargo_metadata",
  "chrono",
  "convert_case 0.6.0",
- "elliptic-curve",
+ "elliptic-curve 0.12.3",
  "ethabi 18.0.0",
  "generic-array 0.14.7",
  "hex",
- "k256",
- "num_enum",
+ "k256 0.11.6",
+ "num_enum 0.5.11",
  "once_cell",
  "open-fastrlp",
  "proc-macro2 1.0.60",
@@ -2652,17 +2878,63 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethers-core"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6da5fa198af0d3be20c19192df2bd9590b92ce09a8421e793bec8851270f1b05"
+dependencies = [
+ "arrayvec 0.7.2",
+ "bytes",
+ "cargo_metadata",
+ "chrono",
+ "elliptic-curve 0.13.5",
+ "ethabi 18.0.0",
+ "generic-array 0.14.7",
+ "hex",
+ "k256 0.13.1",
+ "num_enum 0.6.1",
+ "once_cell",
+ "open-fastrlp",
+ "rand 0.8.5",
+ "rlp",
+ "serde",
+ "serde_json",
+ "strum",
+ "syn 2.0.18",
+ "tempfile",
+ "thiserror",
+ "tiny-keccak 2.0.2",
+ "unicode-xid 0.2.4",
+]
+
+[[package]]
 name = "ethers-etherscan"
 version = "1.0.2"
 source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
- "ethers-core",
- "ethers-solc",
+ "ethers-core 1.0.2",
+ "ethers-solc 1.0.2",
  "getrandom 0.2.10",
  "reqwest",
  "semver",
  "serde",
  "serde-aux",
+ "serde_json",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "ethers-etherscan"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84ebb401ba97c6f5af278c2c9936c4546cad75dec464b439ae6df249906f4caa"
+dependencies = [
+ "ethers-core 2.0.7",
+ "ethers-solc 2.0.7",
+ "reqwest",
+ "semver",
+ "serde",
  "serde_json",
  "thiserror",
  "tracing",
@@ -2675,11 +2947,38 @@ source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#97792
 dependencies = [
  "async-trait",
  "auto_impl 0.5.0",
- "ethers-contract",
- "ethers-core",
- "ethers-etherscan",
- "ethers-providers",
- "ethers-signers",
+ "ethers-contract 1.0.2",
+ "ethers-core 1.0.2",
+ "ethers-etherscan 1.0.2",
+ "ethers-providers 1.0.2",
+ "ethers-signers 1.0.2",
+ "futures-locks",
+ "futures-util",
+ "instant",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-futures",
+ "url",
+]
+
+[[package]]
+name = "ethers-middleware"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "740f4a773c19dd6d6a68c8c2e0996c096488d38997d524e21dc612c55da3bd24"
+dependencies = [
+ "async-trait",
+ "auto_impl 1.1.0",
+ "ethers-contract 2.0.7",
+ "ethers-core 2.0.7",
+ "ethers-etherscan 2.0.7",
+ "ethers-providers 2.0.7",
+ "ethers-signers 2.0.7",
+ "futures-channel",
  "futures-locks",
  "futures-util",
  "instant",
@@ -2702,8 +3001,8 @@ dependencies = [
  "auto_impl 1.1.0",
  "base64 0.21.2",
  "bytes",
- "enr",
- "ethers-core",
+ "enr 0.7.0",
+ "ethers-core 1.0.2",
  "futures-channel",
  "futures-core",
  "futures-timer",
@@ -2733,17 +3032,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethers-providers"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56b498fd2a6c019d023e43e83488cd1fb0721f299055975aa6bac8dbf1e95f2c"
+dependencies = [
+ "async-trait",
+ "auto_impl 1.1.0",
+ "base64 0.21.2",
+ "bytes",
+ "enr 0.8.1",
+ "ethers-core 2.0.7",
+ "futures-core",
+ "futures-timer",
+ "futures-util",
+ "hashers",
+ "hex",
+ "http",
+ "instant",
+ "once_cell",
+ "pin-project",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-tungstenite 0.19.0",
+ "tracing",
+ "tracing-futures",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "ws_stream_wasm",
+]
+
+[[package]]
 name = "ethers-signers"
 version = "1.0.2"
 source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#9779264a752897103e58b266ac2f4dd9a2e735ca"
 dependencies = [
  "async-trait",
- "coins-bip32",
- "coins-bip39",
+ "coins-bip32 0.7.0",
+ "coins-bip39 0.7.0",
  "coins-ledger",
- "elliptic-curve",
+ "elliptic-curve 0.12.3",
  "eth-keystore",
- "ethers-core",
+ "ethers-core 1.0.2",
  "futures-executor",
  "futures-util",
  "hex",
@@ -2753,10 +3088,29 @@ dependencies = [
  "rusoto_kms",
  "semver",
  "sha2 0.10.6",
- "spki",
+ "spki 0.6.0",
  "thiserror",
  "tracing",
  "trezor-client",
+]
+
+[[package]]
+name = "ethers-signers"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02c4b7e15f212fa7cc2e1251868320221d4ff77a3d48068e69f47ce1c491df2d"
+dependencies = [
+ "async-trait",
+ "coins-bip32 0.8.3",
+ "coins-bip39 0.8.6",
+ "elliptic-curve 0.13.5",
+ "eth-keystore",
+ "ethers-core 2.0.7",
+ "hex",
+ "rand 0.8.5",
+ "sha2 0.10.6",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -2766,7 +3120,7 @@ source = "git+https://github.com/mm-zk/ethers-rs?branch=foundry_zksync_fix#97792
 dependencies = [
  "cfg-if 1.0.0",
  "dunce",
- "ethers-core",
+ "ethers-core 1.0.2",
  "fs_extra",
  "futures-util",
  "getrandom 0.2.10",
@@ -2784,10 +3138,41 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.6",
- "solang-parser",
+ "solang-parser 0.2.1",
  "svm-rs",
  "svm-rs-builds",
  "tempfile",
+ "thiserror",
+ "tiny-keccak 2.0.2",
+ "tokio",
+ "tracing",
+ "walkdir",
+ "yansi",
+]
+
+[[package]]
+name = "ethers-solc"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a81c89f121595cf8959e746045bb8b25a6a38d72588561e1a3b7992fc213f674"
+dependencies = [
+ "cfg-if 1.0.0",
+ "dunce",
+ "ethers-core 2.0.7",
+ "glob",
+ "hex",
+ "home",
+ "md-5 0.10.5",
+ "num_cpus",
+ "once_cell",
+ "path-slash",
+ "rayon",
+ "regex",
+ "semver",
+ "serde",
+ "serde_json",
+ "solang-parser 0.3.0",
+ "svm-rs",
  "thiserror",
  "tiny-keccak 2.0.2",
  "tokio",
@@ -2876,6 +3261,16 @@ name = "ff"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d013fc25338cc558c5c2cfbad646908fb23591e2404481826742b651c9af7160"
+dependencies = [
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
+name = "ff"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ded41244b729663b1e574f1b4fb731469f69f79c17667b5d776b16cda0479449"
 dependencies = [
  "rand_core 0.6.4",
  "subtle",
@@ -3016,7 +3411,7 @@ version = "0.2.0"
 dependencies = [
  "comfy-table",
  "data-encoding",
- "ethers",
+ "ethers 1.0.2",
  "eyre",
  "foundry-common",
  "foundry-config",
@@ -3047,8 +3442,8 @@ dependencies = [
  "auto_impl 1.1.0",
  "clap 3.2.25",
  "derive_more",
- "ethers-core",
- "ethers-solc",
+ "ethers-core 1.0.2",
+ "ethers-solc 1.0.2",
  "eyre",
  "forge-fmt",
  "foundry-common",
@@ -3059,7 +3454,7 @@ dependencies = [
  "mdbook",
  "once_cell",
  "rayon",
- "solang-parser",
+ "solang-parser 0.2.1",
  "thiserror",
  "tokio",
  "toml 0.5.11",
@@ -3071,12 +3466,12 @@ dependencies = [
 name = "forge-fmt"
 version = "0.2.0"
 dependencies = [
- "ethers-core",
+ "ethers-core 1.0.2",
  "foundry-config",
  "itertools",
  "pretty_assertions",
  "semver",
- "solang-parser",
+ "solang-parser 0.2.1",
  "thiserror",
  "toml 0.5.11",
 ]
@@ -3095,8 +3490,8 @@ name = "foundry-binder"
 version = "0.1.0"
 dependencies = [
  "curl",
- "ethers-contract",
- "ethers-solc",
+ "ethers-contract 1.0.2",
+ "ethers-solc 1.0.2",
  "eyre",
  "foundry-config",
  "git2",
@@ -3131,7 +3526,7 @@ dependencies = [
  "dunce",
  "error-chain",
  "ethabi 18.0.0",
- "ethers",
+ "ethers 1.0.2",
  "eyre",
  "forge",
  "forge-doc",
@@ -3163,7 +3558,7 @@ dependencies = [
  "serial_test",
  "sha2 0.10.6",
  "similar",
- "solang-parser",
+ "solang-parser 0.2.1",
  "strsim 0.10.0",
  "strum",
  "svm-rs",
@@ -3184,6 +3579,7 @@ dependencies = [
  "which",
  "yansi",
  "zksync",
+ "zksync-web3-rs",
  "zksync_eth_signer",
  "zksync_types",
  "zksync_utils",
@@ -3194,8 +3590,8 @@ name = "foundry-cli-test-utils"
 version = "0.1.0"
 dependencies = [
  "atty",
- "ethers",
- "ethers-solc",
+ "ethers 1.0.2",
+ "ethers-solc 1.0.2",
  "eyre",
  "foundry-common",
  "foundry-config",
@@ -3216,11 +3612,11 @@ dependencies = [
  "clap 4.3.2",
  "comfy-table",
  "dunce",
- "ethers-core",
- "ethers-etherscan",
- "ethers-middleware",
- "ethers-providers",
- "ethers-solc",
+ "ethers-core 1.0.2",
+ "ethers-etherscan 1.0.2",
+ "ethers-middleware 1.0.2",
+ "ethers-providers 1.0.2",
+ "ethers-solc 1.0.2",
  "eyre",
  "foundry-config",
  "once_cell",
@@ -3243,9 +3639,9 @@ version = "0.2.0"
 dependencies = [
  "Inflector",
  "dirs-next",
- "ethers-core",
- "ethers-etherscan",
- "ethers-solc",
+ "ethers-core 1.0.2",
+ "ethers-etherscan 1.0.2",
+ "ethers-solc 1.0.2",
  "eyre",
  "figment",
  "globset",
@@ -3273,7 +3669,7 @@ version = "0.2.0"
 dependencies = [
  "auto_impl 1.1.0",
  "bytes",
- "ethers",
+ "ethers 1.0.2",
  "eyre",
  "foundry-common",
  "foundry-config",
@@ -3304,7 +3700,7 @@ dependencies = [
 name = "foundry-macros"
 version = "0.1.0"
 dependencies = [
- "ethers-core",
+ "ethers-core 1.0.2",
  "foundry-common",
  "foundry-macros-impl",
 ]
@@ -3322,13 +3718,13 @@ dependencies = [
 name = "foundry-utils"
 version = "0.2.0"
 dependencies = [
- "ethers",
- "ethers-addressbook",
- "ethers-contract",
- "ethers-core",
- "ethers-etherscan",
- "ethers-providers",
- "ethers-solc",
+ "ethers 1.0.2",
+ "ethers-addressbook 1.0.2",
+ "ethers-contract 1.0.2",
+ "ethers-core 1.0.2",
+ "ethers-etherscan 1.0.2",
+ "ethers-providers 1.0.2",
+ "ethers-solc 1.0.2",
  "eyre",
  "forge-fmt",
  "foundry-common",
@@ -3566,6 +3962,7 @@ checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
+ "zeroize",
 ]
 
 [[package]]
@@ -3903,7 +4300,18 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dfbfb3a6cfbd390d5c9564ab283a0349b9b9fcd46a706c1eb10e0db70bfbac7"
 dependencies = [
- "ff",
+ "ff 0.12.1",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
+name = "group"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
+dependencies = [
+ "ff 0.13.0",
  "rand_core 0.6.4",
  "subtle",
 ]
@@ -4221,7 +4629,7 @@ dependencies = [
  "rustls-native-certs",
  "tokio",
  "tokio-rustls 0.23.4",
- "webpki-roots",
+ "webpki-roots 0.22.6",
 ]
 
 [[package]]
@@ -4605,7 +5013,7 @@ dependencies = [
  "tokio-rustls 0.23.4",
  "tokio-util 0.7.8",
  "tracing",
- "webpki-roots",
+ "webpki-roots 0.22.6",
 ]
 
 [[package]]
@@ -4708,10 +5116,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72c1e0b51e7ec0a97369623508396067a486bd0cbed95a2659a4b863d28cfc8b"
 dependencies = [
  "cfg-if 1.0.0",
- "ecdsa",
- "elliptic-curve",
+ "ecdsa 0.14.8",
+ "elliptic-curve 0.12.3",
  "sha2 0.10.6",
  "sha3 0.10.6",
+]
+
+[[package]]
+name = "k256"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cadb76004ed8e97623117f3df85b17aaa6626ab0b0831e6573f104df16cd1bcc"
+dependencies = [
+ "cfg-if 1.0.0",
+ "ecdsa 0.16.7",
+ "elliptic-curve 0.13.5",
+ "once_cell",
+ "sha2 0.10.6",
+ "signature 2.1.0",
 ]
 
 [[package]]
@@ -5452,7 +5874,16 @@ version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f646caf906c20226733ed5b1374287eb97e3c2a5c227ce668c1f2ce20ae57c9"
 dependencies = [
- "num_enum_derive",
+ "num_enum_derive 0.5.11",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a015b430d3c108a207fd776d2e2196aaf8b1cf8cf93253e3a097ff3085076a1"
+dependencies = [
+ "num_enum_derive 0.6.1",
 ]
 
 [[package]]
@@ -5465,6 +5896,18 @@ dependencies = [
  "proc-macro2 1.0.60",
  "quote 1.0.28",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96667db765a921f7b295ffee8b60472b686a51d4f21c2ee4ffdb94c7013b65a6"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2 1.0.60",
+ "quote 1.0.28",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -5953,6 +6396,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pbkdf2"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0ca0b5a68607598bf3bad68f32227a8164f6254833f84eafaac409cd6746c31"
+dependencies = [
+ "digest 0.10.7",
+ "hmac 0.12.1",
+]
+
+[[package]]
 name = "pear"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6173,8 +6626,18 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9eca2c590a5f85da82668fa685c09ce2888b9430e83299debf1f34b65fd4a4ba"
 dependencies = [
- "der",
- "spki",
+ "der 0.6.1",
+ "spki 0.6.0",
+]
+
+[[package]]
+name = "pkcs8"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
+dependencies = [
+ "der 0.7.6",
+ "spki 0.7.2",
 ]
 
 [[package]]
@@ -6258,6 +6721,16 @@ checksum = "6c8646e95016a7a6c4adea95bafa8a16baab64b583356217f2c85db4a39d9a86"
 dependencies = [
  "proc-macro2 1.0.60",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "prettyplease"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b69d39aab54d069e7f2fe8cb970493e7834601ca2d8c65fd7bbd183578080d1"
+dependencies = [
+ "proc-macro2 1.0.60",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -6855,7 +7328,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "webpki-roots",
+ "webpki-roots 0.22.6",
  "winreg",
 ]
 
@@ -6890,7 +7363,7 @@ dependencies = [
  "bytes",
  "hashbrown 0.13.2",
  "hex",
- "num_enum",
+ "num_enum 0.5.11",
  "primitive-types 0.12.1",
  "revm_precompiles",
  "rlp",
@@ -6906,7 +7379,7 @@ checksum = "0353d456ef3e989dc9190f42c6020f09bc2025930c37895826029304413204b5"
 dependencies = [
  "bytes",
  "hashbrown 0.13.2",
- "k256",
+ "k256 0.11.6",
  "num 0.4.0",
  "once_cell",
  "primitive-types 0.12.1",
@@ -6923,9 +7396,19 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7743f17af12fa0b03b803ba12cd6a8d9483a587e89c69445e3909655c0b9fabb"
 dependencies = [
- "crypto-bigint",
+ "crypto-bigint 0.4.9",
  "hmac 0.12.1",
  "zeroize",
+]
+
+[[package]]
+name = "rfc6979"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
+dependencies = [
+ "hmac 0.12.1",
+ "subtle",
 ]
 
 [[package]]
@@ -6970,6 +7453,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb919243f34364b6bd2fc10ef797edbfa75f33c252e7998527479c6d6b47e1ec"
 dependencies = [
  "bytes",
+ "rlp-derive",
  "rustc-hex",
 ]
 
@@ -7363,10 +7847,24 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3be24c1842290c45df0a7bf069e0c268a747ad05a192f2fd7dcfdbc1cba40928"
 dependencies = [
- "base16ct",
- "der",
+ "base16ct 0.1.1",
+ "der 0.6.1",
  "generic-array 0.14.7",
- "pkcs8",
+ "pkcs8 0.9.0",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "sec1"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0aec48e813d6b90b15f0b8948af3c63483992dee44c03e9930b3eebdabe046e"
+dependencies = [
+ "base16ct 0.2.0",
+ "der 0.7.6",
+ "generic-array 0.14.7",
+ "pkcs8 0.10.2",
  "subtle",
  "zeroize",
 ]
@@ -7862,6 +8360,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "signature"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e1788eed21689f9cf370582dfc467ef36ed9c707f073528ddafa8d83e3b8500"
+dependencies = [
+ "digest 0.10.7",
+ "rand_core 0.6.4",
+]
+
+[[package]]
 name = "similar"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7927,6 +8435,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "solang-parser"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a94494913728908efa7a25a2dd2e4f037e714897985c24273c40596638ed909"
+dependencies = [
+ "itertools",
+ "lalrpop",
+ "lalrpop-util",
+ "phf 0.11.1",
+ "thiserror",
+ "unicode-xid 0.2.4",
+]
+
+[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7939,7 +8461,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67cf02bbac7a337dc36e4f5a693db6c21e7863f45070f7064577eb4367a3212b"
 dependencies = [
  "base64ct",
- "der",
+ "der 0.6.1",
+]
+
+[[package]]
+name = "spki"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d1e996ef02c474957d681f1b05213dfb0abab947b446a62d37770b23500184a"
+dependencies = [
+ "base64ct",
+ "der 0.7.6",
 ]
 
 [[package]]
@@ -8499,7 +9031,22 @@ dependencies = [
  "tokio-rustls 0.23.4",
  "tungstenite 0.18.0",
  "webpki",
- "webpki-roots",
+ "webpki-roots 0.22.6",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec509ac96e9a0c43427c74f003127d953a265737636129424288d27cb5c4b12c"
+dependencies = [
+ "futures-util",
+ "log",
+ "rustls 0.21.1",
+ "tokio",
+ "tokio-rustls 0.24.1",
+ "tungstenite 0.19.0",
+ "webpki-roots 0.23.1",
 ]
 
 [[package]]
@@ -8907,6 +9454,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tungstenite"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15fba1a6d6bb030745759a9a2a588bfe8490fc8b4751a277db3a0be1c9ebbf67"
+dependencies = [
+ "byteorder",
+ "bytes",
+ "data-encoding",
+ "http",
+ "httparse",
+ "log",
+ "rand 0.8.5",
+ "rustls 0.21.1",
+ "sha1",
+ "thiserror",
+ "url",
+ "utf-8",
+ "webpki",
+]
+
+[[package]]
 name = "typenum"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8923,7 +9491,7 @@ name = "ui"
 version = "0.2.0"
 dependencies = [
  "crossterm 0.22.1",
- "ethers",
+ "ethers 1.0.2",
  "eyre",
  "forge",
  "hex",
@@ -9431,6 +9999,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "webpki-roots"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b03058f88386e5ff5310d9111d53f48b17d732b401aeb83a8d5190f2ac459338"
+dependencies = [
+ "rustls-webpki",
+]
+
+[[package]]
 name = "which"
 version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9771,7 +10348,7 @@ dependencies = [
  "bitflags 2.3.1",
  "blake2 0.10.6",
  "ethereum-types 0.12.1",
- "k256",
+ "k256 0.11.6",
  "lazy_static",
  "sha2 0.10.6",
  "sha3 0.10.6",
@@ -9818,6 +10395,26 @@ dependencies = [
  "zksync_types",
  "zksync_utils",
  "zksync_web3_decl",
+]
+
+[[package]]
+name = "zksync-web3-rs"
+version = "0.1.0"
+source = "git+https://github.com/lambdaclass/zksync-web3-rs/#93ddfa3a37f01e400141ec535d0ee0653ad5d255"
+dependencies = [
+ "async-trait",
+ "clap 4.3.2",
+ "env_logger",
+ "ethers 2.0.7",
+ "ethers-contract 2.0.7",
+ "eyre",
+ "hex",
+ "log",
+ "serde",
+ "serde_json",
+ "sha2 0.9.9",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
