@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, thread};
 
 /// This module handles Bridging assets to ZkSync from Layer 1.
 /// It defines the CLI arguments for the `cast zk-deposit` command and provides functionality
@@ -18,7 +18,7 @@ use crate::{
     cmd::cast::zk_utils::zk_utils::{
         get_chain, get_private_key, get_rpc_url, get_signer, get_url_with_port,
     },
-    opts::{cast::parse_name_or_address, TransactionOpts, Wallet},
+    opts::{TransactionOpts, Wallet},
 };
 use clap::Parser;
 use foundry_config::Chain;
@@ -29,6 +29,16 @@ use zksync_web3_rs::signers::{LocalWallet, Signer};
 use zksync_web3_rs::types::{Address, NameOrAddress, H160, U256};
 use zksync_web3_rs::ZKSWallet;
 
+// FIXME thisfunction belongs in the `crate::opts::cast` module. I moved it here because the rest
+// of the code is using the ethers types while we are using the `zksync_web3_rs` re-exports.
+pub fn parse_name_or_address(s: &str) -> eyre::Result<NameOrAddress> {
+    Ok(if s.starts_with("0x") {
+        NameOrAddress::Address(s.parse()?)
+    } else {
+        NameOrAddress::Name(s.into())
+    })
+}
+
 /// Struct to represent the command line arguments for the `cast zk-deposit` command.
 ///
 /// `ZkDepositTxArgs` contains parameters to be passed via the command line for the `cast zk-deposit`
@@ -36,14 +46,15 @@ use zksync_web3_rs::ZKSWallet;
 /// bridge address, an optional operator tip, the zkSync RPC endpoint, and the token to bridge.
 #[derive(Debug, Parser)]
 pub struct ZkDepositTxArgs {
-    // /// The destination address of the transaction.
-    // /// This can be either a name or an address.
-    // #[clap(
-    //         help = "The destination of the transaction.",
-    //          value_parser = parse_name_or_address,
-    //         value_name = "TO"
-    //     )]
-    // to: NameOrAddress,
+    /// The destination address of the transaction.
+    /// This can be either a name or an address.
+    #[clap(
+            help = "The destination of the transaction.",
+             value_parser = parse_name_or_address,
+            value_name = "TO"
+        )]
+    to: NameOrAddress,
+
     /// The amount of the token to deposit.
     #[clap(
         help = "Amount of token to deposit.",
@@ -139,6 +150,11 @@ impl ZkDepositTxArgs {
             .await
             .unwrap()
             .unwrap();
+
+        println!("Sleeping 30 seconds");
+        tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+        println!("Slept 30 seconds");
+
         println!("l2 receipt: {:?}", l2_receipt);
 
         // match wallet {

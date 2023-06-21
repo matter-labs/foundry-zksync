@@ -1,0 +1,7 @@
+#! /bin/sh
+set -eu
+
+address=0x36615Cf349d7F6344891B1e7CA7C72883F5dc049
+private_key=0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110
+
+cargo run --bin zkcast -- zk-deposit  --chain=270 --private-key "${private_key}" "${address}" 1
