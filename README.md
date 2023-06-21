@@ -1,3 +1,5 @@
+test ci
+
 # Foundry with zkSync Era v0.1
 
 This repository provides [Foundry](https://github.com/foundry-rs/foundry) functionality in Solidity for compiling, deploying, and interacting with smart contracts on zkSync Era.
