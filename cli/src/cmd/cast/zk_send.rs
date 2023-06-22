@@ -37,23 +37,18 @@
 /// The `print_receipt` method extracts relevant information from the transaction receipt and prints it to the console.
 /// This includes the transaction hash, gas used, effective gas price, block number, and deployed contract address, if applicable.
 use crate::cmd::cast::zk_utils::zk_utils::{
-    decode_hex, get_chain, get_private_key, get_rpc_url, get_signer,
+    get_chain, get_rpc_url,
 };
+use std::str::FromStr;
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
-use cast::TxBuilder;
 use clap::Parser;
 use ethers::types::NameOrAddress;
-use eyre::Context;
-use foundry_common::try_get_http_provider;
-use foundry_config::Config;
-use zksync::{
-    self,
-    signer::Signer,
-    types::{Address, TransactionReceipt, H160, U256},
-    wallet,
-};
-use zksync_eth_signer::PrivateKeySigner;
-use zksync_types::CONTRACT_DEPLOYER_ADDRESS;
+use zksync_web3_rs::types::{U256, TransactionReceipt, Address};
+use zksync_web3_rs::zks_utils::CONTRACT_DEPLOYER_ADDR;
+use zksync_web3_rs::ZKSWallet;
+use zksync_web3_rs::providers::Provider;
+use zksync_web3_rs::signers::{LocalWallet, Signer as zksigner};
+
 
 /// CLI arguments for the `cast zk-send` subcommand.
 ///
@@ -137,94 +132,92 @@ impl ZkSendTxArgs {
     /// - Ok: If the transaction or withdraw operation is successful.
     /// - Err: If any error occurs during the operation.
     pub async fn run(self) -> eyre::Result<()> {
-        let config = Config::load();
-
-        let private_key = get_private_key(&self.eth.wallet.private_key)?;
+        let private_key = ["0x", &self.eth.clone().wallet.private_key.unwrap()].concat();
+        //let pk = H256::from_str(&private_key).unwrap();
 
         let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
 
         let chain = get_chain(self.eth.chain)?;
 
-        let signer: Signer<PrivateKeySigner> = get_signer(private_key, &chain);
-        let provider = try_get_http_provider(config.get_rpc_url_or_localhost_http()?)?;
-        let to_address = self.get_to_address();
+        let provider = Provider::try_from(rpc_url).unwrap();
+        //let to_address = self.get_to_address();
         let sender = self.eth.sender().await;
 
-        let wallet = wallet::Wallet::with_http_client(&rpc_url, signer);
+        let wallet = LocalWallet::from_str(&private_key)
+            .unwrap()
+            .with_chain_id(chain);
+
+        let zk_wallet = ZKSWallet::new(wallet, Some(provider), None);
 
         if self.withdraw {
-            let token_address: Address = match &self.token {
-                Some(token_addy) => {
-                    let decoded = match decode_hex(token_addy) {
-                        Ok(addy) => addy,
-                        Err(e) => {
-                            eyre::bail!("Error parsing token address: {e}, try removing the '0x'")
-                        }
-                    };
-                    Address::from_slice(decoded.as_slice())
-                }
-                None => Address::zero(),
-            };
+            // let token_address: Address = match &self.token {
+            //     Some(token_addy) => {
+            //         let decoded = match decode_hex(token_addy) {
+            //             Ok(addy) => addy,
+            //             Err(e) => {
+            //                 eyre::bail!("Error parsing token address: {e}, try removing the '0x'")
+            //             }
+            //         };
+            //         Address::from_slice(decoded.as_slice())
+            //     }
+            //     None => Address::zero(),
+            // };
 
             let amount = self
                 .amount
                 .expect("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )");
 
-            match wallet {
+            match zk_wallet {
                 Ok(w) => {
                     println!("Bridging assets....");
+                    println!("AA");
                     // Build Withdraw //
-                    let tx = w
-                        .start_withdraw()
-                        .to(to_address)
-                        .amount(amount)
-                        .token(token_address)
-                        .send()
+                    let tx_rcpt = w.withdraw(amount)
                         .await
                         .unwrap();
 
-                    let rcpt = match tx.wait_for_commit().await {
-                        Ok(rcpt) => rcpt,
-                        Err(e) => eyre::bail!("Transaction Error: {}", e),
-                    };
+                    // let rcpt = match tx.wait_for_commit().await {
+                    //     Ok(rcpt) => rcpt,
+                    //     Err(e) => eyre::bail!("Transaction Error: {}", e),
+                    // };
 
-                    self.print_receipt(&rcpt);
+                    self.print_receipt(&tx_rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
         } else {
-            match wallet {
+            match zk_wallet {
                 Ok(w) => {
                     println!("Sending transaction....");
 
-                    // Here we are constructing the parameters for the transaction
-                    let sig = self.sig.as_ref().expect("Error: Function Signature is empty");
-                    let params =
-                        if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
+                    // // Here we are constructing the parameters for the transaction
+                    // let sig = self.sig.as_ref().expect("Error: Function Signature is empty");
+                    // let params =
+                    //     if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
 
-                    // Creating a new transaction builder
-                    let mut builder =
-                        TxBuilder::new(&provider, sender, self.to.clone(), chain, true).await?;
+                    // //Creating a new transaction builder
+                    // let mut builder =
+                    //     TxBuilder::new(&provider, sender, self.to.clone(), chain, true).await?;
 
-                    builder.args(params).await?;
+                    // builder.args(params).await?;
 
-                    let (tx, _func) = builder.build();
-                    let encoded_function_call = tx.data().unwrap().to_vec();
+                    // let (tx, _func) = builder.build();
+                    // let encoded_function_call = tx.data().unwrap().to_vec();
 
-                    let tx = w
-                        .start_execute_contract()
-                        .contract_address(to_address)
-                        .calldata(encoded_function_call)
-                        .send()
-                        .await
-                        .wrap_err("Failed to execute transaction")?;
+                    // let tx = w
+                    //     .start_execute_contract()
+                    //     .contract_address(to_address)
+                    //     .calldata(encoded_function_call)
+                    //     .send()
+                    //     .await
+                    //     .wrap_err("Failed to execute transaction")?;
 
-                    let rcpt = match tx.wait_for_commit().await {
-                        Ok(rcpt) => rcpt,
-                        Err(e) => eyre::bail!("Transaction Error: {}", e),
-                    };
+                    // let rcpt = match tx.wait_for_commit().await {
+                    //     Ok(rcpt) => rcpt,
+                    //     Err(e) => eyre::bail!("Transaction Error: {}", e),
+                    // };
 
-                    self.print_receipt(&rcpt);
+                    // self.print_receipt(&rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
@@ -255,7 +248,7 @@ impl ZkSendTxArgs {
 
         // This will display a deployed contract address if one was deployed via zksend
         for log in &rcpt.logs {
-            if log.address == CONTRACT_DEPLOYER_ADDRESS {
+            if log.address == Address::from_str(CONTRACT_DEPLOYER_ADDR).unwrap() {
                 let deployed_address = log.topics.get(3).unwrap();
                 let deployed_address = Address::from(*deployed_address);
                 println!("Deployed contract address: {:#?}", deployed_address);
@@ -264,18 +257,18 @@ impl ZkSendTxArgs {
         }
     }
 
-    /// Gets the recipient address of the transaction.
-    ///
-    /// If the `to` field is `None`, it will panic with the message "Enter TO: Address".
-    ///
-    /// # Returns
-    ///
-    /// A `H160` object that represents the recipient's address.
-    fn get_to_address(&self) -> H160 {
-        let to = self.to.as_ref().expect("Enter TO: Address");
-        let deployed_contract = to.as_address().expect("Invalid address").as_bytes();
-        zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
-    }
+    //// Gets the recipient address of the transaction.
+    // ///
+    // /// If the `to` field is `None`, it will panic with the message "Enter TO: Address".
+    // ///
+    // /// # Returns
+    // ///
+    // /// A `H160` object that represents the recipient's address.
+    // fn get_to_address(&self) -> H160 {
+    //     let to = self.to.as_ref().expect("Enter TO: Address");
+    //     let deployed_contract = to.as_address().expect("Invalid address").as_bytes();
+    //     zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
+    // }
 }
 
 /// Parses a decimal string into a U256 number.
