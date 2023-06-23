@@ -216,3 +216,72 @@ fn parse_decimal_u256(s: &str) -> Result<U256, String> {
         Err(e) => Err(format!("Failed to parse decimal number: {}", e)),
     }
 }
+
+#[cfg(test)]
+mod zk_deposit_tests {
+    use std::env;
+
+    use zksync_web3_rs::types::AddressOrBytes;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_deposit_to_signer_account() {
+        let private_key = "0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
+        let l1_url = env::var("L1_RPC_URL").ok();
+
+        let l1_wallet = {
+            let l1_provider = Provider::try_from(l1_url.unwrap()).unwrap();
+            LocalWallet::from_str(private_key).unwrap().with_chain_id(ERA_CHAIN_ID);
+        };
+
+        let zk_deposit_tx_args = {
+            let to = parse_name_or_address("0x36615Cf349d7F6344891B1e7CA7C72883F5dc049").unwrap();
+            let amount = U256::from(1);
+            let bridge_address = None;
+            let operator_tip = None;
+            let l2_url = env::var("L2_RPC_URL").unwrap();
+            let token = None; // => Ether.
+            let tx = TransactionOpts {
+                gas_limit: None,
+                gas_price: None,
+                priority_gas_price: None,
+                value: None,
+                nonce: None,
+                legacy: false,
+            };
+            let l1_url = env::var("L1_RPC_URL").ok();
+            let chain = Chain::Id(env::var("CHAIN").unwrap());
+            let wallet = Wallet::from_str(private_key);
+
+            ZkDepositTxArgs {
+                to,
+                amount,
+                bridge_address,
+                operator_tip,
+                l2_url,
+                token,
+                tx,
+                l1_url,
+                chain,
+                wallet,
+            }
+        };
+
+        args.run().await.unwrap();
+
+        let l1_balance_after = zk_wallet.eth_balance().await.unwrap();
+        let l2_balance_after = zk_wallet.era_balance().await.unwrap();
+        println!("L1 balance after: {}", l1_balance_after);
+        println!("L2 balance after: {}", l2_balance_after);
+
+        assert!(
+            l1_balance_after <= l1_balance_before - amount,
+            "Balance on L1 should be decreased"
+        );
+        assert!(
+            l2_balance_after >= l2_balance_before + amount,
+            "Balance on L2 should be increased"
+        );
+    }
+}
