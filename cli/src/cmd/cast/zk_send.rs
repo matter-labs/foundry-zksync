@@ -36,19 +36,16 @@
 ///
 /// The `print_receipt` method extracts relevant information from the transaction receipt and prints it to the console.
 /// This includes the transaction hash, gas used, effective gas price, block number, and deployed contract address, if applicable.
-use crate::cmd::cast::zk_utils::zk_utils::{
-    get_chain, get_rpc_url,
-};
-use std::str::FromStr;
+use crate::cmd::cast::zk_utils::zk_utils::{get_rpc_url};
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use clap::Parser;
 use ethers::types::NameOrAddress;
-use zksync_web3_rs::types::{U256, TransactionReceipt, Address};
+use std::str::FromStr;
+use zksync_web3_rs::providers::Provider;
+use zksync_web3_rs::signers::{LocalWallet};
+use zksync_web3_rs::types::{Address, TransactionReceipt, H160, U256};
 use zksync_web3_rs::zks_utils::CONTRACT_DEPLOYER_ADDR;
 use zksync_web3_rs::ZKSWallet;
-use zksync_web3_rs::providers::Provider;
-use zksync_web3_rs::signers::{LocalWallet, Signer as zksigner};
-
 
 /// CLI arguments for the `cast zk-send` subcommand.
 ///
@@ -132,22 +129,17 @@ impl ZkSendTxArgs {
     /// - Ok: If the transaction or withdraw operation is successful.
     /// - Err: If any error occurs during the operation.
     pub async fn run(self) -> eyre::Result<()> {
-        let private_key = ["0x", &self.eth.clone().wallet.private_key.unwrap()].concat();
-        //let pk = H256::from_str(&private_key).unwrap();
+        let private_key = &self.eth.clone().wallet.private_key.unwrap();
 
         let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
 
-        let chain = get_chain(self.eth.chain)?;
-
         let provider = Provider::try_from(rpc_url).unwrap();
-        //let to_address = self.get_to_address();
-        let sender = self.eth.sender().await;
+        let to_address = self.get_to_address();
+        //let sender = self.eth.sender().await;
 
-        let wallet = LocalWallet::from_str(&private_key)
-            .unwrap()
-            .with_chain_id(chain);
+        let wallet = LocalWallet::from_str(&private_key)?;
 
-        let zk_wallet = ZKSWallet::new(wallet, Some(provider), None);
+        let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None);
 
         if self.withdraw {
             // let token_address: Address = match &self.token {
@@ -170,11 +162,8 @@ impl ZkSendTxArgs {
             match zk_wallet {
                 Ok(w) => {
                     println!("Bridging assets....");
-                    println!("AA");
                     // Build Withdraw //
-                    let tx_rcpt = w.withdraw(amount)
-                        .await
-                        .unwrap();
+                    let tx_rcpt = w.withdraw(amount, to_address).await.unwrap();
 
                     // let rcpt = match tx.wait_for_commit().await {
                     //     Ok(rcpt) => rcpt,
@@ -187,7 +176,7 @@ impl ZkSendTxArgs {
             };
         } else {
             match zk_wallet {
-                Ok(w) => {
+                Ok(_w) => {
                     println!("Sending transaction....");
 
                     // // Here we are constructing the parameters for the transaction
@@ -257,18 +246,18 @@ impl ZkSendTxArgs {
         }
     }
 
-    //// Gets the recipient address of the transaction.
-    // ///
-    // /// If the `to` field is `None`, it will panic with the message "Enter TO: Address".
-    // ///
-    // /// # Returns
-    // ///
-    // /// A `H160` object that represents the recipient's address.
-    // fn get_to_address(&self) -> H160 {
-    //     let to = self.to.as_ref().expect("Enter TO: Address");
-    //     let deployed_contract = to.as_address().expect("Invalid address").as_bytes();
-    //     zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
-    // }
+    // Gets the recipient address of the transaction.
+    ///
+    /// If the `to` field is `None`, it will panic with the message "Enter TO: Address".
+    ///
+    /// # Returns
+    ///
+    /// A `H160` object that represents the recipient's address.
+    fn get_to_address(&self) -> H160 {
+        let to = self.to.as_ref().expect("Enter TO: Address");
+        let deployed_contract = to.as_address().expect("Invalid address").as_bytes();
+        Address::from_slice(deployed_contract)
+    }
 }
 
 /// Parses a decimal string into a U256 number.
