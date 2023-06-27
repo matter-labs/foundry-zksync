@@ -47,6 +47,8 @@ use zksync_web3_rs::types::{Address, TransactionReceipt, H160, U256};
 use zksync_web3_rs::zks_utils::CONTRACT_DEPLOYER_ADDR;
 use zksync_web3_rs::ZKSWallet;
 
+use super::zk_utils::zk_utils::get_private_key;
+
 /// CLI arguments for the `cast zk-send` subcommand.
 ///
 /// This struct contains all the arguments and options that can be passed to the `zk-send` subcommand.
@@ -129,16 +131,11 @@ impl ZkSendTxArgs {
     /// - Ok: If the transaction or withdraw operation is successful.
     /// - Err: If any error occurs during the operation.
     pub async fn run(self) -> eyre::Result<()> {
-        let private_key = &self.eth.clone().wallet.private_key.unwrap();
-
+        let private_key = get_private_key(&self.eth.wallet.private_key)?;
         let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
-
-        let provider = Provider::try_from(rpc_url).unwrap();
+        let provider = Provider::try_from(rpc_url)?;
         let to_address = self.get_to_address();
-        //let sender = self.eth.sender().await;
-
-        let wallet = LocalWallet::from_str(&private_key)?;
-
+        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None);
 
         if self.withdraw {
@@ -162,14 +159,7 @@ impl ZkSendTxArgs {
             match zk_wallet {
                 Ok(w) => {
                     println!("Bridging assets....");
-                    // Build Withdraw //
                     let tx_rcpt = w.withdraw(amount, to_address).await.unwrap();
-
-                    // let rcpt = match tx.wait_for_commit().await {
-                    //     Ok(rcpt) => rcpt,
-                    //     Err(e) => eyre::bail!("Transaction Error: {}", e),
-                    // };
-
                     self.print_receipt(&tx_rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
