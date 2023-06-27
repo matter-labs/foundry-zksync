@@ -46,6 +46,9 @@ use zksync_web3_rs::signers::{LocalWallet};
 use zksync_web3_rs::types::{Address, TransactionReceipt, H160, U256};
 use zksync_web3_rs::zks_utils::CONTRACT_DEPLOYER_ADDR;
 use zksync_web3_rs::ZKSWallet;
+use zksync_web3_rs::zks_provider::ZKSProvider;
+use zksync_web3_rs::providers::Middleware;
+use zksync_web3_rs::abi::Token;
 
 use super::zk_utils::zk_utils::get_private_key;
 
@@ -135,6 +138,7 @@ impl ZkSendTxArgs {
         let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
         let provider = Provider::try_from(rpc_url)?;
         let to_address = self.get_to_address();
+        //let sender = self.eth.wallet.address;
         let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None);
 
@@ -159,44 +163,32 @@ impl ZkSendTxArgs {
             match zk_wallet {
                 Ok(w) => {
                     println!("Bridging assets....");
-                    let tx_rcpt = w.withdraw(amount, to_address).await.unwrap();
+                    let tx_rcpt = w.withdraw(amount, to_address).await?;
                     self.print_receipt(&tx_rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
         } else {
             match zk_wallet {
-                Ok(_w) => {
+                Ok(w) => {
                     println!("Sending transaction....");
 
-                    // // Here we are constructing the parameters for the transaction
-                    // let sig = self.sig.as_ref().expect("Error: Function Signature is empty");
+                    // Here we are constructing the parameters for the transaction
+                    let sig = self.sig.as_ref().expect("Error: Function Signature is empty");
+                    // TODO add params support.
                     // let params =
-                    //     if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
+                    //       if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
 
-                    // //Creating a new transaction builder
-                    // let mut builder =
-                    //     TxBuilder::new(&provider, sender, self.to.clone(), chain, true).await?;
+                    let (_, tx_hash) = w.get_era_provider()?.send_eip712::<Token,_>(
+                        &w.l2_wallet,
+                        to_address,
+                        sig,
+                        None,
+                        None
+                    ).await?;
+                    let rcpt = w.get_era_provider()?.get_transaction_receipt(tx_hash).await?.ok_or(eyre::eyre!("Error retrieving transaction receipt"))?;
 
-                    // builder.args(params).await?;
-
-                    // let (tx, _func) = builder.build();
-                    // let encoded_function_call = tx.data().unwrap().to_vec();
-
-                    // let tx = w
-                    //     .start_execute_contract()
-                    //     .contract_address(to_address)
-                    //     .calldata(encoded_function_call)
-                    //     .send()
-                    //     .await
-                    //     .wrap_err("Failed to execute transaction")?;
-
-                    // let rcpt = match tx.wait_for_commit().await {
-                    //     Ok(rcpt) => rcpt,
-                    //     Err(e) => eyre::bail!("Transaction Error: {}", e),
-                    // };
-
-                    // self.print_receipt(&rcpt);
+                    self.print_receipt(&rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
