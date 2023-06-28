@@ -27,6 +27,7 @@ use zksync_web3_rs::providers::Middleware;
 use zksync_web3_rs::providers::{Http, Provider};
 use zksync_web3_rs::signers::{LocalWallet, Signer};
 use zksync_web3_rs::types::{Address, NameOrAddress, H160, U256};
+use zksync_web3_rs::DepositRequest;
 use zksync_web3_rs::ZKSWallet;
 
 // FIXME thisfunction belongs in the `crate::opts::cast` module. I moved it here because the rest
@@ -140,22 +141,22 @@ impl ZkDepositTxArgs {
         let l2_provider = Provider::try_from(l2_url)?;
         let wallet = LocalWallet::from_str(private_key).unwrap().with_chain_id(chain.id());
         let zk_wallet =
-            ZKSWallet::new(wallet, Some(l2_provider.clone()), Some(l1_provider.clone())).unwrap();
+            ZKSWallet::new(wallet, None, Some(l2_provider.clone()), Some(l1_provider.clone()))
+                .unwrap();
 
-        let l1_receipt = zk_wallet.deposit(self.amount.into()).await.unwrap();
+        let deposit_request = DepositRequest::new(self.amount.into());
+        let l1_receipt = zk_wallet.deposit(&deposit_request).await.unwrap();
         println!("l1 receipt: {:?}", l1_receipt);
 
-        let l2_receipt = l2_provider
-            .get_transaction_receipt(l1_receipt.transaction_hash)
-            .await
-            .unwrap()
-            .unwrap();
-
-        println!("Sleeping 30 seconds");
-        tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-        println!("Slept 30 seconds");
-
-        println!("l2 receipt: {:?}", l2_receipt);
+        // println!("Sleeping 60 seconds");
+        // tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        // println!("Slept 60 seconds");
+        // let l2_receipt = l2_provider
+        //     .get_transaction_receipt(l1_receipt.transaction_hash)
+        //     .await
+        //     .unwrap()
+        //     .unwrap();
+        // println!("l2 receipt: {:?}", l2_receipt);
 
         // match wallet {
         //     Ok(w) => {
@@ -227,20 +228,29 @@ mod zk_deposit_tests {
 
     #[tokio::test]
     async fn test_deposit_to_signer_account() {
+        let amount = U256::from(1);
         let private_key = "0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
         let l1_url = env::var("L1_RPC_URL").ok();
+        let l2_url = env::var("L2_RPC_URL").unwrap();
 
-        let l1_wallet = {
+        let zk_wallet = {
             let l1_provider = Provider::try_from(l1_url.unwrap()).unwrap();
-            LocalWallet::from_str(private_key).unwrap().with_chain_id(ERA_CHAIN_ID);
+            let l2_provider = Provider::try_from(l2_url.clone()).unwrap();
+
+            let wallet = LocalWallet::from_str(private_key).unwrap();
+            let zk_wallet =
+                ZKSWallet::new(wallet, None, Some(l2_provider), Some(l1_provider)).unwrap();
+
+            zk_wallet
         };
+
+        let l1_balance_before = zk_wallet.eth_balance().await.unwrap();
+        let l2_balance_before = zk_wallet.era_balance().await.unwrap();
 
         let zk_deposit_tx_args = {
             let to = parse_name_or_address("0x36615Cf349d7F6344891B1e7CA7C72883F5dc049").unwrap();
-            let amount = U256::from(1);
             let bridge_address = None;
             let operator_tip = None;
-            let l2_url = env::var("L2_RPC_URL").unwrap();
             let token = None; // => Ether.
             let tx = TransactionOpts {
                 gas_limit: None,
@@ -251,8 +261,8 @@ mod zk_deposit_tests {
                 legacy: false,
             };
             let l1_url = env::var("L1_RPC_URL").ok();
-            let chain = Chain::Id(env::var("CHAIN").unwrap());
-            let wallet = Wallet::from_str(private_key);
+            let chain = Some(Chain::Id(env::var("CHAIN").unwrap().parse().unwrap()));
+            let wallet: Wallet = Wallet::parse_from(["foundry-cli", "--private-key", private_key]);
 
             ZkDepositTxArgs {
                 to,
@@ -268,7 +278,7 @@ mod zk_deposit_tests {
             }
         };
 
-        args.run().await.unwrap();
+        zk_deposit_tx_args.run().await.unwrap();
 
         let l1_balance_after = zk_wallet.eth_balance().await.unwrap();
         let l2_balance_after = zk_wallet.era_balance().await.unwrap();
