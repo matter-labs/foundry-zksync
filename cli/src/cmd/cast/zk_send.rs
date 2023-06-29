@@ -41,14 +41,7 @@ use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use clap::Parser;
 use ethers::types::NameOrAddress;
 use std::str::FromStr;
-use zksync_web3_rs::providers::Provider;
-use zksync_web3_rs::signers::{LocalWallet};
-use zksync_web3_rs::types::{Address, TransactionReceipt, H160, U256};
-use zksync_web3_rs::zks_utils::CONTRACT_DEPLOYER_ADDR;
-use zksync_web3_rs::ZKSWallet;
-use zksync_web3_rs::zks_provider::ZKSProvider;
-use zksync_web3_rs::providers::Middleware;
-use zksync_web3_rs::abi::Token;
+use zksync_web3_rs::{ZKSWallet,providers::{Provider,Middleware}, signers::LocalWallet, types::{Address, TransactionReceipt, H160, U256}, zks_utils::CONTRACT_DEPLOYER_ADDR, zks_provider::ZKSProvider};
 
 use super::zk_utils::zk_utils::get_private_key;
 
@@ -138,55 +131,38 @@ impl ZkSendTxArgs {
         let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
         let provider = Provider::try_from(rpc_url)?;
         let to_address = self.get_to_address();
-        //let sender = self.eth.wallet.address;
         let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None);
 
+        // TODO Support different tokens than ETH.
         if self.withdraw {
-            // let token_address: Address = match &self.token {
-            //     Some(token_addy) => {
-            //         let decoded = match decode_hex(token_addy) {
-            //             Ok(addy) => addy,
-            //             Err(e) => {
-            //                 eyre::bail!("Error parsing token address: {e}, try removing the '0x'")
-            //             }
-            //         };
-            //         Address::from_slice(decoded.as_slice())
-            //     }
-            //     None => Address::zero(),
-            // };
-
             let amount = self
                 .amount
                 .expect("Amount was not provided. Use --amount flag (ex. --amount 1000000000 )");
 
             match zk_wallet {
-                Ok(w) => {
+                Ok(wallet) => {
                     println!("Bridging assets....");
-                    let tx_rcpt = w.withdraw(amount, to_address).await?;
+                    let tx_rcpt = wallet.withdraw(amount, to_address).await?;
                     self.print_receipt(&tx_rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
             };
         } else {
             match zk_wallet {
-                Ok(w) => {
+                Ok(wallet) => {
                     println!("Sending transaction....");
-
-                    // Here we are constructing the parameters for the transaction
                     let sig = self.sig.as_ref().expect("Error: Function Signature is empty");
-                    // TODO add params support.
-                    // let params =
-                    //       if !sig.is_empty() { Some((&sig[..], self.args.clone())) } else { None };
+                    let params = (!sig.is_empty()).then_some((&sig[..], self.args.clone()));
 
-                    let (_, tx_hash) = w.get_era_provider()?.send_eip712::<Token,_>(
-                        &w.l2_wallet,
+                    let (_, tx_hash) = wallet.get_era_provider()?.send_eip712(
+                        &wallet.l2_wallet,
                         to_address,
                         sig,
-                        None,
+                        params.map(|(_, values)| values),
                         None
                     ).await?;
-                    let rcpt = w.get_era_provider()?.get_transaction_receipt(tx_hash).await?.ok_or(eyre::eyre!("Error retrieving transaction receipt"))?;
+                    let rcpt = wallet.get_era_provider()?.get_transaction_receipt(tx_hash).await?.ok_or(eyre::eyre!("Error retrieving transaction receipt"))?;
 
                     self.print_receipt(&rcpt);
                 }
