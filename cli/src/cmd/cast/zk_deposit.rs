@@ -30,7 +30,7 @@ use zksync_web3_rs::types::{Address, NameOrAddress, H160, U256};
 use zksync_web3_rs::DepositRequest;
 use zksync_web3_rs::ZKSWallet;
 
-// FIXME thisfunction belongs in the `crate::opts::cast` module. I moved it here because the rest
+// FIXME this function belongs in the `crate::opts::cast` module. I moved it here because the rest
 // of the code is using the ethers types while we are using the `zksync_web3_rs` re-exports.
 pub fn parse_name_or_address(s: &str) -> eyre::Result<NameOrAddress> {
     Ok(if s.starts_with("0x") {
@@ -127,11 +127,10 @@ impl ZkDepositTxArgs {
     /// - Ok: If the deposit transaction is successfully completed.
     /// - Err: If an error occurred during the execution of the deposit transaction.
     pub async fn run(self) -> eyre::Result<()> {
-        let private_key = &self.wallet.private_key.unwrap();
+        let private_key = &self.wallet.private_key.as_ref().unwrap();
         let l1_url = get_rpc_url(&self.l1_url)?;
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
         let chain = get_chain(self.chain)?;
-        // let to_address = self.get_to_address();
         // let token_address: Address = match self.token {
         //     Some(token_addy) => token_addy,
         //     None => Address::zero(),
@@ -144,7 +143,11 @@ impl ZkDepositTxArgs {
             ZKSWallet::new(wallet, None, Some(l2_provider.clone()), Some(l1_provider.clone()))
                 .unwrap();
 
-        let deposit_request = DepositRequest::new(self.amount.into());
+        let deposit_request = DepositRequest::new(self.amount.into())
+            .to(self.get_to_address())
+            .operator_tip(self.operator_tip)
+            .gas_price(self.tx.gas_price)
+            .gas_limit(self.tx.gas_limit);
         let l1_receipt = zk_wallet.deposit(&deposit_request).await.unwrap();
         println!("l1 receipt: {:?}", l1_receipt);
 
@@ -181,20 +184,19 @@ impl ZkDepositTxArgs {
         Ok(())
     }
 
-    // Retrieves the 'to' address from the command line arguments.
-    //
-    // The 'to' address is expected to be a command line argument (`to`).
-    // If it is not provided, the function will return an error.
-    //
-    // # Returns
-    //
-    // A `H160` which represents the 'to' address.
-    // FIXME
-    // fn get_to_address(&self) -> H160 {
-    //     let to = self.to.as_address().expect("Please enter TO address.");
-    //     let deployed_contract = to.as_bytes();
-    //     zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
-    // }
+    /// Retrieves the 'to' address from the command line arguments.
+    ///
+    /// The 'to' address is expected to be a command line argument (`to`).
+    /// If it is not provided, the function will return an error.
+    ///
+    /// # Returns
+    ///
+    /// A `H160` which represents the 'to' address.
+    fn get_to_address(&self) -> H160 {
+        let to = self.to.as_address().expect("Please enter TO address.");
+        let deployed_contract = to.as_bytes();
+        Address::from_slice(deployed_contract)
+    }
 }
 
 /// Converts a string to a `U256` number.

@@ -10400,7 +10400,7 @@ dependencies = [
 [[package]]
 name = "zksync-web3-rs"
 version = "0.1.0"
-source = "git+https://github.com/lambdaclass/zksync-web3-rs/?branch=extend-deposit#ba5558d293225b04f0d8b4d9f9a0d2bd451e21f5"
+source = "git+https://github.com/lambdaclass/zksync-web3-rs/?branch=extend-deposit#cda75911b7bf1364f92714cc2e7a9ff5da20bf01"
 dependencies = [
  "async-trait",
  "clap 4.3.2",
