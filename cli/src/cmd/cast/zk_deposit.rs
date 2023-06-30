@@ -75,6 +75,14 @@ pub struct ZkDepositTxArgs {
     )]
     operator_tip: Option<U256>,
 
+    /// Layer 2 gas limit.
+    #[clap(help = "Layer 2 gas limit", value_name = "L2_GAS_LIMIT")]
+    l2_gas_limit: Option<U256>,
+
+    /// Set the gas per pubdata byte (Optional).
+    #[clap(help = "Set the gas per pubdata byte (Optional)", value_name = "GAS_PER_PUBDATA_BYTE")]
+    gas_per_pubdata_byte: Option<U256>,
+
     /// The zkSync RPC Layer 2 endpoint.
     /// Can be provided via the env var L2_RPC_URL
     /// or --l2-url from the command line.
@@ -147,7 +155,9 @@ impl ZkDepositTxArgs {
             .to(self.get_to_address())
             .operator_tip(self.operator_tip)
             .gas_price(self.tx.gas_price)
-            .gas_limit(self.tx.gas_limit);
+            .gas_limit(self.tx.gas_limit)
+            .gas_per_pubdata_byte(self.gas_per_pubdata_byte)
+            .l2_gas_limit(self.l2_gas_limit);
         let l1_receipt = zk_wallet.deposit(&deposit_request).await.unwrap();
         println!("l1 receipt: {:?}", l1_receipt);
 
@@ -277,6 +287,8 @@ mod zk_deposit_tests {
                 l1_url,
                 chain,
                 wallet,
+                l2_gas_limit: None,
+                gas_per_pubdata_byte: None,
             }
         };
 
