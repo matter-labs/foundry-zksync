@@ -1,5 +1,3 @@
-use std::{str::FromStr, thread};
-
 /// This module handles Bridging assets to ZkSync from Layer 1.
 /// It defines the CLI arguments for the `cast zk-deposit` command and provides functionality
 /// for depositing assets onto zkSync.
@@ -15,16 +13,13 @@ use std::{str::FromStr, thread};
 ///     - `parse_decimal_u256`: Converts a string to a `U256` number.
 ///
 use crate::{
-    cmd::cast::zk_utils::zk_utils::{
-        get_chain, get_private_key, get_rpc_url, get_signer, get_url_with_port,
-    },
+    cmd::cast::zk_utils::zk_utils::{get_chain, get_rpc_url, get_url_with_port},
     opts::{TransactionOpts, Wallet},
 };
 use clap::Parser;
 use foundry_config::Chain;
-use zksync::{self, wallet};
-use zksync_web3_rs::providers::Middleware;
-use zksync_web3_rs::providers::{Http, Provider};
+use std::str::FromStr;
+use zksync_web3_rs::providers::Provider;
 use zksync_web3_rs::signers::{LocalWallet, Signer};
 use zksync_web3_rs::types::{Address, NameOrAddress, H160, U256};
 use zksync_web3_rs::DepositRequest;
@@ -158,38 +153,10 @@ impl ZkDepositTxArgs {
             .gas_limit(self.tx.gas_limit)
             .gas_per_pubdata_byte(self.gas_per_pubdata_byte)
             .l2_gas_limit(self.l2_gas_limit);
+
+        println!("Bridging assets....");
         let l1_receipt = zk_wallet.deposit(&deposit_request).await.unwrap();
-        println!("l1 receipt: {:?}", l1_receipt);
-
-        // println!("Sleeping 60 seconds");
-        // tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-        // println!("Slept 60 seconds");
-        // let l2_receipt = l2_provider
-        //     .get_transaction_receipt(l1_receipt.transaction_hash)
-        //     .await
-        //     .unwrap()
-        //     .unwrap();
-        // println!("l2 receipt: {:?}", l2_receipt);
-
-        // match wallet {
-        //     Ok(w) => {
-        //         println!("Bridging assets....");
-        //         let eth_provider = w.ethereum(l1_url).await.map_err(|e| e)?;
-        //         let tx_hash = eth_provider
-        //             .deposit(
-        //                 token_address,
-        //                 self.amount,
-        //                 to_address,
-        //                 self.operator_tip,
-        //                 self.bridge_address,
-        //                 None,
-        //             )
-        //             .await?;
-
-        //         println!("Transaction Hash: {:#?}", tx_hash);
-        //     }
-        //     Err(e) => eyre::bail!("Failed to download the file: {}", e),
-        // }
+        println!("Transaction Hash: {:#?}", l1_receipt.transaction_hash);
 
         Ok(())
     }
@@ -233,8 +200,6 @@ fn parse_decimal_u256(s: &str) -> Result<U256, String> {
 #[cfg(test)]
 mod zk_deposit_tests {
     use std::env;
-
-    use zksync_web3_rs::types::AddressOrBytes;
 
     use super::*;
 
