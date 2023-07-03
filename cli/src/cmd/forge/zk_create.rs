@@ -50,6 +50,7 @@ use crate::{
     opts::{EthereumOpts, TransactionOpts},
 };
 use clap::{Parser, ValueHint};
+use ethabi::ethereum_types::U256;
 use ethers::{
     abi::{encode, Abi, Constructor, Token},
     solc::{info::ContractInfo, Project},
@@ -58,8 +59,8 @@ use ethers::{
 use eyre::Context;
 use foundry_common::abi::parse_tokens;
 use serde_json::Value;
-use std::{fs, path::PathBuf};
-use zksync::wallet;
+use std::{fs, path::PathBuf, str::FromStr};
+use zksync_web3_rs::{abi::Tokenize, providers::Provider, signers::LocalWallet, ZKSWallet};
 
 /// CLI arguments for `forge zk-create`.
 /// Struct `ZkCreateArgs` encapsulates the arguments necessary for creating a new zkSync contract.
@@ -176,7 +177,7 @@ impl ZkCreateArgs {
         }
 
         // get signer
-        let signer = get_signer(private_key, &chain);
+        // let signer = get_signer(private_key, &chain);
 
         // get abi
         let abi = match Self::get_abi_from_contract(&project, &self.contract) {
@@ -193,48 +194,76 @@ impl ZkCreateArgs {
             }
         };
 
+        let provider = Provider::try_from(rpc_url)?;
+        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
+
         // encode constructor args
         let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
 
-        let wallet = wallet::Wallet::with_http_client(&rpc_url, signer);
-        let deployer_builder = match &wallet {
-            Ok(w) => w.start_deploy_contract(),
-            Err(e) => eyre::bail!("error wallet: {e:?}"),
-        };
+        let args = encoded_args;
+        // dbg!(&encoded_args);
+        // dbg!(self.constructor_args.into_tokens());
 
-        let deployer = deployer_builder
-            .bytecode(bytecode.to_vec())
-            .factory_deps(factory_deps)
-            .constructor_calldata(encoded_args);
+        // let wallet = wallet::Wallet::with_http_client(&rpc_url, signer);
+        // let deployer_builder = match &wallet {
+        //     Ok(w) => w.start_deploy_contract(),
+        //     Err(e) => eyre::bail!("error wallet: {e:?}"),
+        // };
+
+        // TODO remove unwrap
+        let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None).unwrap();
+
+        let rcpt =
+            zk_wallet._deploy::<U256>(contract, bytecode.to_vec(), None, None).await.unwrap();
+
+        dbg!(&rcpt);
+
+        let deployed_address = rcpt.contract_address.expect("Error retrieving deployed address");
+        let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
+        let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
+        let block_number = rcpt.block_number.expect("Error retrieving block number");
+
+        println!("+-------------------------------------------------+");
+        println!("Contract successfully deployed to address: {:#?}", deployed_address);
+        // println!("Transaction Hash: {:#?}", tx_handle.hash());
+        println!("Gas used: {:#?}", gas_used);
+        println!("Effective gas price: {:#?}", gas_price);
+        println!("Block Number: {:#?}", block_number);
+        println!("+-------------------------------------------------+");
+
+        // let deployer = deployer_builder
+        //     .bytecode(bytecode.to_vec())
+        //     .factory_deps(factory_deps)
+        //     .constructor_calldata(encoded_args);
 
         // TODO: could be useful as a flag --estimate-gas
         // let est_gas = deployer.estimate_fee(None).await;
         // println!("{:#?}, est_gas", est_gas);
 
-        println!("Deploying contract...");
-        match deployer.send().await {
-            Ok(tx_handle) => {
-                let rcpt = match tx_handle.wait_for_commit().await {
-                    Ok(rcpt) => rcpt,
-                    Err(e) => eyre::bail!("Transaction Error: {}", e),
-                };
+        // println!("Deploying contract...");
+        // match deployer.send().await {
+        //     Ok(tx_handle) => {
+        //         let rcpt = match tx_handle.wait_for_commit().await {
+        //             Ok(rcpt) => rcpt,
+        //             Err(e) => eyre::bail!("Transaction Error: {}", e),
+        //         };
 
-                let deployed_address =
-                    rcpt.contract_address.expect("Error retrieving deployed address");
-                let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
-                let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
-                let block_number = rcpt.block_number.expect("Error retrieving block number");
+        //         let deployed_address =
+        //             rcpt.contract_address.expect("Error retrieving deployed address");
+        //         let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
+        //         let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
+        //         let block_number = rcpt.block_number.expect("Error retrieving block number");
 
-                println!("+-------------------------------------------------+");
-                println!("Contract successfully deployed to address: {:#?}", deployed_address);
-                println!("Transaction Hash: {:#?}", tx_handle.hash());
-                println!("Gas used: {:#?}", gas_used);
-                println!("Effective gas price: {:#?}", gas_price);
-                println!("Block Number: {:#?}", block_number);
-                println!("+-------------------------------------------------+");
-            }
-            Err(e) => eyre::bail!("{:#?}, error", e),
-        };
+        //         println!("+-------------------------------------------------+");
+        //         println!("Contract successfully deployed to address: {:#?}", deployed_address);
+        //         println!("Transaction Hash: {:#?}", tx_handle.hash());
+        //         println!("Gas used: {:#?}", gas_used);
+        //         println!("Effective gas price: {:#?}", gas_price);
+        //         println!("Block Number: {:#?}", block_number);
+        //         println!("+-------------------------------------------------+");
+        //     }
+        //     Err(e) => eyre::bail!("{:#?}, error", e),
+        // };
 
         Ok(())
     }
