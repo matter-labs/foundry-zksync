@@ -197,10 +197,6 @@ impl ZkCreateArgs {
         let provider = Provider::try_from(rpc_url)?;
         let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
 
-        // encode constructor args
-        let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
-
-        let args = encoded_args;
         // dbg!(&encoded_args);
         // dbg!(self.constructor_args.into_tokens());
 
@@ -214,7 +210,7 @@ impl ZkCreateArgs {
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None).unwrap();
 
         let rcpt =
-            zk_wallet._deploy::<U256>(contract, bytecode.to_vec(), None, None).await.unwrap();
+            zk_wallet._deploy(contract, bytecode.to_vec(), None, Some(self.constructor_args)).await.unwrap();
 
         dbg!(&rcpt);
 
