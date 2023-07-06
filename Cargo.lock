@@ -2931,7 +2931,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84ebb401ba97c6f5af278c2c9936c4546cad75dec464b439ae6df249906f4caa"
 dependencies = [
  "ethers-core 2.0.7",
- "ethers-solc 2.0.7",
  "reqwest",
  "semver",
  "serde",
@@ -10400,14 +10399,13 @@ dependencies = [
 [[package]]
 name = "zksync-web3-rs"
 version = "0.1.0"
-source = "git+https://github.com/lambdaclass/zksync-web3-rs/?branch=extend-deposit#7bac27fb44e66cf72fa199eb4915b99fadc5416e"
+source = "git+https://github.com/lambdaclass/zksync-web3-rs/?branch=extend-deposit#c634abc28ba579dc6b2b974a96acf96704c29b61"
 dependencies = [
  "async-trait",
  "clap 4.3.2",
  "env_logger",
  "ethers 2.0.7",
  "ethers-contract 2.0.7",
- "eyre",
  "hex",
  "log",
  "serde",

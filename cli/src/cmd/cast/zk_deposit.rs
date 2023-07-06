@@ -148,7 +148,7 @@ impl ZkDepositTxArgs {
 
         let deposit_request = DepositRequest::new(self.amount.into())
             .to(self.get_to_address())
-            .operator_tip(self.operator_tip)
+            .operator_tip(self.operator_tip.unwrap_or(0.into()))
             .gas_price(self.tx.gas_price)
             .gas_limit(self.tx.gas_limit)
             .gas_per_pubdata_byte(self.gas_per_pubdata_byte)
