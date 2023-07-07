@@ -197,7 +197,7 @@ impl ZkSolcManagerOpts {
 ///     .build()
 ///     .expect("Failed to build ZkSolcManager");
 /// ```
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct ZkSolcManagerBuilder {
     compilers_path: Option<PathBuf>,
     version: String,
@@ -331,7 +331,7 @@ impl ZkSolcManagerBuilder {
 /// The `ZkSolcManager` structure provides a high-level interface to manage the `zksolc` compiler,
 /// simplifying the process of handling different versions and ensuring the availability of the compiler
 /// for contract compilation.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct ZkSolcManager {
     compilers_path: PathBuf,
     version: ZkSolcVersion,
