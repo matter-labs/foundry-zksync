@@ -195,8 +195,9 @@ impl ZkCreateArgs {
         let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None)?;
 
-        let rcpt =
-            zk_wallet._deploy(contract, bytecode.to_vec(), None, Some(self.constructor_args)).await?;
+        let rcpt = zk_wallet
+            .deploy(contract, bytecode.to_vec(), None, Some(self.constructor_args))
+            .await?;
 
         let deployed_address = rcpt.contract_address.expect("Error retrieving deployed address");
         let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
