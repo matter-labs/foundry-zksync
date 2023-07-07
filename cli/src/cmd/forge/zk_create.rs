@@ -43,16 +43,15 @@
 /// - `zksync`
 use crate::{
     cmd::{
-        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_signer},
+        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url},
         forge::build::CoreBuildArgs,
         read_constructor_args_file,
     },
     opts::{EthereumOpts, TransactionOpts},
 };
 use clap::{Parser, ValueHint};
-use ethabi::ethereum_types::U256;
 use ethers::{
-    abi::{encode, Abi, Constructor, Token},
+    abi::{Abi, Constructor, Token},
     solc::{info::ContractInfo, Project},
     types::Bytes,
 };
@@ -60,7 +59,7 @@ use eyre::Context;
 use foundry_common::abi::parse_tokens;
 use serde_json::Value;
 use std::{fs, path::PathBuf, str::FromStr};
-use zksync_web3_rs::{abi::Tokenize, providers::Provider, signers::LocalWallet, ZKSWallet};
+use zksync_web3_rs::{providers::Provider, signers::LocalWallet, ZKSWallet};
 
 /// CLI arguments for `forge zk-create`.
 /// Struct `ZkCreateArgs` encapsulates the arguments necessary for creating a new zkSync contract.
@@ -170,11 +169,11 @@ impl ZkCreateArgs {
         };
 
         //check for additional factory deps
-        let mut factory_deps = Vec::new();
-        if let Some(fdep_contract_info) = &self.factory_deps {
-            factory_deps =
-                self.get_factory_dependencies(&project, factory_deps, fdep_contract_info);
-        }
+        let factory_dependencies = if let Some(fdep_contract_info) = &self.factory_deps {
+            Some(self.get_factory_dependencies(&project, fdep_contract_info))
+        } else {
+            None
+        };
 
         // get abi
         let abi = match Self::get_abi_from_contract(&project, &self.contract) {
@@ -196,7 +195,7 @@ impl ZkCreateArgs {
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None)?;
 
         let rcpt = zk_wallet
-            .deploy(contract, bytecode.to_vec(), None, Some(self.constructor_args))
+            .deploy(contract, bytecode.to_vec(),self.constructor_args, factory_dependencies)
             .await?;
 
         let deployed_address = rcpt.contract_address.expect("Error retrieving deployed address");
@@ -354,14 +353,14 @@ impl ZkCreateArgs {
     fn get_factory_dependencies(
         &self,
         project: &Project,
-        mut factory_dep_vector: Vec<Vec<u8>>,
         fdep_contract_info: &Vec<ContractInfo>,
     ) -> Vec<Vec<u8>> {
+        let mut factory_deps = Vec::new();
         for dep in fdep_contract_info.iter() {
             let dep_bytecode = Self::get_bytecode_from_contract(&project, dep).unwrap();
-            factory_dep_vector.push(dep_bytecode.to_vec());
+            factory_deps.push(dep_bytecode.to_vec());
         }
-        factory_dep_vector
+        factory_deps
     }
 
     /// Parses the constructor arguments based on the ABI inputs.
