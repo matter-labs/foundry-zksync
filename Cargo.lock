@@ -2804,7 +2804,7 @@ dependencies = [
  "ethers-etherscan 2.0.7",
  "eyre",
  "hex",
- "prettyplease 0.2.6",
+ "prettyplease 0.2.9",
  "proc-macro2 1.0.60",
  "quote 1.0.28",
  "regex",
@@ -6724,9 +6724,9 @@ dependencies = [
 
 [[package]]
 name = "prettyplease"
-version = "0.2.6"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b69d39aab54d069e7f2fe8cb970493e7834601ca2d8c65fd7bbd183578080d1"
+checksum = "9825a04601d60621feed79c4e6b56d65db77cdca55cef43b46b0de1096d1c282"
 dependencies = [
  "proc-macro2 1.0.60",
  "syn 2.0.18",
@@ -10399,7 +10399,7 @@ dependencies = [
 [[package]]
 name = "zksync-web3-rs"
 version = "0.1.0"
-source = "git+https://github.com/lambdaclass/zksync-web3-rs/?branch=main#37c6321447a49b564d8511497e2032544300450e"
+source = "git+https://github.com/lambdaclass/zksync-web3-rs.git"
 dependencies = [
  "async-trait",
  "clap 4.3.2",
