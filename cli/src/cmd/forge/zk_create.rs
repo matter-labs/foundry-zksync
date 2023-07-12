@@ -51,12 +51,11 @@ use crate::{
 };
 use clap::{Parser, ValueHint};
 use ethers::{
-    abi::{Abi, Constructor, Token},
+    abi::Abi,
     solc::{info::ContractInfo, Project},
     types::Bytes,
 };
 use eyre::Context;
-use foundry_common::abi::parse_tokens;
 use serde_json::Value;
 use std::{fs, path::PathBuf, str::FromStr};
 use zksync_web3_rs::{providers::Provider, signers::LocalWallet, ZKSWallet};
@@ -218,19 +217,19 @@ impl ZkCreateArgs {
     /// This function retrieves the constructor arguments for the contract.
     ///
     /// # Returns
-    /// A vector of `Token` which represents the constructor arguments.
+    /// A vector of `String` which represents the constructor arguments.
+    /// An empty vector if there are no constructor arguments.
     fn get_constructor_args(&self, abi: &Abi) -> Vec<String> {
-        match &abi.constructor {
-            Some(v) => {
-                let constructor_args =
-                    if let Some(ref constructor_args_path) = self.constructor_args_path {
-                        read_constructor_args_file(constructor_args_path.to_path_buf()).unwrap()
-                    } else {
-                        self.constructor_args.clone()
-                    };
-                constructor_args
-            }
-            None => vec![],
+        if abi.constructor.is_some() {
+            let constructor_args =
+                if let Some(ref constructor_args_path) = self.constructor_args_path {
+                    read_constructor_args_file(constructor_args_path.to_path_buf()).unwrap()
+                } else {
+                    self.constructor_args.clone()
+                };
+            constructor_args
+        } else {
+            vec![]
         }
     }
 
