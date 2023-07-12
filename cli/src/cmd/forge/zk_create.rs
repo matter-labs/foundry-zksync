@@ -190,12 +190,14 @@ impl ZkCreateArgs {
             }
         };
 
+        let constructor_args = self.get_constructor_args(&contract);
+
         let provider = Provider::try_from(rpc_url)?;
         let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None)?;
 
         let rcpt = zk_wallet
-            .deploy(contract, bytecode.to_vec(),self.constructor_args, factory_dependencies)
+            .deploy(contract, bytecode.to_vec(),constructor_args, factory_dependencies)
             .await?;
 
         let deployed_address = rcpt.contract_address.expect("Error retrieving deployed address");
@@ -217,7 +219,7 @@ impl ZkCreateArgs {
     ///
     /// # Returns
     /// A vector of `Token` which represents the constructor arguments.
-    fn get_constructor_args(&self, abi: &Abi) -> Vec<Token> {
+    fn get_constructor_args(&self, abi: &Abi) -> Vec<String> {
         match &abi.constructor {
             Some(v) => {
                 let constructor_args =
@@ -226,7 +228,7 @@ impl ZkCreateArgs {
                     } else {
                         self.constructor_args.clone()
                     };
-                self.parse_constructor_args(v, &constructor_args).unwrap()
+                constructor_args
             }
             None => vec![],
         }
@@ -361,35 +363,5 @@ impl ZkCreateArgs {
             factory_deps.push(dep_bytecode.to_vec());
         }
         factory_deps
-    }
-
-    /// Parses the constructor arguments based on the ABI inputs.
-    ///
-    /// This function parses the constructor arguments provided by the user, matching them with
-    /// the ABI inputs of the constructor. The parsing process ensures that the arguments are
-    /// in the right format and type as specified by the contract's ABI. It uses the `parse_tokens`
-    /// function from the `foundry_common` crate to facilitate this parsing.
-    ///
-    /// # Parameters
-    /// - `constructor`: The ABI of the contract constructor. It contains the input parameters' information.
-    /// - `constructor_args`: A slice of strings that represents the arguments provided by the user.
-    ///
-    /// # Returns
-    /// A `Result` which is:
-    /// - Ok: Contains a vector of `Token` objects that represent the parsed arguments.
-    /// - Err: Contains an eyre::Report error in case of parsing failure.
-    fn parse_constructor_args(
-        &self,
-        constructor: &Constructor,
-        constructor_args: &[String],
-    ) -> eyre::Result<Vec<Token>> {
-        let params = constructor
-            .inputs
-            .iter()
-            .zip(constructor_args)
-            .map(|(input, arg)| (&input.kind, arg.as_str()))
-            .collect::<Vec<_>>();
-
-        parse_tokens(params, true)
     }
 }
