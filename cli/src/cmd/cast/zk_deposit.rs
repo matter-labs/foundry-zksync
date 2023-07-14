@@ -133,7 +133,7 @@ impl ZkDepositTxArgs {
         let private_key = &self.wallet.private_key.as_ref().unwrap();
         let l1_url = get_rpc_url(&self.l1_url)?;
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
-        let chain = get_chain(self.chain)?;
+        let chain: Chain = get_chain(self.chain)?;
         // let token_address: Address = match self.token {
         //     Some(token_addy) => token_addy,
         //     None => Address::zero(),
@@ -141,7 +141,7 @@ impl ZkDepositTxArgs {
 
         let l1_provider = Provider::try_from(l1_url)?;
         let l2_provider = Provider::try_from(l2_url)?;
-        let wallet = LocalWallet::from_str(private_key).unwrap().with_chain_id(chain.id());
+        let wallet = LocalWallet::from_str(private_key)?.with_chain_id(chain);
         let zk_wallet =
             ZKSWallet::new(wallet, None, Some(l2_provider.clone()), Some(l1_provider.clone()))
                 .unwrap();

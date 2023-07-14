@@ -58,7 +58,7 @@ use ethers::{
 use eyre::Context;
 use serde_json::Value;
 use std::{fs, path::PathBuf, str::FromStr};
-use zksync_web3_rs::{providers::Provider, signers::LocalWallet, ZKSWallet};
+use zksync_web3_rs::{providers::Provider, signers::{LocalWallet, Signer}, ZKSWallet};
 
 /// CLI arguments for `forge zk-create`.
 /// Struct `ZkCreateArgs` encapsulates the arguments necessary for creating a new zkSync contract.
@@ -192,7 +192,7 @@ impl ZkCreateArgs {
         let constructor_args = self.get_constructor_args(&contract);
 
         let provider = Provider::try_from(rpc_url)?;
-        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
+        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?.with_chain_id(chain);
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None)?;
 
         let rcpt = zk_wallet
