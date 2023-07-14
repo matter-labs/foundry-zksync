@@ -36,14 +36,14 @@
 ///
 /// The `print_receipt` method extracts relevant information from the transaction receipt and prints it to the console.
 /// This includes the transaction hash, gas used, effective gas price, block number, and deployed contract address, if applicable.
-use crate::cmd::cast::zk_utils::zk_utils::{get_rpc_url};
 use crate::opts::{cast::parse_name_or_address, EthereumOpts, TransactionOpts};
 use clap::Parser;
 use ethers::types::NameOrAddress;
+use zksync_web3_rs::signers::Signer;
 use std::str::FromStr;
 use zksync_web3_rs::{ZKSWallet,providers::{Provider,Middleware}, signers::LocalWallet, types::{Address, TransactionReceipt, H160, U256}, zks_utils::CONTRACT_DEPLOYER_ADDR, zks_provider::ZKSProvider};
 
-use super::zk_utils::zk_utils::get_private_key;
+use super::zk_utils::zk_utils::{get_private_key, get_chain, get_rpc_url};
 
 /// CLI arguments for the `cast zk-send` subcommand.
 ///
@@ -129,9 +129,10 @@ impl ZkSendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
         let private_key = get_private_key(&self.eth.wallet.private_key)?;
         let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
+        let chain = get_chain(self.eth.chain)?;
         let provider = Provider::try_from(rpc_url)?;
         let to_address = self.get_to_address();
-        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?;
+        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?.with_chain_id(chain);
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None);
 
         // TODO Support different tokens than ETH.
