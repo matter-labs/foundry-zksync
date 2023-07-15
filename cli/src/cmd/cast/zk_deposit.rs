@@ -13,27 +13,18 @@
 ///     - `parse_decimal_u256`: Converts a string to a `U256` number.
 ///
 use crate::{
-    cmd::cast::zk_utils::zk_utils::{get_chain, get_rpc_url, get_url_with_port},
-    opts::{TransactionOpts, Wallet},
+    cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
+    opts::{cast::parse_name_or_address, TransactionOpts, Wallet},
 };
 use clap::Parser;
+use ethers::types::NameOrAddress;
 use foundry_config::Chain;
 use std::str::FromStr;
 use zksync_web3_rs::providers::Provider;
 use zksync_web3_rs::signers::{LocalWallet, Signer};
-use zksync_web3_rs::types::{Address, NameOrAddress, H160, U256};
+use zksync_web3_rs::types::{Address, H160, U256};
 use zksync_web3_rs::DepositRequest;
 use zksync_web3_rs::ZKSWallet;
-
-// FIXME this function belongs in the `crate::opts::cast` module. I moved it here because the rest
-// of the code is using the ethers types while we are using the `zksync_web3_rs` re-exports.
-pub fn parse_name_or_address(s: &str) -> eyre::Result<NameOrAddress> {
-    Ok(if s.starts_with("0x") {
-        NameOrAddress::Address(s.parse()?)
-    } else {
-        NameOrAddress::Name(s.into())
-    })
-}
 
 /// Struct to represent the command line arguments for the `cast zk-deposit` command.
 ///
@@ -46,7 +37,7 @@ pub struct ZkDepositTxArgs {
     /// This can be either a name or an address.
     #[clap(
             help = "The destination of the transaction.",
-             value_parser = parse_name_or_address,
+            value_parser = parse_name_or_address,
             value_name = "TO"
         )]
     to: NameOrAddress,
@@ -130,22 +121,18 @@ impl ZkDepositTxArgs {
     /// - Ok: If the deposit transaction is successfully completed.
     /// - Err: If an error occurred during the execution of the deposit transaction.
     pub async fn run(self) -> eyre::Result<()> {
-        let private_key = &self.wallet.private_key.as_ref().unwrap();
+        let private_key = get_private_key(&self.wallet.private_key)?;
         let l1_url = get_rpc_url(&self.l1_url)?;
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
         let chain: Chain = get_chain(self.chain)?;
-        // let token_address: Address = match self.token {
-        //     Some(token_addy) => token_addy,
-        //     None => Address::zero(),
-        // };
-
         let l1_provider = Provider::try_from(l1_url)?;
         let l2_provider = Provider::try_from(l2_url)?;
-        let wallet = LocalWallet::from_str(private_key)?.with_chain_id(chain);
+        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?.with_chain_id(chain);
         let zk_wallet =
             ZKSWallet::new(wallet, None, Some(l2_provider.clone()), Some(l1_provider.clone()))
                 .unwrap();
 
+        // TODO Support different tokens than ETH.
         let deposit_request = DepositRequest::new(self.amount.into())
             .to(self.get_to_address())
             .operator_tip(self.operator_tip.unwrap_or(0.into()))
