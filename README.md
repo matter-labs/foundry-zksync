@@ -218,7 +218,7 @@ Options:
 
 > `--is-system` flag: It is necessary to compile some contracts, including those that deploy other contracts (such as factory contracts), using the `--is-system` flag. These contracts should be placed in the `src/is-system/` folder. If the folder does not exist, manually create it.
 
-        ![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
+![image](https://user-images.githubusercontent.com/76663878/236301037-2a536ab0-3d09-44f3-a74d-5f5891af335b.png)
 
 ### Example usage
 
