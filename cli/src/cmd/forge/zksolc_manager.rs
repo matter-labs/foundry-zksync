@@ -199,9 +199,9 @@ impl ZkSolcManagerOpts {
 /// ```
 #[derive(Debug, Clone)]
 pub struct ZkSolcManagerBuilder {
-    compilers_path: Option<PathBuf>,
+    _compilers_path: Option<PathBuf>,
     version: String,
-    compiler: Option<String>,
+    _compiler: Option<String>,
     download_url: Url,
 }
 
@@ -226,9 +226,9 @@ impl ZkSolcManagerBuilder {
     /// Returns a new `ZkSolcManagerBuilder` instance.
     pub fn new(opts: ZkSolcManagerOpts) -> Self {
         Self {
-            compilers_path: None,
+            _compilers_path: None,
             version: opts.version,
-            compiler: None,
+            _compiler: None,
             download_url: Url::parse(ZKSOLC_DOWNLOAD_BASE_URL).unwrap(),
         }
     }

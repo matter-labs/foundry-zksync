@@ -206,6 +206,7 @@ impl ZkCreateArgs {
 
         println!("+-------------------------------------------------+");
         println!("Contract successfully deployed to address: {:#?}", deployed_address);
+        println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
         println!("Gas used: {:#?}", gas_used);
         println!("Effective gas price: {:#?}", gas_price);
         println!("Block Number: {:#?}", block_number);
