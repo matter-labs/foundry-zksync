@@ -88,7 +88,7 @@ thiserror = "1.0.30"
 which = "4.2.5"
 
 #zksync
-zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "7e82c03e658d73622515a643327a7629d759e630"}
+zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
 
 ansi_term = "0.12.1"
 anyhow = {version = "1.0.70"}
