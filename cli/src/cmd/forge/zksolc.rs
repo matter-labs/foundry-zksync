@@ -26,7 +26,7 @@
 ///   path and file for saving the compiler output artifacts.
 use ansi_term::Colour::{Red, Yellow};
 use anyhow::{Error, Result};
-use ethers::prelude::{artifacts::Source, Solc};
+use ethers::prelude::{artifacts::Source, remappings::RelativeRemapping, Solc};
 use ethers::solc::{
     artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
     Graph, Project,
@@ -44,6 +44,7 @@ use std::{
 
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts {
+    pub remappings: Vec<RelativeRemapping>,
     pub compiler_path: PathBuf,
     pub is_system: bool,
     pub force_evmla: bool,
@@ -63,6 +64,7 @@ pub struct ZkSolcOpts {
 /// - `force_evmla`: A flag indicating whether to force EVMLA optimization.
 /// - `standard_json`: An optional field to store the parsed standard JSON input for the contracts.
 /// - `sources`: An optional field to store the versioned sources for the contracts.
+/// - `remappings`: A vector of relative remappings for the contracts.
 ///
 /// Functionality:
 /// - `new`: Constructs a new `ZkSolc` instance using the provided compiler path, project
@@ -103,6 +105,7 @@ pub struct ZkSolc {
     force_evmla: bool,
     standard_json: Option<StandardJsonCompilerInput>,
     sources: Option<BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>>,
+    remappings: Vec<RelativeRemapping>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -128,82 +131,56 @@ impl ZkSolc {
             force_evmla: opts.force_evmla,
             standard_json: None,
             sources: None,
+            remappings: opts.remappings,
         }
     }
 
-    /// Compiles the Solidity contracts in the project's 'sources' directory and its subdirectories
-    /// using the ZkSolc compiler.
+    /// Compiles the Solidity contracts using the ZkSolc compiler.
     ///
-    /// # Arguments
-    ///
-    /// * `self` - A mutable reference to the `ZkSolc` instance.
-    ///
-    /// # Errors
-    ///
-    /// This function can return an error if any of the following occurs:
-    /// - The Solidity compiler fails to execute or encounters an error during compilation.
-    /// - The source files cannot be collected from the project's 'sources' directory.
-    /// - The compiler arguments cannot be built.
-    /// - The output of the compiler contains errors or warnings.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// let project = Project::new(...);
-    /// let opts = ZkSolcOpts {
-    ///     compiler_path: PathBuf::from("/path/to/zksolc"),
-    ///     is_system: false,
-    ///     force_evmla: true,
-    /// };
-    /// let mut zksolc = ZkSolc::new(opts, project);
-    /// zksolc.compile()?;
-    /// ```
-    ///
-    /// In this example, a `ZkSolc` instance is created using `ZkSolcOpts` and a `Project`. Then, the
-    /// `compile` method is invoked to compile the contracts.
+    /// This applies remappings, parses JSON input, runs the compiler,
+    /// and handles output for each contract source file.
     ///
     /// # Workflow
     ///
-    /// The `compile` function performs the following operations:
+    /// 1. Collect Sources
+    ///    - Calls `configure_solc()` to get sources
     ///
-    /// 1. Collect Source Files:
-    ///    - It collects the source files from the project's 'sources' directory and its subdirectories.
-    ///    - Only the files within the 'sources' directory and its subdirectories are considered for compilation.
+    /// 2. Loop Through Sources
+    ///    - Filter for sources in 'sources' directory
     ///
-    /// 2. Configure Solidity Compiler:
-    ///    - It configures the Solidity compiler by setting options like the compiler path, system mode, and force EVMLA flag.
+    /// 3. Configure Compiler
+    ///    - Calls `configure_compiler_output_settings()`
+    ///  
+    /// 4. Apply Remappings
+    ///    - Calls `remap_source_content()`
     ///
-    /// 3. Parse JSON Input:
-    ///    - For each source file, it parses the JSON input using the Solidity compiler.
-    ///    - The parsed JSON input is stored in the `standard_json` field of the `ZkSolc` instance.
+    /// 5. Parse JSON Input
+    ///    - Calls `parse_json_input()`
     ///
-    /// 4. Build Compiler Arguments:
-    ///    - It builds the compiler arguments for each source file.
-    ///    - The compiler arguments include options like the compiler path, system mode, and force EVMLA flag.
+    /// 6. Build Arguments
+    ///    - Calls `build_compiler_args()`
     ///
-    /// 5. Run Compiler and Handle Output:
-    ///    - It runs the Solidity compiler for each source file with the corresponding compiler arguments.
-    ///    - The output of the compiler, including errors and warnings, is captured.
+    /// 7. Run Compiler
+    ///    - Executes the compiler process
     ///
-    /// 6. Handle Output (Errors and Warnings):
+    /// 8. Handle Output (Errors and Warnings):
     ///    - It handles the output of the compiler, extracting errors and warnings.
     ///    - Errors are printed in red, and warnings are printed in yellow.
+    ///    - Calls `handle_output()`
     ///
-    /// 7. Save Artifacts:
-    ///    - It saves the artifacts (compiler output) as a JSON file for each source file.
-    ///    - The artifacts are saved in the project's artifacts directory under the corresponding source file's directory.
+    /// Returns Ok if successful.
     ///
-    /// # Note
+    /// # Note  
     ///
-    /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the versioned sources.
-    /// These modified values can be accessed after the compilation process for further processing or analysis.
+    /// This function stores parsed JSON input and versioned sources
+    /// on the `ZkSolc` instance for later access.
     pub fn compile(mut self) -> Result<()> {
         // Step 1: Collect Source Files
         self.configure_solc();
         let sources = self.sources.clone().unwrap();
         let mut displayed_warnings = HashSet::new();
 
-        // Step 2: Compile Contracts for Each Source
+        // Step 2: Loop Through Sources
         for (solc, version) in sources {
             //configure project solc for each solc version
             for source in version.1 {
@@ -219,18 +196,23 @@ impl ZkSolc {
                     continue;
                 }
 
-                // Step 3: Parse JSON Input for each Source
-                if let Err(err) = self.parse_json_input(contract_path.clone()) {
+                // Step 3: Configure output settings
+                self.configure_compiler_output_settings();
+
+                // Step 4: Apply remappings
+                self.remap_source_content(&contract_path, source.1.content.clone());
+
+                // Step 5: Parse JSON Input for each Source
+                if let Err(err) = self.parse_json_input(&contract_path) {
                     eprintln!("Failed to parse json input for zksolc compiler: {}", err);
                 }
 
-                // Step 4: Build Compiler Arguments
+                // Step 6: Build Compiler Arguments
                 let comp_args = self.build_compiler_args(source.clone(), solc.clone());
 
-                // Step 5: Run Compiler and Handle Output
+                // Step 7: Run Compiler
                 let mut cmd = Command::new(&self.compiler_path);
                 let mut child = cmd
-                    .arg(contract_path.clone())
                     .args(&comp_args)
                     .stdin(Stdio::piped())
                     .stderr(Stdio::piped())
@@ -242,6 +224,7 @@ impl ZkSolc {
                     |e| Error::msg(format!("Could not assign standard_json to writer: {}", e)),
                 )?;
 
+                // Step 8: Handle Output (Errors and Warnings)
                 let output = child
                     .unwrap()
                     .wait_with_output()
@@ -258,28 +241,58 @@ impl ZkSolc {
                 }
 
                 let filename = contract_path
+                    .file_name()
+                    .expect("Failed to extract filename")
                     .to_str()
-                    .expect("Unable to convert source to string")
-                    .split(
-                        self.project
-                            .paths
-                            .root
-                            .to_str()
-                            .expect("Unable to convert source to string"),
-                    )
-                    .nth(1)
-                    .expect("Failed to get Contract relative path")
-                    .split("/")
-                    .last()
-                    .expect("Failed to get Contract filename.");
+                    .expect("Failed to convert filename to str");
 
-                // Step 6: Handle Output (Errors and Warnings)
                 self.handle_output(output, filename.to_string(), &mut displayed_warnings);
             }
         }
 
-        // Step 7: Return Ok if the compilation process completes without errors
+        // Return Ok if the compilation process completes without errors
         Ok(())
+    }
+
+    /// Applies import remappings to the provided source content.
+    ///
+    /// This is called from `compile()` to remap each contract source.
+    ///
+    /// It replaces import paths with placeholders, then replaces the
+    /// placeholders with relative paths from the remappings.
+    ///
+    /// This was necessary to prevent the same imports from getting
+    /// rewritten by similar remappings being auto generated by Foundry.
+    fn remap_source_content(&mut self, contract_path: &PathBuf, source_content: String) {
+        // We'll use the index in the remappings vector as a placeholder.
+        let placeholders: Vec<_> = self
+            .remappings
+            .iter()
+            .enumerate()
+            .map(|(i, remapping)| (format!("REMAP_PLACEHOLDER_{}", i), remapping.name.clone()))
+            .collect();
+
+        // First, replace names with placeholders.
+        let mut source_content_replaced_with_placeholders = source_content;
+        for (placeholder, name) in &placeholders {
+            source_content_replaced_with_placeholders =
+                source_content_replaced_with_placeholders.replace(name, placeholder);
+        }
+
+        // Now, replace the placeholders with the actual paths.
+        let mut source_content_final = source_content_replaced_with_placeholders;
+        for (i, remapping) in self.remappings.iter().enumerate() {
+            let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
+            let path_str = remapping.path.path.to_str().unwrap();
+            source_content_final = source_content_final.replace(&placeholder, path_str);
+        }
+
+        let mut standard_json = self.project.standard_json_input(contract_path).unwrap();
+
+        standard_json.sources[0].1.content = source_content_final;
+
+        // Store the generated standard JSON input in the ZkSolc instance
+        self.standard_json = Some(standard_json);
     }
 
     /// Builds the compiler arguments for the Solidity compiler based on the provided versioned source
@@ -463,106 +476,26 @@ impl ZkSolc {
         }
     }
 
-    /// Parses the JSON input for a contract and prepares the necessary configuration for the ZkSolc compiler.
-    ///
-    /// # Arguments
-    ///
-    /// * `contract_path` - The path to the contract source file.
-    ///
-    /// # Errors
-    ///
-    /// This function can return an error if any of the following occurs:
-    /// - The standard JSON input cannot be generated for the contract.
-    /// - The artifacts path for the contract cannot be created.
-    /// - The JSON input cannot be saved to the artifacts directory.
+    /// Parses the JSON input for the compiler from the contract source.
     ///
     /// # Workflow
     ///
-    /// The `parse_json_input` function performs the following operations:
+    /// 1. Build Artifacts Path
+    /// 2. Save JSON Input
     ///
-    /// 1. Configure File Output Selection:
-    ///    - It configures the file output selection to specify which outputs should be included in the compiler output.
-    ///
-    /// 2. Configure Solidity Compiler:
-    ///    - It modifies the Solidity compiler settings to exclude metadata from the output.
-    ///
-    /// 3. Update Output Selection:
-    ///    - It updates the file output selection settings in the Solidity compiler configuration with the configured values.
-    ///
-    /// 4. Generate Standard JSON Input:
-    ///    - It generates the standard JSON input for the contract using the `standard_json_input` method of the project.
-    ///    - The standard JSON input includes the contract's source code, compiler options, and file output selection.
-    ///
-    /// 5. Build Artifacts Path:
-    ///    - It builds the path for saving the compiler artifacts based on the contract source file.
-    ///    - The artifacts will be saved in a directory named after the contract's filename within the project's artifacts directory.
-    ///
-    /// 6. Save JSON Input:
-    ///    - It saves the standard JSON input as a file named "json_input.json" within the contract's artifacts directory.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// let contract_path = PathBuf::from("/path/to/contract.sol");
-    /// self.parse_json_input(contract_path)?;
-    /// ```
-    ///
-    /// In this example, the `parse_json_input` function is called with the contract source path. It generates
-    /// the JSON input for the contract, configures the Solidity compiler, and saves the input to the artifacts directory.
-    fn parse_json_input(&mut self, contract_path: PathBuf) -> Result<()> {
-        // Step 1: Configure File Output Selection
-        let mut file_output_selection: FileOutputSelection = BTreeMap::default();
-        file_output_selection.insert(
-            "*".to_string(),
-            vec![
-                "abi".to_string(),
-                "evm.methodIdentifiers".to_string(),
-                // "evm.legacyAssembly".to_string(),
-            ],
-        );
-        file_output_selection.insert(
-            "".to_string(),
-            vec![
-                "metadata".to_string(),
-                // "ast".to_string(),
-                // "userdoc".to_string(),
-                // "devdoc".to_string(),
-                // "storageLayout".to_string(),
-                // "irOptimized".to_string(),
-            ],
-        );
-
-        // Step 2: Configure Solidity Compiler
-        // zksolc requires metadata to be 'None'
-        self.project.solc_config.settings.metadata = None;
-
-        // Step 3: Update Output Selection
-        self.project
-            .solc_config
-            .settings
-            .output_selection
-            .0
-            .insert("*".to_string(), file_output_selection.clone());
-
-        // Step 4: Generate Standard JSON Input
-        let standard_json = self
-            .project
-            .standard_json_input(&contract_path)
-            .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))
-            .unwrap();
-
-        // Store the generated standard JSON input in the ZkSolc instance
-        self.standard_json = Some(standard_json.to_owned());
-
-        // Step 5: Build Artifacts Path
+    /// # Arguments
+    ///  
+    /// * `contract_path` - Path to the contract source
+    fn parse_json_input(&mut self, contract_path: &PathBuf) -> Result<()> {
+        //Build Artifacts Path
         let artifact_path = &self
             .build_artifacts_path(contract_path)
             .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))
             .unwrap();
 
-        // Step 6: Save JSON Input
+        // Save JSON Input
         let json_input_path = artifact_path.join("json_input.json");
-        let stdjson = serde_json::to_value(&standard_json)
+        let stdjson = serde_json::to_value(self.standard_json.clone().unwrap())
             .map_err(|e| Error::msg(format!("Could not serialize standard JSON input: {}", e)))?;
         std::fs::write(&json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
             .map_err(|e| Error::msg(format!("Could not write JSON input file: {}", e)))?;
@@ -698,7 +631,7 @@ impl ZkSolc {
     /// This function can return an error if any of the following occurs:
     /// - The extraction of the filename from the contract source path fails.
     /// - The creation of the artifacts directory fails.
-    fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
+    fn build_artifacts_path(&self, source: &PathBuf) -> Result<PathBuf, anyhow::Error> {
         let filename = source.file_name().expect("Failed to get Contract filename.");
         let path = self.project.paths.artifacts.join(filename);
         fs::create_dir_all(&path)
@@ -733,5 +666,40 @@ impl ZkSolc {
     fn build_artifacts_file(&self, source: String) -> Result<File> {
         File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
             .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))
+    }
+
+    fn configure_compiler_output_settings(&mut self) {
+        // Configure File Output Selection
+        let mut file_output_selection: FileOutputSelection = BTreeMap::default();
+        file_output_selection.insert(
+            "*".to_string(),
+            vec![
+                "abi".to_string(),
+                "evm.methodIdentifiers".to_string(),
+                // "evm.legacyAssembly".to_string(),
+            ],
+        );
+        file_output_selection.insert(
+            "".to_string(),
+            vec![
+                "metadata".to_string(),
+                // "ast".to_string(),
+                // "userdoc".to_string(),
+                // "devdoc".to_string(),
+                // "storageLayout".to_string(),
+                // "irOptimized".to_string(),
+            ],
+        );
+
+        // zksolc requires metadata to be 'None'
+        self.project.solc_config.settings.metadata = None;
+
+        // Update Output Selection
+        self.project
+            .solc_config
+            .settings
+            .output_selection
+            .0
+            .insert("*".to_string(), file_output_selection.clone());
     }
 }
