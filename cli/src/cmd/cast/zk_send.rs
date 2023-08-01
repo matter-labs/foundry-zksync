@@ -144,7 +144,7 @@ impl ZkSendTxArgs {
             match zk_wallet {
                 Ok(wallet) => {
                     println!("Bridging assets....");
-                    let tx_rcpt = wallet.withdraw(amount, to_address).await?;
+                    let tx_rcpt = wallet.withdraw(amount, to_address).await?.await?.ok_or(eyre::eyre!("Error getting the receipt for withdraw"))?;
                     self.print_receipt(&tx_rcpt);
                 }
                 Err(e) => eyre::bail!("error wallet: {e:?}"),
@@ -156,14 +156,13 @@ impl ZkSendTxArgs {
                     let sig = self.sig.as_ref().expect("Error: Function Signature is empty");
                     let params = (!sig.is_empty()).then_some((&sig[..], self.args.clone()));
 
-                    let (_, tx_hash) = wallet.get_era_provider()?.send_eip712(
+                    let rcpt = wallet.get_era_provider()?.send_eip712(
                         &wallet.l2_wallet,
                         to_address,
                         sig,
                         params.map(|(_, values)| values),
                         None
-                    ).await?;
-                    let rcpt = wallet.get_era_provider()?.get_transaction_receipt(tx_hash).await?.ok_or(eyre::eyre!("Error retrieving transaction receipt"))?;
+                    ).await?.await?.ok_or(eyre::eyre!("Error getting the receipt for transaction"))?;
 
                     self.print_receipt(&rcpt);
                 }
