@@ -177,9 +177,10 @@ impl ZkBuildArgs {
     /// The `compile_smart_contracts` function initiates the contract compilation process.
     ///
     /// It follows these steps:
-    /// 1. Create an instance of `ZkSolcOpts` with the appropriate options.
-    /// 2. Instantiate `ZkSolc` with the created options and the project.
-    /// 3. Initiate the contract compilation process.
+    /// 1. Gets config to retrieve remappings
+    /// 2. Create an instance of `ZkSolcOpts` with the appropriate options.
+    /// 3. Instantiate `ZkSolc` with the created options and the project.
+    /// 4. Initiate the contract compilation process.
     ///
     /// The function returns `Ok(())` if the compilation process completes successfully, or an error if it fails.
     fn compile_smart_contracts(
@@ -187,7 +188,10 @@ impl ZkBuildArgs {
         zksolc_manager: ZkSolcManager,
         project: Project,
     ) -> eyre::Result<()> {
+        let config = self.try_load_config_emit_warnings()?;
+
         let zksolc_opts = ZkSolcOpts {
+            remappings: config.remappings,
             compiler_path: zksolc_manager.get_full_compiler_path(),
             is_system: self.is_system,
             force_evmla: self.force_evmla,
