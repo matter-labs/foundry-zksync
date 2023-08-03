@@ -197,11 +197,11 @@ impl ZkSolcManagerOpts {
 ///     .build()
 ///     .expect("Failed to build ZkSolcManager");
 /// ```
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct ZkSolcManagerBuilder {
-    compilers_path: Option<PathBuf>,
+    _compilers_path: Option<PathBuf>,
     version: String,
-    compiler: Option<String>,
+    _compiler: Option<String>,
     download_url: Url,
 }
 
@@ -226,9 +226,9 @@ impl ZkSolcManagerBuilder {
     /// Returns a new `ZkSolcManagerBuilder` instance.
     pub fn new(opts: ZkSolcManagerOpts) -> Self {
         Self {
-            compilers_path: None,
+            _compilers_path: None,
             version: opts.version,
-            compiler: None,
+            _compiler: None,
             download_url: Url::parse(ZKSOLC_DOWNLOAD_BASE_URL).unwrap(),
         }
     }
@@ -331,7 +331,7 @@ impl ZkSolcManagerBuilder {
 /// The `ZkSolcManager` structure provides a high-level interface to manage the `zksolc` compiler,
 /// simplifying the process of handling different versions and ensuring the availability of the compiler
 /// for contract compilation.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct ZkSolcManager {
     compilers_path: PathBuf,
     version: ZkSolcVersion,

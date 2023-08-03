@@ -88,10 +88,7 @@ thiserror = "1.0.30"
 which = "4.2.5"
 
 #zksync
-zksync = {git = "https://github.com/matter-labs/zksync-era.git"}
-zksync_eth_signer = {git = "https://github.com/matter-labs/zksync-era.git"}
-zksync_types = {git = "https://github.com/matter-labs/zksync-era.git"}
-zksync_utils = {git = "https://github.com/matter-labs/zksync-era.git"}
+zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
 
 ansi_term = "0.12.1"
 anyhow = {version = "1.0.70"}
