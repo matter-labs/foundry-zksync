@@ -34,6 +34,7 @@ use ethers::solc::{
 use regex::Regex;
 use semver::Version;
 use serde_json::Value;
+use std::path::Path;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt, fs,
@@ -363,6 +364,8 @@ impl ZkSolc {
         // Handle errors and warnings in the output
         self.handle_output_errors(&output_json, displayed_warnings);
 
+        let contract_name = Path::new(&source).file_stem().unwrap().to_str().unwrap();
+
         // Create the artifacts file for saving the compiler output
         let mut artifacts_file = self
             .build_artifacts_file(source.clone())
@@ -376,8 +379,10 @@ impl ZkSolc {
                 let b_code_obj = b_code.as_object().unwrap();
                 let b_code_keys = b_code_obj.keys();
                 for hash in b_code_keys {
-                    if let Some(bcode_hash) = b_code_obj[hash]["hash"].as_str() {
-                        println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
+                    if hash == contract_name {
+                        if let Some(bcode_hash) = b_code_obj[hash]["hash"].as_str() {
+                            println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
+                        }
                     }
                 }
             }
