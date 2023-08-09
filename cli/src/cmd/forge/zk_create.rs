@@ -5,11 +5,11 @@
 /// - Signing the deployment transaction
 /// - Handling the deployment process
 ///
-/// This module plays a crucial role in the zkSync ecosystem by enabling developers to seamlessly
-/// deploy and interact with zkSync contracts.
+/// This module plays a crucial role in the zkSync ecosystem by enabling developers to
+/// seamlessly deploy and interact with zkSync contracts.
 ///
-/// The main struct in this module is `ZkCreateArgs`, which represents the command-line arguments
-/// for the `forge zk-create` command. It contains fields such as:
+/// The main struct in this module is `ZkCreateArgs`, which represents the command-line
+/// arguments for the `forge zk-create` command. It contains fields such as:
 /// - The contract identifier
 /// - Constructor arguments
 /// - Transaction options
@@ -19,7 +19,8 @@
 /// - Execute the deployment process
 /// - Deploy the contract on the Ethereum network
 ///
-/// Additionally, this module provides several helper functions to assist with the contract deployment, including:
+/// Additionally, this module provides several helper functions to assist with the contract
+/// deployment, including:
 /// - Retrieving the bytecode and ABI of the contract from the Solidity project
 /// - Parsing and encoding the constructor arguments
 /// - Creating a signer for transaction signing
@@ -32,13 +33,15 @@
 /// 4. Creating a signer with the provided private key and chain information
 /// 5. Initializing a wallet for deployment
 /// 6. Sending the deployment transaction to the Ethereum network
-/// 7. Printing contract address, transaction hash, gas used, gas price, and block number if the deployment is successful
+/// 7. Printing contract address, transaction hash, gas used, gas price, and block number if
+///    the deployment is successful
 ///
 /// To use the `forge zk-create` command:
 /// 1. Parse the command-line arguments using the `ZkCreateArgs::parse()` method
 /// 2. Execute the deployment process by calling the `run()` method on the parsed arguments
 ///
-/// It's worth noting that this module relies on the following crates for interacting with Ethereum and zkSync:
+/// It's worth noting that this module relies on the following crates for interacting with
+/// Ethereum and zkSync:
 /// - `ethers`
 /// - `zksync`
 use crate::{
@@ -56,9 +59,14 @@ use ethers::{
     types::Bytes,
 };
 use eyre::Context;
+use foundry_config::Config;
 use serde_json::Value;
 use std::{fs, path::PathBuf, str::FromStr};
-use zksync_web3_rs::{providers::Provider, signers::{LocalWallet, Signer}, ZKSWallet};
+use zksync_web3_rs::{
+    providers::Provider,
+    signers::{LocalWallet, Signer},
+    ZKSWallet,
+};
 
 /// CLI arguments for `forge zk-create`.
 /// Struct `ZkCreateArgs` encapsulates the arguments necessary for creating a new zkSync contract.
@@ -70,8 +78,8 @@ use zksync_web3_rs::{providers::Provider, signers::{LocalWallet, Signer}, ZKSWal
 /// The `ZkCreateArgs` struct has the following fields:
 ///
 /// * `constructor_args`: This field represents the arguments for the zkSync contract constructor.
-///   The arguments are represented as a vector of `Token` values. Each `Token` corresponds to
-///   an argument of the contract's constructor.
+///   The arguments are represented as a vector of `Token` values. Each `Token` corresponds to an
+///   argument of the contract's constructor.
 ///
 /// * `encoded_constructor_args`: This is the hex encoded string representation of the constructor
 ///   arguments. It is used when deploying the contract on the Ethereum network.
@@ -79,8 +87,8 @@ use zksync_web3_rs::{providers::Provider, signers::{LocalWallet, Signer}, ZKSWal
 /// * `bytecode`: The bytecode of the zkSync contract that is to be deployed. This is a compiled
 ///   version of the contract's source code.
 ///
-/// * `private_key`: The private key used for signing the contract deployment transaction. It
-///   is the private key of the account that will own the deployed contract.
+/// * `private_key`: The private key used for signing the contract deployment transaction. It is the
+///   private key of the account that will own the deployed contract.
 ///
 /// * `chain_id`: The ID of the Ethereum network chain where the contract is to be deployed.
 ///   Different chain IDs represent different Ethereum networks (e.g., mainnet, testnet).
@@ -152,11 +160,13 @@ impl ZkCreateArgs {
     /// 7. The constructor arguments are encoded.
     /// 8. A wallet is set up using the signer and the RPC URL.
     /// 9. The contract deployment is started.
-    /// 10. If deployment is successful, the contract address, transaction hash, gas used, gas price, and block number are printed to the console.
+    /// 10. If deployment is successful, the contract address, transaction hash, gas used, gas
+    ///     price, and block number are printed to the console.
     pub async fn run(self) -> eyre::Result<()> {
         let private_key = get_private_key(&self.eth.wallet.private_key)?;
-        let rpc_url = get_rpc_url(&self.eth.rpc_url)?;
-        let chain = get_chain(self.eth.chain)?;
+        let rpc_url = get_rpc_url(&self.eth.rpc.url)?;
+        let config = Config::from(&self.eth);
+        let chain = get_chain(config.chain_id)?;
         let mut project = self.opts.project()?;
         project.paths.artifacts = project.paths.root.join("zkout");
 
@@ -196,7 +206,7 @@ impl ZkCreateArgs {
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None)?;
 
         let rcpt = zk_wallet
-            .deploy(contract, bytecode.to_vec(),constructor_args, factory_dependencies)
+            .deploy(contract, bytecode.to_vec(), constructor_args, factory_dependencies)
             .await?;
 
         let deployed_address = rcpt.contract_address.expect("Error retrieving deployed address");
@@ -271,7 +281,8 @@ impl ZkCreateArgs {
     /// # Returns
     /// A `Result` which is:
     /// - Ok: Contains the bytecode as a Bytes.
-    /// - Err: Contains an error message indicating a problem with retrieving or decoding the bytecode.
+    /// - Err: Contains an error message indicating a problem with retrieving or decoding the
+    ///   bytecode.
     fn get_bytecode_from_contract(
         project: &Project,
         contract_info: &ContractInfo,
@@ -341,8 +352,10 @@ impl ZkCreateArgs {
     /// # Arguments
     ///
     /// * `project` - A `Project` instance that represents the current Solidity project.
-    /// * `factory_dep_vector` - A vector that contains the bytecode of each factory dependency contract.
-    /// * `fdep_contract_info` - A vector of `ContractInfo` instances that contain information about each factory dependency contract.
+    /// * `factory_dep_vector` - A vector that contains the bytecode of each factory dependency
+    ///   contract.
+    /// * `fdep_contract_info` - A vector of `ContractInfo` instances that contain information about
+    ///   each factory dependency contract.
     ///
     /// # Procedure
     ///
@@ -351,7 +364,8 @@ impl ZkCreateArgs {
     ///
     /// # Returns
     ///
-    /// A vector of vectors of bytes that represents the bytecode of each factory dependency contract.
+    /// A vector of vectors of bytes that represents the bytecode of each factory dependency
+    /// contract.
     fn get_factory_dependencies(
         &self,
         project: &Project,

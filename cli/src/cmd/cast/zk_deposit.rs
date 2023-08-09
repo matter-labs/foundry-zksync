@@ -3,41 +3,43 @@
 /// for depositing assets onto zkSync.
 ///
 /// The module contains the following components:
-/// - `ZkDepositTxArgs`: Struct representing the command line arguments for the `cast zk-deposit` command.
-///     It includes parameters such as the destination address, amount to deposit, bridge address,
-///     operator tip, zkSync RPC endpoint, and token to bridge.
-/// - `ZkDepositTxArgs` implementation: Defines methods for executing the deposit transaction based on the provided
-///     command line arguments.
+/// - `ZkDepositTxArgs`: Struct representing the command line arguments for the `cast
+///   zk-deposit` command. It includes parameters such as the destination address, amount to
+///   deposit, bridge address, operator tip, zkSync RPC endpoint, and token to bridge.
+/// - `ZkDepositTxArgs` implementation: Defines methods for executing the deposit transaction
+///   based on the provided command line arguments.
 /// - Helper functions:
-///     - `get_url_with_port`: Parses a URL string and attaches a default port if one is not specified.
+///     - `get_url_with_port`: Parses a URL string and attaches a default port if one is not
+///       specified.
 ///     - `parse_decimal_u256`: Converts a string to a `U256` number.
-///
 use crate::{
     cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
-    opts::{cast::parse_name_or_address, TransactionOpts, Wallet},
+    opts::{TransactionOpts, Wallet},
 };
 use clap::Parser;
 use ethers::types::NameOrAddress;
 use foundry_config::Chain;
 use std::str::FromStr;
-use zksync_web3_rs::providers::Provider;
-use zksync_web3_rs::signers::{LocalWallet, Signer};
-use zksync_web3_rs::types::{Address, H160, U256};
-use zksync_web3_rs::DepositRequest;
-use zksync_web3_rs::ZKSWallet;
+use zksync_web3_rs::{
+    providers::Provider,
+    signers::{LocalWallet, Signer},
+    types::{Address, H160, U256},
+    DepositRequest, ZKSWallet,
+};
 
 /// Struct to represent the command line arguments for the `cast zk-deposit` command.
 ///
-/// `ZkDepositTxArgs` contains parameters to be passed via the command line for the `cast zk-deposit`
-/// operation. These include the destination of the transaction, the amount to deposit, an optional
-/// bridge address, an optional operator tip, the zkSync RPC endpoint, and the token to bridge.
+/// `ZkDepositTxArgs` contains parameters to be passed via the command line for the `cast
+/// zk-deposit` operation. These include the destination of the transaction, the amount to deposit,
+/// an optional bridge address, an optional operator tip, the zkSync RPC endpoint, and the token to
+/// bridge.
 #[derive(Debug, Parser)]
 pub struct ZkDepositTxArgs {
     /// The destination address of the transaction.
     /// This can be either a name or an address.
     #[clap(
             help = "The destination of the transaction.",
-            value_parser = parse_name_or_address,
+            value_parser = NameOrAddress::from_str,
             value_name = "TO"
         )]
     to: NameOrAddress,
@@ -113,7 +115,8 @@ impl ZkDepositTxArgs {
     ///
     /// This function first gets the private key from the Ethereum options and the chain.
     /// Then, it creates a new wallet using the zkSync HTTP client and signer.
-    /// Finally, it deposits the specified amount to the target address and prints the transaction hash.
+    /// Finally, it deposits the specified amount to the target address and prints the transaction
+    /// hash.
     ///
     /// # Returns
     ///
@@ -212,7 +215,7 @@ mod zk_deposit_tests {
         let l2_balance_before = zk_wallet.era_balance().await.unwrap();
 
         let zk_deposit_tx_args = {
-            let to = parse_name_or_address("0x36615Cf349d7F6344891B1e7CA7C72883F5dc049").unwrap();
+            let to = NameOrAddress::from_str("0x36615Cf349d7F6344891B1e7CA7C72883F5dc049").unwrap();
             let bridge_address = None;
             let operator_tip = None;
             let token = None; // => Ether.

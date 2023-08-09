@@ -8,12 +8,7 @@ use crate::{
 };
 use cast::fuzz::CounterExample;
 use clap::Parser;
-use ethers::{
-    abi::Abi,
-    solc::{utils::RuntimeOrHandle},
-    types::U256,
-};
-use ethers::types::U256;
+use ethers::{abi::Abi, types::U256};
 use forge::{
     decode::decode_console_logs,
     executor::inspector::CheatsConfig,
@@ -32,7 +27,7 @@ use foundry_common::{
 };
 use foundry_config::{figment, get_available_profiles, Config};
 use regex::Regex;
-use std::{collections::BTreeMap, path::PathBuf, sync::mpsc::channel, time::Duration};
+use std::{collections::BTreeMap, fs, path::PathBuf, sync::mpsc::channel, time::Duration};
 use tracing::trace;
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
@@ -199,9 +194,9 @@ impl TestArgs {
             .build(project_root, output, env, evm_opts)?;
 
         println!("{:#?}, <-------> runner fork", runner.fork);
-        // let (_contract, _bytes, _bytes_v) = runner.contracts.clone().into_iter().nth(0).unwrap().1;
-        // println!("{:#?}, <-------> _contract", _contract);
-        // println!("{:#?}, <-------> _bytes", _bytes);
+        // let (_contract, _bytes, _bytes_v) =
+        // runner.contracts.clone().into_iter().nth(0).unwrap().1; println!("{:#?},
+        // <-------> _contract", _contract); println!("{:#?}, <-------> _bytes", _bytes);
 
         // zk_evm::
 
@@ -391,7 +386,7 @@ impl TestOutcome {
     pub fn ensure_ok(&self) -> eyre::Result<()> {
         let failures = self.failures().count();
         if self.allow_failure || failures == 0 {
-            return Ok(());
+            return Ok(())
         }
 
         if !shell::verbosity().is_normal() {
@@ -404,7 +399,7 @@ impl TestOutcome {
         for (suite_name, suite) in self.results.iter() {
             let failures = suite.failures().count();
             if failures == 0 {
-                continue;
+                continue
             }
 
             let term = if failures > 1 { "tests" } else { "test" };

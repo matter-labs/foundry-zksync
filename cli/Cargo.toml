@@ -77,20 +77,11 @@ thiserror = "1"
 indicatif = "0.17"
 parking_lot = "0.12"
 pkg-config = "0.3.26"
-proptest = "1.0.0"
-regex = {version = "1.5.4", default-features = false}
-ring = "0.16.20"
-rpassword = "7.0.0"
-rustc-hex = "2.1.0"
-semver = "1.0.5"
-serde = {version = "1.0.133", features = ["derive"]}
-serde_json = "1.0.67"
-sha2 = "0.10.6"
-similar = {version = "2.1.0", features = ["inline"]}
-strsim = "0.10.0"
-strum = {version = "0.24", features = ["derive"]}
-thiserror = "1.0.30"
-which = "4.2.5"
+
+
+# ring = "0.16.20"
+# sha2 = "0.10.6"
+# which = "4.2.5"
 
 #zksync
 zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
@@ -118,7 +109,6 @@ globset = "0.4"
 default = ["rustls"]
 rustls = ["ethers/rustls"]
 openssl = ["ethers/openssl"]
-rustls = ["ethers/rustls"]
 solc-asm = ["ethers/solc-sha2-asm"]
 
 # feature for integration tests that test external projects

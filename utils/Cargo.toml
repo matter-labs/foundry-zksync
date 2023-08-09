@@ -8,11 +8,6 @@ repository = "https://github.com/foundry-rs/foundry"
 
 [dependencies]
 
-tracing-subscriber = { version = "0.3", default-features = false, features = [
-    "env-filter",
-    "fmt",
-], optional = true }
-
 forge-fmt = { path = "../fmt" }
 
 ethers-core = { workspace = true }
@@ -39,8 +34,4 @@ dunce = "1"
 
 [dev-dependencies]
 foundry-common = { path = "./../common" }
-
-
-[features]
-test = ["tracing-subscriber"]
 pretty_assertions = "1.3.0"

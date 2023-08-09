@@ -4,7 +4,7 @@ use crate::{
         access_list::AccessListArgs, bind::BindArgs, call::CallArgs, create2::Create2Args,
         estimate::EstimateArgs, find_block::FindBlockArgs, interface::InterfaceArgs,
         logs::LogsArgs, rpc::RpcArgs, run::RunArgs, send::SendTxArgs, storage::StorageArgs,
-        wallet::WalletSubcommands,
+        wallet::WalletSubcommands, zk_deposit::ZkDepositTxArgs, zk_send::ZkSendTxArgs,
     },
     utils::parse_u256,
 };
