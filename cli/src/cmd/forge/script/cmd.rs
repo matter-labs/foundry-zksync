@@ -16,7 +16,7 @@ type NewSenderChanges = (CallTraceDecoder, Libraries, ArtifactContracts<Contract
 
 impl ScriptArgs {
     /// Executes the script
-    pub async fn run_script(mut self) -> eyre::Result<()> {
+    pub async fn run_script(mut self, breakpoints: Breakpoints) -> eyre::Result<()> {
         trace!(target: "script", "executing script command");
 
         let (config, evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
@@ -85,7 +85,14 @@ impl ScriptArgs {
         let mut decoder = self.decode_traces(&script_config, &mut result, &known_contracts)?;
 
         if self.debug {
-            return self.run_debugger(&decoder, sources, result, project, highlevel_known_contracts)
+            return self.run_debugger(
+                &decoder,
+                sources,
+                result,
+                project,
+                highlevel_known_contracts,
+                breakpoints,
+            )
         }
 
         if let Some((new_traces, updated_libraries, updated_contracts)) = self
@@ -112,14 +119,8 @@ impl ScriptArgs {
         verify.known_contracts = flatten_contracts(&highlevel_known_contracts, false);
         self.check_contract_sizes(&result, &highlevel_known_contracts)?;
 
-        self.handle_broadcastable_transactions(
-            result,
-            libraries,
-            &mut decoder,
-            script_config,
-            verify,
-        )
-        .await
+        self.handle_broadcastable_transactions(result, libraries, &decoder, script_config, verify)
+            .await
     }
 
     // In case there are libraries to be deployed, it makes sure that these are added to the list of
@@ -228,7 +229,11 @@ impl ScriptArgs {
     ) -> eyre::Result<()> {
         trace!(target: "script", "resuming single deployment");
 
-        let fork_url = self.evm_opts.ensure_fork_url()?;
+        let fork_url = script_config
+            .evm_opts
+            .fork_url
+            .as_deref()
+            .ok_or_else(|| eyre::eyre!("Missing `--fork-url` field."))?;
         let provider = Arc::new(try_get_http_provider(fork_url)?);
 
         let chain = provider.get_chainid().await?.as_u64();

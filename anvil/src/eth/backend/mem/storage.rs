@@ -9,13 +9,13 @@ use crate::eth::{
 use anvil_core::eth::{
     block::{Block, PartialHeader},
     receipt::TypedReceipt,
-    transaction::TransactionInfo,
+    transaction::{MaybeImpersonatedTransaction, TransactionInfo},
 };
 use ethers::{
-    prelude::{BlockId, BlockNumber, GethTrace, Trace, H256, H256 as TxHash, U64},
-    types::{ActionType, GethDebugTracingOptions, U256},
+    prelude::{BlockId, BlockNumber, DefaultFrame, Trace, H256, H256 as TxHash, U64},
+    types::{ActionType, Bytes, GethDebugTracingOptions, TransactionReceipt, U256},
 };
-use forge::revm::{Env, Return};
+use forge::revm::{interpreter::InstructionResult, primitives::Env};
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, VecDeque},
@@ -72,6 +72,12 @@ impl InMemoryBlockStates {
         }
     }
 
+    /// Configures no disk caching
+    pub fn memory_only(mut self) -> Self {
+        self.max_on_disk_limit = 0;
+        self
+    }
+
     /// This modifies the `limit` what to keep stored in memory.
     ///
     /// This will ensure the new limit adjusts based on the block time.
@@ -87,6 +93,11 @@ impl InMemoryBlockStates {
         }
     }
 
+    /// Returns true if only memory caching is supported.
+    fn is_memory_only(&self) -> bool {
+        self.max_on_disk_limit == 0
+    }
+
     /// Inserts a new (hash -> state) pair
     ///
     /// When the configured limit for the number of states that can be stored in memory is reached,
@@ -98,7 +109,7 @@ impl InMemoryBlockStates {
     ///
     /// When a state that was previously written to disk is requested, it is simply read from disk.
     pub fn insert(&mut self, hash: H256, state: StateDb) {
-        if self.present.len() >= self.in_memory_limit {
+        if !self.is_memory_only() && self.present.len() >= self.in_memory_limit {
             // once we hit the max limit we gradually decrease it
             self.in_memory_limit =
                 self.in_memory_limit.saturating_sub(1).max(self.min_in_memory_limit);
@@ -120,15 +131,18 @@ impl InMemoryBlockStates {
                 .pop_front()
                 .and_then(|hash| self.states.remove(&hash).map(|state| (hash, state)))
             {
-                let snapshot = state.0.clear_into_snapshot();
-                self.disk_cache.write(hash, snapshot);
-                self.on_disk_states.insert(hash, state);
-                self.oldest_on_disk.push_back(hash);
+                // only write to disk if supported
+                if !self.is_memory_only() {
+                    let snapshot = state.0.clear_into_snapshot();
+                    self.disk_cache.write(hash, snapshot);
+                    self.on_disk_states.insert(hash, state);
+                    self.oldest_on_disk.push_back(hash);
+                }
             }
         }
 
         // enforce on disk limit and purge the oldest state cached on disk
-        while self.oldest_on_disk.len() >= self.max_on_disk_limit {
+        while !self.is_memory_only() && self.oldest_on_disk.len() >= self.max_on_disk_limit {
             // evict the oldest block
             if let Some(hash) = self.oldest_on_disk.pop_front() {
                 self.on_disk_states.remove(&hash);
@@ -212,12 +226,12 @@ impl BlockchainStorage {
         let partial_header = PartialHeader {
             timestamp,
             base_fee,
-            gas_limit: env.block.gas_limit,
-            beneficiary: env.block.coinbase,
-            difficulty: env.block.difficulty,
+            gas_limit: env.block.gas_limit.into(),
+            beneficiary: env.block.coinbase.into(),
+            difficulty: env.block.difficulty.into(),
             ..Default::default()
         };
-        let block = Block::new(partial_header, vec![], vec![]);
+        let block = Block::new::<MaybeImpersonatedTransaction>(partial_header, vec![], vec![]);
         let genesis_hash = block.header.hash();
         let best_hash = genesis_hash;
         let best_number: U64 = 0u64.into();
@@ -321,6 +335,14 @@ impl Blockchain {
         }
     }
 
+    pub fn get_block_by_hash(&self, hash: &H256) -> Option<Block> {
+        self.storage.read().blocks.get(hash).cloned()
+    }
+
+    pub fn get_transaction_by_hash(&self, hash: &H256) -> Option<MinedTransaction> {
+        self.storage.read().transactions.get(hash).cloned()
+    }
+
     /// Returns the total number of blocks
     pub fn blocks_count(&self) -> usize {
         self.storage.read().blocks.len()
@@ -358,7 +380,7 @@ impl MinedTransaction {
             let action = node.parity_action();
             let result = node.parity_result();
 
-            let action_type = if node.status() == Return::SelfDestruct {
+            let action_type = if node.status() == InstructionResult::SelfDestruct {
                 ActionType::Suicide
             } else {
                 node.kind().into()
@@ -382,9 +404,18 @@ impl MinedTransaction {
         traces
     }
 
-    pub fn geth_trace(&self, opts: GethDebugTracingOptions) -> GethTrace {
+    pub fn geth_trace(&self, opts: GethDebugTracingOptions) -> DefaultFrame {
         self.info.traces.geth_trace(self.receipt.gas_used(), opts)
     }
+}
+
+/// Intermediary Anvil representation of a receipt
+#[derive(Debug, Clone)]
+pub struct MinedTransactionReceipt {
+    /// The actual json rpc receipt object
+    pub inner: TransactionReceipt,
+    /// Output data fo the transaction
+    pub out: Option<Bytes>,
 }
 
 #[cfg(test)]
@@ -392,7 +423,10 @@ mod tests {
     use super::*;
     use crate::eth::backend::db::Db;
     use ethers::{abi::ethereum_types::BigEndianHash, types::Address};
-    use forge::revm::{db::DatabaseRef, AccountInfo};
+    use forge::revm::{
+        db::DatabaseRef,
+        primitives::{AccountInfo, U256 as rU256},
+    };
     use foundry_evm::executor::backend::MemDb;
 
     #[test]
@@ -410,7 +444,7 @@ mod tests {
 
         let mut state = MemDb::default();
         let addr = Address::random();
-        let info = AccountInfo::from_balance(1337.into());
+        let info = AccountInfo::from_balance(rU256::from(1337));
         state.insert_account(addr, info);
         storage.insert(one, StateDb::new(state));
         storage.insert(two, StateDb::new(MemDb::default()));
@@ -423,8 +457,8 @@ mod tests {
 
         let loaded = storage.get(&one).unwrap();
 
-        let acc = loaded.basic(addr).unwrap().unwrap();
-        assert_eq!(acc.balance, 1337u64.into());
+        let acc = loaded.basic(addr.into()).unwrap().unwrap();
+        assert_eq!(acc.balance, rU256::from(1337u64));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -438,7 +472,7 @@ mod tests {
             let hash = H256::from_uint(&U256::from(idx));
             let addr = Address::from(hash);
             let balance = (idx * 2) as u64;
-            let info = AccountInfo::from_balance(balance.into());
+            let info = AccountInfo::from_balance(rU256::from(balance));
             state.insert_account(addr, info);
             storage.insert(hash, StateDb::new(state));
         }
@@ -453,9 +487,9 @@ mod tests {
             let hash = H256::from_uint(&U256::from(idx));
             let addr = Address::from(hash);
             let loaded = storage.get(&hash).unwrap();
-            let acc = loaded.basic(addr).unwrap().unwrap();
+            let acc = loaded.basic(addr.into()).unwrap().unwrap();
             let balance = (idx * 2) as u64;
-            assert_eq!(acc.balance, balance.into());
+            assert_eq!(acc.balance, rU256::from(balance));
         }
     }
 }

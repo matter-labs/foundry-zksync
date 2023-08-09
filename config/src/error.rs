@@ -13,6 +13,13 @@ pub struct ExtractConfigError {
     pub(crate) error: figment::Error,
 }
 
+impl ExtractConfigError {
+    /// Wraps the figment error
+    pub fn new(error: figment::Error) -> Self {
+        Self { error }
+    }
+}
+
 impl fmt::Display for ExtractConfigError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut unique_errors = Vec::with_capacity(self.error.count());
@@ -98,6 +105,8 @@ pub enum SolidityErrorCode {
     /// Warning that contract code size exceeds 24576 bytes (a limit introduced in Spurious
     /// Dragon).
     ContractExceeds24576Bytes,
+    /// Warning after shanghai if init code size exceeds 49152 bytes
+    ContractInitCodeSizeExceeds49152Bytes,
     /// Warning that Function state mutability can be restricted to [view,pure]
     FunctionStateMutabilityCanBeRestricted,
     /// Warning: Unused local variable
@@ -136,6 +145,7 @@ impl SolidityErrorCode {
         let s = match self {
             SolidityErrorCode::SpdxLicenseNotProvided => "license",
             SolidityErrorCode::ContractExceeds24576Bytes => "code-size",
+            SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes => "init-code-size",
             SolidityErrorCode::FunctionStateMutabilityCanBeRestricted => "func-mutability",
             SolidityErrorCode::UnusedLocalVariable => "unused-var",
             SolidityErrorCode::UnusedFunctionParameter => "unused-param",
@@ -169,6 +179,7 @@ impl From<SolidityErrorCode> for u64 {
             SolidityErrorCode::UnnamedReturnVariable => 6321,
             SolidityErrorCode::Unreachable => 5740,
             SolidityErrorCode::PragmaSolidity => 3420,
+            SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes => 3860,
             SolidityErrorCode::Other(code) => code,
         }
     }
@@ -193,6 +204,7 @@ impl FromStr for SolidityErrorCode {
             "unused-param" => SolidityErrorCode::UnusedFunctionParameter,
             "unused-var" => SolidityErrorCode::UnusedLocalVariable,
             "code-size" => SolidityErrorCode::ContractExceeds24576Bytes,
+            "init-code-size" => SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes,
             "shadowing" => SolidityErrorCode::ShadowsExistingDeclaration,
             "func-mutability" => SolidityErrorCode::FunctionStateMutabilityCanBeRestricted,
             "license" => SolidityErrorCode::SpdxLicenseNotProvided,
@@ -212,6 +224,7 @@ impl From<u64> for SolidityErrorCode {
         match code {
             1878 => SolidityErrorCode::SpdxLicenseNotProvided,
             5574 => SolidityErrorCode::ContractExceeds24576Bytes,
+            3860 => SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes,
             2018 => SolidityErrorCode::FunctionStateMutabilityCanBeRestricted,
             2072 => SolidityErrorCode::UnusedLocalVariable,
             5667 => SolidityErrorCode::UnusedFunctionParameter,

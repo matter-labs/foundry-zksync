@@ -43,8 +43,8 @@ where
 }
 
 /// Prints the given message to the shell
-pub fn print(msg: impl fmt::Display) -> io::Result<()> {
-    with_shell(|shell| shell.write_stdout(msg))
+pub fn println(msg: impl fmt::Display) -> io::Result<()> {
+    with_shell(|shell| if !shell.verbosity.is_silent() { shell.write_stdout(msg) } else { Ok(()) })
 }
 /// Prints the given message to the shell
 pub fn print_json<T: Serialize>(obj: &T) -> serde_json::Result<()> {
@@ -52,8 +52,8 @@ pub fn print_json<T: Serialize>(obj: &T) -> serde_json::Result<()> {
 }
 
 /// Prints the given message to the shell
-pub fn eprint(msg: impl fmt::Display) -> io::Result<()> {
-    with_shell(|shell| shell.write_stderr(msg))
+pub fn eprintln(msg: impl fmt::Display) -> io::Result<()> {
+    with_shell(|shell| if !shell.verbosity.is_silent() { shell.write_stderr(msg) } else { Ok(()) })
 }
 
 /// Returns the configured verbosity
@@ -175,7 +175,7 @@ unsafe impl Sync for WriteShellOut {}
 impl ShellWrite for WriteShellOut {
     fn write(&self, fragment: impl fmt::Display) -> io::Result<()> {
         if let Ok(mut lock) = self.0.lock() {
-            write!(lock, "{fragment}")?;
+            writeln!(lock, "{fragment}")?;
         }
         Ok(())
     }
@@ -216,6 +216,7 @@ impl ShellOut {
     /// Creates a new shell that writes to memory
     pub fn memory() -> Self {
         #[allow(clippy::box_default)]
+        #[allow(clippy::arc_with_non_send_sync)]
         ShellOut::Write(WriteShellOut(Arc::new(Mutex::new(Box::new(Vec::new())))))
     }
 
@@ -225,7 +226,7 @@ impl ShellOut {
             ShellOut::Stream => {
                 let stdout = io::stdout();
                 let mut handle = stdout.lock();
-                write!(handle, "{fragment}")?;
+                writeln!(handle, "{fragment}")?;
             }
             ShellOut::Write(ref w) => {
                 w.write(fragment)?;
@@ -240,7 +241,7 @@ impl ShellOut {
             ShellOut::Stream => {
                 let stderr = io::stderr();
                 let mut handle = stderr.lock();
-                write!(handle, "{fragment}")?;
+                writeln!(handle, "{fragment}")?;
             }
             ShellOut::Write(ref w) => {
                 w.write(fragment)?;

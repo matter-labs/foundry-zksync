@@ -13,6 +13,8 @@ use ethers::{
         U256,
     },
 };
+use forge::utils::h160_to_b160;
+use foundry_common::get_http_provider;
 use foundry_config::Config;
 use foundry_utils::{rpc, rpc::next_http_rpc_endpoint};
 use futures::StreamExt;
@@ -276,9 +278,9 @@ async fn test_separate_states() {
 
     let fork = api.get_fork().unwrap();
     let fork_db = fork.database.read().await;
-    let acc = fork_db.inner().db().accounts.read().get(&addr).cloned().unwrap();
+    let acc = fork_db.inner().db().accounts.read().get(&h160_to_b160(addr)).cloned().unwrap();
 
-    assert_eq!(acc.balance, remote_balance)
+    assert_eq!(acc.balance, remote_balance.into())
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -588,14 +590,11 @@ async fn test_reset_fork_on_new_blocks() {
     let anvil_provider = handle.http_provider();
 
     let endpoint = next_http_rpc_endpoint();
-    let provider =
-        Arc::new(Provider::try_from(&endpoint).unwrap().interval(Duration::from_secs(2)));
+    let provider = Arc::new(get_http_provider(&endpoint).interval(Duration::from_secs(2)));
 
     let current_block = anvil_provider.get_block_number().await.unwrap();
 
-    handle.task_manager().spawn_reset_on_new_polled_blocks(provider, api);
-
-    let provider = Provider::try_from(endpoint).unwrap();
+    handle.task_manager().spawn_reset_on_new_polled_blocks(provider.clone(), api);
 
     let mut stream = provider.watch_blocks().await.unwrap();
     // the http watcher may fetch multiple blocks at once, so we set a timeout here to offset edge
@@ -803,4 +802,62 @@ async fn test_total_difficulty_fork() {
     let block = provider.get_block(BlockNumber::Latest).await.unwrap().unwrap();
     assert_eq!(block.total_difficulty, Some(next_total_difficulty));
     assert_eq!(block.difficulty, U256::zero());
+}
+
+// <https://etherscan.io/block/14608400>
+#[tokio::test(flavor = "multi_thread")]
+async fn test_transaction_receipt() {
+    let (api, _) = spawn(fork_config()).await;
+
+    // A transaction from the forked block (14608400)
+    let receipt = api
+        .transaction_receipt(
+            "0xce495d665e9091613fd962351a5cbca27a992b919d6a87d542af97e2723ec1e4".parse().unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(receipt.is_some());
+
+    // A transaction from a block in the future (14608401)
+    let receipt = api
+        .transaction_receipt(
+            "0x1a15472088a4a97f29f2f9159511dbf89954b58d9816e58a32b8dc17171dc0e8".parse().unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(receipt.is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn can_override_fork_chain_id() {
+    let chain_id_override = 5u64;
+    let (_api, handle) = spawn(
+        fork_config()
+            .with_fork_block_number(Some(16506610u64))
+            .with_chain_id(Some(chain_id_override)),
+    )
+    .await;
+    let provider = handle.http_provider();
+
+    let wallet = handle.dev_wallets().next().unwrap();
+    let client = Arc::new(SignerMiddleware::new(provider, wallet));
+
+    let greeter_contract = Greeter::deploy(Arc::clone(&client), "Hello World!".to_string())
+        .unwrap()
+        .send()
+        .await
+        .unwrap();
+
+    let greeting = greeter_contract.greet().call().await.unwrap();
+    assert_eq!("Hello World!", greeting);
+
+    let greeter_contract =
+        Greeter::deploy(client, "Hello World!".to_string()).unwrap().send().await.unwrap();
+
+    let greeting = greeter_contract.greet().call().await.unwrap();
+    assert_eq!("Hello World!", greeting);
+
+    let provider = handle.http_provider();
+    let chain_id = provider.get_chainid().await.unwrap();
+    assert_eq!(chain_id.as_u64(), chain_id_override);
 }

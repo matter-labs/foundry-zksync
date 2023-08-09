@@ -6,7 +6,7 @@ use crate::cmd::{
     },
     Cmd, LoadConfig,
 };
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use ethers::solc::{Project, ProjectCompileOutput};
 use foundry_common::{
     compile,
@@ -54,27 +54,28 @@ foundry_config::merge_impl_figment_convert!(BuildArgs, args);
 /// Some arguments are marked as `#[serde(skip)]` and require manual processing in
 /// `figment::Provider` implementation
 #[derive(Debug, Clone, Parser, Serialize, Default)]
-#[clap(next_help_heading = "Build options", about = None)] // override doc
+#[clap(next_help_heading = "Build options", about = None, long_about = None)] // override doc
 pub struct BuildArgs {
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub args: CoreBuildArgs,
-
-    #[clap(help = "Print compiled contract names.", long = "names")]
+    /// Print compiled contract names.
+    #[clap(long)]
     #[serde(skip)]
     pub names: bool,
 
-    #[clap(help = "Print compiled contract sizes.", long = "sizes")]
+    /// Print compiled contract sizes.
+    #[clap(long)]
     #[serde(skip)]
     pub sizes: bool,
 
-    #[clap(
-        long,
-        num_args(1..),
-        action = ArgAction::Append,
-        help = "Skip building whose names contain SKIP. `test` and `script` are aliases for `.t.sol` and `.s.sol`. (this flag can be used multiple times)")]
+    /// Skip building files whose names contain the given filter.
+    ///
+    /// `test` and `script` are aliases for `.t.sol` and `.s.sol`.
+    #[clap(long, num_args(1..))]
     #[serde(skip)]
     pub skip: Option<Vec<SkipBuildFilter>>,
+
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub args: CoreBuildArgs,
 
     #[clap(flatten)]
     #[serde(skip)]
@@ -83,11 +84,12 @@ pub struct BuildArgs {
 
 impl Cmd for BuildArgs {
     type Output = ProjectCompileOutput;
+
     fn run(self) -> eyre::Result<Self::Output> {
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
 
-        if install::install_missing_dependencies(&mut config, &project, self.args.silent) &&
+        if install::install_missing_dependencies(&mut config, self.args.silent) &&
             config.auto_detect_remappings
         {
             // need to re-configure here to also catch additional remappings

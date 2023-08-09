@@ -1,27 +1,28 @@
 use super::*;
-use crate::{
-    cmd::{
-        ensure_clean_constructor,
-        forge::script::{
-            artifacts::ArtifactInfo,
-            runner::SimulationStage,
-            transaction::{AdditionalContract, TransactionWithMetadata},
-        },
-        needs_setup,
+use crate::cmd::{
+    ensure_clean_constructor,
+    forge::script::{
+        artifacts::ArtifactInfo,
+        runner::SimulationStage,
+        transaction::{AdditionalContract, TransactionWithMetadata},
     },
-    utils,
+    needs_setup,
 };
-use cast::executor::inspector::cheatcodes::util::BroadcastableTransactions;
 use ethers::{
     solc::artifacts::CompactContractBytecode,
     types::{transaction::eip2718::TypedTransaction, Address, U256},
 };
 use forge::{
-    executor::{inspector::CheatsConfig, Backend, ExecutorBuilder},
+    executor::{
+        inspector::{cheatcodes::util::BroadcastableTransactions, CheatsConfig},
+        Backend, ExecutorBuilder,
+    },
+    revm::primitives::U256 as rU256,
     trace::{CallTraceDecoder, Traces},
     CallKind,
 };
-use foundry_common::RpcUrl;
+use foundry_common::{shell, RpcUrl};
+use foundry_evm::utils::evm_spec;
 use futures::future::join_all;
 use parking_lot::RwLock;
 use std::{collections::VecDeque, sync::Arc};
@@ -94,8 +95,8 @@ impl ScriptArgs {
     pub async fn onchain_simulation(
         &self,
         transactions: BroadcastableTransactions,
-        script_config: &mut ScriptConfig,
-        decoder: &mut CallTraceDecoder,
+        script_config: &ScriptConfig,
+        decoder: &CallTraceDecoder,
         contracts: &ContractsByArtifact,
     ) -> eyre::Result<VecDeque<TransactionWithMetadata>> {
         trace!(target: "script", "executing onchain simulation");
@@ -179,11 +180,18 @@ impl ScriptArgs {
 
                     // Simulate mining the transaction if the user passes `--slow`.
                     if self.slow {
-                        runner.executor.env_mut().block.number += U256::one();
+                        runner.executor.env_mut().block.number += rU256::from(1);
                     }
 
-                    // We inflate the gas used by the user specified percentage
-                    tx.gas = Some(U256::from(result.gas_used * self.gas_estimate_multiplier / 100));
+                    let is_fixed_gas_limit = tx.gas.is_some();
+                    // If tx.gas is already set that means it was specified in script
+                    if !is_fixed_gas_limit {
+                        // We inflate the gas used by the user specified percentage
+                        tx.gas =
+                            Some(U256::from(result.gas_used * self.gas_estimate_multiplier / 100));
+                    } else {
+                        println!("Gas limit was set in script to {:}", tx.gas.unwrap());
+                    }
 
                     let tx = TransactionWithMetadata::new(
                         tx.into(),
@@ -192,6 +200,7 @@ impl ScriptArgs {
                         &address_to_abi,
                         decoder,
                         created_contracts,
+                        is_fixed_gas_limit,
                     )?;
 
                     Ok((Some(tx), result.traces))
@@ -238,13 +247,12 @@ impl ScriptArgs {
     }
 
     /// Build the multiple runners from different forks.
-    async fn build_runners(
-        &self,
-        script_config: &mut ScriptConfig,
-    ) -> HashMap<RpcUrl, ScriptRunner> {
+    async fn build_runners(&self, script_config: &ScriptConfig) -> HashMap<RpcUrl, ScriptRunner> {
         let sender = script_config.evm_opts.sender;
 
-        eprintln!("\n## Setting up ({}) EVMs.", script_config.total_rpcs.len());
+        if !shell::verbosity().is_silent() {
+            eprintln!("\n## Setting up ({}) EVMs.", script_config.total_rpcs.len());
+        }
 
         let futs = script_config
             .total_rpcs
@@ -271,7 +279,8 @@ impl ScriptArgs {
         stage: SimulationStage,
     ) -> ScriptRunner {
         trace!("preparing script runner");
-        let env = script_config.evm_opts.evm_env().await;
+        let env =
+            script_config.evm_opts.evm_env().await.expect("Could not instantiate fork environment");
 
         // The db backend that serves all the data.
         let db = match &script_config.evm_opts.fork_url {
@@ -280,7 +289,8 @@ impl ScriptArgs {
                 None => {
                     let backend = Backend::spawn(
                         script_config.evm_opts.get_fork(&script_config.config, env.clone()),
-                    );
+                    )
+                    .await;
                     script_config.backends.insert(url.clone(), backend);
                     script_config.backends.get(url).unwrap().clone()
                 }
@@ -290,12 +300,13 @@ impl ScriptArgs {
                 // no need to cache it, since there won't be any onchain simulation that we'd need
                 // to cache the backend for.
                 Backend::spawn(script_config.evm_opts.get_fork(&script_config.config, env.clone()))
+                    .await
             }
         };
 
         let mut builder = ExecutorBuilder::default()
             .with_config(env)
-            .with_spec(utils::evm_spec(&script_config.config.evm_version))
+            .with_spec(evm_spec(&script_config.config.evm_version))
             .with_gas_limit(script_config.evm_opts.gas_limit())
             // We need it enabled to decode contract names: local or external.
             .set_tracing(true);

@@ -6,8 +6,9 @@ use clap::{Parser, ValueHint};
 use ethers::solc::Graph;
 use eyre::WrapErr;
 use foundry_config::{impl_figment_convert_basic, Config};
+use itertools::Itertools;
 use rayon::prelude::*;
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 use yansi::Paint;
 
 mod error;
@@ -17,52 +18,77 @@ mod visitor;
 /// CLI arguments for `forge geiger`.
 #[derive(Debug, Clone, Parser)]
 pub struct GeigerArgs {
+    /// Paths to files or directories to detect.
     #[clap(
-        help = "path to a file or directory to detect",
         conflicts_with = "root",
         value_hint = ValueHint::FilePath,
         value_name = "PATH",
-        num_args(1..)
+        num_args(1..),
     )]
     paths: Vec<PathBuf>,
-    #[clap(
-        help = "The project's root path.",
-        long_help = "The project's root path. By default, this is the root directory of the current Git repository, or the current working directory.",
-        long,
-        value_hint = ValueHint::DirPath,
-        value_name = "PATH"
-    )]
+
+    /// The project's root path.
+    ///
+    /// By default root of the Git repository, if in one,
+    /// or the current working directory.
+    #[clap(long, value_hint = ValueHint::DirPath, value_name = "PATH")]
     root: Option<PathBuf>,
+
+    /// Run in "check" mode.
+    ///
+    /// The exit code of the program will be the number of unsafe cheatcodes found.
+    #[clap(long)]
+    pub check: bool,
+
+    /// Globs to ignore.
     #[clap(
-        help = "run in 'check' mode. Exits with 0 if no unsafe cheat codes were found. Exits with 1 if unsafe cheat codes are detected.",
-        long
+        long,
+        value_hint = ValueHint::FilePath,
+        value_name = "PATH",
+        num_args(1..),
     )]
-    check: bool,
-    #[clap(help = "print a full report of all files even if no unsafe functions are found.", long)]
+    ignore: Vec<PathBuf>,
+
+    /// Print a report of all files, even if no unsafe functions are found.
+    #[clap(long)]
     full: bool,
 }
 
 impl_figment_convert_basic!(GeigerArgs);
 
-// === impl GeigerArgs ===
-
 impl GeigerArgs {
     pub fn sources(&self, config: &Config) -> eyre::Result<Vec<PathBuf>> {
-        if !self.paths.is_empty() {
-            let mut files = HashSet::new();
-            for path in &self.paths {
-                files.extend(foundry_common::fs::files_with_ext(path, "sol"));
-            }
-            return Ok(files.into_iter().collect())
-        }
+        let cwd = std::env::current_dir()?;
 
-        let graph = Graph::resolve(&config.project_paths())?;
-        Ok(graph.files().keys().cloned().collect())
+        let mut sources: Vec<PathBuf> = {
+            if self.paths.is_empty() {
+                Graph::resolve(&config.project_paths())?.files().keys().cloned().collect()
+            } else {
+                self.paths
+                    .iter()
+                    .flat_map(|path| foundry_common::fs::files_with_ext(path, "sol"))
+                    .unique()
+                    .collect()
+            }
+        };
+
+        sources.retain(|path| {
+            let abs_path = if path.is_absolute() { path.clone() } else { cwd.join(path) };
+            !self.ignore.iter().any(|ignore| {
+                if ignore.is_absolute() {
+                    abs_path.starts_with(ignore)
+                } else {
+                    abs_path.starts_with(cwd.join(ignore))
+                }
+            })
+        });
+
+        Ok(sources)
     }
 }
 
 impl Cmd for GeigerArgs {
-    type Output = ();
+    type Output = usize;
 
     fn run(self) -> eyre::Result<Self::Output> {
         let config = self.try_load_config_emit_warnings()?;
@@ -74,20 +100,24 @@ impl Cmd for GeigerArgs {
 
         let root = config.__root.0;
 
-        sources.par_iter().map(|file| find_cheatcodes_in_file(file)).for_each(|res| {
-            match res {
+        let sum = sources
+            .par_iter()
+            .map(|file| match find_cheatcodes_in_file(file) {
                 Ok(metrics) => {
+                    let len = metrics.cheatcodes.len();
                     let printer = SolFileMetricsPrinter { metrics: &metrics, root: &root };
-                    if self.full || printer.metrics.cheatcodes.has_unsafe() {
+                    if self.full || len == 0 {
                         eprint!("{printer}");
                     }
+                    len
                 }
                 Err(err) => {
                     eprintln!("{err}");
+                    0
                 }
-            };
-        });
+            })
+            .sum();
 
-        Ok(())
+        Ok(sum)
     }
 }

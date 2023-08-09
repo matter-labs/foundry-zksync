@@ -1,5 +1,4 @@
 //! terminal utils
-use atty::{self, Stream};
 use ethers_solc::{
     remappings::Remapping,
     report::{self, BasicStdoutReporter, Reporter, SolcCompilerIoReporter},
@@ -9,7 +8,7 @@ use once_cell::sync::Lazy;
 use semver::Version;
 use std::{
     io,
-    io::prelude::*,
+    io::{prelude::*, IsTerminal},
     path::{Path, PathBuf},
     sync::{
         mpsc::{self, TryRecvError},
@@ -37,13 +36,9 @@ pub struct TermSettings {
 }
 
 impl TermSettings {
-    #[allow(missing_docs)]
+    /// Returns a new [`TermSettings`], configured from the current environment.
     pub fn from_env() -> TermSettings {
-        if atty::is(Stream::Stdout) {
-            TermSettings { indicate_progress: true }
-        } else {
-            TermSettings { indicate_progress: false }
-        }
+        TermSettings { indicate_progress: std::io::stdout().is_terminal() }
     }
 }
 

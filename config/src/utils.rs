@@ -4,11 +4,12 @@ use crate::Config;
 use ethers_core::types::{serde_helpers::Numeric, U256};
 use ethers_solc::remappings::{Remapping, RemappingError};
 use figment::value::Value;
-use serde::{Deserialize, Deserializer};
+use serde::{de::Error, Deserialize, Deserializer};
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+use toml_edit::{Document, Item};
 
 /// Loads the config for the current project workspace
 pub fn load_config() -> Config {
@@ -20,7 +21,7 @@ pub fn load_config_with_root(root: Option<PathBuf>) -> Config {
     if let Some(root) = root {
         Config::load_with_root(root)
     } else {
-        Config::load_with_root(find_project_root_path().unwrap())
+        Config::load_with_root(find_project_root_path(None).unwrap())
     }
     .sanitized()
 }
@@ -39,8 +40,8 @@ pub fn find_git_root_path(relative_to: impl AsRef<Path>) -> eyre::Result<PathBuf
 
 /// Returns the root path to set for the project root
 ///
-/// traverse the dir tree up and look for a `foundry.toml` file starting at the cwd, but only until
-/// the root dir of the current repo so that
+/// traverse the dir tree up and look for a `foundry.toml` file starting at the given path or cwd,
+/// but only until the root dir of the current repo so that
 ///
 /// ```text
 /// -- foundry.toml
@@ -48,12 +49,13 @@ pub fn find_git_root_path(relative_to: impl AsRef<Path>) -> eyre::Result<PathBuf
 /// -- repo
 ///   |__ .git
 ///   |__sub
-///      |__ cwd
+///      |__ [given_path | cwd]
 /// ```
 /// will still detect `repo` as root
-pub fn find_project_root_path() -> std::io::Result<PathBuf> {
-    let cwd = std::env::current_dir()?;
-    let boundary = find_git_root_path(&cwd)
+pub fn find_project_root_path(path: Option<&PathBuf>) -> std::io::Result<PathBuf> {
+    let cwd = &std::env::current_dir()?;
+    let cwd = path.unwrap_or(cwd);
+    let boundary = find_git_root_path(cwd)
         .ok()
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| cwd.clone());
@@ -158,7 +160,11 @@ pub fn foundry_toml_dirs(root: impl AsRef<Path>) -> Vec<PathBuf> {
 pub(crate) fn get_dir_remapping(dir: impl AsRef<Path>) -> Option<Remapping> {
     let dir = dir.as_ref();
     if let Some(dir_name) = dir.file_name().and_then(|s| s.to_str()).filter(|s| !s.is_empty()) {
-        let mut r = Remapping { name: format!("{dir_name}/"), path: format!("{}", dir.display()) };
+        let mut r = Remapping {
+            context: None,
+            name: format!("{dir_name}/"),
+            path: format!("{}", dir.display()),
+        };
         if !r.path.ends_with('/') {
             r.path.push('/')
         }
@@ -166,6 +172,45 @@ pub(crate) fn get_dir_remapping(dir: impl AsRef<Path>) -> Option<Remapping> {
     } else {
         None
     }
+}
+
+/// Returns all available `profile` keys in a given `.toml` file
+///
+/// i.e. The toml below would return would return `["default", "ci", "local"]`
+/// ```toml
+/// [profile.default]
+/// ...
+/// [profile.ci]
+/// ...
+/// [profile.local]
+/// ```
+pub fn get_available_profiles(toml_path: impl AsRef<Path>) -> eyre::Result<Vec<String>> {
+    let mut result = vec![Config::DEFAULT_PROFILE.to_string()];
+
+    if !toml_path.as_ref().exists() {
+        return Ok(result)
+    }
+
+    let doc = read_toml(toml_path)?;
+
+    if let Some(Item::Table(profiles)) = doc.as_table().get(Config::PROFILE_SECTION) {
+        for (_, (profile, _)) in profiles.iter().enumerate() {
+            let p = profile.to_string();
+            if !result.contains(&p) {
+                result.push(p);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+/// Returns a [`toml_edit::Document`] loaded from the provided `path`.
+/// Can raise an error in case of I/O or parsing errors.
+fn read_toml(path: impl AsRef<Path>) -> eyre::Result<Document> {
+    let path = path.as_ref().to_owned();
+    let doc: Document = std::fs::read_to_string(path)?.parse()?;
+    Ok(doc)
 }
 
 /// Deserialize stringified percent. The value must be between 0 and 100 inclusive.
@@ -180,5 +225,70 @@ where
         num.try_into().map_err(serde::de::Error::custom)
     } else {
         Err(serde::de::Error::custom("percent must be lte 100"))
+    }
+}
+
+/// Deserialize an usize or
+pub(crate) fn deserialize_usize_or_max<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Val {
+        Number(usize),
+        Text(String),
+    }
+
+    let num = match Val::deserialize(deserializer)? {
+        Val::Number(num) => num,
+        Val::Text(s) => {
+            match s.as_str() {
+                "max" | "MAX" | "Max" => {
+                    // toml limitation
+                    i64::MAX as usize
+                }
+                s => s.parse::<usize>().map_err(D::Error::custom).unwrap(),
+            }
+        }
+    };
+    Ok(num)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::get_available_profiles;
+    use std::path::Path;
+
+    #[test]
+    fn get_profiles_from_toml() {
+        figment::Jail::expect_with(|jail| {
+            jail.create_file(
+                "foundry.toml",
+                r#"
+                [foo.baz]
+                libs = ['node_modules', 'lib']
+
+                [profile.default]
+                libs = ['node_modules', 'lib']
+
+                [profile.ci]
+                libs = ['node_modules', 'lib']
+
+                [profile.local]
+                libs = ['node_modules', 'lib']
+            "#,
+            )?;
+
+            let path = Path::new("./foundry.toml");
+            let profiles = get_available_profiles(path).unwrap();
+
+            assert_eq!(
+                profiles,
+                vec!["default".to_string(), "ci".to_string(), "local".to_string()]
+            );
+
+            Ok(())
+        });
     }
 }

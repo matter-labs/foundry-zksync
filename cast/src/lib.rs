@@ -8,26 +8,32 @@ use chrono::NaiveDateTime;
 use ethers_core::{
     abi::{
         token::{LenientTokenizer, Tokenizer},
-        Function, HumanReadableParser, RawAbi, Token,
+        Function, HumanReadableParser, ParamType, RawAbi, Token,
     },
     types::{Chain, *},
     utils::{
-        self, format_bytes32_string, format_units, get_contract_address, keccak256,
-        parse_bytes32_string, parse_units, rlp, Units,
+        format_bytes32_string, format_units, get_contract_address, keccak256, parse_bytes32_string,
+        parse_units, rlp, Units,
     },
 };
 use ethers_etherscan::{errors::EtherscanError, Client};
 use ethers_providers::{Middleware, PendingTransaction};
+use evm_disassembler::{disassemble_bytes, disassemble_str, format_operations};
 use eyre::{Context, Result};
 use foundry_common::{abi::encode_args, fmt::*, TransactionReceiptWithRevertReason};
 pub use foundry_evm::*;
+use rayon::prelude::*;
 pub use rusoto_core::{
     credential::ChainProvider as AwsChainProvider, region::Region as AwsRegion,
     request::HttpClient as AwsHttpClient, Client as AwsClient,
 };
 pub use rusoto_kms::KmsClient;
 use rustc_hex::{FromHexIter, ToHex};
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    path::PathBuf,
+    str::FromStr,
+    sync::atomic::{AtomicBool, Ordering},
+};
 pub use tx::TxBuilder;
 use tx::{TxBuilderOutput, TxBuilderPeekOutput};
 
@@ -53,7 +59,6 @@ where
     /// ```
     /// use cast::Cast;
     /// use ethers_providers::{Provider, Http};
-    /// use std::convert::TryFrom;
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
@@ -306,7 +311,6 @@ where
     /// ```no_run
     /// use cast::Cast;
     /// use ethers_providers::{Provider, Http};
-    /// use std::convert::TryFrom;
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
@@ -424,6 +428,9 @@ where
             "0x7ca38a1916c42007829c55e69d3e9a73265554b586a499015373241b8a3fa48b" => {
                 "optimism-mainnet"
             }
+            "0xc1fc15cd51159b1f1e5cbc4b82e85c1447ddfa33c52cf1d98d14fba0d6354be1" => {
+                "optimism-goerli"
+            }
             "0x02adc9b449ff5f2467b8c674ece7ff9b21319d76c4ad62a67a70d552655927e5" => {
                 "optimism-kovan"
             }
@@ -503,6 +510,64 @@ where
     /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
+    /// let implementation = cast.implementation(addr, None).await?;
+    /// println!("{}", implementation);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn implementation<T: Into<NameOrAddress> + Send + Sync>(
+        &self,
+        who: T,
+        block: Option<BlockId>,
+    ) -> Result<String> {
+        let slot =
+            H256::from_str("0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc")?;
+        let value = self.provider.get_storage_at(who, slot, block).await?;
+        let addr: H160 = value.into();
+        Ok(format!("{addr:?}"))
+    }
+
+    /// # Example
+    ///
+    /// ```no_run
+    /// use cast::Cast;
+    /// use ethers_providers::{Provider, Http};
+    /// use ethers_core::types::Address;
+    /// use std::{str::FromStr, convert::TryFrom};
+    ///
+    /// # async fn foo() -> eyre::Result<()> {
+    /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
+    /// let cast = Cast::new(provider);
+    /// let addr = Address::from_str("0x7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
+    /// let admin = cast.admin(addr, None).await?;
+    /// println!("{}", admin);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn admin<T: Into<NameOrAddress> + Send + Sync>(
+        &self,
+        who: T,
+        block: Option<BlockId>,
+    ) -> Result<String> {
+        let slot =
+            H256::from_str("0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103")?;
+        let value = self.provider.get_storage_at(who, slot, block).await?;
+        let addr: H160 = value.into();
+        Ok(format!("{addr:?}"))
+    }
+
+    /// # Example
+    ///
+    /// ```no_run
+    /// use cast::Cast;
+    /// use ethers_providers::{Provider, Http};
+    /// use ethers_core::types::Address;
+    /// use std::{str::FromStr, convert::TryFrom};
+    ///
+    /// # async fn foo() -> eyre::Result<()> {
+    /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
+    /// let cast = Cast::new(provider);
+    /// let addr = Address::from_str("0x7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
     /// let nonce = cast.nonce(addr, None).await? + 5;
     /// let computed_address = cast.compute_address(addr, Some(nonce)).await?;
     /// println!("Computed address for address {} with nonce {}: {}", addr, nonce, computed_address);
@@ -537,7 +602,7 @@ where
     /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x00000000219ab540356cbb839cbe05303d7705fa")?;
-    /// let code = cast.code(addr, None).await?;
+    /// let code = cast.code(addr, None, false).await?;
     /// println!("{}", code);
     /// # Ok(())
     /// # }
@@ -546,8 +611,40 @@ where
         &self,
         who: T,
         block: Option<BlockId>,
+        disassemble: bool,
     ) -> Result<String> {
-        Ok(format!("{}", self.provider.get_code(who, block).await?))
+        if disassemble {
+            let code = self.provider.get_code(who, block).await?.to_vec();
+            Ok(format_operations(disassemble_bytes(code)?)?)
+        } else {
+            Ok(format!("{}", self.provider.get_code(who, block).await?))
+        }
+    }
+
+    /// Example
+    ///
+    /// ```no_run
+    /// use cast::Cast;
+    /// use ethers_providers::{Provider, Http};
+    /// use ethers_core::types::Address;
+    /// use std::{str::FromStr, convert::TryFrom};
+    ///
+    /// # async fn foo() -> eyre::Result<()> {
+    /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
+    /// let cast = Cast::new(provider);
+    /// let addr = Address::from_str("0x00000000219ab540356cbb839cbe05303d7705fa")?;
+    /// let codesize = cast.codesize(addr, None).await?;
+    /// println!("{}", codesize);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn codesize<T: Into<NameOrAddress> + Send + Sync>(
+        &self,
+        who: T,
+        block: Option<BlockId>,
+    ) -> Result<String> {
+        let code = self.provider.get_code(who, block).await?.to_vec();
+        Ok(format!("{}", code.len()))
     }
 
     /// # Example
@@ -555,13 +652,12 @@ where
     /// ```no_run
     /// use cast::Cast;
     /// use ethers_providers::{Provider, Http};
-    /// use std::convert::TryFrom;
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
     /// let cast = Cast::new(provider);
     /// let tx_hash = "0xf8d1713ea15a81482958fb7ddf884baee8d3bcc478c5f2f604e008dc788ee4fc";
-    /// let tx = cast.transaction(tx_hash.to_string(), None, false).await?;
+    /// let tx = cast.transaction(tx_hash.to_string(), None, false, false).await?;
     /// println!("{}", tx);
     /// # Ok(())
     /// # }
@@ -570,6 +666,7 @@ where
         &self,
         tx_hash: String,
         field: Option<String>,
+        raw: bool,
         to_json: bool,
     ) -> Result<String> {
         let tx_hash = H256::from_str(&tx_hash).wrap_err("invalid tx hash")?;
@@ -579,9 +676,11 @@ where
             .await?
             .ok_or_else(|| eyre::eyre!("tx not found: {:?}", tx_hash))?;
 
-        Ok(if let Some(ref field) = field {
-            get_pretty_tx_attr(&tx, field)
-                .ok_or_else(|| eyre::eyre!("invalid tx field: {}", field))?
+        Ok(if raw {
+            format!("0x{}", hex::encode(tx.rlp()))
+        } else if let Some(field) = field {
+            get_pretty_tx_attr(&tx, field.as_str())
+                .ok_or_else(|| eyre::eyre!("invalid tx field: {}", field.to_string()))?
         } else if to_json {
             // to_value first to sort json object keys
             serde_json::to_value(&tx)?.to_string()
@@ -595,7 +694,6 @@ where
     /// ```no_run
     /// use cast::Cast;
     /// use ethers_providers::{Provider, Http};
-    /// use std::convert::TryFrom;
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
@@ -658,7 +756,6 @@ where
     /// ```no_run
     /// use cast::Cast;
     /// use ethers_providers::{Provider, Http};
-    /// use std::convert::TryFrom;
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider = Provider::<Http>::try_from("http://localhost:8545")?;
@@ -705,6 +802,25 @@ where
     ) -> Result<String> {
         Ok(format!("{:?}", self.provider.get_storage_at(from, slot, block).await?))
     }
+
+    pub async fn filter_logs(&self, filter: Filter, to_json: bool) -> Result<String> {
+        let logs = self.provider.get_logs(&filter).await?;
+
+        let res = if to_json {
+            serde_json::to_string(&logs)?
+        } else {
+            let mut s = vec![];
+            for log in logs {
+                let pretty = log
+                    .pretty()
+                    .replacen('\n', "- ", 1) // Remove empty first line
+                    .replace('\n', "\n  "); // Indent
+                s.push(pretty);
+            }
+            s.join("\n")
+        };
+        Ok(res)
+    }
 }
 
 pub struct InterfaceSource {
@@ -712,13 +828,77 @@ pub struct InterfaceSource {
     pub source: String,
 }
 
-pub enum InterfacePath {
+// Local is a path to the directory containing the ABI files
+// In case of etherscan, ABI is fetched from the address on the chain
+pub enum AbiPath {
     Local { path: String, name: Option<String> },
     Etherscan { address: Address, chain: Chain, api_key: String },
 }
 
 pub struct SimpleCast;
+
 impl SimpleCast {
+    /// Returns the maximum value of the given integer type
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use cast::SimpleCast;
+    /// # use ethers_core::types::{I256, U256};
+    /// assert_eq!(SimpleCast::max_int("uint256")?, format!("{}", U256::MAX));
+    /// assert_eq!(SimpleCast::max_int("int256")?, format!("{}", I256::MAX));
+    /// assert_eq!(SimpleCast::max_int("int32")?, format!("{}", i32::MAX));
+    /// # Ok::<(), eyre::Report>(())
+    /// ```
+    pub fn max_int(s: &str) -> Result<String> {
+        Self::max_min_int::<true>(s)
+    }
+
+    /// Returns the maximum value of the given integer type
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use cast::SimpleCast;
+    /// # use ethers_core::types::{I256, U256};
+    /// assert_eq!(SimpleCast::min_int("uint256")?, "0");
+    /// assert_eq!(SimpleCast::min_int("int256")?, format!("{}", I256::MIN));
+    /// assert_eq!(SimpleCast::min_int("int32")?, format!("{}", i32::MIN));
+    /// # Ok::<(), eyre::Report>(())
+    /// ```
+    pub fn min_int(s: &str) -> Result<String> {
+        Self::max_min_int::<false>(s)
+    }
+
+    fn max_min_int<const MAX: bool>(s: &str) -> Result<String> {
+        let ty = HumanReadableParser::parse_type(s)
+            .wrap_err("Invalid type, expected `(u)int<bit size>`")?;
+        match ty {
+            ParamType::Int(n) => {
+                let mask = U256::one() << U256::from(n - 1);
+                let max = (U256::MAX & mask) - 1;
+                if MAX {
+                    Ok(max.to_string())
+                } else {
+                    let min = I256::from_raw(max).wrapping_neg() + I256::minus_one();
+                    Ok(min.to_string())
+                }
+            }
+            ParamType::Uint(n) => {
+                if MAX {
+                    let mut max = U256::MAX;
+                    if n < 255 {
+                        max &= U256::one() << U256::from(n);
+                    }
+                    Ok(max.to_string())
+                } else {
+                    Ok("0".to_string())
+                }
+            }
+            _ => Err(eyre::eyre!("Type is not int/uint: {s}")),
+        }
+    }
+
     /// Converts UTF-8 text input to hex
     ///
     /// # Example
@@ -759,7 +939,7 @@ impl SimpleCast {
         let iter = FromHexIter::new(hex_trimmed);
         let mut ascii = String::new();
         for letter in iter.collect::<Vec<_>>() {
-            ascii.push(letter.unwrap() as char);
+            ascii.push(letter? as char);
         }
         Ok(ascii)
     }
@@ -841,21 +1021,19 @@ impl SimpleCast {
     /// use cast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
-    ///     assert_eq!(Cast::concat_hex(vec!["0x00".to_string(), "0x01".to_string()]), "0x0001");
-    ///     assert_eq!(Cast::concat_hex(vec!["1".to_string(), "2".to_string()]), "0x12");
+    ///     assert_eq!(Cast::concat_hex(["0x00", "0x01"]), "0x0001");
+    ///     assert_eq!(Cast::concat_hex(["1", "2"]), "0x12");
     ///
     ///     Ok(())
     /// }
     /// ```
-    pub fn concat_hex(values: Vec<String>) -> String {
-        format!(
-            "0x{}",
-            values
-                .into_iter()
-                .map(|s| s.strip_prefix("0x").unwrap_or(&s).to_string())
-                .collect::<Vec<String>>()
-                .join("")
-        )
+    pub fn concat_hex<T: AsRef<str>>(values: impl IntoIterator<Item = T>) -> String {
+        let mut out = String::new();
+        for s in values {
+            let s = s.as_ref();
+            out.push_str(s.strip_prefix("0x").unwrap_or(s))
+        }
+        format!("0x{out}")
     }
 
     /// Converts an Ethereum address to its checksum format
@@ -877,7 +1055,7 @@ impl SimpleCast {
     /// # }
     /// ```
     pub fn to_checksum_address(address: &Address) -> String {
-        utils::to_checksum(address, None)
+        ethers_core::utils::to_checksum(address, None)
     }
 
     /// Converts a number into uint256 hex string with 0x prefix
@@ -1031,11 +1209,10 @@ impl SimpleCast {
     /// }
     /// ```
     pub fn from_rlp(value: impl AsRef<str>) -> Result<String> {
-        let value = value.as_ref();
-        let striped_value = strip_0x(value);
-        let bytes = hex::decode(striped_value).expect("Could not decode hex");
-        let item = rlp::decode::<Item>(&bytes).expect("Could not decode rlp");
-        Ok(format!("{item}"))
+        let data = strip_0x(value.as_ref());
+        let bytes = hex::decode(data).wrap_err("Could not decode hex")?;
+        let item = rlp::decode::<Item>(&bytes).wrap_err("Could not decode rlp")?;
+        Ok(item.to_string())
     }
 
     /// Encodes hex data or list of hex data to hexadecimal rlp
@@ -1054,7 +1231,8 @@ impl SimpleCast {
     /// }
     /// ```
     pub fn to_rlp(value: &str) -> Result<String> {
-        let val = serde_json::from_str(value).unwrap_or(serde_json::Value::String(value.parse()?));
+        let val = serde_json::from_str(value)
+            .unwrap_or_else(|_| serde_json::Value::String(value.to_string()));
         let item = Item::value_to_item(&val)?;
         Ok(format!("0x{}", hex::encode(rlp::encode(&item))))
     }
@@ -1134,7 +1312,7 @@ impl SimpleCast {
     pub fn parse_bytes32_string(s: &str) -> Result<String> {
         let s = strip_0x(s);
         if s.len() != 64 {
-            eyre::bail!("string not 32 bytes");
+            eyre::bail!("expected 64 byte hex-string, got {s}");
         }
 
         let bytes = hex::decode(s)?;
@@ -1144,7 +1322,28 @@ impl SimpleCast {
         Ok(parse_bytes32_string(&buffer)?.to_owned())
     }
 
+    /// Decodes checksummed address from bytes32 value
+    pub fn parse_bytes32_address(s: &str) -> Result<String> {
+        let s = strip_0x(s);
+        if s.len() != 64 {
+            eyre::bail!("expected 64 byte hex-string, got {s}");
+        }
+
+        let s = if let Some(stripped) = s.strip_prefix("000000000000000000000000") {
+            stripped
+        } else {
+            return Err(eyre::eyre!("Not convertible to address, there are non-zero bytes"))
+        };
+
+        let lowercase_address_string = format!("0x{s}");
+        let lowercase_address = Address::from_str(&lowercase_address_string)?;
+
+        Ok(ethers_core::utils::to_checksum(&lowercase_address, None))
+    }
+
     /// Decodes abi-encoded hex input or output
+    ///
+    /// When `input=true`, `calldata` string MUST not be prefixed with function selector
     ///
     /// # Example
     ///
@@ -1161,7 +1360,8 @@ impl SimpleCast {
     ///     assert_eq!(decoded, "1");
     ///
     ///     // Passing `input = true` will decode the data with the input function signature.
-    ///     let data = "0xf242432a0000000000000000000000008dbd1b711dc621e1404633da156fcc779e1c6f3e000000000000000000000000d9f3c9cc99548bf3b44a43e0a2d07399eb918adc000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000";
+    ///     // We exclude the "prefixed" function selector from the data field (the first 4 bytes).
+    ///     let data = "0x0000000000000000000000008dbd1b711dc621e1404633da156fcc779e1c6f3e000000000000000000000000d9f3c9cc99548bf3b44a43e0a2d07399eb918adc000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000";
     ///     let sig = "safeTransferFrom(address, address, uint256, uint256, bytes)";
     ///     let decoded = Cast::abi_decode(sig, data, true)?;
     ///     let decoded = decoded.iter().map(ToString::to_string).collect::<Vec<_>>();
@@ -1175,7 +1375,43 @@ impl SimpleCast {
     /// }
     /// ```
     pub fn abi_decode(sig: &str, calldata: &str, input: bool) -> Result<Vec<Token>> {
-        foundry_common::abi::abi_decode(sig, calldata, input)
+        foundry_common::abi::abi_decode(sig, calldata, input, false)
+    }
+
+    /// Decodes calldata-encoded hex input or output
+    ///
+    /// Similar to `abi_decode`, but `calldata` string MUST be prefixed with function selector
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cast::SimpleCast as Cast;
+    ///
+    /// fn main() -> eyre::Result<()> {
+    ///     // Passing `input = false` will decode the data as the output type.
+    ///     // The input data types and the full function sig are ignored, i.e.
+    ///     // you could also pass `balanceOf()(uint256)` and it'd still work.
+    ///     let data = "0x0000000000000000000000000000000000000000000000000000000000000001";
+    ///     let sig = "balanceOf(address, uint256)(uint256)";
+    ///     let decoded = Cast::calldata_decode(sig, data, false)?[0].to_string();
+    ///     assert_eq!(decoded, "1");
+    ///
+    ///     // Passing `input = true` will decode the data with the input function signature.
+    ///     let data = "0xf242432a0000000000000000000000008dbd1b711dc621e1404633da156fcc779e1c6f3e000000000000000000000000d9f3c9cc99548bf3b44a43e0a2d07399eb918adc000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000";
+    ///     let sig = "safeTransferFrom(address, address, uint256, uint256, bytes)";
+    ///     let decoded = Cast::calldata_decode(sig, data, true)?;
+    ///     let decoded = decoded.iter().map(ToString::to_string).collect::<Vec<_>>();
+    ///     assert_eq!(
+    ///         decoded,
+    ///         vec!["8dbd1b711dc621e1404633da156fcc779e1c6f3e", "d9f3c9cc99548bf3b44a43e0a2d07399eb918adc", "2a", "1", ""]
+    ///     );
+    ///
+    ///
+    ///     # Ok(())
+    /// }
+    /// ```
+    pub fn calldata_decode(sig: &str, calldata: &str, input: bool) -> Result<Vec<Token>> {
+        foundry_common::abi::abi_decode(sig, calldata, input, true)
     }
 
     /// Performs ABI encoding based off of the function signature. Does not include
@@ -1213,11 +1449,17 @@ impl SimpleCast {
                     }
                 } else {
                     // we return the `Function` parse error as this case is more likely
-                    return Err(err.into())
+                    eyre::bail!("Could not process human-readable ABI. Please check if you've left the parenthesis unclosed or if some type is incomplete.\nError:\n{}", err)
+                    // return Err(err.into()).wrap_err("Could not process human-readable ABI. Please
+                    // check if you've left the parenthesis unclosed or if some type is
+                    // incomplete.")
                 }
             }
         };
-        let calldata = encode_args(&func, args)?.to_hex::<String>();
+        let calldata = match encode_args(&func, args) {
+            Ok(res) => res.to_hex::<String>(),
+            Err(e) => eyre::bail!("Could not ABI encode the function and arguments. Did you pass in the right types?\nError\n{}", e),
+        };
         let encoded = &calldata[8..];
         Ok(format!("0x{encoded}"))
     }
@@ -1248,9 +1490,9 @@ impl SimpleCast {
     /// interface and their name.
     /// ```no_run
     /// use cast::SimpleCast as Cast;
-    /// use cast::InterfacePath;
+    /// use cast::AbiPath;
     /// # async fn foo() -> eyre::Result<()> {
-    /// let path = InterfacePath::Local {
+    /// let path = AbiPath::Local {
     ///     path: "utils/testdata/interfaceTestABI.json".to_owned(),
     ///     name: None,
     /// };
@@ -1259,22 +1501,18 @@ impl SimpleCast {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn generate_interface(
-        address_or_path: InterfacePath,
-    ) -> Result<Vec<InterfaceSource>> {
+    pub async fn generate_interface(address_or_path: AbiPath) -> Result<Vec<InterfaceSource>> {
         let (contract_abis, contract_names): (Vec<RawAbi>, Vec<String>) = match address_or_path {
-            InterfacePath::Local { path, name } => {
+            AbiPath::Local { path, name } => {
                 let file = std::fs::read_to_string(path).wrap_err("unable to read abi file")?;
-
                 let mut json: serde_json::Value = serde_json::from_str(&file)?;
                 let json = if !json["abi"].is_null() { json["abi"].take() } else { json };
-
                 let abi: RawAbi =
                     serde_json::from_value(json).wrap_err("unable to parse json ABI from file")?;
 
                 (vec![abi], vec![name.unwrap_or_else(|| "Interface".to_owned())])
             }
-            InterfacePath::Etherscan { address, chain, api_key } => {
+            AbiPath::Etherscan { address, chain, api_key } => {
                 let client = Client::new(chain, api_key)?;
 
                 // get the source
@@ -1517,6 +1755,81 @@ impl SimpleCast {
         source_tree.write_to(&output_directory)?;
         Ok(())
     }
+
+    /// Disassembles hex encoded bytecode into individual / human readable opcodes
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use cast::SimpleCast as Cast;
+    ///
+    /// # async fn foo() -> eyre::Result<()> {
+    /// let bytecode = "0x608060405260043610603f57600035";
+    /// let opcodes = Cast::disassemble(bytecode)?;
+    /// println!("{}", opcodes);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn disassemble(bytecode: &str) -> Result<String> {
+        format_operations(disassemble_str(bytecode)?)
+    }
+
+    /// Gets the selector for a given function signature
+    /// Optimizes if the `optimize` parameter is set to a number of leading zeroes
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cast::SimpleCast as Cast;
+    ///
+    /// fn main() -> eyre::Result<()> {
+    ///     assert_eq!(Cast::get_selector("foo(address,uint256)", None)?.0, String::from("0xbd0d639f"));
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn get_selector(signature: &str, optimize: Option<usize>) -> Result<(String, String)> {
+        let optimize = optimize.unwrap_or(0);
+        if optimize > 4 {
+            eyre::bail!("Number of leading zeroes must not be greater than 4");
+        }
+        if optimize == 0 {
+            let selector = HumanReadableParser::parse_function(signature)?.short_signature();
+            return Ok((format!("0x{}", hex::encode(selector)), String::from(signature)))
+        }
+        let Some((name, params)) = signature.split_once('(') else {
+            eyre::bail!("Invalid signature");
+        };
+
+        let num_threads = num_cpus::get();
+        let found = AtomicBool::new(false);
+
+        let result: Option<(u32, String, String)> =
+            (0..num_threads).into_par_iter().find_map_any(|i| {
+                let nonce_start = i as u32;
+                let nonce_step = num_threads as u32;
+
+                let mut nonce = nonce_start;
+                while nonce < u32::MAX && !found.load(Ordering::Relaxed) {
+                    let input = format!("{}{}({}", name, nonce, params);
+                    let hash = keccak256(input.as_bytes());
+                    let selector = &hash[..4];
+
+                    if selector.iter().take_while(|&&byte| byte == 0).count() == optimize {
+                        found.store(true, Ordering::Relaxed);
+                        return Some((nonce, format!("0x{}", hex::encode(selector)), input))
+                    }
+
+                    nonce += nonce_step;
+                }
+                None
+            });
+
+        match result {
+            Some((_nonce, selector, signature)) => Ok((selector, signature)),
+            None => eyre::bail!("No selector found"),
+        }
+    }
 }
 
 fn strip_0x(s: &str) -> &str {
@@ -1553,9 +1866,56 @@ mod tests {
     }
 
     #[test]
+    fn abi_decode() {
+        let data = "0x0000000000000000000000000000000000000000000000000000000000000001";
+        let sig = "balanceOf(address, uint256)(uint256)";
+        assert_eq!("1", Cast::abi_decode(sig, data, false).unwrap()[0].to_string());
+
+        let data = "0x0000000000000000000000008dbd1b711dc621e1404633da156fcc779e1c6f3e000000000000000000000000d9f3c9cc99548bf3b44a43e0a2d07399eb918adc000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000";
+        let sig = "safeTransferFrom(address,address,uint256,uint256,bytes)";
+        let decoded = Cast::abi_decode(sig, data, true).unwrap();
+        let decoded = decoded.iter().map(ToString::to_string).collect::<Vec<_>>();
+        assert_eq!(
+            decoded,
+            vec![
+                "8dbd1b711dc621e1404633da156fcc779e1c6f3e",
+                "d9f3c9cc99548bf3b44a43e0a2d07399eb918adc",
+                "2a",
+                "1",
+                ""
+            ]
+        );
+    }
+
+    #[test]
+    fn calldata_decode() {
+        let data = "0x0000000000000000000000000000000000000000000000000000000000000001";
+        let sig = "balanceOf(address, uint256)(uint256)";
+        let decoded = Cast::calldata_decode(sig, data, false).unwrap()[0].to_string();
+        assert_eq!(decoded, "1");
+
+        // Passing `input = true` will decode the data with the input function signature.
+        // We exclude the "prefixed" function selector from the data field (the first 4 bytes).
+        let data = "0xf242432a0000000000000000000000008dbd1b711dc621e1404633da156fcc779e1c6f3e000000000000000000000000d9f3c9cc99548bf3b44a43e0a2d07399eb918adc000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000";
+        let sig = "safeTransferFrom(address, address, uint256, uint256, bytes)";
+        let decoded = Cast::calldata_decode(sig, data, true).unwrap();
+        let decoded = decoded.iter().map(ToString::to_string).collect::<Vec<_>>();
+        assert_eq!(
+            decoded,
+            vec![
+                "8dbd1b711dc621e1404633da156fcc779e1c6f3e",
+                "d9f3c9cc99548bf3b44a43e0a2d07399eb918adc",
+                "2a",
+                "1",
+                ""
+            ]
+        );
+    }
+
+    #[test]
     fn concat_hex() {
-        assert_eq!(Cast::concat_hex(vec!["0x00".to_string(), "0x01".to_string()]), "0x0001");
-        assert_eq!(Cast::concat_hex(vec!["1".to_string(), "2".to_string()]), "0x12");
+        assert_eq!(Cast::concat_hex(["0x00", "0x01"]), "0x0001");
+        assert_eq!(Cast::concat_hex(["1", "2"]), "0x12");
     }
 
     #[test]

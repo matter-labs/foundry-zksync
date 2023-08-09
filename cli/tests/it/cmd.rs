@@ -17,7 +17,12 @@ use foundry_cli_test_utils::{
 };
 use foundry_config::{parse_with_profile, BasicConfig, Chain, Config, SolidityErrorCode};
 use semver::Version;
-use std::{env, fs, path::PathBuf, process::Command, str::FromStr};
+use std::{
+    env, fs,
+    path::PathBuf,
+    process::{Command, Stdio},
+    str::FromStr,
+};
 
 // tests `--help` is printed to std out
 forgetest!(print_help, |_: TestProject, mut cmd: TestCommand| {
@@ -234,11 +239,10 @@ forgetest!(can_init_repo_with_config, |prj: TestProject, mut cmd: TestCommand| {
 
 // Checks that a forge project fails to initialise if dir is already git repo and dirty
 forgetest!(can_detect_dirty_git_status_on_init, |prj: TestProject, mut cmd: TestCommand| {
-    use std::process::Command;
     prj.wipe();
 
-    // initialise new git
-    Command::new("git").arg("init").current_dir(prj.root()).output().unwrap();
+    // initialize new git repo
+    cmd.git_init();
 
     std::fs::write(prj.root().join("untracked.text"), "untracked").unwrap();
 
@@ -287,7 +291,7 @@ forgetest!(can_init_with_dir, |prj: TestProject, mut cmd: TestCommand| {
     assert!(prj.root().join("foobar").exists());
 });
 
-// `forge init` does only work on non-empty dirs
+// `forge init --force` works on non-empty dirs
 forgetest!(can_init_non_empty, |prj: TestProject, mut cmd: TestCommand| {
     prj.create_file("README.md", "non-empty dir");
     cmd.arg("init").arg(prj.root());
@@ -297,6 +301,60 @@ forgetest!(can_init_non_empty, |prj: TestProject, mut cmd: TestCommand| {
     cmd.assert_non_empty_stdout();
     assert!(prj.root().join(".git").exists());
     assert!(prj.root().join("lib/forge-std").exists());
+});
+
+// `forge init --force` works on already initialized git repository
+forgetest!(can_init_in_empty_repo, |prj: TestProject, mut cmd: TestCommand| {
+    let root = prj.root();
+
+    // initialize new git repo
+    let status = Command::new("git")
+        .arg("init")
+        .current_dir(root)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("could not run git init");
+    assert!(status.success());
+    assert!(root.join(".git").exists());
+
+    cmd.arg("init").arg(root);
+    cmd.assert_err();
+
+    cmd.arg("--force");
+    cmd.assert_non_empty_stdout();
+    assert!(root.join("lib/forge-std").exists());
+});
+
+// `forge init --force` works on already initialized git repository
+forgetest!(can_init_in_non_empty_repo, |prj: TestProject, mut cmd: TestCommand| {
+    let root = prj.root();
+
+    // initialize new git repo
+    let status = Command::new("git")
+        .arg("init")
+        .current_dir(root)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("could not run git init");
+    assert!(status.success());
+    assert!(root.join(".git").exists());
+
+    prj.create_file("README.md", "non-empty dir");
+    prj.create_file(".gitignore", "not foundry .gitignore");
+
+    cmd.arg("init").arg(root);
+    cmd.assert_err();
+
+    cmd.arg("--force");
+    cmd.assert_non_empty_stdout();
+    assert!(root.join("lib/forge-std").exists());
+
+    // not overwritten
+    let gitignore = root.join(".gitignore");
+    let gitignore = fs::read_to_string(gitignore).unwrap();
+    assert_eq!(gitignore, "not foundry .gitignore");
 });
 
 // Checks that remappings.txt and .vscode/settings.json is generated
@@ -455,8 +513,8 @@ contract Greeter {
     let output = cmd.stdout_lossy();
     assert!(output.contains(
         "
-Compiler run successful (with warnings)
-warning[5667]: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+Compiler run successful with warnings:
+Warning (5667): Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
 ",
     ));
 });
@@ -522,7 +580,7 @@ library FooLib {
 
     assert!(cmd.stdout_lossy().ends_with(
         "
-Compiler run successful
+Compiler run successful!
 "
     ));
 });
@@ -626,15 +684,15 @@ contract A {
     cmd.args(["build", "--force"]);
     let out = cmd.stdout();
     // no warnings
-    assert!(out.trim().contains("Compiler run successful"));
-    assert!(!out.trim().contains("Compiler run successful (with warnings)"));
+    assert!(out.trim().contains("Compiler run successful!"));
+    assert!(!out.trim().contains("Compiler run successful with warnings:"));
 
     // don't ignore errors
     let config = Config { ignored_error_codes: vec![], ..Default::default() };
     prj.write_config(config);
     let out = cmd.stdout();
 
-    assert!(out.trim().contains("Compiler run successful (with warnings)"));
+    assert!(out.trim().contains("Compiler run successful with warnings:"));
     assert!(
       out.contains(
                     r#"Warning: SPDX license identifier not provided in source file. Before publishing, consider adding a comment containing "SPDX-License-Identifier: <SPDX-License>" to each source file. Use "SPDX-License-Identifier: UNLICENSED" for non-open-source code. Please see https://spdx.org for more information."#
@@ -663,7 +721,7 @@ contract A {
     let out = cmd.stdout();
     // there are no errors
     assert!(out.trim().contains("Compiler run successful"));
-    assert!(out.trim().contains("Compiler run successful (with warnings)"));
+    assert!(out.trim().contains("Compiler run successful with warnings:"));
 
     // warning fails to compile
     let config = Config { ignored_error_codes: vec![], deny_warnings: true, ..Default::default() };
@@ -679,8 +737,8 @@ contract A {
     prj.write_config(config);
     let out = cmd.stdout();
 
-    assert!(out.trim().contains("Compiler run successful"));
-    assert!(!out.trim().contains("Compiler run successful (with warnings)"));
+    assert!(out.trim().contains("Compiler run successful!"));
+    assert!(!out.trim().contains("Compiler run successful with warnings:"));
 });
 
 // test against a local checkout, useful to debug with local ethers-rs patch
@@ -835,7 +893,7 @@ forgetest!(can_install_and_remove, |prj: TestProject, mut cmd: TestCommand| {
     };
 
     let remove = |cmd: &mut TestCommand, target: &str| {
-        cmd.forge_fuse().args(["remove", target]);
+        cmd.forge_fuse().args(["remove", "--force", target]);
         cmd.assert_non_empty_stdout();
         assert!(!forge_std.exists());
         assert!(!forge_std_mod.exists());
@@ -1517,6 +1575,29 @@ forgetest_init!(can_build_skip_contracts, |prj: TestProject, mut cmd: TestComman
     assert!(out.trim().contains("No files changed, compilation skipped"), "{}", out);
 });
 
+forgetest_init!(can_build_skip_glob, |prj: TestProject, mut cmd: TestCommand| {
+    // explicitly set to run with 0.8.17 for consistent output
+    let config = Config { solc: Some("0.8.17".into()), ..Default::default() };
+    prj.write_config(config);
+    prj.inner()
+        .add_test(
+            "Foo",
+            r#"
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.17;
+contract TestDemo {
+function test_run() external {}
+}"#,
+        )
+        .unwrap();
+    // only builds the single template contract `src/*` even if `*.t.sol` or `.s.sol` is absent
+    cmd.args(["build", "--skip", "*/test/**", "--skip", "*/script/**"]);
+
+    cmd.unchecked_output().stdout_matches_path(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/can_build_skip_glob.stdout"),
+    );
+});
+
 // checks that build --sizes includes all contracts even if unchanged
 forgetest_init!(can_build_sizes_repeatedly, |_prj: TestProject, mut cmd: TestCommand| {
     cmd.args(["build", "--sizes"]);
@@ -1526,7 +1607,7 @@ forgetest_init!(can_build_sizes_repeatedly, |_prj: TestProject, mut cmd: TestCom
     assert!(out.contains(TEMPLATE_CONTRACT));
 
     // get the entire table
-    let table = out.split("Compiler run successful").nth(1).unwrap().trim();
+    let table = out.split("Compiler run successful!").nth(1).unwrap().trim();
 
     let unchanged = cmd.stdout();
     assert!(unchanged.contains(table), "{}", table);
@@ -1540,7 +1621,7 @@ forgetest_init!(can_build_names_repeatedly, |_prj: TestProject, mut cmd: TestCom
     assert!(out.contains(TEMPLATE_CONTRACT));
 
     // get the entire list
-    let list = out.split("Compiler run successful").nth(1).unwrap().trim();
+    let list = out.split("Compiler run successful!").nth(1).unwrap().trim();
 
     let unchanged = cmd.stdout();
     assert!(unchanged.contains(list), "{}", list);

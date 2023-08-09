@@ -7,7 +7,7 @@ use crate::prelude::{
     ChiselCommand, ChiselResult, ChiselSession, CmdCategory, CmdDescriptor, SessionSourceConfig,
     SolidityHelper,
 };
-use ethers::{abi::ParamType, contract::Lazy, utils::hex};
+use ethers::{abi::ParamType, contract::Lazy, types::Address, utils::hex};
 use forge::{
     decode::decode_console_logs,
     trace::{
@@ -21,12 +21,14 @@ use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use solang_parser::diagnostics::Diagnostic;
-use std::{error::Error, io::Write, path::PathBuf, process::Command};
+use std::{borrow::Cow, error::Error, io::Write, path::PathBuf, process::Command};
 use strum::IntoEnumIterator;
 use yansi::Paint;
 
-/// Prompt arrow slice
+/// Prompt arrow character
 pub static PROMPT_ARROW: char = '➜';
+static DEFAULT_PROMPT: &str = "➜ ";
+
 /// Command leader character
 pub static COMMAND_LEADER: char = '!';
 /// Chisel character
@@ -35,6 +37,9 @@ pub static CHISEL_CHAR: &str = "⚒️";
 /// Matches Solidity comments
 static COMMENT_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*(?://.*\s*$)|(/*[\s\S]*?\*/\s*$)").unwrap());
+
+/// Matches Ethereum addresses
+static ADDRESS_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"0x[a-fA-F0-9]{40}").unwrap());
 
 /// Chisel input dispatcher
 #[derive(Debug)]
@@ -118,17 +123,21 @@ impl ChiselDispatcher {
         ChiselSession::new(config).map(|session| Self { errored: false, session })
     }
 
-    /// Returns the prompt given the last input's error status
-    pub fn get_prompt(&self) -> String {
-        format!(
-            "{}{} ",
-            self.session
-                .id
-                .as_ref()
-                .map(|id| format!("({}: {}) ", Paint::cyan("ID"), Paint::yellow(id)))
-                .unwrap_or_default(),
-            if self.errored { Paint::red(PROMPT_ARROW) } else { Paint::green(PROMPT_ARROW) }
-        )
+    /// Returns the prompt based on the current status of the Dispatcher
+    pub fn get_prompt(&self) -> Cow<'static, str> {
+        match self.session.id.as_deref() {
+            // `(ID: {id}) ➜ `
+            Some(id) => {
+                let mut prompt = String::with_capacity(DEFAULT_PROMPT.len() + id.len() + 7);
+                prompt.push_str("(ID: ");
+                prompt.push_str(id);
+                prompt.push_str(") ");
+                prompt.push_str(DEFAULT_PROMPT);
+                Cow::Owned(prompt)
+            }
+            // `➜ `
+            None => Cow::Borrowed(DEFAULT_PROMPT),
+        }
     }
 
     /// Dispatches a [ChiselCommand]
@@ -370,6 +379,40 @@ impl ChiselDispatcher {
                     DispatchResult::CommandFailed(Self::make_error("Session not present."))
                 }
             }
+            ChiselCommand::Calldata => {
+                if let Some(session_source) = self.session.session_source.as_mut() {
+                    // remove empty space, double quotes, and 0x prefix
+                    let arg = args
+                        .first()
+                        .map(|s| {
+                            s.trim_matches(|c: char| c.is_whitespace() || c == '"' || c == '\'')
+                        })
+                        .map(|s| s.strip_prefix("0x").unwrap_or(s))
+                        .unwrap_or("");
+
+                    if arg.is_empty() {
+                        session_source.config.calldata = None;
+                        return DispatchResult::CommandSuccess(Some("Calldata cleared.".to_string()))
+                    }
+
+                    let calldata = hex::decode(arg);
+                    match calldata {
+                        Ok(calldata) => {
+                            session_source.config.calldata = Some(calldata);
+                            DispatchResult::CommandSuccess(Some(format!(
+                                "Set calldata to '{}'",
+                                Paint::yellow(arg)
+                            )))
+                        }
+                        Err(e) => DispatchResult::CommandFailed(Self::make_error(format!(
+                            "Invalid calldata: {}",
+                            e
+                        ))),
+                    }
+                } else {
+                    DispatchResult::CommandFailed(Self::make_error("Session not present."))
+                }
+            }
             ChiselCommand::MemDump | ChiselCommand::StackDump => {
                 if let Some(session_source) = self.session.session_source.as_mut() {
                     match session_source.execute().await {
@@ -521,7 +564,7 @@ impl ChiselDispatcher {
                                             .inputs
                                             .iter()
                                             .map(|input| {
-                                                let mut formatted = format_param!(input);
+                                                let mut formatted = format!("{}", input.kind);
                                                 if input.indexed {
                                                     formatted.push_str(" indexed");
                                                 }
@@ -753,7 +796,7 @@ impl ChiselDispatcher {
     }
 
     /// Dispatches an input as a command via [Self::dispatch_command] or as a Solidity snippet.
-    pub async fn dispatch(&mut self, input: &str) -> DispatchResult {
+    pub async fn dispatch(&mut self, mut input: &str) -> DispatchResult {
         // Check if the input is a builtin command.
         // Commands are denoted with a `!` leading character.
         if input.starts_with(COMMAND_LEADER) {
@@ -791,6 +834,20 @@ impl ChiselDispatcher {
             source.with_run_code(input);
             return DispatchResult::Success(None)
         }
+
+        // If there is an address (or multiple addresses) in the input, ensure that they are
+        // encoded with a valid checksum per EIP-55.
+        let mut heap_input = input.to_string();
+        ADDRESS_RE.find_iter(input).for_each(|m| {
+            // Convert the match to a string slice
+            let match_str = m.as_str();
+            // We can always safely unwrap here due to the regex matching.
+            let addr: Address = match_str.parse().expect("Valid address regex");
+            // Replace all occurrences of the address with a checksummed version
+            heap_input = heap_input.replace(match_str, &ethers::utils::to_checksum(&addr, None));
+        });
+        // Replace the old input with the formatted input.
+        input = &heap_input;
 
         // Create new source with exact input appended and parse
         let (mut new_source, do_execute) = match source.clone_with_new_line(input.to_string()) {

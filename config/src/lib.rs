@@ -85,12 +85,15 @@ use crate::{
 use providers::*;
 
 mod fuzz;
-pub use fuzz::FuzzConfig;
+pub use fuzz::{FuzzConfig, FuzzDictionaryConfig};
 
 mod invariant;
 use crate::fs_permissions::PathPermission;
 pub use invariant::InvariantConfig;
 use providers::remappings::RemappingsProvider;
+
+mod inline;
+pub use inline::{validate_profiles, InlineConfig, InlineConfigError, InlineConfigParser, NatSpec};
 
 /// Foundry configuration
 ///
@@ -311,6 +314,8 @@ pub struct Config {
     /// Multiple rpc endpoints and their aliases
     #[serde(default, skip_serializing_if = "RpcEndpoints::is_empty")]
     pub rpc_endpoints: RpcEndpoints,
+    /// Whether to store the referenced sources in the metadata as literal data.
+    pub use_literal_content: bool,
     /// Whether to include the metadata hash.
     ///
     /// The metadata hash is machine dependent. By default, this is set to [BytecodeHash::None] to allow for deterministic code, See: <https://docs.soliditylang.org/en/latest/metadata.html>
@@ -376,9 +381,7 @@ pub static STANDALONE_FALLBACK_SECTIONS: Lazy<HashMap<&'static str, &'static str
     Lazy::new(|| HashMap::from([("invariant", "fuzz")]));
 
 /// Deprecated keys.
-pub static DEPRECATIONS: Lazy<HashMap<String, String>> = Lazy::new(|| {
-    HashMap::from([("fuzz.max_global_rejects".into(), "fuzz.max_test_rejects".into())])
-});
+pub static DEPRECATIONS: Lazy<HashMap<String, String>> = Lazy::new(|| HashMap::from([]));
 
 impl Config {
     /// The default profile: "default"
@@ -444,6 +447,7 @@ impl Config {
     ///
     /// let config = Config::from_provider(figment);
     /// ```
+    #[track_caller]
     pub fn from_provider<T: Provider>(provider: T) -> Self {
         trace!("load config with provider: {:?}", provider.metadata());
         Self::try_from(provider).unwrap_or_else(|err| panic!("{}", err))
@@ -466,7 +470,7 @@ impl Config {
     /// ```
     pub fn try_from<T: Provider>(provider: T) -> Result<Self, ExtractConfigError> {
         let figment = Figment::from(provider);
-        let mut config = figment.extract::<Self>().map_err(|error| ExtractConfigError { error })?;
+        let mut config = figment.extract::<Self>().map_err(ExtractConfigError::new)?;
         config.profile = figment.profile().clone();
         Ok(config)
     }
@@ -576,12 +580,12 @@ impl Config {
     /// Returns the directory in which dependencies should be installed
     ///
     /// Returns the first dir from `libs` that is not `node_modules` or `lib` if `libs` is empty
-    pub fn install_lib_dir(&self) -> PathBuf {
+    pub fn install_lib_dir(&self) -> &Path {
         self.libs
             .iter()
             .find(|p| !p.ends_with("node_modules"))
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("lib"))
+            .map(|p| p.as_path())
+            .unwrap_or_else(|| Path::new("lib"))
     }
 
     /// Serves as the entrypoint for obtaining the project.
@@ -766,12 +770,35 @@ impl Config {
     /// ```
     pub fn get_rpc_url(&self) -> Option<Result<Cow<str>, UnresolvedEnvVarError>> {
         let maybe_alias = self.eth_rpc_url.as_ref().or(self.etherscan_api_key.as_ref())?;
-        let mut endpoints = self.rpc_endpoints.clone().resolved();
-        if let Some(alias) = endpoints.remove(maybe_alias) {
-            Some(alias.map(Cow::Owned))
+        if let Some(alias) = self.get_rpc_url_with_alias(maybe_alias) {
+            Some(alias)
         } else {
             Some(Ok(Cow::Borrowed(self.eth_rpc_url.as_deref()?)))
         }
+    }
+
+    /// Resolves the given alias to a matching rpc url
+    ///
+    /// Returns:
+    ///    - the matching, resolved url of  `rpc_endpoints` if `maybe_alias` is an alias
+    ///    - None otherwise
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// 
+    /// use foundry_config::Config;
+    /// # fn t() {
+    ///     let config = Config::with_root("./");
+    ///     let rpc_url = config.get_rpc_url_with_alias("mainnet").unwrap().unwrap();
+    /// # }
+    /// ```
+    pub fn get_rpc_url_with_alias(
+        &self,
+        maybe_alias: &str,
+    ) -> Option<Result<Cow<str>, UnresolvedEnvVarError>> {
+        let mut endpoints = self.rpc_endpoints.clone().resolved();
+        Some(endpoints.remove(maybe_alias)?.map(Cow::Owned))
     }
 
     /// Returns the configured rpc, or the fallback url
@@ -836,24 +863,24 @@ impl Config {
     ) -> Option<Result<ResolvedEtherscanConfig, EtherscanConfigError>> {
         let maybe_alias = self.etherscan_api_key.as_ref().or(self.eth_rpc_url.as_ref())?;
         if self.etherscan.contains_key(maybe_alias) {
-            // etherscan points to an alias in the `etherscan` table, so we try to resolve
-            // that
+            // etherscan points to an alias in the `etherscan` table, so we try to resolve that
             let mut resolved = self.etherscan.clone().resolved();
             return resolved.remove(maybe_alias)
         }
+
         // we treat the `etherscan_api_key` as actual API key
         // if no chain provided, we assume mainnet
-        let chain = self.chain_id.unwrap_or_else(|| Mainnet.into());
-
+        let chain = self.chain_id.unwrap_or(Chain::Named(Mainnet));
         let api_key = self.etherscan_api_key.as_ref()?;
         ResolvedEtherscanConfig::create(api_key, chain).map(Ok)
     }
 
     /// Same as [`Self::get_etherscan_config()`] but optionally updates the config with the given
-    /// `chain`
+    /// `chain`, and `etherscan_api_key`
     ///
     /// If not matching alias was found, then this will try to find the first entry in the table
-    /// with a matching chain id
+    /// with a matching chain id. If an etherscan_api_key is already set it will take precedence
+    /// over the chain's entry in the table.
     pub fn get_etherscan_config_with_chain(
         &self,
         chain: Option<impl Into<Chain>>,
@@ -861,19 +888,32 @@ impl Config {
         let chain = chain.map(Into::into);
         if let Some(maybe_alias) = self.etherscan_api_key.as_ref().or(self.eth_rpc_url.as_ref()) {
             if self.etherscan.contains_key(maybe_alias) {
-                let mut resolved = self.etherscan.clone().resolved();
-                return resolved.remove(maybe_alias).transpose()
+                return self.etherscan.clone().resolved().remove(maybe_alias).transpose()
             }
         }
 
-        // try to find by comparing chain ids
-        if let Some(config) = chain.and_then(|chain| self.etherscan.find_chain(chain).cloned()) {
-            return Ok(config.resolve().ok())
+        // try to find by comparing chain IDs after resolving
+        if let Some(res) =
+            chain.and_then(|chain| self.etherscan.clone().resolved().find_chain(chain))
+        {
+            match (res, self.etherscan_api_key.as_ref()) {
+                (Ok(mut config), Some(key)) => {
+                    // we update the key, because if an etherscan_api_key is set, it should take
+                    // precedence over the entry, since this is usually set via env var or CLI args.
+                    config.key = key.clone();
+                    return Ok(Some(config))
+                }
+                (Ok(config), None) => return Ok(Some(config)),
+                (Err(err), None) => return Err(err),
+                (Err(_), Some(_)) => {
+                    // use the etherscan key as fallback
+                }
+            }
         }
 
-        // fallback `etherscan_api_key` as actual key
+        // etherscan fallback via API key
         if let Some(key) = self.etherscan_api_key.as_ref() {
-            let chain = chain.or(self.chain_id).unwrap_or_else(|| Mainnet.into());
+            let chain = chain.or(self.chain_id).unwrap_or_default();
             return Ok(ResolvedEtherscanConfig::create(key, chain))
         }
 
@@ -915,11 +955,10 @@ impl Config {
 
     /// Returns the `Optimizer` based on the configured settings
     pub fn optimizer(&self) -> Optimizer {
-        Optimizer {
-            enabled: Some(self.optimizer),
-            runs: Some(self.optimizer_runs),
-            details: self.optimizer_details.clone(),
-        }
+        // only configure optimizer settings if optimizer is enabled
+        let details = if self.optimizer { self.optimizer_details.clone() } else { None };
+
+        Optimizer { enabled: Some(self.optimizer), runs: Some(self.optimizer_runs), details }
     }
 
     /// returns the [`ethers_solc::ConfigurableArtifacts`] for this config, that includes the
@@ -966,7 +1005,11 @@ impl Config {
             optimizer,
             evm_version: Some(self.evm_version),
             libraries,
-            metadata: Some(SettingsMetadata::new(self.bytecode_hash, self.cbor_metadata)),
+            metadata: Some(SettingsMetadata {
+                use_literal_content: Some(self.use_literal_content),
+                bytecode_hash: Some(self.bytecode_hash),
+                cbor_metadata: Some(self.cbor_metadata),
+            }),
             debug: self.revert_strings.map(|revert_strings| DebuggingSettings {
                 revert_strings: Some(revert_strings),
                 debug_info: Vec::new(),
@@ -1113,8 +1156,8 @@ impl Config {
         if !file_path.exists() {
             return Ok(())
         }
-        let cargo_toml_content = fs::read_to_string(&file_path)?;
-        let mut doc = cargo_toml_content.parse::<toml_edit::Document>()?;
+        let contents = fs::read_to_string(&file_path)?;
+        let mut doc = contents.parse::<toml_edit::Document>()?;
         if f(&mut doc) {
             fs::write(file_path, doc.to_string())?;
         }
@@ -1686,7 +1729,7 @@ impl Default for Config {
             allow_paths: vec![],
             include_paths: vec![],
             force: false,
-            evm_version: Default::default(),
+            evm_version: EvmVersion::Paris,
             gas_reports: vec!["*".to_string()],
             gas_reports_ignore: vec![],
             solc: None,
@@ -1734,6 +1777,7 @@ impl Default for Config {
             ignored_error_codes: vec![
                 SolidityErrorCode::SpdxLicenseNotProvided,
                 SolidityErrorCode::ContractExceeds24576Bytes,
+                SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes,
             ],
             deny_warnings: false,
             via_ir: false,
@@ -1742,6 +1786,7 @@ impl Default for Config {
             etherscan: Default::default(),
             no_storage_caching: false,
             no_rpc_rate_limit: false,
+            use_literal_content: false,
             bytecode_hash: BytecodeHash::Ipfs,
             cbor_metadata: true,
             revert_strings: None,
@@ -2303,7 +2348,16 @@ impl<P: Provider> Provider for OptionalStrictProfileProvider<P> {
                 profile.clone(),
             ));
         }
-        figment.data()
+        figment.data().map_err(|err| {
+            // figment does tag metadata and tries to map metadata to an error, since we use a new
+            // figment in this provider this new figment does not know about the metadata of the
+            // provider and can't map the metadata to the error. Therefor we return the root error
+            // if this error originated in the provider's data.
+            if let Err(root_err) = self.provider.data() {
+                return root_err
+            }
+            err
+        })
     }
     fn profile(&self) -> Option<Profile> {
         self.profiles.last().cloned()
@@ -2318,6 +2372,7 @@ trait ProviderExt: Provider {
     ) -> RenameProfileProvider<&Self> {
         RenameProfileProvider::new(self, from, to)
     }
+
     fn wrap(
         &self,
         wrapping_key: impl Into<Profile>,
@@ -2325,12 +2380,14 @@ trait ProviderExt: Provider {
     ) -> WrapProfileProvider<&Self> {
         WrapProfileProvider::new(self, wrapping_key, profile)
     }
+
     fn strict_select(
         &self,
         profiles: impl IntoIterator<Item = impl Into<Profile>>,
     ) -> OptionalStrictProfileProvider<&Self> {
         OptionalStrictProfileProvider::new(self, profiles)
     }
+
     fn fallback(
         &self,
         profile: impl Into<Profile>,
@@ -2375,9 +2432,10 @@ impl BasicConfig {
     pub fn to_string_pretty(&self) -> Result<String, toml::ser::Error> {
         let s = toml::to_string_pretty(self)?;
         Ok(format!(
-            r#"[profile.{}]
+            "\
+[profile.{}]
 {s}
-# See more config options https://github.com/foundry-rs/foundry/tree/master/config"#,
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config\n",
             self.profile
         ))
     }
@@ -2812,6 +2870,59 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_etherscan_with_chain() {
+        figment::Jail::expect_with(|jail| {
+            let env_key = "__BSC_ETHERSCAN_API_KEY";
+            let env_value = "env value";
+            jail.create_file(
+                "foundry.toml",
+                r#"
+                [profile.default]
+
+                [etherscan]
+                bsc = { key = "${__BSC_ETHERSCAN_API_KEY}", url = "https://api.bscscan.com/api" }
+            "#,
+            )?;
+
+            let config = Config::load();
+            assert!(config.get_etherscan_config_with_chain(None::<u64>).unwrap().is_none());
+            assert!(config
+                .get_etherscan_config_with_chain(Some(ethers_core::types::Chain::BinanceSmartChain))
+                .is_err());
+
+            std::env::set_var(env_key, env_value);
+
+            assert_eq!(
+                config
+                    .get_etherscan_config_with_chain(Some(
+                        ethers_core::types::Chain::BinanceSmartChain
+                    ))
+                    .unwrap()
+                    .unwrap()
+                    .key,
+                env_value
+            );
+
+            let mut with_key = config;
+            with_key.etherscan_api_key = Some("via etherscan_api_key".to_string());
+
+            assert_eq!(
+                with_key
+                    .get_etherscan_config_with_chain(Some(
+                        ethers_core::types::Chain::BinanceSmartChain
+                    ))
+                    .unwrap()
+                    .unwrap()
+                    .key,
+                "via etherscan_api_key"
+            );
+
+            std::env::remove_var(env_key);
+            Ok(())
+        });
+    }
+
+    #[test]
     fn test_resolve_etherscan() {
         figment::Jail::expect_with(|jail| {
             jail.create_file(
@@ -3123,6 +3234,7 @@ mod tests {
                 remappings = ["ds-test=lib/ds-test/"]
                 via_ir = true
                 rpc_storage_caching = { chains = [1, "optimism", 999999], endpoints = "all"}
+                use_literal_content = false
                 bytecode_hash = "ipfs"
                 cbor_metadata = true
                 revert_strings = "strip"
@@ -3156,6 +3268,7 @@ mod tests {
                         ]),
                         endpoints: CachedEndpoints::All
                     },
+                    use_literal_content: false,
                     bytecode_hash: BytecodeHash::Ipfs,
                     cbor_metadata: true,
                     revert_strings: Some(RevertStrings::Strip),
@@ -3221,6 +3334,7 @@ mod tests {
                 block_prevrandao = '0x0000000000000000000000000000000000000000000000000000000000000000'
                 block_number = 1
                 block_timestamp = 1
+                use_literal_content = false
                 bytecode_hash = 'ipfs'
                 cbor_metadata = true
                 cache = true
@@ -3275,6 +3389,7 @@ mod tests {
                 depth = 15
                 fail_on_revert = false
                 call_override = false
+                shrink_sequence = true
             "#,
             )?;
 
@@ -3539,18 +3654,33 @@ mod tests {
             assert_ne!(config.invariant.runs, config.fuzz.runs);
             assert_eq!(config.invariant.runs, 420);
 
-            assert_ne!(config.fuzz.include_storage, invariant_default.include_storage);
-            assert_eq!(config.invariant.include_storage, config.fuzz.include_storage);
+            assert_ne!(
+                config.fuzz.dictionary.include_storage,
+                invariant_default.dictionary.include_storage
+            );
+            assert_eq!(
+                config.invariant.dictionary.include_storage,
+                config.fuzz.dictionary.include_storage
+            );
 
-            assert_ne!(config.fuzz.dictionary_weight, invariant_default.dictionary_weight);
-            assert_eq!(config.invariant.dictionary_weight, config.fuzz.dictionary_weight);
+            assert_ne!(
+                config.fuzz.dictionary.dictionary_weight,
+                invariant_default.dictionary.dictionary_weight
+            );
+            assert_eq!(
+                config.invariant.dictionary.dictionary_weight,
+                config.fuzz.dictionary.dictionary_weight
+            );
 
             jail.set_env("FOUNDRY_PROFILE", "ci");
             let ci_config = Config::load();
             assert_eq!(ci_config.fuzz.runs, 1);
             assert_eq!(ci_config.invariant.runs, 400);
-            assert_eq!(ci_config.fuzz.dictionary_weight, 5);
-            assert_eq!(ci_config.invariant.dictionary_weight, config.fuzz.dictionary_weight);
+            assert_eq!(ci_config.fuzz.dictionary.dictionary_weight, 5);
+            assert_eq!(
+                ci_config.invariant.dictionary.dictionary_weight,
+                config.fuzz.dictionary.dictionary_weight
+            );
 
             Ok(())
         })
@@ -3846,7 +3976,13 @@ mod tests {
                         ModelCheckerTarget::Assert,
                         ModelCheckerTarget::OutOfBounds
                     ]),
-                    timeout: Some(10000)
+                    timeout: Some(10000),
+                    invariants: None,
+                    show_unproved: None,
+                    div_mod_with_slacks: None,
+                    solvers: None,
+                    show_unsupported: None,
+                    show_proved_safe: None,
                 })
             );
 
@@ -3902,7 +4038,13 @@ mod tests {
                         ModelCheckerTarget::Assert,
                         ModelCheckerTarget::OutOfBounds
                     ]),
-                    timeout: Some(10000)
+                    timeout: Some(10000),
+                    invariants: None,
+                    show_unproved: None,
+                    div_mod_with_slacks: None,
+                    solvers: None,
+                    show_unsupported: None,
+                    show_proved_safe: None,
                 })
             );
 
@@ -3979,7 +4121,7 @@ mod tests {
 
             let config = Config::load();
             assert_eq!(config.fmt.line_length, 95);
-            assert_eq!(config.fuzz.dictionary_weight, 99);
+            assert_eq!(config.fuzz.dictionary.dictionary_weight, 99);
             assert_eq!(config.invariant.depth, 5);
 
             Ok(())
@@ -4114,7 +4256,7 @@ mod tests {
         fake_block_cache(chain_dir.path(), "2", 500);
         // Pollution file that should not show up in the cached block
         let mut pol_file = File::create(chain_dir.path().join("pol.txt")).unwrap();
-        writeln!(pol_file, "{}", vec![' '; 10].iter().collect::<String>()).unwrap();
+        writeln!(pol_file, "{}", [' '; 10].iter().collect::<String>()).unwrap();
 
         let result = Config::get_cached_blocks(chain_dir.path())?;
 
@@ -4182,6 +4324,24 @@ mod tests {
                     SolidityErrorCode::Other(1337)
                 ]
             );
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn test_parse_optimizer_settings() {
+        figment::Jail::expect_with(|jail| {
+            jail.create_file(
+                "foundry.toml",
+                r#"
+                [default]
+               [profile.default.optimizer_details]
+            "#,
+            )?;
+
+            let config = Config::load();
+            assert_eq!(config.optimizer_details, Some(OptimizerDetails::default()));
 
             Ok(())
         });

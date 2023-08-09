@@ -5,12 +5,12 @@ pub use decoder::{CallTraceDecoder, CallTraceDecoderBuilder};
 use ethers::{
     abi::{ethereum_types::BigEndianHash, Address, RawLog},
     core::utils::to_checksum,
-    types::{Bytes, GethDebugTracingOptions, GethTrace, StructLog, H256, U256},
+    types::{Bytes, DefaultFrame, GethDebugTracingOptions, StructLog, H256, U256},
 };
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use hashbrown::HashMap;
 use node::CallTraceNode;
-use revm::{opcode, CallContext, Memory, Return, Stack};
+use revm::interpreter::{opcode, CallContext, InstructionResult, Memory, Stack};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -150,7 +150,11 @@ impl CallTraceArena {
     }
 
     /// Generate a geth-style trace e.g. for debug_traceTransaction
-    pub fn geth_trace(&self, receipt_gas_used: U256, opts: GethDebugTracingOptions) -> GethTrace {
+    pub fn geth_trace(
+        &self,
+        receipt_gas_used: U256,
+        opts: GethDebugTracingOptions,
+    ) -> DefaultFrame {
         if self.arena.is_empty() {
             return Default::default()
         }
@@ -160,7 +164,7 @@ impl CallTraceArena {
         let main_trace_node = &self.arena[0];
         let main_trace = &main_trace_node.trace;
         // Start geth trace
-        let mut acc = GethTrace {
+        let mut acc = DefaultFrame {
             // If the top-level trace succeeded, then it was a success
             failed: !main_trace.success,
             gas: receipt_gas_used,
@@ -423,7 +427,7 @@ impl From<&CallTraceStep> for StructLog {
             } else {
                 None
             },
-            stack: Some(step.stack.data().clone()),
+            stack: Some(step.stack.data().iter().copied().map(|data| data.into()).collect()),
             // Filled in `CallTraceArena::geth_trace` as a result of compounding all slot changes
             storage: None,
         }
@@ -463,7 +467,7 @@ pub struct CallTrace {
     /// The gas cost of the call
     pub gas_cost: u64,
     /// The status of the trace's call
-    pub status: Return,
+    pub status: InstructionResult,
     /// call context of the runtime
     pub call_context: Option<CallContext>,
     /// Opcode-level execution steps
@@ -493,7 +497,7 @@ impl Default for CallTrace {
             data: Default::default(),
             output: Default::default(),
             gas_cost: Default::default(),
-            status: Return::Continue,
+            status: InstructionResult::Continue,
             call_context: Default::default(),
             steps: Default::default(),
         }

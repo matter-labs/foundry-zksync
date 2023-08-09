@@ -1,20 +1,11 @@
 //! Support for "cheat codes" / bypass functions
 
-use anvil_core::eth::transaction::TypedTransaction;
-use ethers::types::{Address, Signature, U256};
+use anvil_core::eth::transaction::IMPERSONATED_SIGNATURE;
+use ethers::types::{Address, Signature};
 use forge::hashbrown::HashSet;
 use parking_lot::RwLock;
 use std::sync::Arc;
 use tracing::trace;
-
-/// The signature used to bypass signing via the `eth_sendUnsignedTransaction` cheat RPC
-const BYPASS_SIGNATURE: Signature =
-    Signature { r: U256([0, 0, 0, 0]), s: U256([0, 0, 0, 0]), v: 0 };
-
-/// Returns `true` if the signature of the `transaction` is the `BYPASS_SIGNATURE`
-pub fn is_bypassed(transaction: &TypedTransaction) -> bool {
-    transaction.signature() == BYPASS_SIGNATURE
-}
 
 /// Manages user modifications that may affect the node's behavior
 ///
@@ -51,12 +42,23 @@ impl CheatsManager {
 
     /// Returns true if the `addr` is currently impersonated
     pub fn is_impersonated(&self, addr: Address) -> bool {
-        self.state.read().impersonated_accounts.contains(&addr)
+        if self.state.read().auto_impersonate_accounts {
+            true
+        } else {
+            self.state.read().impersonated_accounts.contains(&addr)
+        }
     }
 
     /// Returns the signature to use to bypass transaction signing
     pub fn bypass_signature(&self) -> Signature {
         self.state.read().bypass_signature
+    }
+
+    /// Sets the auto impersonation flag which if set to true will make the `is_impersonated`
+    /// function always return true
+    pub fn set_auto_impersonate_account(&self, enabled: bool) {
+        trace!(target: "cheats", "Auto impersonation set to {:?}", enabled);
+        self.state.write().auto_impersonate_accounts = enabled
     }
 }
 
@@ -67,10 +69,16 @@ pub struct CheatsState {
     pub impersonated_accounts: HashSet<Address>,
     /// The signature used for the `eth_sendUnsignedTransaction` cheat code
     pub bypass_signature: Signature,
+    /// If set to true will make the `is_impersonated` function always return true
+    pub auto_impersonate_accounts: bool,
 }
 
 impl Default for CheatsState {
     fn default() -> Self {
-        Self { impersonated_accounts: Default::default(), bypass_signature: BYPASS_SIGNATURE }
+        Self {
+            impersonated_accounts: Default::default(),
+            bypass_signature: IMPERSONATED_SIGNATURE,
+            auto_impersonate_accounts: false,
+        }
     }
 }

@@ -2,11 +2,11 @@ use crate::{
     eth::backend::db::{
         Db, MaybeHashDatabase, SerializableAccountRecord, SerializableState, StateDb,
     },
-    revm::AccountInfo,
+    revm::primitives::AccountInfo,
     Address, U256,
 };
 use ethers::prelude::H256;
-use forge::revm::{Bytecode, Database, KECCAK_EMPTY};
+use forge::revm::Database;
 pub use foundry_evm::executor::fork::database::ForkedDatabase;
 use foundry_evm::executor::{
     backend::{snapshot::StateSnapshot, DatabaseResult},
@@ -21,12 +21,12 @@ impl Db for ForkedDatabase {
 
     fn set_storage_at(&mut self, address: Address, slot: U256, val: U256) -> DatabaseResult<()> {
         // this ensures the account is loaded first
-        let _ = Database::basic(self, address)?;
+        let _ = Database::basic(self, address.into())?;
         self.database_mut().set_storage_at(address, slot, val)
     }
 
     fn insert_block_hash(&mut self, number: U256, hash: H256) {
-        self.inner().block_hashes().write().insert(number, hash);
+        self.inner().block_hashes().write().insert(number.into(), hash.into());
     }
 
     fn dump_state(&self) -> DatabaseResult<Option<SerializableState>> {
@@ -44,47 +44,21 @@ impl Db for ForkedDatabase {
                 }
                 .to_checked();
                 Ok((
-                    k,
+                    k.into(),
                     SerializableAccountRecord {
                         nonce: v.info.nonce,
-                        balance: v.info.balance,
+                        balance: v.info.balance.into(),
                         code: code.bytes()[..code.len()].to_vec().into(),
-                        storage: v.storage.into_iter().collect(),
+                        storage: v
+                            .storage
+                            .into_iter()
+                            .map(|kv| (kv.0.into(), kv.1.into()))
+                            .collect(),
                     },
                 ))
             })
             .collect::<Result<_, _>>()?;
         Ok(Some(SerializableState { accounts }))
-    }
-
-    fn load_state(&mut self, state: SerializableState) -> DatabaseResult<bool> {
-        for (addr, account) in state.accounts.into_iter() {
-            let old_account_nonce =
-                self.database_mut().accounts.get(&addr).map(|a| a.info.nonce).unwrap_or_default();
-            // use max nonce in case account is imported multiple times with difference
-            // nonces to prevent collisions
-            let nonce = std::cmp::max(old_account_nonce, account.nonce);
-
-            self.insert_account(
-                addr,
-                AccountInfo {
-                    balance: account.balance,
-                    code_hash: KECCAK_EMPTY, // will be set automatically
-                    code: if account.code.0.is_empty() {
-                        None
-                    } else {
-                        Some(Bytecode::new_raw(account.code.0).to_checked())
-                    },
-                    nonce,
-                },
-            );
-
-            for (k, v) in account.storage.into_iter() {
-                self.set_storage_at(addr, k, v)?;
-            }
-        }
-
-        Ok(true)
     }
 
     fn snapshot(&mut self) -> U256 {

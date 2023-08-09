@@ -15,11 +15,12 @@ use ethers::{
         artifacts::{ContractBytecodeSome, Libraries},
         ArtifactId, Bytes, Project,
     },
+    providers::{Http, Middleware},
     signers::LocalWallet,
     solc::contracts::ArtifactContracts,
     types::{
-        transaction::eip2718::TypedTransaction, Address, Log, NameOrAddress, TransactionRequest,
-        U256,
+        transaction::eip2718::TypedTransaction, Address, Chain, Log, NameOrAddress,
+        TransactionRequest, U256,
     },
 };
 use eyre::{ContextCompat, WrapErr};
@@ -35,9 +36,12 @@ use forge::{
     CallKind,
 };
 use foundry_common::{
-    abi::format_token, evm::EvmArgs, ContractsByArtifact, RpcUrl, CONTRACT_MAX_SIZE, SELECTOR_LEN,
+    abi::format_token,
+    evm::{Breakpoints, EvmArgs},
+    shell, ContractsByArtifact, RpcUrl, CONTRACT_MAX_SIZE, SELECTOR_LEN,
 };
 use foundry_config::{figment, Config};
+use futures::future;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
@@ -73,6 +77,16 @@ mod verify;
 use crate::cmd::retry::RetryArgs;
 pub use transaction::TransactionWithMetadata;
 
+/// List of Chains that support Shanghai.
+static SHANGHAI_ENABLED_CHAINS: &[Chain] = &[
+    // Ethereum Mainnet
+    Chain::Mainnet,
+    // Goerli
+    Chain::Goerli,
+    // Sepolia
+    Chain::Sepolia,
+];
+
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(ScriptArgs, opts, evm_opts);
 
@@ -83,11 +97,10 @@ pub struct ScriptArgs {
     ///
     /// If multiple contracts exist in the same file you must specify the target contract with
     /// --target-contract.
-    #[clap(value_hint = ValueHint::FilePath, value_name = "PATH")]
+    #[clap(value_hint = ValueHint::FilePath)]
     pub path: String,
 
     /// Arguments to pass to the script function.
-    #[clap(value_name = "ARGS")]
     pub args: Vec<String>,
 
     /// The name of the contract you want to run.
@@ -99,46 +112,33 @@ pub struct ScriptArgs {
         long,
         short,
         default_value = "run()",
-        value_name = "SIGNATURE",
         value_parser = foundry_common::clap_helpers::strip_0x_prefix
     )]
     pub sig: String,
 
-    #[clap(
-        long,
-        help = "Use legacy transactions instead of EIP1559 ones. this is auto-enabled for common networks without EIP1559."
-    )]
+    /// Use legacy transactions instead of EIP1559 ones.
+    ///
+    /// This is auto-enabled for common networks without EIP1559.
+    #[clap(long)]
     pub legacy: bool,
 
-    #[clap(long, help = "Broadcasts the transactions.")]
+    /// Broadcasts the transactions.
+    #[clap(long)]
     pub broadcast: bool,
 
-    #[clap(long, help = "Skips on-chain simulation")]
+    /// Skips on-chain simulation.
+    #[clap(long)]
     pub skip_simulation: bool,
 
-    #[clap(
-        long,
-        short,
-        default_value = "130",
-        value_name = "GAS_ESTIMATE_MULTIPLIER",
-        help = "Relative percentage to multiply gas estimates by"
-    )]
+    /// Relative percentage to multiply gas estimates by.
+    #[clap(long, short, default_value = "130")]
     pub gas_estimate_multiplier: u64,
 
-    #[clap(flatten)]
-    pub opts: BuildArgs,
-
-    #[clap(flatten)]
-    pub wallets: MultiWallet,
-
-    #[clap(flatten)]
-    pub evm_opts: EvmArgs,
-
+    /// Send via `eth_sendTransaction` using the `--from` argument or `$ETH_FROM` as sender
     #[clap(
         long,
-        help = "Send via `eth_sendTransaction` using the `--sender` argument or `$ETH_FROM` as sender",
         requires = "sender",
-        conflicts_with_all = &["private_key", "private_keys", "froms", "ledger", "trezor", "aws"]
+        conflicts_with_all = &["private_key", "private_keys", "froms", "ledger", "trezor", "aws"],
     )]
     pub unlocked: bool,
 
@@ -151,44 +151,53 @@ pub struct ScriptArgs {
     #[clap(long)]
     pub resume: bool,
 
-    #[clap(
-        long,
-        help = "If present, --resume or --verify will be assumed to be a multi chain deployment."
-    )]
+    /// If present, --resume or --verify will be assumed to be a multi chain deployment.
+    #[clap(long)]
     pub multi: bool,
 
-    #[clap(long, help = "Open the script in the debugger. Takes precedence over broadcast.")]
+    /// Open the script in the debugger.
+    ///
+    /// Takes precedence over broadcast.
+    #[clap(long)]
     pub debug: bool,
 
-    #[clap(
-        long,
-        help = "Makes sure a transaction is sent, only after its previous one has been confirmed and succeeded."
-    )]
+    /// Makes sure a transaction is sent,
+    /// only after its previous one has been confirmed and succeeded.
+    #[clap(long)]
     pub slow: bool,
 
+    /// The Etherscan (or equivalent) API key
     #[clap(long, env = "ETHERSCAN_API_KEY", value_name = "KEY")]
     pub etherscan_api_key: Option<String>,
 
+    /// Verifies all the contracts found in the receipts of a script, if any.
+    #[clap(long)]
+    pub verify: bool,
+
+    /// Output results in JSON format.
+    #[clap(long)]
+    pub json: bool,
+
+    /// Gas price for legacy transactions, or max fee per gas for EIP1559 transactions.
     #[clap(
         long,
-        help = "If it finds a matching broadcast log, it tries to verify every contract found in the receipts."
+        env = "ETH_GAS_PRICE",
+        value_parser = parse_ether_value,
+        value_name = "PRICE",
     )]
-    pub verify: bool,
+    pub with_gas_price: Option<U256>,
+
+    #[clap(flatten)]
+    pub opts: BuildArgs,
+
+    #[clap(flatten)]
+    pub wallets: MultiWallet,
+
+    #[clap(flatten)]
+    pub evm_opts: EvmArgs,
 
     #[clap(flatten)]
     pub verifier: super::verify::VerifierArgs,
-
-    #[clap(long, help = "Output results in JSON format.")]
-    pub json: bool,
-
-    #[clap(
-        long,
-        help = "Gas price for legacy transactions, or max fee per gas for EIP1559 transactions.",
-        env = "ETH_GAS_PRICE",
-        value_parser = parse_ether_value,
-        value_name = "PRICE"
-    )]
-    pub with_gas_price: Option<U256>,
 
     #[clap(flatten)]
     pub retry: RetryArgs,
@@ -220,9 +229,16 @@ impl ScriptArgs {
             script_config.config.offline,
         )?);
 
+        // Decoding traces using etherscan is costly as we run into rate limits,
+        // causing scripts to run for a very long time unnecesarily.
+        // Therefore, we only try and use etherscan if the user has provided an API key.
+        let should_use_etherscan_traces = script_config.config.etherscan_api_key.is_some();
+
         for (_, trace) in &mut result.traces {
             decoder.identify(trace, &mut local_identifier);
-            decoder.identify(trace, &mut etherscan_identifier);
+            if should_use_etherscan_traces {
+                decoder.identify(trace, &mut etherscan_identifier);
+            }
         }
         Ok(decoder)
     }
@@ -256,7 +272,7 @@ impl ScriptArgs {
                 }
             }
             Err(_) => {
-                println!("{:x?}", (&returned));
+                shell::println(format!("{:x?}", (&returned)))?;
             }
         }
 
@@ -277,7 +293,7 @@ impl ScriptArgs {
                 eyre::bail!("Unexpected error: No traces despite verbosity level. Please report this as a bug: https://github.com/foundry-rs/foundry/issues/new?assignees=&labels=T-bug&template=BUG-FORM.yml");
             }
 
-            println!("Traces:");
+            shell::println("Traces:")?;
             for (kind, trace) in &mut result.traces {
                 let should_include = match kind {
                     TraceKind::Setup => verbosity >= 5,
@@ -287,22 +303,22 @@ impl ScriptArgs {
 
                 if should_include {
                     decoder.decode(trace).await;
-                    println!("{trace}");
+                    shell::println(format!("{trace}"))?;
                 }
             }
-            println!();
+            shell::println(String::new())?;
         }
 
         if result.success {
-            println!("{}", Paint::green("Script ran successfully."));
+            shell::println(format!("{}", Paint::green("Script ran successfully.")))?;
         }
 
         if script_config.evm_opts.fork_url.is_none() {
-            println!("Gas used: {}", result.gas_used);
+            shell::println(format!("Gas used: {}", result.gas_used))?;
         }
 
         if result.success && !result.returned.is_empty() {
-            println!("\n== Return ==");
+            shell::println("\n== Return ==")?;
             match func.decode_output(&result.returned) {
                 Ok(decoded) => {
                     for (index, (token, output)) in decoded.iter().zip(&func.outputs).enumerate() {
@@ -313,20 +329,24 @@ impl ScriptArgs {
                         } else {
                             index.to_string()
                         };
-                        println!("{}: {internal_type} {}", label.trim_end(), format_token(token));
+                        shell::println(format!(
+                            "{}: {internal_type} {}",
+                            label.trim_end(),
+                            format_token(token)
+                        ))?;
                     }
                 }
                 Err(_) => {
-                    println!("{:x?}", (&result.returned));
+                    shell::println(format!("{:x?}", (&result.returned)))?;
                 }
             }
         }
 
         let console_logs = decode_console_logs(&result.logs);
         if !console_logs.is_empty() {
-            println!("\n== Logs ==");
+            shell::println("\n== Logs ==")?;
             for log in console_logs {
-                println!("  {log}");
+                shell::println(format!("  {log}"))?;
             }
         }
 
@@ -351,7 +371,7 @@ impl ScriptArgs {
         let console_logs = decode_console_logs(&result.logs);
         let output = JsonResult { logs: console_logs, gas_used: result.gas_used, returns };
         let j = serde_json::to_string(&output)?;
-        println!("{j}");
+        shell::println(j)?;
 
         Ok(())
     }
@@ -378,7 +398,7 @@ impl ScriptArgs {
                                 let sender = tx.from.expect("no sender");
                                 if let Some(ns) = new_sender {
                                     if sender != ns {
-                                        println!("You have more than one deployer who could predeploy libraries. Using `--sender` instead.");
+                                        shell::println("You have more than one deployer who could predeploy libraries. Using `--sender` instead.")?;
                                         return Ok(None)
                                     }
                                 } else if sender != evm_opts.sender {
@@ -424,6 +444,7 @@ impl ScriptArgs {
         result: ScriptResult,
         project: Project,
         highlevel_known_contracts: ArtifactContracts<ContractBytecodeSome>,
+        breakpoints: Breakpoints,
     ) -> eyre::Result<()> {
         trace!(target: "script", "debugging script");
 
@@ -452,6 +473,7 @@ impl ScriptArgs {
                 .into_iter()
                 .map(|(id, _)| (id.name, sources.clone()))
                 .collect(),
+            breakpoints,
         )?;
         match tui.start().expect("Failed to start tui") {
             TUIExitReason::CharExit => Ok(()),
@@ -495,7 +517,8 @@ impl ScriptArgs {
         Ok((func.clone(), data))
     }
 
-    /// Checks if the transaction is a deployment with a size above the `CONTRACT_MAX_SIZE`.
+    /// Checks if the transaction is a deployment with either a size above the `CONTRACT_MAX_SIZE`
+    /// or specified `code_size_limit`.
     ///
     /// If `self.broadcast` is enabled, it asks confirmation of the user. Otherwise, it just warns
     /// the user.
@@ -549,11 +572,16 @@ impl ScriptArgs {
         }
 
         let mut prompt_user = false;
+        let max_size = match self.evm_opts.env.code_size_limit {
+            Some(size) => size,
+            None => CONTRACT_MAX_SIZE,
+        };
+
         for (data, to) in result.transactions.iter().flat_map(|txes| {
             txes.iter().filter_map(|tx| {
                 tx.transaction
                     .data()
-                    .filter(|data| data.len() > CONTRACT_MAX_SIZE)
+                    .filter(|data| data.len() > max_size)
                     .map(|data| (data, tx.transaction.to()))
             })
         }) {
@@ -575,14 +603,14 @@ impl ScriptArgs {
             {
                 let deployment_size = deployed_code.len();
 
-                if deployment_size > CONTRACT_MAX_SIZE {
+                if deployment_size > max_size {
                     prompt_user = self.broadcast;
-                    println!(
+                    shell::println(format!(
                         "{}",
                         Paint::red(format!(
-                            "`{name}` is above the EIP-170 contract size limit ({deployment_size} > {CONTRACT_MAX_SIZE})."
+                            "`{name}` is above the contract size limit ({deployment_size} > {max_size})."
                         ))
-                    );
+                    ))?;
                 }
             }
         }
@@ -640,7 +668,7 @@ pub struct NestedValue {
     pub value: String,
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct ScriptConfig {
     pub config: Config,
     pub evm_opts: EvmOpts,
@@ -677,12 +705,12 @@ impl ScriptConfig {
     /// error. [library support]
     fn check_multi_chain_constraints(&self, libraries: &Libraries) -> eyre::Result<()> {
         if self.has_multiple_rpcs() || (self.missing_rpc && !self.total_rpcs.is_empty()) {
-            eprintln!(
+            shell::eprintln(format!(
                 "{}",
                 Paint::yellow(
                     "Multi chain deployment is still under development. Use with caution."
                 )
-            );
+            ))?;
             if !libraries.libs.is_empty() {
                 eyre::bail!(
                     "Multi chain deployment does not support library linking at the moment."
@@ -695,6 +723,46 @@ impl ScriptConfig {
     /// Returns the script target contract
     fn target_contract(&self) -> &ArtifactId {
         self.target_contract.as_ref().expect("should exist after building")
+    }
+
+    /// Checks if the RPCs used point to chains that support EIP-3855.
+    /// If not, warns the user.
+    async fn check_shanghai_support(&self) -> eyre::Result<()> {
+        let chain_ids = self.total_rpcs.iter().map(|rpc| async move {
+            if let Ok(provider) = ethers::providers::Provider::<Http>::try_from(rpc) {
+                match provider.get_chainid().await {
+                    Ok(chain_id) => match TryInto::<Chain>::try_into(chain_id) {
+                        Ok(chain) => return Some((SHANGHAI_ENABLED_CHAINS.contains(&chain), chain)),
+                        Err(_) => return None,
+                    },
+                    Err(_) => return None,
+                }
+            }
+            None
+        });
+
+        let chain_ids: Vec<_> = future::join_all(chain_ids).await.into_iter().flatten().collect();
+
+        let chain_id_unsupported = chain_ids.iter().any(|(supported, _)| !supported);
+
+        // At least one chain ID is unsupported, therefore we print the message.
+        if chain_id_unsupported {
+            let msg = format!(
+                r#"
+EIP-3855 is not supported in one or more of the RPCs used.
+Unsupported Chain IDs: {}.
+Contracts deployed with a Solidity version equal or higher than 0.8.20 might not work properly.
+For more information, please see https://eips.ethereum.org/EIPS/eip-3855"#,
+                chain_ids
+                    .iter()
+                    .filter(|(supported, _)| !supported)
+                    .map(|(_, chain)| format!("{}", *chain as u64))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            shell::println(Paint::yellow(msg))?;
+        }
+        Ok(())
     }
 }
 
@@ -754,6 +822,43 @@ mod tests {
         ]);
         let config = args.load_config();
         assert_eq!(config.etherscan_api_key, Some("goerli".to_string()));
+    }
+
+    #[test]
+    fn can_parse_verifier_url() {
+        let args: ScriptArgs = ScriptArgs::parse_from([
+            "foundry-cli",
+            "script",
+            "script/Test.s.sol:TestScript",
+            "--fork-url",
+            "http://localhost:8545",
+            "--verifier-url",
+            "http://localhost:3000/api/verify",
+            "--etherscan-api-key",
+            "blacksmith",
+            "--broadcast",
+            "--verify",
+            "-vvvv",
+        ]);
+        assert_eq!(
+            args.verifier.verifier_url,
+            Some("http://localhost:3000/api/verify".to_string())
+        );
+    }
+
+    #[test]
+    fn can_extract_code_size_limit() {
+        let args: ScriptArgs = ScriptArgs::parse_from([
+            "foundry-cli",
+            "script",
+            "script/Test.s.sol:TestScript",
+            "--fork-url",
+            "http://localhost:8545",
+            "--broadcast",
+            "--code-size-limit",
+            "50000",
+        ]);
+        assert_eq!(args.evm_opts.env.code_size_limit, Some(50000));
     }
 
     #[test]
@@ -827,14 +932,14 @@ mod tests {
         let root = temp.path();
 
         let config = r#"
-                [profile.default]
+            [profile.default]
 
-               [rpc_endpoints]
-                mumbai = "https://polygon-mumbai.g.alchemy.com/v2/${_EXTRACT_RPC_ALIAS}"
+            [rpc_endpoints]
+            mumbai = "https://polygon-mumbai.g.alchemy.com/v2/${_EXTRACT_RPC_ALIAS}"
 
-                [etherscan]
-                mumbai = { key = "${_POLYSCAN_API_KEY}", chain = 80001, url = "https://api-testnet.polygonscan.com/" }
-            "#;
+            [etherscan]
+            mumbai = { key = "${_POLYSCAN_API_KEY}", chain = 80001, url = "https://api-testnet.polygonscan.com/" }
+        "#;
 
         let toml_file = root.join(Config::FILE_NAME);
         fs::write(toml_file, config).unwrap();

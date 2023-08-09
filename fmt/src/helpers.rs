@@ -2,8 +2,10 @@ use crate::{
     inline_config::{InlineConfig, InvalidInlineConfigItem},
     Comments, Formatter, FormatterConfig, FormatterError, Visitable,
 };
+use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use itertools::Itertools;
-use solang_parser::pt::*;
+use solang_parser::{diagnostics::Diagnostic, pt::*};
+use std::{fmt::Write, path::Path};
 
 /// Result of parsing the source code
 #[derive(Debug)]
@@ -21,7 +23,7 @@ pub struct Parsed<'a> {
 }
 
 /// Parse source code
-pub fn parse(src: &str) -> Result<Parsed, Vec<solang_parser::diagnostics::Diagnostic>> {
+pub fn parse(src: &str) -> Result<Parsed, Vec<Diagnostic>> {
     let (pt, comments) = solang_parser::parse(src, 0)?;
     let comments = Comments::new(comments, src);
     let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
@@ -31,11 +33,12 @@ pub fn parse(src: &str) -> Result<Parsed, Vec<solang_parser::diagnostics::Diagno
 }
 
 /// Format parsed code
-pub fn format<W: std::fmt::Write>(
-    writer: &mut W,
+pub fn format<W: Write>(
+    writer: W,
     mut parsed: Parsed,
     config: FormatterConfig,
 ) -> Result<(), FormatterError> {
+    trace!(?parsed, ?config, "Formatting");
     let mut formatter =
         Formatter::new(writer, parsed.src, parsed.comments, parsed.inline_config, config);
     parsed.pt.visit(&mut formatter)
@@ -67,4 +70,31 @@ pub fn offset_to_line_column(content: &str, start: usize) -> (usize, usize) {
     }
 
     unreachable!("content.len() > start")
+}
+
+/// Print the report of parser's diagnostics
+pub fn print_diagnostics_report(
+    content: &str,
+    path: Option<&Path>,
+    diagnostics: Vec<Diagnostic>,
+) -> std::io::Result<()> {
+    let filename =
+        path.map(|p| p.file_name().unwrap().to_string_lossy().to_string()).unwrap_or_default();
+    for diag in diagnostics {
+        let (start, end) = (diag.loc.start(), diag.loc.end());
+        let mut report = Report::build(ReportKind::Error, &filename, start)
+            .with_message(format!("{:?}", diag.ty))
+            .with_label(
+                Label::new((&filename, start..end))
+                    .with_color(Color::Red)
+                    .with_message(format!("{}", diag.message.fg(Color::Red))),
+            );
+
+        for note in diag.notes {
+            report = report.with_note(note.message);
+        }
+
+        report.finish().print((&filename, Source::from(content)))?;
+    }
+    Ok(())
 }

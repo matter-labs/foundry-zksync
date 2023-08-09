@@ -9,7 +9,7 @@ use ethers::{
     types::{H160, U256},
     utils::{get_contract_address, secret_key_to_address},
 };
-use rayon::prelude::*;
+use rayon::iter::{self, ParallelIterator};
 use regex::Regex;
 use std::time::Instant;
 
@@ -19,22 +19,24 @@ pub type GeneratedWallet = (SigningKey, H160);
 /// CLI arguments for `cast wallet vanity`.
 #[derive(Debug, Clone, Parser)]
 pub struct VanityArgs {
+    /// Prefix for the vanity address.
     #[clap(
         long,
-        help = "Prefix for the vanity address.",
         required_unless_present = "ends_with",
-        value_parser = HexAddressValidator::default(),
+        value_parser = HexAddressValidator,
         value_name = "HEX"
     )]
     pub starts_with: Option<String>,
-    #[clap(long, help = "Suffix for the vanity address.", value_parser = HexAddressValidator::default(), value_name = "HEX")]
+
+    /// Suffix for the vanity address.
+    #[clap(long, value_parser = HexAddressValidator, value_name = "HEX")]
     pub ends_with: Option<String>,
-    #[clap(
-        long,
-        help = "Generate a vanity contract address created by the generated keypair with the specified nonce.",
-        value_name = "NONCE"
-    )]
-    pub nonce: Option<u64>, /* 2^64-1 is max possible nonce per https://eips.ethereum.org/EIPS/eip-2681 */
+
+    // 2^64-1 is max possible nonce per [eip-2681](https://eips.ethereum.org/EIPS/eip-2681).
+    /// Generate a vanity contract address created by the generated keypair with the specified
+    /// nonce.
+    #[clap(long)]
+    pub nonce: Option<u64>,
 }
 
 impl Cmd for VanityArgs {
@@ -170,8 +172,8 @@ pub fn create_nonce_matcher<T: VanityMatcher>(
 
 /// Returns an infinite parallel iterator which yields a [GeneratedWallet].
 #[inline]
-pub fn wallet_generator() -> impl ParallelIterator<Item = GeneratedWallet> {
-    std::iter::repeat(()).par_bridge().map(|_| generate_wallet())
+pub fn wallet_generator() -> iter::Map<iter::Repeat<()>, fn(()) -> GeneratedWallet> {
+    iter::repeat(()).map(|_| generate_wallet())
 }
 
 /// Generates a random K-256 signing key and derives its Ethereum address.
@@ -283,7 +285,6 @@ impl VanityMatcher for RegexMatcher {
 
 /// Parse 40 byte addresses
 #[derive(Copy, Clone, Debug, Default)]
-#[non_exhaustive]
 pub struct HexAddressValidator;
 
 impl TypedValueParser for HexAddressValidator {
