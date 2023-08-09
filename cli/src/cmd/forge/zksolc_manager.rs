@@ -311,7 +311,7 @@ impl ZkSolcManagerBuilder {
         let compilers_path = home_path.to_owned();
 
         let solc_version = parse_version(&version)?;
-        return Ok(ZkSolcManager::new(compilers_path, solc_version, compiler, download_url))
+        Ok(ZkSolcManager::new(compilers_path, solc_version, compiler, download_url))
     }
 }
 
@@ -439,7 +439,7 @@ impl ZkSolcManager {
     /// Returns a `String` representing the full name of the `zksolc` compiler, including the
     /// version.
     pub fn get_full_compiler(&self) -> String {
-        return format!("{}{}", self.compiler, self.version.get_version())
+        format!("{}{}", self.compiler, self.version.get_version())
     }
 
     /// Returns the full download URL for the `zksolc` compiler binary based on the current

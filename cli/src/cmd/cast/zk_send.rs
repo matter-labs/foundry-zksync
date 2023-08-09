@@ -55,7 +55,7 @@ use zksync_web3_rs::{
     ZKSWallet,
 };
 
-use super::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url};
+use super::zk_utils::{get_chain, get_private_key, get_rpc_url};
 
 /// CLI arguments for the `cast zk-send` subcommand.
 ///

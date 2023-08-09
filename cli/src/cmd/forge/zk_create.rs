@@ -46,7 +46,7 @@
 /// - `zksync`
 use crate::{
     cmd::{
-        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url},
+        cast::zk_utils::{get_chain, get_private_key, get_rpc_url},
         forge::build::CoreBuildArgs,
         read_constructor_args_file,
     },
@@ -178,11 +178,10 @@ impl ZkCreateArgs {
         };
 
         //check for additional factory deps
-        let factory_dependencies = if let Some(fdep_contract_info) = &self.factory_deps {
-            Some(self.get_factory_dependencies(&project, fdep_contract_info))
-        } else {
-            None
-        };
+        let factory_dependencies = self
+            .factory_deps
+            .as_ref()
+            .map(|fdep_contract_info| self.get_factory_dependencies(&project, fdep_contract_info));
 
         // get abi
         let abi = match Self::get_abi_from_contract(&project, &self.contract) {
@@ -232,13 +231,11 @@ impl ZkCreateArgs {
     /// An empty vector if there are no constructor arguments.
     fn get_constructor_args(&self, abi: &Abi) -> Vec<String> {
         if abi.constructor.is_some() {
-            let constructor_args =
-                if let Some(ref constructor_args_path) = self.constructor_args_path {
-                    read_constructor_args_file(constructor_args_path.to_path_buf()).unwrap()
-                } else {
-                    self.constructor_args.clone()
-                };
-            constructor_args
+            if let Some(ref constructor_args_path) = self.constructor_args_path {
+                read_constructor_args_file(constructor_args_path.to_path_buf()).unwrap()
+            } else {
+                self.constructor_args.clone()
+            }
         } else {
             vec![]
         }
@@ -369,11 +366,11 @@ impl ZkCreateArgs {
     fn get_factory_dependencies(
         &self,
         project: &Project,
-        fdep_contract_info: &Vec<ContractInfo>,
+        fdep_contract_info: &[ContractInfo],
     ) -> Vec<Vec<u8>> {
         let mut factory_deps = Vec::new();
         for dep in fdep_contract_info.iter() {
-            let dep_bytecode = Self::get_bytecode_from_contract(&project, dep).unwrap();
+            let dep_bytecode = Self::get_bytecode_from_contract(project, dep).unwrap();
             factory_deps.push(dep_bytecode.to_vec());
         }
         factory_deps

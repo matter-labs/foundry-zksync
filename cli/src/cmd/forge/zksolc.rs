@@ -56,6 +56,9 @@ pub struct ZkSolcOpts {
     pub force_evmla: bool,
 }
 
+/// Files that should be compiled with a given solidity version.
+type SolidityVersionSources = (Version, BTreeMap<PathBuf, Source>);
+
 /// This struct represents the ZkSolc compiler for compiling Solidity contracts.
 ///
 /// Key Components:
@@ -110,7 +113,7 @@ pub struct ZkSolc {
     is_system: bool,
     force_evmla: bool,
     standard_json: Option<StandardJsonCompilerInput>,
-    sources: Option<BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>>,
+    sources: Option<BTreeMap<Solc, SolidityVersionSources>>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -284,7 +287,7 @@ impl ZkSolc {
                     )
                     .nth(1)
                     .expect("Failed to get Contract relative path")
-                    .split("/")
+                    .split('/')
                     .last()
                     .expect("Failed to get Contract filename.");
 
@@ -410,7 +413,7 @@ impl ZkSolc {
                 let b_code_keys = b_code_obj.keys();
                 for hash in b_code_keys {
                     if let Some(bcode_hash) = b_code_obj[hash]["hash"].as_str() {
-                        println!("{}", format!("{} -> Bytecode Hash: {} ", hash, bcode_hash));
+                        println!("{} -> Bytecode Hash: {} ", hash, bcode_hash);
                     }
                 }
             }
@@ -593,7 +596,7 @@ impl ZkSolc {
         let json_input_path = artifact_path.join("json_input.json");
         let stdjson = serde_json::to_value(&standard_json)
             .map_err(|e| Error::msg(format!("Could not serialize standard JSON input: {}", e)))?;
-        std::fs::write(&json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
+        std::fs::write(json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
             .map_err(|e| Error::msg(format!("Could not write JSON input file: {}", e)))?;
 
         Ok(())
@@ -674,9 +677,7 @@ impl ZkSolc {
     /// The `get_versioned_sources` function is typically called internally within the `ZkSolc`
     /// struct to obtain the necessary versioned sources for contract compilation.
     /// The versioned sources can then be used for further processing or analysis.
-    fn get_versioned_sources(
-        &mut self,
-    ) -> Result<BTreeMap<Solc, (Version, BTreeMap<PathBuf, Source>)>> {
+    fn get_versioned_sources(&mut self) -> Result<BTreeMap<Solc, SolidityVersionSources>> {
         // Step 1: Retrieve Project Sources
         let sources = self
             .project
@@ -693,11 +694,7 @@ impl ZkSolc {
             .map_err(|e| Error::msg(format!("Could not get versions & edges: {}", e)))?;
 
         // Step 4: Retrieve Solc Version
-        let solc_version = versions
-            .get(&self.project)
-            .map_err(|e| Error::msg(format!("Could not get solc: {}", e)));
-
-        solc_version
+        versions.get(&self.project).map_err(|e| Error::msg(format!("Could not get solc: {}", e)))
     }
 
     /// Builds the path for saving the artifacts (compiler output) of a contract based on the

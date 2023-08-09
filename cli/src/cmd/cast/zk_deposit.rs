@@ -13,7 +13,7 @@
 ///       specified.
 ///     - `parse_decimal_u256`: Converts a string to a `U256` number.
 use crate::{
-    cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
+    cmd::cast::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
     opts::{TransactionOpts, Wallet},
 };
 use clap::Parser;
@@ -136,7 +136,7 @@ impl ZkDepositTxArgs {
                 .unwrap();
 
         // TODO Support different tokens than ETH.
-        let deposit_request = DepositRequest::new(self.amount.into())
+        let deposit_request = DepositRequest::new(self.amount)
             .to(self.get_to_address())
             .operator_tip(self.operator_tip.unwrap_or(0.into()))
             .gas_price(self.tx.gas_price)
@@ -198,6 +198,10 @@ mod zk_deposit_tests {
         let amount = U256::from(1);
         let private_key = "0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
         let l1_url = env::var("L1_RPC_URL").ok();
+        if env::var("L2_RPC_URL").is_err() {
+            // TODO: this test requires a running L2 to pass.
+            return
+        }
         let l2_url = env::var("L2_RPC_URL").unwrap();
 
         let zk_wallet = {
@@ -205,10 +209,7 @@ mod zk_deposit_tests {
             let l2_provider = Provider::try_from(l2_url.clone()).unwrap();
 
             let wallet = LocalWallet::from_str(private_key).unwrap();
-            let zk_wallet =
-                ZKSWallet::new(wallet, None, Some(l2_provider), Some(l1_provider)).unwrap();
-
-            zk_wallet
+            ZKSWallet::new(wallet, None, Some(l2_provider), Some(l1_provider)).unwrap()
         };
 
         let l1_balance_before = zk_wallet.eth_balance().await.unwrap();
