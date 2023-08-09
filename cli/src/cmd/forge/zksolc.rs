@@ -1,35 +1,42 @@
 /// This module provides the implementation of the ZkSolc compiler for Solidity contracts.
-/// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart contracts.
+/// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart
+/// contracts.
 ///
-/// The `ZkSolc` struct represents an instance of the compiler, and it is responsible for compiling
-/// Solidity contracts and handling the output. It uses the `solc` library to interact with the Solidity compiler.
+/// The `ZkSolc` struct represents an instance of the compiler, and it is responsible for
+/// compiling Solidity contracts and handling the output. It uses the `solc` library to
+/// interact with the Solidity compiler.
 ///
 /// The `ZkSolc` struct provides the following functionality:
 ///
-/// - Configuration: It allows configuring the compiler path, system mode, and force-evmla options through
-///   the `ZkSolcOpts` struct.
+/// - Configuration: It allows configuring the compiler path, system mode, and force-evmla
+///   options through the `ZkSolcOpts` struct.
 ///
-/// - Compilation: The `compile` method initiates the compilation process. It collects the source files,
-///   parses the JSON input, builds compiler arguments, runs the compiler, and handles the output.
-///
-/// - Error and Warning Handling: The compiler output is checked for errors and warnings, and they are
-///   displayed appropriately. If errors are encountered, the process will exit with a non-zero status code.
-///
-/// - JSON Input Generation: The `parse_json_input` method generates the JSON input required by the compiler
-///   for each contract. It configures the Solidity compiler, saves the input to the artifacts directory, and
+/// - Compilation: The `compile` method initiates the compilation process. It collects the
+///   source files, parses the JSON input, builds compiler arguments, runs the compiler, and
 ///   handles the output.
 ///
-/// - Source Management: The `get_versioned_sources` method retrieves the project sources, resolves the graph
-///   of sources and versions, and returns the sources grouped by Solc version.
+/// - Error and Warning Handling: The compiler output is checked for errors and warnings, and
+///   they are displayed appropriately. If errors are encountered, the process will exit with a
+///   non-zero status code.
 ///
-/// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods construct the
-///   path and file for saving the compiler output artifacts.
+/// - JSON Input Generation: The `parse_json_input` method generates the JSON input required by
+///   the compiler for each contract. It configures the Solidity compiler, saves the input to
+///   the artifacts directory, and handles the output.
+///
+/// - Source Management: The `get_versioned_sources` method retrieves the project sources,
+///   resolves the graph of sources and versions, and returns the sources grouped by Solc
+///   version.
+///
+/// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods
+///   construct the path and file for saving the compiler output artifacts.
 use ansi_term::Colour::{Red, Yellow};
 use anyhow::{Error, Result};
-use ethers::prelude::{artifacts::Source, Solc};
-use ethers::solc::{
-    artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
-    Graph, Project,
+use ethers::{
+    prelude::{artifacts::Source, Solc},
+    solc::{
+        artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
+        Graph, Project,
+    },
 };
 use semver::Version;
 use serde_json::Value;
@@ -67,12 +74,12 @@ pub struct ZkSolcOpts {
 /// Functionality:
 /// - `new`: Constructs a new `ZkSolc` instance using the provided compiler path, project
 ///   configurations, and options.
-/// - `compile`: Responsible for compiling the contracts in the project's 'sources' directory
-///   and its subdirectories.
+/// - `compile`: Responsible for compiling the contracts in the project's 'sources' directory and
+///   its subdirectories.
 ///
 /// Error Handling:
-/// - The methods in this struct return the `Result` type from the `anyhow` crate for flexible
-///   and easy-to-use error handling.
+/// - The methods in this struct return the `Result` type from the `anyhow` crate for flexible and
+///   easy-to-use error handling.
 ///
 /// Example Usage:
 /// ```rust
@@ -159,19 +166,22 @@ impl ZkSolc {
     /// zksolc.compile()?;
     /// ```
     ///
-    /// In this example, a `ZkSolc` instance is created using `ZkSolcOpts` and a `Project`. Then, the
-    /// `compile` method is invoked to compile the contracts.
+    /// In this example, a `ZkSolc` instance is created using `ZkSolcOpts` and a `Project`. Then,
+    /// the `compile` method is invoked to compile the contracts.
     ///
     /// # Workflow
     ///
     /// The `compile` function performs the following operations:
     ///
     /// 1. Collect Source Files:
-    ///    - It collects the source files from the project's 'sources' directory and its subdirectories.
-    ///    - Only the files within the 'sources' directory and its subdirectories are considered for compilation.
+    ///    - It collects the source files from the project's 'sources' directory and its
+    ///      subdirectories.
+    ///    - Only the files within the 'sources' directory and its subdirectories are considered for
+    ///      compilation.
     ///
     /// 2. Configure Solidity Compiler:
-    ///    - It configures the Solidity compiler by setting options like the compiler path, system mode, and force EVMLA flag.
+    ///    - It configures the Solidity compiler by setting options like the compiler path, system
+    ///      mode, and force EVMLA flag.
     ///
     /// 3. Parse JSON Input:
     ///    - For each source file, it parses the JSON input using the Solidity compiler.
@@ -179,10 +189,12 @@ impl ZkSolc {
     ///
     /// 4. Build Compiler Arguments:
     ///    - It builds the compiler arguments for each source file.
-    ///    - The compiler arguments include options like the compiler path, system mode, and force EVMLA flag.
+    ///    - The compiler arguments include options like the compiler path, system mode, and force
+    ///      EVMLA flag.
     ///
     /// 5. Run Compiler and Handle Output:
-    ///    - It runs the Solidity compiler for each source file with the corresponding compiler arguments.
+    ///    - It runs the Solidity compiler for each source file with the corresponding compiler
+    ///      arguments.
     ///    - The output of the compiler, including errors and warnings, is captured.
     ///
     /// 6. Handle Output (Errors and Warnings):
@@ -191,12 +203,14 @@ impl ZkSolc {
     ///
     /// 7. Save Artifacts:
     ///    - It saves the artifacts (compiler output) as a JSON file for each source file.
-    ///    - The artifacts are saved in the project's artifacts directory under the corresponding source file's directory.
+    ///    - The artifacts are saved in the project's artifacts directory under the corresponding
+    ///      source file's directory.
     ///
     /// # Note
     ///
-    /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the versioned sources.
-    /// These modified values can be accessed after the compilation process for further processing or analysis.
+    /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the
+    /// versioned sources. These modified values can be accessed after the compilation process
+    /// for further processing or analysis.
     pub fn compile(mut self) -> Result<()> {
         // Step 1: Collect Source Files
         self.configure_solc();
@@ -216,7 +230,7 @@ impl ZkSolc {
 
                 // Skip this file if it's not in the 'sources' directory or its subdirectories
                 if !is_in_sources_dir {
-                    continue;
+                    continue
                 }
 
                 // Step 3: Parse JSON Input for each Source
@@ -254,7 +268,7 @@ impl ZkSolc {
                         self.compiler_path,
                         contract_path,
                         &comp_args
-                    )));
+                    )))
                 }
 
                 let filename = contract_path
@@ -282,13 +296,14 @@ impl ZkSolc {
         Ok(())
     }
 
-    /// Builds the compiler arguments for the Solidity compiler based on the provided versioned source
-    /// and solc instance. The compiler arguments specify options and settings for the compiler's execution.
+    /// Builds the compiler arguments for the Solidity compiler based on the provided versioned
+    /// source and solc instance. The compiler arguments specify options and settings for the
+    /// compiler's execution.
     ///
     /// # Arguments
     ///
-    /// * `versioned_source` - A tuple containing the contract source path (`PathBuf`) and the corresponding
-    ///                         `Source` object.
+    /// * `versioned_source` - A tuple containing the contract source path (`PathBuf`) and the
+    ///   corresponding `Source` object.
     /// * `solc` - The `Solc` instance representing the specific version of the Solidity compiler.
     ///
     /// # Returns
@@ -324,14 +339,16 @@ impl ZkSolc {
         comp_args
     }
 
-    /// Handles the output of the Solidity compiler after the compilation process is completed. It processes
-    /// the compiler output, handles errors and warnings, and saves the compiler artifacts.
+    /// Handles the output of the Solidity compiler after the compilation process is completed. It
+    /// processes the compiler output, handles errors and warnings, and saves the compiler
+    /// artifacts.
     ///
     /// # Arguments
     ///
     /// * `output` - The output of the Solidity compiler as a `std::process::Output` struct.
     /// * `source` - The path of the contract source file that was compiled.
-    /// * `displayed_warnings` - A mutable set that keeps track of displayed warnings to avoid duplicates.
+    /// * `displayed_warnings` - A mutable set that keeps track of displayed warnings to avoid
+    ///   duplicates.
     ///
     /// # Output Handling
     ///
@@ -340,7 +357,8 @@ impl ZkSolc {
     ///
     /// # Error and Warning Handling
     ///
-    /// - The function checks for errors and warnings in the compiler output and handles them accordingly.
+    /// - The function checks for errors and warnings in the compiler output and handles them
+    ///   accordingly.
     /// - Errors are printed in red color.
     /// - Warnings are printed in yellow color.
     /// - If an error is encountered, the function exits with a non-zero status code.
@@ -349,7 +367,8 @@ impl ZkSolc {
     /// # Artifacts Saving
     ///
     /// - The function saves the compiler output (artifacts) in a file.
-    /// - The artifacts are saved in a file named "artifacts.json" within the contract's artifacts directory.
+    /// - The artifacts are saved in a file named "artifacts.json" within the contract's artifacts
+    ///   directory.
     ///
     /// # Example
     ///
@@ -360,9 +379,9 @@ impl ZkSolc {
     /// self.handle_output(output, source, &mut displayed_warnings);
     /// ```
     ///
-    /// In this example, the `handle_output` function is called with the compiler output, contract source,
-    /// and a mutable set for displayed warnings. It processes the output, handles errors and warnings, and
-    /// saves the artifacts.
+    /// In this example, the `handle_output` function is called with the compiler output, contract
+    /// source, and a mutable set for displayed warnings. It processes the output, handles
+    /// errors and warnings, and saves the artifacts.
     fn handle_output(
         &self,
         output: std::process::Output,
@@ -410,24 +429,25 @@ impl ZkSolc {
     ///
     /// # Arguments
     ///
-    /// * `output_json` - A reference to the output JSON from the compiler, represented as a `Value` from
-    ///   the `serde_json` crate.
-    /// * `displayed_warnings` - A mutable reference to a `HashSet` that tracks displayed warnings to
-    ///   avoid duplicates.
+    /// * `output_json` - A reference to the output JSON from the compiler, represented as a `Value`
+    ///   from the `serde_json` crate.
+    /// * `displayed_warnings` - A mutable reference to a `HashSet` that tracks displayed warnings
+    ///   to avoid duplicates.
     ///
     /// # Behavior
     ///
-    /// This function iterates over the `errors` array in the output JSON and processes each error or
-    /// warning individually. For each error or warning, it extracts the severity and formatted message
-    /// from the JSON. If the severity is "warning", it checks if the same warning message has been
-    /// displayed before to avoid duplicates. If the warning message has not been displayed before, it
-    /// adds the message to the `displayed_warnings` set, prints the formatted warning message in
-    /// yellow, and sets the `has_warning` flag to true. If the severity is not "warning", it prints
-    /// the formatted error message in red and sets the `has_error` flag to true.
+    /// This function iterates over the `errors` array in the output JSON and processes each error
+    /// or warning individually. For each error or warning, it extracts the severity and
+    /// formatted message from the JSON. If the severity is "warning", it checks if the same
+    /// warning message has been displayed before to avoid duplicates. If the warning message
+    /// has not been displayed before, it adds the message to the `displayed_warnings` set,
+    /// prints the formatted warning message in yellow, and sets the `has_warning` flag to true.
+    /// If the severity is not "warning", it prints the formatted error message in red and sets
+    /// the `has_error` flag to true.
     ///
-    /// If any errors are encountered, the function calls `exit(1)` to terminate the program. If only
-    /// warnings are encountered, it prints a message indicating that the compiler run completed with
-    /// warnings.
+    /// If any errors are encountered, the function calls `exit(1)` to terminate the program. If
+    /// only warnings are encountered, it prints a message indicating that the compiler run
+    /// completed with warnings.
     fn handle_output_errors(&self, output_json: &Value, displayed_warnings: &mut HashSet<String>) {
         let errors = output_json
             .get("errors")
@@ -463,7 +483,8 @@ impl ZkSolc {
         }
     }
 
-    /// Parses the JSON input for a contract and prepares the necessary configuration for the ZkSolc compiler.
+    /// Parses the JSON input for a contract and prepares the necessary configuration for the ZkSolc
+    /// compiler.
     ///
     /// # Arguments
     ///
@@ -481,24 +502,30 @@ impl ZkSolc {
     /// The `parse_json_input` function performs the following operations:
     ///
     /// 1. Configure File Output Selection:
-    ///    - It configures the file output selection to specify which outputs should be included in the compiler output.
+    ///    - It configures the file output selection to specify which outputs should be included in
+    ///      the compiler output.
     ///
     /// 2. Configure Solidity Compiler:
     ///    - It modifies the Solidity compiler settings to exclude metadata from the output.
     ///
     /// 3. Update Output Selection:
-    ///    - It updates the file output selection settings in the Solidity compiler configuration with the configured values.
+    ///    - It updates the file output selection settings in the Solidity compiler configuration
+    ///      with the configured values.
     ///
     /// 4. Generate Standard JSON Input:
-    ///    - It generates the standard JSON input for the contract using the `standard_json_input` method of the project.
-    ///    - The standard JSON input includes the contract's source code, compiler options, and file output selection.
+    ///    - It generates the standard JSON input for the contract using the `standard_json_input`
+    ///      method of the project.
+    ///    - The standard JSON input includes the contract's source code, compiler options, and file
+    ///      output selection.
     ///
     /// 5. Build Artifacts Path:
     ///    - It builds the path for saving the compiler artifacts based on the contract source file.
-    ///    - The artifacts will be saved in a directory named after the contract's filename within the project's artifacts directory.
+    ///    - The artifacts will be saved in a directory named after the contract's filename within
+    ///      the project's artifacts directory.
     ///
     /// 6. Save JSON Input:
-    ///    - It saves the standard JSON input as a file named "json_input.json" within the contract's artifacts directory.
+    ///    - It saves the standard JSON input as a file named "json_input.json" within the
+    ///      contract's artifacts directory.
     ///
     /// # Example
     ///
@@ -507,8 +534,9 @@ impl ZkSolc {
     /// self.parse_json_input(contract_path)?;
     /// ```
     ///
-    /// In this example, the `parse_json_input` function is called with the contract source path. It generates
-    /// the JSON input for the contract, configures the Solidity compiler, and saves the input to the artifacts directory.
+    /// In this example, the `parse_json_input` function is called with the contract source path. It
+    /// generates the JSON input for the contract, configures the Solidity compiler, and saves
+    /// the input to the artifacts directory.
     fn parse_json_input(&mut self, contract_path: PathBuf) -> Result<()> {
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
@@ -574,38 +602,39 @@ impl ZkSolc {
         self.sources = Some(self.get_versioned_sources().unwrap());
     }
 
-    /// Retrieves the versioned sources for the Solidity contracts in the project. The versioned sources
-    /// represent the contracts grouped by their corresponding Solidity compiler versions. The function
-    /// performs the following steps to obtain the versioned sources:
+    /// Retrieves the versioned sources for the Solidity contracts in the project. The versioned
+    /// sources represent the contracts grouped by their corresponding Solidity compiler
+    /// versions. The function performs the following steps to obtain the versioned sources:
     ///
     /// # Workflow:
     /// 1. Retrieve Project Sources:
-    ///    - The function calls the `sources` method of the `Project` instance to obtain the Solidity
-    ///      contract sources for the project.
+    ///    - The function calls the `sources` method of the `Project` instance to obtain the
+    ///      Solidity contract sources for the project.
     ///    - If the retrieval of project sources fails, an error is returned.
     ///
     /// 2. Resolve Graph of Sources and Versions:
-    ///    - The function creates a graph using the `Graph::resolve_sources` method, passing the project
-    ///      paths and the retrieved contract sources.
-    ///    - The graph represents the relationships between the contract sources and their corresponding
-    ///      Solidity compiler versions.
+    ///    - The function creates a graph using the `Graph::resolve_sources` method, passing the
+    ///      project paths and the retrieved contract sources.
+    ///    - The graph represents the relationships between the contract sources and their
+    ///      corresponding Solidity compiler versions.
     ///    - If the resolution of the graph fails, an error is returned.
     ///
     /// 3. Extract Versions and Edges:
     ///    - The function extracts the versions and edges from the resolved graph.
-    ///    - The `versions` variable contains a mapping of Solidity compiler versions to the contracts
-    ///      associated with each version.
-    ///    - The `edges` variable represents the edges between the contract sources and their corresponding
-    ///      Solidity compiler versions.
+    ///    - The `versions` variable contains a mapping of Solidity compiler versions to the
+    ///      contracts associated with each version.
+    ///    - The `edges` variable represents the edges between the contract sources and their
+    ///      corresponding Solidity compiler versions.
     ///    - If the extraction of versions and edges fails, an error is returned.
     ///
     /// 4. Retrieve Solc Version:
-    ///    - The function attempts to retrieve the Solidity compiler version associated with the project.
+    ///    - The function attempts to retrieve the Solidity compiler version associated with the
+    ///      project.
     ///    - If the retrieval of the solc version fails, an error is returned.
     ///
     /// 5. Return Versioned Sources:
-    ///    - The function returns a `BTreeMap` containing the versioned sources, where each entry in the
-    ///      map represents a Solidity compiler version and its associated contracts.
+    ///    - The function returns a `BTreeMap` containing the versioned sources, where each entry in
+    ///      the map represents a Solidity compiler version and its associated contracts.
     ///    - The map is constructed using the `solc_version` and `versions` variables.
     ///    - If the construction of the versioned sources map fails, an error is returned.
     ///
@@ -615,7 +644,8 @@ impl ZkSolc {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `BTreeMap` of the versioned sources on success, or an `anyhow::Error` on failure.
+    /// A `Result` containing a `BTreeMap` of the versioned sources on success, or an
+    /// `anyhow::Error` on failure.
     ///
     /// # Errors
     ///
@@ -633,14 +663,14 @@ impl ZkSolc {
     /// let versioned_sources = zk_solc.get_versioned_sources()?;
     /// ```
     ///
-    /// In this example, a `ZkSolc` instance is created, and the `get_versioned_sources` method is called
-    /// to retrieve the versioned sources for the Solidity contracts in the project.
+    /// In this example, a `ZkSolc` instance is created, and the `get_versioned_sources` method is
+    /// called to retrieve the versioned sources for the Solidity contracts in the project.
     /// The resulting `BTreeMap` of versioned sources is stored in the `versioned_sources` variable.
     ///
     /// # Note
     ///
-    /// The `get_versioned_sources` function is typically called internally within the `ZkSolc` struct to
-    /// obtain the necessary versioned sources for contract compilation.
+    /// The `get_versioned_sources` function is typically called internally within the `ZkSolc`
+    /// struct to obtain the necessary versioned sources for contract compilation.
     /// The versioned sources can then be used for further processing or analysis.
     fn get_versioned_sources(
         &mut self,
@@ -668,20 +698,25 @@ impl ZkSolc {
         solc_version
     }
 
-    /// Builds the path for saving the artifacts (compiler output) of a contract based on the contract's source file.
-    /// The function performs the following steps to construct the artifacts path:
+    /// Builds the path for saving the artifacts (compiler output) of a contract based on the
+    /// contract's source file. The function performs the following steps to construct the
+    /// artifacts path:
     ///
     /// # Workflow:
     /// 1. Extract Filename:
-    ///    - The function extracts the filename from the provided contract source path using the `file_name` method.
+    ///    - The function extracts the filename from the provided contract source path using the
+    ///      `file_name` method.
     ///    - If the extraction of the filename fails, an error is returned.
     ///
     /// 2. Build Artifacts Path:
-    ///    - The function constructs the artifacts path by joining the extracted filename with the project's artifacts directory path.
-    ///    - The `join` method is used on the `artifacts` directory path, passing the extracted filename.
+    ///    - The function constructs the artifacts path by joining the extracted filename with the
+    ///      project's artifacts directory path.
+    ///    - The `join` method is used on the `artifacts` directory path, passing the extracted
+    ///      filename.
     ///
     /// 3. Create Artifacts Directory:
-    ///    - The function creates the artifacts directory and all its parent directories using the `create_dir_all` method from the `fs` module.
+    ///    - The function creates the artifacts directory and all its parent directories using the
+    ///      `create_dir_all` method from the `fs` module.
     ///    - If the creation of the artifacts directory fails, an error is returned.
     ///
     /// # Arguments
@@ -691,7 +726,8 @@ impl ZkSolc {
     ///
     /// # Returns
     ///
-    /// A `Result` containing the constructed artifacts path (`PathBuf`) on success, or an `anyhow::Error` on failure.
+    /// A `Result` containing the constructed artifacts path (`PathBuf`) on success, or an
+    /// `anyhow::Error` on failure.
     ///
     /// # Errors
     ///
@@ -706,16 +742,21 @@ impl ZkSolc {
         Ok(path)
     }
 
-    /// Builds the file path for the artifacts (compiler output) of a contract based on the contract's source file and the project's artifacts directory.
-    /// The function performs the following steps to construct the artifacts file path:
+    /// Builds the file path for the artifacts (compiler output) of a contract based on the
+    /// contract's source file and the project's artifacts directory. The function performs the
+    /// following steps to construct the artifacts file path:
     ///
     /// # Workflow:
     /// 1. Build Artifacts File Path:
-    ///    - The function constructs the file path for the artifacts file by joining the project's artifacts directory path, the contract's source file path, and the "artifacts.json" filename.
-    ///    - The `join` method is used on the artifacts directory path, passing the contract's source file path joined with the "artifacts.json" filename.
+    ///    - The function constructs the file path for the artifacts file by joining the project's
+    ///      artifacts directory path, the contract's source file path, and the "artifacts.json"
+    ///      filename.
+    ///    - The `join` method is used on the artifacts directory path, passing the contract's
+    ///      source file path joined with the "artifacts.json" filename.
     ///
     /// 2. Create Artifacts File:
-    ///    - The function creates the artifacts file at the constructed file path using the `create` method from the `File` struct.
+    ///    - The function creates the artifacts file at the constructed file path using the `create`
+    ///      method from the `File` struct.
     ///    - If the creation of the artifacts file fails, an error is returned.
     ///
     /// # Arguments
@@ -725,7 +766,8 @@ impl ZkSolc {
     ///
     /// # Returns
     ///
-    /// A `Result` containing the created `File` object on success, or an `anyhow::Error` on failure.
+    /// A `Result` containing the created `File` object on success, or an `anyhow::Error` on
+    /// failure.
     ///
     /// # Errors
     ///

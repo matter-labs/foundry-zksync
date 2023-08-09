@@ -164,7 +164,7 @@ pub enum Subcommands {
 
     #[clap(visible_aliases = ["zkc", "zkcreate", "zk-deploy"], about = "Deploy smart contracts to zksync.")]
     ZkCreate(ZkCreateArgs),
-    
+
     /// Function selector utilities
     #[clap(visible_alias = "se")]
     Selectors {
