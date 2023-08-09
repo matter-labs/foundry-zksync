@@ -82,12 +82,13 @@ pub struct ZkSolcOpts {
 ///   easy-to-use error handling.
 ///
 /// Example Usage:
-/// ```rust
-/// use zk_solc::{ZkSolc, Project};
-///
+/// ```ignore
+/// use zk_solc::{ZkSolc};
+/// use ethers_solc::Project;
 /// // Set the compiler path and other options
 /// let compiler_path = "/path/to/zksolc";
-/// let project = Project::new(...);
+///
+/// let project = Project::builder().build().unwrap();
 ///
 /// // Initialize the ZkSolc compiler
 /// let zksolc = ZkSolc::new(compiler_path, project);
@@ -155,7 +156,7 @@ impl ZkSolc {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```ignore
     /// let project = Project::new(...);
     /// let opts = ZkSolcOpts {
     ///     compiler_path: PathBuf::from("/path/to/zksolc"),
@@ -372,7 +373,7 @@ impl ZkSolc {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// let output = std::process::Output { ... };
     /// let source = "/path/to/contract.sol".to_string();
     /// let mut displayed_warnings = HashSet::new();
@@ -529,7 +530,7 @@ impl ZkSolc {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// let contract_path = PathBuf::from("/path/to/contract.sol");
     /// self.parse_json_input(contract_path)?;
     /// ```
@@ -658,7 +659,8 @@ impl ZkSolc {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
+    /// use foundry_cli::cmd::forge::zksolc::ZkSolc;
     /// let mut zk_solc = ZkSolc::new(...);
     /// let versioned_sources = zk_solc.get_versioned_sources()?;
     /// ```

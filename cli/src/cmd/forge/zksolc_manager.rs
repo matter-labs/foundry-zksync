@@ -205,7 +205,9 @@ impl ZkSolcManagerOpts {
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
+/// use foundry_cli::cmd::forge::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
+/// let opts = ZkSolcManagerOpts::new("v1.3.11")
 /// let zk_solc_manager = ZkSolcManagerBuilder::new(opts)
 ///     .build()
 ///     .expect("Failed to build ZkSolcManager");
@@ -333,7 +335,7 @@ impl ZkSolcManagerBuilder {
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// let compilers_path = PathBuf::from("/path/to/compilers");
 /// let version = ZkSolcVersion::V139;
 /// let compiler = "zksolc-linux-amd64-musl-v1.3.9".to_string();
