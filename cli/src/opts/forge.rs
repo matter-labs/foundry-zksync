@@ -19,6 +19,8 @@ use crate::cmd::forge::{
     selectors::SelectorsSubcommands,
     snapshot, test, tree, update,
     verify::{VerifyArgs, VerifyCheckArgs},
+    zk_build::ZkBuildArgs,
+    zk_create::ZkCreateArgs,
 };
 use clap::{Parser, Subcommand, ValueHint};
 use ethers::solc::{artifacts::output_selection::ContractOutputSelection, EvmVersion};
@@ -156,6 +158,12 @@ pub enum Subcommands {
 
     /// Generate documentation for the project.
     Doc(DocArgs),
+
+    #[clap(visible_aliases = ["zkb", "zkbuild", "zk-compile"], about = "Build the project's smart contracts for zksync.")]
+    ZkBuild(ZkBuildArgs),
+
+    #[clap(visible_aliases = ["zkc", "zkcreate", "zk-deploy"], about = "Deploy smart contracts to zksync.")]
+    ZkCreate(ZkCreateArgs),
 
     /// Function selector utilities
     #[clap(visible_alias = "se")]

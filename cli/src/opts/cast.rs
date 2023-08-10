@@ -4,7 +4,7 @@ use crate::{
         access_list::AccessListArgs, bind::BindArgs, call::CallArgs, create2::Create2Args,
         estimate::EstimateArgs, find_block::FindBlockArgs, interface::InterfaceArgs,
         logs::LogsArgs, rpc::RpcArgs, run::RunArgs, send::SendTxArgs, storage::StorageArgs,
-        wallet::WalletSubcommands,
+        wallet::WalletSubcommands, zk_deposit::ZkDepositTxArgs, zk_send::ZkSendTxArgs,
     },
     utils::parse_u256,
 };
@@ -429,6 +429,16 @@ pub enum Subcommands {
     /// Sign and publish a transaction.
     #[clap(name = "send", visible_alias = "s")]
     SendTx(SendTxArgs),
+
+    #[clap(name = "zk-send")]
+    #[clap(visible_aliases = ["zks", "zksend"])]
+    #[clap(about = "Sign and publish a zksync transaction.")]
+    ZkSendTx(ZkSendTxArgs),
+
+    #[clap(name = "zk-deposit")]
+    #[clap(visible_aliases = ["zkd", "zkdeposit"])]
+    #[clap(about = "Bridge Assets from L1 to L2.")]
+    ZkDepositTx(ZkDepositTxArgs),
 
     /// Publish a raw transaction to the network.
     #[clap(name = "publish", visible_alias = "p")]

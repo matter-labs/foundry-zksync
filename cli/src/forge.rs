@@ -95,6 +95,8 @@ fn main() -> eyre::Result<()> {
             }
             Ok(())
         }
+        Subcommands::ZkBuild(cmd) => cmd.run(),
+        Subcommands::ZkCreate(cmd) => utils::block_on(cmd.run()),
         Subcommands::Doc(cmd) => cmd.run(),
         Subcommands::Selectors { command } => utils::block_on(command.run()),
         Subcommands::Generate(cmd) => match cmd.sub {

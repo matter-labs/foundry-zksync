@@ -342,6 +342,9 @@ async fn main() -> eyre::Result<()> {
         }
         Subcommands::Run(cmd) => cmd.run().await?,
         Subcommands::SendTx(cmd) => cmd.run().await?,
+        Subcommands::ZkSendTx(cmd) => cmd.run().await?,
+        Subcommands::ZkDepositTx(cmd) => cmd.run().await?,
+
         Subcommands::Tx { tx_hash, field, raw, json, rpc } => {
             let config = Config::from(&rpc);
             let provider = utils::get_provider(&config)?;

@@ -1,11 +1,11 @@
 [package]
-name = "foundry-cli"
-version = "0.2.0"
 edition = "2021"
+keywords = ["ethereum", "web3"]
 license = "MIT OR Apache-2.0"
+name = "foundry-cli"
 readme = "README.md"
 repository = "https://github.com/foundry-rs/foundry"
-keywords = ["ethereum", "web3"]
+version = "0.2.0"
 
 [build-dependencies]
 vergen = { version = "8", default-features = false, features = ["build", "git", "git2"] }
@@ -76,6 +76,23 @@ strum = { version = "0.25", features = ["derive"] }
 thiserror = "1"
 indicatif = "0.17"
 parking_lot = "0.12"
+pkg-config = "0.3.26"
+
+
+# ring = "0.16.20"
+# sha2 = "0.10.6"
+# which = "4.2.5"
+
+#zksync
+zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
+
+ansi_term = "0.12.1"
+anyhow = {version = "1.0.70"}
+dirs = {version = "5.0.0"}
+url = "2.3.1"
+
+ethabi = "18.0.0"
+uint = "0.9.0"
 
 [dev-dependencies]
 anvil = { path = "../anvil" }
@@ -92,24 +109,25 @@ globset = "0.4"
 default = ["rustls"]
 rustls = ["ethers/rustls"]
 openssl = ["ethers/openssl"]
+solc-asm = ["ethers/solc-sha2-asm"]
 
 # feature for integration tests that test external projects
 external-integration-tests = []
 
 [[bin]]
-name = "cast"
-path = "src/cast.rs"
 doc = false
+name = "zkcast"
+path = "src/cast.rs"
 
 [[bin]]
-name = "forge"
-path = "src/forge.rs"
 doc = false
+name = "zkforge"
+path = "src/forge.rs"
 
 [[bench]]
+harness = false
 name = "forge_test"
-harness = false
 
 [[bench]]
-name = "cast"
 harness = false
+name = "cast"

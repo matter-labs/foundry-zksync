@@ -8,7 +8,7 @@ use crate::{
 };
 use cast::fuzz::CounterExample;
 use clap::Parser;
-use ethers::types::U256;
+use ethers::{abi::Abi, types::U256};
 use forge::{
     decode::decode_console_logs,
     executor::inspector::CheatsConfig,
@@ -27,10 +27,11 @@ use foundry_common::{
 };
 use foundry_config::{figment, get_available_profiles, Config};
 use regex::Regex;
-use std::{collections::BTreeMap, path::PathBuf, sync::mpsc::channel, time::Duration};
+use std::{collections::BTreeMap, fs, path::PathBuf, sync::mpsc::channel, time::Duration};
 use tracing::trace;
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
+
 mod filter;
 use crate::cmd::forge::test::filter::ProjectPathsAwareFilter;
 pub use filter::FilterArgs;
@@ -40,6 +41,8 @@ use foundry_config::figment::{
     Metadata, Profile, Provider,
 };
 use foundry_evm::utils::evm_spec;
+
+use ethers::types::Bytes;
 
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
@@ -189,6 +192,13 @@ impl TestArgs {
             .with_cheats_config(CheatsConfig::new(&config, &evm_opts))
             .with_test_options(test_options.clone())
             .build(project_root, output, env, evm_opts)?;
+
+        println!("{:#?}, <-------> runner fork", runner.fork);
+        // let (_contract, _bytes, _bytes_v) =
+        // runner.contracts.clone().into_iter().nth(0).unwrap().1; println!("{:#?},
+        // <-------> _contract", _contract); println!("{:#?}, <-------> _bytes", _bytes);
+
+        // zk_evm::
 
         if self.debug.is_some() {
             filter.args_mut().test_pattern = self.debug;
@@ -514,6 +524,31 @@ async fn test(
     gas_reporting: bool,
     fail_fast: bool,
 ) -> eyre::Result<TestOutcome> {
+    let project = config.project().unwrap();
+
+    //get bytecode
+    let contract_path = "src/Greeter.sol:Greeter";
+    let output_path: &str =
+        &format!("{}/zksolc/{}/combined.json", project.paths.artifacts.display(), "Greeter.sol");
+    let data = fs::read_to_string(output_path).expect("Unable to read file");
+    //convert to json Value
+    let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
+    let bytecode: Bytes =
+        serde_json::from_value(res["contracts"][&contract_path]["bin"].clone()).unwrap();
+    let bytecode_v = bytecode.to_vec();
+    //get abi
+    let abi: Abi = serde_json::from_value(res["contracts"][&contract_path]["abi"].clone()).unwrap();
+    let a = runner.known_contracts.clone().0.into_iter();
+    for (art, _ctx) in a {
+        if &art.name == "Greeter" {
+            // println!(
+            //     "{:#?}, before contracts",
+            //     runner.known_contracts.0.get_key_value(&art).unwrap().1
+            // );
+            runner.known_contracts.0.insert(art, (abi.clone(), bytecode_v.clone()));
+        }
+    }
+
     trace!(target: "forge::test", "running all tests");
     if runner.count_filtered_tests(&filter) == 0 {
         let filter_str = filter.to_string();
@@ -543,6 +578,8 @@ async fn test(
         // Set up identifiers
         let mut local_identifier = LocalTraceIdentifier::new(&runner.known_contracts);
         let remote_chain_id = runner.evm_opts.get_remote_chain_id();
+        // let env = runner.evm_opts.env.chain_id;
+        // println!("{:#?}, env", env);
         // Do not re-query etherscan for contracts that you've already queried today.
         let mut etherscan_identifier = EtherscanIdentifier::new(&config, remote_chain_id)?;
 
@@ -566,6 +603,9 @@ async fn test(
             results.insert(contract_name.clone(), suite_result.clone());
 
             let mut tests = suite_result.test_results.clone();
+            // println!("{:#?}, tests", tests);
+
+            println!("{:#?}, remote_chain_id", remote_chain_id);
             println!();
             for warning in suite_result.warnings.iter() {
                 eprintln!("{} {warning}", Paint::yellow("Warning:").bold());

@@ -18,3 +18,6 @@ pub mod run;
 pub mod send;
 pub mod storage;
 pub mod wallet;
+pub mod zk_deposit;
+pub mod zk_send;
+pub mod zk_utils;
