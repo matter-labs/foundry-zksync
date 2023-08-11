@@ -13,19 +13,18 @@
 ///     - `parse_decimal_u256`: Converts a string to a `U256` number.
 ///
 use crate::{
-    cmd::cast::zk_utils::zk_utils::{
-        get_chain, get_private_key, get_rpc_url, get_signer, get_url_with_port,
-    },
+    cmd::cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_url_with_port},
     opts::{cast::parse_name_or_address, TransactionOpts, Wallet},
 };
 use clap::Parser;
 use ethers::types::NameOrAddress;
 use foundry_config::Chain;
-use zksync::{
-    self,
-    types::{Address, H160, U256},
-    wallet,
-};
+use std::str::FromStr;
+use zksync_web3_rs::providers::Provider;
+use zksync_web3_rs::signers::{LocalWallet, Signer};
+use zksync_web3_rs::types::{Address, H160, U256};
+use zksync_web3_rs::DepositRequest;
+use zksync_web3_rs::ZKSWallet;
 
 /// Struct to represent the command line arguments for the `cast zk-deposit` command.
 ///
@@ -38,7 +37,7 @@ pub struct ZkDepositTxArgs {
     /// This can be either a name or an address.
     #[clap(
             help = "The destination of the transaction.",
-             value_parser = parse_name_or_address,
+            value_parser = parse_name_or_address,
             value_name = "TO"
         )]
     to: NameOrAddress,
@@ -61,6 +60,14 @@ pub struct ZkDepositTxArgs {
         value_name = "TIP"
     )]
     operator_tip: Option<U256>,
+
+    /// Layer 2 gas limit.
+    #[clap(help = "Layer 2 gas limit", value_name = "L2_GAS_LIMIT")]
+    l2_gas_limit: Option<U256>,
+
+    /// Set the gas per pubdata byte (Optional).
+    #[clap(help = "Set the gas per pubdata byte (Optional)", value_name = "GAS_PER_PUBDATA_BYTE")]
+    gas_per_pubdata_byte: Option<U256>,
 
     /// The zkSync RPC Layer 2 endpoint.
     /// Can be provided via the env var L2_RPC_URL
@@ -85,8 +92,13 @@ pub struct ZkDepositTxArgs {
     tx: TransactionOpts,
 
     /// Ethereum-specific options, such as the network and wallet.
-    /// We use the options directly, as we want to have a separate URL 
-    #[clap(env = "L1_RPC_URL", long = "l1-rpc-url", help = "The L1 RPC endpoint.", value_name = "L1_URL")]
+    /// We use the options directly, as we want to have a separate URL
+    #[clap(
+        env = "L1_RPC_URL",
+        long = "l1-rpc-url",
+        help = "The L1 RPC endpoint.",
+        value_name = "L1_URL"
+    )]
     pub l1_url: Option<String>,
 
     #[clap(long, env = "CHAIN", value_name = "CHAIN_NAME")]
@@ -94,7 +106,6 @@ pub struct ZkDepositTxArgs {
 
     #[clap(flatten)]
     pub wallet: Wallet,
-
 }
 
 impl ZkDepositTxArgs {
@@ -113,34 +124,26 @@ impl ZkDepositTxArgs {
         let private_key = get_private_key(&self.wallet.private_key)?;
         let l1_url = get_rpc_url(&self.l1_url)?;
         let l2_url = get_url_with_port(&self.l2_url).expect("Invalid L2_RPC_URL");
-        let chain = get_chain(self.chain)?;
-        let signer = get_signer(private_key, &chain);
-        let wallet = wallet::Wallet::with_http_client(&l2_url, signer);
-        let to_address = self.get_to_address();
-        let token_address: Address = match self.token {
-            Some(token_addy) => token_addy,
-            None => Address::zero(),
-        };
+        let chain: Chain = get_chain(self.chain)?;
+        let l1_provider = Provider::try_from(l1_url)?;
+        let l2_provider = Provider::try_from(l2_url)?;
+        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?.with_chain_id(chain);
+        let zk_wallet =
+            ZKSWallet::new(wallet, None, Some(l2_provider.clone()), Some(l1_provider.clone()))
+                .unwrap();
 
-        match wallet {
-            Ok(w) => {
-                println!("Bridging assets....");
-                let eth_provider = w.ethereum(l1_url).await.map_err(|e| e)?;
-                let tx_hash = eth_provider
-                    .deposit(
-                        token_address,
-                        self.amount,
-                        to_address,
-                        self.operator_tip,
-                        self.bridge_address,
-                        None,
-                    )
-                    .await?;
+        // TODO Support different tokens than ETH.
+        let deposit_request = DepositRequest::new(self.amount.into())
+            .to(self.get_to_address())
+            .operator_tip(self.operator_tip.unwrap_or(0.into()))
+            .gas_price(self.tx.gas_price)
+            .gas_limit(self.tx.gas_limit)
+            .gas_per_pubdata_byte(self.gas_per_pubdata_byte)
+            .l2_gas_limit(self.l2_gas_limit);
 
-                println!("Transaction Hash: {:#?}", tx_hash);
-            }
-            Err(e) => eyre::bail!("Failed to download the file: {}", e),
-        }
+        println!("Bridging assets....");
+        let l1_receipt = zk_wallet.deposit(&deposit_request).await.unwrap();
+        println!("Transaction Hash: {:#?}", l1_receipt.transaction_hash);
 
         Ok(())
     }
@@ -156,7 +159,7 @@ impl ZkDepositTxArgs {
     fn get_to_address(&self) -> H160 {
         let to = self.to.as_address().expect("Please enter TO address.");
         let deployed_contract = to.as_bytes();
-        zksync_utils::be_bytes_to_safe_address(&deployed_contract).unwrap()
+        Address::from_slice(deployed_contract)
     }
 }
 
@@ -178,5 +181,83 @@ fn parse_decimal_u256(s: &str) -> Result<U256, String> {
     match U256::from_dec_str(s) {
         Ok(value) => Ok(value),
         Err(e) => Err(format!("Failed to parse decimal number: {}", e)),
+    }
+}
+
+#[cfg(test)]
+mod zk_deposit_tests {
+    use std::env;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_deposit_to_signer_account() {
+        let amount = U256::from(1);
+        let private_key = "0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110";
+        let l1_url = env::var("L1_RPC_URL").ok();
+        let l2_url = env::var("L2_RPC_URL").unwrap();
+
+        let zk_wallet = {
+            let l1_provider = Provider::try_from(l1_url.unwrap()).unwrap();
+            let l2_provider = Provider::try_from(l2_url.clone()).unwrap();
+
+            let wallet = LocalWallet::from_str(private_key).unwrap();
+            let zk_wallet =
+                ZKSWallet::new(wallet, None, Some(l2_provider), Some(l1_provider)).unwrap();
+
+            zk_wallet
+        };
+
+        let l1_balance_before = zk_wallet.eth_balance().await.unwrap();
+        let l2_balance_before = zk_wallet.era_balance().await.unwrap();
+
+        let zk_deposit_tx_args = {
+            let to = parse_name_or_address("0x36615Cf349d7F6344891B1e7CA7C72883F5dc049").unwrap();
+            let bridge_address = None;
+            let operator_tip = None;
+            let token = None; // => Ether.
+            let tx = TransactionOpts {
+                gas_limit: None,
+                gas_price: None,
+                priority_gas_price: None,
+                value: None,
+                nonce: None,
+                legacy: false,
+            };
+            let l1_url = env::var("L1_RPC_URL").ok();
+            let chain = Some(Chain::Id(env::var("CHAIN").unwrap().parse().unwrap()));
+            let wallet: Wallet = Wallet::parse_from(["foundry-cli", "--private-key", private_key]);
+
+            ZkDepositTxArgs {
+                to,
+                amount,
+                bridge_address,
+                operator_tip,
+                l2_url,
+                token,
+                tx,
+                l1_url,
+                chain,
+                wallet,
+                l2_gas_limit: None,
+                gas_per_pubdata_byte: None,
+            }
+        };
+
+        zk_deposit_tx_args.run().await.unwrap();
+
+        let l1_balance_after = zk_wallet.eth_balance().await.unwrap();
+        let l2_balance_after = zk_wallet.era_balance().await.unwrap();
+        println!("L1 balance after: {}", l1_balance_after);
+        println!("L2 balance after: {}", l2_balance_after);
+
+        assert!(
+            l1_balance_after <= l1_balance_before - amount,
+            "Balance on L1 should be decreased"
+        );
+        assert!(
+            l2_balance_after >= l2_balance_before + amount,
+            "Balance on L2 should be increased"
+        );
     }
 }

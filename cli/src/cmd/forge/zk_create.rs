@@ -43,7 +43,7 @@
 /// - `zksync`
 use crate::{
     cmd::{
-        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url, get_signer},
+        cast::zk_utils::zk_utils::{get_chain, get_private_key, get_rpc_url},
         forge::build::CoreBuildArgs,
         read_constructor_args_file,
     },
@@ -51,15 +51,14 @@ use crate::{
 };
 use clap::{Parser, ValueHint};
 use ethers::{
-    abi::{encode, Abi, Constructor, Token},
+    abi::Abi,
     solc::{info::ContractInfo, Project},
     types::Bytes,
 };
 use eyre::Context;
-use foundry_common::abi::parse_tokens;
 use serde_json::Value;
-use std::{fs, path::PathBuf};
-use zksync::wallet;
+use std::{fs, path::PathBuf, str::FromStr};
+use zksync_web3_rs::{providers::Provider, signers::{LocalWallet, Signer}, ZKSWallet};
 
 /// CLI arguments for `forge zk-create`.
 /// Struct `ZkCreateArgs` encapsulates the arguments necessary for creating a new zkSync contract.
@@ -169,14 +168,11 @@ impl ZkCreateArgs {
         };
 
         //check for additional factory deps
-        let mut factory_deps = Vec::new();
-        if let Some(fdep_contract_info) = &self.factory_deps {
-            factory_deps =
-                self.get_factory_dependencies(&project, factory_deps, fdep_contract_info);
-        }
-
-        // get signer
-        let signer = get_signer(private_key, &chain);
+        let factory_dependencies = if let Some(fdep_contract_info) = &self.factory_deps {
+            Some(self.get_factory_dependencies(&project, fdep_contract_info))
+        } else {
+            None
+        };
 
         // get abi
         let abi = match Self::get_abi_from_contract(&project, &self.contract) {
@@ -193,48 +189,28 @@ impl ZkCreateArgs {
             }
         };
 
-        // encode constructor args
-        let encoded_args = encode(self.get_constructor_args(&contract).as_slice());
+        let constructor_args = self.get_constructor_args(&contract);
 
-        let wallet = wallet::Wallet::with_http_client(&rpc_url, signer);
-        let deployer_builder = match &wallet {
-            Ok(w) => w.start_deploy_contract(),
-            Err(e) => eyre::bail!("error wallet: {e:?}"),
-        };
+        let provider = Provider::try_from(rpc_url)?;
+        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?.with_chain_id(chain);
+        let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None)?;
 
-        let deployer = deployer_builder
-            .bytecode(bytecode.to_vec())
-            .factory_deps(factory_deps)
-            .constructor_calldata(encoded_args);
+        let rcpt = zk_wallet
+            .deploy(contract, bytecode.to_vec(),constructor_args, factory_dependencies)
+            .await?;
 
-        // TODO: could be useful as a flag --estimate-gas
-        // let est_gas = deployer.estimate_fee(None).await;
-        // println!("{:#?}, est_gas", est_gas);
+        let deployed_address = rcpt.contract_address.expect("Error retrieving deployed address");
+        let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
+        let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
+        let block_number = rcpt.block_number.expect("Error retrieving block number");
 
-        println!("Deploying contract...");
-        match deployer.send().await {
-            Ok(tx_handle) => {
-                let rcpt = match tx_handle.wait_for_commit().await {
-                    Ok(rcpt) => rcpt,
-                    Err(e) => eyre::bail!("Transaction Error: {}", e),
-                };
-
-                let deployed_address =
-                    rcpt.contract_address.expect("Error retrieving deployed address");
-                let gas_used = rcpt.gas_used.expect("Error retrieving gas used");
-                let gas_price = rcpt.effective_gas_price.expect("Error retrieving gas price");
-                let block_number = rcpt.block_number.expect("Error retrieving block number");
-
-                println!("+-------------------------------------------------+");
-                println!("Contract successfully deployed to address: {:#?}", deployed_address);
-                println!("Transaction Hash: {:#?}", tx_handle.hash());
-                println!("Gas used: {:#?}", gas_used);
-                println!("Effective gas price: {:#?}", gas_price);
-                println!("Block Number: {:#?}", block_number);
-                println!("+-------------------------------------------------+");
-            }
-            Err(e) => eyre::bail!("{:#?}, error", e),
-        };
+        println!("+-------------------------------------------------+");
+        println!("Contract successfully deployed to address: {:#?}", deployed_address);
+        println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
+        println!("Gas used: {:#?}", gas_used);
+        println!("Effective gas price: {:#?}", gas_price);
+        println!("Block Number: {:#?}", block_number);
+        println!("+-------------------------------------------------+");
 
         Ok(())
     }
@@ -242,19 +218,19 @@ impl ZkCreateArgs {
     /// This function retrieves the constructor arguments for the contract.
     ///
     /// # Returns
-    /// A vector of `Token` which represents the constructor arguments.
-    fn get_constructor_args(&self, abi: &Abi) -> Vec<Token> {
-        match &abi.constructor {
-            Some(v) => {
-                let constructor_args =
-                    if let Some(ref constructor_args_path) = self.constructor_args_path {
-                        read_constructor_args_file(constructor_args_path.to_path_buf()).unwrap()
-                    } else {
-                        self.constructor_args.clone()
-                    };
-                self.parse_constructor_args(v, &constructor_args).unwrap()
-            }
-            None => vec![],
+    /// A vector of `String` which represents the constructor arguments.
+    /// An empty vector if there are no constructor arguments.
+    fn get_constructor_args(&self, abi: &Abi) -> Vec<String> {
+        if abi.constructor.is_some() {
+            let constructor_args =
+                if let Some(ref constructor_args_path) = self.constructor_args_path {
+                    read_constructor_args_file(constructor_args_path.to_path_buf()).unwrap()
+                } else {
+                    self.constructor_args.clone()
+                };
+            constructor_args
+        } else {
+            vec![]
         }
     }
 
@@ -379,43 +355,13 @@ impl ZkCreateArgs {
     fn get_factory_dependencies(
         &self,
         project: &Project,
-        mut factory_dep_vector: Vec<Vec<u8>>,
         fdep_contract_info: &Vec<ContractInfo>,
     ) -> Vec<Vec<u8>> {
+        let mut factory_deps = Vec::new();
         for dep in fdep_contract_info.iter() {
             let dep_bytecode = Self::get_bytecode_from_contract(&project, dep).unwrap();
-            factory_dep_vector.push(dep_bytecode.to_vec());
+            factory_deps.push(dep_bytecode.to_vec());
         }
-        factory_dep_vector
-    }
-
-    /// Parses the constructor arguments based on the ABI inputs.
-    ///
-    /// This function parses the constructor arguments provided by the user, matching them with
-    /// the ABI inputs of the constructor. The parsing process ensures that the arguments are
-    /// in the right format and type as specified by the contract's ABI. It uses the `parse_tokens`
-    /// function from the `foundry_common` crate to facilitate this parsing.
-    ///
-    /// # Parameters
-    /// - `constructor`: The ABI of the contract constructor. It contains the input parameters' information.
-    /// - `constructor_args`: A slice of strings that represents the arguments provided by the user.
-    ///
-    /// # Returns
-    /// A `Result` which is:
-    /// - Ok: Contains a vector of `Token` objects that represent the parsed arguments.
-    /// - Err: Contains an eyre::Report error in case of parsing failure.
-    fn parse_constructor_args(
-        &self,
-        constructor: &Constructor,
-        constructor_args: &[String],
-    ) -> eyre::Result<Vec<Token>> {
-        let params = constructor
-            .inputs
-            .iter()
-            .zip(constructor_args)
-            .map(|(input, arg)| (&input.kind, arg.as_str()))
-            .collect::<Vec<_>>();
-
-        parse_tokens(params, true)
+        factory_deps
     }
 }
