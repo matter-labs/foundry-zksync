@@ -652,6 +652,35 @@ impl ZkSolc {
             .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))
     }
 
+    /// Configures the compiler output settings for the project.
+    /// The function prepares the compiler output settings, specifying which compilation artifacts to generate.
+    ///
+    /// # Workflow:
+    /// 1. Configure File Output Selection:
+    ///    - The function creates a map of file output selections, where each key represents a specific source file pattern
+    ///      and the associated value is a list of artifact types to be generated for that pattern.
+    ///    - The map is populated with key-value pairs using the `BTreeMap` data structure.
+    ///
+    /// 2. Set Metadata to None:
+    ///    - Since the `zksolc` compiler requires metadata to be set to `None`, this function sets the metadata field in the
+    ///      project's solc configuration to `None`.
+    ///
+    /// 3. Update Output Selection:
+    ///    - The function updates the output selection settings of the project's solc configuration by inserting the previously
+    ///      configured file output selections into the `output_selection` map.
+    ///    - The key "*" corresponds to the default settings for all source files, while other keys can be added for specific
+    ///      source file patterns.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A mutable reference to the `ZkSolc` instance.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// // Configure compiler output settings
+    /// zksolc.configure_compiler_output_settings();
+    /// ```
     fn configure_compiler_output_settings(&mut self) {
         // Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
@@ -688,7 +717,17 @@ impl ZkSolc {
     }
 }
 
-// Replace imports with placeholders
+/// Replaces import statements with placeholders in the provided content.
+/// The function iterates through the remappings and replaces import statements with placeholders.
+///
+/// # Arguments
+///
+/// * `content` - The content containing import statements as a `String`.
+/// * `remappings` - An array of `RelativeRemapping` instances representing the remappings.
+///
+/// # Returns
+///
+/// The content with import statements replaced by placeholders.
 fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRemapping]) -> String {
     let mut replaced_content = content.clone();
 
@@ -711,6 +750,17 @@ fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRema
     replaced_content
 }
 
+/// Substitutes remapped paths in the provided content.
+/// The function iteratively replaces placeholders with the corresponding remapped paths.
+///
+/// # Arguments
+///
+/// * `content` - The content containing placeholders as a `String`.
+/// * `remappings` - An array of `RelativeRemapping` instances representing the remappings.
+///
+/// # Returns
+///
+/// The content with placeholders replaced by remapped paths.
 fn substitute_remapped_paths(content: String, remappings: &[RelativeRemapping]) -> String {
     let mut substituted = content;
 
