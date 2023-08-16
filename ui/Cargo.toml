@@ -16,5 +16,13 @@ ethers = { workspace = true }
 crossterm = "0.26"
 eyre = "0.6"
 hex = "0.4"
-revm = { version = "3", features = ["std", "serde"] }
+# revm = { version = "3", features = ["std", "serde"] }
+revm = { path = "../../../matter-public/revm/crates/revm", version = "3", default-features = false, features = [
+  "std",
+  "serde",
+  "memory_limit",
+  "optional_eip3607",
+  "optional_block_gas_limit",
+  "optional_no_base_fee"
+] }
 tui = { version = "0.19", default-features = false, features = ["crossterm"] }

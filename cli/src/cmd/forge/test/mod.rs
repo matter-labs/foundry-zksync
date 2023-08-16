@@ -1,7 +1,15 @@
 //! Test command
 use crate::{
     cmd::{
-        forge::{build::CoreBuildArgs, debug::DebugArgs, install, watch::WatchArgs},
+        forge::{
+            build::CoreBuildArgs,
+            debug::DebugArgs,
+            install,
+            watch::WatchArgs,
+            zk_build::ZkBuildArgs,
+            zksolc::{ZkSolc, ZkSolcOpts},
+            zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts, DEFAULT_ZKSOLC_VERSION},
+        },
         LoadConfig,
     },
     suggestions, utils,
@@ -48,7 +56,7 @@ use ethers::types::Bytes;
 foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
 
 /// CLI arguments for `forge test`.
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, Default)]
 #[clap(next_help_heading = "Test options")]
 pub struct TestArgs {
     /// Run a test in the debugger.
@@ -112,6 +120,15 @@ pub struct TestArgs {
     #[clap(flatten)]
     pub watch: WatchArgs,
 }
+mod test {
+    use super::TestArgs;
+
+    #[tokio::test]
+    async fn test_era() {
+        let foo: TestArgs = Default::default();
+        foo.execute_tests().await.unwrap();
+    }
+}
 
 impl TestArgs {
     /// Returns the flattened [`CoreBuildArgs`].
@@ -143,8 +160,8 @@ impl TestArgs {
         let mut project = config.project()?;
 
         // install missing dependencies
-        if install::install_missing_dependencies(&mut config, self.build_args().silent) &&
-            config.auto_detect_remappings
+        if install::install_missing_dependencies(&mut config, self.build_args().silent)
+            && config.auto_detect_remappings
         {
             // need to re-configure here to also catch additional remappings
             config = self.load_config();
@@ -152,26 +169,63 @@ impl TestArgs {
         }
 
         let compiler = ProjectCompiler::default();
-        let output = if config.sparse_mode {
+        /*let output_old = if config.sparse_mode {
             compiler.compile_sparse(&project, filter.clone())
         } else if self.opts.silent {
             compile::suppress_compile(&project)
         } else {
             compiler.compile(&project)
-        }?;
+        }?;*/
+        let project_root = project.paths.root.clone();
+
+        let zksolc_manager =
+            ZkSolcManagerBuilder::new(ZkSolcManagerOpts::new(DEFAULT_ZKSOLC_VERSION.to_owned()))
+                .build()
+                .unwrap();
+
+        let zksolc_opts = ZkSolcOpts {
+            compiler_path: zksolc_manager.get_full_compiler_path(),
+            is_system: false,
+            force_evmla: false,
+        };
+
+        let zksolc = ZkSolc::new(zksolc_opts, project);
+        let output = zksolc.compile().unwrap();
+        /*println!("!!! OLD:");
+        for (k, v) in output_old.cached_artifacts().0.iter() {
+            println!("Key is: {:?}", k);
+            for (entry_k, entry_vec) in v.iter() {
+                println!(" entry: {:?}", entry_k);
+                for f in entry_vec {
+                    println!("    file: {:?}", f.file);
+                }
+            }
+        }*/
+
+        println!("!!! NEW:");
+        for (k, v) in output.compiled_artifacts.iter() {
+            println!("Key is: {:?}", k);
+            for (entry_k, entry_vec) in v.iter() {
+                println!(" entry: {:?}", entry_k);
+                for f in entry_vec {
+                    println!("    file: {:?}", f.file);
+                }
+            }
+        }
 
         // Create test options from general project settings
         // and compiler output
-        let project_root = &project.paths.root;
+
         let toml = config.get_config_path();
         let profiles = get_available_profiles(toml)?;
+        let test_options: TestOptions = Default::default();
 
-        let test_options: TestOptions = TestOptionsBuilder::default()
-            .fuzz(config.fuzz)
-            .invariant(config.invariant)
-            .compile_output(&output)
-            .profiles(profiles)
-            .build(project_root)?;
+        /*let test_options: TestOptions = TestOptionsBuilder::default()
+        .fuzz(config.fuzz)
+        .invariant(config.invariant)
+        .compile_output(&output)
+        .profiles(profiles)
+        .build(&project_root)?;*/
 
         // Determine print verbosity and executor verbosity
         let verbosity = evm_opts.verbosity;
@@ -190,8 +244,8 @@ impl TestArgs {
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .with_cheats_config(CheatsConfig::new(&config, &evm_opts))
-            .with_test_options(test_options.clone())
-            .build(project_root, output, env, evm_opts)?;
+            //.with_test_options(test_options.clone())
+            .build(&project_root, output, env, evm_opts)?;
 
         println!("{:#?}, <-------> runner fork", runner.fork);
         // let (_contract, _bytes, _bytes_v) =
@@ -386,7 +440,7 @@ impl TestOutcome {
     pub fn ensure_ok(&self) -> eyre::Result<()> {
         let failures = self.failures().count();
         if self.allow_failure || failures == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         if !shell::verbosity().is_normal() {
@@ -399,7 +453,7 @@ impl TestOutcome {
         for (suite_name, suite) in self.results.iter() {
             let failures = suite.failures().count();
             if failures == 0 {
-                continue
+                continue;
             }
 
             let term = if failures > 1 { "tests" } else { "test" };
@@ -526,6 +580,7 @@ async fn test(
 ) -> eyre::Result<TestOutcome> {
     let project = config.project().unwrap();
 
+    /*
     //get bytecode
     let contract_path = "src/Greeter.sol:Greeter";
     let output_path: &str =
@@ -547,7 +602,7 @@ async fn test(
             // );
             runner.known_contracts.0.insert(art, (abi.clone(), bytecode_v.clone()));
         }
-    }
+    }*/
 
     trace!(target: "forge::test", "running all tests");
     if runner.count_filtered_tests(&filter) == 0 {
@@ -585,6 +640,10 @@ async fn test(
 
         // Set up test reporter channel
         let (tx, rx) = channel::<(String, SuiteResult)>();
+        //let (tx2, rx2) = channel::<(String, SuiteResult)>();
+
+        // Run the test.
+        //runner.test(filter.clone(), Some(tx2), test_options.clone()).await;
 
         // Run tests
         let handle =
@@ -619,7 +678,7 @@ async fn test(
 
                 // If the test failed, we want to stop processing the rest of the tests
                 if fail_fast && result.status == TestStatus::Failure {
-                    break 'outer
+                    break 'outer;
                 }
 
                 // We only display logs at level 2 and above
@@ -660,12 +719,12 @@ async fn test(
                             // tests At verbosity level 5, we display
                             // all traces for all tests
                             TraceKind::Setup => {
-                                (verbosity >= 5) ||
-                                    (verbosity == 4 && result.status == TestStatus::Failure)
+                                (verbosity >= 5)
+                                    || (verbosity == 4 && result.status == TestStatus::Failure)
                             }
                             TraceKind::Execution => {
-                                verbosity > 3 ||
-                                    (verbosity == 3 && result.status == TestStatus::Failure)
+                                verbosity > 3
+                                    || (verbosity == 3 && result.status == TestStatus::Failure)
                             }
                             _ => false,
                         };

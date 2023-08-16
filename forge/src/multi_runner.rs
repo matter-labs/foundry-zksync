@@ -15,7 +15,7 @@ use foundry_evm::{
     revm,
 };
 use foundry_utils::{PostLinkInput, ResolvedDependency};
-use rayon::prelude::*;
+use rayon::{prelude::*, ThreadPoolBuilder};
 use revm::primitives::SpecId;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -61,8 +61,8 @@ impl MultiContractRunner {
         self.contracts
             .iter()
             .filter(|(id, _)| {
-                filter.matches_path(id.source.to_string_lossy()) &&
-                    filter.matches_contract(&id.name)
+                filter.matches_path(id.source.to_string_lossy())
+                    && filter.matches_contract(&id.name)
             })
             .flat_map(|(_, (abi, _, _))| {
                 abi.functions().filter(|func| filter.matches_test(func.signature()))
@@ -75,8 +75,8 @@ impl MultiContractRunner {
         self.contracts
             .iter()
             .filter(|(id, _)| {
-                filter.matches_path(id.source.to_string_lossy()) &&
-                    filter.matches_contract(&id.name)
+                filter.matches_path(id.source.to_string_lossy())
+                    && filter.matches_contract(&id.name)
             })
             .flat_map(|(_, (abi, _, _))| abi.functions().map(|func| func.name.clone()))
             .filter(|sig| sig.is_test())
@@ -91,8 +91,8 @@ impl MultiContractRunner {
         self.contracts
             .iter()
             .filter(|(id, _)| {
-                filter.matches_path(id.source.to_string_lossy()) &&
-                    filter.matches_contract(&id.name)
+                filter.matches_path(id.source.to_string_lossy())
+                    && filter.matches_contract(&id.name)
             })
             .filter(|(_, (abi, _, _))| abi.functions().any(|func| filter.matches_test(&func.name)))
             .map(|(id, (abi, _, _))| {
@@ -126,48 +126,56 @@ impl MultiContractRunner {
         test_options: TestOptions,
     ) -> BTreeMap<String, SuiteResult> {
         trace!("running all tests");
-
-        // the db backend that serves all the data, each contract gets its own instance
+        let pool = ThreadPoolBuilder::new()
+            .num_threads(1) // For this example, we use 4 threads.
+            .build()
+            .unwrap();
         let db = Backend::spawn(self.fork.take()).await;
-        let filter = &filter;
 
-        self.contracts
-            .par_iter()
-            .filter(|(id, _)| {
-                filter.matches_path(id.source.to_string_lossy()) &&
-                    filter.matches_contract(&id.name)
-            })
-            .filter(|(_, (abi, _, _))| abi.functions().any(|func| filter.matches_test(&func.name)))
-            .map_with(stream_result, |stream_result, (id, (abi, deploy_code, libs))| {
-                let executor = ExecutorBuilder::default()
-                    .with_cheatcodes(self.cheats_config.clone())
-                    .with_config(self.env.clone())
-                    .with_spec(self.evm_spec)
-                    .with_gas_limit(self.evm_opts.gas_limit())
-                    .set_tracing(self.evm_opts.verbosity >= 3)
-                    .set_coverage(self.coverage)
-                    .build(db.clone());
-                let identifier = id.identifier();
-                trace!(contract=%identifier, "start executing all tests in contract");
+        pool.install(|| {
+            // the db backend that serves all the data, each contract gets its own instance
+            let filter = &filter;
 
-                let result = self.run_tests(
-                    &identifier,
-                    abi,
-                    executor,
-                    deploy_code.clone(),
-                    libs,
-                    filter,
-                    test_options.clone(),
-                );
-                trace!(contract= ?identifier, "executed all tests in contract");
+            self.contracts
+                .par_iter()
+                .filter(|(id, _)| {
+                    filter.matches_path(id.source.to_string_lossy())
+                        && filter.matches_contract(&id.name)
+                })
+                .filter(|(_, (abi, _, _))| {
+                    abi.functions().any(|func| filter.matches_test(&func.name))
+                })
+                .map_with(stream_result, |stream_result, (id, (abi, deploy_code, libs))| {
+                    let executor = ExecutorBuilder::default()
+                        .with_cheatcodes(self.cheats_config.clone())
+                        .with_config(self.env.clone())
+                        .with_spec(self.evm_spec)
+                        .with_gas_limit(self.evm_opts.gas_limit())
+                        .set_tracing(self.evm_opts.verbosity >= 3)
+                        .set_coverage(self.coverage)
+                        .build(db.clone());
+                    let identifier = id.identifier();
+                    trace!(contract=%identifier, "start executing all tests in contract");
 
-                if let Some(stream_result) = stream_result {
-                    let _ = stream_result.send((identifier.clone(), result.clone()));
-                }
+                    let result = self.run_tests(
+                        &identifier,
+                        abi,
+                        executor,
+                        deploy_code.clone(),
+                        libs,
+                        filter,
+                        test_options.clone(),
+                    );
+                    trace!(contract= ?identifier, "executed all tests in contract");
 
-                (identifier, result)
-            })
-            .collect()
+                    if let Some(stream_result) = stream_result {
+                        let _ = stream_result.send((identifier.clone(), result.clone()));
+                    }
+
+                    (identifier, result)
+                })
+                .collect()
+        })
     }
 
     #[instrument(skip_all, fields(name = %name))]
@@ -222,7 +230,7 @@ impl MultiContractRunnerBuilder {
     pub fn build<A>(
         self,
         root: impl AsRef<Path>,
-        output: ProjectCompileOutput<A>,
+        output: ProjectCompileOutput<A>, // FIXME: THIS.
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
     ) -> Result<MultiContractRunner>
@@ -250,7 +258,7 @@ impl MultiContractRunnerBuilder {
             let mut seen = HashSet::new();
             for dep in deps {
                 if !seen.insert(dep.id.clone()) {
-                    continue
+                    continue;
                 }
                 filtered.push(dep);
             }
@@ -280,13 +288,14 @@ impl MultiContractRunnerBuilder {
                     if let Some(b) = contract.bytecode.expect("No bytecode").object.into_bytes() {
                         b
                     } else {
-                        return Ok(())
+                        return Ok(());
                     };
 
                 let abi = contract.abi.expect("We should have an abi by now");
                 // if it's a test, add it to deployable contracts
-                if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true) &&
-                    abi.functions()
+                if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true)
+                    && abi
+                        .functions()
                         .any(|func| func.name.is_test() || func.name.is_invariant_test())
                 {
                     deployable_contracts.insert(

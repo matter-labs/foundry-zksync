@@ -204,7 +204,7 @@ impl<'a> ContractRunner<'a> {
                 )]
                 .into(),
                 warnings,
-            )
+            );
         }
 
         let has_invariants = self.contract.functions().any(|func| func.is_invariant_test());
@@ -239,7 +239,7 @@ impl<'a> ContractRunner<'a> {
                 )]
                 .into(),
                 warnings,
-            )
+            );
         }
 
         let mut test_results = self
@@ -435,7 +435,7 @@ impl<'a> ContractRunner<'a> {
                 labeled_addresses,
                 kind: TestKind::Standard(0),
                 ..Default::default()
-            }]
+            }];
         };
 
         let mut evm = InvariantExecutor::new(
@@ -556,7 +556,7 @@ impl<'a> ContractRunner<'a> {
                 labeled_addresses,
                 kind: TestKind::Standard(0),
                 ..Default::default()
-            }
+            };
         }
 
         let kind = TestKind::Fuzz {

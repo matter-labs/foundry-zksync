@@ -26,7 +26,7 @@ resolver = "2"
 [profile.dev]
 # Disabling debug info speeds up builds a bunch,
 # and we don't rely on it for debugging that much
-debug = 0
+#debug = 1
 
 # These speed up local tests
 [profile.dev.package.ethers-solc]
@@ -74,17 +74,25 @@ ethers-solc = { git = "https://github.com/gakonst/ethers-rs", default-features =
 
 solang-parser = "=0.3.1"
 
-#[patch."https://github.com/gakonst/ethers-rs"]
-#ethers = { path = "../ethers-rs/ethers" }
-#ethers-addressbook = { path = "../ethers-rs/ethers-addressbook" }
-#ethers-contract = { path = "../ethers-rs/ethers-contract" }
-#ethers-contract-abigen = { path = "../ethers-rs/ethers-contract/ethers-contract-abigen" }
-#ethers-core = { path = "../ethers-rs/ethers-core" }
-#ethers-etherscan = { path = "../ethers-rs/ethers-etherscan" }
-#ethers-middleware = { path = "../ethers-rs/ethers-middleware" }
-#ethers-providers = { path = "../ethers-rs/ethers-providers" }
-#ethers-signers = { path = "../ethers-rs/ethers-signers" }
-#ethers-solc = { path = "../ethers-rs/ethers-solc" }
+[patch."https://github.com/gakonst/ethers-rs"]
+ethers = { path = "../ethers-rs/ethers" }
+ethers-addressbook = { path = "../ethers-rs/ethers-addressbook" }
+ethers-contract = { path = "../ethers-rs/ethers-contract" }
+ethers-contract-abigen = { path = "../ethers-rs/ethers-contract/ethers-contract-abigen" }
+ethers-core = { path = "../ethers-rs/ethers-core" }
+ethers-etherscan = { path = "../ethers-rs/ethers-etherscan" }
+ethers-middleware = { path = "../ethers-rs/ethers-middleware" }
+ethers-providers = { path = "../ethers-rs/ethers-providers" }
+ethers-signers = { path = "../ethers-rs/ethers-signers" }
+ethers-solc = { path = "../ethers-rs/ethers-solc" }
 
 [patch.crates-io]
-revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+# revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+revm = { path = "../../matter-public/revm/crates/revm", version = "3", default-features = false, features = [
+  "std",
+  "serde",
+  "memory_limit",
+  "optional_eip3607",
+  "optional_block_gas_limit",
+  "optional_no_base_fee"
+] }

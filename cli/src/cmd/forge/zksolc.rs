@@ -34,9 +34,14 @@ use anyhow::{Error, Result};
 use ethers::{
     prelude::{artifacts::Source, Solc},
     solc::{
-        artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
-        Graph, Project,
+        artifacts::{
+            output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
+            LosslessAbi, SourceFile, StandardJsonCompilerInput,
+        },
+        ArtifactFile, Artifacts, CompilerOutput, ConfigurableArtifacts,
+        ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     },
+    types::Bytes,
 };
 use semver::Version;
 use serde_json::Value;
@@ -44,9 +49,10 @@ use std::{
     collections::{BTreeMap, HashSet},
     fmt, fs,
     fs::File,
-    io::Write,
+    io::{Read, Write},
     path::PathBuf,
     process::{exit, Command, Stdio},
+    str::FromStr,
 };
 
 #[derive(Debug, Clone)]
@@ -215,11 +221,13 @@ impl ZkSolc {
     /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the
     /// versioned sources. These modified values can be accessed after the compilation process
     /// for further processing or analysis.
-    pub fn compile(mut self) -> Result<()> {
-        // Step 1: Collect Source Files
-        self.configure_solc();
-        let sources = self.sources.clone().unwrap();
+    pub fn compile(mut self) -> Result<ProjectCompileOutput> {
+        let mut result = ProjectCompileOutput::default();
         let mut displayed_warnings = HashSet::new();
+        let mut data = BTreeMap::new();
+        // Step 1: Collect Source Files
+        /*self.configure_solc();
+        let sources = self.sources.clone().unwrap();
 
         // Step 2: Compile Contracts for Each Source
         for (solc, version) in sources {
@@ -234,46 +242,51 @@ impl ZkSolc {
 
                 // Skip this file if it's not in the 'sources' directory or its subdirectories
                 if !is_in_sources_dir {
-                    continue
+                    continue;
                 }
 
-                // Step 3: Parse JSON Input for each Source
-                if let Err(err) = self.parse_json_input(contract_path.clone()) {
-                    eprintln!("Failed to parse json input for zksolc compiler: {}", err);
-                }
+                let output = if false {
+                    // Step 3: Parse JSON Input for each Source
+                    if let Err(err) = self.parse_json_input(contract_path.clone()) {
+                        eprintln!("Failed to parse json input for zksolc compiler: {}", err);
+                    }
 
-                // Step 4: Build Compiler Arguments
-                let comp_args = self.build_compiler_args(source.clone(), solc.clone());
+                    // Step 4: Build Compiler Arguments
+                    let comp_args = self.build_compiler_args(source.clone(), solc.clone());
 
-                // Step 5: Run Compiler and Handle Output
-                let mut cmd = Command::new(&self.compiler_path);
-                let mut child = cmd
-                    .arg(contract_path.clone())
-                    .args(&comp_args)
-                    .stdin(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .stdout(Stdio::piped())
-                    .spawn();
-                let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+                    // Step 5: Run Compiler and Handle Output
+                    let mut cmd = Command::new(&self.compiler_path);
+                    let mut child = cmd
+                        .arg(contract_path.clone())
+                        .args(&comp_args)
+                        .stdin(Stdio::piped())
+                        .stderr(Stdio::piped())
+                        .stdout(Stdio::piped())
+                        .spawn();
+                    let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
 
-                serde_json::to_writer(stdin, &self.standard_json.clone().unwrap()).map_err(
-                    |e| Error::msg(format!("Could not assign standard_json to writer: {}", e)),
-                )?;
+                    serde_json::to_writer(stdin, &self.standard_json.clone().unwrap()).map_err(
+                        |e| Error::msg(format!("Could not assign standard_json to writer: {}", e)),
+                    )?;
 
-                let output = child
-                    .unwrap()
-                    .wait_with_output()
-                    .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
+                    let output = child
+                        .unwrap()
+                        .wait_with_output()
+                        .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
 
-                if !output.status.success() {
-                    return Err(Error::msg(format!(
+                    if !output.status.success() {
+                        return Err(Error::msg(format!(
                         "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
                         String::from_utf8(output.stderr).unwrap_or_default(),
                         self.compiler_path,
                         contract_path,
                         &comp_args
-                    )))
-                }
+                    )));
+                    }
+                    Some(output)
+                } else {
+                    None
+                };
 
                 let filename = contract_path
                     .to_str()
@@ -292,12 +305,20 @@ impl ZkSolc {
                     .expect("Failed to get Contract filename.");
 
                 // Step 6: Handle Output (Errors and Warnings)
-                self.handle_output(output, filename.to_string(), &mut displayed_warnings);
+                let foo = self.handle_output(output, filename.to_string(), &mut displayed_warnings);
+                data.insert(filename.to_string(), foo);
             }
         }
+        */
+
+        let filename = "Counter.sol";
+        let foo = self.handle_output(None, filename.to_string(), &mut displayed_warnings);
+        data.insert(filename.to_string(), foo);
+
+        result.compiled_artifacts = Artifacts { 0: data };
 
         // Step 7: Return Ok if the compilation process completes without errors
-        Ok(())
+        Ok(result)
     }
 
     /// Builds the compiler arguments for the Solidity compiler based on the provided versioned
@@ -388,21 +409,31 @@ impl ZkSolc {
     /// errors and warnings, and saves the artifacts.
     fn handle_output(
         &self,
-        output: std::process::Output,
+        output: Option<std::process::Output>,
         source: String,
         displayed_warnings: &mut HashSet<String>,
-    ) {
+    ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
         // Deserialize the compiler output into a serde_json::Value object
-        let output_json: Value = serde_json::from_slice(&output.clone().stdout)
-            .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
+        let output_json: Value = if let Some(output) = output {
+            serde_json::from_slice(&output.clone().stdout)
+                .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e))
+        } else {
+            let mut file = File::open("/media/cyfra/ssd_storage/matter-public/example-foundry/hello_foundry/zkout/Counter.sol/artifacts.json").expect("Failed to open file");
+            let mut json_data = String::new();
+            file.read_to_string(&mut json_data).expect("Failed to read from file");
+
+            serde_json::from_str(json_data.as_str()).unwrap()
+        };
 
         // Handle errors and warnings in the output
-        self.handle_output_errors(&output_json, displayed_warnings);
+        //self.handle_output_errors(&output_json, displayed_warnings);
 
         // Create the artifacts file for saving the compiler output
-        let mut artifacts_file = self
-            .build_artifacts_file(source.clone())
-            .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));
+        /*let mut artifacts_file = self
+        .build_artifacts_file(source.clone())
+        .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));*/
+
+        let mut result = BTreeMap::new();
 
         // Get the bytecode hashes for each contract in the output
         let output_obj = output_json["contracts"].as_object().unwrap();
@@ -415,18 +446,65 @@ impl ZkSolc {
                     if let Some(bcode_hash) = b_code_obj[hash]["hash"].as_str() {
                         println!("{} -> Bytecode Hash: {} ", hash, bcode_hash);
                     }
+                    let mut art = ConfigurableContractArtifact::default();
+                    art.bytecode = Some(CompactBytecode {
+                        object: ethers::solc::artifacts::BytecodeObject::Bytecode(
+                            Bytes::from_str(
+                                b_code_obj[hash]["evm"]["bytecode"]["object"].as_str().unwrap(),
+                            )
+                            .unwrap(),
+                        ),
+                        source_map: None,
+                        link_references: Default::default(),
+                    });
+
+                    // FIXME: incorrect
+                    art.deployed_bytecode = Some(CompactDeployedBytecode {
+                        bytecode: Some(CompactBytecode {
+                            object: ethers::solc::artifacts::BytecodeObject::Bytecode(
+                                Bytes::from_str(
+                                    b_code_obj[hash]["evm"]["bytecode"]["object"].as_str().unwrap(),
+                                )
+                                .unwrap(),
+                            ),
+                            source_map: None,
+                            link_references: Default::default(),
+                        }),
+                        immutable_references: Default::default(),
+                    });
+
+                    art.abi = Some(
+                        serde_json::from_value::<LosslessAbi>(b_code_obj[hash]["abi"].clone())
+                            .unwrap(),
+                    );
+
+                    let foo = ArtifactFile {
+                        artifact: art,
+                        file: format!("{}.sol", hash).into(),
+                        version: Version::parse("0.8.20").unwrap(),
+                    };
+                    result.insert(hash.clone(), vec![foo]);
+                    //art.additional_files.
                 }
             }
         }
 
         // Beautify the output JSON
-        let output_json_pretty = serde_json::to_string_pretty(&output_json)
+        /*let output_json_pretty = serde_json::to_string_pretty(&output_json)
             .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
 
         // Write the beautified output JSON to the artifacts file
         artifacts_file
             .write_all(output_json_pretty.as_bytes())
-            .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+            .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));*/
+
+        /*        let result = CompilerOutput {
+            errors: vec![],
+            // TODO: fixme: sourceFile id.
+            sources: BTreeMap::from([(source, SourceFile { id: 0, ast: None })]),
+            contracts: BTreeMap::from([(source, BTreeMap::from[()])]),
+        };*/
+        result
     }
 
     /// Handles the errors and warnings present in the output JSON from the compiler.
