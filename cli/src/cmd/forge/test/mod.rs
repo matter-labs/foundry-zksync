@@ -167,15 +167,21 @@ impl TestArgs {
             config = self.load_config();
             project = config.project()?;
         }
-
+        /*
         let compiler = ProjectCompiler::default();
-        /*let output_old = if config.sparse_mode {
+        let output_old = if config.sparse_mode {
             compiler.compile_sparse(&project, filter.clone())
         } else if self.opts.silent {
             compile::suppress_compile(&project)
         } else {
             compiler.compile(&project)
-        }?;*/
+        }?;
+
+        println!("original artifacts");
+
+        for (k, v) in output_old.artifacts() {
+            println!("Key: {:?} v: {:?}", k, v.deployed_bytecode.is_some());
+        }*/
         let project_root = project.paths.root.clone();
 
         let zksolc_manager =
@@ -190,7 +196,7 @@ impl TestArgs {
         };
 
         let zksolc = ZkSolc::new(zksolc_opts, project);
-        let output = zksolc.compile().unwrap();
+        let output = zksolc.take_compiled().unwrap();
         /*println!("!!! OLD:");
         for (k, v) in output_old.cached_artifacts().0.iter() {
             println!("Key is: {:?}", k);

@@ -303,6 +303,7 @@ impl MultiContractRunnerBuilder {
                         (
                             abi.clone(),
                             bytecode,
+                            // FIXME: add the dependencies from the artifact (somehow)...
                             dependencies.into_iter().map(|dep| dep.bytecode).collect::<Vec<_>>(),
                         ),
                     );

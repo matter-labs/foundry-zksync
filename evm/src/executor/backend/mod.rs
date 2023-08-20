@@ -28,6 +28,7 @@ use revm::{
 };
 use std::{
     collections::{HashMap, HashSet},
+    ops::AddAssign,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -753,6 +754,9 @@ impl Backend {
         self.initialize(env);
 
         let result: EVMResult<DatabaseError> = revm_era::run_era_transaction(env, self, inspector);
+        // FIXME: we should read it from the database (and before execution).
+        env.block.number.add_assign(rU256::from(1));
+        env.block.timestamp.add_assign(rU256::from(1));
 
         Ok(result.unwrap())
 

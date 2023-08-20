@@ -8479,7 +8479,10 @@ version = "0.1.0"
 dependencies = [
  "era_test_node",
  "ethabi 18.0.0",
+ "hex",
  "revm",
+ "serde",
+ "serde_json",
  "zk_evm",
  "zksync_basic_types",
  "zksync_types",
