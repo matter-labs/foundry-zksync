@@ -83,7 +83,7 @@ CHAIN=270
 
 ### Spin up local Docker node
 
-Follow [these instructions]((https://era.zksync.io/docs/api/hardhat/testing.html)) to set up a local Docker node.
+Follow [these instructions](https://era.zksync.io/docs/tools/testing/dockerized-testing.html) to set up a local Docker node.
 
 ---
 
