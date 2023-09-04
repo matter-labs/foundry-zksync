@@ -442,7 +442,10 @@ impl ZkSolc {
             serde_json::from_slice(&output.clone().stdout)
                 .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e))
         } else {
-            let mut file = File::open("/ssd_storage/matter-public/example-foundry/hello_foundry/zkout/Counter.sol/artifacts.json").expect("Failed to open file");
+            let mut file = File::open(
+                "/Users/michalski/public_matter/hello_foundry/zkout/Counter.sol/artifacts.json",
+            )
+            .expect("Failed to open file");
             let mut json_data = String::new();
             file.read_to_string(&mut json_data).expect("Failed to read from file");
 
@@ -458,7 +461,7 @@ impl ZkSolc {
         let mut all_bytecodes: HashMap<String, String> = Default::default();
         for (_source_file_name, source_file_results) in output_obj {
             for (_contract_name, contract_results) in source_file_results.as_object().unwrap() {
-                if (!contract_results["hash"].is_null()) {
+                if !contract_results["hash"].is_null() {
                     all_bytecodes.insert(
                         contract_results["hash"].as_str().unwrap().to_owned(),
                         contract_results["evm"]["bytecode"]["object"].as_str().unwrap().to_owned(),

@@ -57,7 +57,7 @@ use crate::{
             error::{DatabaseError, DatabaseResult},
             DatabaseExt,
         },
-        inspector::{InspectorStack, DEFAULT_CREATE2_DEPLOYER},
+        inspector::InspectorStack,
     },
 };
 pub use builder::ExecutorBuilder;

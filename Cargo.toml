@@ -88,7 +88,9 @@ ethers-solc = { path = "../ethers-rs/ethers-solc" }
 
 [patch.crates-io]
 # revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
-revm = { path = "../../matter-public/revm/crates/revm", version = "3", default-features = false, features = [
+# revm = { git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha" }
+
+revm = {  git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha", version = "3", default-features = false, features = [
   "std",
   "serde",
   "memory_limit",

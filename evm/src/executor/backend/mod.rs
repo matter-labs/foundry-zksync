@@ -9,7 +9,6 @@ use crate::{
     utils::{b160_to_h160, h160_to_b160, h256_to_b256, ru256_to_u256, u256_to_ru256},
     CALLER, TEST_CONTRACT_ADDRESS,
 };
-use era_test_node::node::InMemoryNode;
 use ethers::{
     prelude::{Block, H160, H256, U256},
     types::{Address, BlockNumber, Transaction, U64},
@@ -22,7 +21,7 @@ use revm::{
     precompile::{Precompiles, SpecId},
     primitives::{
         Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, Log, ResultAndState,
-        TransactTo, TxEnv, B160, B256, KECCAK_EMPTY, U256 as rU256,
+        TransactTo, B160, B256, KECCAK_EMPTY, U256 as rU256,
     },
     Database, DatabaseCommit, Inspector, JournaledState, EVM,
 };

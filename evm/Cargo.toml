@@ -38,7 +38,7 @@ once_cell = "1"
 # EVM
 bytes = "1"
 hashbrown = { version = "0.13", features = ["serde"] }
-revm = { path = "../../../matter-public/revm/crates/revm", version = "3", default-features = false, features = [
+revm = {  git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha", default-features = false, features = [
   "std",
   "serde",
   "memory_limit",
@@ -47,8 +47,8 @@ revm = { path = "../../../matter-public/revm/crates/revm", version = "3", defaul
   "optional_no_base_fee"
 ] }
 
-era_test_node = { path = "../../../matter-public/era-test-node"}
-revm_era = { path = "../../../matter-public/revm_era"}
+era_test_node = { path = "../../../public_matter/era-test-node"}
+revm_era = { path = "../../../public_matter/revm_era"}
 
 # Fuzzer
 proptest = "1"

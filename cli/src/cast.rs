@@ -350,7 +350,7 @@ async fn main() -> eyre::Result<()> {
             let provider = utils::get_provider(&config)?;
 
             // Can use either --raw or specify raw as a field
-            let raw = raw || field.as_ref().is_some_and(|f| f == "raw");
+            let raw = raw; //|| field.as_ref().is_some_and(|f| f == "raw");
 
             println!("{}", Cast::new(&provider).transaction(tx_hash, field, raw, json).await?)
         }
