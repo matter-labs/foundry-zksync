@@ -9,7 +9,7 @@ use std::{fmt, path::Path};
 /// The filter to use during testing.
 ///
 /// See also `FileFilter`.
-#[derive(Clone, Parser, Default)]
+#[derive(Clone, Parser)]
 #[clap(next_help_heading = "Test filtering")]
 pub struct FilterArgs {
     /// Only run test functions matching the specified regex pattern.
@@ -90,10 +90,10 @@ impl FileFilter for FilterArgs {
     fn is_match(&self, file: &Path) -> bool {
         if let Some(file) = file.as_os_str().to_str() {
             if let Some(ref glob) = self.path_pattern {
-                return glob.is_match(file);
+                return glob.is_match(file)
             }
             if let Some(ref glob) = self.path_pattern_inverse {
-                return !glob.is_match(file);
+                return !glob.is_match(file)
             }
         }
         file.is_sol_test()

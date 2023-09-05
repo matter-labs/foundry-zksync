@@ -68,7 +68,7 @@ impl Spinner {
 
     pub fn tick(&mut self) {
         if self.no_progress {
-            return;
+            return
         }
 
         print!(
@@ -124,7 +124,7 @@ impl SpinnerReporter {
                                 // end with a newline
                                 println!();
                                 let _ = ack.send(());
-                                break;
+                                break
                             }
                         }
                     }

@@ -556,9 +556,8 @@ impl Backend {
     /// Checks if the test contract associated with this backend failed, See
     /// [Self::is_failed_test_contract]
     pub fn is_failed(&self) -> bool {
-        self.has_snapshot_failure()
-            || self
-                .test_contract_address()
+        self.has_snapshot_failure() ||
+            self.test_contract_address()
                 .map(|addr| self.is_failed_test_contract(addr))
                 .unwrap_or_default()
     }
@@ -599,7 +598,7 @@ impl Backend {
                 .cloned()
                 .unwrap_or_default()
                 .present_value();
-            return value.as_le_bytes()[1] != 0;
+            return value.as_le_bytes()[1] != 0
         }
 
         false
@@ -613,7 +612,7 @@ impl Backend {
             U256::from_str_radix(GLOBAL_FAILURE_SLOT, 16).expect("This is a bug.").into();
         if let Some(account) = current_state.state.get(&h160_to_b160(CHEATCODE_ADDRESS)) {
             let value = account.storage.get(&index).cloned().unwrap_or_default().present_value();
-            return value == revm::primitives::U256::from(1);
+            return value == revm::primitives::U256::from(1)
         }
 
         false
@@ -715,7 +714,7 @@ impl Backend {
                         all_logs.extend(f.journaled_state.logs.clone())
                     }
                 });
-            return all_logs;
+            return all_logs
         }
 
         logs
