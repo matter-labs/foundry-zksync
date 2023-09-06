@@ -6,7 +6,6 @@ use crate::{
             debug::DebugArgs,
             install,
             watch::WatchArgs,
-            zk_build::ZkBuildArgs,
             zksolc::{ZkSolc, ZkSolcOpts},
             zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts, DEFAULT_ZKSOLC_VERSION},
         },
@@ -17,6 +16,7 @@ use crate::{
 use cast::fuzz::CounterExample;
 use clap::Parser;
 use ethers::{abi::Abi, types::U256};
+use eyre::WrapErr;
 use forge::{
     decode::decode_console_logs,
     executor::inspector::CheatsConfig,
@@ -167,21 +167,7 @@ impl TestArgs {
             config = self.load_config();
             project = config.project()?;
         }
-        /*
-        let compiler = ProjectCompiler::default();
-        let output_old = if config.sparse_mode {
-            compiler.compile_sparse(&project, filter.clone())
-        } else if self.opts.silent {
-            compile::suppress_compile(&project)
-        } else {
-            compiler.compile(&project)
-        }?;
 
-        println!("original artifacts");
-
-        for (k, v) in output_old.artifacts() {
-            println!("Key: {:?} v: {:?}", k, v.deployed_bytecode.is_some());
-        }*/
         let project_root = project.paths.root.clone();
 
         let zksolc_manager =
@@ -196,42 +182,8 @@ impl TestArgs {
         };
 
         let zksolc = ZkSolc::new(zksolc_opts, project);
-        let output = zksolc.take_compiled().unwrap();
-        /*println!("!!! OLD:");
-        for (k, v) in output_old.cached_artifacts().0.iter() {
-            println!("Key is: {:?}", k);
-            for (entry_k, entry_vec) in v.iter() {
-                println!(" entry: {:?}", entry_k);
-                for f in entry_vec {
-                    println!("    file: {:?}", f.file);
-                }
-            }
-        }*/
-
-        println!("!!! NEW:");
-        for (k, v) in output.compiled_artifacts.iter() {
-            println!("Key is: {:?}", k);
-            for (entry_k, entry_vec) in v.iter() {
-                println!(" entry: {:?}", entry_k);
-                for f in entry_vec {
-                    println!("    file: {:?}", f.file);
-                }
-            }
-        }
-
-        // Create test options from general project settings
-        // and compiler output
-
-        let toml = config.get_config_path();
-        let profiles = get_available_profiles(toml)?;
-        let test_options: TestOptions = Default::default();
-
-        /*let test_options: TestOptions = TestOptionsBuilder::default()
-        .fuzz(config.fuzz)
-        .invariant(config.invariant)
-        .compile_output(&output)
-        .profiles(profiles)
-        .build(&project_root)?;*/
+        let output = zksolc.compile().unwrap();
+        let test_options = TestOptions::default();
 
         // Determine print verbosity and executor verbosity
         let verbosity = evm_opts.verbosity;
@@ -250,15 +202,7 @@ impl TestArgs {
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .with_cheats_config(CheatsConfig::new(&config, &evm_opts))
-            //.with_test_options(test_options.clone())
             .build(&project_root, output, env, evm_opts)?;
-
-        println!("{:#?}, <-------> runner fork", runner.fork);
-        // let (_contract, _bytes, _bytes_v) =
-        // runner.contracts.clone().into_iter().nth(0).unwrap().1; println!("{:#?},
-        // <-------> _contract", _contract); println!("{:#?}, <-------> _bytes", _bytes);
-
-        // zk_evm::
 
         if self.debug.is_some() {
             filter.args_mut().test_pattern = self.debug;
@@ -646,10 +590,6 @@ async fn test(
 
         // Set up test reporter channel
         let (tx, rx) = channel::<(String, SuiteResult)>();
-        //let (tx2, rx2) = channel::<(String, SuiteResult)>();
-
-        // Run the test.
-        //runner.test(filter.clone(), Some(tx2), test_options.clone()).await;
 
         // Run tests
         let handle =

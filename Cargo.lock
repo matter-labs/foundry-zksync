@@ -4051,6 +4051,7 @@ dependencies = [
  "rayon",
  "regex",
  "reqwest",
+ "revm_era",
  "rpassword",
  "rustc-hex",
  "semver 1.0.18",
