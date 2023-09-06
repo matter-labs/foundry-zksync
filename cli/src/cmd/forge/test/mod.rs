@@ -181,7 +181,7 @@ impl TestArgs {
             force_evmla: false,
         };
 
-        let zksolc = ZkSolc::new(zksolc_opts, project);
+        let mut zksolc = ZkSolc::new(zksolc_opts, project);
         let output = zksolc.compile().unwrap();
         let test_options = TestOptions::default();
 
