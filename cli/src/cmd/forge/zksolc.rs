@@ -32,6 +32,7 @@
 use ansi_term::Colour::{Red, Yellow};
 use anyhow::{Error, Result};
 use ethers::{
+    etherscan::contract,
     prelude::{artifacts::Source, Solc},
     solc::{
         artifacts::{
@@ -44,6 +45,7 @@ use ethers::{
     types::Bytes,
 };
 use semver::Version;
+use serde::Deserialize;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -411,22 +413,20 @@ impl ZkSolc {
         write_artifacts: Option<PathBuf>,
     ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
         // Deserialize the compiler output into a serde_json::Value object
-        let output_json: Value = serde_json::from_slice(&output)
+        let compiler_output: ZkSolcCompilerOutput = serde_json::from_slice(&output)
             .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
 
         // Handle errors and warnings in the output
-        ZkSolc::handle_output_errors(&output_json, displayed_warnings);
-
-        let output_obj = output_json["contracts"].as_object().unwrap();
+        ZkSolc::handle_output_errors(&compiler_output, displayed_warnings);
 
         // First - let's get all the bytecodes.
         let mut all_bytecodes: HashMap<String, String> = Default::default();
-        for (_source_file_name, source_file_results) in output_obj {
-            for (_contract_name, contract_results) in source_file_results.as_object().unwrap() {
-                if !contract_results["hash"].is_null() {
+        for (_source_file_name, source_file_results) in &compiler_output.contracts {
+            for (_contract_name, contract_results) in source_file_results {
+                if !contract_results.hash.is_empty() {
                     all_bytecodes.insert(
-                        contract_results["hash"].as_str().unwrap().to_owned(),
-                        contract_results["evm"]["bytecode"]["object"].as_str().unwrap().to_owned(),
+                        contract_results.hash.clone(),
+                        contract_results.evm.bytecode.object.clone(),
                     );
                 }
             }
@@ -435,22 +435,14 @@ impl ZkSolc {
         let mut result = BTreeMap::new();
 
         // Get the bytecode hashes for each contract in the output
-        for key in output_obj.keys() {
+        for key in compiler_output.contracts.keys() {
             if key.contains(&source) {
-                let b_code = output_obj[key].clone();
-                let b_code_obj = b_code.as_object().unwrap();
-                let b_code_keys = b_code_obj.keys();
-                for hash in b_code_keys {
-                    if let Some(bcode_hash) = b_code_obj[hash]["hash"].as_str() {
-                        println!("{} -> Bytecode Hash: {} ", hash, bcode_hash);
-                    }
-                    let bcode_hash = b_code_obj[hash]["hash"].as_str().unwrap();
-                    let contract_bytecode =
-                        b_code_obj[hash]["evm"]["bytecode"]["object"].as_str().unwrap().to_owned();
+                let contracts_in_file = compiler_output.contracts.get(key).unwrap();
+                for (contract_name, contract) in contracts_in_file {
+                    println!("{} -> Bytecode Hash: {} ", contract_name, contract.hash);
 
-                    let factory_deps: Vec<String> = b_code_obj[hash]["factoryDependencies"]
-                        .as_object()
-                        .unwrap()
+                    let factory_deps: Vec<String> = contract
+                        .factory_dependencies
                         .keys()
                         .map(|factory_hash| all_bytecodes.get(factory_hash).unwrap())
                         .cloned()
@@ -458,8 +450,8 @@ impl ZkSolc {
 
                     let packed_bytecode = Bytes::from(
                         revm_era::factory_deps::PackedEraBytecode::new(
-                            bcode_hash.to_owned(),
-                            contract_bytecode,
+                            contract.hash.clone(),
+                            contract.evm.bytecode.object.clone(),
                             factory_deps,
                         )
                         .to_vec(),
@@ -486,22 +478,21 @@ impl ZkSolc {
                         immutable_references: Default::default(),
                     });
 
-                    art.abi = Some(
-                        serde_json::from_value::<LosslessAbi>(b_code_obj[hash]["abi"].clone())
-                            .unwrap(),
-                    );
+                    art.abi = contract.abi.clone();
 
-                    let foo = ArtifactFile {
+                    let artifact = ArtifactFile {
                         artifact: art,
-                        file: format!("{}.sol", hash).into(),
-                        version: Version::parse("0.8.20").unwrap(),
+                        file: format!("{}.sol", contract_name).into(),
+                        version: Version::parse(&compiler_output.version).unwrap(),
                     };
-                    result.insert(hash.clone(), vec![foo]);
-                    //art.additional_files.
+                    result.insert(contract_name.clone(), vec![artifact]);
                 }
             }
         }
         if let Some(write_artifacts) = write_artifacts {
+            let output_json: Value = serde_json::from_slice(&output)
+                .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
+
             // Beautify the output JSON
             let output_json_pretty = serde_json::to_string_pretty(&output_json)
                 .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
@@ -543,11 +534,11 @@ impl ZkSolc {
     /// If any errors are encountered, the function calls `exit(1)` to terminate the program. If
     /// only warnings are encountered, it prints a message indicating that the compiler run
     /// completed with warnings.
-    pub fn handle_output_errors(output_json: &Value, displayed_warnings: &mut HashSet<String>) {
-        let errors = output_json
-            .get("errors")
-            .and_then(|v| v.as_array())
-            .unwrap_or_else(|| panic!("Could not find 'errors' array in the output JSON"));
+    pub fn handle_output_errors(
+        output_json: &ZkSolcCompilerOutput,
+        displayed_warnings: &mut HashSet<String>,
+    ) {
+        let errors = &output_json.errors;
 
         let mut has_error = false;
         let mut has_warning = false;
@@ -833,11 +824,47 @@ impl ZkSolc {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ZkSolcCompilerOutput {
+    // Map from file name -> (Contract name -> Contract)
+    pub contracts: HashMap<String, HashMap<String, ZkContract>>,
+    pub sources: HashMap<String, ZkSourceFile>,
+    pub version: String,
+    pub long_version: String,
+    pub zk_version: String,
+    pub errors: Vec<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ZkContract {
+    pub hash: String,
+    // Hashmap from hash to filename:contract_name string.
+    #[serde(rename = "factoryDependencies")]
+    pub factory_dependencies: HashMap<String, String>,
+    pub evm: Evm,
+    pub abi: Option<LosslessAbi>,
+}
+#[derive(Debug, Deserialize)]
+
+pub struct Evm {
+    pub bytecode: ZkSolcBytecode,
+}
+#[derive(Debug, Deserialize)]
+
+pub struct ZkSolcBytecode {
+    object: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ZkSourceFile {
+    pub id: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 
-    use super::ZkSolc;
+    use super::{ZkSolc, ZkSolcCompilerOutput};
 
     /// Basic test to analyze the single Counter.sol artifact.
     #[test]
@@ -854,5 +881,11 @@ mod tests {
         assert_eq!(first.version.to_string(), "0.8.20");
         assert!(first.artifact.abi.is_some());
         assert_eq!(first.artifact.bytecode.as_ref().unwrap().object.bytes_len(), 3883);
+    }
+    #[test]
+    pub fn test_other_parse() {
+        let data = include_str!("testdata/artifacts.json").as_bytes().to_vec();
+        let parsed: ZkSolcCompilerOutput = serde_json::from_slice(&data).unwrap();
+        println!("Parsed: {:?}", parsed);
     }
 }
