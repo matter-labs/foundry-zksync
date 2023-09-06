@@ -423,10 +423,10 @@ impl ZkSolc {
         let mut all_bytecodes: HashMap<String, String> = Default::default();
         for (_source_file_name, source_file_results) in &compiler_output.contracts {
             for (_contract_name, contract_results) in source_file_results {
-                if !contract_results.hash.is_empty() {
+                if let Some(hash) = &contract_results.hash {
                     all_bytecodes.insert(
-                        contract_results.hash.clone(),
-                        contract_results.evm.bytecode.object.clone(),
+                        hash.clone(),
+                        contract_results.evm.bytecode.as_ref().unwrap().object.clone(),
                     );
                 }
             }
@@ -439,7 +439,11 @@ impl ZkSolc {
             if key.contains(&source) {
                 let contracts_in_file = compiler_output.contracts.get(key).unwrap();
                 for (contract_name, contract) in contracts_in_file {
-                    println!("{} -> Bytecode Hash: {} ", contract_name, contract.hash);
+                    println!(
+                        "{} -> Bytecode Hash: {} ",
+                        contract_name,
+                        contract.hash.as_ref().unwrap()
+                    );
 
                     let factory_deps: Vec<String> = contract
                         .factory_dependencies
@@ -450,8 +454,8 @@ impl ZkSolc {
 
                     let packed_bytecode = Bytes::from(
                         revm_era::factory_deps::PackedEraBytecode::new(
-                            contract.hash.clone(),
-                            contract.evm.bytecode.object.clone(),
+                            contract.hash.as_ref().unwrap().clone(),
+                            contract.evm.bytecode.as_ref().unwrap().object.clone(),
                             factory_deps,
                         )
                         .to_vec(),
@@ -837,9 +841,9 @@ pub struct ZkSolcCompilerOutput {
 
 #[derive(Debug, Deserialize)]
 pub struct ZkContract {
-    pub hash: String,
+    pub hash: Option<String>,
     // Hashmap from hash to filename:contract_name string.
-    #[serde(rename = "factoryDependencies")]
+    #[serde(rename = "factoryDependencies", default)]
     pub factory_dependencies: HashMap<String, String>,
     pub evm: Evm,
     pub abi: Option<LosslessAbi>,
@@ -847,7 +851,7 @@ pub struct ZkContract {
 #[derive(Debug, Deserialize)]
 
 pub struct Evm {
-    pub bytecode: ZkSolcBytecode,
+    pub bytecode: Option<ZkSolcBytecode>,
 }
 #[derive(Debug, Deserialize)]
 
@@ -868,7 +872,7 @@ mod tests {
 
     /// Basic test to analyze the single Counter.sol artifact.
     #[test]
-    pub fn test_artifacts_json_parse() {
+    pub fn test_artifacts_extraction() {
         let data = include_str!("testdata/artifacts.json").as_bytes().to_vec();
         let mut displayed_warnings = HashSet::new();
         let source = "src/Counter.sol".to_owned();
@@ -883,9 +887,13 @@ mod tests {
         assert_eq!(first.artifact.bytecode.as_ref().unwrap().object.bytes_len(), 3883);
     }
     #[test]
-    pub fn test_other_parse() {
+    pub fn test_json_parsing() {
         let data = include_str!("testdata/artifacts.json").as_bytes().to_vec();
-        let parsed: ZkSolcCompilerOutput = serde_json::from_slice(&data).unwrap();
-        println!("Parsed: {:?}", parsed);
+        let _parsed: ZkSolcCompilerOutput = serde_json::from_slice(&data).unwrap();
+
+        // Contract that has almost no data (and many fields missing).
+        let almost_empty_data = include_str!("testdata/empty.json").as_bytes().to_vec();
+        let _parsed_empty: ZkSolcCompilerOutput =
+            serde_json::from_slice(&almost_empty_data).unwrap();
     }
 }
