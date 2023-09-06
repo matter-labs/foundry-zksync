@@ -27,7 +27,6 @@ use revm::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    ops::AddAssign,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -556,8 +555,9 @@ impl Backend {
     /// Checks if the test contract associated with this backend failed, See
     /// [Self::is_failed_test_contract]
     pub fn is_failed(&self) -> bool {
-        self.has_snapshot_failure() ||
-            self.test_contract_address()
+        self.has_snapshot_failure()
+            || self
+                .test_contract_address()
                 .map(|addr| self.is_failed_test_contract(addr))
                 .unwrap_or_default()
     }
@@ -598,7 +598,7 @@ impl Backend {
                 .cloned()
                 .unwrap_or_default()
                 .present_value();
-            return value.as_le_bytes()[1] != 0
+            return value.as_le_bytes()[1] != 0;
         }
 
         false
@@ -612,7 +612,7 @@ impl Backend {
             U256::from_str_radix(GLOBAL_FAILURE_SLOT, 16).expect("This is a bug.").into();
         if let Some(account) = current_state.state.get(&h160_to_b160(CHEATCODE_ADDRESS)) {
             let value = account.storage.get(&index).cloned().unwrap_or_default().present_value();
-            return value == revm::primitives::U256::from(1)
+            return value == revm::primitives::U256::from(1);
         }
 
         false
@@ -714,7 +714,7 @@ impl Backend {
                         all_logs.extend(f.journaled_state.logs.clone())
                     }
                 });
-            return all_logs
+            return all_logs;
         }
 
         logs
@@ -744,7 +744,7 @@ impl Backend {
     pub fn inspect_ref<INSP>(
         &mut self,
         env: &mut Env,
-        mut inspector: INSP,
+        inspector: INSP,
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>,
@@ -752,21 +752,8 @@ impl Backend {
         self.initialize(env);
 
         let result: EVMResult<DatabaseError> = revm_era::run_era_transaction(env, self, inspector);
-        // FIXME: we should read it from the database (and before execution).
-        env.block.number.add_assign(rU256::from(1));
-        env.block.timestamp.add_assign(rU256::from(1));
 
         Ok(result.unwrap())
-
-        /*         let node = InMemoryNode::new(None, era_test_node::ShowCalls::None, false, false);
-
-                node.apply_txs(txs)
-        */
-
-        /*match revm::evm_inner::<Self, true>(env, self, &mut inspector).transact() {
-            Ok(res) => Ok(res),
-            Err(e) => eyre::bail!("backend: failed while inspecting: {:?}", e),
-        }*/
     }
 
     /// Returns true if the address is a precompile
