@@ -146,7 +146,7 @@ impl Executor {
     /// XXXX
     pub fn deploy_create2_deployer(&mut self) -> eyre::Result<()> {
         trace!("deploying local create2 deployer");
-        return Ok(());
+        return Ok(())
         /*
         let create2_deployer_account = self
             .backend_mut()
@@ -480,7 +480,7 @@ impl Executor {
                     state_changeset: None,
                     transactions: None,
                     script_wallets,
-                })));
+                })))
             }
         };
 
@@ -551,7 +551,7 @@ impl Executor {
     ) -> Result<bool, DatabaseError> {
         if self.backend().has_snapshot_failure() {
             // a failure occurred in a reverted snapshot, which is considered a failed test
-            return Ok(should_fail);
+            return Ok(should_fail)
         }
 
         // Construct a new VM with the state changeset
@@ -912,7 +912,7 @@ fn convert_call_result<D: Detokenize>(
             let reason = decode::decode_revert(result.as_ref(), abi, Some(status))
                 .unwrap_or_else(|_| format!("{status:?}"));
             if reason == "SKIPPED" {
-                return Err(EvmError::SkipError);
+                return Err(EvmError::SkipError)
             }
             Err(EvmError::Execution(Box::new(ExecutionErr {
                 reverted,

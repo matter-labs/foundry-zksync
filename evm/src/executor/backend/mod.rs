@@ -290,7 +290,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> {
     /// Returns an error if [`Self::has_cheatcode_access`] returns `false`
     fn ensure_cheatcode_access(&self, account: Address) -> Result<(), NoCheatcodeAccessError> {
         if !self.has_cheatcode_access(account) {
-            return Err(NoCheatcodeAccessError(account));
+            return Err(NoCheatcodeAccessError(account))
         }
         Ok(())
     }
@@ -302,7 +302,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> {
         account: Address,
     ) -> Result<(), NoCheatcodeAccessError> {
         if self.is_forked_mode() {
-            return self.ensure_cheatcode_access(account);
+            return self.ensure_cheatcode_access(account)
         }
         Ok(())
     }
@@ -555,9 +555,8 @@ impl Backend {
     /// Checks if the test contract associated with this backend failed, See
     /// [Self::is_failed_test_contract]
     pub fn is_failed(&self) -> bool {
-        self.has_snapshot_failure()
-            || self
-                .test_contract_address()
+        self.has_snapshot_failure() ||
+            self.test_contract_address()
                 .map(|addr| self.is_failed_test_contract(addr))
                 .unwrap_or_default()
     }
@@ -598,7 +597,7 @@ impl Backend {
                 .cloned()
                 .unwrap_or_default()
                 .present_value();
-            return value.as_le_bytes()[1] != 0;
+            return value.as_le_bytes()[1] != 0
         }
 
         false
@@ -612,7 +611,7 @@ impl Backend {
             U256::from_str_radix(GLOBAL_FAILURE_SLOT, 16).expect("This is a bug.").into();
         if let Some(account) = current_state.state.get(&h160_to_b160(CHEATCODE_ADDRESS)) {
             let value = account.storage.get(&index).cloned().unwrap_or_default().present_value();
-            return value == revm::primitives::U256::from(1);
+            return value == revm::primitives::U256::from(1)
         }
 
         false
@@ -714,7 +713,7 @@ impl Backend {
                         all_logs.extend(f.journaled_state.logs.clone())
                     }
                 });
-            return all_logs;
+            return all_logs
         }
 
         logs
@@ -751,7 +750,8 @@ impl Backend {
     {
         self.initialize(env);
 
-        let result: EVMResult<DatabaseError> = era_revm::transactions::run_era_transaction(env, self, inspector);
+        let result: EVMResult<DatabaseError> =
+            era_revm::transactions::run_era_transaction(env, self, inspector);
 
         Ok(result.unwrap())
     }
@@ -848,7 +848,7 @@ impl Backend {
         for tx in full_block.transactions.into_iter() {
             if tx.hash().eq(&tx_hash) {
                 // found the target transaction
-                return Ok(Some(tx));
+                return Ok(Some(tx))
             }
             trace!(tx=?tx.hash, "committing transaction");
 
@@ -973,7 +973,7 @@ impl DatabaseExt for Backend {
         trace!(?id, "select fork");
         if self.is_active_fork(id) {
             // nothing to do
-            return Ok(());
+            return Ok(())
         }
 
         let fork_id = self.ensure_fork_id(id).cloned()?;
@@ -1190,7 +1190,7 @@ impl DatabaseExt for Backend {
     fn ensure_fork(&self, id: Option<LocalForkId>) -> eyre::Result<LocalForkId> {
         if let Some(id) = id {
             if self.inner.issued_local_fork_ids.contains_key(&id) {
-                return Ok(id);
+                return Ok(id)
             }
             eyre::bail!("Requested fork `{}` does not exit", id)
         }
@@ -1216,7 +1216,7 @@ impl DatabaseExt for Backend {
         if self.inner.forks.len() == 1 {
             // we only want to provide additional diagnostics here when in multifork mode with > 1
             // forks
-            return None;
+            return None
         }
 
         if !active_fork.is_contract(callee) && !is_contract_in_state(journaled_state, callee) {
@@ -1243,7 +1243,7 @@ impl DatabaseExt for Backend {
                     active: active_id,
                     available_on,
                 })
-            };
+            }
         }
         None
     }
@@ -1416,7 +1416,7 @@ impl Fork {
     pub fn is_contract(&self, acc: Address) -> bool {
         if let Ok(Some(acc)) = self.db.basic(h160_to_b160(acc)) {
             if acc.code_hash != KECCAK_EMPTY {
-                return true;
+                return true
             }
         }
         is_contract_in_state(&self.journaled_state, acc)
@@ -1736,7 +1736,7 @@ fn merge_db_account_data<ExtDB: DatabaseRef>(
         acc
     } else {
         // Account does not exist
-        return;
+        return
     };
 
     if let Some(code) = active.contracts.get(&acc.info.code_hash).cloned() {

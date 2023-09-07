@@ -239,7 +239,7 @@ impl ZkSolc {
 
                 // Skip this file if it's not in the 'sources' directory or its subdirectories
                 if !is_in_sources_dir {
-                    continue;
+                    continue
                 }
 
                 // Step 3: Parse JSON Input for each Source
@@ -605,9 +605,9 @@ impl ZkSolc {
     /// self.prepare_compiler_input(contract_path)?;
     /// ```
     ///
-    /// In this example, the `prepare_compiler_input` function is called with the contract source path. It
-    /// generates the JSON input for the contract, configures the Solidity compiler, and saves
-    /// the input to the artifacts directory.
+    /// In this example, the `prepare_compiler_input` function is called with the contract source
+    /// path. It generates the JSON input for the contract, configures the Solidity compiler,
+    /// and saves the input to the artifacts directory.
     fn prepare_compiler_input(&mut self, contract_path: &PathBuf) -> Result<()> {
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
@@ -847,7 +847,7 @@ mod tests {
         let data = include_str!("testdata/artifacts.json").as_bytes().to_vec();
         let mut displayed_warnings = HashSet::new();
         let source = "src/Counter.sol".to_owned();
-        let result = ZkSolc::handle_output(data, source, &mut displayed_warnings, None);
+        let result = ZkSolc::handle_output(data, &source, &mut displayed_warnings, None);
 
         let artifacts = result.get("Counter").unwrap();
         assert_eq!(artifacts.len(), 1);

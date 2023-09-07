@@ -90,10 +90,10 @@ impl FileFilter for FilterArgs {
     fn is_match(&self, file: &Path) -> bool {
         if let Some(file) = file.as_os_str().to_str() {
             if let Some(ref glob) = self.path_pattern {
-                return glob.is_match(file);
+                return glob.is_match(file)
             }
             if let Some(ref glob) = self.path_pattern_inverse {
-                return !glob.is_match(file);
+                return !glob.is_match(file)
             }
         }
         file.is_sol_test()
