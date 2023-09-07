@@ -435,7 +435,7 @@ impl ZkSolc {
                         .collect();
 
                     let packed_bytecode = Bytes::from(
-                        revm_era::factory_deps::PackedEraBytecode::new(
+                        era_revm::factory_deps::PackedEraBytecode::new(
                             contract.hash.as_ref().unwrap().clone(),
                             contract.evm.bytecode.as_ref().unwrap().object.clone(),
                             factory_deps,

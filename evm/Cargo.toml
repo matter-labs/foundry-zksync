@@ -47,8 +47,8 @@ revm = {  git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_
   "optional_no_base_fee"
 ] }
 
-era_test_node = { path = "../../../public_matter/era-test-node"}
-revm_era = { path = "../../../public_matter/revm_era"}
+era_revm = { git = "https://github.com/matter-labs/era-revm.git", rev = "792cb820587eccdc35bbecb45f343cf1b891b6d2"}
+# era_revm = { path = "../../revm_era"}
 
 # Fuzzer
 proptest = "1"
