@@ -32,12 +32,13 @@
 use ansi_term::Colour::{Red, Yellow};
 use anyhow::{Error, Result};
 use ethers::{
-    prelude::{artifacts::Source, Solc},
+    prelude::{artifacts::Source, remappings::RelativeRemapping, Solc},
     solc::{
         artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
         Graph, Project,
     },
 };
+use regex::Regex;
 use semver::Version;
 use serde_json::Value;
 use std::{
@@ -54,6 +55,7 @@ pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
     pub is_system: bool,
     pub force_evmla: bool,
+    pub remappings: Vec<RelativeRemapping>,
 }
 
 /// Files that should be compiled with a given solidity version.
@@ -73,6 +75,7 @@ type SolidityVersionSources = (Version, BTreeMap<PathBuf, Source>);
 /// - `force_evmla`: A flag indicating whether to force EVMLA optimization.
 /// - `standard_json`: An optional field to store the parsed standard JSON input for the contracts.
 /// - `sources`: An optional field to store the versioned sources for the contracts.
+/// - `remappings`: A vector of relative remappings for the contracts.
 ///
 /// Functionality:
 /// - `new`: Constructs a new `ZkSolc` instance using the provided compiler path, project
@@ -114,6 +117,7 @@ pub struct ZkSolc {
     force_evmla: bool,
     standard_json: Option<StandardJsonCompilerInput>,
     sources: Option<BTreeMap<Solc, SolidityVersionSources>>,
+    remappings: Vec<RelativeRemapping>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -139,6 +143,7 @@ impl ZkSolc {
             force_evmla: opts.force_evmla,
             standard_json: None,
             sources: None,
+            remappings: opts.remappings,
         }
     }
 
@@ -218,6 +223,7 @@ impl ZkSolc {
     pub fn compile(mut self) -> Result<()> {
         // Step 1: Collect Source Files
         self.configure_solc();
+        self.configure_compiler_output_settings();
         let sources = self.sources.clone().unwrap();
         let mut displayed_warnings = HashSet::new();
 
@@ -234,16 +240,27 @@ impl ZkSolc {
 
                 // Skip this file if it's not in the 'sources' directory or its subdirectories
                 if !is_in_sources_dir {
-                    continue
+                    continue;
                 }
 
+                // get standard_json for this contract
+                let mut standard_json = self.project.standard_json_input(&contract_path).unwrap();
+
+                // Apply remappings for each contract dependency
+                for _source in &mut standard_json.sources {
+                    _source.1.content =
+                        self.remap_source_content(_source.1.content.to_string()).into();
+                }
+
+                self.standard_json = Some(standard_json);
+
                 // Step 3: Parse JSON Input for each Source
-                if let Err(err) = self.parse_json_input(contract_path.clone()) {
+                if let Err(err) = self.parse_json_input(&contract_path) {
                     eprintln!("Failed to parse json input for zksolc compiler: {}", err);
                 }
 
                 // Step 4: Build Compiler Arguments
-                let comp_args = self.build_compiler_args(source.clone(), solc.clone());
+                let comp_args = self.build_compiler_args(&contract_path, &solc);
 
                 // Step 5: Run Compiler and Handle Output
                 let mut cmd = Command::new(&self.compiler_path);
@@ -272,7 +289,7 @@ impl ZkSolc {
                         self.compiler_path,
                         contract_path,
                         &comp_args
-                    )))
+                    )));
                 }
 
                 let filename = contract_path
@@ -306,18 +323,14 @@ impl ZkSolc {
     ///
     /// # Arguments
     ///
-    /// * `versioned_source` - A tuple containing the contract source path (`PathBuf`) and the
-    ///   corresponding `Source` object.
+    /// * `self` - A mutable reference to the `ZkSolc` instance.
+    /// * `contract_path` - The path of the contract source file that was compiled.
     /// * `solc` - The `Solc` instance representing the specific version of the Solidity compiler.
     ///
     /// # Returns
     ///
     /// A vector of strings representing the compiler arguments.
-    fn build_compiler_args(
-        &mut self,
-        versioned_source: (PathBuf, Source),
-        solc: Solc,
-    ) -> Vec<String> {
+    fn build_compiler_args(&mut self, contract_path: &PathBuf, solc: &Solc) -> Vec<String> {
         // Get the solc compiler path as a string
         let solc_path = solc
             .solc
@@ -332,7 +345,7 @@ impl ZkSolc {
         comp_args.push(solc_path.to_owned());
 
         // Check if system mode is enabled or if the source path contains "is-system"
-        if self.is_system || versioned_source.0.to_str().unwrap().contains("is-system") {
+        if self.is_system || contract_path.to_str().unwrap().contains("is-system") {
             comp_args.push("--system-mode".to_string());
         }
 
@@ -487,116 +500,50 @@ impl ZkSolc {
         }
     }
 
-    /// Parses the JSON input for a contract and prepares the necessary configuration for the ZkSolc
-    /// compiler.
+    // write detailed comment for parse_json_input
+    /// Parses the JSON input for the contracts using the Solidity compiler. The function performs
+    /// the following steps to parse the JSON input:
+    ///
+    /// 1. Build Artifacts Path:
+    ///   - The function builds the path for saving the artifacts (compiler output) of the contract
+    ///    using the `build_artifacts_path` method.
+    ///  - If the construction of the artifacts path fails, an error is returned.
+    ///
+    /// 2. Save JSON Input:
+    ///  - The function saves the JSON input for the contract in a file named "json_input.json"
+    ///   within the contract's artifacts directory.
+    /// - If the saving of the JSON input fails, an error is returned.
+    ///
+    /// 3. Return Ok if the JSON input is parsed successfully.
     ///
     /// # Arguments
+    /// * `self` - A mutable reference to the `ZkSolc` instance.
+    /// * `contract_path` - The path of the contract source file that was compiled.
     ///
-    /// * `contract_path` - The path to the contract source file.
+    /// # Returns
+    /// A `Result` containing `Ok(())` on success, or an `anyhow::Error` on failure.
     ///
     /// # Errors
-    ///
     /// This function can return an error if any of the following occurs:
-    /// - The standard JSON input cannot be generated for the contract.
-    /// - The artifacts path for the contract cannot be created.
-    /// - The JSON input cannot be saved to the artifacts directory.
-    ///
-    /// # Workflow
-    ///
-    /// The `parse_json_input` function performs the following operations:
-    ///
-    /// 1. Configure File Output Selection:
-    ///    - It configures the file output selection to specify which outputs should be included in
-    ///      the compiler output.
-    ///
-    /// 2. Configure Solidity Compiler:
-    ///    - It modifies the Solidity compiler settings to exclude metadata from the output.
-    ///
-    /// 3. Update Output Selection:
-    ///    - It updates the file output selection settings in the Solidity compiler configuration
-    ///      with the configured values.
-    ///
-    /// 4. Generate Standard JSON Input:
-    ///    - It generates the standard JSON input for the contract using the `standard_json_input`
-    ///      method of the project.
-    ///    - The standard JSON input includes the contract's source code, compiler options, and file
-    ///      output selection.
-    ///
-    /// 5. Build Artifacts Path:
-    ///    - It builds the path for saving the compiler artifacts based on the contract source file.
-    ///    - The artifacts will be saved in a directory named after the contract's filename within
-    ///      the project's artifacts directory.
-    ///
-    /// 6. Save JSON Input:
-    ///    - It saves the standard JSON input as a file named "json_input.json" within the
-    ///      contract's artifacts directory.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let contract_path = PathBuf::from("/path/to/contract.sol");
-    /// self.parse_json_input(contract_path)?;
-    /// ```
-    ///
-    /// In this example, the `parse_json_input` function is called with the contract source path. It
-    /// generates the JSON input for the contract, configures the Solidity compiler, and saves
-    /// the input to the artifacts directory.
-    fn parse_json_input(&mut self, contract_path: PathBuf) -> Result<()> {
-        // Step 1: Configure File Output Selection
-        let mut file_output_selection: FileOutputSelection = BTreeMap::default();
-        file_output_selection.insert(
-            "*".to_string(),
-            vec![
-                "abi".to_string(),
-                "evm.methodIdentifiers".to_string(),
-                // "evm.legacyAssembly".to_string(),
-            ],
-        );
-        file_output_selection.insert(
-            "".to_string(),
-            vec![
-                "metadata".to_string(),
-                // "ast".to_string(),
-                // "userdoc".to_string(),
-                // "devdoc".to_string(),
-                // "storageLayout".to_string(),
-                // "irOptimized".to_string(),
-            ],
-        );
-
-        // Step 2: Configure Solidity Compiler
-        // zksolc requires metadata to be 'None'
-        self.project.solc_config.settings.metadata = None;
-
-        // Step 3: Update Output Selection
-        self.project
-            .solc_config
-            .settings
-            .output_selection
-            .0
-            .insert("*".to_string(), file_output_selection.clone());
-
-        // Step 4: Generate Standard JSON Input
-        let standard_json = self
-            .project
-            .standard_json_input(&contract_path)
-            .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))
-            .unwrap();
-
-        // Store the generated standard JSON input in the ZkSolc instance
-        self.standard_json = Some(standard_json.to_owned());
-
-        // Step 5: Build Artifacts Path
+    /// - The construction of the artifacts path fails.
+    /// - The saving of the JSON input fails.
+    fn parse_json_input(&mut self, contract_path: &PathBuf) -> Result<()> {
+        //Build Artifacts Path
         let artifact_path = &self
             .build_artifacts_path(contract_path)
             .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))
             .unwrap();
 
-        // Step 6: Save JSON Input
+        let standard_json = match &self.standard_json {
+            Some(json) => json,
+            None => return Err(Error::msg("Standard JSON is not set")),
+        };
+
+        // Save JSON Input
         let json_input_path = artifact_path.join("json_input.json");
-        let stdjson = serde_json::to_value(&standard_json)
+        let stdjson = serde_json::to_value(standard_json)
             .map_err(|e| Error::msg(format!("Could not serialize standard JSON input: {}", e)))?;
-        std::fs::write(json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
+        std::fs::write(&json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
             .map_err(|e| Error::msg(format!("Could not write JSON input file: {}", e)))?;
 
         Ok(())
@@ -733,7 +680,7 @@ impl ZkSolc {
     /// This function can return an error if any of the following occurs:
     /// - The extraction of the filename from the contract source path fails.
     /// - The creation of the artifacts directory fails.
-    fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
+    fn build_artifacts_path(&self, source: &PathBuf) -> Result<PathBuf, anyhow::Error> {
         let filename = source.file_name().expect("Failed to get Contract filename.");
         let path = self.project.paths.artifacts.join(filename);
         fs::create_dir_all(&path)
@@ -775,4 +722,165 @@ impl ZkSolc {
         File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
             .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))
     }
+
+    /// Configures the compiler output settings for the project.
+    /// The function prepares the compiler output settings, specifying which compilation artifacts to generate.
+    ///
+    /// # Workflow:
+    /// 1. Configure File Output Selection:
+    ///    - The function creates a map of file output selections, where each key represents a specific source file pattern
+    ///      and the associated value is a list of artifact types to be generated for that pattern.
+    ///    - The map is populated with key-value pairs using the `BTreeMap` data structure.
+    ///
+    /// 2. Set Metadata to None:
+    ///    - Since the `zksolc` compiler requires metadata to be set to `None`, this function sets the metadata field in the
+    ///      project's solc configuration to `None`.
+    ///
+    /// 3. Update Output Selection:
+    ///    - The function updates the output selection settings of the project's solc configuration by inserting the previously
+    ///      configured file output selections into the `output_selection` map.
+    ///    - The key "*" corresponds to the default settings for all source files, while other keys can be added for specific
+    ///      source file patterns.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A mutable reference to the `ZkSolc` instance.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// // Configure compiler output settings
+    /// zksolc.configure_compiler_output_settings();
+    /// ```
+    fn configure_compiler_output_settings(&mut self) {
+        // Configure File Output Selection
+        let mut file_output_selection: FileOutputSelection = BTreeMap::default();
+        file_output_selection.insert(
+            "*".to_string(),
+            vec![
+                "abi".to_string(),
+                "evm.methodIdentifiers".to_string(),
+                // "evm.legacyAssembly".to_string(),
+            ],
+        );
+        file_output_selection.insert(
+            "".to_string(),
+            vec![
+                "metadata".to_string(),
+                // "ast".to_string(),
+                // "userdoc".to_string(),
+                // "devdoc".to_string(),
+                // "storageLayout".to_string(),
+                // "irOptimized".to_string(),
+            ],
+        );
+
+        // zksolc requires metadata to be 'None'
+        self.project.solc_config.settings.metadata = None;
+
+        // Update Output Selection
+        self.project
+            .solc_config
+            .settings
+            .output_selection
+            .0
+            .insert("*".to_string(), file_output_selection.clone());
+    }
+
+    /// Applies import remappings to the provided source content.
+    ///
+    /// This is called from `compile()` to remap each contract source.
+    ///
+    /// It replaces import paths with placeholders, then replaces the
+    /// placeholders with relative paths from the remappings.
+    ///
+    /// This was necessary to prevent the same imports from getting
+    /// rewritten by similar remappings being auto generated by Foundry.
+    fn remap_source_content(&mut self, source_content: String) -> String {
+        let content = source_content;
+
+        // Get relative remappings
+        let remappings = &self.remappings.clone();
+
+        // Replace imports with placeholders
+        let content = replace_imports_with_placeholders(content, &remappings);
+
+        // Substitute remapped paths
+        let content = substitute_remapped_paths(content, &remappings);
+        // Return the remapped source content
+        content
+    }
+}
+
+/// Replaces import statements with placeholders in the provided content.
+/// The function iterates through the remappings and replaces import statements with placeholders.
+///
+/// # Arguments
+///
+/// * `content` - The content containing import statements as a `String`.
+/// * `remappings` - An array of `RelativeRemapping` instances representing the remappings.
+///
+/// # Returns
+///
+/// The content with import statements replaced by placeholders.
+fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRemapping]) -> String {
+    let mut replaced_content = content.clone();
+
+    // Iterate through the remappings
+    for (i, remapping) in remappings.iter().enumerate() {
+        // Create a placeholder based on the remapping name and index
+        let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
+
+        // Define a pattern that matches the import statement, capturing the rest of the path
+        let pattern = format!(r#"import\s+"{}(?P<rest>[^"]*)""#, regex::escape(&remapping.name));
+
+        // Define a replacement that includes the placeholder and the captured rest of the path
+        let replacement = format!(r#"import "{}$rest""#, placeholder);
+
+        // Replace all instances of the pattern with the replacement
+        replaced_content =
+            Regex::new(&pattern).unwrap().replace_all(&replaced_content, replacement).into_owned();
+    }
+
+    replaced_content
+}
+
+/// Substitutes remapped paths in the provided content.
+/// The function iteratively replaces placeholders with the corresponding remapped paths.
+///
+/// # Arguments
+///
+/// * `content` - The content containing placeholders as a `String`.
+/// * `remappings` - An array of `RelativeRemapping` instances representing the remappings.
+///
+/// # Returns
+///
+/// The content with placeholders replaced by remapped paths.
+fn substitute_remapped_paths(content: String, remappings: &[RelativeRemapping]) -> String {
+    let mut substituted = content;
+
+    loop {
+        let mut made_replacements = false;
+
+        for (i, r) in remappings.iter().enumerate() {
+            // Create the placeholder based on the index
+            let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
+            let import_path = r.path.path.to_str().unwrap();
+
+            // Replace all instances of the placeholder with the remapped path
+            let new_substituted = substituted.replace(&placeholder, &import_path);
+
+            if new_substituted != substituted {
+                made_replacements = true;
+                substituted = new_substituted;
+            }
+        }
+
+        // Exit the loop if no more replacements were made
+        if !made_replacements {
+            break;
+        }
+    }
+
+    substituted
 }

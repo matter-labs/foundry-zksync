@@ -35,6 +35,7 @@ use super::{
 use crate::cmd::{Cmd, LoadConfig};
 use clap::Parser;
 use ethers::prelude::Project;
+use ethers::solc::remappings::RelativeRemapping;
 use foundry_config::{
     figment::{
         self,
@@ -154,8 +155,11 @@ impl Cmd for ZkBuildArgs {
 
         let zksolc_manager = self.setup_zksolc_manager()?;
 
+        //get remappings
+        let remappings = config.remappings;
+
         println!("Compiling smart contracts...");
-        self.compile_smart_contracts(zksolc_manager, project)
+        self.compile_smart_contracts(zksolc_manager, project, remappings)
     }
 }
 
@@ -209,11 +213,13 @@ impl ZkBuildArgs {
         &self,
         zksolc_manager: ZkSolcManager,
         project: Project,
+        remappings: Vec<RelativeRemapping>,
     ) -> eyre::Result<()> {
         let zksolc_opts = ZkSolcOpts {
             compiler_path: zksolc_manager.get_full_compiler_path(),
             is_system: self.is_system,
             force_evmla: self.force_evmla,
+            remappings,
         };
 
         let zksolc = ZkSolc::new(zksolc_opts, project);
