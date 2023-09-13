@@ -452,7 +452,6 @@ impl ZkSolc {
                         link_references: Default::default(),
                     });
 
-                    // FIXME: incorrect
                     art.deployed_bytecode = Some(CompactDeployedBytecode {
                         bytecode: Some(CompactBytecode {
                             object: ethers::solc::artifacts::BytecodeObject::Bytecode(

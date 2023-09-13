@@ -143,35 +143,13 @@ impl Executor {
     }
 
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
-    /// XXXX
     pub fn deploy_create2_deployer(&mut self) -> eyre::Result<()> {
         trace!("deploying local create2 deployer");
+        // Crate2 deployer is not needed for Era.
         return Ok(())
-        /*
-        let create2_deployer_account = self
-            .backend_mut()
-            .basic(h160_to_b160(DEFAULT_CREATE2_DEPLOYER))?
-            .ok_or(DatabaseError::MissingAccount(DEFAULT_CREATE2_DEPLOYER))?;
-
-        // if the deployer is not currently deployed, deploy the default one
-        if create2_deployer_account.code.map_or(true, |code| code.is_empty()) {
-            let creator = "0x3fAB184622Dc19b6109349B94811493BF2a45362".parse().unwrap();
-
-            // Probably 0, but just in case.
-            let initial_balance = self.get_balance(creator)?;
-
-            self.set_balance(creator, U256::MAX)?;
-            let res =
-                self.deploy(creator, DEFAULT_CREATE2_DEPLOYER_CODE.into(), U256::zero(), None)?;
-            trace!(create2=?res.address, "deployed local create2 deployer");
-
-            self.set_balance(creator, initial_balance)?;
-        }
-        Ok(())*/
     }
 
     /// Set the balance of an account.
-    /// XXX
     pub fn set_balance(&mut self, address: Address, amount: U256) -> DatabaseResult<&mut Self> {
         trace!(?address, ?amount, "setting account balance");
         let mut account = self.backend_mut().basic(h160_to_b160(address))?.unwrap_or_default();
@@ -191,7 +169,6 @@ impl Executor {
     }
 
     /// Set the nonce of an account.
-    /// XXX
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> DatabaseResult<&mut Self> {
         let mut account = self.backend_mut().basic(h160_to_b160(address))?.unwrap_or_default();
         account.nonce = nonce;
@@ -505,7 +482,6 @@ impl Executor {
     ///
     /// Executes a CREATE transaction with the contract `code` and persistent database state
     /// modifications
-    /// XXX
     pub fn deploy(
         &mut self,
         from: Address,

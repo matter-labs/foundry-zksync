@@ -61,34 +61,33 @@ panic = "abort"
 strip = true
 
 [workspace.dependencies]
-ethers = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-addressbook = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-core = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-contract = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-contract-abigen = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-providers = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-signers = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-middleware = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-etherscan = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-solc = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
+ethers = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-addressbook = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-core = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-contract = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-contract-abigen = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-providers = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-signers = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-middleware = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-etherscan = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-solc = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
 
 solang-parser = "=0.3.1"
 
-[patch."https://github.com/gakonst/ethers-rs"]
-ethers = { path = "../ethers-rs/ethers" }
-ethers-addressbook = { path = "../ethers-rs/ethers-addressbook" }
-ethers-contract = { path = "../ethers-rs/ethers-contract" }
-ethers-contract-abigen = { path = "../ethers-rs/ethers-contract/ethers-contract-abigen" }
-ethers-core = { path = "../ethers-rs/ethers-core" }
-ethers-etherscan = { path = "../ethers-rs/ethers-etherscan" }
-ethers-middleware = { path = "../ethers-rs/ethers-middleware" }
-ethers-providers = { path = "../ethers-rs/ethers-providers" }
-ethers-signers = { path = "../ethers-rs/ethers-signers" }
-ethers-solc = { path = "../ethers-rs/ethers-solc" }
+#[patch."https://github.com/gakonst/ethers-rs"]
+#ethers = { path = "../ethers-rs/ethers" }
+#ethers-addressbook = { path = "../ethers-rs/ethers-addressbook" }
+#ethers-contract = { path = "../ethers-rs/ethers-contract" }
+#ethers-contract-abigen = { path = "../ethers-rs/ethers-contract/ethers-contract-abigen" }
+#ethers-core = { path = "../ethers-rs/ethers-core" }
+#ethers-etherscan = { path = "../ethers-rs/ethers-etherscan" }
+#ethers-middleware = { path = "../ethers-rs/ethers-middleware" }
+#ethers-providers = { path = "../ethers-rs/ethers-providers" }
+#ethers-signers = { path = "../ethers-rs/ethers-signers" }
+#ethers-solc = { path = "../ethers-rs/ethers-solc" }
 
 [patch.crates-io]
 # revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
-# revm = { git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha" }
 
 revm = {  git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha", version = "3", default-features = false, features = [
   "std",
