@@ -230,9 +230,7 @@ impl ZkSolc {
         // Step 2: Compile Contracts for Each Source
         for (solc, version) in sources {
             //configure project solc for each solc version
-            for source in version.1 {
-                let contract_path = source.0.clone();
-
+            for (contract_path, _) in version.1 {
                 // Check if the contract_path is in 'sources' directory or its subdirectories
                 let is_in_sources_dir = contract_path
                     .ancestors()
@@ -293,20 +291,10 @@ impl ZkSolc {
                 }
 
                 let filename = contract_path
+                    .file_name()
+                    .expect("Failed to extract filename")
                     .to_str()
-                    .expect("Unable to convert source to string")
-                    .split(
-                        self.project
-                            .paths
-                            .root
-                            .to_str()
-                            .expect("Unable to convert source to string"),
-                    )
-                    .nth(1)
-                    .expect("Failed to get Contract relative path")
-                    .split('/')
-                    .last()
-                    .expect("Failed to get Contract filename.");
+                    .expect("Failed to convert filename to str");
 
                 // Step 6: Handle Output (Errors and Warnings)
                 self.handle_output(output, filename.to_string(), &mut displayed_warnings);
