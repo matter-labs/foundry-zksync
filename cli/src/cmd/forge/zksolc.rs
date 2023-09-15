@@ -747,7 +747,7 @@ impl ZkSolc {
             .settings
             .output_selection
             .0
-            .insert("*".to_string(), file_output_selection.clone());
+            .insert("*".to_string(), file_output_selection);
     }
 
     /// Applies import remappings to the provided source content.
@@ -763,7 +763,7 @@ impl ZkSolc {
         let content = source_content;
 
         // Get relative remappings
-        let remappings = &self.remappings.clone();
+        let remappings = &self.remappings;
 
         // Replace imports with placeholders
         let content = replace_imports_with_placeholders(content, &remappings);
@@ -787,7 +787,7 @@ impl ZkSolc {
 ///
 /// The content with import statements replaced by placeholders.
 fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRemapping]) -> String {
-    let mut replaced_content = content.clone();
+    let mut replaced_content = content;
 
     // Iterate through the remappings
     for (i, remapping) in remappings.iter().enumerate() {
