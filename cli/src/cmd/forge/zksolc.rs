@@ -147,8 +147,8 @@ impl ZkSolc {
         }
     }
 
-    /// Compiles the Solidity contracts in the project's 'sources' directory and its subdirectories
-    /// using the ZkSolc compiler.
+    /// Compiles the Solidity contracts located in the project's 'sources' directory and its
+    /// subdirectories using the ZkSolc compiler.
     ///
     /// # Arguments
     ///
@@ -162,72 +162,46 @@ impl ZkSolc {
     /// - The compiler arguments cannot be built.
     /// - The output of the compiler contains errors or warnings.
     ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// let project = Project::new(...);
-    /// let opts = ZkSolcOpts {
-    ///     compiler_path: PathBuf::from("/path/to/zksolc"),
-    ///     is_system: false,
-    ///     force_evmla: true,
-    /// };
-    /// let mut zksolc = ZkSolc::new(opts, project);
-    /// zksolc.compile()?;
-    /// ```
-    ///
-    /// In this example, a `ZkSolc` instance is created using `ZkSolcOpts` and a `Project`. Then,
-    /// the `compile` method is invoked to compile the contracts.
-    ///
     /// # Workflow
     ///
     /// The `compile` function performs the following operations:
     ///
-    /// 1. Collect Source Files:
-    ///    - It collects the source files from the project's 'sources' directory and its
-    ///      subdirectories.
-    ///    - Only the files within the 'sources' directory and its subdirectories are considered for
-    ///      compilation.
+    /// - **Configure Solidity Compiler**: Sets various compiler options including the compiler
+    ///   path, system mode, and output settings.
     ///
-    /// 2. Configure Solidity Compiler:
-    ///    - It configures the Solidity compiler by setting options like the compiler path, system
-    ///      mode, and force EVMLA flag.
+    /// - **Collect Source Files**: Collects all source files from the project's 'sources' directory
+    ///   and its subdirectories for compilation.
     ///
-    /// 3. Parse JSON Input:
-    ///    - For each source file, it parses the JSON input using the Solidity compiler.
-    ///    - The parsed JSON input is stored in the `standard_json` field of the `ZkSolc` instance.
+    /// - **Apply Remappings**: Adjusts the source paths and content based on specified remappings.
     ///
-    /// 4. Build Compiler Arguments:
-    ///    - It builds the compiler arguments for each source file.
-    ///    - The compiler arguments include options like the compiler path, system mode, and force
-    ///      EVMLA flag.
+    /// - **Parse JSON Input**: Parses the JSON input for each source file using the Solidity compiler,
+    ///   storing the parsed data in the `standard_json` field of the `ZkSolc` instance.
     ///
-    /// 5. Run Compiler and Handle Output:
-    ///    - It runs the Solidity compiler for each source file with the corresponding compiler
-    ///      arguments.
-    ///    - The output of the compiler, including errors and warnings, is captured.
+    /// - **Build Compiler Arguments**: Builds a set of compiler arguments for each source file based
+    ///   on specified options such as the compiler path and system mode.
     ///
-    /// 6. Handle Output (Errors and Warnings):
-    ///    - It handles the output of the compiler, extracting errors and warnings.
-    ///    - Errors are printed in red, and warnings are printed in yellow.
+    /// - **Run Compiler and Handle Output**: Runs the Solidity compiler for each source file, gathering
+    ///   all output including any errors and warnings.
     ///
-    /// 7. Save Artifacts:
-    ///    - It saves the artifacts (compiler output) as a JSON file for each source file.
-    ///    - The artifacts are saved in the project's artifacts directory under the corresponding
-    ///      source file's directory.
+    /// - **Handle Output (Errors and Warnings)**: Processes the compiler output to extract and
+    ///   appropriately display errors (in red) and warnings (in yellow).
+    ///
+    /// - **Save Artifacts**: Saves the compiler output artifacts as JSON files in the project's artifact
+    ///   directory, organizing them based on the corresponding source file's directory.
     ///
     /// # Note
     ///
     /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the
-    /// versioned sources. These modified values can be accessed after the compilation process
-    /// for further processing or analysis.
+    /// versioned sources. These modified values can be accessed after the compilation process for
+    /// further processing or analysis.
     pub fn compile(mut self) -> Result<()> {
-        // Step 1: Collect Source Files
+        // Collect Source Files
         self.configure_solc();
         self.configure_compiler_output_settings();
-        let sources = self.sources.clone().unwrap();
+        let sources = self.sources.clone().ok_or_else(|| Error::msg("Sources not found"))?;
         let mut displayed_warnings = HashSet::new();
 
-        // Step 2: Compile Contracts for Each Source
+        //  Compile Contracts for Each Source
         for (solc, version) in sources {
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
@@ -245,25 +219,25 @@ impl ZkSolc {
                 let mut standard_json = self.project.standard_json_input(&contract_path).unwrap();
 
                 // Apply remappings for each contract dependency
-                for _source in &mut standard_json.sources {
-                    _source.1.content =
-                        self.remap_source_content(_source.1.content.to_string()).into();
+                for (_path, _source) in &mut standard_json.sources {
+                    remap_source_path(_path, &self.remappings);
+                    _source.content = self.remap_source_content(_source.content.to_string()).into();
                 }
 
                 self.standard_json = Some(standard_json);
 
-                // Step 3: Parse JSON Input for each Source
+                // Parse JSON Input for each Source
                 if let Err(err) = self.parse_json_input(&contract_path) {
                     eprintln!("Failed to parse json input for zksolc compiler: {}", err);
                 }
 
-                // Step 4: Build Compiler Arguments
+                // Build Compiler Arguments
                 let comp_args = self.build_compiler_args(&contract_path, &solc);
 
-                // Step 5: Run Compiler and Handle Output
+                // Run Compiler and Handle Output
                 let mut cmd = Command::new(&self.compiler_path);
                 let mut child = cmd
-                    .arg(contract_path.clone())
+                    // .arg(contract_path.clone())
                     .args(&comp_args)
                     .stdin(Stdio::piped())
                     .stderr(Stdio::piped())
@@ -290,6 +264,7 @@ impl ZkSolc {
                     )));
                 }
 
+                //Get filename from contract_path
                 let filename = contract_path
                     .file_name()
                     .expect("Failed to extract filename")
@@ -531,7 +506,7 @@ impl ZkSolc {
         let json_input_path = artifact_path.join("json_input.json");
         let stdjson = serde_json::to_value(standard_json)
             .map_err(|e| Error::msg(format!("Could not serialize standard JSON input: {}", e)))?;
-        std::fs::write(&json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
+        std::fs::write(&json_input_path, serde_json::to_string_pretty(&stdjson)?)
             .map_err(|e| Error::msg(format!("Could not write JSON input file: {}", e)))?;
 
         Ok(())
@@ -820,7 +795,10 @@ fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRema
         let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
 
         // Define a pattern that matches the import statement, capturing the rest of the path
-        let pattern = format!(r#"import\s+"{}(?P<rest>[^"]*)""#, regex::escape(&remapping.name));
+        let pattern = format!(
+            r#"import\s+(?:\{{.*\}}\s+from\s+)?"{}(?P<rest>[^"]*)""#,
+            regex::escape(&remapping.name)
+        );
 
         // Define a replacement that includes the placeholder and the captured rest of the path
         let replacement = format!(r#"import "{}$rest""#, placeholder);
@@ -871,4 +849,45 @@ fn substitute_remapped_paths(content: String, remappings: &[RelativeRemapping]) 
     }
 
     substituted
+}
+
+/// Modifies a source file path in-place based on the first applicable remapping found in the provided remappings array.
+///
+/// The function iterates over each relative remapping in the array. For each remapping, it splits the source path string
+/// using the remapping's prefix as the delimiter. If a split occurs, the function reconstructs the source path using
+/// the remapping's path joined with the latter portion of the split source path, effectively applying the remapping to
+/// the source path.
+///
+/// The source path is modified in-place, and the function does not return a value. The function performs these operations
+/// using mutable references to avoid unnecessary allocations.
+///
+/// Note that only the first applicable remapping is applied; if multiple remappings could apply, only the first one encountered
+/// will be used.
+///
+/// # Arguments
+///
+/// * `source_path` - A mutable reference to a `PathBuf` representing the source file path to be remapped.
+/// * `remappings` - A reference to an array of `RelativeRemapping` instances representing the project remappings.
+///
+/// # Panics
+///
+/// This function will panic if it fails to convert the `PathBuf` to a str, which would typically occur if the path contains invalid
+/// UTF-8 sequences.
+fn remap_source_path(source_path: &mut PathBuf, remappings: &[RelativeRemapping]) {
+    let source_path_str = source_path.to_str().expect("Failed to convert path to str");
+
+    for r in remappings.iter() {
+        let prefix = &r.name; // The name field of the RelativeRemapping struct
+
+        // Attempt to split the source key using the prefix
+        let mut parts = source_path_str.splitn(2, prefix);
+
+        // If a split occurs, parts.next() will be Some(...), and we reconstruct the path using the replacement path
+        if let Some(_before) = parts.next() {
+            if let Some(after) = parts.next() {
+                *source_path = r.path.path.join(after);
+                break;
+            }
+        }
+    }
 }
