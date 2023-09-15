@@ -262,6 +262,20 @@ forge-std/=lib/forge-std/src/
 era-system-contracts/=lib/era-system-contracts/
 ```
 
+### To use remapped imports:
+
+```solidity
+import "era-system-contracts/contracts/Constants.sol";
+import "era-system-contracts/contracts/libraries/SystemContractsCaller.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+```
+
+NOTES:
+
+- The `remappings.txt` file must be in the project root.
+- For remappings **_suggestions_**, use the command `zkforge remappings`, but double check output for your use case, if the remappings are correct, you can use `zkforge remappings > remappings.txt` to create the file.
+
 ---
 
 ## Deploy with `zkforge zk-create`
