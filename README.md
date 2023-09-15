@@ -45,7 +45,7 @@ mkdir fzksync && cd fzksync
 2. Clone the repos into the same directory.
 
 ```sh
-git clone https://github.com/matter-labs/foundry-zksync.git 
+git clone https://github.com/matter-labs/foundry-zksync.git
 git clone https://github.com/sammyshakes/sample-fzksync-project.git
 ```
 
@@ -65,10 +65,10 @@ git submodule update --init --recursive
 
 ### Environment variables
 
-Create a new file `.env` at the `PROJECT-ROOT` and copy/paste the following environment variables. 
+Create a new file `.env` at the `PROJECT-ROOT` and copy/paste the following environment variables.
 
 ```txt
-# ETH_RPC_URL replaces --rpc-url on the command line 
+# ETH_RPC_URL replaces --rpc-url on the command line
 ETH_RPC_URL=http://localhost:3050
 
 ## L1_RPC_URL and L2_RPC_URL are only used for `zk-deposit`
@@ -76,14 +76,14 @@ L1_RPC_URL=https://localhost:8545
 # L2_RPC_URL can be used to replace --l2-url in command line for `zk-deposit`
 L2_RPC_URL=https://localhost:3050
 
-# CHAIN replaces --chain in command line  
+# CHAIN replaces --chain in command line
 # Local: 270, Testnet: 280, Mainnet: 324
 CHAIN=270
 ```
 
 ### Spin up local Docker node
 
-Follow [these instructions]((https://era.zksync.io/docs/api/hardhat/testing.html)) to set up a local Docker node.
+Follow [these instructions](<(https://era.zksync.io/docs/api/hardhat/testing.html)>) to set up a local Docker node.
 
 ---
 
@@ -103,7 +103,7 @@ Follow [these instructions]((https://era.zksync.io/docs/api/hardhat/testing.html
 
 270
 
-#### Get chain id of testnet 
+#### Get chain id of testnet
 
 ```sh
 ../foundry-zksync/target/debug/zkcast chain-id --rpc-url https://zksync2-testnet.zksync.dev:443
@@ -115,7 +115,7 @@ Follow [these instructions]((https://era.zksync.io/docs/api/hardhat/testing.html
 280
 ```
 
-#### Get client 
+#### Get client
 
 ```sh
 ../foundry-zksync/target/debug/zkcast client --rpc-url https://zksync2-testnet.zksync.dev:443
@@ -129,7 +129,7 @@ zkSync/v2.0
 
 #### Get account's L2 ETH balance
 
-```sh 
+```sh
 ../foundry-zksync/target/debug/zkcast balance 0x42C7eF198f8aC9888E2B1b73e5B71f1D4535194A --rpc-url https://zksync2-testnet.zksync.dev:443
 ```
 
@@ -194,6 +194,7 @@ totalDifficulty      0
 l1BatchNumber        null
 l1BatchTimestamp     null
 ```
+
 ---
 
 ## Compile with `zkforge zk-build`
@@ -206,7 +207,7 @@ Compile smart contracts to zkEVM bytecode and store the compiled output files in
 
 Compiler subcommands for zkSync
 
-Usage: 
+Usage:
 zkforge zk-build [OPTIONS]
 
 Options:
@@ -225,7 +226,7 @@ Options:
 To compile with default compiler options (v1.3.11).
 
 ```sh
-../foundry-zksync/target/debug/zkforge zk-build 
+../foundry-zksync/target/debug/zkforge zk-build
 ```
 
 ### Compiler settings
@@ -243,17 +244,23 @@ Configure the `zksolc` compiler version using the optional `--use` flag.
 ```bash
 <PROJECT-ROOT>/zkout/<CONTRACT_FILENAME>
 ```
+
 ![image](https://user-images.githubusercontent.com/76663878/234152279-e144e489-41ab-4cbd-8321-8ccd9b0aa6ef.png)
 
 Example terminal output:
 
 ![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
 
-NOTE: Currently, until `forge remappings` are implemented, import paths must be relative to the contract importing it:
+### Remappings are now implemented.
 
-![image](https://github.com/matter-labs/foundry-zksync/assets/76663878/490b34f4-e286-42a7-8570-d4b228ec10c7)
+An example `remappings.txt` file to include in the project root:
 
-`SimpleFactory.sol` and `AAFactory.sol` are in the `src/is-system/` folder.
+```txt
+ds-test/=lib/forge-std/lib/ds-test/src/
+forge-std/=lib/forge-std/src/
+@openzeppelin/=lib/openzeppelin-contracts/
+era-system-contracts/=lib/era-system-contracts/
+```
 
 ---
 
@@ -315,6 +322,7 @@ Block Number: 6651906
 ```sh
 zkcast zk-deposit <TO> <AMOUNT> <TOKEN> --l1-rpc-url <L1-RPC-URL> --l2-url <L2URL> --chain <CHAIN-ID> --private-key <PRIVATE-KEY>
 ```
+
 NOTE: Leave `<TOKEN>` blank to bridge ETH
 
 ```bash
@@ -336,9 +344,9 @@ Arguments:
 Options:
   -z, --l2-url <L2URL>
           The zkSync RPC Layer 2 endpoint. Can be provided via the env var ZKSYNC_RPC_URL or --l2-url from the command line.
-          
+
           NOTE: For Deposits, ETH_RPC_URL, or --rpc-url should be set to the Layer 1 RPC URL
-          
+
           [env: ZKSYNC_RPC_URL=https://zksync2-testnet.zksync.dev]
 
       --token <TOKEN>
@@ -360,6 +368,7 @@ Options:
 Bridging assets....
 Transaction Hash: 0x55793df0a636aedd098309e3487c6d9ec0910422d5b9f0bdbdf764bc82dc1b9f
 ```
+
 ---
 
 ### L2 → L1 withdrawals
@@ -605,7 +614,7 @@ Place the contract in the `src/is-system/` folder
 #### Output
 
 ```sh
-AAFactory -> Bytecode Hash: "010000791703a54dbe2502b00ee470989c267d0f6c0d12a9009a947715683744" 
+AAFactory -> Bytecode Hash: "010000791703a54dbe2502b00ee470989c267d0f6c0d12a9009a947715683744"
 Compiled Successfully
 ```
 
@@ -652,11 +661,11 @@ function deployAccount(bytes32 salt, address owner1, address owner2) external re
 We need to provide the two owner addresses for the newly deployed multisig:
 
 ```js
-owner1 = 0xa61464658AfeAf65CccaaFD3a512b69A83B77618
-owner2 = 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
+owner1 = 0xa61464658afeaf65cccaafd3a512b69a83b77618;
+owner2 = 0x0d43eb5b8a47ba8900d84aa36656c92024e9772e;
 ```
 
-We are also just using a `0x00` value for the ***salt*** parameter. (You will need a unique value for salt for each instance that uses same owner wallets).
+We are also just using a `0x00` value for the **_salt_** parameter. (You will need a unique value for salt for each instance that uses same owner wallets).
 
 ```sh
 # command line using zkcast zk-send
@@ -738,9 +747,9 @@ Verify `owner2`:
 
 Make sure that:
 
-* You are using zksync specific methods (`zkcreate` not `create`, `zksend` not `send`).
-* You set the correct `--rpc-url`.
-* You have the proper contract address - the bytecodes in zkSync Era are different to in EVM - so the resulting contracts will be deployed at different addresses.
+- You are using zksync specific methods (`zkcreate` not `create`, `zksend` not `send`).
+- You set the correct `--rpc-url`.
+- You have the proper contract address - the bytecodes in zkSync Era are different to in EVM - so the resulting contracts will be deployed at different addresses.
 
 ### 'Method not found' when calling 'send'
 
@@ -752,8 +761,8 @@ These errors might show up on the Mac with ARM chip (M1, M2) due to the fact tha
 
 There are 2 workarounds:
 
- - Use an older compiler by adding `--use 0.8.19` flag to the `zk-build` command.
- - Download the compiler manually and then use the `--offline` mode. (Download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20).
+- Use an older compiler by adding `--use 0.8.19` flag to the `zk-build` command.
+- Download the compiler manually and then use the `--offline` mode. (Download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20).
 
 You can get the latest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
 

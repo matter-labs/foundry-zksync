@@ -305,7 +305,7 @@ impl ZkSolc {
         let mut comp_args = Vec::<String>::new();
         comp_args.push("--standard-json".to_string());
         comp_args.push("--solc".to_string());
-        comp_args.push(solc_path.to_owned());
+        comp_args.push(solc_path);
 
         // Check if system mode is enabled or if the source path contains "is-system"
         if self.is_system || contract_path.to_str().unwrap().contains("is-system") {
