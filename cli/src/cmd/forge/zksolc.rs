@@ -369,16 +369,11 @@ impl ZkSolc {
         displayed_warnings: &mut HashSet<String>,
     ) {
         // Deserialize the compiler output into a serde_json::Value object
-        let output_json: Value = serde_json::from_slice(&output.clone().stdout)
+        let output_json: Value = serde_json::from_slice(&output.stdout)
             .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
 
         // Handle errors and warnings in the output
         self.handle_output_errors(&output_json, displayed_warnings);
-
-        // Create the artifacts file for saving the compiler output
-        let mut artifacts_file = self
-            .build_artifacts_file(source.clone())
-            .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));
 
         // Get the bytecode hashes for each contract in the output
         let output_obj = output_json["contracts"].as_object().unwrap();
@@ -398,6 +393,11 @@ impl ZkSolc {
         // Beautify the output JSON
         let output_json_pretty = serde_json::to_string_pretty(&output_json)
             .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
+
+        // Create the artifacts file for saving the compiler output
+        let mut artifacts_file = self
+            .build_artifacts_file(source)
+            .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));
 
         // Write the beautified output JSON to the artifacts file
         artifacts_file
