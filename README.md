@@ -22,6 +22,7 @@ This repository provides [Foundry](https://github.com/foundry-rs/foundry) functi
 - [Interact with contract](https://github.com/matter-labs/foundry-zksync#interact-with-contract)
 - [Deploy and interact with `SimpleFactory.sol`](https://github.com/matter-labs/foundry-zksync#deploy-and-interact-with-simplefactorysol)
 - [Account abstraction multisig example](https://github.com/matter-labs/foundry-zksync#account-abstraction-multisig)
+- [Remappings](https://github.com/matter-labs/foundry-zksync#remappings)
 - [Troubleshooting](https://github.com/matter-labs/foundry-zksync#troubleshooting)
 
 ---
@@ -251,32 +252,7 @@ Example terminal output:
 
 ![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
 
-### Remappings are now implemented.
-
-An example `remappings.txt` file to include in the project root:
-
-```txt
-ds-test/=lib/forge-std/lib/ds-test/src/
-forge-std/=lib/forge-std/src/
-@openzeppelin/=lib/openzeppelin-contracts/
-era-system-contracts/=lib/era-system-contracts/
-```
-
-### To use remapped imports:
-
-```solidity
-import "era-system-contracts/contracts/Constants.sol";
-import "era-system-contracts/contracts/libraries/SystemContractsCaller.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-```
-
-NOTES:
-
-- The `remappings.txt` file must be in the project root.
-- For remappings **_suggestions_**, use the command `zkforge remappings`, but double check output for your use case, if the remappings are correct, you can use `zkforge remappings > remappings.txt` to create the file.
-
----
+NOTE: [Remappings are now implemented](https://github.com/matter-labs/foundry-zksync#remappings)
 
 ## Deploy with `zkforge zk-create`
 
@@ -754,6 +730,35 @@ Verify `owner2`:
 ```txt
 0x0D43eB5B8a47bA8900d84AA36656c92024e9772e
 ```
+
+---
+
+## `Remappings` are now implemented.
+
+An example `remappings.txt` file to include in the project root:
+
+```txt
+ds-test/=lib/forge-std/lib/ds-test/src/
+forge-std/=lib/forge-std/src/
+@openzeppelin/=lib/openzeppelin-contracts/
+era-system-contracts/=lib/era-system-contracts/
+```
+
+### To use remapped imports:
+
+```solidity
+import "era-system-contracts/contracts/Constants.sol";
+import "era-system-contracts/contracts/libraries/SystemContractsCaller.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+```
+
+NOTES:
+
+- The `remappings.txt` file must be in the project root.
+- For remappings **_suggestions_**, use the command `zkforge remappings`, but double check output for your use case, if the remappings are correct, you can use `zkforge remappings > remappings.txt` to create the file.
+
+---
 
 ## Troubleshooting
 
