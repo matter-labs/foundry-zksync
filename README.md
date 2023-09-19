@@ -751,6 +751,7 @@ import "era-system-contracts/contracts/Constants.sol";
 import "era-system-contracts/contracts/libraries/SystemContractsCaller.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {ERC20 as Token} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 ```
 
 NOTES:
