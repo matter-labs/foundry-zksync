@@ -796,12 +796,12 @@ fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRema
 
         // Define a pattern that matches the import statement, capturing the rest of the path
         let pattern = format!(
-            r#"import\s+(?:\{{.*\}}\s+from\s+)?"{}(?P<rest>[^"]*)""#,
+            r#"import\s+((?:\{{.*?\}}\s+from\s+)?)\s*"{}(?P<rest>[^"]*)""#,
             regex::escape(&remapping.name)
         );
 
         // Define a replacement that includes the placeholder and the captured rest of the path
-        let replacement = format!(r#"import "{}$rest""#, placeholder);
+        let replacement = format!(r#"import {}"{}$rest""#, "$1", placeholder);
 
         // Replace all instances of the pattern with the replacement
         replaced_content =
