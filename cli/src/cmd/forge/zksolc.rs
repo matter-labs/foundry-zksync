@@ -306,6 +306,10 @@ impl ZkSolc {
         comp_args.push("--standard-json".to_string());
         comp_args.push("--solc".to_string());
         comp_args.push(solc_path);
+        comp_args.push("--base-path".to_string());
+        comp_args.push(self.project.paths.root.to_str().unwrap().to_string());
+        comp_args.push("--allow-paths".to_string());
+        comp_args.push(self.project.allowed_paths.to_string());
 
         // Check if system mode is enabled or if the source path contains "is-system"
         if self.is_system || contract_path.to_str().unwrap().contains("is-system") {
