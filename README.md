@@ -22,7 +22,7 @@ This repository provides [Foundry](https://github.com/foundry-rs/foundry) functi
 - [Interact with contract](https://github.com/matter-labs/foundry-zksync#interact-with-contract)
 - [Deploy and interact with `SimpleFactory.sol`](https://github.com/matter-labs/foundry-zksync#deploy-and-interact-with-simplefactorysol)
 - [Account abstraction multisig example](https://github.com/matter-labs/foundry-zksync#account-abstraction-multisig)
-- [Remappings](https://github.com/matter-labs/foundry-zksync#remappings)
+- [Remappings](https://github.com/matter-labs/foundry-zksync#remappings-are-now-implemented)
 - [Troubleshooting](https://github.com/matter-labs/foundry-zksync#troubleshooting)
 
 ---
@@ -252,7 +252,7 @@ Example terminal output:
 
 ![image](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
 
-NOTE: [Remappings are now implemented](https://github.com/matter-labs/foundry-zksync#remappings)
+NOTE: [Remappings are now implemented](https://github.com/matter-labs/foundry-zksync#remappings-are-now-implemented)
 
 ## Deploy with `zkforge zk-create`
 
