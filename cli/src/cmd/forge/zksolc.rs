@@ -712,13 +712,6 @@ impl ZkSolc {
     /// # Arguments
     ///
     /// * `self` - A mutable reference to the `ZkSolc` instance.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// // Configure compiler output settings
-    /// zksolc.configure_compiler_output_settings();
-    /// ```
     fn configure_compiler_output_settings(&mut self) {
         // Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
