@@ -255,6 +255,14 @@ impl ZkSolc {
                     .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
 
                 if !output.status.success() {
+                    // Skip this file if the compiler output is empty
+                    // currently zksolc returns false for success if output is empty
+                    // when output is empty, it has a length of 3, `[]\n`
+                    // solc returns true for success if output is empty
+                    if output.stderr.len() <= 3 {
+                        continue;
+                    }
+
                     return Err(Error::msg(format!(
                         "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
                         String::from_utf8(output.stderr).unwrap_or_default(),
