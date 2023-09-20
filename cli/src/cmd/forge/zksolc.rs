@@ -889,7 +889,10 @@ fn remap_source_path(source_path: &mut PathBuf, remappings: &[RelativeRemapping]
         // If a split occurs, parts.next() will be Some(...), and we reconstruct the path using the replacement path
         if let Some(_before) = parts.next() {
             if let Some(after) = parts.next() {
-                *source_path = r.path.path.join(after);
+                let temp_path = r.path.path.join(after);
+
+                *source_path =
+                    PathBuf::from(temp_path.to_str().unwrap().replace("src/src/", "src/"));
                 break;
             }
         }
