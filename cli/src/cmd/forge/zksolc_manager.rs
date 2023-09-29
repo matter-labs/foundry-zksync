@@ -577,12 +577,12 @@ impl ZkSolcManager {
             let compiler_path = self.compilers_path.join(self.get_full_compiler());
             fs::set_permissions(compiler_path, PermissionsExt::from_mode(0o755)).map_err(|e| {
                 Error::msg(format!("Failed to set zksync compiler permissions: {e}"))
-            })?
+            })?;
         } else {
             return Err(Error::msg(format!(
                 "Failed to download file: status code {}",
                 response.status()
-            )));
+            )))
         }
         Ok(())
     }
