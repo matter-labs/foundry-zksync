@@ -234,7 +234,7 @@ impl ZkSolc {
 
                 // Skip this file if it's not in the 'sources' directory or its subdirectories
                 if !is_in_sources_dir {
-                    continue
+                    continue;
                 }
 
                 // Step 3: Parse JSON Input for each Source
@@ -272,24 +272,15 @@ impl ZkSolc {
                         self.compiler_path,
                         contract_path,
                         &comp_args
-                    )))
+                    )));
                 }
 
+                //Get filename from contract_path
                 let filename = contract_path
+                    .file_name()
+                    .expect("Failed to extract filename")
                     .to_str()
-                    .expect("Unable to convert source to string")
-                    .split(
-                        self.project
-                            .paths
-                            .root
-                            .to_str()
-                            .expect("Unable to convert source to string"),
-                    )
-                    .nth(1)
-                    .expect("Failed to get Contract relative path")
-                    .split('/')
-                    .last()
-                    .expect("Failed to get Contract filename.");
+                    .expect("Failed to convert filename to str");
 
                 // Step 6: Handle Output (Errors and Warnings)
                 self.handle_output(output, filename.to_string(), &mut displayed_warnings);
