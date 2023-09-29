@@ -234,7 +234,7 @@ impl ZkSolc {
 
                 // Skip this file if it's not in the 'sources' directory or its subdirectories
                 if !is_in_sources_dir {
-                    continue;
+                    continue
                 }
 
                 // Step 3: Parse JSON Input for each Source
@@ -271,7 +271,7 @@ impl ZkSolc {
                         self.compiler_path,
                         contract_path,
                         &comp_args
-                    )));
+                    )))
                 }
 
                 //Get filename from contract_path
