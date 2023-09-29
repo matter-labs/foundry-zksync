@@ -248,7 +248,6 @@ impl ZkSolc {
                 // Step 5: Run Compiler and Handle Output
                 let mut cmd = Command::new(&self.compiler_path);
                 let mut child = cmd
-                    .arg(contract_path.clone())
                     .args(&comp_args)
                     .stdin(Stdio::piped())
                     .stderr(Stdio::piped())
