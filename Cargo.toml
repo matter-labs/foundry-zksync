@@ -26,7 +26,6 @@ resolver = "2"
 [profile.dev]
 # Disabling debug info speeds up builds a bunch,
 # and we don't rely on it for debugging that much
-#debug = 1
 
 # These speed up local tests
 [profile.dev.package.ethers-solc]
@@ -87,6 +86,7 @@ solang-parser = "=0.3.1"
 #ethers-solc = { path = "../ethers-rs/ethers-solc" }
 
 [patch.crates-io]
+# Original revm - we had to fork it, due to compilation issues with SHA
 # revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
 
 revm = {  git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha", version = "3", default-features = false, features = [

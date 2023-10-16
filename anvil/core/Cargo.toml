@@ -7,6 +7,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 # foundry internal
 foundry-evm = { path = "../../evm" }
+# Original REVM - we had to fork it, due to compilation issues with SHA 
 # revm = { version = "3", default-features = false, features = ["std", "serde", "memory_limit"] }
 revm = {  git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha", version = "3", default-features = false, features = [
   "std",

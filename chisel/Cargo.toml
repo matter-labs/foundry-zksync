@@ -55,6 +55,7 @@ serde = "1"
 serde_json = { version = "1", features = ["raw_value"] }
 semver = "1"
 bytes = "1"
+# Original REVM. We had to fork it, due to conflicts in SHA.
 # revm = "3"
 
 revm = {  git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha", version = "3" }
