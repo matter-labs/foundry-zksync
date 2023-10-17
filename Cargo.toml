@@ -26,7 +26,6 @@ resolver = "2"
 [profile.dev]
 # Disabling debug info speeds up builds a bunch,
 # and we don't rely on it for debugging that much
-debug = 0
 
 # These speed up local tests
 [profile.dev.package.ethers-solc]
@@ -61,16 +60,16 @@ panic = "abort"
 strip = true
 
 [workspace.dependencies]
-ethers = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-addressbook = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-core = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-contract = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-contract-abigen = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-providers = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-signers = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-middleware = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-etherscan = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
-ethers-solc = { git = "https://github.com/gakonst/ethers-rs", default-features = false }
+ethers = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-addressbook = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-core = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-contract = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-contract-abigen = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-providers = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-signers = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-middleware = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-etherscan = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
+ethers-solc = { git = "https://github.com/mm-zk/ethers-rs", branch = "main_with_public_artifacts", default-features = false }
 
 solang-parser = "=0.3.1"
 
@@ -87,4 +86,14 @@ solang-parser = "=0.3.1"
 #ethers-solc = { path = "../ethers-rs/ethers-solc" }
 
 [patch.crates-io]
-revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+# Original revm - we had to fork it, due to compilation issues with SHA
+# revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+
+revm = {  git = "https://github.com/mm-zk/revm.git", branch = "release_v25_with_old_sha", version = "3", default-features = false, features = [
+  "std",
+  "serde",
+  "memory_limit",
+  "optional_eip3607",
+  "optional_block_gas_limit",
+  "optional_no_base_fee"
+] }

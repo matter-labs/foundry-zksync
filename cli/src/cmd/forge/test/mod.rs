@@ -1,14 +1,21 @@
 //! Test command
 use crate::{
     cmd::{
-        forge::{build::CoreBuildArgs, debug::DebugArgs, install, watch::WatchArgs},
+        forge::{
+            build::CoreBuildArgs,
+            debug::DebugArgs,
+            install,
+            watch::WatchArgs,
+            zksolc::{ZkSolc, ZkSolcOpts},
+            zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts, DEFAULT_ZKSOLC_VERSION},
+        },
         LoadConfig,
     },
     suggestions, utils,
 };
 use cast::fuzz::CounterExample;
 use clap::Parser;
-use ethers::{abi::Abi, types::U256};
+use ethers::types::U256;
 use forge::{
     decode::decode_console_logs,
     executor::inspector::CheatsConfig,
@@ -18,16 +25,12 @@ use forge::{
         identifier::{EtherscanIdentifier, LocalTraceIdentifier, SignaturesIdentifier},
         CallTraceDecoderBuilder, TraceKind,
     },
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
+    MultiContractRunner, MultiContractRunnerBuilder, TestOptions,
 };
-use foundry_common::{
-    compile::{self, ProjectCompiler},
-    evm::EvmArgs,
-    get_contract_name, get_file_name,
-};
-use foundry_config::{figment, get_available_profiles, Config};
+use foundry_common::{evm::EvmArgs, get_contract_name, get_file_name};
+use foundry_config::{figment, Config};
 use regex::Regex;
-use std::{collections::BTreeMap, fs, path::PathBuf, sync::mpsc::channel, time::Duration};
+use std::{collections::BTreeMap, path::PathBuf, sync::mpsc::channel, time::Duration};
 use tracing::trace;
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
@@ -42,13 +45,11 @@ use foundry_config::figment::{
 };
 use foundry_evm::utils::evm_spec;
 
-use ethers::types::Bytes;
-
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
 
 /// CLI arguments for `forge test`.
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, Default)]
 #[clap(next_help_heading = "Test options")]
 pub struct TestArgs {
     /// Run a test in the debugger.
@@ -151,27 +152,22 @@ impl TestArgs {
             project = config.project()?;
         }
 
-        let compiler = ProjectCompiler::default();
-        let output = if config.sparse_mode {
-            compiler.compile_sparse(&project, filter.clone())
-        } else if self.opts.silent {
-            compile::suppress_compile(&project)
-        } else {
-            compiler.compile(&project)
-        }?;
+        let project_root = project.paths.root.clone();
 
-        // Create test options from general project settings
-        // and compiler output
-        let project_root = &project.paths.root;
-        let toml = config.get_config_path();
-        let profiles = get_available_profiles(toml)?;
+        let zksolc_manager =
+            ZkSolcManagerBuilder::new(ZkSolcManagerOpts::new(DEFAULT_ZKSOLC_VERSION.to_owned()))
+                .build()
+                .unwrap();
 
-        let test_options: TestOptions = TestOptionsBuilder::default()
-            .fuzz(config.fuzz)
-            .invariant(config.invariant)
-            .compile_output(&output)
-            .profiles(profiles)
-            .build(project_root)?;
+        let zksolc_opts = ZkSolcOpts {
+            compiler_path: zksolc_manager.get_full_compiler_path(),
+            is_system: false,
+            force_evmla: false,
+        };
+
+        let mut zksolc = ZkSolc::new(zksolc_opts, project);
+        let output = zksolc.compile().unwrap();
+        let test_options = TestOptions::default();
 
         // Determine print verbosity and executor verbosity
         let verbosity = evm_opts.verbosity;
@@ -190,15 +186,7 @@ impl TestArgs {
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .with_cheats_config(CheatsConfig::new(&config, &evm_opts))
-            .with_test_options(test_options.clone())
-            .build(project_root, output, env, evm_opts)?;
-
-        println!("{:#?}, <-------> runner fork", runner.fork);
-        // let (_contract, _bytes, _bytes_v) =
-        // runner.contracts.clone().into_iter().nth(0).unwrap().1; println!("{:#?},
-        // <-------> _contract", _contract); println!("{:#?}, <-------> _bytes", _bytes);
-
-        // zk_evm::
+            .build(&project_root, output, env, evm_opts)?;
 
         if self.debug.is_some() {
             filter.args_mut().test_pattern = self.debug;
@@ -524,31 +512,6 @@ async fn test(
     gas_reporting: bool,
     fail_fast: bool,
 ) -> eyre::Result<TestOutcome> {
-    let project = config.project().unwrap();
-
-    //get bytecode
-    let contract_path = "src/Greeter.sol:Greeter";
-    let output_path: &str =
-        &format!("{}/zksolc/{}/combined.json", project.paths.artifacts.display(), "Greeter.sol");
-    let data = fs::read_to_string(output_path).expect("Unable to read file");
-    //convert to json Value
-    let res: serde_json::Value = serde_json::from_str(&data).expect("Unable to parse");
-    let bytecode: Bytes =
-        serde_json::from_value(res["contracts"][&contract_path]["bin"].clone()).unwrap();
-    let bytecode_v = bytecode.to_vec();
-    //get abi
-    let abi: Abi = serde_json::from_value(res["contracts"][&contract_path]["abi"].clone()).unwrap();
-    let a = runner.known_contracts.clone().0.into_iter();
-    for (art, _ctx) in a {
-        if &art.name == "Greeter" {
-            // println!(
-            //     "{:#?}, before contracts",
-            //     runner.known_contracts.0.get_key_value(&art).unwrap().1
-            // );
-            runner.known_contracts.0.insert(art, (abi.clone(), bytecode_v.clone()));
-        }
-    }
-
     trace!(target: "forge::test", "running all tests");
     if runner.count_filtered_tests(&filter) == 0 {
         let filter_str = filter.to_string();

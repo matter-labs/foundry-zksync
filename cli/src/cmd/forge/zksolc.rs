@@ -30,18 +30,24 @@
 /// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods
 ///   construct the path and file for saving the compiler output artifacts.
 use ansi_term::Colour::{Red, Yellow};
-use anyhow::{Error, Result};
 use ethers::{
     prelude::{artifacts::Source, Solc},
     solc::{
-        artifacts::{output_selection::FileOutputSelection, StandardJsonCompilerInput},
-        Graph, Project,
+        artifacts::{
+            output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
+            LosslessAbi, StandardJsonCompilerInput,
+        },
+        ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project,
+        ProjectCompileOutput,
     },
+    types::Bytes,
 };
+use eyre::{Context, ContextCompat, Result};
 use semver::Version;
+use serde::Deserialize;
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt, fs,
     fs::File,
     io::Write,
@@ -113,7 +119,6 @@ pub struct ZkSolc {
     is_system: bool,
     force_evmla: bool,
     standard_json: Option<StandardJsonCompilerInput>,
-    sources: Option<BTreeMap<Solc, SolidityVersionSources>>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -138,7 +143,6 @@ impl ZkSolc {
             is_system: opts.is_system,
             force_evmla: opts.force_evmla,
             standard_json: None,
-            sources: None,
         }
     }
 
@@ -215,16 +219,17 @@ impl ZkSolc {
     /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the
     /// versioned sources. These modified values can be accessed after the compilation process
     /// for further processing or analysis.
-    pub fn compile(mut self) -> Result<()> {
-        // Step 1: Collect Source Files
-        self.configure_solc();
-        let sources = self.sources.clone().unwrap();
+    pub fn compile(&mut self) -> Result<ProjectCompileOutput> {
         let mut displayed_warnings = HashSet::new();
+        let mut data = BTreeMap::new();
+        // Step 1: Collect Source Files
+        let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
 
         // Step 2: Compile Contracts for Each Source
         for (solc, version) in sources {
             //configure project solc for each solc version
             for source in version.1 {
+                // Contract path is an absolute path of the file.
                 let contract_path = source.0.clone();
 
                 // Check if the contract_path is in 'sources' directory or its subdirectories
@@ -238,12 +243,13 @@ impl ZkSolc {
                 }
 
                 // Step 3: Parse JSON Input for each Source
-                if let Err(err) = self.parse_json_input(contract_path.clone()) {
-                    eprintln!("Failed to parse json input for zksolc compiler: {}", err);
-                }
+                self.prepare_compiler_input(&contract_path).wrap_err(format!(
+                    "Failed to prepare inputs when compiling {:?}",
+                    contract_path
+                ))?;
 
                 // Step 4: Build Compiler Arguments
-                let comp_args = self.build_compiler_args(source.clone(), solc.clone());
+                let comp_args = self.build_compiler_args(&source, &solc);
 
                 // Step 5: Run Compiler and Handle Output
                 let mut cmd = Command::new(&self.compiler_path);
@@ -253,51 +259,54 @@ impl ZkSolc {
                     .stdin(Stdio::piped())
                     .stderr(Stdio::piped())
                     .stdout(Stdio::piped())
-                    .spawn();
-                let stdin = child.as_mut().unwrap().stdin.take().expect("Stdin exists.");
+                    .spawn()
+                    .wrap_err("Failed to start the compiler")?;
 
-                serde_json::to_writer(stdin, &self.standard_json.clone().unwrap()).map_err(
-                    |e| Error::msg(format!("Could not assign standard_json to writer: {}", e)),
-                )?;
+                let stdin = child.stdin.take().expect("Stdin exists.");
 
-                let output = child
-                    .unwrap()
-                    .wait_with_output()
-                    .map_err(|e| Error::msg(format!("Could not run compiler cmd: {}", e)))?;
+                serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
+                    .wrap_err("Could not assign standard_json to writer")?;
+
+                let output = child.wait_with_output().wrap_err("Could not run compiler cmd")?;
 
                 if !output.status.success() {
-                    return Err(Error::msg(format!(
+                    eyre::bail!(
                         "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
                         String::from_utf8(output.stderr).unwrap_or_default(),
                         self.compiler_path,
                         contract_path,
                         &comp_args
-                    )))
+                    );
                 }
 
                 let filename = contract_path
+                    .file_name()
+                    .wrap_err(format!("Could not get filename from {:?}", contract_path))?
                     .to_str()
-                    .expect("Unable to convert source to string")
-                    .split(
-                        self.project
-                            .paths
-                            .root
-                            .to_str()
-                            .expect("Unable to convert source to string"),
-                    )
-                    .nth(1)
-                    .expect("Failed to get Contract relative path")
-                    .split('/')
-                    .last()
-                    .expect("Failed to get Contract filename.");
+                    .unwrap()
+                    .to_string();
 
                 // Step 6: Handle Output (Errors and Warnings)
-                self.handle_output(output, filename.to_string(), &mut displayed_warnings);
+                data.insert(
+                    filename.clone(),
+                    ZkSolc::handle_output(
+                        output.stdout,
+                        &filename,
+                        &mut displayed_warnings,
+                        Some(
+                            self.project
+                                .paths
+                                .artifacts
+                                .join(filename.clone())
+                                .join("artifacts.json"),
+                        ),
+                    ),
+                );
             }
         }
-
-        // Step 7: Return Ok if the compilation process completes without errors
-        Ok(())
+        let mut result = ProjectCompileOutput::default();
+        result.compiled_artifacts = Artifacts { 0: data };
+        Ok(result)
     }
 
     /// Builds the compiler arguments for the Solidity compiler based on the provided versioned
@@ -314,22 +323,15 @@ impl ZkSolc {
     ///
     /// A vector of strings representing the compiler arguments.
     fn build_compiler_args(
-        &mut self,
-        versioned_source: (PathBuf, Source),
-        solc: Solc,
+        &self,
+        versioned_source: &(PathBuf, Source),
+        solc: &Solc,
     ) -> Vec<String> {
         // Get the solc compiler path as a string
-        let solc_path = solc
-            .solc
-            .to_str()
-            .unwrap_or_else(|| panic!("Error configuring solc compiler."))
-            .to_string();
+        let solc_path = solc.solc.to_str().expect("Error configuring solc compiler.").to_string();
 
         // Build compiler arguments
-        let mut comp_args = Vec::<String>::new();
-        comp_args.push("--standard-json".to_string());
-        comp_args.push("--solc".to_string());
-        comp_args.push(solc_path.to_owned());
+        let mut comp_args = vec!["--standard-json".to_string(), "--solc".to_string(), solc_path];
 
         // Check if system mode is enabled or if the source path contains "is-system"
         if self.is_system || versioned_source.0.to_str().unwrap().contains("is-system") {
@@ -380,53 +382,117 @@ impl ZkSolc {
     /// let output = std::process::Output { ... };
     /// let source = "/path/to/contract.sol".to_string();
     /// let mut displayed_warnings = HashSet::new();
-    /// self.handle_output(output, source, &mut displayed_warnings);
+    /// ZkSolc::handle_output(output, source, &mut displayed_warnings);
     /// ```
     ///
     /// In this example, the `handle_output` function is called with the compiler output, contract
     /// source, and a mutable set for displayed warnings. It processes the output, handles
     /// errors and warnings, and saves the artifacts.
-    fn handle_output(
-        &self,
-        output: std::process::Output,
-        source: String,
+    pub fn handle_output(
+        output: Vec<u8>,
+        source: &String,
         displayed_warnings: &mut HashSet<String>,
-    ) {
+        write_artifacts: Option<PathBuf>,
+    ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
         // Deserialize the compiler output into a serde_json::Value object
-        let output_json: Value = serde_json::from_slice(&output.clone().stdout)
+        let compiler_output: ZkSolcCompilerOutput = serde_json::from_slice(&output)
             .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
 
         // Handle errors and warnings in the output
-        self.handle_output_errors(&output_json, displayed_warnings);
+        ZkSolc::handle_output_errors(&compiler_output, displayed_warnings);
 
-        // Create the artifacts file for saving the compiler output
-        let mut artifacts_file = self
-            .build_artifacts_file(source.clone())
-            .unwrap_or_else(|e| panic!("Error configuring solc compiler: {}", e));
-
-        // Get the bytecode hashes for each contract in the output
-        let output_obj = output_json["contracts"].as_object().unwrap();
-        for key in output_obj.keys() {
-            if key.contains(&source) {
-                let b_code = output_obj[key].clone();
-                let b_code_obj = b_code.as_object().unwrap();
-                let b_code_keys = b_code_obj.keys();
-                for hash in b_code_keys {
-                    if let Some(bcode_hash) = b_code_obj[hash]["hash"].as_str() {
-                        println!("{} -> Bytecode Hash: {} ", hash, bcode_hash);
-                    }
+        // First - let's get all the bytecodes.
+        let mut all_bytecodes: HashMap<String, String> = Default::default();
+        for (_source_file_name, source_file_results) in &compiler_output.contracts {
+            for (_contract_name, contract_results) in source_file_results {
+                if let Some(hash) = &contract_results.hash {
+                    all_bytecodes.insert(
+                        hash.clone(),
+                        contract_results.evm.bytecode.as_ref().unwrap().object.clone(),
+                    );
                 }
             }
         }
 
-        // Beautify the output JSON
-        let output_json_pretty = serde_json::to_string_pretty(&output_json)
-            .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
+        let mut result = BTreeMap::new();
 
-        // Write the beautified output JSON to the artifacts file
-        artifacts_file
-            .write_all(output_json_pretty.as_bytes())
-            .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+        // Get the bytecode hashes for each contract in the output
+        for key in compiler_output.contracts.keys() {
+            if key.contains(source) {
+                let contracts_in_file = compiler_output.contracts.get(key).unwrap();
+                for (contract_name, contract) in contracts_in_file {
+                    println!(
+                        "{} -> Bytecode Hash: {} ",
+                        contract_name,
+                        contract.hash.as_ref().unwrap()
+                    );
+
+                    let factory_deps: Vec<String> = contract
+                        .factory_dependencies
+                        .keys()
+                        .map(|factory_hash| all_bytecodes.get(factory_hash).unwrap())
+                        .cloned()
+                        .collect();
+
+                    let packed_bytecode = Bytes::from(
+                        era_revm::factory_deps::PackedEraBytecode::new(
+                            contract.hash.as_ref().unwrap().clone(),
+                            contract.evm.bytecode.as_ref().unwrap().object.clone(),
+                            factory_deps,
+                        )
+                        .to_vec(),
+                    );
+
+                    let mut art = ConfigurableContractArtifact::default();
+                    art.bytecode = Some(CompactBytecode {
+                        object: ethers::solc::artifacts::BytecodeObject::Bytecode(
+                            packed_bytecode.clone(),
+                        ),
+                        source_map: None,
+                        link_references: Default::default(),
+                    });
+
+                    art.deployed_bytecode = Some(CompactDeployedBytecode {
+                        bytecode: Some(CompactBytecode {
+                            object: ethers::solc::artifacts::BytecodeObject::Bytecode(
+                                packed_bytecode,
+                            ),
+                            source_map: None,
+                            link_references: Default::default(),
+                        }),
+                        immutable_references: Default::default(),
+                    });
+
+                    art.abi = contract.abi.clone();
+
+                    let artifact = ArtifactFile {
+                        artifact: art,
+                        file: format!("{}.sol", contract_name).into(),
+                        version: Version::parse(&compiler_output.version).unwrap(),
+                    };
+                    result.insert(contract_name.clone(), vec![artifact]);
+                }
+            }
+        }
+        if let Some(write_artifacts) = write_artifacts {
+            let output_json: Value = serde_json::from_slice(&output)
+                .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
+
+            // Beautify the output JSON
+            let output_json_pretty = serde_json::to_string_pretty(&output_json)
+                .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
+
+            // Create the artifacts file for saving the compiler output
+            let mut artifacts_file =
+                File::create(write_artifacts).wrap_err("Could not create artifacts file").unwrap();
+
+            // Write the beautified output JSON to the artifacts file
+            artifacts_file
+                .write_all(output_json_pretty.as_bytes())
+                .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+        }
+
+        result
     }
 
     /// Handles the errors and warnings present in the output JSON from the compiler.
@@ -452,11 +518,11 @@ impl ZkSolc {
     /// If any errors are encountered, the function calls `exit(1)` to terminate the program. If
     /// only warnings are encountered, it prints a message indicating that the compiler run
     /// completed with warnings.
-    fn handle_output_errors(&self, output_json: &Value, displayed_warnings: &mut HashSet<String>) {
-        let errors = output_json
-            .get("errors")
-            .and_then(|v| v.as_array())
-            .unwrap_or_else(|| panic!("Could not find 'errors' array in the output JSON"));
+    pub fn handle_output_errors(
+        output_json: &ZkSolcCompilerOutput,
+        displayed_warnings: &mut HashSet<String>,
+    ) {
+        let errors = &output_json.errors;
 
         let mut has_error = false;
         let mut has_warning = false;
@@ -535,13 +601,13 @@ impl ZkSolc {
     ///
     /// ```ignore
     /// let contract_path = PathBuf::from("/path/to/contract.sol");
-    /// self.parse_json_input(contract_path)?;
+    /// self.prepare_compiler_input(contract_path)?;
     /// ```
     ///
-    /// In this example, the `parse_json_input` function is called with the contract source path. It
-    /// generates the JSON input for the contract, configures the Solidity compiler, and saves
-    /// the input to the artifacts directory.
-    fn parse_json_input(&mut self, contract_path: PathBuf) -> Result<()> {
+    /// In this example, the `prepare_compiler_input` function is called with the contract source
+    /// path. It generates the JSON input for the contract, configures the Solidity compiler,
+    /// and saves the input to the artifacts directory.
+    fn prepare_compiler_input(&mut self, contract_path: &PathBuf) -> Result<()> {
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
         file_output_selection.insert(
@@ -579,31 +645,25 @@ impl ZkSolc {
         // Step 4: Generate Standard JSON Input
         let standard_json = self
             .project
-            .standard_json_input(&contract_path)
-            .map_err(|e| Error::msg(format!("Could not get standard json input: {}", e)))
+            .standard_json_input(contract_path)
+            .wrap_err("Could not get standard json input")
             .unwrap();
 
         // Store the generated standard JSON input in the ZkSolc instance
         self.standard_json = Some(standard_json.to_owned());
 
         // Step 5: Build Artifacts Path
-        let artifact_path = &self
-            .build_artifacts_path(contract_path)
-            .map_err(|e| Error::msg(format!("Could not build_artifacts_path: {}", e)))
-            .unwrap();
+        let artifact_path = &self.build_artifacts_path(contract_path)?;
 
         // Step 6: Save JSON Input
         let json_input_path = artifact_path.join("json_input.json");
-        let stdjson = serde_json::to_value(&standard_json)
-            .map_err(|e| Error::msg(format!("Could not serialize standard JSON input: {}", e)))?;
+        let stdjson =
+            serde_json::to_value(&standard_json).wrap_err("Could not serialize JSON input")?;
+
         std::fs::write(json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
-            .map_err(|e| Error::msg(format!("Could not write JSON input file: {}", e)))?;
+            .wrap_err("Could not write JSON input file")?;
 
         Ok(())
-    }
-
-    fn configure_solc(&mut self) {
-        self.sources = Some(self.get_versioned_sources().unwrap());
     }
 
     /// Retrieves the versioned sources for the Solidity contracts in the project. The versioned
@@ -679,22 +739,19 @@ impl ZkSolc {
     /// The versioned sources can then be used for further processing or analysis.
     fn get_versioned_sources(&mut self) -> Result<BTreeMap<Solc, SolidityVersionSources>> {
         // Step 1: Retrieve Project Sources
-        let sources = self
-            .project
-            .sources()
-            .map_err(|e| Error::msg(format!("Could not get project sources: {}", e)))?;
+        let sources = self.project.sources().wrap_err("Could not get project sources")?;
 
         // Step 2: Resolve Graph of Sources and Versions
         let graph = Graph::resolve_sources(&self.project.paths, sources)
-            .map_err(|e| Error::msg(format!("Could not create graph: {}", e)))?;
+            .wrap_err("Could not resolve sources")?;
 
         // Step 3: Extract Versions and Edges
         let (versions, _edges) = graph
             .into_sources_by_version(self.project.offline)
-            .map_err(|e| Error::msg(format!("Could not get versions & edges: {}", e)))?;
+            .wrap_err("Could not match solc versions to files")?;
 
         // Step 4: Retrieve Solc Version
-        versions.get(&self.project).map_err(|e| Error::msg(format!("Could not get solc: {}", e)))
+        versions.get(&self.project).wrap_err("Could not get solc")
     }
 
     /// Builds the path for saving the artifacts (compiler output) of a contract based on the
@@ -733,46 +790,80 @@ impl ZkSolc {
     /// This function can return an error if any of the following occurs:
     /// - The extraction of the filename from the contract source path fails.
     /// - The creation of the artifacts directory fails.
-    fn build_artifacts_path(&self, source: PathBuf) -> Result<PathBuf, anyhow::Error> {
+    fn build_artifacts_path(&self, source: &PathBuf) -> Result<PathBuf> {
         let filename = source.file_name().expect("Failed to get Contract filename.");
         let path = self.project.paths.artifacts.join(filename);
-        fs::create_dir_all(&path)
-            .map_err(|e| Error::msg(format!("Could not create artifacts directory: {}", e)))?;
+        fs::create_dir_all(&path).wrap_err("Could not create artifacts directory")?;
         Ok(path)
     }
+}
 
-    /// Builds the file path for the artifacts (compiler output) of a contract based on the
-    /// contract's source file and the project's artifacts directory. The function performs the
-    /// following steps to construct the artifacts file path:
-    ///
-    /// # Workflow:
-    /// 1. Build Artifacts File Path:
-    ///    - The function constructs the file path for the artifacts file by joining the project's
-    ///      artifacts directory path, the contract's source file path, and the "artifacts.json"
-    ///      filename.
-    ///    - The `join` method is used on the artifacts directory path, passing the contract's
-    ///      source file path joined with the "artifacts.json" filename.
-    ///
-    /// 2. Create Artifacts File:
-    ///    - The function creates the artifacts file at the constructed file path using the `create`
-    ///      method from the `File` struct.
-    ///    - If the creation of the artifacts file fails, an error is returned.
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - A reference to the `ZkSolc` instance.
-    /// * `source` - The contract source file represented as a `String`.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing the created `File` object on success, or an `anyhow::Error` on
-    /// failure.
-    ///
-    /// # Errors
-    ///
-    /// This function can return an error if the creation of the artifacts file fails.
-    fn build_artifacts_file(&self, source: String) -> Result<File> {
-        File::create(self.project.paths.artifacts.join(source).join("artifacts.json"))
-            .map_err(|e| Error::msg(format!("Could not create artifacts file: {}", e)))
+#[derive(Debug, Deserialize)]
+pub struct ZkSolcCompilerOutput {
+    // Map from file name -> (Contract name -> Contract)
+    pub contracts: HashMap<String, HashMap<String, ZkContract>>,
+    pub sources: HashMap<String, ZkSourceFile>,
+    pub version: String,
+    pub long_version: String,
+    pub zk_version: String,
+    pub errors: Vec<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ZkContract {
+    pub hash: Option<String>,
+    // Hashmap from hash to filename:contract_name string.
+    #[serde(rename = "factoryDependencies", default)]
+    pub factory_dependencies: HashMap<String, String>,
+    pub evm: Evm,
+    pub abi: Option<LosslessAbi>,
+}
+#[derive(Debug, Deserialize)]
+
+pub struct Evm {
+    pub bytecode: Option<ZkSolcBytecode>,
+}
+#[derive(Debug, Deserialize)]
+
+pub struct ZkSolcBytecode {
+    object: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ZkSourceFile {
+    pub id: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::{ZkSolc, ZkSolcCompilerOutput};
+
+    /// Basic test to analyze the single Counter.sol artifact.
+    #[test]
+    pub fn test_artifacts_extraction() {
+        let data = include_str!("testdata/artifacts.json").as_bytes().to_vec();
+        let mut displayed_warnings = HashSet::new();
+        let source = "src/Counter.sol".to_owned();
+        let result = ZkSolc::handle_output(data, &source, &mut displayed_warnings, None);
+
+        let artifacts = result.get("Counter").unwrap();
+        assert_eq!(artifacts.len(), 1);
+        let first = &artifacts[0];
+        assert_eq!(first.file.to_str(), Some("Counter.sol"));
+        assert_eq!(first.version.to_string(), "0.8.20");
+        assert!(first.artifact.abi.is_some());
+        assert_eq!(first.artifact.bytecode.as_ref().unwrap().object.bytes_len(), 3883);
+    }
+    #[test]
+    pub fn test_json_parsing() {
+        let data = include_str!("testdata/artifacts.json").as_bytes().to_vec();
+        let _parsed: ZkSolcCompilerOutput = serde_json::from_slice(&data).unwrap();
+
+        // Contract that has almost no data (and many fields missing).
+        let almost_empty_data = include_str!("testdata/empty.json").as_bytes().to_vec();
+        let _parsed_empty: ZkSolcCompilerOutput =
+            serde_json::from_slice(&almost_empty_data).unwrap();
     }
 }
