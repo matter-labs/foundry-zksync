@@ -668,7 +668,7 @@ impl Config {
                         if self.offline {
                             return Err(SolcError::msg(format!(
                                 "can't install missing solc {version} in offline mode"
-                            )))
+                            )));
                         }
                         Solc::blocking_install(version)?;
                         solc = Solc::find_svm_installed_version(&v)?;
@@ -680,12 +680,12 @@ impl Config {
                         return Err(SolcError::msg(format!(
                             "`solc` {} does not exist",
                             solc.display()
-                        )))
+                        )));
                     }
                     Some(Solc::new(solc))
                 }
             };
-            return Ok(solc)
+            return Ok(solc);
         }
 
         Ok(None)
@@ -695,7 +695,7 @@ impl Config {
     #[inline]
     pub fn evm_spec_id(&self) -> SpecId {
         if self.cancun {
-            return SpecId::CANCUN
+            return SpecId::CANCUN;
         }
         evm_spec_id(&self.evm_version)
     }
@@ -706,16 +706,16 @@ impl Config {
     /// `auto_detect_solc`
     pub fn is_auto_detect(&self) -> bool {
         if self.solc.is_some() {
-            return false
+            return false;
         }
         self.auto_detect_solc
     }
 
     /// Whether caching should be enabled for the given chain id
     pub fn enable_caching(&self, endpoint: &str, chain_id: impl Into<u64>) -> bool {
-        !self.no_storage_caching &&
-            self.rpc_storage_caching.enable_for_chain_id(chain_id.into()) &&
-            self.rpc_storage_caching.enable_for_endpoint(endpoint)
+        !self.no_storage_caching
+            && self.rpc_storage_caching.enable_for_chain_id(chain_id.into())
+            && self.rpc_storage_caching.enable_for_endpoint(endpoint)
     }
 
     /// Returns the `ProjectPathsConfig`  sub set of the config.
@@ -895,7 +895,7 @@ impl Config {
         if self.etherscan.contains_key(maybe_alias) {
             // etherscan points to an alias in the `etherscan` table, so we try to resolve that
             let mut resolved = self.etherscan.clone().resolved();
-            return resolved.remove(maybe_alias)
+            return resolved.remove(maybe_alias);
         }
 
         // we treat the `etherscan_api_key` as actual API key
@@ -917,7 +917,7 @@ impl Config {
     ) -> Result<Option<ResolvedEtherscanConfig>, EtherscanConfigError> {
         if let Some(maybe_alias) = self.etherscan_api_key.as_ref().or(self.eth_rpc_url.as_ref()) {
             if self.etherscan.contains_key(maybe_alias) {
-                return self.etherscan.clone().resolved().remove(maybe_alias).transpose()
+                return self.etherscan.clone().resolved().remove(maybe_alias).transpose();
             }
         }
 
@@ -930,7 +930,7 @@ impl Config {
                     // we update the key, because if an etherscan_api_key is set, it should take
                     // precedence over the entry, since this is usually set via env var or CLI args.
                     config.key = key.clone();
-                    return Ok(Some(config))
+                    return Ok(Some(config));
                 }
                 (Ok(config), None) => return Ok(Some(config)),
                 (Err(err), None) => return Err(err),
@@ -943,7 +943,7 @@ impl Config {
         // etherscan fallback via API key
         if let Some(key) = self.etherscan_api_key.as_ref() {
             let chain = chain.or(self.chain).unwrap_or_default();
-            return Ok(ResolvedEtherscanConfig::create(key, chain))
+            return Ok(ResolvedEtherscanConfig::create(key, chain));
         }
 
         Ok(None)
@@ -1183,7 +1183,7 @@ impl Config {
     {
         let file_path = self.get_config_path();
         if !file_path.exists() {
-            return Ok(())
+            return Ok(());
         }
         let contents = fs::read_to_string(&file_path)?;
         let mut doc = contents.parse::<toml_edit::Document>()?;
@@ -1345,14 +1345,14 @@ impl Config {
                 return match path.is_file() {
                     true => Some(path.to_path_buf()),
                     false => None,
-                }
+                };
             }
             let cwd = std::env::current_dir().ok()?;
             let mut cwd = cwd.as_path();
             loop {
                 let file_path = cwd.join(path);
                 if file_path.is_file() {
-                    return Some(file_path)
+                    return Some(file_path);
                 }
                 cwd = cwd.parent()?;
             }
@@ -1426,7 +1426,7 @@ impl Config {
         if let Some(cache_dir) = Config::foundry_rpc_cache_dir() {
             let mut cache = Cache { chains: vec![] };
             if !cache_dir.exists() {
-                return Ok(cache)
+                return Ok(cache);
             }
             if let Ok(entries) = cache_dir.as_path().read_dir() {
                 for entry in entries.flatten().filter(|x| x.path().is_dir()) {
@@ -1470,7 +1470,7 @@ impl Config {
     fn get_cached_blocks(chain_path: &Path) -> eyre::Result<Vec<(String, u64)>> {
         let mut blocks = vec![];
         if !chain_path.exists() {
-            return Ok(blocks)
+            return Ok(blocks);
         }
         for block in chain_path.read_dir()?.flatten().filter(|x| x.file_type().unwrap().is_dir()) {
             let filepath = block.path().join("storage.json");
@@ -1485,7 +1485,7 @@ impl Config {
     //The path provided to this function should point to the etherscan cache for a chain
     fn get_cached_block_explorer_data(chain_path: &Path) -> eyre::Result<u64> {
         if !chain_path.exists() {
-            return Ok(0)
+            return Ok(0);
         }
 
         fn dir_size_recursive(mut dir: fs::ReadDir) -> eyre::Result<u64> {
@@ -1673,7 +1673,7 @@ pub(crate) mod from_opt_glob {
     {
         let s: Option<String> = Option::deserialize(deserializer)?;
         if let Some(s) = s {
-            return Ok(Some(globset::Glob::new(&s).map_err(serde::de::Error::custom)?))
+            return Ok(Some(globset::Glob::new(&s).map_err(serde::de::Error::custom)?));
         }
         Ok(None)
     }
@@ -1957,7 +1957,7 @@ impl TomlFileProvider {
         if let Some(file) = self.env_val() {
             let path = Path::new(&file);
             if !path.exists() {
-                return true
+                return true;
             }
         }
         false
@@ -1977,7 +1977,7 @@ impl TomlFileProvider {
                     "Config file `{}` set in env var `{}` does not exist",
                     file,
                     self.env_var.unwrap()
-                )))
+                )));
             }
             Toml::file(file)
         } else {
@@ -2021,7 +2021,7 @@ impl<P: Provider> Provider for ForcedSnakeCaseData<P> {
             if Config::STANDALONE_SECTIONS.contains(&profile.as_ref()) {
                 // don't force snake case for keys in standalone sections
                 map.insert(profile, dict);
-                continue
+                continue;
             }
             map.insert(profile, dict.into_iter().map(|(k, v)| (k.to_snake_case(), v)).collect());
         }
@@ -2161,7 +2161,7 @@ impl Provider for DappEnvCompatProvider {
             if val > 1 {
                 return Err(
                     format!("Invalid $DAPP_BUILD_OPTIMIZE value `{val}`, expected 0 or 1").into()
-                )
+                );
             }
             dict.insert("optimizer".to_string(), (val == 1).into());
         }
@@ -2227,7 +2227,7 @@ impl<P: Provider> Provider for RenameProfileProvider<P> {
     fn data(&self) -> Result<Map<Profile, Dict>, Error> {
         let mut data = self.provider.data()?;
         if let Some(data) = data.remove(&self.from) {
-            return Ok(Map::from([(self.to.clone(), data)]))
+            return Ok(Map::from([(self.to.clone(), data)]));
         }
         Ok(Default::default())
     }
@@ -2273,7 +2273,7 @@ impl<P: Provider> Provider for UnwrapProfileProvider<P> {
                 for (profile_str, profile_val) in profiles {
                     let profile = Profile::new(&profile_str);
                     if profile != self.profile {
-                        continue
+                        continue;
                     }
                     match profile_val {
                         Value::Dict(_, dict) => return Ok(profile.collect(dict)),
@@ -2284,7 +2284,7 @@ impl<P: Provider> Provider for UnwrapProfileProvider<P> {
                             ));
                             err.metadata = Some(self.provider.metadata());
                             err.profile = Some(self.profile.clone());
-                            return Err(err)
+                            return Err(err);
                         }
                     }
                 }
@@ -2396,7 +2396,7 @@ impl<P: Provider> Provider for OptionalStrictProfileProvider<P> {
             // provider and can't map the metadata to the error. Therefor we return the root error
             // if this error originated in the provider's data.
             if let Err(root_err) = self.provider.data() {
-                return root_err
+                return root_err;
             }
             err
         })

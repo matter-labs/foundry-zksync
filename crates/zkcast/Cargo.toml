@@ -1,0 +1,90 @@
+[package]
+name = "zkcast"
+description = "Command-line tool for performing Ethereum RPC calls"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "zkcast"
+path = "bin/main.rs"
+
+[build-dependencies]
+vergen = { version = "8", default-features = false, features = ["build", "git", "git2"] }
+
+[dependencies]
+# lib
+foundry-utils.workspace = true
+foundry-evm.workspace = true
+foundry-config.workspace = true
+foundry-common.workspace = true
+
+ethers-etherscan.workspace = true
+ethers-core.workspace = true
+ethers-providers.workspace = true
+chrono.workspace = true
+evm-disassembler = "0.2"
+eyre.workspace = true
+futures = "0.3"
+hex.workspace = true
+rayon = "1"
+serde.workspace = true
+serde_json.workspace = true
+
+# zksync
+zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
+
+# commit 2a5ab4cf7db0625b406cdf9023604654ce56af46 
+ansi_term = "0.12.1"
+anyhow = {version = "1.0.70"}
+dirs = {version = "5.0.0"}
+url = "2.3.1"
+
+ethabi = "18.0.0"
+uint = "0.9.0"
+
+# aws
+rusoto_core = { version = "0.48", default-features = false }
+rusoto_kms = { version = "0.48", default-features = false }
+
+# bin
+# foundry internal
+foundry-cli.workspace = true
+
+# eth
+ethers = { workspace = true, features = ["rustls", "solc-sha2-asm"] }
+eth-keystore = "0.5"
+
+clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+clap_complete = "4"
+clap_complete_fig = "4"
+comfy-table = "7"
+dunce = "1"
+indicatif = "0.17"
+itertools.workspace = true
+regex = { version = "1", default-features = false }
+rpassword = "7"
+semver = "1"
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "signal"] }
+tracing.workspace = true
+yansi = "0.5"
+
+[dev-dependencies]
+foundry-test-utils.workspace = true
+async-trait = "0.1"
+criterion = "0.5"
+
+[features]
+default = ["rustls"]
+rustls = ["foundry-cli/rustls"]
+openssl = ["foundry-cli/openssl"]
+
+[[bench]]
+name = "vanity"
+harness = false

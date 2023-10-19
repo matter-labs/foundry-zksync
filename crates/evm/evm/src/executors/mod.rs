@@ -92,26 +92,8 @@ impl Executor {
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
     pub fn deploy_create2_deployer(&mut self) -> eyre::Result<()> {
         trace!("deploying local create2 deployer");
-        let create2_deployer_account = self
-            .backend
-            .basic_ref(DEFAULT_CREATE2_DEPLOYER)?
-            .ok_or_else(|| DatabaseError::MissingAccount(DEFAULT_CREATE2_DEPLOYER))?;
 
-        // if the deployer is not currently deployed, deploy the default one
-        if create2_deployer_account.code.map_or(true, |code| code.is_empty()) {
-            let creator = "0x3fAB184622Dc19b6109349B94811493BF2a45362".parse().unwrap();
-
-            // Probably 0, but just in case.
-            let initial_balance = self.get_balance(creator)?;
-
-            self.set_balance(creator, U256::MAX)?;
-            let res =
-                self.deploy(creator, DEFAULT_CREATE2_DEPLOYER_CODE.into(), U256::ZERO, None)?;
-            trace!(create2=?res.address, "deployed local create2 deployer");
-
-            self.set_balance(creator, initial_balance)?;
-        }
-        Ok(())
+        return Ok(());
     }
 
     /// Set the balance of an account.
@@ -420,7 +402,7 @@ impl Executor {
                     state_changeset: None,
                     transactions: None,
                     script_wallets,
-                })))
+                })));
             }
         };
 
@@ -496,7 +478,7 @@ impl Executor {
     ) -> bool {
         if call_result.has_snapshot_failure {
             // a failure occurred in a reverted snapshot, which is considered a failed test
-            return should_fail
+            return should_fail;
         }
         self.is_success(address, call_result.reverted, state_changeset, should_fail)
     }
@@ -510,7 +492,7 @@ impl Executor {
     ) -> Result<bool, DatabaseError> {
         if self.backend.has_snapshot_failure() {
             // a failure occurred in a reverted snapshot, which is considered a failed test
-            return Ok(should_fail)
+            return Ok(should_fail);
         }
 
         // Construct a new VM with the state changeset
@@ -884,7 +866,7 @@ fn convert_call_result(
         }
         _ => {
             if &result == crate::constants::MAGIC_SKIP {
-                return Err(EvmError::SkipError)
+                return Err(EvmError::SkipError);
             }
             let reason = decode::decode_revert(&result, abi, Some(status));
             Err(EvmError::Execution(Box::new(ExecutionErr {
