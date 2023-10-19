@@ -21,6 +21,9 @@ ethers-providers = { workspace = true, features = ["ws", "ipc"] }
 ethers-middleware.workspace = true
 ethers-etherscan = { workspace = true, features = ["ethers-solc"] }
 
+# zksync
+zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
+
 # io
 reqwest = { version = "0.11", default-features = false }
 

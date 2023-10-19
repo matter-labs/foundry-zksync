@@ -118,8 +118,10 @@ codegen-units = 16
 [workspace.dependencies]
 anvil = { path = "crates/anvil" }
 cast = { path = "crates/cast" }
+zkcast = { path = "crates/zkcast" }
 chisel = { path = "crates/chisel" }
 forge = { path = "crates/forge" }
+zkforge = { path = "crates/zkforge" }
 
 forge-doc = { path = "crates/doc" }
 forge-fmt = { path = "crates/fmt" }
@@ -137,20 +139,23 @@ foundry-debugger = { path = "crates/debugger" }
 
 ## revm
 # no default features to avoid c-kzg
-revm = { version = "3", default-features = false } #
-revm-primitives = { version = "1", default-features = false }
+# Using a fork of revm as zksync-era requires the usage of sha3 0.10.6, and the latest revm uses 0.10.8
+revm = { git = "https://github.com/dutterbutter/revm.git", tag = "sha3_0.10.6", default-features = false }
 
-## ethers
-ethers = { version = "2.0", default-features = false }
-ethers-addressbook = { version = "2.0", default-features = false }
-ethers-core = { version = "2.0", default-features = false }
-ethers-contract = { version = "2.0", default-features = false }
-ethers-contract-abigen = { version = "2.0", default-features = false }
-ethers-providers = { version = "2.0", default-features = false }
-ethers-signers = { version = "2.0", default-features = false }
-ethers-middleware = { version = "2.0", default-features = false }
-ethers-etherscan = { version = "2.0", default-features = false }
-ethers-solc = { version = "2.0", default-features = false }
+# We use a fork of `ethers` to gain access to a previously private variable.
+# This ensures that all artifact files, freshly compiled and saved in the `output` directory, are publicly accessible.
+# For details on this modification, refer to:
+# https://github.com/mm-zk/ethers-rs/commit/2b2c7312f328a431fa40a7b87a722eaf28e27061
+ethers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-addressbook = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-core = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-contract = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-contract-abigen = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-providers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-signers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-middleware = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-etherscan = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-solc = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
 
 ## alloy
 alloy-primitives = "0.4.1"
@@ -174,31 +179,18 @@ jsonpath_lib = "0.3"
 eyre = "0.6"
 color-eyre = "0.6"
 
-#[patch."https://github.com/gakonst/ethers-rs"]
-#ethers = { path = "../ethers-rs/ethers" }
-#ethers-addressbook = { path = "../ethers-rs/ethers-addressbook" }
-#ethers-contract = { path = "../ethers-rs/ethers-contract" }
-#ethers-contract-abigen = { path = "../ethers-rs/ethers-contract/ethers-contract-abigen" }
-#ethers-core = { path = "../ethers-rs/ethers-core" }
-#ethers-etherscan = { path = "../ethers-rs/ethers-etherscan" }
-#ethers-middleware = { path = "../ethers-rs/ethers-middleware" }
-#ethers-providers = { path = "../ethers-rs/ethers-providers" }
-#ethers-signers = { path = "../ethers-rs/ethers-signers" }
-#ethers-solc = { path = "../ethers-rs/ethers-solc" }
-
 [patch.crates-io]
-ethers = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-addressbook = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-core = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-contract = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-contract-abigen = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-providers = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-signers = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-middleware = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-etherscan = { git = "https://github.com/gakonst/ethers-rs" }
-ethers-solc = { git = "https://github.com/gakonst/ethers-rs" }
-
-# revm = { git = "https://github.com/bluealloy/revm/", branch = "main" }
-# revm-interpreter = { git = "https://github.com/bluealloy/revm/", branch = "main" }
-# revm-precompile = { git = "https://github.com/bluealloy/revm/", branch = "main" }
-# revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "main" }
+# We use a fork of `ethers` to gain access to a previously private variable.
+# This ensures that all artifact files, freshly compiled and saved in the `output` directory, are publicly accessible.
+# For details on this modification, refer to:
+# https://github.com/mm-zk/ethers-rs/commit/2b2c7312f328a431fa40a7b87a722eaf28e27061
+ethers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-addressbook = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-core = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-contract = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-contract-abigen = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-providers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-signers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-middleware = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-etherscan = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+ethers-solc = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }

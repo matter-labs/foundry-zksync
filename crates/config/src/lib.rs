@@ -76,7 +76,7 @@ pub mod fix;
 
 // reexport so cli types can implement `figment::Provider` to easily merge compiler arguments
 pub use figment;
-use revm_primitives::SpecId;
+use revm::primitives::SpecId;
 use tracing::warn;
 
 /// config providers

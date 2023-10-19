@@ -19,5 +19,14 @@ alloy-primitives.workspace = true
 crossterm = "0.27"
 eyre.workspace = true
 tracing.workspace = true
-revm = { workspace = true, default-features = false, features = ["std", "serde", "arbitrary"] }
+# Using a fork of revm as zksync-era requires the usage of sha3 0.10.6, and the latest revm uses 0.10.8
+revm = { git = "https://github.com/dutterbutter/revm.git", tag = "sha3_0.10.6", default-features = false, features = [
+  "std",
+  "serde",
+  "memory_limit",
+  "optional_eip3607",
+  "optional_block_gas_limit",
+  "optional_no_base_fee",
+  "arbitrary",
+]}
 ratatui = { version = "0.23.0", default-features = false, features = ["crossterm"] }

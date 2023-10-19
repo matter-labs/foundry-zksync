@@ -16,6 +16,7 @@ use foundry_evm::{
     executor::{inspector::CheatsConfig, Backend, ExecutorBuilder},
 };
 use foundry_utils::types::ToEthers;
+use revm::primitives::SpecId;
 use solang_parser::pt::{self, CodeLocation};
 use std::str::FromStr;
 use yansi::Paint;
@@ -296,7 +297,7 @@ impl SessionSource {
                 )
             })
             .gas_limit(self.config.evm_opts.gas_limit())
-            .spec(self.config.foundry_config.evm_spec_id())
+            .spec(SpecId::LATEST)
             .build(env, backend);
 
         // Create a [ChiselRunner] with a default balance of [U256::MAX] and

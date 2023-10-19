@@ -7,7 +7,7 @@ use ethers_solc::{
     EvmVersion,
 };
 use figment::value::Value;
-use revm_primitives::SpecId;
+use revm::primitives::SpecId;
 use serde::{de::Error, Deserialize, Deserializer};
 use std::{
     path::{Path, PathBuf},

@@ -29,8 +29,8 @@ use revm::{
     db::{CacheDB, DatabaseRef},
     precompile::{Precompiles, SpecId},
     primitives::{
-        Account, AccountInfo, Bytecode, CreateScheme, Env, HashMap as Map, Log, ResultAndState,
-        TransactTo, KECCAK_EMPTY,
+        Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, HashMap as Map, Log,
+        ResultAndState, TransactTo, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, Inspector, JournaledState, EVM,
 };
@@ -763,17 +763,17 @@ impl Backend {
     pub fn inspect_ref<INSP>(
         &mut self,
         env: &mut Env,
-        mut inspector: INSP,
+        inspector: INSP,
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>,
     {
         self.initialize(env);
 
-        match revm::evm_inner::<Self, true>(env, self, &mut inspector).transact() {
-            Ok(res) => Ok(res),
-            Err(e) => eyre::bail!("backend: failed while inspecting: {:?}", e),
-        }
+        let result: EVMResult<DatabaseError> =
+            era_revm::transactions::run_era_transaction(env, self, inspector);
+
+        Ok(result.unwrap())
     }
 
     /// Returns true if the address is a precompile

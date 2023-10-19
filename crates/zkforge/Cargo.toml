@@ -1,0 +1,98 @@
+[package]
+name = "zkforge"
+description = "Fast and flexible Ethereum testing framework"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "zkforge"
+path = "bin/main.rs"
+
+[build-dependencies]
+vergen = { version = "8", default-features = false, features = ["build", "git", "git2"] }
+
+[dependencies]
+# lib
+foundry-utils.workspace = true
+foundry-common.workspace = true
+foundry-config.workspace = true
+foundry-evm.workspace = true
+zkcast.workspace = true
+
+comfy-table = "7"
+ethers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", features = ["solc-full"] }
+eyre.workspace = true
+proptest = "1"
+rayon = "1"
+serde.workspace = true
+tracing.workspace = true
+yansi = "0.5"
+
+# zksync
+era_revm = { git = "https://github.com/matter-labs/era-revm.git", tag = "v0.0.1-alpha" }
+zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
+ansi_term = "0.12.1"
+anyhow = {version = "1.0.70"}
+dirs = {version = "5.0.0"}
+url = "2.3.1"
+
+# bin
+forge-fmt.workspace = true
+forge-doc.workspace = true
+foundry-cli.workspace = true
+foundry-debugger.workspace = true
+
+alloy-primitives = { workspace = true, features = ["serde"] }
+
+async-trait = "0.1"
+clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+clap_complete = "4"
+clap_complete_fig = "4"
+dialoguer = { version = "0.11", default-features = false }
+dunce = "1"
+futures = "0.3"
+hex.workspace = true
+indicatif = "0.17"
+itertools.workspace = true
+once_cell = "1"
+parking_lot = "0.12"
+regex = { version = "1", default-features = false }
+reqwest = { version = "0.11", default-features = false, features = ["json"] }
+semver = "1"
+serde_json.workspace = true
+similar = { version = "2", features = ["inline"] }
+solang-parser.workspace = true
+strum = { version = "0.25", features = ["derive"] }
+thiserror = "1"
+tokio = { version = "1", features = ["time"] }
+watchexec = "2"
+
+[dev-dependencies]
+anvil.workspace = true
+foundry-test-utils.workspace = true
+
+criterion = "0.5"
+globset = "0.4"
+path-slash = "0.2"
+pretty_assertions = "1"
+serial_test = "2"
+svm = { package = "svm-rs", version = "0.3", default-features = false, features = ["rustls"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[features]
+default = ["rustls"]
+rustls = ["foundry-cli/rustls", "reqwest/rustls-tls", "reqwest/rustls-tls-native-roots"]
+openssl = ["foundry-cli/openssl", "reqwest/default-tls"]
+
+# feature for heavy (long-running) integration tests
+heavy-integration-tests = []
+
+[[bench]]
+name = "test"
+harness = false

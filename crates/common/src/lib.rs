@@ -20,9 +20,11 @@ pub mod shell;
 pub mod term;
 pub mod traits;
 pub mod transactions;
+pub mod zk_utils;
 
 pub use constants::*;
 pub use contracts::*;
 pub use provider::*;
 pub use traits::*;
 pub use transactions::*;
+pub use zk_utils::*;
