@@ -14,11 +14,8 @@ body:
           description: What component is the bug in?
           multiple: true
           options:
-              - Forge
-              - Cast
-              - Anvil
-              - Foundryup
-              - Chisel
+              - zkForge
+              - zkCast
               - Other (please describe)
       validations:
           required: true

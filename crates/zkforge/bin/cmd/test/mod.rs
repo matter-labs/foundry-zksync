@@ -131,7 +131,7 @@ impl TestArgs {
     }
 
     pub async fn run(self) -> Result<TestOutcome> {
-        trace!(target: "forge::test", "executing test command");
+        trace!(target: "zkforge::test", "executing test command");
         shell::set_shell(shell::Shell::from_args(self.opts.silent, self.json))?;
         self.execute_tests().await
     }
@@ -147,8 +147,7 @@ impl TestArgs {
         let (mut config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
 
         let mut filter = self.filter(&config);
-
-        trace!(target: "forge::test", ?filter, "using filter");
+        trace!(target: "zkforge::test", ?filter, "using filter");
 
         // Set up the project
         let mut project = config.project()?;
@@ -164,7 +163,7 @@ impl TestArgs {
 
         // Create test options from general project settings
         // and compiler output
-        let project_root = project.paths.root.join("zkout");
+        let project_root = &project.paths.root.clone();
         let toml = config.get_config_path();
         let profiles = get_available_profiles(toml)?;
 
@@ -186,7 +185,7 @@ impl TestArgs {
             .fuzz(config.fuzz)
             .invariant(config.invariant)
             .profiles(profiles)
-            .build(&output, &project_root)?;
+            .build(&output, project_root)?;
 
         // Determine print verbosity and executor verbosity
         let verbosity = evm_opts.verbosity;
@@ -209,7 +208,7 @@ impl TestArgs {
             .with_test_options(test_options.clone());
 
         let mut runner = runner_builder.clone().build(
-            &project_root,
+            project_root,
             output.clone(),
             env.clone(),
             evm_opts.clone(),
@@ -226,7 +225,7 @@ impl TestArgs {
             }
             let test_funcs = runner.get_matching_test_functions(&filter);
             // if we debug a fuzz test, we should not collect data on the first run
-            if !test_funcs.get(0).expect("matching function exists").inputs.is_empty() {
+            if !test_funcs.first().expect("matching function exists").inputs.is_empty() {
                 runner_builder = runner_builder.set_debug(false);
                 runner = runner_builder.clone().build(
                     project_root,
@@ -642,13 +641,12 @@ async fn test(
     summary: bool,
     detailed: bool,
 ) -> Result<TestOutcome> {
-    trace!(target: "forge::test", "running all tests");
-
+    trace!(target: "zkforge::test", "running all tests");
     if runner.matching_test_function_count(&filter) == 0 {
         let filter_str = filter.to_string();
         if filter_str.is_empty() {
             println!(
-                "\nNo tests found in project! Forge looks for functions that starts with `test`."
+                "\nNo tests found in project! zkforge looks for functions that starts with `test`."
             );
         } else {
             println!("\nNo tests match the provided pattern:");

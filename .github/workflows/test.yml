@@ -3,7 +3,7 @@ name: test
 on:
     push:
         branches:
-            - master
+            - main
     pull_request:
 
 concurrency:
@@ -42,15 +42,15 @@ jobs:
 
     build-tests:
         name: build tests
-        runs-on: ${{ matrix.os }}
-        timeout-minutes: 30
+        runs-on: [ubuntu-22.04-github-hosted-16core, macos-latest]
+        timeout-minutes: 60
         needs: matrices
         strategy:
             fail-fast: false
             matrix: ${{ fromJson(needs.matrices.outputs.build-matrix) }}
         steps:
             - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@nightly
               with:
                   target: ${{ matrix.target }}
             - uses: Swatinem/rust-cache@v2
@@ -71,8 +71,8 @@ jobs:
 
     test:
         name: test ${{ matrix.name }}
-        runs-on: ${{ matrix.os }}
-        timeout-minutes: 60
+        runs-on: [ubuntu-22.04-github-hosted-16core, macos-latest]
+        timeout-minutes: 90
         needs:
             - matrices
             - build-tests
@@ -83,7 +83,7 @@ jobs:
             ETH_RPC_URL: https://eth-mainnet.alchemyapi.io/v2/C3JEvfW6VgtqZQa-Qp1E-2srEiIc02sD
         steps:
             - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@nightly
               with:
                   target: ${{ matrix.target }}
             - uses: taiki-e/install-action@nextest
@@ -116,21 +116,23 @@ jobs:
 
     doctests:
         name: doc tests
-        runs-on: ubuntu-latest
-        timeout-minutes: 30
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@nightly
             - uses: Swatinem/rust-cache@v2
               with:
-                  cache-on-failure: true
+                cache-on-failure: true
             - name: cargo test
-              run: cargo test --doc
+              run: cargo test --doc -p zkforge -p zkcast
+              env:
+                RUST_TEST_THREADS: 2
 
     clippy:
         name: clippy
         runs-on: ubuntu-latest
-        timeout-minutes: 30
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
             - uses: dtolnay/rust-toolchain@clippy
@@ -143,8 +145,8 @@ jobs:
 
     fmt:
         name: fmt
-        runs-on: ubuntu-latest
-        timeout-minutes: 30
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
             - uses: dtolnay/rust-toolchain@nightly
@@ -155,10 +157,10 @@ jobs:
     forge-fmt:
         name: forge fmt
         runs-on: ubuntu-latest
-        timeout-minutes: 30
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@nightly
             - uses: Swatinem/rust-cache@v2
               with:
                   cache-on-failure: true
@@ -167,11 +169,11 @@ jobs:
 
     feature-checks:
         name: feature checks
-        runs-on: ubuntu-latest
-        timeout-minutes: 30
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@nightly
             - uses: taiki-e/install-action@cargo-hack
             - uses: Swatinem/rust-cache@v2
               with:
