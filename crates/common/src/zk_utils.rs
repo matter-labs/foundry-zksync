@@ -133,7 +133,7 @@ pub fn get_chain(chain: Option<Chain>) -> Result<Chain> {
 /// # Examples
 ///
 /// ```
-/// use foundry_cli::cmd::cast::zk_utils::decode_hex;
+/// use foundry_common::zk_utils::decode_hex;
 /// let hex_string = "48656c6c6f2c20576f726c6421";
 /// let bytes = decode_hex(hex_string).expect("Error decoding hex");
 /// assert_eq!(bytes, vec![72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33]);

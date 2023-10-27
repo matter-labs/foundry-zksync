@@ -204,7 +204,7 @@ impl Base {
 /// # Example
 ///
 /// ```
-/// use cast::base::NumberWithBase;
+/// use zkcast::base::NumberWithBase;
 /// use ethers_core::types::U256;
 ///
 /// let number: NumberWithBase = U256::from(12345).into();
@@ -479,7 +479,7 @@ pub trait ToBase {
     /// # Example
     ///
     /// ```
-    /// use cast::base::{Base, ToBase};
+    /// use zkcast::base::{Base, ToBase};
     /// use ethers_core::types::U256;
     ///
     /// // Any type that implements ToBase

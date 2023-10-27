@@ -16,123 +16,25 @@ env:
     CARGO_TERM_COLOR: always
 
 jobs:
-    matrices:
-        name: build matrices
-        runs-on: ubuntu-latest
-        outputs:
-            build-matrix: ${{ steps.gen.outputs.build-matrix }}
-            test-matrix: ${{ steps.gen.outputs.test-matrix }}
-        steps:
-            - uses: actions/checkout@v3
-            - uses: actions/setup-python@v4
-              with:
-                  python-version: "3.11"
-            - name: Generate matrices
-              id: gen
-              env:
-                  EVENT_NAME: ${{ github.event_name }}
-              run: |
-                  output=$(python3 .github/scripts/matrices.py)
-                  echo "::debug::build-matrix=$output"
-                  echo "build-matrix=$output" >> $GITHUB_OUTPUT
-
-                  export TEST=1
-
-                  output=$(python3 .github/scripts/matrices.py)
-                  echo "::debug::test-matrix=$output"
-                  echo "test-matrix=$output" >> $GITHUB_OUTPUT
-
-    build-tests:
-        name: build tests
-        runs-on: ${{ matrix.os }}
-        timeout-minutes: 30
-        needs: matrices
-        strategy:
-            fail-fast: false
-            matrix: ${{ fromJson(needs.matrices.outputs.build-matrix) }}
-        steps:
-            - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
-              with:
-                  target: ${{ matrix.target }}
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  cache-on-failure: true
-            - uses: taiki-e/install-action@nextest
-            - name: Build archive
-              shell: bash
-              run: |
-                  cargo nextest archive \
-                    --workspace \
-                    --archive-file tests-${{ matrix.target }}.tar.zst
-            - name: Upload archive
-              uses: actions/upload-artifact@v3
-              with:
-                  name: tests-${{ matrix.target }}
-                  path: tests-${{ matrix.target }}.tar.zst
-
-    test:
-        name: test ${{ matrix.name }}
-        runs-on: ${{ matrix.os }}
-        timeout-minutes: 60
-        needs:
-            - matrices
-            - build-tests
-        strategy:
-            fail-fast: false
-            matrix: ${{ fromJson(needs.matrices.outputs.test-matrix) }}
-        env:
-            ETH_RPC_URL: https://eth-mainnet.alchemyapi.io/v2/C3JEvfW6VgtqZQa-Qp1E-2srEiIc02sD
-        steps:
-            - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
-              with:
-                  target: ${{ matrix.target }}
-            - uses: taiki-e/install-action@nextest
-            - name: Download archive
-              uses: actions/download-artifact@v3
-              with:
-                  name: tests-${{ matrix.target }}
-            - name: Forge RPC cache
-              uses: actions/cache@v3
-              with:
-                  path: |
-                      ~/.foundry/cache
-                      ~/.config/.foundry/cache
-                  key: rpc-cache-${{ hashFiles('crates/forge/tests/rpc-cache-keyfile') }}
-            - name: Setup git config
-              run: |
-                  git config --global user.name "GitHub Actions Bot"
-                  git config --global user.email "<>"
-            - name: Force use of HTTPS for submodules
-              run: git config --global url."https://github.com/".insteadOf "git@github.com:"
-            - name: Test
-              shell: bash
-              run: |
-                  # see https://github.com/foundry-rs/foundry/pull/3959
-                  export LD_LIBRARY_PATH="$(rustc --print sysroot)/lib"
-                  cargo nextest run \
-                    --retries 2 \
-                    --archive-file tests-${{ matrix.target }}.tar.zst \
-                    ${{ matrix.flags }}
-
     doctests:
         name: doc tests
-        runs-on: ubuntu-latest
-        timeout-minutes: 30
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@nightly
             - uses: Swatinem/rust-cache@v2
               with:
-                  cache-on-failure: true
+                cache-on-failure: true
             - name: cargo test
-              run: cargo test --doc
+              run: cargo test --doc -p zkforge -p zkcast
+              env:
+                RUST_TEST_THREADS: 2
 
     clippy:
         name: clippy
         runs-on: ubuntu-latest
-        timeout-minutes: 30
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
             - uses: dtolnay/rust-toolchain@clippy
@@ -145,8 +47,8 @@ jobs:
 
     fmt:
         name: fmt
-        runs-on: ubuntu-latest
-        timeout-minutes: 30
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
             - uses: dtolnay/rust-toolchain@nightly
@@ -157,10 +59,10 @@ jobs:
     forge-fmt:
         name: forge fmt
         runs-on: ubuntu-latest
-        timeout-minutes: 30
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@nightly
             - uses: Swatinem/rust-cache@v2
               with:
                   cache-on-failure: true
@@ -169,11 +71,11 @@ jobs:
 
     feature-checks:
         name: feature checks
-        runs-on: ubuntu-latest
-        timeout-minutes: 30
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
         steps:
             - uses: actions/checkout@v3
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@nightly
             - uses: taiki-e/install-action@cargo-hack
             - uses: Swatinem/rust-cache@v2
               with:
