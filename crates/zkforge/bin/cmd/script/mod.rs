@@ -69,7 +69,7 @@ mod runner;
 mod sequence;
 pub mod transaction;
 mod verify;
-
+#[allow(unused_imports)]
 pub use transaction::TransactionWithMetadata;
 
 /// List of Chains that support Shanghai.

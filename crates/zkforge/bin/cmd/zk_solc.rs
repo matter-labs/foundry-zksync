@@ -51,7 +51,7 @@ use std::{
     fmt, fs,
     fs::File,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
 
@@ -305,7 +305,7 @@ impl ZkSolc {
             }
         }
         let mut result = ProjectCompileOutput::default();
-        result.compiled_artifacts = Artifacts { 0: data };
+        result.compiled_artifacts = Artifacts(data);
         Ok(result)
     }
 
@@ -403,8 +403,8 @@ impl ZkSolc {
 
         // First - let's get all the bytecodes.
         let mut all_bytecodes: HashMap<String, String> = Default::default();
-        for (_source_file_name, source_file_results) in &compiler_output.contracts {
-            for (_contract_name, contract_results) in source_file_results {
+        for source_file_results in compiler_output.contracts.values() {
+            for contract_results in source_file_results.values() {
                 if let Some(hash) = &contract_results.hash {
                     all_bytecodes.insert(
                         hash.clone(),
@@ -443,25 +443,27 @@ impl ZkSolc {
                         .to_vec(),
                     );
 
-                    let mut art = ConfigurableContractArtifact::default();
-                    art.bytecode = Some(CompactBytecode {
-                        object: ethers::solc::artifacts::BytecodeObject::Bytecode(
-                            packed_bytecode.clone(),
-                        ),
-                        source_map: None,
-                        link_references: Default::default(),
-                    });
-
-                    art.deployed_bytecode = Some(CompactDeployedBytecode {
+                    let mut art = ConfigurableContractArtifact {
                         bytecode: Some(CompactBytecode {
                             object: ethers::solc::artifacts::BytecodeObject::Bytecode(
-                                packed_bytecode,
+                                packed_bytecode.clone(),
                             ),
                             source_map: None,
                             link_references: Default::default(),
                         }),
-                        immutable_references: Default::default(),
-                    });
+                        deployed_bytecode: Some(CompactDeployedBytecode {
+                            bytecode: Some(CompactBytecode {
+                                object: ethers::solc::artifacts::BytecodeObject::Bytecode(
+                                    packed_bytecode,
+                                ),
+                                source_map: None,
+                                link_references: Default::default(),
+                            }),
+                            immutable_references: Default::default(),
+                        }),
+                        // Initialize other fields with their default values if they exist
+                        ..ConfigurableContractArtifact::default()
+                    };
 
                     art.abi = contract.abi.clone();
 
@@ -790,7 +792,7 @@ impl ZkSolc {
     /// This function can return an error if any of the following occurs:
     /// - The extraction of the filename from the contract source path fails.
     /// - The creation of the artifacts directory fails.
-    fn build_artifacts_path(&self, source: &PathBuf) -> Result<PathBuf> {
+    fn build_artifacts_path(&self, source: &Path) -> Result<PathBuf> {
         let filename = source.file_name().expect("Failed to get Contract filename.");
         let path = self.project.paths.artifacts.join(filename);
         fs::create_dir_all(&path).wrap_err("Could not create artifacts directory")?;

@@ -227,6 +227,7 @@ impl Provider for ChiselParser {
 }
 
 /// Evaluate a single Solidity line.
+#[allow(clippy::needless_pass_by_ref_mut)]
 async fn dispatch_repl_line(dispatcher: &mut ChiselDispatcher, line: &str) {
     match dispatcher.dispatch(line).await {
         DispatchResult::Success(msg) | DispatchResult::CommandSuccess(msg) => if let Some(msg) = msg {
@@ -245,6 +246,7 @@ async fn dispatch_repl_line(dispatcher: &mut ChiselDispatcher, line: &str) {
 
 /// Evaluate multiple Solidity source files contained within a
 /// Chisel prelude directory.
+#[allow(clippy::needless_pass_by_ref_mut)]
 async fn evaluate_prelude(
     dispatcher: &mut ChiselDispatcher,
     maybe_prelude: Option<PathBuf>,
@@ -270,6 +272,7 @@ async fn evaluate_prelude(
 }
 
 /// Loads a single Solidity file into the prelude.
+#[allow(clippy::needless_pass_by_ref_mut)]
 async fn load_prelude_file(dispatcher: &mut ChiselDispatcher, file: PathBuf) -> eyre::Result<()> {
     let prelude = fs::read_to_string(file)
         .wrap_err("Could not load source file. Are you sure this path is correct?")?;
