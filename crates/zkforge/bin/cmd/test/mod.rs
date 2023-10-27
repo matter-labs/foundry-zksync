@@ -176,6 +176,7 @@ impl TestArgs {
             compiler_path: zksolc_manager.get_full_compiler_path(),
             is_system: false,
             force_evmla: false,
+            remappings: config.remappings.clone(),
         };
 
         let mut zksolc = ZkSolc::new(zksolc_opts, project);
