@@ -30,7 +30,7 @@ Please note that `foundry-zksync` is still in its **alpha** stage. Some features
 
 | ✅ Features                                                                                     | 🚫 Limitations                                                         |
 |------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| Compile smart contracts with the [zksolc compiler](https://github.com/matter-labs/zksolc-bin). | Must use relative import paths based on compiled source code location. |
+| Compile smart contracts with the [zksolc compiler](https://github.com/matter-labs/zksolc-bin). | Can't find `test/` directory |
 | Deploy smart contracts to zkSync Era mainnet, testnet, or local test node.                     | `script` command lacks `zksolc` support.                               |
 | Bridge assets L1 <-> L2.                                                                       | Cheat codes are not supported.                                         |
 | Call deployed contracts on zkSync Era testnet or local test node.                              | Lacks advanced testing methods (e.g., variant testing).                |
@@ -95,20 +95,9 @@ $ tree . -d -L 1
 ├── test
 ```
 
-Due to a known issue where import paths need to be relative, it's necessary to modify certain paths in the `hello-foundry-zksync` project before compiling. This ensures proper resolution of dependencies during compilation. The required changes are outlined below:
+#### Compiling contracts
 
-**Modifications:**
-1. In the file `lib/forge-std/src/StdAssertions.sol`, adjust the import statement as follows:
-    ```solidity
-    import {DSTest} from "../lib/ds-test/src/test.sol";
-    ```
-
-2. In the file `lib/forge-std/src/Test.sol`, update the import path in a similar manner:
-    ```solidity
-    import {DSTest} from "../lib/ds-test/src/test.sol";
-    ```
-
-We can then build the project with zkforge zkbuild:
+We can build the project with zkforge zkbuild:
 ```
 $ zkforge zkbuild
 Compiling smart contracts...
@@ -125,7 +114,11 @@ Compiled Successfully
 
 #### Running Tests
 
-You can run the tests using `zkforge test`. The command and its expected output are shown below:
+You can run the tests using `zkforge test`. 
+
+>❗Known issue of not being able to find tests in the `/tests/` directory. 
+
+The command and its expected output are shown below:
 
 ```bash
 $ zkforge test
