@@ -233,8 +233,6 @@ impl ZkSolc {
         for (solc, version) in sources {
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
-                // Contract path is an absolute path of the file.
-                //let contract_path = source.0.clone();
                 // Check if the contract_path is in 'sources' directory or its subdirectories
                 let is_in_sources_dir = contract_path
                     .ancestors()
