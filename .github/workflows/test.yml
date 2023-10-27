@@ -3,8 +3,10 @@ name: test
 on:
     push:
         branches:
-            - master
+            - main
     pull_request:
+        branches:
+            - main
 
 concurrency:
     cancel-in-progress: true

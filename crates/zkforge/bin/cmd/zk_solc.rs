@@ -231,7 +231,6 @@ impl ZkSolc {
             for source in version.1 {
                 // Contract path is an absolute path of the file.
                 let contract_path = source.0.clone();
-
                 // Check if the contract_path is in 'sources' directory or its subdirectories
                 let is_in_sources_dir = contract_path
                     .ancestors()
@@ -254,7 +253,6 @@ impl ZkSolc {
                 // Step 5: Run Compiler and Handle Output
                 let mut cmd = Command::new(&self.compiler_path);
                 let mut child = cmd
-                    .arg(contract_path.clone())
                     .args(&comp_args)
                     .stdin(Stdio::piped())
                     .stderr(Stdio::piped())
