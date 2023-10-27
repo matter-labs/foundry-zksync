@@ -156,7 +156,6 @@ impl ZkBuildArgs {
 
         let zksolc_manager = self.setup_zksolc_manager()?;
 
-        println!("Compiling smart contracts...");
         self.compile_smart_contracts(zksolc_manager, project)
     }
     /// Returns whether `ZkBuildArgs` was configured with `--watch`

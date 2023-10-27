@@ -34,7 +34,8 @@ use serde::Serialize;
 use std::{fmt, fs, fs::File, io::copy, os::unix::prelude::PermissionsExt, path::PathBuf};
 use url::Url;
 
-const ZKSOLC_DOWNLOAD_BASE_URL: &str = "https://github.com/matter-labs/zksolc-bin/raw/main";
+const ZKSOLC_DOWNLOAD_BASE_URL: &str =
+    "https://github.com/matter-labs/zksolc-bin/releases/download/";
 
 /// `ZkSolcVersion` is an enumeration of the supported versions of the `zksolc` compiler.
 ///
@@ -56,9 +57,12 @@ pub enum ZkSolcVersion {
     V139,
     V1310,
     V1311,
+    V1313,
+    V1314,
+    V1315,
 }
 
-pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.3.11";
+pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.3.15";
 
 /// `parse_version` parses a string representation of a `zksolc` compiler version
 /// and returns the `ZkSolcVersion` enum variant if it matches a supported version.
@@ -80,6 +84,9 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.9" => Ok(ZkSolcVersion::V139),
         "v1.3.10" => Ok(ZkSolcVersion::V1310),
         "v1.3.11" => Ok(ZkSolcVersion::V1311),
+        "v1.3.13" => Ok(ZkSolcVersion::V1313),
+        "v1.3.14" => Ok(ZkSolcVersion::V1314),
+        "v1.3.15" => Ok(ZkSolcVersion::V1315),
         _ => Err(Error::msg(
             "ZkSolc compiler version not supported. Proper version format: 'v1.3.x'",
         )),
@@ -101,6 +108,9 @@ impl ZkSolcVersion {
             ZkSolcVersion::V139 => "v1.3.9",
             ZkSolcVersion::V1310 => "v1.3.10",
             ZkSolcVersion::V1311 => "v1.3.11",
+            ZkSolcVersion::V1313 => "v1.3.13",
+            ZkSolcVersion::V1314 => "v1.3.14",
+            ZkSolcVersion::V1315 => "v1.3.15",
         }
     }
 }
@@ -206,8 +216,8 @@ impl ZkSolcManagerOpts {
 /// # Example
 ///
 /// ```ignore
-/// use foundry_cli::cmd::forge::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
-/// let opts = ZkSolcManagerOpts::new("v1.3.11")
+/// use zkforge::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
+/// let opts = ZkSolcManagerOpts::new("v1.3.15")
 /// let zk_solc_manager = ZkSolcManagerBuilder::new(opts)
 ///     .build()
 ///     .expect("Failed to build ZkSolcManager");
@@ -311,6 +321,7 @@ impl ZkSolcManagerBuilder {
         let compilers_path = home_path.to_owned();
 
         let solc_version = parse_version(&version)?;
+
         Ok(ZkSolcManager::new(compilers_path, solc_version, compiler, download_url))
     }
 }
@@ -458,14 +469,20 @@ impl ZkSolcManager {
     ///
     /// This function can return an `Err` if the full download URL cannot be parsed into a valid
     /// `Url`.
+
     pub fn get_full_download_url(&self) -> Result<Url> {
         let zk_solc_os = get_operating_system()
             .map_err(|err| anyhow!("Failed to determine OS to select the binary: {}", err))?;
 
         let download_uri = zk_solc_os.get_download_uri();
 
-        let full_download_url =
-            format!("{}/{}/{}", self.download_url, download_uri, self.get_full_compiler());
+        // Using the GitHub releases URL pattern
+        let full_download_url = format!(
+            "https://github.com/matter-labs/zksolc-bin/releases/download/{}/zksolc-{}-{}",
+            self.version.get_version(),
+            download_uri,
+            self.version.get_version()
+        );
 
         Url::parse(&full_download_url)
             .map_err(|err| anyhow!("Could not parse URL for binary download: {}", err))
