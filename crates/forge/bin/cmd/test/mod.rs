@@ -143,7 +143,6 @@ impl TestArgs {
         let (mut config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
 
         let mut filter = self.filter(&config);
-
         trace!(target: "forge::test", ?filter, "using filter");
 
         // Set up the project

@@ -55,7 +55,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -73,7 +73,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::{Cast, TxBuilder};
+    /// use zkcast::{Cast, TxBuilder};
     /// use ethers_core::types::{Address, Chain};
     /// use ethers_providers::{Provider, Http};
     /// use std::{str::FromStr, convert::TryFrom};
@@ -143,7 +143,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::{Cast, TxBuilder};
+    /// use zkcast::{Cast, TxBuilder};
     /// use ethers_core::types::{Address, Chain};
     /// use ethers_providers::{Provider, Http};
     /// use std::{str::FromStr, convert::TryFrom};
@@ -204,7 +204,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::{Cast, TxBuilder};
+    /// use zkcast::{Cast, TxBuilder};
     /// use ethers_core::types::{Address, Chain, U256};
     /// use ethers_providers::{Provider, Http};
     /// use std::{str::FromStr, convert::TryFrom};
@@ -246,7 +246,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -273,7 +273,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::{Cast, TxBuilder};
+    /// use zkcast::{Cast, TxBuilder};
     /// use ethers_core::types::{Address, Chain, U256};
     /// use ethers_providers::{Provider, Http};
     /// use std::{str::FromStr, convert::TryFrom};
@@ -307,7 +307,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -474,7 +474,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     /// use ethers_core::types::Address;
     /// use std::{str::FromStr, convert::TryFrom};
@@ -499,7 +499,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     /// use ethers_core::types::Address;
     /// use std::{str::FromStr, convert::TryFrom};
@@ -528,7 +528,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     /// use ethers_core::types::Address;
     /// use std::{str::FromStr, convert::TryFrom};
@@ -557,7 +557,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     /// use ethers_core::types::Address;
     /// use std::{str::FromStr, convert::TryFrom};
@@ -591,7 +591,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     /// use ethers_core::types::Address;
     /// use std::{str::FromStr, convert::TryFrom};
@@ -622,7 +622,7 @@ where
     /// Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     /// use ethers_core::types::Address;
     /// use std::{str::FromStr, convert::TryFrom};
@@ -648,7 +648,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -690,7 +690,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -752,7 +752,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -777,7 +777,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     /// use ethers_core::types::{Address, H256};
     /// use std::{str::FromStr, convert::TryFrom};
@@ -829,7 +829,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_providers::{Provider, Http};
     /// use ethers_core::types::{BlockId, BlockNumber};
     /// use std::convert::TryFrom;
@@ -870,7 +870,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use cast::Cast;
+    /// use zkcast::Cast;
     /// use ethers_core::abi::Address;
     /// use ethers_providers::{Provider, Ws};
     /// use ethers_core::types::Filter;
@@ -983,7 +983,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// # use cast::SimpleCast;
+    /// # use zkcast::SimpleCast;
     /// # use ethers_core::types::{I256, U256};
     /// assert_eq!(SimpleCast::max_int("uint256")?, format!("{}", U256::MAX));
     /// assert_eq!(SimpleCast::max_int("int256")?, format!("{}", I256::MAX));
@@ -999,7 +999,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// # use cast::SimpleCast;
+    /// # use zkcast::SimpleCast;
     /// # use ethers_core::types::{I256, U256};
     /// assert_eq!(SimpleCast::min_int("uint256")?, "0");
     /// assert_eq!(SimpleCast::min_int("int256")?, format!("{}", I256::MIN));
@@ -1044,7 +1044,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::from_utf8("yo"), "0x796f");
@@ -1063,7 +1063,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::to_ascii("0x796f")?, "yo");
@@ -1083,7 +1083,7 @@ impl SimpleCast {
 
     /// Converts fixed point number into specified number of decimals
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     /// use ethers_core::types::U256;
     ///
     /// fn main() -> eyre::Result<()> {
@@ -1110,7 +1110,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     /// use ethers_core::types::U256;
     ///
     /// fn main() -> eyre::Result<()> {
@@ -1155,7 +1155,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::concat_hex(["0x00", "0x01"]), "0x0001");
@@ -1179,7 +1179,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     /// use ethers_core::types::Address;
     /// use std::str::FromStr;
     ///
@@ -1200,7 +1200,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::to_uint256("100")?, "0x0000000000000000000000000000000000000000000000000000000000000064");
@@ -1223,7 +1223,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::to_int256("0")?, "0x0000000000000000000000000000000000000000000000000000000000000000");
@@ -1253,7 +1253,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::to_unit("1 wei", "wei")?, "1");
@@ -1296,7 +1296,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::from_wei("1", "gwei")?, "0.000000001");
@@ -1322,7 +1322,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::to_wei("1", "")?, "1000000000000000000");
@@ -1346,7 +1346,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::from_rlp("0xc0".to_string()).unwrap(), "[]");
@@ -1368,7 +1368,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::to_rlp("[]").unwrap(),"0xc0".to_string());
@@ -1390,7 +1390,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     /// use ethers_core::types::{I256, U256};
     ///
     /// fn main() -> eyre::Result<()> {
@@ -1425,7 +1425,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// # fn main() -> eyre::Result<()> {
     /// let bytes = Cast::to_bytes32("1234")?;
@@ -1495,7 +1495,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     // Passing `input = false` will decode the data as the output type.
@@ -1532,7 +1532,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     // Passing `input = false` will decode the data as the output type.
@@ -1567,7 +1567,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// # use cast::SimpleCast as Cast;
+    /// # use zkcast::SimpleCast as Cast;
     ///
     /// # fn main() -> eyre::Result<()> {
     ///     assert_eq!(
@@ -1616,7 +1616,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// # use cast::SimpleCast as Cast;
+    /// # use zkcast::SimpleCast as Cast;
     ///
     /// # fn main() -> eyre::Result<()> {
     ///     assert_eq!(
@@ -1636,8 +1636,8 @@ impl SimpleCast {
     /// Etherscan. It returns a vector of [`InterfaceSource`] structs that contain the source of the
     /// interface and their name.
     /// ```no_run
-    /// use cast::SimpleCast as Cast;
-    /// use cast::AbiPath;
+    /// use zkcast::SimpleCast as Cast;
+    /// use zkcast::AbiPath;
     /// # async fn foo() -> eyre::Result<()> {
     /// let path = AbiPath::Local {
     ///     path: "utils/testdata/interfaceTestABI.json".to_owned(),
@@ -1709,7 +1709,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// # use cast::SimpleCast as Cast;
+    /// # use zkcast::SimpleCast as Cast;
     ///
     /// # fn main() -> eyre::Result<()> {
     ///
@@ -1732,7 +1732,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::namehash("")?, "0x0000000000000000000000000000000000000000000000000000000000000000");
@@ -1768,7 +1768,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::keccak("foo")?, "0x41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d");
@@ -1795,7 +1795,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::left_shift("16", "10", Some("10".to_string()), "hex")?, "0x4000");
@@ -1825,7 +1825,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::right_shift("0x4000", "10", None, "dec")?, "16");
@@ -1855,7 +1855,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// # use cast::SimpleCast as Cast;
+    /// # use zkcast::SimpleCast as Cast;
     /// # use ethers_core::types::Chain;
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -1884,7 +1884,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// # use cast::SimpleCast as Cast;
+    /// # use zkcast::SimpleCast as Cast;
     /// # use ethers_core::types::Chain;
     /// # use std::path::PathBuf;
     ///
@@ -1911,7 +1911,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```no_run
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let bytecode = "0x608060405260043610603f57600035";
@@ -1930,7 +1930,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     assert_eq!(Cast::get_selector("foo(address,uint256)", None)?.0, String::from("0xbd0d639f"));
@@ -1987,7 +1987,7 @@ impl SimpleCast {
     /// # Example
     ///
     /// ```
-    /// use cast::SimpleCast as Cast;
+    /// use zkcast::SimpleCast as Cast;
     ///
     /// fn main() -> eyre::Result<()> {
     ///     let tx = "0x02f8f582a86a82058d8459682f008508351050808303fd84948e42f2f4101563bf679975178e880fd87d3efd4e80b884659ac74b00000000000000000000000080f0c1c49891dcfdd40b6e0f960f84e6042bcb6f000000000000000000000000b97ef9ef8734c71904d8002f8b6bc66dd9c48a6e00000000000000000000000000000000000000000000000000000000007ff4e20000000000000000000000000000000000000000000000000000000000000064c001a05d429597befe2835396206781b199122f2e8297327ed4a05483339e7a8b2022aa04c23a7f70fb29dda1b4ee342fb10a625e9b8ddc6a603fb4e170d4f6f37700cb8";

@@ -3,7 +3,7 @@
 #![warn(unused_extern_crates)]
 #![forbid(unsafe_code)]
 #![forbid(where_clauses_object_safety)]
-
+#![allow(unused_imports)]
 /// REPL input dispatcher module
 pub mod dispatcher;
 

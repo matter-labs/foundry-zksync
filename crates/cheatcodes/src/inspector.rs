@@ -274,6 +274,7 @@ impl Cheatcodes {
     ///
     /// Cleanup any previously applied cheatcodes that altered the state in such a way that revm's
     /// revert would run into issues.
+    // #[allow(private_bounds)] // TODO
     pub fn on_revert<DB: DatabaseExt>(&mut self, data: &mut EVMData<'_, DB>) {
         trace!(deals=?self.eth_deals.len(), "rolling back deals");
 

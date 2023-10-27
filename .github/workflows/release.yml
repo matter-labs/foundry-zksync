@@ -61,10 +61,6 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    release-docker:
-        name: Release Docker
-        uses: ./.github/workflows/docker-publish.yml
-
     release:
         name: ${{ matrix.target }} (${{ matrix.os }})
         runs-on: ${{ matrix.os }}
@@ -238,8 +234,8 @@ jobs:
     issue:
         name: Open an issue
         runs-on: ubuntu-latest
-        needs: [prepare, release-docker, release, cleanup]
-        if: failure()
+        needs: [prepare, release, cleanup]
+        if: ${{ failure() }}
         steps:
             - uses: actions/checkout@v4
             - uses: JasonEtco/create-an-issue@v2

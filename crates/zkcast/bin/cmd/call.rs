@@ -218,6 +218,7 @@ impl CallArgs {
 }
 
 /// fills the builder from create arg
+#[allow(clippy::needless_pass_by_ref_mut)]
 async fn fill_create(
     builder: &mut TxBuilder<'_, Provider>,
     value: Option<U256>,
@@ -240,6 +241,7 @@ async fn fill_create(
 }
 
 /// fills the builder from args
+#[allow(clippy::needless_pass_by_ref_mut)]
 async fn fill_tx(
     builder: &mut TxBuilder<'_, Provider>,
     value: Option<U256>,

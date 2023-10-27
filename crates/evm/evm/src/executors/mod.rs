@@ -93,7 +93,7 @@ impl Executor {
     pub fn deploy_create2_deployer(&mut self) -> eyre::Result<()> {
         trace!("deploying local create2 deployer");
 
-        return Ok(());
+        Ok(())
     }
 
     /// Set the balance of an account.

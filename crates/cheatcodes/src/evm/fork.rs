@@ -349,7 +349,7 @@ fn create_fork_at_transaction<DB: DatabaseExt>(
 
 /// Creates the request object for a new fork request
 fn create_fork_request<DB: DatabaseExt>(
-    ccx: &mut CheatsCtxt<DB>,
+    ccx: &CheatsCtxt<DB>,
     url_or_alias: &str,
     block: Option<u64>,
 ) -> Result<CreateFork> {
