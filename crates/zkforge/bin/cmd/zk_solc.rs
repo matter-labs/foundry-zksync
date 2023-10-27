@@ -31,7 +31,7 @@
 ///   construct the path and file for saving the compiler output artifacts.
 use ansi_term::Colour::{Red, Yellow};
 use ethers::{
-    prelude::{artifacts::Source, Solc},
+    prelude::{artifacts::Source, remappings::RelativeRemapping, Solc},
     solc::{
         artifacts::{
             output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
@@ -43,6 +43,7 @@ use ethers::{
     types::Bytes,
 };
 use eyre::{Context, ContextCompat, Result};
+use regex::Regex;
 use semver::Version;
 use serde::Deserialize;
 use serde_json::Value;
@@ -60,6 +61,7 @@ pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
     pub is_system: bool,
     pub force_evmla: bool,
+    pub remappings: Vec<RelativeRemapping>,
 }
 
 /// Files that should be compiled with a given solidity version.
@@ -119,6 +121,7 @@ pub struct ZkSolc {
     is_system: bool,
     force_evmla: bool,
     standard_json: Option<StandardJsonCompilerInput>,
+    remappings: Vec<RelativeRemapping>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -143,6 +146,7 @@ impl ZkSolc {
             is_system: opts.is_system,
             force_evmla: opts.force_evmla,
             standard_json: None,
+            remappings: opts.remappings,
         }
     }
 
@@ -228,9 +232,7 @@ impl ZkSolc {
         // Step 2: Compile Contracts for Each Source
         for (solc, version) in sources {
             //configure project solc for each solc version
-            for source in version.1 {
-                // Contract path is an absolute path of the file.
-                let contract_path = source.0.clone();
+            for (contract_path, _) in version.1 {
                 // Check if the contract_path is in 'sources' directory or its subdirectories
                 let is_in_sources_dir = contract_path
                     .ancestors()
@@ -248,7 +250,7 @@ impl ZkSolc {
                 ))?;
 
                 // Step 4: Build Compiler Arguments
-                let comp_args = self.build_compiler_args(&source, &solc);
+                let comp_args = self.build_compiler_args(&contract_path, &solc);
 
                 // Step 5: Run Compiler and Handle Output
                 let mut cmd = Command::new(&self.compiler_path);
@@ -268,6 +270,13 @@ impl ZkSolc {
                 let output = child.wait_with_output().wrap_err("Could not run compiler cmd")?;
 
                 if !output.status.success() {
+                    // Skip this file if the compiler output is empty
+                    // currently zksolc returns false for success if output is empty
+                    // when output is empty, it has a length of 3, `[]\n`
+                    // solc returns true for success if output is empty
+                    if output.stderr.len() <= 3 {
+                        continue;
+                    }
                     eyre::bail!(
                         "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
                         String::from_utf8(output.stderr).unwrap_or_default(),
@@ -320,11 +329,7 @@ impl ZkSolc {
     /// # Returns
     ///
     /// A vector of strings representing the compiler arguments.
-    fn build_compiler_args(
-        &self,
-        versioned_source: &(PathBuf, Source),
-        solc: &Solc,
-    ) -> Vec<String> {
+    fn build_compiler_args(&self, contract_path: &Path, solc: &Solc) -> Vec<String> {
         // Get the solc compiler path as a string
         let solc_path = solc.solc.to_str().expect("Error configuring solc compiler.").to_string();
 
@@ -332,7 +337,7 @@ impl ZkSolc {
         let mut comp_args = vec!["--standard-json".to_string(), "--solc".to_string(), solc_path];
 
         // Check if system mode is enabled or if the source path contains "is-system"
-        if self.is_system || versioned_source.0.to_str().unwrap().contains("is-system") {
+        if self.is_system || contract_path.to_str().unwrap().contains("is-system") {
             comp_args.push("--system-mode".to_string());
         }
 
@@ -643,11 +648,17 @@ impl ZkSolc {
             .insert("*".to_string(), file_output_selection.clone());
 
         // Step 4: Generate Standard JSON Input
-        let standard_json = self
+        let mut standard_json = self
             .project
             .standard_json_input(contract_path)
             .wrap_err("Could not get standard json input")
             .unwrap();
+
+        // Apply remappings for each contract dependency
+        for (_path, _source) in &mut standard_json.sources {
+            remap_source_path(_path, &self.remappings);
+            _source.content = self.remap_source_content(_source.content.to_string()).into();
+        }
 
         // Store the generated standard JSON input in the ZkSolc instance
         self.standard_json = Some(standard_json.to_owned());
@@ -795,6 +806,93 @@ impl ZkSolc {
         let path = self.project.paths.artifacts.join(filename);
         fs::create_dir_all(&path).wrap_err("Could not create artifacts directory")?;
         Ok(path)
+    }
+
+    fn remap_source_content(&mut self, source_content: String) -> String {
+        let content = source_content;
+
+        // Get relative remappings
+        let remappings = &self.remappings;
+
+        // Replace imports with placeholders
+        let content = replace_imports_with_placeholders(content, remappings);
+
+        substitute_remapped_paths(content, remappings)
+    }
+}
+// TODO:
+// This approach will need to be refactored and improved
+// It solves the import path issue but should be revisited before production
+fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRemapping]) -> String {
+    let mut replaced_content = content;
+
+    // Iterate through the remappings
+    for (i, remapping) in remappings.iter().enumerate() {
+        let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
+
+        // Define a pattern that matches the import statement, capturing the rest of the path
+        let pattern = format!(
+            r#"import\s+((?:\{{.*?\}}\s+from\s+)?)\s*"{}(?P<rest>[^"]*)""#,
+            regex::escape(&remapping.name)
+        );
+
+        let replacement = format!(r#"import {}"{}$rest""#, "$1", placeholder);
+
+        replaced_content =
+            Regex::new(&pattern).unwrap().replace_all(&replaced_content, replacement).into_owned();
+    }
+
+    replaced_content
+}
+// TODO:
+// This approach will need to be refactored and improved
+// It solves the import path issue but should be revisited before production
+fn substitute_remapped_paths(content: String, remappings: &[RelativeRemapping]) -> String {
+    let mut substituted = content;
+
+    loop {
+        let mut made_replacements = false;
+
+        for (i, r) in remappings.iter().enumerate() {
+            let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
+            let import_path = r.path.path.to_str().unwrap();
+
+            let new_substituted = substituted.replace(&placeholder, import_path);
+
+            if new_substituted != substituted {
+                made_replacements = true;
+                substituted = new_substituted;
+            }
+        }
+
+        // Exit the loop if no more replacements were made
+        if !made_replacements {
+            break;
+        }
+    }
+
+    substituted
+}
+// TODO:
+// This approach will need to be refactored and improved
+// It solves the import path issue but should be revisited before production
+fn remap_source_path(source_path: &mut PathBuf, remappings: &[RelativeRemapping]) {
+    let source_path_str = source_path.to_str().expect("Failed to convert path to str");
+
+    for r in remappings.iter() {
+        let prefix = &r.name;
+
+        let mut parts = source_path_str.splitn(2, prefix);
+
+        if let Some(_before) = parts.next() {
+            if let Some(after) = parts.next() {
+                let temp_path = r.path.path.join(after);
+
+                *source_path =
+                    PathBuf::from(temp_path.to_str().unwrap().replace("src/src/", "src/"));
+                break;
+            }
+        }
     }
 }
 

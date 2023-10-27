@@ -33,7 +33,7 @@ use super::{
     },
 };
 use clap::Parser;
-use ethers::prelude::Project;
+use ethers::{prelude::Project, solc::remappings::RelativeRemapping};
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
 use foundry_config::{
     figment::{
@@ -156,7 +156,9 @@ impl ZkBuildArgs {
 
         let zksolc_manager = self.setup_zksolc_manager()?;
 
-        self.compile_smart_contracts(zksolc_manager, project)
+        let remappings = config.remappings;
+
+        self.compile_smart_contracts(zksolc_manager, project, remappings)
     }
     /// Returns whether `ZkBuildArgs` was configured with `--watch`
     pub fn _is_watch(&self) -> bool {
@@ -220,11 +222,13 @@ impl ZkBuildArgs {
         &self,
         zksolc_manager: ZkSolcManager,
         project: Project,
+        remappings: Vec<RelativeRemapping>,
     ) -> eyre::Result<()> {
         let zksolc_opts = ZkSolcOpts {
             compiler_path: zksolc_manager.get_full_compiler_path(),
             is_system: self.is_system,
             force_evmla: self.force_evmla,
+            remappings,
         };
 
         let mut zksolc = ZkSolc::new(zksolc_opts, project);
