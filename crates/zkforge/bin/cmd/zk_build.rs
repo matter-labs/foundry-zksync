@@ -86,13 +86,6 @@ pub struct ZkBuildArgs {
     #[serde(skip)]
     pub sizes: bool,
 
-    /// Skip building files whose names contain the given filter.
-    ///
-    /// `test` and `script` are aliases for `.t.sol` and `.s.sol`.
-    //#[clap(long, num_args(1..))]
-    // #[serde(skip)]
-    //pub skip: Option<Vec<SkipBuildFilter>>,
-
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
@@ -176,17 +169,9 @@ impl ZkBuildArgs {
         }
 
         let zksolc_manager = setup_zksolc_manager(self.use_zksolc.clone())?;
-
         let remappings = config.remappings;
 
         // TODO: add filter support
-        // let filters = self.skip.unwrap_or_default();
-        // if self.args.silent {
-        //     compile::suppress_compile_with_filter(&project, filters)
-        // } else {
-        //     let compiler = ProjectCompiler::with_filter(self.names, self.sizes, filters);
-        //     compiler.compile(&project)
-        // }
 
         foundry_common::zk_compile::compile_smart_contracts(
             self.is_system,

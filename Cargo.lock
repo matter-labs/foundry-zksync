@@ -12166,9 +12166,7 @@ name = "zkforge"
 version = "0.2.0"
 dependencies = [
  "alloy-primitives",
- "ansi_term",
  "anvil",
- "anyhow",
  "async-trait",
  "clap 4.4.6",
  "clap_complete",
@@ -12177,9 +12175,7 @@ dependencies = [
  "const-hex",
  "criterion",
  "dialoguer",
- "dirs 5.0.1",
  "dunce",
- "era_revm",
  "ethers",
  "eyre",
  "forge-doc",

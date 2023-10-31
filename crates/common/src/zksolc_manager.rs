@@ -635,38 +635,3 @@ impl ZkSolcManager {
         Ok(())
     }
 }
-
-// The `compile_smart_contracts` function initiates the contract compilation process.
-//
-// It follows these steps:
-// 1. Create an instance of `ZkSolcOpts` with the appropriate options.
-// 2. Instantiate `ZkSolc` with the created options and the project.
-// 3. Initiate the contract compilation process.
-//
-// The function returns `Ok(())` if the compilation process completes successfully, or an error
-// if it fails.
-// fn compile_smart_contracts(
-//     &self,
-//     zksolc_manager: ZkSolcManager,
-//     project: Project,
-//     remappings: Vec<RelativeRemapping>,
-// ) -> eyre::Result<()> {
-//     let zksolc_opts = ZkSolcOpts {
-//         compiler_path: zksolc_manager.get_full_compiler_path(),
-//         is_system: self.is_system,
-//         force_evmla: self.force_evmla,
-//         remappings,
-//     };
-
-//     let mut zksolc = ZkSolc::new(zksolc_opts, project);
-
-//     match zksolc.compile() {
-//         Ok(_) => {
-//             println!("Compiled Successfully");
-//             Ok(())
-//         }
-//         Err(err) => {
-//             eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
-//         }
-//     }
-// }
