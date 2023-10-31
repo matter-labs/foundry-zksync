@@ -1,4 +1,5 @@
-/// The `ZkSolcManager` module manages the downloading and setup of the `zksolc` Solidity
+#![allow(missing_docs)]
+//! The `ZkSolcManager` module manages the downloading and setup of the `zksolc` Solidity
 /// compiler. This module provides functionalities to interact with different versions of the
 /// zksolc compiler as well as supporting different operating systems.
 ///
@@ -409,6 +410,42 @@ impl fmt::Display for ZkSolcManager {
     }
 }
 
+/// The `setup_zksolc_manager` function creates and prepares an instance of `ZkSolcManager`.
+///
+/// It follows these steps:
+/// 1. Instantiate `ZkSolcManagerOpts` and `ZkSolcManagerBuilder` with the specified zkSync Solidity
+///    compiler.
+/// 2. Create a `ZkSolcManager` using the builder.
+/// 3. Check if the setup compilers directory is properly set up. If not, it raises an error.
+/// 4. If the zkSync Solidity compiler does not exist in the compilers directory, it triggers its
+///    download.
+///
+/// The function returns the `ZkSolcManager` if all steps are successful, or an error if any
+/// step fails.
+pub fn setup_zksolc_manager(zksolc_version: String) -> eyre::Result<ZkSolcManager> {
+    let zksolc_manager_opts = ZkSolcManagerOpts::new(zksolc_version);
+    let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
+    let zksolc_manager = zksolc_manager_builder
+        .build()
+        .map_err(|e| eyre::eyre!("Error building zksolc_manager: {}", e))?;
+
+    if let Err(err) = zksolc_manager.check_setup_compilers_dir() {
+        eyre::bail!("Failed to setup compilers directory: {}", err);
+    }
+
+    if !zksolc_manager.exists() {
+        println!(
+            "Downloading zksolc compiler from {:?}",
+            zksolc_manager.get_full_download_url().unwrap().to_string()
+        );
+        zksolc_manager
+            .download()
+            .map_err(|err| eyre::eyre!("Failed to download the file: {}", err))?;
+    }
+
+    Ok(zksolc_manager)
+}
+
 impl ZkSolcManager {
     /// Constructs a new instance of `ZkSolcManager` with the specified configuration options.
     ///
@@ -598,3 +635,38 @@ impl ZkSolcManager {
         Ok(())
     }
 }
+
+// The `compile_smart_contracts` function initiates the contract compilation process.
+//
+// It follows these steps:
+// 1. Create an instance of `ZkSolcOpts` with the appropriate options.
+// 2. Instantiate `ZkSolc` with the created options and the project.
+// 3. Initiate the contract compilation process.
+//
+// The function returns `Ok(())` if the compilation process completes successfully, or an error
+// if it fails.
+// fn compile_smart_contracts(
+//     &self,
+//     zksolc_manager: ZkSolcManager,
+//     project: Project,
+//     remappings: Vec<RelativeRemapping>,
+// ) -> eyre::Result<()> {
+//     let zksolc_opts = ZkSolcOpts {
+//         compiler_path: zksolc_manager.get_full_compiler_path(),
+//         is_system: self.is_system,
+//         force_evmla: self.force_evmla,
+//         remappings,
+//     };
+
+//     let mut zksolc = ZkSolc::new(zksolc_opts, project);
+
+//     match zksolc.compile() {
+//         Ok(_) => {
+//             println!("Compiled Successfully");
+//             Ok(())
+//         }
+//         Err(err) => {
+//             eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
+//         }
+//     }
+// }

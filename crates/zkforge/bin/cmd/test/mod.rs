@@ -1,8 +1,4 @@
 use super::{install, test::filter::ProjectPathsAwareFilter, watch::WatchArgs};
-use crate::cmd::{
-    zk_solc::{ZkSolc, ZkSolcOpts},
-    zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts, DEFAULT_ZKSOLC_VERSION},
-};
 use alloy_primitives::U256;
 use clap::Parser;
 use eyre::Result;
@@ -11,8 +7,12 @@ use foundry_cli::{
     utils::{self, LoadConfig},
 };
 use foundry_common::{
-    compact_to_contract, compile::ContractSources, evm::EvmArgs, get_contract_name, get_file_name,
-    shell,
+    compact_to_contract,
+    compile::ContractSources,
+    evm::EvmArgs,
+    get_contract_name, get_file_name, shell,
+    zk_compile::{ZkSolc, ZkSolcOpts},
+    zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts, DEFAULT_ZKSOLC_VERSION},
 };
 use foundry_config::{
     figment,

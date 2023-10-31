@@ -1,4 +1,5 @@
-/// This module provides the implementation of the ZkSolc compiler for Solidity contracts.
+#![allow(missing_docs)]
+//! This module provides the implementation of the ZkSolc compiler for Solidity contracts.
 /// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart
 /// contracts.
 ///
@@ -29,18 +30,17 @@
 ///
 /// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods
 ///   construct the path and file for saving the compiler output artifacts.
+use crate::zksolc_manager::ZkSolcManager;
 use ansi_term::Colour::{Red, Yellow};
-use ethers::{
-    prelude::{artifacts::Source, remappings::RelativeRemapping, Solc},
-    solc::{
-        artifacts::{
-            output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
-            LosslessAbi, StandardJsonCompilerInput,
-        },
-        ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project,
-        ProjectCompileOutput,
+use ethers_core::types::Bytes;
+use ethers_solc::{
+    artifacts::{
+        output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
+        LosslessAbi, Source, StandardJsonCompilerInput,
     },
-    types::Bytes,
+    remappings::RelativeRemapping,
+    ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
+    Solc,
 };
 use eyre::{Context, ContextCompat, Result};
 use regex::Regex;
@@ -135,6 +135,42 @@ impl fmt::Display for ZkSolc {
             self.compiler_path.display(),
             self.project.paths.artifacts.display(),
         )
+    }
+}
+
+/// The `compile_smart_contracts` function initiates the contract compilation process.
+///
+/// It follows these steps:
+/// 1. Create an instance of `ZkSolcOpts` with the appropriate options.
+/// 2. Instantiate `ZkSolc` with the created options and the project.
+/// 3. Initiate the contract compilation process.
+///
+/// The function returns `Ok(())` if the compilation process completes successfully, or an error
+/// if it fails.
+pub fn compile_smart_contracts(
+    is_system: bool,
+    is_legacy: bool,
+    zksolc_manager: ZkSolcManager,
+    project: Project,
+    remappings: Vec<RelativeRemapping>,
+) -> eyre::Result<()> {
+    let zksolc_opts = ZkSolcOpts {
+        compiler_path: zksolc_manager.get_full_compiler_path(),
+        is_system,
+        force_evmla: is_legacy,
+        remappings,
+    };
+
+    let mut zksolc = ZkSolc::new(zksolc_opts, project);
+
+    match zksolc.compile() {
+        Ok(_) => {
+            println!("Compiled Successfully");
+            Ok(())
+        }
+        Err(err) => {
+            eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
+        }
     }
 }
 
@@ -448,7 +484,7 @@ impl ZkSolc {
 
                     let mut art = ConfigurableContractArtifact {
                         bytecode: Some(CompactBytecode {
-                            object: ethers::solc::artifacts::BytecodeObject::Bytecode(
+                            object: ethers_solc::artifacts::BytecodeObject::Bytecode(
                                 packed_bytecode.clone(),
                             ),
                             source_map: None,
@@ -456,7 +492,7 @@ impl ZkSolc {
                         }),
                         deployed_bytecode: Some(CompactDeployedBytecode {
                             bytecode: Some(CompactBytecode {
-                                object: ethers::solc::artifacts::BytecodeObject::Bytecode(
+                                object: ethers_solc::artifacts::BytecodeObject::Bytecode(
                                     packed_bytecode,
                                 ),
                                 source_map: None,
@@ -941,9 +977,8 @@ mod tests {
     /// Basic test to analyze the single Counter.sol artifact.
     #[test]
     pub fn test_artifacts_extraction() {
-        let data = include_str!("../../../../testdata/artifacts-counter/artifacts.json")
-            .as_bytes()
-            .to_vec();
+        let data =
+            include_str!("../../../testdata/artifacts-counter/artifacts.json").as_bytes().to_vec();
         let mut displayed_warnings = HashSet::new();
         let source = "src/Counter.sol".to_owned();
         let result = ZkSolc::handle_output(data, &source, &mut displayed_warnings, None);
@@ -958,14 +993,13 @@ mod tests {
     }
     #[test]
     pub fn test_json_parsing() {
-        let data = include_str!("../../../../testdata/artifacts-counter/artifacts.json")
-            .as_bytes()
-            .to_vec();
+        let data =
+            include_str!("../../../testdata/artifacts-counter/artifacts.json").as_bytes().to_vec();
         let _parsed: ZkSolcCompilerOutput = serde_json::from_slice(&data).unwrap();
 
         // Contract that has almost no data (and many fields missing).
         let almost_empty_data =
-            include_str!("../../../../testdata/artifacts-counter/empty.json").as_bytes().to_vec();
+            include_str!("../../../testdata/artifacts-counter/empty.json").as_bytes().to_vec();
         let _parsed_empty: ZkSolcCompilerOutput =
             serde_json::from_slice(&almost_empty_data).unwrap();
     }

@@ -4110,12 +4110,16 @@ dependencies = [
 name = "foundry-common"
 version = "0.2.0"
 dependencies = [
+ "ansi_term",
+ "anyhow",
  "async-trait",
  "auto_impl",
  "clap 4.4.6",
  "comfy-table",
  "const-hex",
+ "dirs 5.0.1",
  "dunce",
+ "era_revm",
  "ethers-core",
  "ethers-etherscan",
  "ethers-middleware",
