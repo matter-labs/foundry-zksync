@@ -230,7 +230,7 @@ impl ZkSolc {
         let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
 
         // Step 2: Compile Contracts for Each Source
-        for (solc, version) in sources {
+        for (_solc, version) in sources {
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
                 // Check if the contract_path is in 'sources' directory or its subdirectories
@@ -250,7 +250,7 @@ impl ZkSolc {
                 ))?;
 
                 // Step 4: Build Compiler Arguments
-                let comp_args = self.build_compiler_args(&contract_path, &solc);
+                let comp_args = self.build_compiler_args(&contract_path, &self.project.solc);
 
                 // Step 5: Run Compiler and Handle Output
                 let mut cmd = Command::new(&self.compiler_path);
