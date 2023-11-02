@@ -174,7 +174,7 @@ impl ZkSolcOS {
     /// This function is used to construct the URI for downloading the zkSync compiler binary.
     fn get_download_uri(&self) -> &str {
         match self {
-            ZkSolcOS::Linux => "linux-amd64",
+            ZkSolcOS::Linux => "linux-amd64-musl",
             ZkSolcOS::MacAMD => "macosx-amd64",
             ZkSolcOS::MacARM => "macosx-arm64",
         }
