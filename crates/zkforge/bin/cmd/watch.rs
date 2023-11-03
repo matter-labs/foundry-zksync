@@ -1,4 +1,5 @@
 use super::{snapshot::SnapshotArgs, test::TestArgs};
+use crate::cmd::zk_build::ZkBuildArgs;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::utils::{self, FoundryPathExt};
@@ -82,22 +83,22 @@ impl WatchArgs {
 
 /// Executes a [`Watchexec`] that listens for changes in the project's src dir and reruns `forge
 /// build`
-// pub async fn watch_build(args: ZkBuildArgs) -> Result<()> {
-//     let (init, mut runtime) = args.watchexec_config()?;
-//     let cmd = cmd_args(args.watch.watch.as_ref().map(|paths| paths.len()).unwrap_or_default());
+pub async fn watch_build(args: ZkBuildArgs) -> Result<()> {
+    let (init, mut runtime) = args.watchexec_config()?;
+    let cmd = cmd_args(args.watch.watch.as_ref().map(|paths| paths.len()).unwrap_or_default());
 
-//     trace!("watch build cmd={:?}", cmd);
-//     runtime.command(watch_command(cmd.clone()));
+    trace!("watch build cmd={:?}", cmd);
+    runtime.command(watch_command(cmd.clone()));
 
-//     let wx = Watchexec::new(init, runtime.clone())?;
-//     on_action(args.watch, runtime, Arc::clone(&wx), cmd, (), |_| {});
+    let wx = Watchexec::new(init, runtime.clone())?;
+    on_action(args.watch, runtime, Arc::clone(&wx), cmd, (), |_| {});
 
-//     // start executing the command immediately
-//     wx.send_event(Event::default(), Priority::default()).await?;
-//     wx.main().await??;
+    // start executing the command immediately
+    wx.send_event(Event::default(), Priority::default()).await?;
+    wx.main().await??;
 
-//     Ok(())
-// }
+    Ok(())
+}
 
 /// Executes a [`Watchexec`] that listens for changes in the project's src dir and reruns `forge
 /// snapshot`

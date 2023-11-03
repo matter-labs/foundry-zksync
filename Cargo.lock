@@ -4110,12 +4110,16 @@ dependencies = [
 name = "foundry-common"
 version = "0.2.0"
 dependencies = [
+ "ansi_term",
+ "anyhow",
  "async-trait",
  "auto_impl",
  "clap 4.4.6",
  "comfy-table",
  "const-hex",
+ "dirs 5.0.1",
  "dunce",
+ "era_revm",
  "ethers-core",
  "ethers-etherscan",
  "ethers-middleware",
@@ -12162,9 +12166,7 @@ name = "zkforge"
 version = "0.2.0"
 dependencies = [
  "alloy-primitives",
- "ansi_term",
  "anvil",
- "anyhow",
  "async-trait",
  "clap 4.4.6",
  "clap_complete",
@@ -12173,9 +12175,7 @@ dependencies = [
  "const-hex",
  "criterion",
  "dialoguer",
- "dirs 5.0.1",
  "dunce",
- "era_revm",
  "ethers",
  "eyre",
  "forge-doc",
