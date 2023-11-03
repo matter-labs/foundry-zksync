@@ -35,7 +35,13 @@ fn main() -> Result<()> {
         }
         Subcommands::Coverage(cmd) => utils::block_on(cmd.run()),
         Subcommands::Bind(cmd) => cmd.run(),
-        Subcommands::ZkBuild(cmd) => cmd.run(),
+        Subcommands::ZkBuild(cmd) => {
+            if cmd.is_watch() {
+                utils::block_on(watch::watch_build(cmd))
+            } else {
+                cmd.run().map(|_| ())
+            }
+        }
         Subcommands::Debug(cmd) => utils::block_on(cmd.run()),
         Subcommands::VerifyContract(args) => utils::block_on(args.run()),
         Subcommands::VerifyCheck(args) => utils::block_on(args.run()),
@@ -57,7 +63,7 @@ fn main() -> Result<()> {
             clap_complete::generate(
                 clap_complete_fig::Fig,
                 &mut Opts::command(),
-                "forge",
+                "zkforge",
                 &mut std::io::stdout(),
             );
             Ok(())

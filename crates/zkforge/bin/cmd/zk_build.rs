@@ -25,16 +25,11 @@
 /// zkSync contracts. It is designed to provide a seamless experience for developers, providing
 /// an easy-to-use interface for contract compilation while taking care of the underlying
 /// complexities.
-use super::watch::WatchArgs;
-use super::{
-    zk_solc::{ZkSolc, ZkSolcOpts},
-    zksolc_manager::{
-        ZkSolcManager, ZkSolcManagerBuilder, ZkSolcManagerOpts, DEFAULT_ZKSOLC_VERSION,
-    },
-};
+use super::{install, watch::WatchArgs};
 use clap::Parser;
-use ethers::{prelude::Project, solc::remappings::RelativeRemapping};
+use ethers::prelude::Project;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
+use foundry_common::zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION};
 use foundry_config::{
     figment::{
         self,
@@ -46,6 +41,7 @@ use foundry_config::{
 };
 use serde::Serialize;
 use std::fmt::Debug;
+use watchexec::config::{InitConfig, RuntimeConfig};
 
 foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 
@@ -80,6 +76,16 @@ foundry_config::merge_impl_figment_convert!(ZkBuildArgs, args);
 #[derive(Debug, Clone, Parser, Serialize, Default)]
 #[clap(next_help_heading = "ZkBuild options", about = None)]
 pub struct ZkBuildArgs {
+    /// Print compiled contract names.
+    #[clap(long)]
+    #[serde(skip)]
+    pub names: bool,
+
+    /// Print compiled contract sizes.
+    #[clap(long)]
+    #[serde(skip)]
+    pub sizes: bool,
+
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
@@ -147,101 +153,55 @@ impl ZkBuildArgs {
     /// involved in the zkSync contract compilation process in a single method, allowing for
     /// easy invocation of the process with a single function call.
     pub fn run(self) -> eyre::Result<()> {
-        let config = self.try_load_config_emit_warnings()?;
+        let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
 
         //set zk out path
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
 
-        let zksolc_manager = self.setup_zksolc_manager()?;
+        if install::install_missing_dependencies(&mut config, self.args.silent) &&
+            config.auto_detect_remappings
+        {
+            // need to re-configure here to also catch additional remappings
+            config = self.load_config();
+            project = config.project()?;
+        }
 
+        let zksolc_manager = setup_zksolc_manager(self.use_zksolc.clone())?;
         let remappings = config.remappings;
 
-        self.compile_smart_contracts(zksolc_manager, project, remappings)
+        // TODO: add filter support
+
+        foundry_common::zk_compile::compile_smart_contracts(
+            self.is_system,
+            self.force_evmla,
+            zksolc_manager,
+            project,
+            remappings,
+        )
     }
+    /// Returns the `Project` for the current workspace
+    ///
+    /// This loads the `foundry_config::Config` for the current workspace (see
+    /// [`utils::find_project_root_path`] and merges the cli `BuildArgs` into it before returning
+    /// [`foundry_config::Config::project()`]
+    pub fn project(&self) -> eyre::Result<Project> {
+        self.args.project()
+    }
+
     /// Returns whether `ZkBuildArgs` was configured with `--watch`
-    pub fn _is_watch(&self) -> bool {
+    pub fn is_watch(&self) -> bool {
         self.watch.watch.is_some()
     }
     /// Returns the [`watchexec::InitConfig`] and [`watchexec::RuntimeConfig`] necessary to
     /// bootstrap a new [`watchexe::Watchexec`] loop.
-    // pub(crate) fn watchexec_config(&self) -> Result<(InitConfig, RuntimeConfig)> {
-    //     // use the path arguments or if none where provided the `src` dir
-    //     self.watch.watchexec_config(|| {
-    //         let config = Config::from(self);
-    //         vec![config.src, config.test, config.script]
-    //     })
-    // }
-    /// The `setup_zksolc_manager` function creates and prepares an instance of `ZkSolcManager`.
-    ///
-    /// It follows these steps:
-    /// 1. Instantiate `ZkSolcManagerOpts` and `ZkSolcManagerBuilder` with the specified zkSync
-    ///    Solidity compiler.
-    /// 2. Create a `ZkSolcManager` using the builder.
-    /// 3. Check if the setup compilers directory is properly set up. If not, it raises an error.
-    /// 4. If the zkSync Solidity compiler does not exist in the compilers directory, it triggers
-    ///    its download.
-    ///
-    /// The function returns the `ZkSolcManager` if all steps are successful, or an error if any
-    /// step fails.
-    fn setup_zksolc_manager(&self) -> eyre::Result<ZkSolcManager> {
-        let zksolc_manager_opts = ZkSolcManagerOpts::new(self.use_zksolc.clone());
-        let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
-        let zksolc_manager = zksolc_manager_builder
-            .build()
-            .map_err(|e| eyre::eyre!("Error building zksolc_manager: {}", e))?;
-
-        if let Err(err) = zksolc_manager.check_setup_compilers_dir() {
-            eyre::bail!("Failed to setup compilers directory: {}", err);
-        }
-
-        if !zksolc_manager.exists() {
-            println!(
-                "Downloading zksolc compiler from {:?}",
-                zksolc_manager.get_full_download_url().unwrap().to_string()
-            );
-            zksolc_manager
-                .download()
-                .map_err(|err| eyre::eyre!("Failed to download the file: {}", err))?;
-        }
-
-        Ok(zksolc_manager)
-    }
-
-    /// The `compile_smart_contracts` function initiates the contract compilation process.
-    ///
-    /// It follows these steps:
-    /// 1. Create an instance of `ZkSolcOpts` with the appropriate options.
-    /// 2. Instantiate `ZkSolc` with the created options and the project.
-    /// 3. Initiate the contract compilation process.
-    ///
-    /// The function returns `Ok(())` if the compilation process completes successfully, or an error
-    /// if it fails.
-    fn compile_smart_contracts(
-        &self,
-        zksolc_manager: ZkSolcManager,
-        project: Project,
-        remappings: Vec<RelativeRemapping>,
-    ) -> eyre::Result<()> {
-        let zksolc_opts = ZkSolcOpts {
-            compiler_path: zksolc_manager.get_full_compiler_path(),
-            is_system: self.is_system,
-            force_evmla: self.force_evmla,
-            remappings,
-        };
-
-        let mut zksolc = ZkSolc::new(zksolc_opts, project);
-
-        match zksolc.compile() {
-            Ok(_) => {
-                println!("Compiled Successfully");
-                Ok(())
-            }
-            Err(err) => {
-                eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
-            }
-        }
+    pub(crate) fn watchexec_config(&self) -> eyre::Result<(InitConfig, RuntimeConfig)> {
+        // use the path arguments or if none where provided the `src` dir
+        self.watch.watchexec_config(|| {
+            let config = Config::from(self);
+            vec![config.src, config.test, config.script]
+        })
     }
 }
 
@@ -254,15 +214,15 @@ impl Provider for ZkBuildArgs {
     fn data(&self) -> Result<Map<Profile, Dict>, figment::Error> {
         let value = Value::serialize(self)?;
         let error = InvalidType(value.to_actual(), "map".into());
-        let dict = value.into_dict().ok_or(error)?;
+        let mut dict = value.into_dict().ok_or(error)?;
 
-        // if self.names {
-        //     dict.insert("names".to_string(), true.into());
-        // }
+        if self.names {
+            dict.insert("names".to_string(), true.into());
+        }
 
-        // if self.sizes {
-        //     dict.insert("sizes".to_string(), true.into());
-        // }
+        if self.sizes {
+            dict.insert("sizes".to_string(), true.into());
+        }
 
         Ok(Map::from([(Config::selected_profile(), dict)]))
     }

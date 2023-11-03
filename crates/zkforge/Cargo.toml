@@ -35,11 +35,7 @@ tracing.workspace = true
 yansi = "0.5"
 
 # zksync
-era_revm = { git = "https://github.com/matter-labs/era-revm.git", tag = "v0.0.1-alpha" }
 zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
-ansi_term = "0.12.1"
-anyhow = {version = "1.0.70"}
-dirs = {version = "5.0.0"}
 url = "2.3.1"
 
 # bin

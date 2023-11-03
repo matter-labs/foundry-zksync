@@ -1,4 +1,5 @@
-/// The `ZkSolcManager` module manages the downloading and setup of the `zksolc` Solidity
+#![allow(missing_docs)]
+//! The `ZkSolcManager` module manages the downloading and setup of the `zksolc` Solidity
 /// compiler. This module provides functionalities to interact with different versions of the
 /// zksolc compiler as well as supporting different operating systems.
 ///
@@ -407,6 +408,42 @@ impl fmt::Display for ZkSolcManager {
             self.exists(),
         )
     }
+}
+
+/// The `setup_zksolc_manager` function creates and prepares an instance of `ZkSolcManager`.
+///
+/// It follows these steps:
+/// 1. Instantiate `ZkSolcManagerOpts` and `ZkSolcManagerBuilder` with the specified zkSync Solidity
+///    compiler.
+/// 2. Create a `ZkSolcManager` using the builder.
+/// 3. Check if the setup compilers directory is properly set up. If not, it raises an error.
+/// 4. If the zkSync Solidity compiler does not exist in the compilers directory, it triggers its
+///    download.
+///
+/// The function returns the `ZkSolcManager` if all steps are successful, or an error if any
+/// step fails.
+pub fn setup_zksolc_manager(zksolc_version: String) -> eyre::Result<ZkSolcManager> {
+    let zksolc_manager_opts = ZkSolcManagerOpts::new(zksolc_version);
+    let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
+    let zksolc_manager = zksolc_manager_builder
+        .build()
+        .map_err(|e| eyre::eyre!("Error building zksolc_manager: {}", e))?;
+
+    if let Err(err) = zksolc_manager.check_setup_compilers_dir() {
+        eyre::bail!("Failed to setup compilers directory: {}", err);
+    }
+
+    if !zksolc_manager.exists() {
+        println!(
+            "Downloading zksolc compiler from {:?}",
+            zksolc_manager.get_full_download_url().unwrap().to_string()
+        );
+        zksolc_manager
+            .download()
+            .map_err(|err| eyre::eyre!("Failed to download the file: {}", err))?;
+    }
+
+    Ok(zksolc_manager)
 }
 
 impl ZkSolcManager {
