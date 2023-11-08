@@ -327,14 +327,14 @@ impl TestArgs {
         test_options: TestOptions,
     ) -> eyre::Result<TestOutcome> {
         if self.list {
-            return list(runner, filter, self.json);
+            return list(runner, filter, self.json)
         }
 
         if let Some(debug_regex) = self.debug.as_ref() {
             let mut filter = filter.clone();
             filter.args_mut().test_pattern = Some(debug_regex.clone());
             let results = runner.test_collect(&filter, test_options).await;
-            return Ok(TestOutcome::new(results, self.allow_failure));
+            return Ok(TestOutcome::new(results, self.allow_failure))
         }
 
         trace!(target: "forge::test", "running all tests");

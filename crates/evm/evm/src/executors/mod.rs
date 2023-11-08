@@ -149,6 +149,15 @@ impl Executor {
         self
     }
 
+    // Record any changes made to the block's environment during setup,
+    // and also the chainid, which can be set manually.
+    pub fn record_env_changes(&mut self, env: &Env) {
+        // record any changes made to the block's environment during setup
+        self.env.block = env.block.clone();
+        // and also the chainid, which can be set manually
+        self.env.cfg.chain_id = env.cfg.chain_id;
+    }
+
     /// Calls the `setUp()` function on a contract.
     ///
     /// This will commit any state changes to the underlying database.
@@ -162,10 +171,7 @@ impl Executor {
         self.backend.set_test_contract(to).set_caller(from);
         let res = self.call_committing::<_, _>(from, to, "setUp()", vec![], U256::ZERO, None)?;
 
-        // record any changes made to the block's environment during setup
-        self.env.block = res.env.block.clone();
-        // and also the chainid, which can be set manually
-        self.env.cfg.chain_id = res.env.cfg.chain_id;
+        self.record_env_changes(&res.env);
 
         match res.state_changeset.as_ref() {
             Some(changeset) => {
@@ -402,7 +408,7 @@ impl Executor {
                     state_changeset: None,
                     transactions: None,
                     script_wallets,
-                })));
+                })))
             }
         };
 
@@ -427,7 +433,12 @@ impl Executor {
         abi: Option<&Abi>,
     ) -> Result<DeployResult, EvmError> {
         let env = self.build_test_env(from, TransactTo::Create(CreateScheme::Create), code, value);
-        self.deploy_with_env(env, abi)
+        let res = self.deploy_with_env(env, abi);
+        if let Ok(DeployResult { env, .. }) = &res {
+            self.record_env_changes(env);
+        }
+
+        res
     }
 
     /// Check if a call to a test contract was successful.
@@ -478,7 +489,7 @@ impl Executor {
     ) -> bool {
         if call_result.has_snapshot_failure {
             // a failure occurred in a reverted snapshot, which is considered a failed test
-            return should_fail;
+            return should_fail
         }
         self.is_success(address, call_result.reverted, state_changeset, should_fail)
     }
@@ -492,7 +503,7 @@ impl Executor {
     ) -> Result<bool, DatabaseError> {
         if self.backend.has_snapshot_failure() {
             // a failure occurred in a reverted snapshot, which is considered a failed test
-            return Ok(should_fail);
+            return Ok(should_fail)
         }
 
         // Construct a new VM with the state changeset
@@ -866,7 +877,7 @@ fn convert_call_result(
         }
         _ => {
             if &result == crate::constants::MAGIC_SKIP {
-                return Err(EvmError::SkipError);
+                return Err(EvmError::SkipError)
             }
             let reason = decode::decode_revert(&result, abi, Some(status));
             Err(EvmError::Execution(Box::new(ExecutionErr {

@@ -132,7 +132,8 @@ foundry-compilers = { version = "0.1.1", default-features = false }
 # no default features to avoid c-kzg
 revm-primitives = { version = "1", default-features = false }
 # Using a fork of revm as zksync-era requires the usage of sha3 0.10.6, and the latest revm uses 0.10.8
-revm = { git = "https://github.com/dutterbutter/revm.git", tag = "sha3_0.10.6", default-features = false }
+revm = { version = "3.5.0", default-features = false }
+era_revm = { git="https://github.com/matter-labs/era-revm", rev = "dc04c89902ea317f3b0e68b80765b5634a4f42b2" }
 
 # We use a fork of `ethers` to gain access to a previously private variable.
 # This ensures that all artifact files, freshly compiled and saved in the `output` directory, are publicly accessible.
@@ -202,4 +203,5 @@ revm = { git = "https://github.com/dutterbutter/revm", tag = "sha3_0.10" }
 revm-interpreter = { git = "https://github.com/dutterbutter/revm", tag = "sha3_0.10" }
 revm-precompile = { git = "https://github.com/dutterbutter/revm", tag = "sha3_0.10" }
 revm-primitives = { git = "https://github.com/dutterbutter/revm", tag = "sha3_0.10" }
+
 
