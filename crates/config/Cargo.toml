@@ -16,7 +16,7 @@ ethers-core.workspace = true
 ethers-solc = { workspace = true, features = ["async", "svm-solc"] }
 ethers-etherscan.workspace = true
 # Using a fork of revm as zksync-era requires the usage of sha3 0.10.6, and the latest revm uses 0.10.8
-revm = { git = "https://github.com/dutterbutter/revm.git", tag = "sha3_0.10.6", default-features = false, features = ["std", "serde", "memory_limit"] }
+revm = { workspace = true, default-features = false, features = ["std", "serde", "memory_limit"] }
 
 # formats
 Inflector = "0.11"

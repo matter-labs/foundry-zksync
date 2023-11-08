@@ -311,7 +311,7 @@ impl ZkSolc {
                     // when output is empty, it has a length of 3, `[]\n`
                     // solc returns true for success if output is empty
                     if output.stderr.len() <= 3 {
-                        continue;
+                        continue
                     }
                     eyre::bail!(
                         "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
@@ -434,8 +434,14 @@ impl ZkSolc {
         write_artifacts: Option<PathBuf>,
     ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
         // Deserialize the compiler output into a serde_json::Value object
-        let compiler_output: ZkSolcCompilerOutput = serde_json::from_slice(&output)
-            .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
+        let compiler_output: ZkSolcCompilerOutput =
+            serde_json::from_slice(&output).unwrap_or_else(|e| {
+                panic!(
+                    "Could not parse zksolc compiler output: {}\n{}",
+                    e,
+                    std::str::from_utf8(&output).unwrap_or_default()
+                )
+            });
 
         // Handle errors and warnings in the output
         ZkSolc::handle_output_errors(&compiler_output, displayed_warnings);
@@ -903,7 +909,7 @@ fn substitute_remapped_paths(content: String, remappings: &[RelativeRemapping]) 
 
         // Exit the loop if no more replacements were made
         if !made_replacements {
-            break;
+            break
         }
     }
 
@@ -926,7 +932,7 @@ fn remap_source_path(source_path: &mut PathBuf, remappings: &[RelativeRemapping]
 
                 *source_path =
                     PathBuf::from(temp_path.to_str().unwrap().replace("src/src/", "src/"));
-                break;
+                break
             }
         }
     }
