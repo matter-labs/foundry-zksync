@@ -116,5 +116,4 @@ jobs:
         run: |
           git clone https://github.com/matter-labs/zkfoundry-smoke-test
           cd zkfoundry-smoke-test
-          git fetch && git checkout nish-fix-test-foundry
           ./smoke-test.sh
