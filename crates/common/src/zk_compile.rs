@@ -466,9 +466,9 @@ impl ZkSolc {
             if key.contains(source) {
                 let contracts_in_file = compiler_output.contracts.get(key).unwrap();
                 for (contract_name, contract) in contracts_in_file {
-                    // if contract is empty, skip
-                    if  contract.hash.is_none() {
-                        println!("{} -> emtpy file", contract_name);
+                    // if contract hash is empty, skip
+                    if contract.hash.is_none() {
+                        println!("{} -> empty contract.hash", contract_name);
                         continue;
                     }
 
