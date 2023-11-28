@@ -469,7 +469,7 @@ impl ZkSolc {
                     // if contract hash is empty, skip
                     if contract.hash.is_none() {
                         println!("{} -> empty contract.hash", contract_name);
-                        continue;
+                        continue
                     }
 
                     println!(
