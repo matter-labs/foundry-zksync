@@ -196,7 +196,7 @@ There are 2 workarounds:
 
 You can get the latest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
 
-You might have to remove the `zkout` directory (that holds the compilation artifacts) and in some rare scenarios also cleanup the installed solc versions (by removing `~/.svm/` directory)
+You might have to remove the `zkout` directory (that holds the compilation artifacts) and in some rare scenarios also cleanup the installed solc versions (by removing `~/.svm/` directory).
 
 ### `solc` versions >0.8.19 are not supported, found 0.8.20
 
