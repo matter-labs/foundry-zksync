@@ -395,4 +395,21 @@ mod tests {
         let addr = format!("{addr:x}");
         assert!(addr.ends_with("00"));
     }
+
+    #[test]
+    fn save_path() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let args: VanityArgs = VanityArgs::parse_from([
+            "foundry-cli",
+            "--starts-with",
+            "00",
+            "--save-path",
+            tmp.path().to_str().unwrap(),
+        ]);
+        args.run().unwrap();
+        assert!(tmp.path().exists());
+        let s = fs::read_to_string(tmp.path()).unwrap();
+        let wallets: Wallets = serde_json::from_str(&s).unwrap();
+        assert!(!wallets.wallets.is_empty());
+    }
 }
