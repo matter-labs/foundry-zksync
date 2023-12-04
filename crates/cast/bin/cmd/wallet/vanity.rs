@@ -10,7 +10,12 @@ use eyre::Result;
 
 use rayon::iter::{self, ParallelIterator};
 use regex::Regex;
-use std::time::Instant;
+use serde::{Deserialize, Serialize};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 /// Type alias for the result of [generate_wallet].
 pub type GeneratedWallet = (SigningKey, H160);
@@ -36,11 +41,44 @@ pub struct VanityArgs {
     /// nonce.
     #[clap(long)]
     pub nonce: Option<u64>,
+
+    /// Path to save the generated vanity contract address to.
+    ///
+    /// If provided, the generated vanity addresses will appended to a JSON array in the specified
+    /// file.
+    #[clap(
+        long,
+        value_hint = clap::ValueHint::FilePath,
+        value_name = "PATH",
+    )]
+    pub save_path: Option<PathBuf>,
+}
+
+/// WalletData contains address and private_key information for a wallet.
+#[derive(Serialize, Deserialize)]
+struct WalletData {
+    address: String,
+    private_key: String,
+}
+
+/// Wallets is a collection of WalletData.
+#[derive(Default, Serialize, Deserialize)]
+struct Wallets {
+    wallets: Vec<WalletData>,
+}
+
+impl WalletData {
+    pub fn new(wallet: &LocalWallet) -> Self {
+        WalletData {
+            address: SimpleCast::to_checksum_address(&wallet.address()),
+            private_key: format!("0x{}", hex::encode(wallet.signer().to_bytes())),
+        }
+    }
 }
 
 impl VanityArgs {
     pub fn run(self) -> Result<LocalWallet> {
-        let Self { starts_with, ends_with, nonce } = self;
+        let Self { starts_with, ends_with, nonce, save_path } = self;
         let mut left_exact_hex = None;
         let mut left_regex = None;
         let mut right_exact_hex = None;
@@ -112,6 +150,11 @@ impl VanityArgs {
         }
         .expect("failed to generate vanity wallet");
 
+        // If a save path is provided, save the generated vanity wallet to the specified path.
+        if let Some(save_path) = save_path {
+            save_wallet_to_file(&wallet, &save_path)?;
+        }
+
         println!(
             "Successfully found vanity address in {} seconds.{}{}\nAddress: {}\nPrivate Key: 0x{}",
             timer.elapsed().as_secs(),
@@ -130,6 +173,22 @@ impl VanityArgs {
 
         Ok(wallet)
     }
+}
+
+/// If the file exists, the wallet data is appended to the existing content;
+/// otherwise, a new file is created.
+fn save_wallet_to_file(wallet: &LocalWallet, path: &Path) -> Result<()> {
+    let mut wallets = if path.exists() {
+        let data = fs::read_to_string(path)?;
+        serde_json::from_str::<Wallets>(&data).unwrap_or_default()
+    } else {
+        Wallets::default()
+    };
+
+    wallets.wallets.push(WalletData::new(wallet));
+
+    fs::write(path, serde_json::to_string_pretty(&wallets)?)?;
+    Ok(())
 }
 
 /// Generates random wallets until `matcher` matches the wallet address, returning the wallet.
