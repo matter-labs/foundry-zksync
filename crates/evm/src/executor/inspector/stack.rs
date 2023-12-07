@@ -195,7 +195,6 @@ pub struct InspectorData {
     pub script_wallets: Vec<LocalWallet>,
     pub chisel_state: Option<(Stack, Memory, InstructionResult)>,
 }
-
 /// An inspector that calls multiple inspectors in sequence.
 ///
 /// If a call to an inspector returns a value other than [InstructionResult::Continue] (or

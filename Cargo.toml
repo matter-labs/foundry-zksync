@@ -195,4 +195,3 @@ ethers-signers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_publi
 ethers-middleware = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
 ethers-etherscan = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
 ethers-solc = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-
