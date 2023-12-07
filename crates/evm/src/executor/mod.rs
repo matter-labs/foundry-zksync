@@ -274,6 +274,7 @@ impl Executor {
         // execute the call
         let env = self.build_test_env(from, TransactTo::Call(test_contract), calldata, value);
         let call_result = self.call_raw_with_env(env)?;
+        self.record_env_changes(&call_result.env);
         convert_call_result(abi, &func, call_result)
     }
 
@@ -498,7 +499,7 @@ impl Executor {
         }
 
         // Construct a new VM with the state changeset
-        let mut backend = self.backend.clone_empty();
+        let mut backend = self.backend.clone();
 
         // we only clone the test contract and cheatcode accounts, that's all we need to evaluate
         // success
@@ -760,6 +761,7 @@ fn convert_executed_result(
 
     let result = match out {
         Some(Output::Call(ref data)) => data.to_owned(),
+        Some(Output::Create(ref data, _)) => data.to_owned(),
         _ => Bytes::default(),
     };
 

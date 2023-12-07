@@ -139,9 +139,8 @@ foundry-debugger = { path = "crates/debugger" }
 
 ## revm
 # no default features to avoid c-kzg
-# Using a fork of revm as zksync-era requires the usage of sha3 0.10.6, and the latest revm uses 0.10.8
 revm = { version = "3.5.0", default-features = false }
-era_revm = { git="https://github.com/matter-labs/era-revm", rev = "0e0ea26106a16cfc74a2b9ec37cadd69417ae68b" }
+era_revm = { git="https://github.com/matter-labs/era-revm", rev = "2662bb19427a421662a7e463cf1ed6a15da361e5" }
 
 # We use a fork of `ethers` to gain access to a previously private variable.
 # This ensures that all artifact files, freshly compiled and saved in the `output` directory, are publicly accessible.
@@ -195,4 +194,3 @@ ethers-signers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_publi
 ethers-middleware = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
 ethers-etherscan = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
 ethers-solc = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-
