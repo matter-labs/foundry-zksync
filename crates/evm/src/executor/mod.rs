@@ -499,7 +499,6 @@ impl Executor {
         }
 
         // Construct a new VM with the state changeset
-        // let mut backend = self.backend.clone_empty();
         let mut backend = self.backend.clone();
 
         // we only clone the test contract and cheatcode accounts, that's all we need to evaluate
