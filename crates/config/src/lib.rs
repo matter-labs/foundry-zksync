@@ -422,10 +422,7 @@ impl Config {
     /// Default address for tx.origin
     ///
     /// `0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38`
-    pub const DEFAULT_SENDER: H160 = H160([
-        0x18, 0x04, 0xc8, 0xAB, 0x1F, 0x12, 0xE6, 0xbb, 0xF3, 0x89, 0x4D, 0x40, 0x83, 0xF3, 0x3E,
-        0x07, 0x30, 0x9D, 0x1F, 0x38,
-    ]);
+    pub const DEFAULT_SENDER: Address = address!("1804c8AB1F12E6bbf3894d4083f33e07309d1f38");
 
     /// Returns the current `Config`
     ///
@@ -903,7 +900,7 @@ impl Config {
 
         // we treat the `etherscan_api_key` as actual API key
         // if no chain provided, we assume mainnet
-        let chain = self.chain_id.unwrap_or(Chain::Named(Mainnet));
+        let chain = self.chain.unwrap_or(Chain::mainnet());
         let api_key = self.etherscan_api_key.as_ref()?;
         ResolvedEtherscanConfig::create(api_key, chain).map(Ok)
     }
@@ -916,7 +913,7 @@ impl Config {
     /// over the chain's entry in the table.
     pub fn get_etherscan_config_with_chain(
         &self,
-        chain: Option<impl Into<Chain>>,
+        chain: Option<Chain>,
     ) -> Result<Option<ResolvedEtherscanConfig>, EtherscanConfigError> {
         let chain = chain.map(Into::into);
         if let Some(maybe_alias) = self.etherscan_api_key.as_ref().or(self.eth_rpc_url.as_ref()) {
@@ -946,7 +943,7 @@ impl Config {
 
         // etherscan fallback via API key
         if let Some(key) = self.etherscan_api_key.as_ref() {
-            let chain = chain.or(self.chain_id).unwrap_or_default();
+            let chain = chain.or(self.chain).unwrap_or_default();
             return Ok(ResolvedEtherscanConfig::create(key, chain))
         }
 
@@ -954,7 +951,7 @@ impl Config {
     }
 
     /// Helper function to just get the API key
-    pub fn get_etherscan_api_key(&self, chain: Option<impl Into<Chain>>) -> Option<String> {
+    pub fn get_etherscan_api_key(&self, chain: Option<Chain>) -> Option<String> {
         self.get_etherscan_config_with_chain(chain).ok().flatten().map(|c| c.key)
     }
 
@@ -1140,7 +1137,7 @@ impl Config {
     /// Returns the default config that uses dapptools style paths
     pub fn dapptools() -> Self {
         Config {
-            chain_id: Some(Chain::Id(99)),
+            chain: Some(Chain::from_id(99)),
             block_timestamp: 0,
             block_number: 0,
             ..Config::default()
@@ -1796,12 +1793,12 @@ impl Default for Config {
             initial_balance: U256::from(0xffffffffffffffffffffffffu128),
             block_number: 1,
             fork_block_number: None,
-            chain_id: None,
+            chain: None,
             gas_limit: i64::MAX.into(),
             code_size_limit: None,
             gas_price: None,
             block_base_fee_per_gas: 0,
-            block_coinbase: Address::zero(),
+            block_coinbase: Address::ZERO,
             block_timestamp: 1,
             block_difficulty: 0,
             block_prevrandao: Default::default(),
@@ -2451,54 +2448,26 @@ impl<P: Provider> ProviderExt for P {}
 ///
 /// ```rust
 /// use foundry_config::{BasicConfig, Config};
-    /// let config = Config { src: "other".into(), ..Default::default() };
-    pub const DEFAULT_SENDER: Address = address!("1804c8AB1F12E6bbf3894d4083f33e07309d1f38");
-    /// use figment::providers::{Env, Format, Toml};
-    /// let figment = Config::figment().merge(Toml::file("other.toml").nested());
-    /// use figment::providers::{Env, Format, Toml};
-    /// let figment = Config::figment().merge(Toml::file("other.toml").nested());
-        self.create_project(self.cache, false)
-                            )));
-                        )));
-            return Ok(solc);
-            return SpecId::CANCUN;
-            return false;
-        !self.no_storage_caching
-            && self.rpc_storage_caching.enable_for_chain_id(chain_id.into())
-            && self.rpc_storage_caching.enable_for_endpoint(endpoint)
-    /// let config = Config::with_root("./");
-    /// let rpc_jwt = config.get_rpc_jwt_secret().unwrap().unwrap();
-    /// let config = Config::with_root("./");
-    /// let rpc_url = config.get_rpc_url().unwrap().unwrap();
-    /// let config = Config::with_root("./");
-    /// let rpc_url = config.get_rpc_url_with_alias("mainnet").unwrap().unwrap();
-    /// let config = Config::with_root("./");
-    /// let rpc_url = config.get_rpc_url_or("http://localhost:8545").unwrap();
-    /// let config = Config::with_root("./");
-    /// let rpc_url = config.get_rpc_url_or_localhost_http().unwrap();
-    /// let config = Config::with_root("./");
-    /// let etherscan_config = config.get_etherscan_config().unwrap().unwrap();
-    /// let client = etherscan_config.into_client().unwrap();
-            return resolved.remove(maybe_alias);
-        let chain = self.chain.unwrap_or(Chain::mainnet());
-        chain: Option<Chain>,
-                return self.etherscan.clone().resolved().remove(maybe_alias).transpose();
-                    return Ok(Some(config));
-            let chain = chain.or(self.chain).unwrap_or_default();
-            return Ok(ResolvedEtherscanConfig::create(key, chain));
-    pub fn get_etherscan_api_key(&self, chain: Option<Chain>) -> Option<String> {
-    /// returns the [`foundry_compilers::ConfigurableArtifacts`] for this config, that includes the
-            chain: Some(Chain::from_id(99)),
-            return Ok(());
-                };
-                    return Some(file_path);
-                return Ok(cache);
-            return Ok(blocks);
-            return Ok(0);
-            return Ok(Some(globset::Glob::new(&s).map_err(serde::de::Error::custom)?));
-            block_number: 0, // era-test-node starts at block 0
-            chain: None,
-            memory_limit: 1 << 27, // 2**27 = 128MiB = 134_217_728 bytes
+/// let config = Config { src: "other".into(), ..Default::default() };
+pub const DEFAULT_SENDER: Address = address!("1804c8AB1F12E6bbf3894d4083f33e07309d1f38");
+/// use figment::providers::{Env, Format, Toml};
+/// let figment = Config::figment().merge(Toml::file("other.toml").nested());
+/// use figment::providers::{Env, Format, Toml};
+/// let figment = Config::figment().merge(Toml::file("other.toml").nested());
+/// let config = Config::with_root("./");
+/// let rpc_jwt = config.get_rpc_jwt_secret().unwrap().unwrap();
+/// let config = Config::with_root("./");
+/// let rpc_url = config.get_rpc_url().unwrap().unwrap();
+/// let config = Config::with_root("./");
+/// let rpc_url = config.get_rpc_url_with_alias("mainnet").unwrap().unwrap();
+/// let config = Config::with_root("./");
+/// let rpc_url = config.get_rpc_url_or("http://localhost:8545").unwrap();
+/// let config = Config::with_root("./");
+/// let rpc_url = config.get_rpc_url_or_localhost_http().unwrap();
+/// let config = Config::with_root("./");
+/// let etherscan_config = config.get_etherscan_config().unwrap().unwrap();
+/// let client = etherscan_config.into_client().unwrap();
+/// returns the [`foundry_compilers::ConfigurableArtifacts`] for this config, that includes the
 /// use foundry_config::{BasicConfig, Config};
 /// use serde::Deserialize;
 ///

@@ -4,8 +4,7 @@ use crate::{
 };
 use comfy_table::{presets::ASCII_MARKDOWN, *};
 use ethers::types::U256;
-use foundry_common::{calc, TestFunctionExt};
-use foundry_utils::types::ToEthers;
+use foundry_common::{calc, types::ToEthers, TestFunctionExt};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Display};
 

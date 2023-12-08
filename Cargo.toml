@@ -104,10 +104,8 @@ trezor-client.opt-level = 1
 [workspace.dependencies]
 anvil = { path = "crates/anvil" }
 cast = { path = "crates/cast" }
-zkcast = { path = "crates/zkcast" }
 chisel = { path = "crates/chisel" }
 forge = { path = "crates/forge" }
-zkforge = { path = "crates/zkforge" }
 
 forge-doc = { path = "crates/doc" }
 forge-fmt = { path = "crates/fmt" }
@@ -126,31 +124,24 @@ foundry-macros = { path = "crates/macros" }
 foundry-test-utils = { path = "crates/test-utils" }
 
 foundry-block-explorers = { version = "0.1.2", default-features = false }
-foundry-compilers = { version = "0.1.1", default-features = false }
 
 ## revm
 # no default features to avoid c-kzg
+revm = { version = "3", default-features = false }
 revm-primitives = { version = "1", default-features = false }
-# Using a fork of revm as zksync-era requires the usage of sha3 0.10.6, and the latest revm uses 0.10.8
-revm = { version = "3.5.0", default-features = false }
 era_revm = { git="https://github.com/matter-labs/era-revm", rev = "2662bb19427a421662a7e463cf1ed6a15da361e5" }
 
-# We use a fork of `ethers` to gain access to a previously private variable.
-# This ensures that all artifact files, freshly compiled and saved in the `output` directory, are publicly accessible.
-# For details on this modification, refer to:
-# https://github.com/mm-zk/ethers-rs/commit/2b2c7312f328a431fa40a7b87a722eaf28e27061
-ethers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-addressbook = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-core = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-contract = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-contract-abigen = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-providers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-signers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-middleware = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-etherscan = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-solc = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
+## ethers
+ethers = { version = "2.0", default-features = false }
+ethers-core = { version = "2.0", default-features = false }
+ethers-contract = { version = "2.0", default-features = false }
+ethers-contract-abigen = { version = "2.0", default-features = false }
+ethers-providers = { version = "2.0", default-features = false }
+ethers-signers = { version = "2.0", default-features = false }
+ethers-middleware = { version = "2.0", default-features = false }
+ethers-solc = { version = "2.0", default-features = false }
 
-
+foundry-compilers = { version = "0.1.1", default-features = false }
 ## alloy
 alloy-primitives = "0.5.0"
 alloy-dyn-abi = "0.5.0"
@@ -185,22 +176,18 @@ tower = "0.4"
 tower-http = "0.4"
 
 [patch.crates-io]
-# We use a fork of `ethers` to gain access to a previously private variable.
-# This ensures that all artifact files, freshly compiled and saved in the `output` directory, are publicly accessible.
-# For details on this modification, refer to:
-# https://github.com/mm-zk/ethers-rs/commit/2b2c7312f328a431fa40a7b87a722eaf28e27061
-ethers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-addressbook = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-core = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-contract = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-contract-abigen = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-providers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-signers = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-middleware = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-etherscan = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-ethers-solc = { git = "https://github.com/mm-zk/ethers-rs", tag = "main_public_artifact", default-features = false }
-revm = { git = "https://github.com/dutterbutter/revm", tag = "sha3_0.10" }
-revm-interpreter = { git = "https://github.com/dutterbutter/revm", tag = "sha3_0.10" }
-revm-precompile = { git = "https://github.com/dutterbutter/revm", tag = "sha3_0.10" }
-revm-primitives = { git = "https://github.com/dutterbutter/revm", tag = "sha3_0.10" }
+ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
+ethers-core = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
+ethers-contract = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
+ethers-contract-abigen = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
+ethers-providers = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
+ethers-signers = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
+ethers-middleware = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
+ethers-solc = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
 
+revm = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+revm-interpreter = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+revm-precompile = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+
+foundry-compilers = { git  = "https://github.com/Deniallugo/compilers.git", branch = "main", default-features = false }

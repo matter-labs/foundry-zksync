@@ -2,7 +2,7 @@
 
 use crate::Address;
 use ethers::prelude::Log;
-use foundry_common::evm::Breakpoints;
+use foundry_common::{evm::Breakpoints, types::ToEthers};
 use foundry_evm::{
     coverage::HitMaps,
     debug::DebugArena,
@@ -10,7 +10,6 @@ use foundry_evm::{
     fuzz::{types::FuzzCase, CounterExample},
     trace::{TraceKind, Traces},
 };
-use foundry_utils::types::ToEthers;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt, time::Duration};
 

@@ -14,9 +14,8 @@ use foundry_cli::{
     p_println,
     utils::{LoadConfig, STATIC_FUZZ_SEED},
 };
-use foundry_common::{compile::ProjectCompiler, evm::EvmArgs, fs};
+use foundry_common::{compile::ProjectCompiler, evm::EvmArgs, fs, types::ToEthers};
 use foundry_config::{Config, SolcReq};
-use foundry_utils::types::ToEthers;
 use semver::Version;
 use std::{collections::HashMap, path::PathBuf, sync::mpsc::channel};
 use tracing::trace;

@@ -34,6 +34,7 @@ revm = { workspace = true, default-features = false, features = [
 
 ethers-core.workspace = true
 ethers-providers.workspace = true
+era_revm.workspace = true
 
 derive_more.workspace = true
 eyre = "0.6"

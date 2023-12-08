@@ -10,8 +10,7 @@ use ethers::{
 };
 use eyre::Result;
 use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
-use foundry_common::{shell, RpcUrl};
-use foundry_utils::types::ToEthers;
+use foundry_common::{shell, types::ToEthers, RpcUrl};
 use futures::future::join_all;
 use parking_lot::RwLock;
 use std::{collections::VecDeque, sync::Arc};
