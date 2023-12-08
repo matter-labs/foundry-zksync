@@ -4,8 +4,8 @@ use zksync_basic_types::H256;
 
 /// Factory deps packer.
 ///
-/// EVM assumes that all the necessary bytecodes (factory deps) are present within the original bytecode.
-/// In case of Era - they are actually returned separate from the compiler.
+/// EVM assumes that all the necessary bytecodes (factory deps) are present within the original
+/// bytecode. In case of Era - they are actually returned separate from the compiler.
 ///
 /// So in order to fit to the REVM / Forge - we "serialize" all the factory deps into
 /// one huge "fake" bytecode string - and then pass them around.
@@ -20,11 +20,7 @@ pub struct PackedEraBytecode {
 
 impl PackedEraBytecode {
     pub fn new(hash: String, bytecode: String, factory_deps: Vec<String>) -> Self {
-        Self {
-            hash,
-            bytecode,
-            factory_deps,
-        }
+        Self { hash, bytecode, factory_deps }
     }
     pub fn to_vec(&self) -> Vec<u8> {
         serde_json::to_vec(self).unwrap()
@@ -50,10 +46,7 @@ impl PackedEraBytecode {
 }
 
 fn ensure_chunkable(bytes: &[u8]) {
-    assert!(
-        bytes.len() % 32 == 0,
-        "Bytes must be divisible by 32 to split into chunks"
-    );
+    assert!(bytes.len() % 32 == 0, "Bytes must be divisible by 32 to split into chunks");
 }
 
 pub fn bytes_to_chunks(bytes: &[u8]) -> Vec<[u8; 32]> {

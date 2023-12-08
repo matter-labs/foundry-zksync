@@ -1,18 +1,19 @@
-use era_test_node::fork::{ForkSource, ForkStorage};
-use era_test_node::utils::bytecode_to_factory_dep;
-use ethers::utils::to_checksum;
-use ethers::{abi::AbiDecode, prelude::abigen};
-use itertools::Itertools;
-use multivm::interface::dyn_tracers::vm_1_3_3::DynTracer;
-use multivm::interface::tracer::TracerExecutionStatus;
-use multivm::vm_refunds_enhancement::{
-    BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState,
+use era_test_node::{
+    fork::{ForkSource, ForkStorage},
+    utils::bytecode_to_factory_dep,
 };
-use multivm::zk_evm_1_3_1::zkevm_opcode_defs::RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER;
-use multivm::zk_evm_1_3_3::tracing::{BeforeExecutionData, VmLocalStateData};
-use multivm::zk_evm_1_3_3::vm_state::PrimitiveValue;
-use std::collections::HashMap;
-use std::fmt::Debug;
+use ethers::{abi::AbiDecode, prelude::abigen, utils::to_checksum};
+use itertools::Itertools;
+use multivm::{
+    interface::{dyn_tracers::vm_1_3_3::DynTracer, tracer::TracerExecutionStatus},
+    vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
+    zk_evm_1_3_1::zkevm_opcode_defs::RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
+    zk_evm_1_3_3::{
+        tracing::{BeforeExecutionData, VmLocalStateData},
+        vm_state::PrimitiveValue,
+    },
+};
+use std::{collections::HashMap, fmt::Debug};
 use zk_evm::zkevm_opcode_defs::{FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER};
 use zksync_basic_types::{AccountTreeId, Address, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, StorageView};
@@ -20,9 +21,8 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    StorageKey,
+    LogQuery, StorageKey, Timestamp,
 };
-use zksync_types::{LogQuery, Timestamp};
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
 // address(uint160(uint256(keccak256('hevm cheat code'))))
@@ -94,15 +94,8 @@ pub struct CheatcodeTracer {
 
 #[derive(Debug, Clone)]
 enum FinishCycleOneTimeActions {
-    StorageWrite {
-        key: StorageKey,
-        read_value: H256,
-        write_value: H256,
-    },
-    StoreFactoryDep {
-        hash: U256,
-        bytecode: Vec<U256>,
-    },
+    StorageWrite { key: StorageKey, read_value: H256, write_value: H256 },
+    StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -129,11 +122,11 @@ impl<S: std::fmt::Debug + ForkSource, H: HistoryMode> DynTracer<ForkStorageView<
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
             if current.this_address != CHEATCODE_ADDRESS {
-                return;
+                return
             }
             if current.code_page.0 == 0 || current.ergs_remaining == 0 {
                 tracing::error!("cheatcode triggered, but no calldata or ergs available");
-                return;
+                return
             }
             tracing::info!("near call: cheatcode triggered");
             let calldata = {
@@ -198,11 +191,7 @@ impl<S: std::fmt::Debug + ForkSource, H: HistoryMode> VmTracer<ForkStorageView<S
     ) -> TracerExecutionStatus {
         while let Some(action) = self.one_time_actions.pop() {
             match action {
-                FinishCycleOneTimeActions::StorageWrite {
-                    key,
-                    read_value,
-                    write_value,
-                } => {
+                FinishCycleOneTimeActions::StorageWrite { key, read_value, write_value } => {
                     state.storage.write_value(LogQuery {
                         timestamp: Timestamp(state.local_state.timestamp),
                         tx_number_in_block: state.local_state.tx_number_in_block,
@@ -217,12 +206,9 @@ impl<S: std::fmt::Debug + ForkSource, H: HistoryMode> VmTracer<ForkStorageView<S
                         is_service: false,
                     });
                 }
-                FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => {
-                    state.decommittment_processor.populate(
-                        vec![(hash, bytecode)],
-                        Timestamp(state.local_state.timestamp),
-                    )
-                }
+                FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
+                    .decommittment_processor
+                    .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
             }
         }
 
@@ -233,10 +219,7 @@ impl<S: std::fmt::Debug + ForkSource, H: HistoryMode> VmTracer<ForkStorageView<S
             let elements = self.return_data.take().unwrap();
             fat_pointer.length = (elements.len() as u32) * 32;
             state.local_state.registers[RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize] =
-                PrimitiveValue {
-                    value: fat_pointer.to_u256(),
-                    is_pointer: true,
-                };
+                PrimitiveValue { value: fat_pointer.to_u256(), is_pointer: true };
             state.memory.populate_page(
                 fat_pointer.memory_page as usize,
                 elements.into_iter().enumerate().collect_vec(),
@@ -284,7 +267,7 @@ impl CheatcodeTracer {
                     &u256_to_h256(private_key),
                 ) else {
                     tracing::error!("Failed generating address for private key");
-                    return;
+                    return
                 };
                 self.return_data = Some(vec![h256_to_u256(address.into())]);
             }
@@ -319,11 +302,7 @@ impl CheatcodeTracer {
                 self.return_data = Some(vec![account_nonce]);
             }
             Load(LoadCall { account, slot }) => {
-                tracing::info!(
-                    "👷 Getting storage slot {:?} for account {:?}",
-                    slot,
-                    account
-                );
+                tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, account);
                 let key = StorageKey::new(AccountTreeId::new(account), H256(slot));
                 let mut storage = storage.borrow_mut();
                 let value = storage.read_value(&key);
@@ -345,11 +324,7 @@ impl CheatcodeTracer {
                     &mut storage,
                 );
             }
-            SerializeAddress(SerializeAddressCall {
-                object_key,
-                value_key,
-                value,
-            }) => {
+            SerializeAddress(SerializeAddressCall { object_key, value_key, value }) => {
                 tracing::info!(
                     "👷 Serializing address {:?} with key {:?} to object {:?}",
                     value,
@@ -361,18 +336,13 @@ impl CheatcodeTracer {
                 });
 
                 //write to serialized_objects
-                self.serialized_objects
-                    .insert(object_key.clone(), json_value.to_string());
+                self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let address = Address::from(value);
                 let address_with_checksum = to_checksum(&address, None);
                 self.add_trimmed_return_data(address_with_checksum.as_bytes());
             }
-            SerializeBool(SerializeBoolCall {
-                object_key,
-                value_key,
-                value,
-            }) => {
+            SerializeBool(SerializeBoolCall { object_key, value_key, value }) => {
                 tracing::info!(
                     "👷 Serializing bool {:?} with key {:?} to object {:?}",
                     value,
@@ -383,17 +353,12 @@ impl CheatcodeTracer {
                     value_key: value
                 });
 
-                self.serialized_objects
-                    .insert(object_key.clone(), json_value.to_string());
+                self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let bool_value = value.to_string();
                 self.add_trimmed_return_data(bool_value.as_bytes());
             }
-            SerializeUint(SerializeUintCall {
-                object_key,
-                value_key,
-                value,
-            }) => {
+            SerializeUint(SerializeUintCall { object_key, value_key, value }) => {
                 tracing::info!(
                     "👷 Serializing uint256 {:?} with key {:?} to object {:?}",
                     value,
@@ -404,8 +369,7 @@ impl CheatcodeTracer {
                     value_key: value
                 });
 
-                self.serialized_objects
-                    .insert(object_key.clone(), json_value.to_string());
+                self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let uint_value = value.to_string();
                 self.add_trimmed_return_data(uint_value.as_bytes());
@@ -423,7 +387,7 @@ impl CheatcodeTracer {
                       account_nonce,
                       nonce
                   );
-                    return;
+                    return
                 }
                 account_nonce = nonce.into();
                 if deployment_nonce.as_u64() >= nonce {
@@ -432,23 +396,16 @@ impl CheatcodeTracer {
                       deployment_nonce,
                       nonce
                   );
-                    return;
+                    return
                 }
                 deployment_nonce = nonce.into();
                 let enforced_full_nonce = nonces_to_full_nonce(account_nonce, deployment_nonce);
-                tracing::info!(
-                    "👷 Nonces for account {:?} have been set to {}",
-                    account,
-                    nonce
-                );
+                tracing::info!("👷 Nonces for account {:?} have been set to {}", account, nonce);
                 self.write_storage(nonce_key, u256_to_h256(enforced_full_nonce), &mut storage);
             }
             StartPrank(StartPrankCall { sender }) => {
                 tracing::info!("👷 Starting prank to {sender:?}");
-                self.permanent_actions.start_prank = Some(StartPrankOpts {
-                    sender,
-                    origin: None,
-                });
+                self.permanent_actions.start_prank = Some(StartPrankOpts { sender, origin: None });
             }
             StartPrankWithOrigin(StartPrankWithOriginCall { sender, origin }) => {
                 tracing::info!("👷 Starting prank to {sender:?} with origin {origin:?}");
@@ -459,19 +416,14 @@ impl CheatcodeTracer {
                 let original_tx_origin = storage.borrow_mut().read_value(&key);
                 self.write_storage(key, origin.into(), &mut storage.borrow_mut());
 
-                self.permanent_actions.start_prank = Some(StartPrankOpts {
-                    sender,
-                    origin: Some(original_tx_origin),
-                });
+                self.permanent_actions.start_prank =
+                    Some(StartPrankOpts { sender, origin: Some(original_tx_origin) });
             }
             StopPrank(StopPrankCall) => {
                 tracing::info!("👷 Stopping prank");
 
-                if let Some(origin) = self
-                    .permanent_actions
-                    .start_prank
-                    .as_ref()
-                    .and_then(|v| v.origin)
+                if let Some(origin) =
+                    self.permanent_actions.start_prank.as_ref().and_then(|v| v.origin)
                 {
                     let key = StorageKey::new(
                         AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
@@ -482,11 +434,7 @@ impl CheatcodeTracer {
 
                 self.permanent_actions.start_prank = None;
             }
-            Store(StoreCall {
-                account,
-                slot,
-                value,
-            }) => {
+            Store(StoreCall { account, slot, value }) => {
                 tracing::info!(
                     "👷 Setting storage slot {:?} for account {:?} to {:?}",
                     slot,
@@ -547,8 +495,7 @@ impl CheatcodeTracer {
     }
 
     fn store_factory_dep(&mut self, hash: U256, bytecode: Vec<U256>) {
-        self.one_time_actions
-            .push(FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode });
+        self.one_time_actions.push(FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode });
     }
 
     fn write_storage<S: std::fmt::Debug + ForkSource>(
@@ -557,12 +504,11 @@ impl CheatcodeTracer {
         write_value: H256,
         storage: &mut StorageView<ForkStorage<S>>,
     ) {
-        self.one_time_actions
-            .push(FinishCycleOneTimeActions::StorageWrite {
-                key,
-                read_value: storage.read_value(&key),
-                write_value,
-            });
+        self.one_time_actions.push(FinishCycleOneTimeActions::StorageWrite {
+            key,
+            read_value: storage.read_value(&key),
+            write_value,
+        });
     }
 
     fn add_trimmed_return_data(&mut self, data: &[u8]) {

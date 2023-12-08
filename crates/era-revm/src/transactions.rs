@@ -20,10 +20,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
-use zksync_types::api::Block;
 use zksync_types::{
-    fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
-    StorageLogQueryType, ACCOUNT_CODE_STORAGE_ADDRESS,
+    api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
+    StorageKey, StorageLogQueryType, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 
 use revm::primitives::U256 as revmU256;
@@ -40,10 +39,10 @@ use crate::{
 
 fn contract_address_from_tx_result(execution_result: &VmExecutionResultAndLogs) -> Option<H160> {
     for query in execution_result.logs.storage_logs.iter().rev() {
-        if query.log_type == StorageLogQueryType::InitialWrite
-            && query.log_query.address == ACCOUNT_CODE_STORAGE_ADDRESS
+        if query.log_type == StorageLogQueryType::InitialWrite &&
+            query.log_query.address == ACCOUNT_CODE_STORAGE_ADDRESS
         {
-            return Some(h256_to_account_address(&u256_to_h256(query.log_query.key)));
+            return Some(h256_to_account_address(&u256_to_h256(query.log_query.key)))
         }
     }
     None
@@ -56,8 +55,8 @@ pub fn encode_deploy_params_create(
     contract_hash: H256,
     constructor_input: Vec<u8>,
 ) -> Vec<u8> {
-    // TODO (SMA-1608): We should not re-implement the ABI parts in different places, instead have the ABI available
-    //  from the `zksync_contracts` crate.
+    // TODO (SMA-1608): We should not re-implement the ABI parts in different places, instead have
+    // the ABI available  from the `zksync_contracts` crate.
     let signature = ethabi::short_signature(
         "create",
         &[
@@ -80,7 +79,8 @@ pub fn tx_env_to_fee(tx_env: &TxEnv) -> Fee {
     Fee {
         // Currently zkSync doesn't allow gas limits larger than u32.
         gas_limit: U256::min(tx_env.gas_limit.into(), U256::from(2147483640)),
-        // Block base fee on L2 is 0.25 GWei - make sure that the max_fee_per_gas is set to higher value.
+        // Block base fee on L2 is 0.25 GWei - make sure that the max_fee_per_gas is set to higher
+        // value.
         max_fee_per_gas: U256::max(revm_u256_to_u256(tx_env.gas_price), U256::from(260_000_000)),
         max_priority_fee_per_gas: revm_u256_to_u256(tx_env.gas_priority_fee.unwrap_or_default()),
         gas_per_pubdata_limit: U256::from(800),
@@ -119,10 +119,7 @@ pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64) -> L2Tx {
             )
         }
     };
-    l2tx.set_input(
-        tx_env.data.to_vec(),
-        H256(keccak256(tx_env.data.to_vec().as_slice())),
-    );
+    l2tx.set_input(tx_env.data.to_vec(), H256(keccak256(tx_env.data.to_vec().as_slice())));
     l2tx
 }
 
@@ -136,14 +133,8 @@ where
     DB: Database + Send,
     <DB as revm::Database>::Error: Debug,
 {
-    let (num, ts) = (
-        env.block.number.to::<u64>(),
-        env.block.timestamp.to::<u64>(),
-    );
-    let era_db = RevmDatabaseForEra {
-        db: Arc::new(Mutex::new(Box::new(db))),
-        current_block: num,
-    };
+    let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
+    let era_db = RevmDatabaseForEra { db: Arc::new(Mutex::new(Box::new(db))), current_block: num };
 
     let nonces = era_db.get_nonce_for_address(address_to_h160(env.tx.caller));
 
@@ -237,8 +228,8 @@ where
             }
         }
         multivm::interface::ExecutionResult::Halt { reason } => {
-            // Need to decide what to do in the case of a halt. This might depend on the reason for the halt.
-            // TODO: FIXME
+            // Need to decide what to do in the case of a halt. This might depend on the reason for
+            // the halt. TODO: FIXME
             tracing::error!("tx execution halted: {}", reason);
             revm::primitives::ExecutionResult::Halt {
                 reason: match reason {
@@ -253,14 +244,10 @@ where
     };
 
     let account_to_keys: HashMap<H160, HashMap<StorageKey, H256>> =
-        modified_keys
-            .iter()
-            .fold(HashMap::new(), |mut acc, (storage_key, value)| {
-                acc.entry(*storage_key.address())
-                    .or_default()
-                    .insert(*storage_key, *value);
-                acc
-            });
+        modified_keys.iter().fold(HashMap::new(), |mut acc, (storage_key, value)| {
+            acc.entry(*storage_key.address()).or_default().insert(*storage_key, *value);
+            acc
+        });
 
     // List of touched accounts
     let mut accounts_touched: HashSet<H160> = Default::default();
@@ -268,7 +255,8 @@ where
     for x in account_to_keys.keys() {
         accounts_touched.insert(*x);
     }
-    // Also insert 'fake' accounts for bytecodes (to make sure that factory bytecodes get persisted).
+    // Also insert 'fake' accounts for bytecodes (to make sure that factory bytecodes get
+    // persisted).
     for k in bytecodes.keys() {
         accounts_touched.insert(h256_to_h160(&u256_to_h256(*k)));
     }
@@ -328,10 +316,7 @@ where
         })
         .collect();
 
-    Ok(ResultAndState {
-        result: execution_result,
-        state,
-    })
+    Ok(ResultAndState { result: execution_result, state })
 }
 
 fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
@@ -383,10 +368,7 @@ mod tests {
             run_era_transaction::<_, ResultAndState, _>(&mut env, &mut MockDatabase::default(), ())
                 .expect("failed executing");
 
-        assert!(
-            !res.state.is_empty(),
-            "unexpected failure: no states were touched"
-        );
+        assert!(!res.state.is_empty(), "unexpected failure: no states were touched");
         for (address, account) in res.state {
             assert!(
                 account.is_touched(),

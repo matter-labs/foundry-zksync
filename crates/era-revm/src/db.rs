@@ -4,6 +4,7 @@
 /// in the Database object.
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
 /// is usually collecing all the diffs - and applies them to database itself.
+
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -74,16 +75,15 @@ where
 
     fn read_storage_internal(&self, address: H160, idx: U256) -> H256 {
         let mut db = self.db.lock().unwrap();
-        let result = db
-            .storage(h160_to_address(address), u256_to_revm_u256(idx))
-            .unwrap();
+        let result = db.storage(h160_to_address(address), u256_to_revm_u256(idx)).unwrap();
         revm_u256_to_h256(result)
     }
 
     /// Tries to fetch the bytecode that belongs to a given account.
-    /// Start, by looking into account code storage - to see if there is any information about the bytecode for this account.
-    /// If there is none - check if any of the bytecode hashes are matching the account.
-    /// And as the final step - read the bytecode from the database itself.
+    /// Start, by looking into account code storage - to see if there is any information about the
+    /// bytecode for this account. If there is none - check if any of the bytecode hashes are
+    /// matching the account. And as the final step - read the bytecode from the database
+    /// itself.
     pub fn fetch_account_code(
         &self,
         account: H160,
@@ -97,10 +97,8 @@ where
         )) {
             let new_bytecode_hash = *v;
             if let Some(new_bytecode) = bytecodes.get(&h256_to_u256(new_bytecode_hash)) {
-                let u8_bytecode: Vec<u8> = new_bytecode
-                    .iter()
-                    .flat_map(|x| u256_to_h256(*x).to_fixed_bytes())
-                    .collect();
+                let u8_bytecode: Vec<u8> =
+                    new_bytecode.iter().flat_map(|x| u256_to_h256(*x).to_fixed_bytes()).collect();
 
                 return Some((
                     new_bytecode_hash,
@@ -108,7 +106,7 @@ where
                         bytecode: Bytes::copy_from_slice(u8_bytecode.as_slice()),
                         state: revm::primitives::BytecodeState::Raw,
                     },
-                ));
+                ))
             }
         }
 
@@ -117,10 +115,8 @@ where
         // so we have to iterate over all the bytecodes, truncate their hash and then compare.
         for (k, v) in bytecodes {
             if h256_to_h160(&u256_to_h256(*k)) == account {
-                let u8_bytecode: Vec<u8> = v
-                    .iter()
-                    .flat_map(|x| u256_to_h256(*x).to_fixed_bytes())
-                    .collect();
+                let u8_bytecode: Vec<u8> =
+                    v.iter().flat_map(|x| u256_to_h256(*x).to_fixed_bytes()).collect();
 
                 return Some((
                     u256_to_h256(*k),
@@ -128,7 +124,7 @@ where
                         bytecode: Bytes::copy_from_slice(u8_bytecode.as_slice()),
                         state: revm::primitives::BytecodeState::Raw,
                     },
-                ));
+                ))
             }
         }
 
@@ -268,6 +264,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::box_default)]
 mod tests {
     use maplit::hashmap;
     use revm::primitives::AccountInfo;
@@ -442,9 +439,9 @@ mod tests {
             .get_storage_at(
                 H160::zero(),
                 U256::zero(),
-                Some(BlockIdVariant::BlockNumber(
-                    zksync_types::api::BlockNumber::Number(zksync_basic_types::U64::from(2)),
-                )),
+                Some(BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(
+                    zksync_basic_types::U64::from(2),
+                ))),
             )
             .expect("failed getting storage");
 
@@ -467,9 +464,9 @@ mod tests {
         db.get_storage_at(
             H160::zero(),
             U256::zero(),
-            Some(BlockIdVariant::BlockNumber(
-                zksync_types::api::BlockNumber::Number(zksync_basic_types::U64::from(1)),
-            )),
+            Some(BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(
+                zksync_basic_types::U64::from(1),
+            ))),
         )
         .unwrap();
     }
