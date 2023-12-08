@@ -423,24 +423,34 @@ impl fmt::Display for ZkSolcManager {
 /// The function returns the `ZkSolcManager` if all steps are successful, or an error if any
 /// step fails.
 pub fn setup_zksolc_manager(zksolc_version: String) -> eyre::Result<ZkSolcManager> {
-    let zksolc_manager_opts = ZkSolcManagerOpts::new(zksolc_version);
+    let zksolc_manager_opts = ZkSolcManagerOpts::new(zksolc_version.clone());
     let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
-    let zksolc_manager = zksolc_manager_builder
-        .build()
-        .map_err(|e| eyre::eyre!("Error building zksolc_manager: {}", e))?;
+    let zksolc_manager = zksolc_manager_builder.build().map_err(|e| {
+        eyre::eyre!("Error initializing ZkSolcManager for version '{}': {}", zksolc_version, e)
+    })?;
 
     if let Err(err) = zksolc_manager.check_setup_compilers_dir() {
-        eyre::bail!("Failed to setup compilers directory: {}", err);
+        eyre::bail!("Failed to set up or access the ZkSolc compilers directory: {}", err);
     }
 
     if !zksolc_manager.exists() {
+        let download_url = zksolc_manager
+            .get_full_download_url()
+            .map(|url| url.to_string())
+            .unwrap_or_else(|_| "unknown URL".to_string());
+
         println!(
-            "Downloading zksolc compiler from {:?}",
-            zksolc_manager.get_full_download_url().unwrap().to_string()
+            "zksolc not found in `.zksync` directory. Downloading zksolc compiler from {}",
+            download_url
         );
-        zksolc_manager
-            .download()
-            .map_err(|err| eyre::eyre!("Failed to download the file: {}", err))?;
+        zksolc_manager.download().map_err(|err| {
+            eyre::eyre!(
+                "Failed to download zksolc version '{}' from {}: {}",
+                zksolc_version,
+                download_url,
+                err
+            )
+        })?;
     }
 
     Ok(zksolc_manager)
