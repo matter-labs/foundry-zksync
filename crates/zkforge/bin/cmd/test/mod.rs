@@ -12,7 +12,7 @@ use foundry_common::{
     evm::EvmArgs,
     get_contract_name, get_file_name, shell,
     zk_compile::{ZkSolc, ZkSolcOpts},
-    zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts, DEFAULT_ZKSOLC_VERSION},
+    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
 };
 use foundry_config::{
     figment,
@@ -167,10 +167,7 @@ impl TestArgs {
         let toml = config.get_config_path();
         let profiles = get_available_profiles(toml)?;
 
-        let zksolc_manager =
-            ZkSolcManagerBuilder::new(ZkSolcManagerOpts::new(DEFAULT_ZKSOLC_VERSION.to_owned()))
-                .build()
-                .unwrap();
+        let zksolc_manager = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned())?;
 
         let zksolc_opts = ZkSolcOpts {
             compiler_path: zksolc_manager.get_full_compiler_path(),
@@ -180,7 +177,10 @@ impl TestArgs {
         };
 
         let mut zksolc = ZkSolc::new(zksolc_opts, project);
-        let output = zksolc.compile().unwrap();
+        let output = match zksolc.compile() {
+            Ok(compiled) => compiled,
+            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
+        };
 
         let test_options: TestOptions = TestOptionsBuilder::default()
             .fuzz(config.fuzz)
