@@ -3304,7 +3304,6 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 [[package]]
 name = "era_revm"
 version = "0.0.1-alpha"
-source = "git+https://github.com/matter-labs/era-revm?rev=2662bb19427a421662a7e463cf1ed6a15da361e5#2662bb19427a421662a7e463cf1ed6a15da361e5"
 dependencies = [
  "era_test_node",
  "ethabi 18.0.0",
@@ -3312,6 +3311,8 @@ dependencies = [
  "eyre",
  "hashbrown 0.14.2",
  "hex",
+ "itertools 0.12.0",
+ "maplit",
  "multivm",
  "revm",
  "serde",
@@ -5836,6 +5837,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8298,7 +8308,7 @@ checksum = "c55e02e35260070b6f716a2423c2ff1c3bb1642ddca6f99e1f26d06268a0e2d2"
 dependencies = [
  "bytes 1.5.0",
  "heck 0.4.1",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -8319,7 +8329,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efb6c9a1dd1def8e2124d17e83a20af56f1570d6c2d2bd9e266ccb768df3840e"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "proc-macro2 1.0.69",
  "quote 1.0.33",
  "syn 2.0.38",

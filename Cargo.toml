@@ -136,11 +136,11 @@ foundry-macros = { path = "crates/macros" }
 foundry-test-utils = { path = "crates/test-utils" }
 foundry-utils = { path = "crates/utils" }
 foundry-debugger = { path = "crates/debugger" }
+era_revm = { path = "crates/era-revm" }
 
 ## revm
 # no default features to avoid c-kzg
 revm = { version = "3.5.0", default-features = false }
-era_revm = { git="https://github.com/matter-labs/era-revm", rev = "2662bb19427a421662a7e463cf1ed6a15da361e5" }
 
 # We use a fork of `ethers` to gain access to a previously private variable.
 # This ensures that all artifact files, freshly compiled and saved in the `output` directory, are publicly accessible.
