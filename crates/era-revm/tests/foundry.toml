@@ -1,0 +1,9 @@
+[profile.default]
+src = 'src'
+out = 'out'
+libs = ['lib']
+
+[rpc_endpoints]
+local = "${ERA_TEST_NODE_RPC_URL}"
+
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config

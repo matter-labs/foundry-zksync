@@ -22,6 +22,7 @@ members = [
     "crates/forge/",
     "crates/macros/",
     "crates/test-utils/",
+    "crates/era-revm/",
 ]
 resolver = "2"
 
@@ -122,6 +123,7 @@ foundry-evm-fuzz = { path = "crates/evm/fuzz" }
 foundry-evm-traces = { path = "crates/evm/traces" }
 foundry-macros = { path = "crates/macros" }
 foundry-test-utils = { path = "crates/test-utils" }
+era_revm = { path = "crates/era-revm" }
 
 foundry-block-explorers = { version = "0.1.2", default-features = false }
 
@@ -129,7 +131,6 @@ foundry-block-explorers = { version = "0.1.2", default-features = false }
 # no default features to avoid c-kzg
 revm = { version = "3", default-features = false }
 revm-primitives = { version = "1", default-features = false }
-era_revm = { git="https://github.com/matter-labs/era-revm", rev = "2662bb19427a421662a7e463cf1ed6a15da361e5" }
 
 ## ethers
 ethers = { version = "2.0", default-features = false }
