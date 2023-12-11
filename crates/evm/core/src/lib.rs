@@ -16,3 +16,4 @@ pub mod fork;
 pub mod opts;
 pub mod snapshot;
 pub mod utils;
+pub mod era_revm;

@@ -32,6 +32,8 @@ use foundry_config::Chain;
 use std::num::ParseIntError;
 use url::Url;
 use zksync_web3_rs::types::H256;
+pub mod conversion_utils;
+pub mod factory_deps;
 /// Gets the RPC URL for Ethereum.
 ///
 /// If the `eth.rpc_url` is `None`, an error is returned.

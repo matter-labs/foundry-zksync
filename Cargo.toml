@@ -22,7 +22,7 @@ members = [
     "crates/forge/",
     "crates/macros/",
     "crates/test-utils/",
-    "crates/era-revm/",
+    # "crates/era-revm/",
     "crates/zkcast",
     "crates/zkforge",
 ]
@@ -127,7 +127,7 @@ foundry-evm-fuzz = { path = "crates/evm/fuzz" }
 foundry-evm-traces = { path = "crates/evm/traces" }
 foundry-macros = { path = "crates/macros" }
 foundry-test-utils = { path = "crates/test-utils" }
-era_revm = { path = "crates/era-revm" }
+# era_revm = { path = "crates/era-revm" }
 
 foundry-block-explorers = { version = "0.1.2", default-features = false }
 
@@ -157,6 +157,15 @@ syn-solidity = "0.5.0"
 alloy-chains = "0.1.4"
 alloy-rlp = "0.3.3"
 solang-parser = "=0.3.3"
+
+## zksync 
+era_test_node = { git = "https://github.com/matter-labs/era-test-node.git", rev = "21b48af90a9f9d98ec38cb93a32c119a3266f401" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
+multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
+zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
 
 ## misc
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

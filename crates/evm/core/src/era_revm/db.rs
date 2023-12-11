@@ -12,6 +12,9 @@ use std::{
 
 use era_test_node::fork::ForkSource;
 use eyre::ErrReport;
+use foundry_common::zk_utils::conversion_utils::{
+    h160_to_address, h256_to_b256, h256_to_h160, revm_u256_to_h256, u256_to_revm_u256,
+};
 use revm::{
     primitives::{Bytecode, Bytes},
     Database,
@@ -26,10 +29,6 @@ use zksync_types::{
 };
 
 use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
-
-use foundry_common::zk_utils::conversion_utils::{
-    h160_to_address, h256_to_b256, h256_to_h160, revm_u256_to_h256, u256_to_revm_u256,
-};
 
 #[derive(Default, Clone)]
 pub struct RevmDatabaseForEra<DB> {

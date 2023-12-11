@@ -767,7 +767,7 @@ impl Backend {
         self.initialize(env);
 
         let result: EVMResult<DatabaseError> =
-            era_revm::transactions::run_era_transaction(env, self, inspector);
+            crate::era_revm::transactions::run_era_transaction(env, self, inspector);
 
         Ok(result.unwrap())
     }

@@ -58,7 +58,7 @@ impl<'a> FuzzBackendWrapper<'a> {
         self.is_initialized = false;
 
         let result: EVMResult<DatabaseError> =
-            era_revm::transactions::run_era_transaction(env, self, inspector);
+            crate::era_revm::transactions::run_era_transaction(env, self, inspector);
 
         Ok(result.unwrap())
     }
