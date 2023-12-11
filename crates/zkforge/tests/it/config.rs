@@ -185,7 +185,6 @@ pub async fn tracing_runner() -> MultiContractRunner {
 // Builds a runner that runs against forked state
 pub async fn forked_runner(rpc: &str) -> MultiContractRunner {
     let mut opts = EVM_OPTS.clone();
-
     opts.env.chain_id = None; // clear chain id so the correct one gets fetched from the RPC
     opts.fork_url = Some(rpc.to_string());
 
