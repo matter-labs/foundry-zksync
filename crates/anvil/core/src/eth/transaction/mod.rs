@@ -860,9 +860,7 @@ impl Decodable for TypedTransaction {
         if rlp.is_list() {
             return Ok(TypedTransaction::Legacy(rlp.as_val()?))
         }
-        let [first, s @ ..] = rlp.data()? else {
-            return Err(DecoderError::Custom("empty slice"))
-        };
+        let [first, s @ ..] = rlp.data()? else { return Err(DecoderError::Custom("empty slice")) };
         // "advance" the header, see comments in fastrlp impl below
         let s = if s.is_empty() { &rlp.as_raw()[1..] } else { s };
 

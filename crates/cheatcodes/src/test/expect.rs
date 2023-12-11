@@ -456,9 +456,7 @@ pub(crate) fn handle_expect_revert(
     ensure!(!matches!(status, return_ok!()), "call did not revert as expected");
 
     // If None, accept any revert
-    let Some(expected_revert) = expected_revert else {
-        return Ok(success_return())
-    };
+    let Some(expected_revert) = expected_revert else { return Ok(success_return()) };
 
     if !expected_revert.is_empty() && retdata.is_empty() {
         bail!("call reverted as expected, but without data");

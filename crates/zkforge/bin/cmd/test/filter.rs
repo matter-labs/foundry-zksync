@@ -124,9 +124,7 @@ impl TestFilter for FilterArgs {
     }
 
     fn matches_path(&self, path: &Path) -> bool {
-        let Some(path) = path.to_str() else {
-            return false
-        };
+        let Some(path) = path.to_str() else { return false };
 
         let mut ok = true;
         if let Some(re) = &self.path_pattern {

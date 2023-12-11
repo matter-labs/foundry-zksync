@@ -75,9 +75,7 @@ impl TestFilter for Filter {
     }
 
     fn matches_path(&self, path: &Path) -> bool {
-        let Some(path) = path.to_str() else {
-            return false
-        };
+        let Some(path) = path.to_str() else { return false };
 
         if let Some(exclude) = &self.exclude_paths {
             if exclude.is_match(path) {
