@@ -1,4 +1,5 @@
 use super::{build::BuildArgs, snapshot::SnapshotArgs, test::TestArgs};
+use crate::cmd::zk_build::ZkBuildArgs;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::utils::{self, FoundryPathExt};
@@ -81,7 +82,7 @@ impl WatchArgs {
 
 /// Executes a [`Watchexec`] that listens for changes in the project's src dir and reruns `forge
 /// build`
-pub async fn watch_build(args: BuildArgs) -> Result<()> {
+pub async fn watch_build(args: ZkBuildArgs) -> Result<()> {
     let (init, mut runtime) = args.watchexec_config()?;
     let cmd = cmd_args(args.watch.watch.as_ref().map(|paths| paths.len()).unwrap_or_default());
 

@@ -38,13 +38,14 @@ fn main() -> Result<()> {
         }
         Subcommands::Coverage(cmd) => utils::block_on(cmd.run()),
         Subcommands::Bind(cmd) => cmd.run(),
-        Subcommands::Build(cmd) => {
+        Subcommands::ZkBuild(cmd) => {
             if cmd.is_watch() {
                 utils::block_on(watch::watch_build(cmd))
             } else {
                 cmd.run().map(|_| ())
             }
         }
+        Subcommands::ZkCreate(cmd) => utils::block_on(cmd.run()),
         Subcommands::Debug(cmd) => utils::block_on(cmd.run()),
         Subcommands::VerifyContract(args) => utils::block_on(args.run()),
         Subcommands::VerifyCheck(args) => utils::block_on(args.run()),
@@ -52,7 +53,6 @@ fn main() -> Result<()> {
             CacheSubcommands::Clean(cmd) => cmd.run(),
             CacheSubcommands::Ls(cmd) => cmd.run(),
         },
-        Subcommands::Create(cmd) => utils::block_on(cmd.run()),
         Subcommands::Update(cmd) => cmd.run(),
         Subcommands::Install(cmd) => cmd.run(),
         Subcommands::Remove(cmd) => cmd.run(),

@@ -22,6 +22,7 @@ use foundry_common::{
     compile::{self, ContractSources, ProjectCompiler},
     evm::EvmArgs,
     get_contract_name, get_file_name, shell,
+    zk_compile::ZkSolcOpts,
 };
 use foundry_config::{
     figment,
@@ -42,6 +43,10 @@ mod summary;
 use summary::TestSummaryReporter;
 
 pub use filter::FilterArgs;
+use foundry_common::{
+    zk_compile::ZkSolc,
+    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
+};
 
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
@@ -143,7 +148,7 @@ impl TestArgs {
         let (mut config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
 
         let mut filter = self.filter(&config);
-        trace!(target: "forge::test", ?filter, "using filter");
+        trace!(target: "zkforge::test", ?filter, "using filter");
 
         // Set up the project
         let mut project = config.project()?;
@@ -157,19 +162,28 @@ impl TestArgs {
             project = config.project()?;
         }
 
-        let compiler = ProjectCompiler::default();
-        let output = match (config.sparse_mode, self.opts.silent | self.json) {
-            (false, false) => compiler.compile(&project),
-            (true, false) => compiler.compile_sparse(&project, filter.clone()),
-            (false, true) => compile::suppress_compile(&project),
-            (true, true) => compile::suppress_compile_sparse(&project, filter.clone()),
-        }?;
         // Create test options from general project settings
         // and compiler output
-        let project_root = &project.paths.root;
+        let project_root = &project.paths.root.clone();
         let toml = config.get_config_path();
         let profiles = get_available_profiles(toml)?;
 
+        let zksolc_manager = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned())?;
+
+        let zksolc_opts = ZkSolcOpts {
+            compiler_path: zksolc_manager.get_full_compiler_path(),
+            is_system: false,
+            force_evmla: false,
+            remappings: config.remappings.clone(),
+        };
+
+        let mut zksolc = ZkSolc::new(zksolc_opts, project);
+        let output = match zksolc.compile() {
+            Ok(compiled) => compiled,
+            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
+        };
+
+        let mut project = config.project()?;
         let test_options: TestOptions = TestOptionsBuilder::default()
             .fuzz(config.fuzz)
             .invariant(config.invariant)
