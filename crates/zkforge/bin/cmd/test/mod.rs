@@ -19,7 +19,7 @@ use foundry_cli::{
 };
 use foundry_common::{
     compact_to_contract,
-    compile::{self, ContractSources, ProjectCompiler},
+    compile::ContractSources,
     evm::EvmArgs,
     get_contract_name, get_file_name, shell,
     zk_compile::ZkSolcOpts,
@@ -183,7 +183,7 @@ impl TestArgs {
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
 
-        let mut project = config.project()?;
+        let project = config.project()?;
         let test_options: TestOptions = TestOptionsBuilder::default()
             .fuzz(config.fuzz)
             .invariant(config.invariant)

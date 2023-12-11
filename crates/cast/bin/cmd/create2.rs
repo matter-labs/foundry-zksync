@@ -200,7 +200,7 @@ impl Create2Args {
                     }
 
                     // Calculate the `CREATE2` address.
-                    #[allow(clippy::needless_borrows_for_generic_args)]
+                    #[allow(clippy::all)]
                     let addr = deployer.create2(&salt.0, init_code_hash);
 
                     // Check if the the regex matches the calculated address' checksum.

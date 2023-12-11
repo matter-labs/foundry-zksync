@@ -1,4 +1,4 @@
-use super::{build::BuildArgs, snapshot::SnapshotArgs, test::TestArgs};
+use super::{snapshot::SnapshotArgs, test::TestArgs};
 use crate::cmd::zk_build::ZkBuildArgs;
 use clap::Parser;
 use eyre::Result;

@@ -29,7 +29,7 @@ use super::{install, watch::WatchArgs};
 use clap::Parser;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
 use foundry_common::zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION};
-use foundry_compilers::{Project, ProjectCompileOutput};
+use foundry_compilers::Project;
 use foundry_config::{
     figment::{
         self,
