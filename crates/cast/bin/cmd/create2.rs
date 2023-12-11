@@ -196,7 +196,7 @@ impl Create2Args {
                 loop {
                     // Stop if a result was found in another thread.
                     if found.load(Ordering::Relaxed) {
-                        break None;
+                        break None
                     }
 
                     // Calculate the `CREATE2` address.
@@ -211,7 +211,7 @@ impl Create2Args {
                     if regex.matches(s).into_iter().count() == regex_len {
                         // Notify other threads that we found a result.
                         found.store(true, Ordering::Relaxed);
-                        break Some((salt.0, addr));
+                        break Some((salt.0, addr))
                     }
 
                     // Increment the salt for the next iteration.

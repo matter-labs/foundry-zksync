@@ -64,7 +64,7 @@ impl TestFilter for Filter {
     fn matches_test(&self, test_name: &str) -> bool {
         if let Some(exclude) = &self.exclude_tests {
             if exclude.is_match(test_name) {
-                return false;
+                return false
             }
         }
         self.test_regex.is_match(test_name)
@@ -75,13 +75,11 @@ impl TestFilter for Filter {
     }
 
     fn matches_path(&self, path: &Path) -> bool {
-        let Some(path) = path.to_str() else {
-            return false;
-        };
+        let Some(path) = path.to_str() else { return false };
 
         if let Some(exclude) = &self.exclude_paths {
             if exclude.is_match(path) {
-                return false;
+                return false
             }
         }
         self.path_regex.is_match(path)

@@ -57,7 +57,7 @@ pub fn maybe_decode_revert(
     if err.len() < SELECTOR_LEN {
         if let Some(status) = status {
             if !status.is_ok() {
-                return Some(format!("EvmError: {status:?}"));
+                return Some(format!("EvmError: {status:?}"))
             }
         }
         return if err.is_empty() {
@@ -69,12 +69,12 @@ pub fn maybe_decode_revert(
 
     if err == crate::constants::MAGIC_SKIP {
         // Also used in forge fuzz runner
-        return Some("SKIPPED".to_string());
+        return Some("SKIPPED".to_string())
     }
 
     // Solidity's `Error(string)` or `Panic(uint256)`
     if let Ok(e) = alloy_sol_types::GenericContractError::abi_decode(err, false) {
-        return Some(e.to_string());
+        return Some(e.to_string())
     }
 
     let (selector, data) = err.split_at(SELECTOR_LEN);
@@ -84,17 +84,17 @@ pub fn maybe_decode_revert(
         // `CheatcodeError(string)`
         Vm::CheatcodeError::SELECTOR => {
             let e = Vm::CheatcodeError::abi_decode_raw(data, false).ok()?;
-            return Some(e.message);
+            return Some(e.message)
         }
         // `expectRevert(bytes)`
         Vm::expectRevert_2Call::SELECTOR => {
             let e = Vm::expectRevert_2Call::abi_decode_raw(data, false).ok()?;
-            return maybe_decode_revert(&e.revertData[..], maybe_abi, status);
+            return maybe_decode_revert(&e.revertData[..], maybe_abi, status)
         }
         // `expectRevert(bytes4)`
         Vm::expectRevert_1Call::SELECTOR => {
             let e = Vm::expectRevert_1Call::abi_decode_raw(data, false).ok()?;
-            return maybe_decode_revert(&e.revertData[..], maybe_abi, status);
+            return maybe_decode_revert(&e.revertData[..], maybe_abi, status)
         }
         _ => {}
     }
@@ -108,19 +108,19 @@ pub fn maybe_decode_revert(
                     "{}({})",
                     abi_error.name,
                     decoded.iter().map(foundry_common::fmt::format_token).format(", ")
-                ));
+                ))
             }
         }
     }
 
     // ABI-encoded `string`
     if let Ok(s) = String::abi_decode(err, false) {
-        return Some(s);
+        return Some(s)
     }
 
     // UTF-8-encoded string
     if let Ok(s) = std::str::from_utf8(err) {
-        return Some(s.to_string());
+        return Some(s.to_string())
     }
 
     // Generic custom error

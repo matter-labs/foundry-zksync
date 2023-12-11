@@ -144,7 +144,7 @@ impl ScriptArgs {
                 join_all(futs).await.into_iter().filter(|res| res.is_err()).collect::<Vec<_>>();
 
             if !errors.is_empty() {
-                return Err(eyre::eyre!("{errors:?}"));
+                return Err(eyre::eyre!("{errors:?}"))
             }
         }
 

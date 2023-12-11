@@ -111,7 +111,7 @@ impl DebuggerContext<'_> {
         if let KeyCode::Char(c) = event.code {
             if c.is_alphabetic() && self.key_buffer.starts_with('\'') {
                 self.handle_breakpoint(c);
-                return ControlFlow::Continue(());
+                return ControlFlow::Continue(())
             }
         }
 

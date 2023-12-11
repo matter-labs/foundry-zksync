@@ -133,13 +133,13 @@ impl DocBuilder {
                     Err(err) => {
                         if from_library {
                             // Ignore failures for library files
-                            return Ok(Vec::new());
+                            return Ok(Vec::new())
                         } else {
                             return Err(eyre::eyre!(
                                 "Failed to parse Solidity code for {}\nDebug info: {:?}",
                                 path.display(),
                                 err
-                            ));
+                            ))
                         }
                     }
                 };

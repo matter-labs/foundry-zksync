@@ -1,9 +1,6 @@
+use alloy_primitives::Bytes;
 use clap::{Parser, ValueHint};
-use ethers::{
-    abi::Abi,
-    solc::{info::ContractInfo, Project},
-    types::Bytes,
-};
+use ethers_core::abi::Abi;
 use eyre::Context;
 /// ZKSync Contract Deployment Module
 /// This module encapsulates the logic required for contract deployment, including:
@@ -56,6 +53,7 @@ use foundry_cli::{
     utils::read_constructor_args_file,
 };
 use foundry_common::zk_utils::{get_chain, get_private_key, get_rpc_url};
+use foundry_compilers::{info::ContractInfo, Project};
 use foundry_config::Config;
 use serde_json::Value;
 use std::{fs, path::PathBuf, str::FromStr};
@@ -101,33 +99,33 @@ pub struct ZkCreateArgs {
 
     /// The constructor arguments.
     #[clap(
-        long,
-        num_args(1..),
-        help = "The constructor arguments.",
-        name = "constructor_args",
-        conflicts_with = "constructor_args_path",
-        value_name = "ARGS"
+    long,
+    num_args(1..),
+    help = "The constructor arguments.",
+    name = "constructor_args",
+    conflicts_with = "constructor_args_path",
+    value_name = "ARGS"
     )]
     constructor_args: Vec<String>,
 
     /// The path to a file containing the constructor arguments.
     #[clap(
-        long,
-        help = "The path to a file containing the constructor arguments.",
-        value_hint = ValueHint::FilePath,
-        name = "constructor_args_path",
-        conflicts_with = "constructor_args",
-        value_name = "FILE"
+    long,
+    help = "The path to a file containing the constructor arguments.",
+    value_hint = ValueHint::FilePath,
+    name = "constructor_args_path",
+    conflicts_with = "constructor_args",
+    value_name = "FILE"
     )]
     constructor_args_path: Option<PathBuf>,
 
     /// The factory dependencies in the form `<path>:<contractname>`.
     #[clap(
-        long,
-        num_args(1..),
-        help_heading = "ZkSync Features",
-        help = "The factory dependencies in the form `<path>:<contractname>`.",
-        value_name = "FACTORY-DEPS"
+    long,
+    num_args(1..),
+    help_heading = "ZkSync Features",
+    help = "The factory dependencies in the form `<path>:<contractname>`.",
+    value_name = "FACTORY-DEPS"
     )]
     factory_deps: Option<Vec<ContractInfo>>,
 
@@ -163,7 +161,7 @@ impl ZkCreateArgs {
         let private_key = get_private_key(&self.eth.wallet.raw.private_key)?;
         let rpc_url = get_rpc_url(&self.eth.rpc.url)?;
         let config = Config::from(&self.eth);
-        let chain = get_chain(config.chain_id)?;
+        let chain = get_chain(config.chain)?;
         let mut project = self.opts.project()?;
         project.paths.artifacts = project.paths.root.join("zkout");
 

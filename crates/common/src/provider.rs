@@ -302,7 +302,7 @@ fn resolve_path(path: &Path) -> Result<PathBuf, ()> {
 fn resolve_path(path: &Path) -> Result<PathBuf, ()> {
     if let Some(s) = path.to_str() {
         if s.starts_with(r"\\.\pipe\") {
-            return Ok(path.to_path_buf());
+            return Ok(path.to_path_buf())
         }
     }
     Err(())

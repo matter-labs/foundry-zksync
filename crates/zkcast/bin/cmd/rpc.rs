@@ -1,9 +1,9 @@
+use cast::Cast;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{opts::RpcOpts, utils};
 use foundry_config::Config;
 use itertools::Itertools;
-use zkcast::Cast;
 
 /// CLI arguments for `cast rpc`.
 #[derive(Debug, Clone, Parser)]

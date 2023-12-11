@@ -54,7 +54,7 @@ impl ContractInheritance {
     fn try_link_base(&self, base: &str, documents: &Vec<Document>) -> Option<PathBuf> {
         for candidate in documents {
             if candidate.from_library && !self.include_libraries {
-                continue;
+                continue
             }
             if let DocumentContent::Single(ref item) = candidate.content {
                 if let ParseSource::Contract(ref contract) = item.source {

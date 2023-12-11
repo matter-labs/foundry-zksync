@@ -5,25 +5,21 @@ use super::{
     *,
 };
 use alloy_primitives::{Address, Bytes, U256};
-use ethers::{
-    solc::artifacts::CompactContractBytecode, types::transaction::eip2718::TypedTransaction,
-};
+use ethers_core::types::transaction::eip2718::TypedTransaction;
 use eyre::Result;
+use forge::{
+    backend::Backend,
+    executors::ExecutorBuilder,
+    inspectors::{cheatcodes::BroadcastableTransactions, CheatsConfig},
+    traces::{CallTraceDecoder, Traces},
+    utils::CallKind,
+};
 use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
 use foundry_common::{shell, types::ToEthers, RpcUrl};
+use foundry_compilers::artifacts::CompactContractBytecode;
 use futures::future::join_all;
 use parking_lot::RwLock;
 use std::{collections::VecDeque, sync::Arc};
-use tracing::trace;
-use zkforge::{
-    executor::{
-        inspector::{cheatcodes::util::BroadcastableTransactions, CheatsConfig},
-        Backend, ExecutorBuilder,
-    },
-    revm::primitives::{SpecId, U256 as rU256},
-    trace::{CallTraceDecoder, Traces},
-    CallKind,
-};
 
 /// Helper alias type for the processed result of a runner onchain simulation.
 type RunnerResult = (Option<TransactionWithMetadata>, Traces);
@@ -53,12 +49,10 @@ impl ScriptArgs {
 
         ensure_clean_constructor(&abi)?;
 
-        let predeploy_libraries =
-            predeploy_libraries.iter().map(|b| b.0.clone().into()).collect::<Vec<_>>();
         let mut runner = self.prepare_runner(script_config, sender, SimulationStage::Local).await;
         let (address, mut result) = runner.setup(
-            &predeploy_libraries,
-            bytecode.0.into(),
+            predeploy_libraries,
+            bytecode,
             needs_setup(&abi),
             script_config.sender_nonce,
             self.broadcast,
@@ -70,7 +64,7 @@ impl ScriptArgs {
 
         // Only call the method if `setUp()` succeeded.
         if result.success {
-            let script_result = runner.script(address, calldata.0.into())?;
+            let script_result = runner.script(address, calldata)?;
 
             result.success &= script_result.success;
             result.gas_used = script_result.gas_used;
@@ -134,7 +128,7 @@ impl ScriptArgs {
                         abi,
                         code,
                     };
-                    return Some(((*addr).to_alloy(), info))
+                    return Some((*addr, info))
                 }
                 None
             })
@@ -159,10 +153,10 @@ impl ScriptArgs {
                                 "Transaction doesn't have a `from` address at execution time",
                             ).to_alloy(),
                             tx.to.clone(),
-                            tx.data.clone().map(|b| b.0.into()),
+                            tx.data.clone().map(|b| b.to_alloy()),
                             tx.value.map(|v| v.to_alloy()),
                         )
-                        .expect("Internal EVM error");
+                        .wrap_err("Internal EVM error during simulation")?;
 
                         if !result.success || result.traces.is_empty() {
                             return Ok((None, result.traces))
@@ -176,8 +170,8 @@ impl ScriptArgs {
                                     if matches!(node.kind(), CallKind::Create | CallKind::Create2) {
                                         return Some(AdditionalContract {
                                             opcode: node.kind(),
-                                            address: node.trace.address.to_alloy(),
-                                            init_code: node.trace.data.to_raw(),
+                                            address: node.trace.address,
+                                            init_code: node.trace.data.as_bytes().to_vec().into(),
                                         })
                                     }
                                     None
@@ -187,7 +181,7 @@ impl ScriptArgs {
 
                         // Simulate mining the transaction if the user passes `--slow`.
                         if self.slow {
-                            runner.executor.env.block.number += rU256::from(1);
+                            runner.executor.env.block.number += U256::from(1);
                         }
 
                         let is_fixed_gas_limit = tx.gas.is_some();
@@ -231,8 +225,8 @@ impl ScriptArgs {
                 // Identify all contracts created during the call.
                 if traces.is_empty() {
                     eyre::bail!(
-                        "Forge script requires tracing enabled to collect created contracts."
-                    )
+                        "forge script requires tracing enabled to collect created contracts"
+                    );
                 }
 
                 for (_kind, trace) in &mut traces {
@@ -260,7 +254,9 @@ impl ScriptArgs {
         let sender = script_config.evm_opts.sender;
 
         if !shell::verbosity().is_silent() {
-            eprintln!("\n## Setting up ({}) EVMs.", script_config.total_rpcs.len());
+            let n = script_config.total_rpcs.len();
+            let s = if n != 1 { "s" } else { "" };
+            println!("\n## Setting up {n} EVM{s}.");
         }
 
         let futs = script_config
@@ -316,13 +312,13 @@ impl ScriptArgs {
         // We need to enable tracing to decode contract names: local or external.
         let mut builder = ExecutorBuilder::new()
             .inspectors(|stack| stack.trace(true))
-            .spec(SpecId::LATEST)
+            .spec(script_config.config.evm_spec_id())
             .gas_limit(script_config.evm_opts.gas_limit());
 
         if let SimulationStage::Local = stage {
             builder = builder.inspectors(|stack| {
                 stack.debug(self.debug).cheatcodes(
-                    CheatsConfig::new(&script_config.config, &script_config.evm_opts).into(),
+                    CheatsConfig::new(&script_config.config, script_config.evm_opts.clone()).into(),
                 )
             });
         }

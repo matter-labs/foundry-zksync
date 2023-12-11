@@ -29,7 +29,7 @@ impl Preprocessor for GitSource {
             let commit = self.commit.clone().unwrap_or("master".to_owned());
             for document in documents.iter() {
                 if document.from_library {
-                    continue;
+                    continue
                 }
                 let git_url = format!(
                     "{repo}/blob/{commit}/{}",

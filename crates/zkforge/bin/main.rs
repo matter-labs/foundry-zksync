@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate tracing;
+
 use clap::{CommandFactory, Parser};
 use clap_complete::generate;
 use eyre::Result;
@@ -10,8 +13,8 @@ use cmd::{cache::CacheSubcommands, generate::GenerateSubcommands, watch};
 use opts::{Opts, Subcommands};
 
 fn main() -> Result<()> {
-    utils::load_dotenv();
     handler::install()?;
+    utils::load_dotenv();
     utils::subscriber();
     utils::enable_paint();
 
@@ -42,6 +45,7 @@ fn main() -> Result<()> {
                 cmd.run().map(|_| ())
             }
         }
+        Subcommands::ZkCreate(cmd) => utils::block_on(cmd.run()),
         Subcommands::Debug(cmd) => utils::block_on(cmd.run()),
         Subcommands::VerifyContract(args) => utils::block_on(args.run()),
         Subcommands::VerifyCheck(args) => utils::block_on(args.run()),
@@ -49,7 +53,6 @@ fn main() -> Result<()> {
             CacheSubcommands::Clean(cmd) => cmd.run(),
             CacheSubcommands::Ls(cmd) => cmd.run(),
         },
-        Subcommands::ZkCreate(cmd) => utils::block_on(cmd.run()),
         Subcommands::Update(cmd) => cmd.run(),
         Subcommands::Install(cmd) => cmd.run(),
         Subcommands::Remove(cmd) => cmd.run(),
@@ -63,7 +66,7 @@ fn main() -> Result<()> {
             clap_complete::generate(
                 clap_complete_fig::Fig,
                 &mut Opts::command(),
-                "zkforge",
+                "forge",
                 &mut std::io::stdout(),
             );
             Ok(())
@@ -84,7 +87,6 @@ fn main() -> Result<()> {
         Subcommands::Config(cmd) => cmd.run(),
         Subcommands::Flatten(cmd) => cmd.run(),
         Subcommands::Inspect(cmd) => cmd.run(),
-        Subcommands::UploadSelectors(args) => utils::block_on(args.run()),
         Subcommands::Tree(cmd) => cmd.run(),
         Subcommands::Geiger(cmd) => {
             let check = cmd.check;
