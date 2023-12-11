@@ -24,7 +24,7 @@ impl Decodable for Item {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let h = Header::decode(buf)?;
         if buf.len() < h.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort);
+            return Err(alloy_rlp::Error::InputTooShort)
         }
         let mut d = &buf[..h.payload_length];
         let r = if h.list {

@@ -457,7 +457,7 @@ pub(crate) fn handle_expect_revert(
 
     // If None, accept any revert
     let Some(expected_revert) = expected_revert else {
-        return Ok(success_return());
+        return Ok(success_return())
     };
 
     if !expected_revert.is_empty() && retdata.is_empty() {

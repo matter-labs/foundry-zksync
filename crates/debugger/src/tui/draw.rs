@@ -29,7 +29,7 @@ impl DebuggerContext<'_> {
         let min_height = 16;
         if size.width < min_width || size.height < min_height {
             self.size_too_small(f, min_width, min_height);
-            return;
+            return
         }
 
         // The horizontal layout draws these panes at 50% width.
@@ -323,15 +323,15 @@ impl DebuggerContext<'_> {
     fn src_map(&self) -> Result<(SourceElement, &str), String> {
         let address = self.address();
         let Some(contract_name) = self.debugger.identified_contracts.get(address) else {
-            return Err(format!("Unknown contract at address {address}"));
+            return Err(format!("Unknown contract at address {address}"))
         };
 
         let Some(files_source_code) = self.debugger.contracts_sources.0.get(contract_name) else {
-            return Err(format!("No source map index for contract {contract_name}"));
+            return Err(format!("No source map index for contract {contract_name}"))
         };
 
         let Some((create_map, rt_map)) = self.debugger.pc_ic_maps.get(contract_name) else {
-            return Err(format!("No PC-IC maps for contract {contract_name}"));
+            return Err(format!("No PC-IC maps for contract {contract_name}"))
         };
 
         let is_create = matches!(self.call_kind(), CallKind::Create | CallKind::Create2);
@@ -351,7 +351,7 @@ impl DebuggerContext<'_> {
                 (*file_id == source_element.index?).then_some((source_element, source_code))
             })
         else {
-            return Err(format!("No source map for contract {contract_name}"));
+            return Err(format!("No source map for contract {contract_name}"))
         };
 
         Ok((source_element, source_code))

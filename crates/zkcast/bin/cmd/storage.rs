@@ -217,7 +217,7 @@ async fn fetch_storage_slots(
 fn print_storage(layout: StorageLayout, values: Vec<B256>, pretty: bool) -> Result<()> {
     if !pretty {
         println!("{}", serde_json::to_string_pretty(&serde_json::to_value(layout)?)?);
-        return Ok(());
+        return Ok(())
     }
 
     let mut table = Table::new();

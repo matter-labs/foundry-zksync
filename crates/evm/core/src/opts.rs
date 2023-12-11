@@ -182,14 +182,14 @@ impl EvmOpts {
         if let Some(ref url) = self.fork_url {
             if url.contains("mainnet") {
                 trace!(?url, "auto detected mainnet chain");
-                return Some(Chain::mainnet());
+                return Some(Chain::mainnet())
             }
             trace!(?url, "retrieving chain via eth_chainId");
             let provider = Provider::try_from(url.as_str())
                 .unwrap_or_else(|_| panic!("Failed to establish provider to {url}"));
 
             if let Ok(id) = RuntimeOrHandle::new().block_on(provider.get_chainid()) {
-                return Some(Chain::from(id.as_u64()));
+                return Some(Chain::from(id.as_u64()))
             }
         }
 

@@ -157,7 +157,7 @@ impl Debugger {
             if event::poll(tick_rate.saturating_sub(last_tick.elapsed())).unwrap() {
                 let event = event::read().unwrap();
                 if tx.send(event).is_err() {
-                    return;
+                    return
                 }
             }
 

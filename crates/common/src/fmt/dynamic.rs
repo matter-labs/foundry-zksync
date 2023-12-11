@@ -41,7 +41,7 @@ impl DynValueFormatter {
             DynSolValue::Bool(inner) => write!(f, "{inner}"),
             DynSolValue::CustomStruct { name, prop_names, tuple } => {
                 if self.raw {
-                    return self.tuple(tuple, f);
+                    return self.tuple(tuple, f)
                 }
 
                 f.write_str(name)?;

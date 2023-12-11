@@ -138,7 +138,7 @@ fn parse_value_fallback(s: &str, ty: &DynSolType) -> Option<Result<DynSolValue, 
                 s if s.eq_ignore_ascii_case("false") => false,
                 _ => return None,
             };
-            return Some(Ok(DynSolValue::Bool(b)));
+            return Some(Ok(DynSolValue::Bool(b)))
         }
         DynSolType::Int(_) |
         DynSolType::Uint(_) |

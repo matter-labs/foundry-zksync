@@ -248,7 +248,7 @@ impl CallTraceDecoder {
 
         // Decode precompile
         if precompiles::decode(trace, 1) {
-            return;
+            return
         }
 
         // Set label
@@ -271,7 +271,7 @@ impl CallTraceDecoder {
         if trace.address == DEFAULT_CREATE2_DEPLOYER {
             trace!("decoded as create2");
             trace.data = TraceCallData::Decoded { signature: "create2".to_string(), args: vec![] };
-            return;
+            return
         }
 
         if cdata.len() >= SELECTOR_LEN {
@@ -483,7 +483,7 @@ impl CallTraceDecoder {
                         })
                         .collect(),
                 );
-                break;
+                break
             }
         }
     }
@@ -491,7 +491,7 @@ impl CallTraceDecoder {
     fn apply_label(&self, value: &DynSolValue) -> String {
         if let DynSolValue::Address(addr) = value {
             if let Some(label) = self.labels.get(addr) {
-                return format!("{label}: [{addr}]");
+                return format!("{label}: [{addr}]")
             }
         }
         format_token(value)

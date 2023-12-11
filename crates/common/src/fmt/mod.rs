@@ -68,7 +68,7 @@ pub fn format_uint_exp(num: U256) -> String {
 pub fn format_int_exp(num: I256) -> String {
     let (sign, abs) = num.into_sign_and_abs();
     if abs < U256::from(10_000) {
-        return format!("{sign}{abs}");
+        return format!("{sign}{abs}")
     }
 
     let exp = to_exp_notation(abs, 4, true, sign);
