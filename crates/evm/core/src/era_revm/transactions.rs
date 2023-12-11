@@ -7,12 +7,9 @@ use era_test_node::{
 };
 use ethers_core::abi::ethabi::{self, ParamType};
 use multivm::{interface::VmExecutionResultAndLogs, vm_refunds_enhancement::ToTracerPointer};
-use revm::{
-    primitives::{
-        Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
-        OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
-    },
-    Database,
+use revm::primitives::{
+    Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
+    OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -36,6 +33,7 @@ use foundry_common::zk_utils::{
 };
 
 use super::db::RevmDatabaseForEra;
+use crate::backend::DatabaseExt;
 
 fn contract_address_from_tx_result(execution_result: &VmExecutionResultAndLogs) -> Option<H160> {
     for query in execution_result.logs.storage_logs.iter().rev() {
@@ -130,7 +128,7 @@ pub enum DatabaseError {
 
 pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, _inspector: INSP) -> EVMResult<E>
 where
-    DB: Database + Send,
+    DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
 {
     let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());

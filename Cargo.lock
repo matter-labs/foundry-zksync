@@ -4407,6 +4407,7 @@ dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
  "alloy-sol-types",
+ "auto_impl",
  "const-hex",
  "derive_more",
  "era_test_node",
