@@ -231,7 +231,8 @@ mod zk_deposit_tests {
                 legacy: false,
             };
             let l1_url = env::var("L1_RPC_URL").ok();
-            let chain = Some(Chain::Id(env::var("CHAIN").unwrap().parse().unwrap()));
+            let chain_id: u64 = env::var("CHAIN").unwrap().parse().unwrap();
+            let chain = Some(Chain::from_id(chain_id));
             let wallet: Wallet = Wallet::parse_from(["foundry-cli", "--private-key", private_key]);
 
             ZkDepositTxArgs {

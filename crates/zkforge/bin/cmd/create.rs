@@ -87,7 +87,7 @@ pub struct CreateArgs {
 
 impl CreateArgs {
     /// Executes the command to create a contract
-    pub async fn run(mut self) -> Result<()> {
+    pub async fn _run(mut self) -> Result<()> {
         // Find Project & Compile
         let project = self.opts.project()?;
         let mut output = if self.json || self.opts.silent {
@@ -130,13 +130,13 @@ impl CreateArgs {
                     } else {
                         self.constructor_args.clone()
                     };
-                self.parse_constructor_args(v, &constructor_args)?
+                self._parse_constructor_args(v, &constructor_args)?
             }
             None => vec![],
         };
 
         // respect chain, if set explicitly via cmd args
-        let chain_id = if let Some(chain_id) = self.chain_id() {
+        let chain_id = if let Some(chain_id) = self._chain_id() {
             chain_id
         } else {
             provider.get_chainid().await?.as_u64()
@@ -145,17 +145,17 @@ impl CreateArgs {
             // Deploy with unlocked account
             let sender = self.eth.wallet.from.expect("required");
             let provider = provider.with_sender(sender.to_ethers());
-            self.deploy(abi, bin, params, provider, chain_id).await
+            self._deploy(abi, bin, params, provider, chain_id).await
         } else {
             // Deploy with signer
             let signer = self.eth.wallet.signer(chain_id).await?;
             let provider = provider.with_signer(signer);
-            self.deploy(abi, bin, params, provider, chain_id).await
+            self._deploy(abi, bin, params, provider, chain_id).await
         }
     }
 
     /// Returns the provided chain id, if any.
-    fn chain_id(&self) -> Option<u64> {
+    fn _chain_id(&self) -> Option<u64> {
         self.eth.etherscan.chain.map(|chain| chain.id())
     }
 
@@ -165,7 +165,7 @@ impl CreateArgs {
     /// before the contract is deployed. This should prevent situations where a contract is deployed
     /// successfully, but we fail to prepare a verify request which would require manual
     /// verification.
-    async fn verify_preflight_check(
+    async fn _verify_preflight_check(
         &self,
         constructor_args: Option<String>,
         chain: u64,
@@ -205,7 +205,7 @@ impl CreateArgs {
     }
 
     /// Deploys the contract
-    async fn deploy<M: Middleware + 'static>(
+    async fn _deploy<M: Middleware + 'static>(
         self,
         abi: Abi,
         bin: BytecodeObject,
@@ -219,11 +219,11 @@ impl CreateArgs {
             panic!("no bytecode found in bin object for {}", self.contract.name)
         });
         let provider = Arc::new(provider);
-        let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone());
+        let factory = _ContractFactory::_new(abi.clone(), bin.clone(), provider.clone());
 
         let is_args_empty = args.is_empty();
         let deployer =
-            factory.deploy_tokens(args.clone()).context("failed to deploy contract").map_err(|e| {
+            factory._deploy_tokens(args.clone()).context("failed to deploy contract").map_err(|e| {
                 if is_args_empty {
                     e.wrap_err("no arguments provided for contract constructor; consider --constructor-args or --constructor-args-path")
                 } else {
@@ -232,7 +232,7 @@ impl CreateArgs {
             })?;
         let is_legacy = self.tx.legacy ||
             Chain::try_from(chain).map(|x| Chain::is_legacy(&x)).unwrap_or_default();
-        let mut deployer = if is_legacy { deployer.legacy() } else { deployer };
+        let mut deployer = if is_legacy { deployer._legacy() } else { deployer };
 
         // set tx value if specified
         if let Some(value) = self.tx.value {
@@ -294,11 +294,11 @@ impl CreateArgs {
                 constructor_args = Some(hex::encode(encoded_args));
             }
 
-            self.verify_preflight_check(constructor_args.clone(), chain).await?;
+            self._verify_preflight_check(constructor_args.clone(), chain).await?;
         }
 
         // Deploy the actual contract
-        let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
+        let (deployed_contract, receipt) = deployer._send_with_receipt().await?;
 
         let address = deployed_contract;
         if self.json {
@@ -348,7 +348,7 @@ impl CreateArgs {
     /// against the constructor's input params.
     ///
     /// Returns a list of parsed values that match the constructor's input params.
-    fn parse_constructor_args(
+    fn _parse_constructor_args(
         &self,
         constructor: &Constructor,
         constructor_args: &[String],
@@ -371,7 +371,7 @@ impl CreateArgs {
 /// compatibility with less-abstract Contracts.
 ///
 /// For full usage docs, see [`DeploymentTxFactory`].
-pub type ContractFactory<M> = DeploymentTxFactory<Arc<M>, M>;
+pub type _ContractFactory<M> = DeploymentTxFactory<Arc<M>, M>;
 
 /// Helper which manages the deployment transaction of a smart contract. It
 /// wraps a deployment transaction, and retrieves the contract address output
@@ -439,7 +439,7 @@ where
     M: Middleware,
 {
     /// Uses a Legacy transaction instead of an EIP-1559 one to do the deployment
-    pub fn legacy(mut self) -> Self {
+    pub fn _legacy(mut self) -> Self {
         self.tx = match self.tx {
             TypedTransaction::Eip1559(inner) => {
                 let tx: TransactionRequest = inner.into();
@@ -454,7 +454,7 @@ where
     /// be sufficiently confirmed (default: 1), it returns a tuple with
     /// the [`Contract`](crate::Contract) struct at the deployed contract's address
     /// and the corresponding [`TransactionReceipt`].
-    pub async fn send_with_receipt(
+    pub async fn _send_with_receipt(
         self,
     ) -> Result<(Address, TransactionReceipt), ContractError<M>> {
         let pending_tx = self
@@ -543,13 +543,13 @@ where
     /// Creates a factory for deployment of the Contract with bytecode, and the
     /// constructor defined in the abi. The client will be used to send any deployment
     /// transaction.
-    pub fn new(abi: Abi, bytecode: Bytes, client: B) -> Self {
+    pub fn _new(abi: Abi, bytecode: Bytes, client: B) -> Self {
         Self { client, abi, bytecode, _m: PhantomData }
     }
 
     /// Create a deployment tx using the provided tokens as constructor
     /// arguments
-    pub fn deploy_tokens(self, params: Vec<DynSolValue>) -> Result<Deployer<B, M>, ContractError<M>>
+    pub fn _deploy_tokens(self, params: Vec<DynSolValue>) -> Result<Deployer<B, M>, ContractError<M>>
     where
         B: Clone,
     {
@@ -622,7 +622,7 @@ mod tests {
             "--chain-id",
             "9999",
         ]);
-        assert_eq!(args.chain_id(), Some(9999));
+        assert_eq!(args._chain_id(), Some(9999));
     }
 
     #[test]
@@ -634,7 +634,7 @@ mod tests {
             "Hello",
         ]);
         let constructor: Constructor = serde_json::from_str(r#"{"type":"constructor","inputs":[{"name":"_name","type":"string","internalType":"string"}],"stateMutability":"nonpayable"}"#).unwrap();
-        let params = args.parse_constructor_args(&constructor, &args.constructor_args).unwrap();
+        let params = args._parse_constructor_args(&constructor, &args.constructor_args).unwrap();
         assert_eq!(params, vec![DynSolValue::String("Hello".to_string())]);
     }
 
@@ -647,6 +647,6 @@ mod tests {
             "[(1,2), (2,3), (3,4)]",
         ]);
         let constructor: Constructor = serde_json::from_str(r#"{"type":"constructor","inputs":[{"name":"_points","type":"tuple[]","internalType":"struct Point[]","components":[{"name":"x","type":"uint256","internalType":"uint256"},{"name":"y","type":"uint256","internalType":"uint256"}]}],"stateMutability":"nonpayable"}"#).unwrap();
-        let _params = args.parse_constructor_args(&constructor, &args.constructor_args).unwrap();
+        let _params = args._parse_constructor_args(&constructor, &args.constructor_args).unwrap();
     }
 }

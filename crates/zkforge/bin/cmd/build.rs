@@ -121,7 +121,7 @@ impl BuildArgs {
 
     /// Returns the [`watchexec::InitConfig`] and [`watchexec::RuntimeConfig`] necessary to
     /// bootstrap a new [`watchexe::Watchexec`] loop.
-    pub(crate) fn watchexec_config(&self) -> Result<(InitConfig, RuntimeConfig)> {
+    pub(crate) fn _watchexec_config(&self) -> Result<(InitConfig, RuntimeConfig)> {
         // use the path arguments or if none where provided the `src` dir
         self.watch.watchexec_config(|| {
             let config = Config::from(self);
