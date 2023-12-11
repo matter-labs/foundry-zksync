@@ -30,10 +30,16 @@ use zksync_types::{
 
 use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct RevmDatabaseForEra<DB> {
     pub db: Arc<Mutex<Box<DB>>>,
     pub current_block: u64,
+}
+
+impl<Db> Clone for RevmDatabaseForEra<Db> {
+    fn clone(&self) -> Self {
+        Self { db: self.db.clone(), current_block: self.current_block }
+    }
 }
 
 impl<DB> Debug for RevmDatabaseForEra<DB> {
@@ -139,7 +145,7 @@ where
     }
 }
 
-impl<DB: Database + Send> ForkSource for &RevmDatabaseForEra<DB>
+impl<DB: Database + Send> ForkSource for RevmDatabaseForEra<DB>
 where
     <DB as revm::Database>::Error: Debug,
 {
@@ -268,7 +274,8 @@ mod tests {
     use maplit::hashmap;
     use revm::primitives::AccountInfo;
 
-    use crate::testing::MockDatabase;
+    use crate::era_revm::testing::MockDatabase;
+    use foundry_common::factory_deps::hash_bytecode;
 
     use super::*;
 

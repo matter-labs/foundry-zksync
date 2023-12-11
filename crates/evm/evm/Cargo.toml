@@ -44,3 +44,9 @@ parking_lot = "0.12"
 proptest = "1"
 thiserror = "1"
 tracing = "0.1"
+
+# zksync
+multivm.workspace = true
+era_cheatcodes.workspace = true
+zksync_state.workspace = true
+era_test_node.workspace = true

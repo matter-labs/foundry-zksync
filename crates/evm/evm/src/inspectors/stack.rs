@@ -569,3 +569,24 @@ impl<DB: DatabaseExt> Inspector<DB> for InspectorStack {
         );
     }
 }
+
+use era_test_node::fork::ForkStorage;
+use foundry_evm_core::era_revm::db::RevmDatabaseForEra;
+
+use era_cheatcodes::cheatcodes::CheatcodeTracer;
+use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
+use zksync_state::StorageView;
+
+impl<DB: DatabaseExt + Send>
+    ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>
+    for &mut InspectorStack
+{
+    fn into_tracer_pointer(
+        self,
+    ) -> multivm::vm_refunds_enhancement::TracerPointer<
+        StorageView<ForkStorage<RevmDatabaseForEra<DB>>>,
+        HistoryDisabled,
+    > {
+        CheatcodeTracer::new().into_tracer_pointer()
+    }
+}

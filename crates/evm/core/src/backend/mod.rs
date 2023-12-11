@@ -28,6 +28,11 @@ use revm::{
 };
 use std::collections::{HashMap, HashSet};
 
+use crate::era_revm::db::RevmDatabaseForEra;
+use era_test_node::fork::ForkStorage;
+use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
+use zksync_state::StorageView;
+
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
 
@@ -763,7 +768,8 @@ impl Backend {
         inspector: INSP,
     ) -> eyre::Result<ResultAndState>
     where
-        INSP: Inspector<Self>,
+        INSP: Inspector<Self>
+            + ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<Self>>>, HistoryDisabled>,
     {
         self.initialize(env);
 

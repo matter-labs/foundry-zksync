@@ -15,6 +15,11 @@ use revm::{
 };
 use std::{borrow::Cow, collections::HashMap};
 
+use crate::era_revm::db::RevmDatabaseForEra;
+use era_test_node::fork::ForkStorage;
+use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
+use zksync_state::StorageView;
+
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
 /// Any changes made during its existence that affect the caching layer of the underlying Database
@@ -53,7 +58,8 @@ impl<'a> FuzzBackendWrapper<'a> {
         inspector: INSP,
     ) -> eyre::Result<ResultAndState>
     where
-        INSP: Inspector<Self>,
+        INSP: Inspector<Self>
+            + ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<Self>>>, HistoryDisabled>,
     {
         self.is_initialized = false;
 

@@ -35,3 +35,8 @@ revm.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 walkdir = "2"
+
+# zksync
+# multivm.workspace = true
+# era_cheatcodes.workspace = true
+# zksync_state.workspace = true

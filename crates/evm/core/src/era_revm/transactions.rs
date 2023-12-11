@@ -1,15 +1,19 @@
 use era_test_node::{
-    fork::ForkDetails,
+    fork::{ForkDetails, ForkStorage},
     node::{
         InMemoryNode, InMemoryNodeConfig, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails,
     },
     system_contracts,
 };
 use ethers_core::abi::ethabi::{self, ParamType};
-use multivm::{interface::VmExecutionResultAndLogs, vm_refunds_enhancement::ToTracerPointer};
+use multivm::{
+    interface::VmExecutionResultAndLogs,
+    vm_refunds_enhancement::{HistoryDisabled, HistoryMode, ToTracerPointer},
+};
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
     OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
+    U256 as revmU256,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -17,12 +21,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
+use zksync_state::{StorageView, WriteStorage};
 use zksync_types::{
     api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
     StorageKey, StorageLogQueryType, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
-
-use revm::primitives::U256 as revmU256;
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
 use foundry_common::zk_utils::{
@@ -126,10 +129,11 @@ pub enum DatabaseError {
     MissingCode(bool),
 }
 
-pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, _inspector: INSP) -> EVMResult<E>
+pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: &mut DB, inspector: INSP) -> EVMResult<E>
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
+    INSP: ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>,
 {
     let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
     let era_db = RevmDatabaseForEra { db: Arc::new(Mutex::new(Box::new(db))), current_block: num };
@@ -159,7 +163,7 @@ where
 
     let (l2_num, l2_ts) = (num * 2, ts * 2);
     let fork_details = ForkDetails {
-        fork_source: &era_db,
+        fork_source: era_db.clone(),
         l1_block: L1BatchNumber(num as u32),
         l2_block: Block::default(),
         l2_miniblock: l2_num,
@@ -188,12 +192,12 @@ where
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
 
+    let tracer = inspector.into_tracer_pointer();
     let era_execution_result = node
         .run_l2_tx_raw(
             l2_tx,
             multivm::interface::TxExecutionMode::VerifyExecute,
-            // vec![CheatcodeTracer::new().into_tracer_pointer()],
-            vec![],
+            vec![].into(), // inspector.into_tracer_pointer().into(),
         )
         .unwrap();
 
@@ -328,9 +332,15 @@ fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{factory_deps::hash_bytecode, testing::MockDatabase};
+    use core::marker::PhantomData;
+    use multivm::{
+        interface::dyn_tracers::vm_1_3_3::DynTracer,
+        vm_refunds_enhancement::{SimpleMemory, VmTracer},
+    };
 
     use super::*;
+    use crate::era_revm::testing::MockDatabase;
+    use zksync_utils::bytecode::hash_bytecode;
 
     #[test]
     fn test_env_number_and_timestamp_is_incremented_after_transaction_and_marks_storage_as_touched()
@@ -347,7 +357,6 @@ mod tests {
             transact_to: revm::primitives::TransactTo::Create(
                 revm::primitives::CreateScheme::Create,
             ),
-            value: Default::default(),
             data: serde_json::to_vec(&PackedEraBytecode::new(
                 hex::encode(hash_bytecode(&[0; 32])),
                 hex::encode([0; 32]),
@@ -355,17 +364,15 @@ mod tests {
             ))
             .unwrap()
             .into(),
-            nonce: Default::default(),
-            chain_id: Default::default(),
-            access_list: Default::default(),
-            gas_priority_fee: Default::default(),
-            blob_hashes: Default::default(),
-            max_fee_per_blob_gas: Default::default(),
+            ..Default::default()
         };
 
-        let res =
-            run_era_transaction::<_, ResultAndState, _>(&mut env, &mut MockDatabase::default(), ())
-                .expect("failed executing");
+        let res = run_era_transaction::<_, ResultAndState, _>(
+            &mut env,
+            &mut MockDatabase::default(),
+            Noop::default(),
+        )
+        .expect("failed executing");
 
         assert!(!res.state.is_empty(), "unexpected failure: no states were touched");
         for (address, account) in res.state {
@@ -379,4 +386,17 @@ mod tests {
         assert_eq!(1, env.block.number.to::<u64>());
         assert_eq!(1, env.block.timestamp.to::<u64>());
     }
+
+    struct Noop<S, H> {
+        _phantom: PhantomData<(S, H)>,
+    }
+
+    impl<S, H> Default for Noop<S, H> {
+        fn default() -> Self {
+            Self { _phantom: Default::default() }
+        }
+    }
+
+    impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Noop<S, H> {}
+    impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for Noop<S, H> {}
 }

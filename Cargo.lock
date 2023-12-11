@@ -1508,8 +1508,8 @@ dependencies = [
  "bincode",
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "const_format",
- "convert_case 0.4.0",
- "crossbeam 0.7.3",
+ "convert_case 0.6.0",
+ "crossbeam 0.8.2",
  "crypto-bigint 0.5.3",
  "cs_derive 0.1.0 (git+https://github.com/matter-labs/era-boojum.git?branch=main)",
  "derivative",
@@ -3291,6 +3291,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
+name = "era_cheatcodes"
+version = "0.0.1-alpha"
+dependencies = [
+ "era_test_node",
+ "ethabi 18.0.0",
+ "ethers",
+ "eyre",
+ "hashbrown 0.14.2",
+ "hex",
+ "itertools 0.12.0",
+ "maplit",
+ "multivm",
+ "revm",
+ "serde",
+ "serde_json",
+ "tracing",
+ "zksync_basic_types",
+ "zksync_state",
+ "zksync_types",
+ "zksync_utils",
+ "zksync_web3_decl",
+]
+
+[[package]]
 name = "era_test_node"
 version = "0.1.0-alpha.12"
 source = "git+https://github.com/matter-labs/era-test-node.git?rev=21b48af90a9f9d98ec38cb93a32c119a3266f401#21b48af90a9f9d98ec38cb93a32c119a3266f401"
@@ -4380,6 +4404,8 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "const-hex",
+ "era_cheatcodes",
+ "era_test_node",
  "ethers-core",
  "ethers-signers",
  "eyre",
@@ -4392,11 +4418,13 @@ dependencies = [
  "foundry-evm-fuzz",
  "foundry-evm-traces",
  "hashbrown 0.14.2",
+ "multivm",
  "parking_lot 0.12.1",
  "proptest",
  "revm",
  "thiserror",
  "tracing",
+ "zksync_state",
 ]
 
 [[package]]
@@ -4421,6 +4449,7 @@ dependencies = [
  "foundry-macros",
  "futures 0.3.28",
  "itertools 0.11.0",
+ "maplit",
  "multivm",
  "once_cell",
  "parking_lot 0.12.1",
@@ -4432,6 +4461,7 @@ dependencies = [
  "tracing",
  "url",
  "zksync_basic_types",
+ "zksync_state",
  "zksync_types",
  "zksync_utils",
  "zksync_web3_decl",
@@ -5952,6 +5982,15 @@ name = "itertools"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
 dependencies = [
  "either",
 ]
@@ -8425,7 +8464,7 @@ checksum = "c55e02e35260070b6f716a2423c2ff1c3bb1642ddca6f99e1f26d06268a0e2d2"
 dependencies = [
  "bytes 1.5.0",
  "heck 0.4.1",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -8446,7 +8485,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efb6c9a1dd1def8e2124d17e83a20af56f1570d6c2d2bd9e266ccb768df3840e"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "proc-macro2 1.0.69",
  "quote 1.0.33",
  "syn 2.0.38",
@@ -12711,7 +12750,7 @@ dependencies = [
  "codegen 0.2.0",
  "crossbeam 0.8.2",
  "derivative",
- "env_logger 0.9.3",
+ "env_logger 0.10.0",
  "hex",
  "rand 0.4.6",
  "rayon",

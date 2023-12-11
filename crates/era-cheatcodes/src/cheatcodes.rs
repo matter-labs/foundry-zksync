@@ -1,7 +1,4 @@
-use era_test_node::{
-    fork::{ForkSource, ForkStorage},
-    utils::bytecode_to_factory_dep,
-};
+use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{abi::AbiDecode, prelude::abigen, utils::to_checksum};
 use itertools::Itertools;
 use multivm::{
@@ -10,12 +7,15 @@ use multivm::{
     zk_evm_1_3_3::{
         tracing::{BeforeExecutionData, VmLocalStateData},
         vm_state::PrimitiveValue,
-        zkevm_opcode_defs::{FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER, RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER}
+        zkevm_opcode_defs::{
+            FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
+            RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
+        },
     },
 };
-use std::{collections::HashMap, fmt::Debug};
+use std::{cell::RefMut, collections::HashMap, fmt::Debug};
 use zksync_basic_types::{AccountTreeId, Address, H160, H256, U256};
-use zksync_state::{ReadStorage, StoragePtr, StorageView};
+use zksync_state::{StoragePtr, WriteStorage};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
@@ -51,8 +51,6 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     zksync_types::MINT_AND_BURN_ADDRESS,
     H160::zero(),
 ];
-
-type ForkStorageView<S> = StorageView<ForkStorage<S>>;
 
 abigen!(
     CheatcodeContract,
@@ -108,15 +106,13 @@ struct StartPrankOpts {
     origin: Option<H256>,
 }
 
-impl<S: std::fmt::Debug + ForkSource, H: HistoryMode> DynTracer<ForkStorageView<S>, SimpleMemory<H>>
-    for CheatcodeTracer
-{
+impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
     fn before_execution(
         &mut self,
         state: VmLocalStateData<'_>,
         data: BeforeExecutionData,
         memory: &SimpleMemory<H>,
-        storage: StoragePtr<ForkStorageView<S>>,
+        storage: StoragePtr<S>,
     ) {
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
@@ -157,7 +153,7 @@ impl<S: std::fmt::Debug + ForkSource, H: HistoryMode> DynTracer<ForkStorageView<
         state: VmLocalStateData<'_>,
         data: multivm::zk_evm_1_3_3::tracing::AfterExecutionData,
         _memory: &SimpleMemory<H>,
-        _storage: StoragePtr<ForkStorageView<S>>,
+        _storage: StoragePtr<S>,
     ) {
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -180,12 +176,10 @@ impl<S: std::fmt::Debug + ForkSource, H: HistoryMode> DynTracer<ForkStorageView<
     }
 }
 
-impl<S: std::fmt::Debug + ForkSource, H: HistoryMode> VmTracer<ForkStorageView<S>, H>
-    for CheatcodeTracer
-{
+impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
     fn finish_cycle(
         &mut self,
-        state: &mut ZkSyncVmState<ForkStorageView<S>, H>,
+        state: &mut ZkSyncVmState<S, H>,
         _bootloader_state: &mut BootloaderState,
     ) -> TracerExecutionStatus {
         while let Some(action) = self.one_time_actions.pop() {
@@ -250,12 +244,12 @@ impl CheatcodeTracer {
         }
     }
 
-    pub fn dispatch_cheatcode<S: std::fmt::Debug + ForkSource, H: HistoryMode>(
+    pub fn dispatch_cheatcode<S: WriteStorage, H: HistoryMode>(
         &mut self,
         _state: VmLocalStateData<'_>,
         _data: BeforeExecutionData,
         _memory: &SimpleMemory<H>,
-        storage: StoragePtr<ForkStorageView<S>>,
+        storage: StoragePtr<S>,
         call: CheatcodeContractCalls,
     ) {
         use CheatcodeContractCalls::*;
@@ -497,11 +491,11 @@ impl CheatcodeTracer {
         self.one_time_actions.push(FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode });
     }
 
-    fn write_storage<S: std::fmt::Debug + ForkSource>(
+    fn write_storage<S: WriteStorage>(
         &mut self,
         key: StorageKey,
         write_value: H256,
-        storage: &mut StorageView<ForkStorage<S>>,
+        storage: &mut RefMut<S>,
     ) {
         self.one_time_actions.push(FinishCycleOneTimeActions::StorageWrite {
             key,
