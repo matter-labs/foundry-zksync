@@ -3298,6 +3298,7 @@ dependencies = [
  "ethabi 18.0.0",
  "ethers",
  "eyre",
+ "foundry-evm-core",
  "hashbrown 0.14.2",
  "hex",
  "itertools 0.12.0",

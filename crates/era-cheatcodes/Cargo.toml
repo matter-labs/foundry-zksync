@@ -14,6 +14,7 @@ zksync_state.workspace = true
 multivm.workspace = true
 zksync_web3_decl.workspace = true
 zksync_utils.workspace = true
+foundry-evm-core.workspace = true
 
 ethabi = "18.0.0"
 itertools = "0.12.0"

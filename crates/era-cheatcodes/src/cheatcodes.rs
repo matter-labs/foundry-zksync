@@ -1,5 +1,6 @@
-use era_test_node::utils::bytecode_to_factory_dep;
+use era_test_node::{fork::ForkStorage, utils::bytecode_to_factory_dep};
 use ethers::{abi::AbiDecode, prelude::abigen, utils::to_checksum};
+use foundry_evm_core::{backend::DatabaseExt, era_revm::db::RevmDatabaseForEra};
 use itertools::Itertools;
 use multivm::{
     interface::{dyn_tracers::vm_1_3_3::DynTracer, tracer::TracerExecutionStatus},
@@ -15,7 +16,7 @@ use multivm::{
 };
 use std::{cell::RefMut, collections::HashMap, fmt::Debug};
 use zksync_basic_types::{AccountTreeId, Address, H160, H256, U256};
-use zksync_state::{StoragePtr, WriteStorage};
+use zksync_state::{ReadStorage, StoragePtr, StorageView, WriteStorage};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
@@ -23,6 +24,8 @@ use zksync_types::{
     LogQuery, StorageKey, Timestamp,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
+
+type EraDb<DB> = StorageView<ForkStorage<RevmDatabaseForEra<DB>>>;
 
 // address(uint160(uint256(keccak256('hevm cheat code'))))
 const CHEATCODE_ADDRESS: H160 = H160([
@@ -106,13 +109,15 @@ struct StartPrankOpts {
     origin: Option<H256>,
 }
 
-impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
+impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
+    for CheatcodeTracer
+{
     fn before_execution(
         &mut self,
         state: VmLocalStateData<'_>,
         data: BeforeExecutionData,
         memory: &SimpleMemory<H>,
-        storage: StoragePtr<S>,
+        storage: StoragePtr<EraDb<S>>,
     ) {
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
@@ -153,7 +158,7 @@ impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcod
         state: VmLocalStateData<'_>,
         data: multivm::zk_evm_1_3_3::tracing::AfterExecutionData,
         _memory: &SimpleMemory<H>,
-        _storage: StoragePtr<S>,
+        _storage: StoragePtr<EraDb<S>>,
     ) {
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -176,10 +181,10 @@ impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcod
     }
 }
 
-impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
+impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeTracer {
     fn finish_cycle(
         &mut self,
-        state: &mut ZkSyncVmState<S, H>,
+        state: &mut ZkSyncVmState<EraDb<S>, H>,
         _bootloader_state: &mut BootloaderState,
     ) -> TracerExecutionStatus {
         while let Some(action) = self.one_time_actions.pop() {
@@ -244,12 +249,12 @@ impl CheatcodeTracer {
         }
     }
 
-    pub fn dispatch_cheatcode<S: WriteStorage, H: HistoryMode>(
+    pub fn dispatch_cheatcode<S: DatabaseExt + Send, H: HistoryMode>(
         &mut self,
         _state: VmLocalStateData<'_>,
         _data: BeforeExecutionData,
         _memory: &SimpleMemory<H>,
-        storage: StoragePtr<S>,
+        storage: StoragePtr<EraDb<S>>,
         call: CheatcodeContractCalls,
     ) {
         use CheatcodeContractCalls::*;
