@@ -52,14 +52,17 @@ impl<'a> FuzzBackendWrapper<'a> {
     }
 
     /// Executes the configured transaction of the `env` without committing state changes
-    pub fn inspect_ref<INSP>(
-        &mut self,
-        env: &mut Env,
+    pub fn inspect_ref<'b, INSP>(
+        &'b mut self,
+        env: &'b mut Env,
         inspector: INSP,
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<Self>>>, HistoryDisabled>,
+            + ToTracerPointer<
+                StorageView<ForkStorage<RevmDatabaseForEra<&'b mut Self>>>,
+                HistoryDisabled,
+            >,
     {
         self.is_initialized = false;
 

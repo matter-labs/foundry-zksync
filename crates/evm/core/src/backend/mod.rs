@@ -762,14 +762,17 @@ impl Backend {
     }
 
     /// Executes the configured test call of the `env` without committing state changes
-    pub fn inspect_ref<INSP>(
-        &mut self,
-        env: &mut Env,
+    pub fn inspect_ref<'a, INSP>(
+        &'a mut self,
+        env: &'a mut Env,
         inspector: INSP,
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<Self>>>, HistoryDisabled>,
+            + ToTracerPointer<
+                StorageView<ForkStorage<RevmDatabaseForEra<&'a mut Self>>>,
+                HistoryDisabled,
+            >,
     {
         self.initialize(env);
 

@@ -8,7 +8,7 @@ use era_test_node::{
 use ethers_core::abi::ethabi::{self, ParamType};
 use multivm::{
     interface::VmExecutionResultAndLogs,
-    vm_refunds_enhancement::{HistoryDisabled, HistoryMode, ToTracerPointer},
+    vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer},
 };
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
@@ -21,7 +21,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
-use zksync_state::{StorageView, WriteStorage};
+use zksync_state::StorageView;
 use zksync_types::{
     api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
     StorageKey, StorageLogQueryType, ACCOUNT_CODE_STORAGE_ADDRESS,
@@ -129,7 +129,7 @@ pub enum DatabaseError {
     MissingCode(bool),
 }
 
-pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: &mut DB, inspector: INSP) -> EVMResult<E>
+pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, inspector: INSP) -> EVMResult<E>
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
@@ -191,14 +191,9 @@ where
         // Fails without a signature here: https://github.com/matter-labs/zksync-era/blob/73a1e8ff564025d06e02c2689da238ae47bb10c3/core/lib/types/src/transaction_request.rs#L381
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
-
     let tracer = inspector.into_tracer_pointer();
     let era_execution_result = node
-        .run_l2_tx_raw(
-            l2_tx,
-            multivm::interface::TxExecutionMode::VerifyExecute,
-            vec![].into(), // inspector.into_tracer_pointer().into(),
-        )
+        .run_l2_tx_raw(l2_tx, multivm::interface::TxExecutionMode::VerifyExecute, vec![tracer])
         .unwrap();
 
     let (modified_keys, tx_result, _call_traces, _block, bytecodes, _block_ctx) =

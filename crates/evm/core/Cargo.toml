@@ -56,4 +56,6 @@ tokio = { version = "1", features = ["time", "macros"] }
 tracing = "0.1"
 url = "2"
 auto_impl = "1"
+
+[dev-dependencies]
 maplit = "1"

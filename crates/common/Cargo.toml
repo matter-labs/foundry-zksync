@@ -25,7 +25,6 @@ zksync_basic_types.workspace = true
 zksync_utils.workspace = true
 revm.workspace =true
 
-# era_revm = { workspace = true }
 anyhow = {version = "1.0.70"}
 dirs = {version = "5.0.0"}
 ansi_term = "0.12.1"
