@@ -5,6 +5,7 @@ use super::{
 use alloy_primitives::U256;
 use clap::{builder::RangedU64ValueParser, Parser, ValueHint};
 use eyre::{Context, Result};
+use forge::result::TestKindReport;
 use foundry_cli::utils::STATIC_FUZZ_SEED;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -18,7 +19,6 @@ use std::{
 };
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
-use zkforge::result::TestKindReport;
 
 /// A regex that matches a basic snapshot entry like
 /// `Test:testDeposit() (gas: 58804)`

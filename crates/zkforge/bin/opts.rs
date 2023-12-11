@@ -1,12 +1,13 @@
 use crate::cmd::{
     bind::BindArgs,
+    build::BuildArgs,
     cache::CacheArgs,
     config, coverage,
+    create::CreateArgs,
     debug::DebugArgs,
     doc::DocArgs,
     flatten,
     fmt::FmtArgs,
-    fourbyte::UploadSelectorsArgs,
     geiger, generate,
     init::InitArgs,
     inspect,
@@ -17,8 +18,6 @@ use crate::cmd::{
     selectors::SelectorsSubcommands,
     snapshot, test, tree, update,
     verify::{VerifyArgs, VerifyCheckArgs},
-    zk_build::ZkBuildArgs,
-    zk_create::ZkCreateArgs,
 };
 use clap::{Parser, Subcommand, ValueHint};
 use std::path::PathBuf;
@@ -61,6 +60,10 @@ pub enum Subcommands {
     #[clap(alias = "bi")]
     Bind(BindArgs),
 
+    /// Build the project's smart contracts.
+    #[clap(visible_aliases = ["b", "compile"])]
+    Build(BuildArgs),
+
     /// Debugs a single smart contract as a script.
     #[clap(visible_alias = "d")]
     Debug(DebugArgs),
@@ -92,6 +95,10 @@ pub enum Subcommands {
     /// Check verification status on Etherscan.
     #[clap(visible_alias = "vc")]
     VerifyCheck(VerifyCheckArgs),
+
+    /// Deploy a smart contract.
+    #[clap(visible_alias = "c")]
+    Create(CreateArgs),
 
     /// Create a new Forge project.
     Init(InitArgs),
@@ -140,11 +147,6 @@ pub enum Subcommands {
     #[clap(visible_alias = "in")]
     Inspect(inspect::InspectArgs),
 
-    /// Uploads abi of given contract to the https://api.openchain.xyz
-    /// function selector database.
-    #[clap(visible_alias = "up")]
-    UploadSelectors(UploadSelectorsArgs),
-
     /// Display a tree visualization of the project's dependency graph.
     #[clap(visible_alias = "tr")]
     Tree(tree::TreeArgs),
@@ -154,12 +156,6 @@ pub enum Subcommands {
 
     /// Generate documentation for the project.
     Doc(DocArgs),
-
-    #[clap(visible_aliases = ["zkb", "zkbuild", "zk-compile"], about = "Build the project's smart contracts for zksync.")]
-    ZkBuild(ZkBuildArgs),
-
-    #[clap(visible_aliases = ["zkc", "zkcreate", "zk-deploy"], about = "Deploy smart contracts to zksync.")]
-    ZkCreate(ZkCreateArgs),
 
     /// Function selector utilities
     #[clap(visible_alias = "se")]

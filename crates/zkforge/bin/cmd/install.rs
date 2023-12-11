@@ -15,7 +15,6 @@ use std::{
     path::{Path, PathBuf},
     str,
 };
-use tracing::{trace, warn};
 use yansi::Paint;
 
 static DEPENDENCY_VERSION_TAG_REGEX: Lazy<Regex> =
@@ -125,9 +124,24 @@ impl DependencyInstallOpts {
         let libs = git.root.join(install_lib_dir);
 
         if dependencies.is_empty() && !self.no_git {
-            p_println!(!self.quiet => "Updating dependencies in {}", libs.display());
-            git.submodule_update(false, false, false, Some(&libs))?;
+            // Use the root of the git repository to look for submodules.
+            let root = Git::root_of(git.root)?;
+            match git.has_submodules(Some(&root)) {
+                Ok(true) => {
+                    p_println!(!quiet => "Updating dependencies in {}", libs.display());
+                    // recursively fetch all submodules (without fetching latest)
+                    git.submodule_update(false, false, false, true, Some(&libs))?;
+                }
+
+                Err(err) => {
+                    warn!(?err, "Failed to check for submodules");
+                }
+                _ => {
+                    // no submodules, nothing to do
+                }
+            }
         }
+
         fs::create_dir_all(&libs)?;
 
         let installer = Installer { git, no_commit };
@@ -303,8 +317,8 @@ impl Installer<'_> {
         trace!(?dep, url, ?path, "installing git submodule");
         self.git.submodule_add(true, url, path)?;
 
-        trace!("updating submodule recursively");
-        self.git.submodule_update(false, false, false, Some(path))
+        trace!("initializing submodule recursively");
+        self.git.submodule_update(false, false, false, true, Some(path))
     }
 
     fn git_checkout(self, dep: &Dependency, path: &Path, recurse: bool) -> Result<String> {
@@ -488,7 +502,7 @@ fn match_yn(input: String) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use foundry_test_utils::tempfile::tempdir;
+    use tempfile::tempdir;
 
     #[test]
     fn get_oz_tags() {

@@ -1,5 +1,5 @@
 use clap::Parser;
-use ethers::types::NameOrAddress;
+use ethers_core::types::NameOrAddress;
 /// This module handles transactions related to ZkSync. It provides functionality for sending
 /// transactions and withdrawing from Layer 2 to Layer 1. The module also defines the
 /// command-line arguments for the `cast zk-send` subcommand.
@@ -67,10 +67,10 @@ pub struct ZkSendTxArgs {
     /// This field can be populated using the value parser `parse_name_or_address`.
     /// If not provided, the value is `None`.
     #[clap(
-            help = "The destination of the transaction.",
-            value_parser = NameOrAddress::from_str,
-            value_name = "TO"
-        )]
+    help = "The destination of the transaction.",
+    value_parser = NameOrAddress::from_str,
+    value_name = "TO"
+    )]
     to: Option<NameOrAddress>,
 
     /// Signature of the function to call.
@@ -106,13 +106,13 @@ pub struct ZkSendTxArgs {
     /// Amount of token to bridge in case of L2 to L1 withdrawal.
     /// This is required when the `withdraw` flag is set.
     #[clap(
-        long,
-        short,
-        help_heading = "Bridging options",
-        help = "Amount of token to bridge. Required value when bridging",
-        value_name = "AMOUNT",
-        requires = "bridging",
-        value_parser = parse_decimal_u256
+    long,
+    short,
+    help_heading = "Bridging options",
+    help = "Amount of token to bridge. Required value when bridging",
+    value_name = "AMOUNT",
+    requires = "bridging",
+    value_parser = parse_decimal_u256
     )]
     amount: Option<U256>,
 
@@ -141,7 +141,7 @@ impl ZkSendTxArgs {
         let private_key = get_private_key(&self.eth.wallet.raw.private_key)?;
         let rpc_url = get_rpc_url(&self.eth.rpc.url)?;
         let config = Config::from(&self.eth);
-        let chain = get_chain(config.chain_id)?;
+        let chain = get_chain(config.chain)?;
         let provider = Provider::try_from(rpc_url)?;
         let to_address = self.get_to_address();
         let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?.with_chain_id(chain);

@@ -1,11 +1,9 @@
-use super::{snapshot::SnapshotArgs, test::TestArgs};
-use crate::cmd::zk_build::ZkBuildArgs;
+use super::{build::BuildArgs, snapshot::SnapshotArgs, test::TestArgs};
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::utils::{self, FoundryPathExt};
 use foundry_config::Config;
 use std::{collections::HashSet, convert::Infallible, path::PathBuf, sync::Arc};
-use tracing::trace;
 use watchexec::{
     action::{Action, Outcome, PreSpawn},
     command::Command,
@@ -83,7 +81,7 @@ impl WatchArgs {
 
 /// Executes a [`Watchexec`] that listens for changes in the project's src dir and reruns `forge
 /// build`
-pub async fn watch_build(args: ZkBuildArgs) -> Result<()> {
+pub async fn watch_build(args: BuildArgs) -> Result<()> {
     let (init, mut runtime) = args.watchexec_config()?;
     let cmd = cmd_args(args.watch.watch.as_ref().map(|paths| paths.len()).unwrap_or_default());
 
@@ -301,9 +299,9 @@ fn clean_cmd_args(num: usize, mut cmd_args: Vec<String>) -> Vec<String> {
 /// Returns the Initialisation configuration for [`Watchexec`].
 pub fn init() -> Result<InitConfig> {
     let mut config = InitConfig::default();
-    config.on_error(SyncFnHandler::from(|data| -> std::result::Result<(), Infallible> {
+    config.on_error(SyncFnHandler::from(|data| {
         trace!("[[{:?}]]", data);
-        Ok(())
+        Ok::<_, Infallible>(())
     }));
 
     Ok(config)
@@ -364,20 +362,20 @@ fn on_action<F, T>(
             if let Some(status) = completion {
                 match status {
                     Some(ProcessEnd::ExitError(code)) => {
-                        tracing::trace!("Command exited with {code}")
+                        trace!("Command exited with {code}")
                     }
                     Some(ProcessEnd::ExitSignal(sig)) => {
-                        tracing::trace!("Command killed by {:?}", sig)
+                        trace!("Command killed by {:?}", sig)
                     }
                     Some(ProcessEnd::ExitStop(sig)) => {
-                        tracing::trace!("Command stopped by {:?}", sig)
+                        trace!("Command stopped by {:?}", sig)
                     }
-                    Some(ProcessEnd::Continued) => tracing::trace!("Command continued"),
+                    Some(ProcessEnd::Continued) => trace!("Command continued"),
                     Some(ProcessEnd::Exception(ex)) => {
-                        tracing::trace!("Command ended by exception {:#x}", ex)
+                        trace!("Command ended by exception {:#x}", ex)
                     }
-                    Some(ProcessEnd::Success) => tracing::trace!("Command was successful"),
-                    None => tracing::trace!("Command completed"),
+                    Some(ProcessEnd::Success) => trace!("Command was successful"),
+                    None => trace!("Command completed"),
                 };
 
                 action.outcome(Outcome::DoNothing);
