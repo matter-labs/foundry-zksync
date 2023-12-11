@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use zksync_basic_types::H256;
+use zksync_utils::bytecode::hash_bytecode;
 
 /// Factory deps packer.
 ///
@@ -19,23 +20,34 @@ pub struct PackedEraBytecode {
 }
 
 impl PackedEraBytecode {
+    /// Create a new instance of the `PackedEraBytecode`.
     pub fn new(hash: String, bytecode: String, factory_deps: Vec<String>) -> Self {
         Self { hash, bytecode, factory_deps }
     }
+
+    /// Convert the `PackedEraBytecode` into a `Vec<u8>`.
     pub fn to_vec(&self) -> Vec<u8> {
         serde_json::to_vec(self).unwrap()
     }
+
+    /// Convert a `Vec<u8>` into a `PackedEraBytecode`.
     pub fn from_vec(input: &[u8]) -> Self {
         serde_json::from_slice(input).unwrap()
     }
+
+    /// Convert the `PackedEraBytecode` into a `Vec<u8>`.
     pub fn bytecode(&self) -> Vec<u8> {
         hex::decode(self.bytecode.clone()).unwrap()
     }
+
+    /// Get the bytecode hash.
     pub fn bytecode_hash(&self) -> H256 {
         let h = hash_bytecode(&self.bytecode());
         assert_eq!(h, H256::from_str(&self.hash).unwrap());
         h
     }
+
+    /// Get the factory deps.
     pub fn factory_deps(&self) -> Vec<Vec<u8>> {
         self.factory_deps
             .iter()
@@ -49,6 +61,7 @@ fn ensure_chunkable(bytes: &[u8]) {
     assert!(bytes.len() % 32 == 0, "Bytes must be divisible by 32 to split into chunks");
 }
 
+/// Convert bytes into 32 bytes chunks.
 pub fn bytes_to_chunks(bytes: &[u8]) -> Vec<[u8; 32]> {
     ensure_chunkable(bytes);
     bytes
@@ -59,12 +72,4 @@ pub fn bytes_to_chunks(bytes: &[u8]) -> Vec<[u8; 32]> {
             chunk
         })
         .collect()
-}
-
-pub fn hash_bytecode(code: &[u8]) -> H256 {
-    let chunked_code = bytes_to_chunks(code);
-    let hash = multivm::zk_evm_1_3_3::zkevm_opcode_defs::utils::bytecode_to_code_hash(&chunked_code)
-        .expect("Invalid bytecode");
-
-    H256(hash)
 }

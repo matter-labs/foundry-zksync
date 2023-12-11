@@ -32,7 +32,9 @@ use foundry_config::Chain;
 use std::num::ParseIntError;
 use url::Url;
 use zksync_web3_rs::types::H256;
+/// Utils for conversion between zksync types and revm types
 pub mod conversion_utils;
+/// Tools for working with factory deps
 pub mod factory_deps;
 /// Gets the RPC URL for Ethereum.
 ///

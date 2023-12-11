@@ -5,42 +5,51 @@ use revm::primitives::{Address, B256};
 use zksync_basic_types::{H160, H256, U256};
 use zksync_utils::h256_to_u256;
 
+/// Convert address to h160
 pub fn address_to_h160(i: Address) -> H160 {
     H160::from(i.0 .0)
 }
 
+/// Convert h160 to address
 pub fn h160_to_address(i: H160) -> Address {
     i.as_fixed_bytes().into()
 }
 
+/// Convert u256 to b256
 pub fn u256_to_b256(i: U256) -> B256 {
     let mut payload: [u8; 32] = [0; 32];
     i.to_big_endian(&mut payload);
     B256::from_slice(&payload)
 }
 
+/// Convert u256 to revm u256
 pub fn u256_to_revm_u256(i: U256) -> revmU256 {
     let mut payload: [u8; 32] = [0; 32];
     i.to_big_endian(&mut payload);
     revmU256::from_be_bytes(payload)
 }
 
+/// Convert revm u256 to u256
 pub fn revm_u256_to_u256(i: revmU256) -> U256 {
     U256::from_big_endian(&i.to_be_bytes::<32>())
 }
 
+/// Convert revm u256 to h256
 pub fn revm_u256_to_h256(i: revmU256) -> H256 {
     i.to_be_bytes::<32>().into()
 }
 
+/// Convert h256 to revm u256
 pub fn h256_to_revm_u256(i: H256) -> revmU256 {
     u256_to_revm_u256(h256_to_u256(i))
 }
 
+/// Convert h256 to b256
 pub fn h256_to_b256(i: H256) -> B256 {
     i.to_fixed_bytes().into()
 }
 
+/// Convert h256 to h160
 pub fn h256_to_h160(i: &H256) -> H160 {
     H160::from_slice(&i.0[12..32])
 }
