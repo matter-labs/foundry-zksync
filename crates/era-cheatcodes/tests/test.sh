@@ -3,15 +3,10 @@
 # Fail fast and on piped commands
 set -o pipefail -e
 
-TEST_REPO=${1:-$TEST_REPO}
-TEST_REPO_DIR=${2:-$TEST_REPO_DIR}
+REPO_ROOT="../../.."
 SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
-BINARY_PATH="../../../target/debug/zkforge"
-
-if [ "${TEST_REPO}" == "foundry-zksync" ]; then
-  BINARY_PATH="${TEST_REPO_DIR}/target/release/zkforge"
-fi
+BINARY_PATH="${REPO_ROOT}/target/release/zkforge"
 
 function cleanup() {
   echo "Cleaning up..."
@@ -67,7 +62,7 @@ command -v git &>/dev/null || {
   exit 1
 }
 
-build_zkforge "../../.."
+build_zkforge "${REPO_ROOT}"
 
 echo "Running tests..."
 # "${BINARY_PATH}" zkbuild --use "./${SOLC}"
