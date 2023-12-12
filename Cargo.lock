@@ -3292,22 +3292,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
-name = "era_revm"
-version = "0.0.1-alpha"
-source = "git+https://github.com/matter-labs/era-revm?rev=2662bb19427a421662a7e463cf1ed6a15da361e5#2662bb19427a421662a7e463cf1ed6a15da361e5"
+name = "era_cheatcodes"
+version = "0.2.0"
 dependencies = [
  "era_test_node",
  "ethabi 18.0.0",
  "ethers",
  "eyre",
+ "foundry-evm-core",
  "hashbrown 0.14.2",
  "hex",
+ "itertools 0.12.0",
+ "maplit",
  "multivm",
  "revm",
  "serde",
  "serde_json",
  "tracing",
- "zk_evm 1.3.3 (git+https://github.com/matter-labs/era-zk_evm.git?tag=v1.3.3-rc1)",
  "zksync_basic_types",
  "zksync_state",
  "zksync_types",
@@ -4277,7 +4278,6 @@ dependencies = [
  "const-hex",
  "dirs 5.0.1",
  "dunce",
- "era_revm",
  "ethers-core",
  "ethers-middleware",
  "ethers-providers",
@@ -4293,6 +4293,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "reqwest",
+ "revm",
  "semver 1.0.20",
  "serde",
  "serde_json",
@@ -4304,6 +4305,8 @@ dependencies = [
  "walkdir",
  "yansi 0.5.1",
  "zksync-web3-rs",
+ "zksync_basic_types",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -4402,6 +4405,8 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "const-hex",
+ "era_cheatcodes",
+ "era_test_node",
  "ethers-core",
  "ethers-signers",
  "eyre",
@@ -4414,11 +4419,13 @@ dependencies = [
  "foundry-evm-fuzz",
  "foundry-evm-traces",
  "hashbrown 0.14.2",
+ "multivm",
  "parking_lot 0.12.1",
  "proptest",
  "revm",
  "thiserror",
  "tracing",
+ "zksync_state",
 ]
 
 [[package]]
@@ -4429,9 +4436,10 @@ dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
  "alloy-sol-types",
+ "auto_impl",
  "const-hex",
  "derive_more",
- "era_revm",
+ "era_test_node",
  "ethers-core",
  "ethers-providers",
  "eyre",
@@ -4442,6 +4450,8 @@ dependencies = [
  "foundry-macros",
  "futures 0.3.28",
  "itertools 0.11.0",
+ "maplit",
+ "multivm",
  "once_cell",
  "parking_lot 0.12.1",
  "revm",
@@ -4451,6 +4461,11 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "zksync_basic_types",
+ "zksync_state",
+ "zksync_types",
+ "zksync_utils",
+ "zksync_web3_decl",
 ]
 
 [[package]]
@@ -5968,6 +5983,15 @@ name = "itertools"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
 dependencies = [
  "either",
 ]
@@ -9141,11 +9165,9 @@ dependencies = [
  "bitflags 2.4.1",
  "bitvec 1.0.1",
  "c-kzg",
- "derive_more",
  "enumn",
  "hashbrown 0.14.2",
  "hex",
- "once_cell",
  "serde",
 ]
 
@@ -12505,21 +12527,6 @@ dependencies = [
  "sha3 0.10.6",
  "static_assertions",
  "zkevm_opcode_defs 1.3.1",
-]
-
-[[package]]
-name = "zk_evm"
-version = "1.3.3"
-source = "git+https://github.com/matter-labs/era-zk_evm.git?tag=v1.3.3-rc1#fe8215a7047d24430ad470cf15a19bedb4d6ba0b"
-dependencies = [
- "anyhow",
- "lazy_static",
- "num 0.4.1",
- "serde",
- "serde_json",
- "static_assertions",
- "zk_evm_abstractions",
- "zkevm_opcode_defs 1.3.2",
 ]
 
 [[package]]

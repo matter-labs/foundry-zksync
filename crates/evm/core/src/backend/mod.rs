@@ -28,6 +28,11 @@ use revm::{
 };
 use std::collections::{HashMap, HashSet};
 
+use crate::era_revm::db::RevmDatabaseForEra;
+use era_test_node::fork::ForkStorage;
+use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
+use zksync_state::StorageView;
+
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
 
@@ -65,6 +70,7 @@ const GLOBAL_FAILURE_SLOT: B256 =
     b256!("6661696c65640000000000000000000000000000000000000000000000000000");
 
 /// An extension trait that allows us to easily extend the `revm::Inspector` capabilities
+#[auto_impl::auto_impl(&mut, Box)]
 pub trait DatabaseExt: Database<Error = DatabaseError> {
     /// Creates a new snapshot at the current point of execution.
     ///
@@ -756,18 +762,22 @@ impl Backend {
     }
 
     /// Executes the configured test call of the `env` without committing state changes
-    pub fn inspect_ref<INSP>(
-        &mut self,
-        env: &mut Env,
+    pub fn inspect_ref<'a, INSP>(
+        &'a mut self,
+        env: &'a mut Env,
         inspector: INSP,
     ) -> eyre::Result<ResultAndState>
     where
-        INSP: Inspector<Self>,
+        INSP: Inspector<Self>
+            + ToTracerPointer<
+                StorageView<ForkStorage<RevmDatabaseForEra<&'a mut Self>>>,
+                HistoryDisabled,
+            >,
     {
         self.initialize(env);
 
         let result: EVMResult<DatabaseError> =
-            era_revm::transactions::run_era_transaction(env, self, inspector);
+            crate::era_revm::transactions::run_era_transaction(env, self, inspector);
 
         Ok(result.unwrap())
     }

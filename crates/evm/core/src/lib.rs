@@ -12,6 +12,7 @@ pub mod backend;
 pub mod constants;
 pub mod debug;
 pub mod decode;
+pub mod era_revm;
 pub mod fork;
 pub mod opts;
 pub mod snapshot;

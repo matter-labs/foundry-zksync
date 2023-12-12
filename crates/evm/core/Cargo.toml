@@ -34,7 +34,13 @@ revm = { workspace = true, default-features = false, features = [
 
 ethers-core.workspace = true
 ethers-providers.workspace = true
-era_revm.workspace = true
+multivm.workspace = true
+zksync_basic_types.workspace = true
+zksync_types.workspace = true
+era_test_node.workspace = true
+zksync_utils.workspace = true
+zksync_web3_decl.workspace = true
+zksync_state.workspace = true
 
 derive_more.workspace = true
 eyre = "0.6"
@@ -49,3 +55,7 @@ thiserror = "1"
 tokio = { version = "1", features = ["time", "macros"] }
 tracing = "0.1"
 url = "2"
+auto_impl = "1"
+
+[dev-dependencies]
+maplit = "1"
