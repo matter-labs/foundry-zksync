@@ -3,7 +3,6 @@
 use crate::{config::*, test_helpers::PROJECT};
 use alloy_primitives::{address, Address};
 use ethers_core::abi::{Event, EventParam, Log, LogParam, ParamType, RawLog, Token};
-use forge::result::TestStatus;
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_evm::{
     constants::HARDHAT_CONSOLE_ADDRESS,
@@ -11,6 +10,7 @@ use foundry_evm::{
     utils::CallKind,
 };
 use foundry_test_utils::Filter;
+use zkforge::result::TestStatus;
 
 /// Creates a test that runs `testdata/repros/Issue{issue}.t.sol`.
 macro_rules! test_repro {

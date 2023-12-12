@@ -2,17 +2,6 @@ use super::{install, test::filter::ProjectPathsAwareFilter, watch::WatchArgs};
 use alloy_primitives::U256;
 use clap::Parser;
 use eyre::Result;
-use forge::{
-    decode::decode_console_logs,
-    gas_report::GasReport,
-    inspectors::CheatsConfig,
-    result::{SuiteResult, TestResult, TestStatus},
-    traces::{
-        identifier::{EtherscanIdentifier, LocalTraceIdentifier, SignaturesIdentifier},
-        CallTraceDecoderBuilder, TraceKind,
-    },
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
-};
 use foundry_cli::{
     opts::CoreBuildArgs,
     utils::{self, LoadConfig},
@@ -34,6 +23,17 @@ use regex::Regex;
 use std::{collections::BTreeMap, fs, sync::mpsc::channel, time::Duration};
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
+use zkforge::{
+    decode::decode_console_logs,
+    gas_report::GasReport,
+    inspectors::CheatsConfig,
+    result::{SuiteResult, TestResult, TestStatus},
+    traces::{
+        identifier::{EtherscanIdentifier, LocalTraceIdentifier, SignaturesIdentifier},
+        CallTraceDecoderBuilder, TraceKind,
+    },
+    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
+};
 
 mod filter;
 mod summary;
@@ -129,7 +129,7 @@ impl TestArgs {
     }
 
     pub async fn run(self) -> Result<TestOutcome> {
-        trace!(target: "forge::test", "executing test command");
+        trace!(target: "zkforge::test", "executing test command");
         shell::set_shell(shell::Shell::from_args(self.opts.silent, self.json))?;
         self.execute_tests().await
     }
@@ -348,14 +348,14 @@ impl TestArgs {
             return Ok(TestOutcome::new(results, self.allow_failure))
         }
 
-        trace!(target: "forge::test", "running all tests");
+        trace!(target: "zkforge::test", "running all tests");
 
         if runner.matching_test_function_count(filter) == 0 {
             let filter_str = filter.to_string();
             if filter_str.is_empty() {
                 println!(
                     "\nNo tests found in project! \
-                     Forge looks for functions that starts with `test`."
+                     ZKForge looks for functions that starts with `test`."
                 );
             } else {
                 println!("\nNo tests match the provided pattern:\n{filter_str}");
@@ -541,7 +541,7 @@ impl TestArgs {
             }
         }
 
-        trace!(target: "forge::test", "received {} results", results.len());
+        trace!(target: "zkforge::test", "received {} results", results.len());
 
         Ok(TestOutcome::new(results, self.allow_failure))
     }

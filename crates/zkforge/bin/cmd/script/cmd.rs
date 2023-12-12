@@ -32,7 +32,7 @@ impl ScriptArgs {
         if let Some(ref fork_url) = script_config.evm_opts.fork_url {
             // when forking, override the sender's nonce to the onchain value
             script_config.sender_nonce =
-                forge::next_nonce(script_config.evm_opts.sender, fork_url, None).await?
+                zkforge::next_nonce(script_config.evm_opts.sender, fork_url, None).await?
         } else {
             // if not forking, then ignore any pre-deployed library addresses
             script_config.config.libraries = Default::default();
@@ -300,7 +300,7 @@ impl ScriptArgs {
     ) -> Result<(Libraries, ArtifactContracts<ContractBytecodeSome>)> {
         // if we had a new sender that requires relinking, we need to
         // get the nonce mainnet for accurate addresses for predeploy libs
-        let nonce = forge::next_nonce(
+        let nonce = zkforge::next_nonce(
             new_sender,
             script_config.evm_opts.fork_url.as_ref().ok_or_else(|| {
                 eyre::eyre!("You must provide an RPC URL (see --fork-url) when broadcasting.")

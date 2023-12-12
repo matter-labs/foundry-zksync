@@ -115,24 +115,27 @@ impl<'a> ContractRunner<'a> {
             }
         }
 
-        let sender_nonce = self.executor.get_nonce(self.sender)?;
-        let address = self.sender.create(sender_nonce);
-
-        // Set the contracts initial balance before deployment, so it is available during
-        // construction
-        self.executor.set_balance(address, self.initial_balance)?;
+        // TODO: Look into generating address via zksync's scheme and set the balance before deploy
+        // let sender_nonce = self.executor.get_nonce(self.sender)?;
+        // let address = self.sender.create(sender_nonce);
 
         // Deploy the test contract
-        match self.executor.deploy(self.sender, self.code.clone(), U256::ZERO, self.errors) {
-            Ok(d) => {
-                logs.extend(d.logs);
-                traces.extend(d.traces.map(|traces| (TraceKind::Deployment, traces)));
-                d.address
-            }
-            Err(e) => {
-                return Ok(TestSetup::from_evm_error_with(e, logs, traces, Default::default()))
-            }
-        };
+        let address =
+            match self.executor.deploy(self.sender, self.code.clone(), U256::ZERO, self.errors) {
+                Ok(d) => {
+                    logs.extend(d.logs);
+                    traces.extend(d.traces.map(|traces| (TraceKind::Deployment, traces)));
+                    d.address
+                }
+                Err(e) => {
+                    return Ok(TestSetup::from_evm_error_with(e, logs, traces, Default::default()))
+                }
+            };
+
+        // TODO: Move this before deploy to be consistent with upstream once the addresses are
+        // predictable Set the contracts initial balance before deployment, so it is
+        // available during construction
+        self.executor.set_balance(address, self.initial_balance)?;
 
         // Reset `self.sender`s and `CALLER`s balance to the initial balance we want
         self.executor.set_balance(self.sender, self.initial_balance)?;
@@ -427,7 +430,7 @@ impl<'a> ContractRunner<'a> {
         known_contracts: Option<&ContractsByArtifact>,
         identified_contracts: &ContractsByAddress,
     ) -> TestResult {
-        trace!(target: "forge::test::fuzz", "executing invariant test for {:?}", func.name);
+        trace!(target: "zkforge::test::fuzz", "executing invariant test for {:?}", func.name);
         let empty = ContractsByArtifact::default();
         let project_contracts = known_contracts.unwrap_or(&empty);
         let TestSetup { address, logs, traces, labeled_addresses, coverage, .. } = setup;

@@ -1,10 +1,6 @@
 //! Test config.
 
 use crate::test_helpers::{COMPILED, EVM_OPTS, PROJECT};
-use forge::{
-    result::{SuiteResult, TestStatus},
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
-};
 use foundry_config::{
     fs_permissions::PathPermission, Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig,
     InvariantConfig, RpcEndpoint, RpcEndpoints,
@@ -15,6 +11,10 @@ use foundry_evm::{
 use foundry_test_utils::{init_tracing, Filter};
 use itertools::Itertools;
 use std::{collections::BTreeMap, path::Path};
+use zkforge::{
+    result::{SuiteResult, TestStatus},
+    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
+};
 
 /// How to execute a test run.
 pub struct TestConfig {

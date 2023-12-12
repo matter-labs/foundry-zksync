@@ -4,9 +4,9 @@ use crate::{
     config::*,
     test_helpers::{PROJECT, RE_PATH_SEPARATOR},
 };
-use forge::result::SuiteResult;
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_test_utils::Filter;
+use zkforge::result::SuiteResult;
 
 /// Executes reverting fork test
 #[tokio::test(flavor = "multi_thread")]

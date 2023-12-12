@@ -2,18 +2,6 @@ use super::{install, test::FilterArgs};
 use alloy_primitives::{Address, Bytes, U256};
 use clap::{Parser, ValueEnum, ValueHint};
 use eyre::{Context, Result};
-use forge::{
-    coverage::{
-        analysis::SourceAnalyzer, anchors::find_anchors, ContractId, CoverageReport,
-        CoverageReporter, DebugReporter, ItemAnchor, LcovReporter, SummaryReporter,
-    },
-    inspectors::CheatsConfig,
-    opts::EvmOpts,
-    result::SuiteResult,
-    revm::primitives::SpecId,
-    utils::{build_ic_pc_map, ICPCMap},
-    MultiContractRunnerBuilder, TestOptions,
-};
 use foundry_cli::{
     opts::CoreBuildArgs,
     p_println,
@@ -29,6 +17,18 @@ use foundry_config::{Config, SolcReq};
 use semver::Version;
 use std::{collections::HashMap, path::PathBuf, sync::mpsc::channel};
 use yansi::Paint;
+use zkforge::{
+    coverage::{
+        analysis::SourceAnalyzer, anchors::find_anchors, ContractId, CoverageReport,
+        CoverageReporter, DebugReporter, ItemAnchor, LcovReporter, SummaryReporter,
+    },
+    inspectors::CheatsConfig,
+    opts::EvmOpts,
+    result::SuiteResult,
+    revm::primitives::SpecId,
+    utils::{build_ic_pc_map, ICPCMap},
+    MultiContractRunnerBuilder, TestOptions,
+};
 
 /// A map, keyed by contract ID, to a tuple of the deployment source map and the runtime source map.
 type SourceMaps = HashMap<ContractId, (SourceMap, SourceMap)>;

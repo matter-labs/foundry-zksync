@@ -154,11 +154,11 @@ impl TestOptions {
         };
 
         if let Some(ref fuzz_seed) = self.fuzz.seed {
-            trace!(target: "forge::test", "building deterministic fuzzer with seed {}", fuzz_seed);
+            trace!(target: "zkforge::test", "building deterministic fuzzer with seed {}", fuzz_seed);
             let rng = TestRng::from_seed(RngAlgorithm::ChaCha, &B256::from(*fuzz_seed).0);
             TestRunner::new_with_rng(cfg, rng)
         } else {
-            trace!(target: "forge::test", "building stochastic fuzzer");
+            trace!(target: "zkforge::test", "building stochastic fuzzer");
             TestRunner::new(cfg)
         }
     }

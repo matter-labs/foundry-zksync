@@ -66,7 +66,7 @@ fn main() -> Result<()> {
             clap_complete::generate(
                 clap_complete_fig::Fig,
                 &mut Opts::command(),
-                "forge",
+                "zkforge",
                 &mut std::io::stdout(),
             );
             Ok(())

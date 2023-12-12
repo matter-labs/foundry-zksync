@@ -227,7 +227,7 @@ impl ScriptArgs {
         let from = tx.from().expect("no sender");
 
         if sequential_broadcast {
-            let nonce = forge::next_nonce((*from).to_alloy(), fork_url, None)
+            let nonce = zkforge::next_nonce((*from).to_alloy(), fork_url, None)
                 .await
                 .map_err(|_| eyre::eyre!("Not able to query the EOA nonce."))?;
 

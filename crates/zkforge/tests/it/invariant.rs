@@ -2,9 +2,9 @@
 
 use crate::config::*;
 use alloy_primitives::U256;
-use forge::fuzz::CounterExample;
 use foundry_test_utils::Filter;
 use std::collections::BTreeMap;
+use zkforge::fuzz::CounterExample;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_invariant() {

@@ -30,7 +30,7 @@ foundry_config::merge_impl_figment_convert!(BuildArgs, args);
 /// # Example
 ///
 /// ```
-/// use foundry_cli::cmd::forge::build::BuildArgs;
+/// use foundry_cli::cmd::zkforge::build::BuildArgs;
 /// use foundry_config::Config;
 /// # fn t(args: BuildArgs) {
 /// let config = Config::from(&args);

@@ -11,17 +11,6 @@ use ethers_core::types::{
 use ethers_providers::{Http, Middleware};
 use ethers_signers::LocalWallet;
 use eyre::{ContextCompat, Result, WrapErr};
-use forge::{
-    backend::Backend,
-    debug::DebugArena,
-    decode::decode_console_logs,
-    opts::EvmOpts,
-    traces::{
-        identifier::{EtherscanIdentifier, LocalTraceIdentifier, SignaturesIdentifier},
-        CallTraceDecoder, CallTraceDecoderBuilder, TraceCallData, TraceKind, TraceRetData, Traces,
-    },
-    utils::CallKind,
-};
 use foundry_cli::opts::MultiWallet;
 use foundry_common::{
     abi::{encode_function_args, get_func},
@@ -56,6 +45,17 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use yansi::Paint;
+use zkforge::{
+    backend::Backend,
+    debug::DebugArena,
+    decode::decode_console_logs,
+    opts::EvmOpts,
+    traces::{
+        identifier::{EtherscanIdentifier, LocalTraceIdentifier, SignaturesIdentifier},
+        CallTraceDecoder, CallTraceDecoderBuilder, TraceCallData, TraceKind, TraceRetData, Traces,
+    },
+    utils::CallKind,
+};
 
 mod artifacts;
 mod broadcast;
