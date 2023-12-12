@@ -330,8 +330,9 @@ mod tests {
     use core::marker::PhantomData;
     use multivm::{
         interface::dyn_tracers::vm_1_3_3::DynTracer,
-        vm_refunds_enhancement::{SimpleMemory, VmTracer},
+        vm_refunds_enhancement::{HistoryMode, SimpleMemory, VmTracer},
     };
+    use zksync_state::WriteStorage;
 
     use super::*;
     use crate::era_revm::testing::MockDatabase;
@@ -361,13 +362,10 @@ mod tests {
             .into(),
             ..Default::default()
         };
+        let mock_db = MockDatabase::default();
 
-        let res = run_era_transaction::<_, ResultAndState, _>(
-            &mut env,
-            &mut MockDatabase::default(),
-            Noop::default(),
-        )
-        .expect("failed executing");
+        let res = run_era_transaction::<_, ResultAndState, _>(&mut env, mock_db, Noop::default())
+            .expect("failed executing");
 
         assert!(!res.state.is_empty(), "unexpected failure: no states were touched");
         for (address, account) in res.state {

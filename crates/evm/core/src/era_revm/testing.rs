@@ -6,9 +6,8 @@ use crate::{
 use crate::backend::RevertDiagnostic;
 use ethers_core::utils::GenesisAccount;
 use revm::{
-    db::DatabaseRef,
-    primitives::{AccountInfo, Address, Bytecode, EVMResult, Env, ResultAndState, B256, U256},
-    Database, Inspector, JournaledState,
+    primitives::{AccountInfo, Address, Bytecode, Env, B256, U256},
+    Inspector, JournaledState,
 };
 use std::collections::HashMap;
 
@@ -38,67 +37,67 @@ impl revm::Database for MockDatabase {
 }
 
 impl DatabaseExt for MockDatabase {
-    fn snapshot(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
+    fn snapshot(&mut self, _journaled_state: &JournaledState, _env: &Env) -> U256 {
         todo!()
     }
 
     fn revert(
         &mut self,
-        id: U256,
-        journaled_state: &JournaledState,
-        env: &mut Env,
+        _id: U256,
+        _journaled_state: &JournaledState,
+        _env: &mut Env,
     ) -> Option<JournaledState> {
         todo!()
     }
 
-    fn create_fork(&mut self, fork: CreateFork) -> eyre::Result<LocalForkId> {
+    fn create_fork(&mut self, _fork: CreateFork) -> eyre::Result<LocalForkId> {
         todo!()
     }
 
     fn create_fork_at_transaction(
         &mut self,
-        fork: CreateFork,
-        transaction: B256,
+        _fork: CreateFork,
+        _transaction: B256,
     ) -> eyre::Result<LocalForkId> {
         todo!()
     }
 
     fn select_fork(
         &mut self,
-        id: LocalForkId,
-        env: &mut Env,
-        journaled_state: &mut JournaledState,
+        _id: LocalForkId,
+        _env: &mut Env,
+        _journaled_state: &mut JournaledState,
     ) -> eyre::Result<()> {
         todo!()
     }
 
     fn roll_fork(
         &mut self,
-        id: Option<LocalForkId>,
-        block_number: U256,
-        env: &mut Env,
-        journaled_state: &mut JournaledState,
+        _id: Option<LocalForkId>,
+        _block_number: U256,
+        _env: &mut Env,
+        _journaled_state: &mut JournaledState,
     ) -> eyre::Result<()> {
         todo!()
     }
 
     fn roll_fork_to_transaction(
         &mut self,
-        id: Option<LocalForkId>,
-        transaction: B256,
-        env: &mut Env,
-        journaled_state: &mut JournaledState,
+        _id: Option<LocalForkId>,
+        _transaction: B256,
+        _env: &mut Env,
+        _journaled_state: &mut JournaledState,
     ) -> eyre::Result<()> {
         todo!()
     }
 
     fn transact<I: Inspector<Backend>>(
         &mut self,
-        id: Option<LocalForkId>,
-        transaction: B256,
-        env: &mut Env,
-        journaled_state: &mut JournaledState,
-        inspector: &mut I,
+        _id: Option<LocalForkId>,
+        _transaction: B256,
+        _env: &mut Env,
+        _journaled_state: &mut JournaledState,
+        _inspector: &mut I,
     ) -> eyre::Result<()> {
         todo!()
     }
@@ -111,52 +110,52 @@ impl DatabaseExt for MockDatabase {
         todo!()
     }
 
-    fn ensure_fork(&self, id: Option<LocalForkId>) -> eyre::Result<LocalForkId> {
+    fn ensure_fork(&self, _id: Option<LocalForkId>) -> eyre::Result<LocalForkId> {
         todo!()
     }
 
-    fn ensure_fork_id(&self, id: LocalForkId) -> eyre::Result<&ForkId> {
+    fn ensure_fork_id(&self, _id: LocalForkId) -> eyre::Result<&ForkId> {
         todo!()
     }
 
     fn diagnose_revert(
         &self,
-        callee: Address,
-        journaled_state: &JournaledState,
+        _callee: Address,
+        _journaled_state: &JournaledState,
     ) -> Option<RevertDiagnostic> {
         todo!()
     }
 
     fn load_allocs(
         &mut self,
-        allocs: &HashMap<Address, GenesisAccount>,
-        journaled_state: &mut JournaledState,
+        _allocs: &HashMap<Address, GenesisAccount>,
+        _journaled_state: &mut JournaledState,
     ) -> Result<(), DatabaseError> {
         todo!()
     }
 
-    fn is_persistent(&self, acc: &Address) -> bool {
+    fn is_persistent(&self, _acc: &Address) -> bool {
         todo!()
     }
 
-    fn remove_persistent_account(&mut self, account: &Address) -> bool {
+    fn remove_persistent_account(&mut self, _account: &Address) -> bool {
         todo!()
     }
 
     #[doc = " Marks the given account as persistent."]
-    fn add_persistent_account(&mut self, account: Address) -> bool {
+    fn add_persistent_account(&mut self, _account: Address) -> bool {
         todo!()
     }
 
-    fn allow_cheatcode_access(&mut self, account: Address) -> bool {
+    fn allow_cheatcode_access(&mut self, _account: Address) -> bool {
         todo!()
     }
 
-    fn revoke_cheatcode_access(&mut self, account: Address) -> bool {
+    fn revoke_cheatcode_access(&mut self, _account: Address) -> bool {
         todo!()
     }
 
-    fn has_cheatcode_access(&self, account: Address) -> bool {
+    fn has_cheatcode_access(&self, _account: Address) -> bool {
         todo!()
     }
 }

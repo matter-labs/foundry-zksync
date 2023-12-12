@@ -274,10 +274,8 @@ mod tests {
     use maplit::hashmap;
     use revm::primitives::AccountInfo;
 
-    use crate::era_revm::testing::MockDatabase;
-    use foundry_common::factory_deps::hash_bytecode;
-
     use super::*;
+    use crate::era_revm::testing::MockDatabase;
 
     #[test]
     fn test_fetch_account_code_returns_hash_and_code_if_present_in_modified_keys_and_bytecodes() {
