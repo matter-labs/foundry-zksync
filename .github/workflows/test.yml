@@ -117,3 +117,20 @@ jobs:
           git clone https://github.com/matter-labs/zkfoundry-smoke-test
           cd zkfoundry-smoke-test
           ./smoke-test.sh
+
+    cheatcodes:
+      name: cheatcode-test
+      runs-on: ubuntu-22.04-github-hosted-16core
+      steps:
+        - uses: actions/checkout@v3
+          with:
+            submodules: recursive
+            ref: ${{ github.event.pull_request.head.sha }}
+  
+        - name: Install Rust
+          uses: actions-rust-lang/setup-rust-toolchain@v1
+          with:
+            toolchain: nightly-2023-07-23
+  
+        - name: Test Cheatcodes
+          run: cd tests && ./test.sh

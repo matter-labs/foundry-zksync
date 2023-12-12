@@ -1,0 +1,3 @@
+[submodule "crates/era-cheatcodes/tests/lib/forge-std"]
+	path = crates/era-cheatcodes/tests/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
