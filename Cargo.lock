@@ -4309,7 +4309,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.1.1"
-source = "git+https://github.com/Deniallugo/compilers.git?branch=main#49eaf03523e4b2853e1329d06f24d40b683d706b"
+source = "git+https://github.com/dutterbutter/compilers.git?branch=db/add_set_get_for_compiler_artifact_object#f3e7dfdcd482ec582d19953db1130612198b15cd"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
