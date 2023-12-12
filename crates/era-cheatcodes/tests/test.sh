@@ -65,7 +65,6 @@ command -v git &>/dev/null || {
 build_zkforge "${REPO_ROOT}"
 
 echo "Running tests..."
-# "${BINARY_PATH}" zkbuild --use "./${SOLC}"
 RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}"
 
 # cleanup
