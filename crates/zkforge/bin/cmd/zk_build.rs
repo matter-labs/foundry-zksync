@@ -27,9 +27,9 @@
 /// complexities.
 use super::{install, watch::WatchArgs};
 use clap::Parser;
-use ethers::prelude::Project;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
 use foundry_common::zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION};
+use foundry_compilers::Project;
 use foundry_config::{
     figment::{
         self,
@@ -90,10 +90,10 @@ pub struct ZkBuildArgs {
     ///
     /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
     #[clap(
-        help_heading = "ZkSync Compiler options",
-        value_name = "ZK_SOLC_VERSION",
-        long = "use-zksolc",
-        default_value = DEFAULT_ZKSOLC_VERSION
+    help_heading = "ZkSync Compiler options",
+    value_name = "ZK_SOLC_VERSION",
+    long = "use-zksolc",
+    default_value = DEFAULT_ZKSOLC_VERSION
     )]
     #[serde(skip)]
     pub use_zksolc: String,
@@ -196,7 +196,7 @@ impl ZkBuildArgs {
     }
     /// Returns the [`watchexec::InitConfig`] and [`watchexec::RuntimeConfig`] necessary to
     /// bootstrap a new [`watchexe::Watchexec`] loop.
-    pub(crate) fn watchexec_config(&self) -> eyre::Result<(InitConfig, RuntimeConfig)> {
+    pub fn watchexec_config(&self) -> eyre::Result<(InitConfig, RuntimeConfig)> {
         // use the path arguments or if none where provided the `src` dir
         self.watch.watchexec_config(|| {
             let config = Config::from(self);

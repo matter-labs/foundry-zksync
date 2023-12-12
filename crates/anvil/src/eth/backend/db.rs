@@ -8,21 +8,17 @@ use ethers::{
     types::{BlockId, H256},
     utils::keccak256,
 };
-use foundry_common::errors::FsPathError;
+use foundry_common::{errors::FsPathError, types::ToAlloy};
 use foundry_evm::{
-    executor::{
-        backend::{snapshot::StateSnapshot, DatabaseError, DatabaseResult, MemDb},
-        fork::BlockchainDb,
-        DatabaseRef,
-    },
+    backend::{DatabaseError, DatabaseResult, MemDb, RevertSnapshotAction, StateSnapshot},
+    fork::BlockchainDb,
+    hashbrown::HashMap,
     revm::{
-        db::{CacheDB, DbAccount},
+        db::{CacheDB, DatabaseRef, DbAccount},
         primitives::{Bytecode, KECCAK_EMPTY},
         Database, DatabaseCommit,
     },
-    HashMap,
 };
-use foundry_utils::types::ToAlloy;
 use hash_db::HashDB;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt, path::Path};
@@ -139,7 +135,7 @@ pub trait Db:
     /// Deserialize and add all chain data to the backend storage
     fn load_state(&mut self, state: SerializableState) -> DatabaseResult<bool> {
         for (addr, account) in state.accounts.into_iter() {
-            let old_account_nonce = DatabaseRef::basic(self, addr.to_alloy())
+            let old_account_nonce = DatabaseRef::basic_ref(self, addr.to_alloy())
                 .ok()
                 .and_then(|acc| acc.map(|acc| acc.nonce))
                 .unwrap_or_default();
@@ -176,7 +172,7 @@ pub trait Db:
     /// Reverts a snapshot
     ///
     /// Returns `true` if the snapshot was reverted
-    fn revert(&mut self, snapshot: U256) -> bool;
+    fn revert(&mut self, snapshot: U256, action: RevertSnapshotAction) -> bool;
 
     /// Returns the state root if possible to compute
     fn maybe_state_root(&self) -> Option<H256> {
@@ -212,7 +208,7 @@ impl<T: DatabaseRef<Error = DatabaseError> + Send + Sync + Clone + fmt::Debug> D
         U256::zero()
     }
 
-    fn revert(&mut self, _snapshot: U256) -> bool {
+    fn revert(&mut self, _snapshot: U256, _action: RevertSnapshotAction) -> bool {
         false
     }
 
@@ -291,20 +287,20 @@ impl StateDb {
 
 impl DatabaseRef for StateDb {
     type Error = DatabaseError;
-    fn basic(&self, address: B160) -> DatabaseResult<Option<AccountInfo>> {
-        self.0.basic(address)
+    fn basic_ref(&self, address: B160) -> DatabaseResult<Option<AccountInfo>> {
+        self.0.basic_ref(address)
     }
 
-    fn code_by_hash(&self, code_hash: B256) -> DatabaseResult<Bytecode> {
-        self.0.code_by_hash(code_hash)
+    fn code_by_hash_ref(&self, code_hash: B256) -> DatabaseResult<Bytecode> {
+        self.0.code_by_hash_ref(code_hash)
     }
 
-    fn storage(&self, address: B160, index: rU256) -> DatabaseResult<rU256> {
-        self.0.storage(address, index)
+    fn storage_ref(&self, address: B160, index: rU256) -> DatabaseResult<rU256> {
+        self.0.storage_ref(address, index)
     }
 
-    fn block_hash(&self, number: rU256) -> DatabaseResult<B256> {
-        self.0.block_hash(number)
+    fn block_hash_ref(&self, number: rU256) -> DatabaseResult<B256> {
+        self.0.block_hash_ref(number)
     }
 }
 

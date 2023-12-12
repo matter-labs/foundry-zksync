@@ -3,9 +3,9 @@ use crate::cmd::{
     verify::{VerifierArgs, VerifyArgs},
 };
 use alloy_primitives::Address;
-use ethers::solc::{info::ContractInfo, Project};
 use foundry_cli::opts::{EtherscanOpts, ProjectPathsArgs};
 use foundry_common::ContractsByArtifact;
+use foundry_compilers::{info::ContractInfo, Project};
 use foundry_config::{Chain, Config};
 use semver::Version;
 
@@ -103,6 +103,7 @@ impl VerifyBundle {
                     etherscan: self.etherscan.clone(),
                     flatten: false,
                     force: false,
+                    skip_is_verified_check: true,
                     watch: true,
                     retry: self.retry,
                     libraries: libraries.to_vec(),

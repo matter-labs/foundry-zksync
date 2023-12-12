@@ -3,16 +3,11 @@ use crate::cmd::{
     estimate::EstimateArgs, find_block::FindBlockArgs, interface::InterfaceArgs, logs::LogsArgs,
     rpc::RpcArgs, run::RunArgs, send::SendTxArgs, storage::StorageArgs, wallet::WalletSubcommands,
 };
+use alloy_primitives::{Address, B256, U256};
 use clap::{Parser, Subcommand, ValueHint};
-use ethers::{
-    abi::ethabi::ethereum_types::BigEndianHash,
-    types::{serde_helpers::Numeric, Address, BlockId, NameOrAddress, H256, U256},
-};
+use ethers_core::types::{BlockId, NameOrAddress};
 use eyre::Result;
-use foundry_cli::{
-    opts::{EtherscanOpts, RpcOpts},
-    utils::parse_u256,
-};
+use foundry_cli::opts::{EtherscanOpts, RpcOpts};
 use std::{path::PathBuf, str::FromStr};
 
 const VERSION_MESSAGE: &str = concat!(
@@ -91,7 +86,7 @@ pub enum Subcommands {
         data: Vec<String>,
     },
 
-    /// "Convert binary data into hex data."
+    /// Convert binary data into hex data.
     #[clap(visible_aliases = &["--from-bin", "from-binx", "fb"])]
     FromBin,
 
@@ -371,8 +366,8 @@ pub enum Subcommands {
         address: Option<String>,
 
         /// The nonce of the deployer address.
-        #[clap(long, value_parser = parse_u256)]
-        nonce: Option<U256>,
+        #[clap(long)]
+        nonce: Option<u64>,
 
         #[clap(flatten)]
         rpc: RpcOpts,
@@ -562,7 +557,7 @@ pub enum Subcommands {
     },
 
     /// Get the event signature for a given topic 0 from https://openchain.xyz.
-    #[clap(name = "4byte-event", visible_aliases = &["4e", "4be"])]
+    #[clap(name = "4byte-event", visible_aliases = &["4e", "4be", "topic0-event", "t0e"])]
     FourByteEvent {
         /// Topic 0
         #[clap(value_name = "TOPIC_0")]
@@ -743,7 +738,7 @@ pub enum Subcommands {
 
         /// The storage slot numbers (hex or decimal).
         #[clap(value_parser = parse_slot)]
-        slots: Vec<H256>,
+        slots: Vec<B256>,
 
         /// The block height to query at.
         ///
@@ -877,17 +872,45 @@ pub struct ToBaseArgs {
     pub base_in: Option<String>,
 }
 
-pub fn parse_slot(s: &str) -> Result<H256> {
-    Numeric::from_str(s)
-        .map_err(|e| eyre::eyre!("Could not parse slot number: {e}"))
-        .map(|n| H256::from_uint(&n.into()))
+pub fn parse_slot(s: &str) -> Result<B256> {
+    let slot = U256::from_str(s).map_err(|e| eyre::eyre!("Could not parse slot number: {e}"))?;
+    Ok(B256::from(slot))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use cast::SimpleCast;
-    use ethers::types::BlockNumber;
+    use ethers_core::types::BlockNumber;
+
+    #[test]
+    fn parse_proof_slot() {
+        let args: Opts = Opts::parse_from([
+            "foundry-cli",
+            "proof",
+            "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "0",
+            "1",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x1",
+            "0x01",
+        ]);
+        match args.sub {
+            Subcommands::Proof { slots, .. } => {
+                assert_eq!(
+                    slots,
+                    vec![
+                        B256::ZERO,
+                        U256::from(1).into(),
+                        B256::ZERO,
+                        U256::from(1).into(),
+                        U256::from(1).into()
+                    ]
+                );
+            }
+            _ => unreachable!(),
+        };
+    }
 
     #[test]
     fn parse_call_data() {
@@ -925,7 +948,7 @@ mod tests {
                     "__$_$__$$$$$__$$_$$$_$$__$$___$$(address,address,uint256)".to_string()
                 );
 
-                let selector = SimpleCast::get_selector(&sig, None).unwrap();
+                let selector = SimpleCast::get_selector(&sig, 0).unwrap();
                 assert_eq!(selector.0, "0x23b872dd".to_string());
             }
             _ => unreachable!(),

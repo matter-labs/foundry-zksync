@@ -7,15 +7,15 @@ use ethers::{
     types::H256,
     utils::{rlp, rlp::RlpStream},
 };
+use foundry_common::types::{ToAlloy, ToEthers};
 use foundry_evm::{
-    executor::{backend::DatabaseError, DatabaseRef},
+    backend::DatabaseError,
+    hashbrown::HashMap as Map,
     revm::{
-        db::{CacheDB, DbAccount},
+        db::{CacheDB, DatabaseRef, DbAccount},
         primitives::{AccountInfo, Bytecode, Log},
     },
-    HashMap as Map,
 };
-use foundry_utils::types::{ToAlloy, ToEthers};
 use memory_db::HashKey;
 use trie_db::TrieMut;
 
@@ -116,7 +116,7 @@ where
 {
     let mut cache_db = CacheDB::new(state);
     for (account, account_overrides) in overrides.iter() {
-        let mut account_info = cache_db.basic((*account).to_alloy())?.unwrap_or_default();
+        let mut account_info = cache_db.basic_ref((*account).to_alloy())?.unwrap_or_default();
 
         if let Some(nonce) = account_overrides.nonce {
             account_info.nonce = nonce;

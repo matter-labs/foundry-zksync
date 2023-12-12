@@ -15,10 +15,10 @@
 //!
 //! ```
 //! use clap::Parser;
-//! use forge::executor::opts::EvmOpts;
-//! use foundry_cli::cmd::forge::build::BuildArgs;
+//! use foundry_cli::cmd::zkforge::build::BuildArgs;
 //! use foundry_common::evm::EvmArgs;
 //! use foundry_config::{figment::Figment, *};
+//! use zkforge::executor::opts::EvmOpts;
 //!
 //! // A new clap subcommand that accepts both `EvmArgs` and `BuildArgs`
 //! #[derive(Debug, Clone, Parser)]
@@ -49,7 +49,6 @@ pub mod debug;
 pub mod doc;
 pub mod flatten;
 pub mod fmt;
-pub mod fourbyte;
 pub mod geiger;
 pub mod generate;
 pub mod init;

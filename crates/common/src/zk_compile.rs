@@ -31,18 +31,19 @@
 /// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods
 ///   construct the path and file for saving the compiler output artifacts.
 use crate::zksolc_manager::ZkSolcManager;
+use alloy_json_abi::JsonAbi;
+use alloy_primitives::Bytes;
 use ansi_term::Colour::{Red, Yellow};
-use ethers_core::types::Bytes;
-use ethers_solc::{
+use eyre::{Context, ContextCompat, Result};
+use foundry_compilers::{
     artifacts::{
-        output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
-        LosslessAbi, Source, StandardJsonCompilerInput,
+        output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode, Source,
+        StandardJsonCompilerInput,
     },
     remappings::RelativeRemapping,
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
 };
-use eyre::{Context, ContextCompat, Result};
 use regex::Regex;
 use semver::Version;
 use serde::Deserialize;
@@ -496,7 +497,7 @@ impl ZkSolc {
 
                     let mut art = ConfigurableContractArtifact {
                         bytecode: Some(CompactBytecode {
-                            object: ethers_solc::artifacts::BytecodeObject::Bytecode(
+                            object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
                                 packed_bytecode.clone(),
                             ),
                             source_map: None,
@@ -504,7 +505,7 @@ impl ZkSolc {
                         }),
                         deployed_bytecode: Some(CompactDeployedBytecode {
                             bytecode: Some(CompactBytecode {
-                                object: ethers_solc::artifacts::BytecodeObject::Bytecode(
+                                object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
                                     packed_bytecode,
                                 ),
                                 source_map: None,
@@ -962,7 +963,7 @@ pub struct ZkContract {
     #[serde(rename = "factoryDependencies", default)]
     pub factory_dependencies: HashMap<String, String>,
     pub evm: Evm,
-    pub abi: Option<LosslessAbi>,
+    pub abi: Option<JsonAbi>,
 }
 #[derive(Debug, Deserialize)]
 

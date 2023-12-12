@@ -1,13 +1,12 @@
 use super::*;
 use alloy_primitives::{Address, Bytes, U256};
-use ethers::types::NameOrAddress;
+use ethers_core::types::NameOrAddress;
 use eyre::Result;
-use tracing::log::trace;
 use zkforge::{
-    executor::{CallResult, DeployResult, EvmError, ExecutionErr, Executor, RawCallResult},
+    constants::CALLER,
+    executors::{CallResult, DeployResult, EvmError, ExecutionErr, Executor, RawCallResult},
     revm::interpreter::{return_ok, InstructionResult},
-    trace::{TraceKind, Traces},
-    CALLER,
+    traces::{TraceKind, Traces},
 };
 
 /// Represents which simulation stage is the script execution at.
@@ -42,7 +41,7 @@ impl ScriptRunner {
         trace!(target: "script", "executing setUP()");
 
         if !is_broadcast {
-            if self.sender == Config::DEFAULT_SENDER.to_alloy() {
+            if self.sender == Config::DEFAULT_SENDER {
                 // We max out their balance so that they can deploy and make calls.
                 self.executor.set_balance(self.sender, U256::MAX)?;
             }
@@ -63,13 +62,20 @@ impl ScriptRunner {
             .filter_map(|code| {
                 let DeployResult { traces, .. } = self
                     .executor
-                    .deploy(self.sender, code.0.clone().into(), U256::ZERO, None)
+                    .deploy(self.sender, code.clone(), U256::ZERO, None)
                     .expect("couldn't deploy library");
 
                 traces
             })
             .map(|traces| (TraceKind::Deployment, traces))
             .collect();
+
+        let sender_nonce = self.executor.get_nonce(CALLER)?;
+        let address = CALLER.create(sender_nonce);
+
+        // Set the contracts initial balance before deployment, so it is available during the
+        // construction
+        self.executor.set_balance(address, self.initial_balance)?;
 
         // Deploy an instance of the contract
         let DeployResult {
@@ -80,11 +86,10 @@ impl ScriptRunner {
             ..
         } = self
             .executor
-            .deploy(CALLER, code.0.into(), U256::ZERO, None)
+            .deploy(CALLER, code, U256::ZERO, None)
             .map_err(|err| eyre::eyre!("Failed to deploy script:\n{}", err))?;
 
         traces.extend(constructor_traces.map(|traces| (TraceKind::Deployment, traces)));
-        self.executor.set_balance(address, self.initial_balance)?;
 
         // Optionally call the `setUp` function
         let (success, gas_used, labeled_addresses, transactions, debug, script_wallets) = if !setup
@@ -218,7 +223,7 @@ impl ScriptRunner {
         } else if to.is_none() {
             let (address, gas_used, logs, traces, debug) = match self.executor.deploy(
                 from,
-                calldata.expect("No data for create transaction").0.into(),
+                calldata.expect("No data for create transaction"),
                 value.unwrap_or(U256::ZERO),
                 None,
             ) {
@@ -269,7 +274,7 @@ impl ScriptRunner {
         value: U256,
         commit: bool,
     ) -> Result<ScriptResult> {
-        let mut res = self.executor.call_raw(from, to, calldata.0.clone().into(), value)?;
+        let mut res = self.executor.call_raw(from, to, calldata.clone(), value)?;
         let mut gas_used = res.gas_used;
 
         // We should only need to calculate realistic gas costs when preparing to broadcast
@@ -279,7 +284,7 @@ impl ScriptRunner {
         // Otherwise don't re-execute, or some usecases might be broken: https://github.com/foundry-rs/foundry/issues/3921
         if commit {
             gas_used = self.search_optimal_gas_usage(&res, from, to, &calldata, value)?;
-            res = self.executor.call_raw_committing(from, to, calldata.0.into(), value)?;
+            res = self.executor.call_raw_committing(from, to, calldata, value)?;
         }
 
         let RawCallResult {
@@ -307,7 +312,7 @@ impl ScriptRunner {
                     vec![(TraceKind::Execution, traces)]
                 })
                 .unwrap_or_default(),
-            debug: vec![debug].into_iter().collect(),
+            debug: debug.map(|d| vec![d]),
             labeled_addresses: labels,
             transactions,
             address: None,

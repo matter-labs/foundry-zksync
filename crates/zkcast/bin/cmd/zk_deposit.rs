@@ -1,5 +1,6 @@
+use alloy_primitives::U256 as revmU256;
 use clap::Parser;
-use ethers::types::NameOrAddress;
+use ethers_core::types::NameOrAddress;
 /// This module handles Bridging assets to ZkSync from Layer 1.
 /// It defines the CLI arguments for the `cast zk-deposit` command and provides functionality
 /// for depositing assets onto zkSync.
@@ -36,17 +37,17 @@ pub struct ZkDepositTxArgs {
     /// The destination address of the transaction.
     /// This can be either a name or an address.
     #[clap(
-            help = "The destination of the transaction.",
-            value_parser = NameOrAddress::from_str,
-            value_name = "TO"
-        )]
+    help = "The destination of the transaction.",
+    value_parser = NameOrAddress::from_str,
+    value_name = "TO"
+    )]
     to: NameOrAddress,
 
     /// The amount of the token to deposit.
     #[clap(
-        help = "Amount of token to deposit.",
-        value_name = "AMOUNT",
-        value_parser = parse_decimal_u256
+    help = "Amount of token to deposit.",
+    value_name = "AMOUNT",
+    value_parser = parse_decimal_u256
     )]
     amount: U256,
 
@@ -133,12 +134,15 @@ impl ZkDepositTxArgs {
             ZKSWallet::new(wallet, None, Some(l2_provider.clone()), Some(l1_provider.clone()))
                 .unwrap();
 
+        let tx_gas_limit = self.tx.gas_limit.map(revm_u256_to_u256);
+        let tx_gas_price = self.tx.gas_price.map(revm_u256_to_u256);
+
         // TODO Support different tokens than ETH.
         let deposit_request = DepositRequest::new(self.amount)
             .to(self.get_to_address())
             .operator_tip(self.operator_tip.unwrap_or(0.into()))
-            .gas_price(self.tx.gas_price)
-            .gas_limit(self.tx.gas_limit)
+            .gas_price(tx_gas_price)
+            .gas_limit(tx_gas_limit)
             .gas_per_pubdata_byte(self.gas_per_pubdata_byte)
             .l2_gas_limit(self.l2_gas_limit);
 
@@ -227,7 +231,8 @@ mod zk_deposit_tests {
                 legacy: false,
             };
             let l1_url = env::var("L1_RPC_URL").ok();
-            let chain = Some(Chain::Id(env::var("CHAIN").unwrap().parse().unwrap()));
+            let chain_id: u64 = env::var("CHAIN").unwrap().parse().unwrap();
+            let chain = Some(Chain::from_id(chain_id));
             let wallet: Wallet = Wallet::parse_from(["foundry-cli", "--private-key", private_key]);
 
             ZkDepositTxArgs {
@@ -262,4 +267,8 @@ mod zk_deposit_tests {
             "Balance on L2 should be increased"
         );
     }
+}
+
+pub fn revm_u256_to_u256(i: revmU256) -> U256 {
+    U256::from_big_endian(&i.to_be_bytes::<32>())
 }

@@ -1,5 +1,6 @@
+use alloy_primitives::U256;
 use clap::Parser;
-use ethers::{prelude::Middleware, solc::EvmVersion};
+use ethers_providers::Middleware;
 use eyre::{Result, WrapErr};
 use foundry_cli::{
     init_progress,
@@ -7,15 +8,14 @@ use foundry_cli::{
     update_progress, utils,
     utils::{handle_traces, TraceResult},
 };
-use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
+use foundry_common::{is_known_system_sender, types::ToAlloy, SYSTEM_TRANSACTION_TYPE};
+use foundry_compilers::EvmVersion;
 use foundry_config::{find_project_root_path, Config};
 use foundry_evm::{
-    executor::{inspector::cheatcodes::util::configure_tx_env, opts::EvmOpts, EvmError},
-    revm::primitives::U256 as rU256,
-    trace::TracingExecutor,
+    executors::{EvmError, TracingExecutor},
+    opts::EvmOpts,
+    utils::configure_tx_env,
 };
-use foundry_utils::types::ToAlloy;
-use tracing::trace;
 
 /// CLI arguments for `cast run`.
 #[derive(Debug, Clone, Parser)]
@@ -59,7 +59,7 @@ pub struct RunArgs {
     ///
     /// default value: 330
     ///
-    /// See also, https://github.com/alchemyplatform/alchemy-docs/blob/master/documentation/compute-units.md#rate-limits-cups
+    /// See also, https://docs.alchemy.com/reference/compute-units#what-are-cups-compute-units-per-second
     #[clap(long, alias = "cups", value_name = "CUPS")]
     pub compute_units_per_second: Option<u64>,
 
@@ -67,7 +67,7 @@ pub struct RunArgs {
     ///
     /// default value: false
     ///
-    /// See also, https://github.com/alchemyplatform/alchemy-docs/blob/master/documentation/compute-units.md#rate-limits-cups
+    /// See also, https://docs.alchemy.com/reference/compute-units#what-are-cups-compute-units-per-second
     #[clap(long, value_name = "NO_RATE_LIMITS", visible_alias = "no-rpc-rate-limit")]
     pub no_rate_limit: bool,
 }
@@ -98,7 +98,7 @@ impl RunArgs {
             .ok_or_else(|| eyre::eyre!("tx not found: {:?}", tx_hash))?;
 
         // check if the tx is a system transaction
-        if is_known_system_sender(tx.from) ||
+        if is_known_system_sender(tx.from.to_alloy()) ||
             tx.transaction_type.map(|ty| ty.as_u64()) == Some(SYSTEM_TRANSACTION_TYPE)
         {
             return Err(eyre::eyre!(
@@ -120,7 +120,7 @@ impl RunArgs {
         let mut executor =
             TracingExecutor::new(env.clone(), fork, self.evm_version, self.debug).await;
 
-        env.block.number = rU256::from(tx_block_number);
+        env.block.number = U256::from(tx_block_number);
 
         let block = provider.get_block_with_txs(tx_block_number).await?;
         if let Some(ref block) = block {
@@ -143,14 +143,14 @@ impl RunArgs {
                 for (index, tx) in block.transactions.into_iter().enumerate() {
                     // System transactions such as on L2s don't contain any pricing info so we skip
                     // them otherwise this would cause reverts
-                    if is_known_system_sender(tx.from) ||
+                    if is_known_system_sender(tx.from.to_alloy()) ||
                         tx.transaction_type.map(|ty| ty.as_u64()) ==
                             Some(SYSTEM_TRANSACTION_TYPE)
                     {
                         update_progress!(pb, index);
                         continue
                     }
-                    if tx.hash.eq(&tx_hash) {
+                    if tx.hash == tx_hash {
                         break
                     }
 
@@ -194,7 +194,7 @@ impl RunArgs {
             configure_tx_env(&mut env, &tx);
 
             if let Some(to) = tx.to {
-                trace!(tx=?tx.hash,to=?to, "executing call transaction");
+                trace!(tx=?tx.hash, to=?to, "executing call transaction");
                 TraceResult::from(executor.commit_tx_with_env(env)?)
             } else {
                 trace!(tx=?tx.hash, "executing create transaction");
