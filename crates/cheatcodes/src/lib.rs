@@ -57,13 +57,6 @@ pub(crate) trait Cheatcode: CheatcodeDef {
 
     #[inline]
     fn apply_traced<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
-        let span = trace_span(self);
-        let _enter = span.enter();
-        trace_call();
-        let result = self.apply_full(ccx);
-        trace_return(&result);
-        return result;
-
         // Separate functions to avoid inline and monomorphization bloat.
         fn trace_span<T: Cheatcode>(cheat: &T) -> tracing::Span {
             if enabled!(tracing::Level::TRACE) {
@@ -86,6 +79,13 @@ pub(crate) trait Cheatcode: CheatcodeDef {
                 }
             );
         }
+
+        let span = trace_span(self);
+        let _enter = span.enter();
+        trace_call();
+        let result = self.apply_full(ccx);
+        trace_return(&result);
+        result
     }
 }
 

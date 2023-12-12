@@ -549,7 +549,10 @@ where
 
     /// Create a deployment tx using the provided tokens as constructor
     /// arguments
-    pub fn _deploy_tokens(self, params: Vec<DynSolValue>) -> Result<Deployer<B, M>, ContractError<M>>
+    pub fn _deploy_tokens(
+        self,
+        params: Vec<DynSolValue>,
+    ) -> Result<Deployer<B, M>, ContractError<M>>
     where
         B: Clone,
     {
