@@ -149,6 +149,8 @@ impl TestArgs {
 
         // Set up the project
         let mut project = config.project()?;
+        let zk_out_path = project.paths.root.join("zkout");
+        project.paths.artifacts = zk_out_path;
 
         // install missing dependencies
         if install::install_missing_dependencies(&mut config, self.build_args().silent) &&
