@@ -349,7 +349,7 @@ impl ZkSolc {
             }
         }
         let mut result = ProjectCompileOutput::default();
-        result.compiled_artifacts = Artifacts(data);
+        result.set_compiled_artifacts(Artifacts(data));
         Ok(result)
     }
 

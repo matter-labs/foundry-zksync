@@ -194,4 +194,4 @@ revm-interpreter = { git = "https://github.com/bluealloy/revm", branch = "reth_f
 revm-precompile = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
 revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
 
-foundry-compilers = { git  = "https://github.com/Deniallugo/compilers.git", branch = "main", default-features = false }
+foundry-compilers = { git  = "https://github.com/foundry-rs/compilers", rev = "b1561d807c246c066c7c4b0c72c8eb64c696a43d", default-features = false }
