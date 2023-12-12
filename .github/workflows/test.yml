@@ -133,4 +133,4 @@ jobs:
             toolchain: nightly-2023-07-23
   
         - name: Test Cheatcodes
-          run: cd tests && ./test.sh
+          run: cd crates/era-cheatcodes/tests && ./test.sh
