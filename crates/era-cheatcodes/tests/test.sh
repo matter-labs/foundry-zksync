@@ -24,7 +24,7 @@ function download_solc() {
   *) arch=linux ;;
   esac
   if [ ! -x "${SOLC}" ]; then
-    wget -O "${SOLC}" "https://github.com/ethereum/solidity/releases/download/${1}/solc-static-${arch}"
+    wget --quiet -O "${SOLC}" "https://github.com/ethereum/solidity/releases/download/${1}/solc-static-${arch}"
     chmod +x "${SOLC}"
   fi
 }
