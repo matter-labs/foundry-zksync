@@ -1,0 +1,7 @@
+/target
+/Cargo.lock
+tests/*
+!tests/src
+!tests/lib
+!tests/test.sh
+!tests/foundry.toml
