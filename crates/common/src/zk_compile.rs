@@ -145,7 +145,7 @@ impl fmt::Display for ZkSolc {
         write!(
             f,
             "ZkSolc (
-                compiler_path: {},   
+                compiler_path: {},
                 output_path: {},
             )",
             self.compiler_path.display(),
@@ -385,8 +385,8 @@ impl ZkSolc {
         Ok(result)
     }
 
-    /// Checks if the contract has already been compiled for the given input contract hash.
-    /// If yes, returns the pre-compiled data.
+    /// Checks if the contract has already been compiled, and if yes then returns the compiled data.
+    /// The contents will not be persisted again.
     fn check_cache(
         &self,
         artifact_paths: &ZkSolcArtifactPaths,
