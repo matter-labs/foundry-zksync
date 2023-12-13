@@ -8,11 +8,6 @@ SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
 BINARY_PATH="${REPO_ROOT}/target/release/zkforge"
 
-function cleanup() {
-  echo "Cleaning up..."
-  rm "./${SOLC}"
-}
-
 function download_solc() {
   case "$(uname -s)" in
   Darwin*) arch=macos ;;
@@ -44,8 +39,6 @@ function build_zkforge() {
   wait_for_build 30
 }
 
-# trap cleanup ERR
-
 echo "Solc: ${SOLC_VERSION}"
 echo "Zkforge binary: ${BINARY_PATH}"
 
@@ -66,5 +59,3 @@ build_zkforge "${REPO_ROOT}"
 
 echo "Running tests..."
 RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}"
-
-# cleanup

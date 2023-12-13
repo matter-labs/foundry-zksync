@@ -52,10 +52,25 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt, fs,
     fs::File,
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
+
+#[derive(Debug, Default, Clone)]
+pub struct ZkSolcArtifactPaths {
+    artifact: PathBuf,
+    contract_hash: PathBuf,
+}
+
+impl ZkSolcArtifactPaths {
+    pub fn new(filename: PathBuf) -> Self {
+        Self {
+            artifact: filename.clone().join("artifacts.json"),
+            contract_hash: filename.join("contract_hash"),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts {
@@ -289,39 +304,12 @@ impl ZkSolc {
                 // Step 4: Build Compiler Arguments
                 let comp_args = self.build_compiler_args(&contract_path, &self.project.solc);
 
-                // Step 5: Run Compiler and Handle Output
-                let mut cmd = Command::new(&self.compiler_path);
-                let mut child = cmd
-                    .args(&comp_args)
-                    .stdin(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .stdout(Stdio::piped())
-                    .spawn()
-                    .wrap_err("Failed to start the compiler")?;
-
-                let stdin = child.stdin.take().expect("Stdin exists.");
-
-                serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
-                    .wrap_err("Could not assign standard_json to writer")?;
-
-                let output = child.wait_with_output().wrap_err("Could not run compiler cmd")?;
-
-                if !output.status.success() {
-                    // Skip this file if the compiler output is empty
-                    // currently zksolc returns false for success if output is empty
-                    // when output is empty, it has a length of 3, `[]\n`
-                    // solc returns true for success if output is empty
-                    if output.stderr.len() <= 3 {
-                        continue
-                    }
-                    eyre::bail!(
-                        "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
-                        String::from_utf8(output.stderr).unwrap_or_default(),
-                        self.compiler_path,
-                        contract_path,
-                        &comp_args
-                    );
-                }
+                // Hash the input contract to allow caching
+                let mut contract_file = File::open(&contract_path)?;
+                let mut buffer = Vec::new();
+                contract_file.read_to_end(&mut buffer)?;
+                let contract_hash =
+                    hex::encode(xxhash_rust::const_xxh3::xxh3_64(&buffer).to_be_bytes());
 
                 let filename = contract_path
                     .file_name()
@@ -329,21 +317,65 @@ impl ZkSolc {
                     .to_str()
                     .unwrap()
                     .to_string();
+                let artifact_paths =
+                    ZkSolcArtifactPaths::new(self.project.paths.artifacts.join(&filename));
+
+                // Step 5: Run Compiler (or use cached) and Handle Output
+                let (output, maybe_artifact_paths) = match self
+                    .check_cache(&artifact_paths, &contract_hash)
+                {
+                    Some(output) => {
+                        info!("Using hashed artifact ({}) for {:?}", contract_hash, filename);
+                        (output, None)
+                    }
+                    None => {
+                        let mut cmd = Command::new(&self.compiler_path);
+                        let mut child = cmd
+                            .args(&comp_args)
+                            .stdin(Stdio::piped())
+                            .stderr(Stdio::piped())
+                            .stdout(Stdio::piped())
+                            .spawn()
+                            .wrap_err("Failed to start the compiler")?;
+
+                        let stdin = child.stdin.take().expect("Stdin exists.");
+
+                        serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
+                            .wrap_err("Could not assign standard_json to writer")?;
+
+                        let output =
+                            child.wait_with_output().wrap_err("Could not run compiler cmd")?;
+
+                        if !output.status.success() {
+                            // Skip this file if the compiler output is empty
+                            // currently zksolc returns false for success if output is empty
+                            // when output is empty, it has a length of 3, `[]\n`
+                            // solc returns true for success if output is empty
+                            if output.stderr.len() <= 3 {
+                                continue
+                            }
+                            eyre::bail!(
+                                    "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
+                                    String::from_utf8(output.stderr).unwrap_or_default(),
+                                    self.compiler_path,
+                                    contract_path,
+                                    &comp_args
+                                );
+                        }
+
+                        (output.stdout, Some(artifact_paths))
+                    }
+                };
 
                 // Step 6: Handle Output (Errors and Warnings)
                 data.insert(
                     filename.clone(),
                     ZkSolc::handle_output(
-                        output.stdout,
+                        output,
                         &filename,
                         &mut displayed_warnings,
-                        Some(
-                            self.project
-                                .paths
-                                .artifacts
-                                .join(filename.clone())
-                                .join("artifacts.json"),
-                        ),
+                        &contract_hash,
+                        maybe_artifact_paths,
                     ),
                 );
             }
@@ -351,6 +383,39 @@ impl ZkSolc {
         let mut result = ProjectCompileOutput::default();
         result.set_compiled_artifacts(Artifacts(data));
         Ok(result)
+    }
+
+    /// Checks if the contract has already been compiled, and if yes then returns the compiled data.
+    /// The contents will not be persisted again.
+    fn check_cache(
+        &self,
+        artifact_paths: &ZkSolcArtifactPaths,
+        contract_hash: &str,
+    ) -> Option<Vec<u8>> {
+        if artifact_paths.contract_hash.exists() && artifact_paths.artifact.exists() {
+            File::open(&artifact_paths.contract_hash)
+                .and_then(|mut file| {
+                    let mut cached_contract_hash = String::new();
+                    file.read_to_string(&mut cached_contract_hash).map(|_| cached_contract_hash)
+                })
+                .and_then(|cached_contract_hash| {
+                    if cached_contract_hash == contract_hash {
+                        Ok(Some(contract_hash))
+                    } else {
+                        Err(std::io::Error::new(std::io::ErrorKind::Other, "hashes do not match"))
+                    }
+                })
+                .and_then(|_| {
+                    File::open(&artifact_paths.artifact).and_then(|mut file| {
+                        let mut buffer = Vec::new();
+                        file.read_to_end(&mut buffer).map(|_| Some(buffer))
+                    })
+                })
+                .ok()
+                .flatten()
+        } else {
+            None
+        }
     }
 
     /// Builds the compiler arguments for the Solidity compiler based on the provided versioned
@@ -430,9 +495,10 @@ impl ZkSolc {
     /// errors and warnings, and saves the artifacts.
     pub fn handle_output(
         output: Vec<u8>,
-        source: &String,
+        source: &str,
         displayed_warnings: &mut HashSet<String>,
-        write_artifacts: Option<PathBuf>,
+        contract_hash: &str,
+        write_artifacts: Option<ZkSolcArtifactPaths>,
     ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
         // Deserialize the compiler output into a serde_json::Value object
         let compiler_output: ZkSolcCompilerOutput =
@@ -473,7 +539,7 @@ impl ZkSolc {
                         continue
                     }
 
-                    println!(
+                    info!(
                         "{} -> Bytecode Hash: {} ",
                         contract_name,
                         contract.hash.as_ref().unwrap()
@@ -537,13 +603,24 @@ impl ZkSolc {
                 .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
 
             // Create the artifacts file for saving the compiler output
-            let mut artifacts_file =
-                File::create(write_artifacts).wrap_err("Could not create artifacts file").unwrap();
+            let mut artifacts_file = File::create(write_artifacts.artifact)
+                .wrap_err("Could not create artifacts file")
+                .unwrap();
 
             // Write the beautified output JSON to the artifacts file
             artifacts_file
                 .write_all(output_json_pretty.as_bytes())
                 .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+
+            // Create the contract_hash file for saving the input contract hash
+            let mut contract_hash_file = File::create(write_artifacts.contract_hash)
+                .wrap_err("Could not create contract_hash file")
+                .unwrap();
+
+            // Write the contract's file hash to the contract_hash file
+            contract_hash_file
+                .write_all(contract_hash.as_bytes())
+                .unwrap_or_else(|e| panic!("Could not write contract_hash file: {}", e));
         }
 
         result

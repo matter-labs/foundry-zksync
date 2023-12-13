@@ -4303,6 +4303,7 @@ dependencies = [
  "tracing",
  "url",
  "walkdir",
+ "xxhash-rust",
  "yansi 0.5.1",
  "zksync-web3-rs",
  "zksync_basic_types",
@@ -12459,6 +12460,12 @@ name = "xml-rs"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fcb9cbac069e033553e8bb871be2fbdffcab578eb25bd0f7c508cedc6dcd75a"
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9828b178da53440fa9c766a3d2f73f7cf5d0ac1fe3980c1e5018d899fd19e07b"
 
 [[package]]
 name = "yansi"
