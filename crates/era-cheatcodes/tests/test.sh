@@ -11,10 +11,10 @@ BINARY_PATH="${REPO_ROOT}/target/release/zkforge"
 function download_solc() {
   case "$(uname -s)" in
   Darwin*) arch=macos ;;
-  *) arch=linux ;;
+  *) arch=static-linux ;;
   esac
   if [ ! -x "${SOLC}" ]; then
-    wget --quiet -O "${SOLC}" "https://github.com/ethereum/solidity/releases/download/${1}/solc-static-${arch}"
+    wget --quiet -O "${SOLC}" "https://github.com/ethereum/solidity/releases/download/${1}/solc-${arch}"
     chmod +x "${SOLC}"
   fi
 }
