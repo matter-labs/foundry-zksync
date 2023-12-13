@@ -140,7 +140,7 @@ where
 
     let nonces = era_db.get_nonce_for_address(address_to_h160(env.tx.caller));
 
-    println!(
+    debug!(
         "*** Starting ERA transaction: block: {:?} timestamp: {:?} - but using {:?} and {:?} instead with nonce {:?}",
         env.block.number.to::<u32>(),
         env.block.timestamp.to::<u64>(),
