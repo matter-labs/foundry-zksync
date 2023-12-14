@@ -91,7 +91,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     fn after_execution(
         &mut self,
         state: VmLocalStateData<'_>,
-        data: multivm::zk_evm_1_3_3::tracing::AfterExecutionData,
+        data: AfterExecutionData,
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
