@@ -145,7 +145,7 @@ impl fmt::Display for ZkSolc {
         write!(
             f,
             "ZkSolc (
-                compiler_path: {},   
+                compiler_path: {},
                 output_path: {},
             )",
             self.compiler_path.display(),
