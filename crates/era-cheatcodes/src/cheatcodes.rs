@@ -1,5 +1,9 @@
 use era_test_node::{fork::ForkStorage, utils::bytecode_to_factory_dep};
-use ethers::{abi::AbiDecode, prelude::abigen, utils::to_checksum};
+use ethers::{
+    abi::{AbiDecode, AbiEncode},
+    prelude::abigen,
+    utils::to_checksum,
+};
 use foundry_evm_core::{backend::DatabaseExt, era_revm::db::RevmDatabaseForEra};
 use itertools::Itertools;
 use multivm::{
@@ -14,14 +18,19 @@ use multivm::{
         },
     },
 };
-use std::{cell::RefMut, collections::HashMap, fmt::Debug};
+use serde::Serialize;
+use std::{
+    cell::RefMut,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 use zksync_basic_types::{AccountTreeId, Address, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, StorageView, WriteStorage};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, Timestamp,
+    EventMessage, LogQuery, StorageKey, Timestamp,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
@@ -62,7 +71,9 @@ abigen!(
         function deal(address who, uint256 newBalance)
         function etch(address who, bytes calldata code)
         function getNonce(address account)
+        function getRecordedLogs()
         function load(address account, bytes32 slot)
+        function recordLogs()
         function roll(uint256 blockNumber)
         function serializeAddress(string objectKey, string valueKey, address value)
         function serializeBool(string objectKey, string valueKey, bool value)
@@ -79,6 +90,7 @@ abigen!(
         function toString(bytes32 value)
         function toString(bytes value)
         function warp(uint256 timestamp)
+        struct Log { bytes32[] topics; bytes data; address emitter }
     ]"#
 );
 
@@ -90,6 +102,22 @@ pub struct CheatcodeTracer {
     return_ptr: Option<FatPointer>,
     near_calls: usize,
     serialized_objects: HashMap<String, String>,
+    recorded_logs: HashSet<LogEntry>,
+    recording_logs: bool,
+    recording_timestamp: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
+struct LogEntry {
+    topic: H256,
+    data: H256,
+    emitter: H160,
+}
+
+impl LogEntry {
+    fn new(topic: H256, data: H256, emitter: H160) -> Self {
+        LogEntry { topic, data, emitter }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -187,6 +215,23 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         state: &mut ZkSyncVmState<EraDb<S>, H>,
         _bootloader_state: &mut BootloaderState,
     ) -> TracerExecutionStatus {
+        let emitter = state.local_state.callstack.current.this_address;
+        if self.recording_logs {
+            let logs = transform_to_logs(
+                state
+                    .event_sink
+                    .get_events_and_l2_l1_logs_after_timestamp(Timestamp(self.recording_timestamp))
+                    .0,
+                emitter,
+            );
+            if !logs.is_empty() {
+                let mut unique_set: HashSet<LogEntry> = HashSet::new();
+
+                // Filter out duplicates and extend the unique entries to the vector
+                self.recorded_logs
+                    .extend(logs.into_iter().filter(|log| unique_set.insert(log.clone())));
+            }
+        }
         while let Some(action) = self.one_time_actions.pop() {
             match action {
                 FinishCycleOneTimeActions::StorageWrite { key, read_value, write_value } => {
@@ -246,12 +291,15 @@ impl CheatcodeTracer {
             return_data: None,
             return_ptr: None,
             serialized_objects: HashMap::new(),
+            recorded_logs: HashSet::new(),
+            recording_logs: false,
+            recording_timestamp: 0,
         }
     }
 
     pub fn dispatch_cheatcode<S: DatabaseExt + Send, H: HistoryMode>(
         &mut self,
-        _state: VmLocalStateData<'_>,
+        state: VmLocalStateData<'_>,
         _data: BeforeExecutionData,
         _memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
@@ -299,12 +347,51 @@ impl CheatcodeTracer {
                 tracing::info!("👷 Returndata is {:?}", account_nonce);
                 self.return_data = Some(vec![account_nonce]);
             }
+            GetRecordedLogs(GetRecordedLogsCall) => {
+                tracing::info!("👷 Getting recorded logs");
+                let log_vector: Vec<Vec<u8>> = self
+                    .recorded_logs
+                    .iter()
+                    .map(|log| {
+                        Log {
+                            topics: vec![log.topic.into()],
+                            data: log.data.to_fixed_bytes().into(),
+                            emitter: log.emitter,
+                        }
+                        .encode()
+                    })
+                    .collect();
+                //keep only first element
+                let log_vector = log_vector.into_iter().next().unwrap_or_default();
+
+                let mut return_data = vec![0u8; 32];
+                return_data[31] = 0x20;
+                return_data.extend(log_vector);
+                let return_data: Vec<U256> = return_data.chunks(32).map(|b| b.into()).collect_vec();
+                self.return_data = Some(return_data);
+                //TODO: return logs as returndata
+
+                //clean up logs
+                self.recorded_logs = HashSet::new();
+                //disable flag of recording logs
+                self.recording_logs = false;
+            }
             Load(LoadCall { account, slot }) => {
                 tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, account);
                 let key = StorageKey::new(AccountTreeId::new(account), H256(slot));
                 let mut storage = storage.borrow_mut();
                 let value = storage.read_value(&key);
                 self.return_data = Some(vec![h256_to_u256(value)]);
+            }
+            RecordLogs(RecordLogsCall) => {
+                tracing::info!("👷 Recording logs");
+                tracing::info!(
+                    "👷 Logs will be with the timestamp {}",
+                    state.vm_local_state.timestamp
+                );
+
+                self.recording_timestamp = state.vm_local_state.timestamp;
+                self.recording_logs = true;
             }
             Roll(RollCall { block_number }) => {
                 tracing::info!("👷 Setting block number to {}", block_number);
@@ -527,4 +614,11 @@ impl CheatcodeTracer {
 
         self.return_data = Some(data);
     }
+}
+fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> {
+    events
+        .iter()
+        .filter(|event| event.address == zksync_types::EVENT_WRITER_ADDRESS)
+        .map(|event| LogEntry::new(u256_to_h256(event.key), u256_to_h256(event.value), emitter))
+        .collect()
 }
