@@ -181,7 +181,7 @@ pub fn compile_smart_contracts(
 
     match zksolc.compile() {
         Ok(_) => {
-            println!("Compiled Successfully");
+            info!("Compiled Successfully");
             Ok(())
         }
         Err(err) => {
@@ -680,7 +680,7 @@ impl ZkSolc {
         if has_error {
             exit(1);
         } else if has_warning {
-            println!("Compiler run completed with warnings");
+            warn!("Compiler run completed with warnings");
         }
     }
 

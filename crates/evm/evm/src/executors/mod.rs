@@ -161,9 +161,9 @@ impl Executor {
         let res = self.call_committing::<_, _>(from, to, "setUp()", vec![], U256::ZERO, None)?;
 
         // record any changes made to the block's environment during setup
-        self.env.block = env.block.clone();
+        self.env.block = res.env.block.clone();
         // and also the chainid, which can be set manually
-        self.env.cfg.chain_id = env.cfg.chain_id;
+        self.env.cfg.chain_id = res.env.cfg.chain_id;
 
         match res.state_changeset.as_ref() {
             Some(changeset) => {

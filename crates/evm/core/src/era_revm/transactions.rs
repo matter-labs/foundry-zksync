@@ -136,17 +136,10 @@ where
     INSP: ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>,
 {
     let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
-    let nonces = era_db.get_nonce_for_address(address_to_h160(env.tx.caller));
+    let nonce = era_db.get_nonce_for_address(address_to_h160(env.tx.caller));
     let (num, ts) = era_db.get_l2_block_number_and_timestamp();
 
-    debug!(
-        "*** Starting ERA transaction: block: {:?} timestamp: {:?} - but using {:?} and {:?} instead with nonce {:?}",
-        env.block.number.to::<u32>(),
-        env.block.timestamp.to::<u64>(),
-        num,
-        ts,
-        nonces
-    );
+    debug!("Starting ERA transaction: block={:?} timestamp={:?} nonce={:?}", num, ts, nonce);
 
     // Update the environment timestamp and block number.
     // Check if this should be done at the end?
@@ -183,7 +176,7 @@ where
     };
     let node = InMemoryNode::new(Some(fork_details), None, config);
 
-    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonces);
+    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
 
     if l2_tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
