@@ -30,7 +30,7 @@
 ///
 /// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods
 ///   construct the path and file for saving the compiler output artifacts.
-use crate::zksolc_manager::ZkSolcManager;
+use crate::{zksolc_manager::ZkSolcManager};
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::Bytes;
 use ansi_term::Colour::{Red, Yellow};
@@ -78,6 +78,28 @@ pub struct ZkSolcOpts {
     pub is_system: bool,
     pub force_evmla: bool,
     pub remappings: Vec<RelativeRemapping>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct CompilerError {
+    component: String,
+    #[serde(rename = "errorCode")]
+    error_code: Option<String>,
+    #[serde(rename = "formattedMessage")]
+    formatted_message: String,
+    message: String,
+    severity: String,
+    #[serde(rename = "sourceLocation")]
+    source_location: SourceLocation,
+    #[serde(rename = "type")]
+    type_of_error: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct SourceLocation {
+    file: String,
+    start: u32,
+    end: u32,
 }
 
 /// Files that should be compiled with a given solidity version.
@@ -338,14 +360,17 @@ impl ZkSolc {
                             .spawn()
                             .wrap_err("Failed to start the compiler")?;
 
-                        let stdin = child.stdin.take().expect("Stdin exists.");
-
-                        serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
-                            .wrap_err("Could not assign standard_json to writer")?;
-
+                        if let Some(mut stdin) = child.stdin.take() {
+                            let input_json = serde_json::to_string(&self.standard_json)
+                                .wrap_err("Failed to serialize input to JSON")?;
+                            stdin
+                                .write_all(input_json.as_bytes())
+                                .wrap_err("Failed to write to stdin")?;
+                        }
                         let output =
                             child.wait_with_output().wrap_err("Could not run compiler cmd")?;
-
+                        
+                        
                         if !output.status.success() {
                             // Skip this file if the compiler output is empty
                             // currently zksolc returns false for success if output is empty
@@ -366,8 +391,8 @@ impl ZkSolc {
                         (output.stdout, Some(artifact_paths))
                     }
                 };
-
                 // Step 6: Handle Output (Errors and Warnings)
+
                 data.insert(
                     filename.clone(),
                     ZkSolc::handle_output(
@@ -501,17 +526,29 @@ impl ZkSolc {
         write_artifacts: Option<ZkSolcArtifactPaths>,
     ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
         // Deserialize the compiler output into a serde_json::Value object
-        let compiler_output: ZkSolcCompilerOutput =
-            serde_json::from_slice(&output).unwrap_or_else(|e| {
-                panic!(
-                    "Could not parse zksolc compiler output: {}\n{}",
-                    e,
-                    std::str::from_utf8(&output).unwrap_or_default()
-                )
-            });
+        let compiler_output: ZkSolcCompilerOutput = match serde_json::from_slice(&output) {
+            Ok(output) => output,
+            Err(_) => {
+                let output_str = String::from_utf8_lossy(&output);
+                let parsed_json: Result<serde_json::Value, _> = serde_json::from_str(&output_str);
+    
+                match parsed_json {
+                    Ok(json) if json.get("errors").is_some() => {
+                        let errors = json["errors"].as_array()
+                            .expect("Expected 'errors' to be an array")
+                            .iter()
+                            .map(|e| serde_json::from_value(e.clone()).expect("Error parsing error"))
+                            .collect::<Vec<CompilerError>>();
+                        ZkSolc::handle_output_errors(errors);
+                    },
+                    _ => println!("Failed to parse compiler output!"),
+                }
+                exit(1);
+            }
+        };
 
-        // Handle errors and warnings in the output
-        ZkSolc::handle_output_errors(&compiler_output, displayed_warnings);
+        // Handle warnings in the output
+        ZkSolc::handle_output_warnings(&compiler_output, displayed_warnings);
 
         // First - let's get all the bytecodes.
         let mut all_bytecodes: HashMap<String, String> = Default::default();
@@ -649,7 +686,7 @@ impl ZkSolc {
     /// If any errors are encountered, the function calls `exit(1)` to terminate the program. If
     /// only warnings are encountered, it prints a message indicating that the compiler run
     /// completed with warnings.
-    pub fn handle_output_errors(
+    pub fn handle_output_warnings(
         output_json: &ZkSolcCompilerOutput,
         displayed_warnings: &mut HashSet<String>,
     ) {
@@ -681,6 +718,24 @@ impl ZkSolc {
             exit(1);
         } else if has_warning {
             println!("Compiler run completed with warnings");
+        }
+    }
+
+    pub fn handle_output_errors(errors: Vec<CompilerError>) {
+        let mut has_error = false;
+    
+        for error in errors {
+            if error.severity.eq_ignore_ascii_case("error") {
+                // Using the formatted message directly
+                let error_message = &error.formatted_message;
+                println!("{}", Red.paint(error_message));
+                has_error = true;
+            }
+        }
+    
+        if has_error {
+            println!("{}", Red.paint("Compilation failed"));
+            exit(1);
         }
     }
 
