@@ -724,7 +724,6 @@ impl ZkSolc {
 
         for error in errors {
             if error.severity.eq_ignore_ascii_case("error") {
-                // Using the formatted message directly
                 let error_message = &error.formatted_message;
                 error!("{}", Red.paint(error_message));
                 has_error = true;
