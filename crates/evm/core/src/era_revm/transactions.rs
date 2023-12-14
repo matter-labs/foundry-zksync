@@ -1,4 +1,5 @@
 use era_test_node::{
+    deps::storage_view::StorageView,
     fork::{ForkDetails, ForkStorage},
     node::{
         InMemoryNode, InMemoryNodeConfig, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails,
@@ -21,7 +22,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
-use zksync_state::StorageView;
 use zksync_types::{
     api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
     StorageKey, StorageLogQueryType, ACCOUNT_CODE_STORAGE_ADDRESS,

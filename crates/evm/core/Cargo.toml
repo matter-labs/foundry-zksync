@@ -40,7 +40,6 @@ zksync_types.workspace = true
 era_test_node.workspace = true
 zksync_utils.workspace = true
 zksync_web3_decl.workspace = true
-zksync_state.workspace = true
 
 derive_more.workspace = true
 eyre = "0.6"

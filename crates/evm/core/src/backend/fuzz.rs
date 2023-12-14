@@ -16,9 +16,8 @@ use revm::{
 use std::{borrow::Cow, collections::HashMap};
 
 use crate::era_revm::db::RevmDatabaseForEra;
-use era_test_node::fork::ForkStorage;
+use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
 use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
-use zksync_state::StorageView;
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///

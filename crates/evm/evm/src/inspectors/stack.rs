@@ -574,8 +574,8 @@ use era_test_node::fork::ForkStorage;
 use foundry_evm_core::era_revm::db::RevmDatabaseForEra;
 
 use era_cheatcodes::cheatcodes::CheatcodeTracer;
+use era_test_node::deps::storage_view::StorageView;
 use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
-use zksync_state::StorageView;
 
 impl<DB: DatabaseExt + Send>
     ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>

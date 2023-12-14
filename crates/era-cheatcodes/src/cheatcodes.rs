@@ -1,12 +1,17 @@
-use crate::utils::{ToH160, ToH256};
+use crate::utils::{ToH160, ToH256, ToU256};
 use alloy_sol_types::SolInterface;
-use era_test_node::{fork::ForkStorage, utils::bytecode_to_factory_dep};
+use era_test_node::{
+    deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
+};
 use ethers::utils::to_checksum;
 use foundry_cheatcodes_spec::Vm;
-use foundry_evm_core::{backend::DatabaseExt, era_revm::db::RevmDatabaseForEra};
+use foundry_evm_core::{
+    backend::DatabaseExt, era_revm::db::RevmDatabaseForEra, fork::CreateFork, opts::EvmOpts,
+};
 use itertools::Itertools;
 use multivm::{
     interface::{dyn_tracers::vm_1_3_3::DynTracer, tracer::TracerExecutionStatus},
+    vm_latest::{L1BatchEnv, SystemEnv},
     vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
     zk_evm_1_3_3::{
         tracing::{AfterExecutionData, VmLocalStateData},
@@ -17,9 +22,17 @@ use multivm::{
         },
     },
 };
-use std::{cell::RefMut, collections::HashMap, fmt::Debug};
+use revm::{
+    primitives::{BlockEnv, CfgEnv, Env, SpecId},
+    JournaledState,
+};
+use std::{
+    cell::{OnceCell, RefMut},
+    collections::HashMap,
+    fmt::Debug,
+};
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
-use zksync_state::{ReadStorage, StoragePtr, StorageView, WriteStorage};
+use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
@@ -58,6 +71,12 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     H160::zero(),
 ];
 
+#[derive(Debug, Clone)]
+struct EraEnv {
+    l1_batch_env: L1BatchEnv,
+    system_env: SystemEnv,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
     one_time_actions: Vec<FinishCycleOneTimeActions>,
@@ -66,6 +85,7 @@ pub struct CheatcodeTracer {
     return_ptr: Option<FatPointer>,
     near_calls: usize,
     serialized_objects: HashMap<String, String>,
+    env: OnceCell<EraEnv>,
 }
 
 #[derive(Debug, Clone)]
@@ -150,10 +170,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 }
 
 impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeTracer {
+    fn initialize_tracer(
+        &mut self,
+        _state: &mut ZkSyncVmState<EraDb<S>, H>,
+        l1_batch_env: &L1BatchEnv,
+        system_env: &SystemEnv,
+    ) {
+        self.env
+            .set(EraEnv { l1_batch_env: l1_batch_env.clone(), system_env: system_env.clone() })
+            .unwrap();
+    }
+
     fn finish_cycle(
         &mut self,
         state: &mut ZkSyncVmState<EraDb<S>, H>,
         _bootloader_state: &mut BootloaderState,
+        _storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
         while let Some(action) = self.one_time_actions.pop() {
             match action {
@@ -214,6 +246,7 @@ impl CheatcodeTracer {
             return_data: None,
             return_ptr: None,
             serialized_objects: HashMap::new(),
+            env: OnceCell::default(),
         }
     }
 
@@ -474,6 +507,32 @@ impl CheatcodeTracer {
                     &mut storage,
                 );
             }
+            createSelectFork_1(createSelectFork_1Call { urlOrAlias, blockNumber }) => {
+                tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
+                let handle = &storage.borrow_mut().storage_handle;
+                let s = handle.inner.write().unwrap();
+                let mut f = s.fork.as_ref().unwrap().fork_source.db.lock().unwrap();
+                let era_env = self.env.get().unwrap();
+                let mut era_rpc = HashMap::new();
+                era_rpc
+                    .insert("mainnet".to_string(), "https://mainnet.era.zksync.io:443".to_string());
+                era_rpc.insert(
+                    "testnet".to_string(),
+                    "https://testnet.era.zksync.dev:443".to_string(),
+                );
+                let block_number = blockNumber.to_u256().as_u64();
+                let mut env = into_revm_env(&era_env);
+                let mut state = JournaledState::new(SpecId::LATEST, vec![]);
+                let q = f.create_select_fork(
+                    create_fork_request(era_env, &era_rpc, Some(block_number), urlOrAlias),
+                    &mut env,
+                    &mut state,
+                );
+                dbg!(&q);
+                dbg!(&state);
+                dbg!(&env);
+                self.return_data = Some(vec![q.unwrap().to_u256()]);
+            }
             _ => {
                 tracing::error!("👷 Unrecognized cheatcode");
             }
@@ -515,4 +574,50 @@ impl CheatcodeTracer {
 
         self.return_data = Some(data);
     }
+}
+
+fn into_revm_env(env: &EraEnv) -> Env {
+    use foundry_common::zk_utils::conversion_utils::h160_to_address;
+    use revm::primitives::U256;
+    let block = BlockEnv {
+        number: U256::from(env.l1_batch_env.number.0),
+        coinbase: h160_to_address(env.l1_batch_env.fee_account),
+        timestamp: U256::from(env.l1_batch_env.timestamp),
+        gas_limit: U256::from(env.system_env.gas_limit),
+        basefee: U256::from(env.l1_batch_env.base_fee()),
+        ..Default::default()
+    };
+
+    let mut cfg = CfgEnv::default();
+    cfg.chain_id = env.system_env.chain_id.as_u64();
+
+    Env { block, cfg, ..Default::default() }
+}
+
+fn create_fork_request(
+    env: &EraEnv,
+    era_rpc: &HashMap<String, String>,
+    block_number: Option<u64>,
+    url_or_alias: String,
+) -> CreateFork {
+    use foundry_evm_core::opts::Env;
+    use revm::primitives::Address as revmAddress;
+    let url = &era_rpc[&url_or_alias];
+    let env = into_revm_env(&env);
+    let opts_env = Env {
+        gas_limit: u64::MAX,
+        chain_id: None,
+        tx_origin: revmAddress::ZERO,
+        block_number: 0,
+        block_timestamp: 0,
+        ..Default::default()
+    };
+    let evm_opts = EvmOpts {
+        env: opts_env,
+        fork_url: Some(url.clone()),
+        fork_block_number: block_number,
+        ..Default::default()
+    };
+
+    CreateFork { enable_caching: true, url: url.clone(), env, evm_opts }
 }

@@ -48,5 +48,4 @@ tracing = "0.1"
 # zksync
 multivm.workspace = true
 era_cheatcodes.workspace = true
-zksync_state.workspace = true
 era_test_node.workspace = true
