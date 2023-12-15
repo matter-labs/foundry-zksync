@@ -93,14 +93,11 @@ jobs:
     smoke-test:
       name: smoke-test
       runs-on: ubuntu-22.04-github-hosted-16core
-      env:
-        TEST_REPO_DIR: test-repo
-  
+
       steps:
       - name: Checkout code
         uses: actions/checkout@v4 
         with:
-          path: ${{ env.TEST_REPO_DIR }}
           ref: ${{ github.event.pull_request.head.sha }}
       
       - name: Install Rust
@@ -108,15 +105,14 @@ jobs:
         with:
           toolchain: nightly-2023-09-21
       
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+        
       - name: Run smoke-test
         env:
-          TEST_REPO: ${{ github.event.repository.name }}
-          TEST_REPO_DIR: "../${{ env.TEST_REPO_DIR }}"
           RUST_BACKTRACE: full
-        run: |
-          git clone https://github.com/matter-labs/zkfoundry-smoke-test
-          cd zkfoundry-smoke-test
-          ./smoke-test.sh
+        run: cd smoke-test && ./test.sh
 
     cheatcodes:
       name: cheatcode-test
