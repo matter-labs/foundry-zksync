@@ -57,7 +57,7 @@ use std::{
     process::{exit, Command, Stdio},
 };
 
-/// Mapping of bytecodes to the respective contract name
+/// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
 
 #[derive(Debug, Default, Clone)]
