@@ -23,7 +23,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
     fs,
-    process::Command
+    process::Command,
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, StorageView, WriteStorage};
@@ -295,7 +295,7 @@ impl CheatcodeTracer {
                 let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
-            } 
+            }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
