@@ -129,5 +129,9 @@ jobs:
           with:
             toolchain: nightly-2023-07-23
   
+        - uses: Swatinem/rust-cache@v2
+          with:
+            cache-on-failure: true
+
         - name: Test Cheatcodes
           run: cd crates/era-cheatcodes/tests && ./test.sh
