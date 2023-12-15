@@ -17,7 +17,7 @@ use foundry_common::{
     SYSTEM_TRANSACTION_TYPE,
 };
 use revm::{
-    db::{CacheDB, DatabaseRef},
+    db::{self, CacheDB, DatabaseRef},
     inspectors::NoOpInspector,
     precompile::{Precompiles, SpecId},
     primitives::{

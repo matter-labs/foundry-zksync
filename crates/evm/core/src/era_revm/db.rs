@@ -5,6 +5,7 @@
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
 /// is usually collecing all the diffs - and applies them to database itself.
 use std::{
+    backtrace::Backtrace,
     collections::HashMap,
     fmt::Debug,
     sync::{Arc, Mutex},

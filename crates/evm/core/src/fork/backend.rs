@@ -2,6 +2,7 @@
 use crate::{
     backend::{DatabaseError, DatabaseResult},
     fork::{cache::FlushJsonBlockCacheDB, BlockchainDb},
+    utils::CallKind,
 };
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use ethers_core::{
@@ -13,6 +14,7 @@ use foundry_common::{
     types::{ToAlloy, ToEthers},
     NON_ARCHIVE_NODE_WARNING,
 };
+use foundry_compilers::artifacts::bytecode;
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
     stream::Stream,
@@ -32,6 +34,8 @@ use std::{
     },
 };
 
+use super::zksync_provider::ZkSyncMiddleware;
+
 // Various future/request type aliases
 
 type AccountFuture<Err> =
@@ -48,10 +52,14 @@ type TransactionFuture<Err> = Pin<
     Box<dyn Future<Output = (TransactionSender, Result<Option<Transaction>, Err>, B256)> + Send>,
 >;
 
+type BytecodeHashFuture<Err> =
+    Pin<Box<dyn Future<Output = (ByteCodeHashSender, Result<Option<Bytecode>, Err>, B256)> + Send>>;
+
 type AccountInfoSender = OneshotSender<DatabaseResult<AccountInfo>>;
 type StorageSender = OneshotSender<DatabaseResult<U256>>;
 type BlockHashSender = OneshotSender<DatabaseResult<B256>>;
 type FullBlockSender = OneshotSender<DatabaseResult<Block<Transaction>>>;
+type ByteCodeHashSender = OneshotSender<DatabaseResult<Bytecode>>;
 type TransactionSender = OneshotSender<DatabaseResult<Transaction>>;
 
 /// Request variants that are executed by the provider
@@ -61,6 +69,7 @@ enum ProviderRequest<Err> {
     BlockHash(BlockHashFuture<Err>),
     FullBlock(FullBlockFuture<Err>),
     Transaction(TransactionFuture<Err>),
+    ByteCodeHash(BytecodeHashFuture<Err>),
 }
 
 /// The Request type the Backend listens for
@@ -78,6 +87,8 @@ enum BackendRequest {
     Transaction(B256, TransactionSender),
     /// Sets the pinned block to fetch data from
     SetPinnedBlock(BlockId),
+    /// Get the bytecode for the given hash
+    ByteCodeHash(B256, ByteCodeHashSender),
 }
 
 /// Handles an internal provider and listens for requests.
@@ -85,7 +96,7 @@ enum BackendRequest {
 /// This handler will remain active as long as it is reachable (request channel still open) and
 /// requests are in progress.
 #[must_use = "futures do nothing unless polled"]
-pub struct BackendHandler<M: Middleware> {
+pub struct BackendHandler<M: ZkSyncMiddleware> {
     provider: M,
     /// Stores all the data.
     db: BlockchainDb,
@@ -108,7 +119,7 @@ pub struct BackendHandler<M: Middleware> {
 
 impl<M> BackendHandler<M>
 where
-    M: Middleware + Clone + 'static,
+    M: ZkSyncMiddleware + Clone + 'static,
 {
     fn new(
         provider: M,
@@ -173,6 +184,9 @@ where
             }
             BackendRequest::SetPinnedBlock(block_id) => {
                 self.block_id = Some(block_id);
+            }
+            BackendRequest::ByteCodeHash(code_hash, sender) => {
+                self.request_bytecode_by_hash(code_hash, sender);
             }
         }
     }
@@ -241,6 +255,15 @@ where
         }
     }
 
+    fn request_bytecode_by_hash(&mut self, code_hash: B256, sender: ByteCodeHashSender) {
+        let provider = self.provider.clone();
+        let fut = Box::pin(async move {
+            let bytecode = provider.get_bytecode_by_hash(code_hash).await;
+            (sender, bytecode, code_hash)
+        });
+        self.pending_requests.push(ProviderRequest::ByteCodeHash(fut));
+    }
+
     /// process a request for an entire block
     fn request_full_block(&mut self, number: BlockId, sender: FullBlockSender) {
         let provider = self.provider.clone();
@@ -301,7 +324,7 @@ where
 
 impl<M> Future for BackendHandler<M>
 where
-    M: Middleware + Clone + Unpin + 'static,
+    M: ZkSyncMiddleware + Clone + Unpin + 'static,
 {
     type Output = ();
 
@@ -468,6 +491,20 @@ where
                             continue
                         }
                     }
+                    ProviderRequest::ByteCodeHash(fut) => {
+                        if let Poll::Ready((sender, bytecode, code_hash)) = fut.poll_unpin(cx) {
+                            let msg = match bytecode {
+                                Ok(Some(bytecode)) => Ok(bytecode),
+                                Ok(None) => Err(DatabaseError::MissingCode(code_hash)),
+                                Err(err) => {
+                                    let err = Arc::new(eyre::Error::new(err));
+                                    Err(DatabaseError::GetBytecode(code_hash, err))
+                                }
+                            };
+                            let _ = sender.send(msg);
+                            continue
+                        }
+                    }
                 }
                 // not ready, insert and poll again
                 pin.pending_requests.push(request);
@@ -531,7 +568,7 @@ impl SharedBackend {
     /// NOTE: this should be called with `Arc<Provider>`
     pub async fn spawn_backend<M>(provider: M, db: BlockchainDb, pin_block: Option<BlockId>) -> Self
     where
-        M: Middleware + Unpin + 'static + Clone,
+        M: ZkSyncMiddleware + Unpin + 'static + Clone,
     {
         let (shared, handler) = Self::new(provider, db, pin_block);
         // spawn the provider handler to a task
@@ -548,7 +585,7 @@ impl SharedBackend {
         pin_block: Option<BlockId>,
     ) -> Self
     where
-        M: Middleware + Unpin + 'static + Clone,
+        M: ZkSyncMiddleware + Unpin + 'static + Clone,
     {
         let (shared, handler) = Self::new(provider, db, pin_block);
 
@@ -577,7 +614,7 @@ impl SharedBackend {
         pin_block: Option<BlockId>,
     ) -> (Self, BackendHandler<M>)
     where
-        M: Middleware + Unpin + 'static + Clone,
+        M: ZkSyncMiddleware + Unpin + 'static + Clone,
     {
         let (backend, backend_rx) = channel(1);
         let cache = Arc::new(FlushJsonBlockCacheDB(Arc::clone(db.cache())));
@@ -638,6 +675,15 @@ impl SharedBackend {
         })
     }
 
+    fn do_get_bytecode(&self, hash: B256) -> DatabaseResult<Bytecode> {
+        tokio::task::block_in_place(|| {
+            let (sender, rx) = oneshot_channel();
+            let req = BackendRequest::ByteCodeHash(hash, sender);
+            self.backend.clone().try_send(req)?;
+            rx.recv()?
+        })
+    }
+
     /// Flushes the DB to disk if caching is enabled
     pub(crate) fn flush_cache(&self) {
         self.cache.0.flush();
@@ -659,7 +705,14 @@ impl DatabaseRef for SharedBackend {
     }
 
     fn code_by_hash_ref(&self, hash: B256) -> Result<Bytecode, Self::Error> {
-        Err(DatabaseError::MissingCode(hash))
+        trace!(target: "sharedbackend", %hash, "request codehash");
+        self.do_get_bytecode(hash).map_err(|err| {
+            error!(target: "sharedbackend", %err, %hash, "Failed to send/recv `code_by_hash`");
+            if err.is_possibly_non_archive_node_error() {
+                error!(target: "sharedbackend", "{NON_ARCHIVE_NODE_WARNING}");
+            }
+            err
+        })
     }
 
     fn storage_ref(&self, address: Address, index: U256) -> Result<U256, Self::Error> {
@@ -674,7 +727,6 @@ impl DatabaseRef for SharedBackend {
             Ok(val) => Ok(val),
             Err(err) => Err(err),
         };
-        dbg!(&res);
         res
     }
 
