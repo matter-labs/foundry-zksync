@@ -255,10 +255,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             &mut journaled_state,
                         )
                     };
-                    dbg!(&fork_id);
                     storage.borrow_mut().modified_storage_keys = modified_storage;
-                    // dbg!(&state);
-                    // dbg!(&env);
                     self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
                 }
             }

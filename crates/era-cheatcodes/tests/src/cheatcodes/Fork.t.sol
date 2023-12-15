@@ -6,29 +6,29 @@ import {Test, console2 as console} from "../../lib/forge-std/src/Test.sol";
 import {Constants} from "./Constants.sol";
 
 contract ForkTest is Test {
-    address constant TEST_ADDRESS = 0x9C5819D1F9391B9818F5BD6D701755fBF8d013AC;
+    /// USDC TOKEN 
     address constant TOKEN_ADDRESS = 0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4;
     function setUp() public {
-        // (bool success, bytes memory data) = TOKEN_ADDRESS.call(
-        //     abi.encodeWithSignature("getBalance(address)", TEST_ADDRESS)
-        // );
-        // uint256 balance_before = address(TEST_ADDRESS).balance;
-        // console.log("balance before:", balance_before);
+        /// USDC TOKEN doesn't exists locally
+        (bool success2, bytes memory data2) = TOKEN_ADDRESS.call(
+            abi.encodeWithSignature("decimals()")
+        );
+        uint256 decimals_before = uint256(bytes32(data2));
+        console.log("decimals_before:", decimals_before);
          (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature("createSelectFork(string,uint256)", "mainnet", 243698)
         );
+        require(decimals_before == 0, "Contract exists locally");
         require(success1, "fork failed");   
     }
     function testFork() public {
-
+        /// After createSelect fork the decimals  should exist
         (bool success2, bytes memory data2) = TOKEN_ADDRESS.call(
-            abi.encodeWithSignature("getBalance(address)", TEST_ADDRESS)
+            abi.encodeWithSignature("decimals()")
         );
-        uint256 balance_after = uint256(bytes32(data2));
-        // uint256 balance_after = address(TEST_ADDRESS).balance;
-        // require(success2, "balance failed");   
-        // uint256 balance_after = 1;
-        console.log("balance after:", balance_after);
+        uint256 decimals_after = uint256(bytes32(data2));
+        console.log("decimals_after:", decimals_after);
+        require(decimals_after == 6, "Contract dosent exists in fork");
 
     }
 }

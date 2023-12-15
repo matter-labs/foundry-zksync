@@ -205,7 +205,6 @@ where
                 let fut = Box::pin(async move {
                     // serialize & deserialize back to U256
                     let idx_req = B256::from(idx);
-                    dbg!(address, idx, block_id);
                     let storage = provider
                         .get_storage_at(
                             NameOrAddress::Address(address.to_ethers()),
@@ -236,7 +235,6 @@ where
                 (balance.to_alloy(), nonce.to_alloy(), Bytes::from(code.0))
             });
 
-            dbg!((&resp, &address));
             (resp, address)
         });
         ProviderRequest::Account(fut)

@@ -160,12 +160,10 @@ impl Database for ForkedDatabase {
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
-        dbg!(code_hash);
         Database::code_by_hash(&mut self.cache_db, code_hash)
     }
 
     fn storage(&mut self, address: Address, index: U256) -> Result<U256, Self::Error> {
-        dbg!(address, index);
         Database::storage(&mut self.cache_db, address, index)
     }
 
