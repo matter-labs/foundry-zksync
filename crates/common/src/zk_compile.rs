@@ -80,6 +80,28 @@ pub struct ZkSolcOpts {
     pub remappings: Vec<RelativeRemapping>,
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct CompilerError {
+    component: String,
+    #[serde(rename = "errorCode")]
+    error_code: Option<String>,
+    #[serde(rename = "formattedMessage")]
+    formatted_message: String,
+    message: String,
+    severity: String,
+    #[serde(rename = "sourceLocation")]
+    source_location: SourceLocation,
+    #[serde(rename = "type")]
+    type_of_error: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct SourceLocation {
+    file: String,
+    start: u32,
+    end: u32,
+}
+
 /// Files that should be compiled with a given solidity version.
 type SolidityVersionSources = (Version, BTreeMap<PathBuf, Source>);
 
@@ -501,17 +523,33 @@ impl ZkSolc {
         write_artifacts: Option<ZkSolcArtifactPaths>,
     ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
         // Deserialize the compiler output into a serde_json::Value object
-        let compiler_output: ZkSolcCompilerOutput =
-            serde_json::from_slice(&output).unwrap_or_else(|e| {
-                panic!(
-                    "Could not parse zksolc compiler output: {}\n{}",
-                    e,
-                    std::str::from_utf8(&output).unwrap_or_default()
-                )
-            });
+        let compiler_output: ZkSolcCompilerOutput = match serde_json::from_slice(&output) {
+            Ok(output) => output,
+            Err(_) => {
+                let output_str = String::from_utf8_lossy(&output);
+                let parsed_json: Result<serde_json::Value, _> = serde_json::from_str(&output_str);
 
-        // Handle errors and warnings in the output
-        ZkSolc::handle_output_errors(&compiler_output, displayed_warnings);
+                match parsed_json {
+                    Ok(json) if json.get("errors").is_some() => {
+                        let errors = json["errors"]
+                            .as_array()
+                            .expect("Expected 'errors' to be an array")
+                            .iter()
+                            .map(|e| {
+                                serde_json::from_value(e.clone()).expect("Error parsing error")
+                            })
+                            .collect::<Vec<CompilerError>>();
+                        // Handle errors in the output
+                        ZkSolc::handle_output_errors(errors);
+                    }
+                    _ => info!("Failed to parse compiler output!"),
+                }
+                exit(1);
+            }
+        };
+
+        // Handle warnings in the output
+        ZkSolc::handle_output_warnings(&compiler_output, displayed_warnings);
 
         // First - let's get all the bytecodes.
         let mut all_bytecodes: HashMap<String, String> = Default::default();
@@ -649,7 +687,7 @@ impl ZkSolc {
     /// If any errors are encountered, the function calls `exit(1)` to terminate the program. If
     /// only warnings are encountered, it prints a message indicating that the compiler run
     /// completed with warnings.
-    pub fn handle_output_errors(
+    pub fn handle_output_warnings(
         output_json: &ZkSolcCompilerOutput,
         displayed_warnings: &mut HashSet<String>,
     ) {
@@ -681,6 +719,29 @@ impl ZkSolc {
             exit(1);
         } else if has_warning {
             println!("Compiler run completed with warnings");
+        }
+    }
+    /// Handles and formats the errors present in the output JSON from the zksolc compiler.
+    pub fn handle_output_errors(errors: Vec<CompilerError>) {
+        let mut has_error = false;
+        let mut error_codes = Vec::new();
+
+        for error in errors {
+            if error.severity.eq_ignore_ascii_case("error") {
+                let error_message = &error.formatted_message;
+                error!("{}", Red.paint(error_message));
+                if let Some(code) = &error.error_code {
+                    error_codes.push(code.clone());
+                }
+                has_error = true;
+            }
+        }
+
+        if has_error {
+            for code in error_codes {
+                error!("{}", Red.paint(format!("Compilation failed with error code: {}", code)));
+            }
+            exit(1);
         }
     }
 
