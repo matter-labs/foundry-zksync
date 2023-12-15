@@ -364,6 +364,7 @@ impl ZkSolc {
 
                         serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
                             .wrap_err("Could not assign standard_json to writer")?;
+
                         let output =
                             child.wait_with_output().wrap_err("Could not run compiler cmd")?;
 
@@ -387,6 +388,7 @@ impl ZkSolc {
                         (output.stdout, Some(artifact_paths))
                     }
                 };
+
                 // Step 6: Handle Output (Errors and Warnings)
                 data.insert(
                     filename.clone(),
@@ -537,6 +539,7 @@ impl ZkSolc {
                                 serde_json::from_value(e.clone()).expect("Error parsing error")
                             })
                             .collect::<Vec<CompilerError>>();
+                        // Handle errors in the output
                         ZkSolc::handle_output_errors(errors);
                     }
                     _ => info!("Failed to parse compiler output!"),
@@ -718,20 +721,26 @@ impl ZkSolc {
             println!("Compiler run completed with warnings");
         }
     }
-
+    /// Handles and formats the errors present in the output JSON from the zksolc compiler.
     pub fn handle_output_errors(errors: Vec<CompilerError>) {
         let mut has_error = false;
+        let mut error_codes = Vec::new();
 
         for error in errors {
             if error.severity.eq_ignore_ascii_case("error") {
                 let error_message = &error.formatted_message;
                 error!("{}", Red.paint(error_message));
+                if let Some(code) = &error.error_code {
+                    error_codes.push(code.clone());
+                }
                 has_error = true;
             }
         }
 
         if has_error {
-            error!("{}", Red.paint("Compilation failed"));
+            for code in error_codes {
+                error!("{}", Red.paint(format!("Compilation failed with error code: {}", code)));
+            }
             exit(1);
         }
     }
