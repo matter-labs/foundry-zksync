@@ -59,7 +59,7 @@ where
     pub fn new(db: Arc<Mutex<Box<DB>>>) -> Self {
         let db_inner = db.clone();
         let current_block = {
-            let mut db = db_inner.lock().unwrap();
+            let mut db = db_inner.lock().expect("failed aquiring lock on the database");
             let result = db
                 .storage(h160_to_address(SYSTEM_CONTEXT_ADDRESS), u256_to_revm_u256(U256::from(9)))
                 .unwrap();
@@ -187,7 +187,6 @@ where
         if let Some(block) = &block {
             match block {
                 BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(num)) => {
-                    // let current_block_number_l2 = current_l1_block * 2;
                     if num.as_u64() != self.current_block {
                         eyre::bail!("Only fetching of the most recent L2 block {} is supported - but queried for {}", self.current_block, num)
                     }
