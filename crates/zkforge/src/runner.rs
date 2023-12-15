@@ -174,21 +174,19 @@ impl<'a> ContractRunner<'a> {
             };
 
             setup_logs.iter().for_each(|log| {
-                if log.address == H160::from(zksync_types::CONTRACT_DEPLOYER_ADDRESS) {
-                    if log.topics.len() == 4 {
-                        let l2_event_hash = H256::from_str(
-                            "290afdae231a3fc0bbae8b1af63698b0a1d79b21ad17df0342dfb952fe74f8e5",
-                        )
-                        .unwrap();
+                if log.address == zksync_types::CONTRACT_DEPLOYER_ADDRESS && log.topics.len() == 4 {
+                    let l2_event_hash = H256::from_str(
+                        "290afdae231a3fc0bbae8b1af63698b0a1d79b21ad17df0342dfb952fe74f8e5",
+                    )
+                    .unwrap();
 
-                        if log.topics[0] == l2_event_hash &&
-                            h256_to_h160(&log.topics[1]) == address_to_h160(address)
-                        {
-                            labeled_addresses.insert(
-                                Address::from(h256_to_h160(&log.topics[3]).0),
-                                hex::encode(&log.topics[2]),
-                            );
-                        }
+                    if log.topics[0] == l2_event_hash &&
+                        h256_to_h160(&log.topics[1]) == address_to_h160(address)
+                    {
+                        labeled_addresses.insert(
+                            Address::from(h256_to_h160(&log.topics[3]).0),
+                            hex::encode(log.topics[2]),
+                        );
                     }
                 }
             });
@@ -308,7 +306,7 @@ impl<'a> ContractRunner<'a> {
                                     "using invaraint contract {} ({:?}) with hash 0x{}",
                                     name, addr, bytecode_hash
                                 );
-                                (addr.clone(), (name.clone(), abi.clone()))
+                                (addr, (name.clone(), abi.clone()))
                             })
                     })
                 })
