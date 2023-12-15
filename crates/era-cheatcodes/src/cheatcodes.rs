@@ -6,7 +6,10 @@ use era_test_node::{
 use ethers::utils::to_checksum;
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{
-    backend::DatabaseExt, era_revm::db::RevmDatabaseForEra, fork::CreateFork, opts::EvmOpts,
+    backend::DatabaseExt,
+    era_revm::{db::RevmDatabaseForEra, transactions::storage_to_state},
+    fork::CreateFork,
+    opts::EvmOpts,
 };
 use itertools::Itertools;
 use multivm::{
@@ -92,6 +95,7 @@ pub struct CheatcodeTracer {
 enum FinishCycleOneTimeActions {
     StorageWrite { key: StorageKey, read_value: H256, write_value: H256 },
     StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
+    CreateFork { url_or_alias: String, block_number: u64 },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -184,8 +188,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
     fn finish_cycle(
         &mut self,
         state: &mut ZkSyncVmState<EraDb<S>, H>,
-        _bootloader_state: &mut BootloaderState,
-        _storage: StoragePtr<EraDb<S>>,
+        bootloader_state: &mut BootloaderState,
+        storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
         while let Some(action) = self.one_time_actions.pop() {
             match action {
@@ -207,6 +211,56 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
+                FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
+                    let modified_storage: HashMap<StorageKey, H256> =
+                        storage.borrow_mut().modified_storage_keys().clone();
+                    storage.borrow_mut().clean_cache();
+                    let fork_id = {
+                        let handle = &storage.borrow_mut().storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+
+                        let state =
+                            storage_to_state(modified_storage.clone(), bytecodes, era_db.clone());
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut era_rpc = HashMap::new();
+                        era_rpc.insert(
+                            "mainnet".to_string(),
+                            "https://mainnet.era.zksync.io:443".to_string(),
+                        );
+                        era_rpc.insert(
+                            "testnet".to_string(),
+                            "https://testnet.era.zksync.dev:443".to_string(),
+                        );
+                        let mut env = into_revm_env(&era_env);
+                        db.create_select_fork(
+                            create_fork_request(
+                                era_env,
+                                &era_rpc,
+                                Some(block_number),
+                                url_or_alias,
+                            ),
+                            &mut env,
+                            &mut journaled_state,
+                        )
+                    };
+                    dbg!(&fork_id);
+                    storage.borrow_mut().modified_storage_keys = modified_storage;
+                    // dbg!(&state);
+                    // dbg!(&env);
+                    self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                }
             }
         }
 
@@ -509,29 +563,12 @@ impl CheatcodeTracer {
             }
             createSelectFork_1(createSelectFork_1Call { urlOrAlias, blockNumber }) => {
                 tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
-                let handle = &storage.borrow_mut().storage_handle;
-                let s = handle.inner.write().unwrap();
-                let mut f = s.fork.as_ref().unwrap().fork_source.db.lock().unwrap();
-                let era_env = self.env.get().unwrap();
-                let mut era_rpc = HashMap::new();
-                era_rpc
-                    .insert("mainnet".to_string(), "https://mainnet.era.zksync.io:443".to_string());
-                era_rpc.insert(
-                    "testnet".to_string(),
-                    "https://testnet.era.zksync.dev:443".to_string(),
-                );
+
                 let block_number = blockNumber.to_u256().as_u64();
-                let mut env = into_revm_env(&era_env);
-                let mut state = JournaledState::new(SpecId::LATEST, vec![]);
-                let q = f.create_select_fork(
-                    create_fork_request(era_env, &era_rpc, Some(block_number), urlOrAlias),
-                    &mut env,
-                    &mut state,
-                );
-                dbg!(&q);
-                dbg!(&state);
-                dbg!(&env);
-                self.return_data = Some(vec![q.unwrap().to_u256()]);
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateFork {
+                    url_or_alias: urlOrAlias,
+                    block_number,
+                });
             }
             _ => {
                 tracing::error!("👷 Unrecognized cheatcode");

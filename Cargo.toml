@@ -159,13 +159,13 @@ alloy-rlp = "0.3.3"
 solang-parser = "=0.3.3"
 
 ## zksync 
-era_test_node = { git = "https://github.com/matter-labs/era-test-node.git", rev = "bc43d87f43207fbac8521d8daf145d9d9f69b85e" }
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "a954b3ad6bd3b8c44e41217c6a50a2044b48dc06" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "a954b3ad6bd3b8c44e41217c6a50a2044b48dc06" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "a954b3ad6bd3b8c44e41217c6a50a2044b48dc06" }
-multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "a954b3ad6bd3b8c44e41217c6a50a2044b48dc06" }
-zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "a954b3ad6bd3b8c44e41217c6a50a2044b48dc06" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "a954b3ad6bd3b8c44e41217c6a50a2044b48dc06" }
+era_test_node = { path = "../era-test-node" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c26612279698a572afcdd54132e7cbf58a9c332" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c26612279698a572afcdd54132e7cbf58a9c332" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c26612279698a572afcdd54132e7cbf58a9c332" }
+multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c26612279698a572afcdd54132e7cbf58a9c332" }
+zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c26612279698a572afcdd54132e7cbf58a9c332" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c26612279698a572afcdd54132e7cbf58a9c332" }
 
 ## misc
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

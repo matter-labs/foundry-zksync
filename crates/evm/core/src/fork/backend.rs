@@ -191,6 +191,7 @@ where
                 let fut = Box::pin(async move {
                     // serialize & deserialize back to U256
                     let idx_req = B256::from(idx);
+                    dbg!(address, idx, block_id);
                     let storage = provider
                         .get_storage_at(
                             NameOrAddress::Address(address.to_ethers()),
@@ -220,6 +221,8 @@ where
             let resp = tokio::try_join!(balance, nonce, code).map(|(balance, nonce, code)| {
                 (balance.to_alloy(), nonce.to_alloy(), Bytes::from(code.0))
             });
+
+            dbg!((&resp, &address));
             (resp, address)
         });
         ProviderRequest::Account(fut)
@@ -661,7 +664,7 @@ impl DatabaseRef for SharedBackend {
 
     fn storage_ref(&self, address: Address, index: U256) -> Result<U256, Self::Error> {
         trace!(target: "sharedbackend", "request storage {:?} at {:?}", address, index);
-        match self.do_get_storage(address, index).map_err(|err| {
+        let res = match self.do_get_storage(address, index).map_err(|err| {
             error!(target: "sharedbackend", %err, %address, %index, "Failed to send/recv `storage`");
             if err.is_possibly_non_archive_node_error() {
                 error!(target: "sharedbackend", "{NON_ARCHIVE_NODE_WARNING}");
@@ -670,7 +673,9 @@ impl DatabaseRef for SharedBackend {
         }) {
             Ok(val) => Ok(val),
             Err(err) => Err(err),
-        }
+        };
+        dbg!(&res);
+        res
     }
 
     fn block_hash_ref(&self, number: U256) -> Result<B256, Self::Error> {

@@ -24,7 +24,7 @@ use std::{
 use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
 use zksync_types::{
     api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
-    StorageKey, StorageLogQueryType, ACCOUNT_CODE_STORAGE_ADDRESS,
+    StorageKey, StorageLogQueryType, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
@@ -129,7 +129,12 @@ pub enum DatabaseError {
     MissingCode(bool),
 }
 
-pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, inspector: INSP) -> EVMResult<E>
+pub fn run_era_transaction<DB, E, INSP>(
+    env: &mut Env,
+    db: DB,
+    inspector: INSP,
+    modified_storage: HashMap<StorageKey, StorageValue>,
+) -> EVMResult<E>
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
@@ -193,7 +198,12 @@ where
     }
     let tracer = inspector.into_tracer_pointer();
     let era_execution_result = node
-        .run_l2_tx_raw(l2_tx, multivm::interface::TxExecutionMode::VerifyExecute, vec![tracer])
+        .run_l2_tx_raw(
+            l2_tx,
+            multivm::interface::TxExecutionMode::VerifyExecute,
+            vec![tracer],
+            modified_storage,
+        )
         .unwrap();
 
     let (modified_keys, tx_result, _call_traces, _block, bytecodes, _block_ctx) =
@@ -241,6 +251,28 @@ where
         }
     };
 
+    let state = storage_to_state(modified_keys.clone(), bytecodes, era_db.clone());
+    era_db.db.lock().unwrap().set_modified_keys(modified_keys);
+    Ok(ResultAndState { result: execution_result, state })
+}
+
+fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
+    ethabi::decode(&[ParamType::Bytes], &output)
+        .ok()
+        .and_then(|result| result.first().cloned())
+        .and_then(|result| result.into_bytes())
+        .unwrap_or_default()
+}
+
+pub fn storage_to_state<DB>(
+    modified_keys: HashMap<StorageKey, StorageValue>,
+    bytecodes: HashMap<U256, Vec<U256>>,
+    era_db: RevmDatabaseForEra<DB>,
+) -> rHashMap<Address, Account>
+where
+    DB: DatabaseExt + Send,
+    <DB as revm::Database>::Error: Debug,
+{
     let account_to_keys: HashMap<H160, HashMap<StorageKey, H256>> =
         modified_keys.iter().fold(HashMap::new(), |mut acc, (storage_key, value)| {
             acc.entry(*storage_key.address()).or_default().insert(*storage_key, *value);
@@ -313,16 +345,7 @@ where
             )
         })
         .collect();
-
-    Ok(ResultAndState { result: execution_result, state })
-}
-
-fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
-    ethabi::decode(&[ParamType::Bytes], &output)
-        .ok()
-        .and_then(|result| result.first().cloned())
-        .and_then(|result| result.into_bytes())
-        .unwrap_or_default()
+    state
 }
 
 #[cfg(test)]
@@ -364,8 +387,13 @@ mod tests {
         };
         let mock_db = MockDatabase::default();
 
-        let res = run_era_transaction::<_, ResultAndState, _>(&mut env, mock_db, Noop::default())
-            .expect("failed executing");
+        let res = run_era_transaction::<_, ResultAndState, _>(
+            &mut env,
+            mock_db,
+            Noop::default(),
+            Default::default(),
+        )
+        .expect("failed executing");
 
         assert!(!res.state.is_empty(), "unexpected failure: no states were touched");
         for (address, account) in res.state {

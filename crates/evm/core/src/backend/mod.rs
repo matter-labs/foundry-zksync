@@ -21,8 +21,8 @@ use revm::{
     inspectors::NoOpInspector,
     precompile::{Precompiles, SpecId},
     primitives::{
-        Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, HashMap as Map, Log,
-        ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
+        Account, AccountInfo, Bytecode, CreateScheme, EVMError, EVMResult, Env, HashMap as Map,
+        Log, ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, Inspector, JournaledState, EVM,
 };
@@ -31,6 +31,7 @@ use std::collections::{HashMap, HashSet};
 use crate::era_revm::db::RevmDatabaseForEra;
 use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
 use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
+use zksync_types::{StorageKey, StorageValue};
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -312,6 +313,8 @@ pub trait DatabaseExt: Database<Error = DatabaseError> {
         }
         Ok(())
     }
+
+    fn set_modified_keys(&mut self, keys: HashMap<StorageKey, StorageValue>) {}
 }
 
 /// Provides the underlying `revm::Database` implementation.
@@ -395,6 +398,8 @@ pub struct Backend {
     active_fork_ids: Option<(LocalForkId, ForkLookupIndex)>,
     /// holds additional Backend data
     inner: BackendInner,
+    /// Storage for zksync
+    modified_storage_keys: HashMap<StorageKey, StorageValue>,
 }
 
 // === impl Backend ===
@@ -423,6 +428,7 @@ impl Backend {
             fork_init_journaled_state: inner.new_journaled_state(),
             active_fork_ids: None,
             inner,
+            modified_storage_keys: Default::default(),
         };
 
         if let Some(fork) = fork {
@@ -466,6 +472,7 @@ impl Backend {
             fork_init_journaled_state: self.inner.new_journaled_state(),
             active_fork_ids: None,
             inner: Default::default(),
+            modified_storage_keys: Default::default(),
         }
     }
 
@@ -775,8 +782,9 @@ impl Backend {
     {
         self.initialize(env);
 
-        let result: EVMResult<DatabaseError> =
-            crate::era_revm::transactions::run_era_transaction(env, self, inspector);
+        let keys = self.modified_storage_keys.clone();
+        let result: Result<ResultAndState, EVMError<DatabaseError>> =
+            crate::era_revm::transactions::run_era_transaction(env, self, inspector, keys);
 
         Ok(result.unwrap())
     }
@@ -1385,6 +1393,9 @@ impl DatabaseExt for Backend {
 
     fn has_cheatcode_access(&self, account: Address) -> bool {
         self.inner.cheatcode_access_accounts.contains(&account)
+    }
+    fn set_modified_keys(&mut self, keys: HashMap<StorageKey, StorageValue>) {
+        self.modified_storage_keys = keys;
     }
 }
 
