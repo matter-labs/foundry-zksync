@@ -1,5 +1,5 @@
 use crate::utils::{ToH160, ToH256};
-use alloy_sol_types::SolInterface;
+use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{fork::ForkStorage, utils::bytecode_to_factory_dep};
 use ethers::utils::to_checksum;
 use foundry_cheatcodes_spec::Vm;
@@ -17,7 +17,7 @@ use multivm::{
         },
     },
 };
-use std::{cell::RefMut, collections::HashMap, fmt::Debug};
+use std::{cell::RefMut, collections::HashMap, fmt::Debug, fs, process::Command};
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, StorageView, WriteStorage};
 use zksync_types::{
@@ -253,6 +253,34 @@ impl CheatcodeTracer {
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
             }
+            ffi(ffiCall { commandInput: command_input }) => {
+                tracing::info!("👷 Running ffi: {command_input:?}");
+                let Some(first_arg) = command_input.get(0) else {
+                    tracing::error!("Failed to run ffi: no args");
+                    return
+                };
+                // TODO: set directory to root
+                let Ok(output) = Command::new(first_arg).args(&command_input[1..]).output() else {
+                    tracing::error!("Failed to run ffi");
+                    return
+                };
+
+                // The stdout might be encoded on valid hex, or it might just be a string,
+                // so we need to determine which it is to avoid improperly encoding later.
+                let Ok(trimmed_stdout) = String::from_utf8(output.stdout) else {
+                    tracing::error!("Failed to parse ffi output");
+                    return
+                };
+                let trimmed_stdout = trimmed_stdout.trim();
+                let encoded_stdout =
+                    if let Ok(hex) = hex::decode(trimmed_stdout.trim_start_matches("0x")) {
+                        hex
+                    } else {
+                        trimmed_stdout.as_bytes().to_vec()
+                    };
+
+                self.add_trimmed_return_data(&encoded_stdout);
+            }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
                 let mut storage = storage.borrow_mut();
@@ -274,6 +302,52 @@ impl CheatcodeTracer {
                 let mut storage = storage.borrow_mut();
                 let value = storage.read_value(&key);
                 self.return_data = Some(vec![h256_to_u256(value)]);
+            }
+            readCallers(readCallersCall {}) => {
+                tracing::info!("👷 Reading callers");
+
+                let current_origin = {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                    );
+
+                    storage.borrow_mut().read_value(&key)
+                };
+
+                let mut mode = CallerMode::None;
+                let mut new_caller = current_origin;
+
+                if let Some(prank) = &self.permanent_actions.start_prank {
+                    //TODO: vm.prank -> CallerMode::Prank
+                    println!("PRANK");
+                    mode = CallerMode::RecurrentPrank;
+                    new_caller = prank.sender.into();
+                }
+                // TODO: vm.broadcast / vm.startBroadcast section
+                // else if let Some(broadcast) = broadcast {
+                //     mode = if broadcast.single_call {
+                //         CallerMode::Broadcast
+                //     } else {
+                //         CallerMode::RecurrentBroadcast
+                //     };
+                //     new_caller = &broadcast.new_origin;
+                //     new_origin = &broadcast.new_origin;
+                // }
+
+                let caller_mode = (mode as u8).into();
+                let message_sender = h256_to_u256(new_caller);
+                let tx_origin = h256_to_u256(current_origin);
+
+                self.return_data = Some(vec![caller_mode, message_sender, tx_origin]);
+            }
+            readFile(readFileCall { path }) => {
+                tracing::info!("👷 Reading file in path {}", path);
+                let Ok(data) = fs::read(path) else {
+                    tracing::error!("Failed to read file");
+                    return
+                };
+                self.add_trimmed_return_data(&data);
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
@@ -459,6 +533,42 @@ impl CheatcodeTracer {
                 let int_value = value.to_string();
                 self.add_trimmed_return_data(int_value.as_bytes());
             }
+            tryFfi(tryFfiCall { commandInput: command_input }) => {
+                tracing::info!("👷 Running try ffi: {command_input:?}");
+                let Some(first_arg) = command_input.get(0) else {
+                    tracing::error!("Failed to run ffi: no args");
+                    return
+                };
+                // TODO: set directory to root
+                let Ok(output) = Command::new(first_arg).args(&command_input[1..]).output() else {
+                    tracing::error!("Failed to run ffi");
+                    return
+                };
+
+                // The stdout might be encoded on valid hex, or it might just be a string,
+                // so we need to determine which it is to avoid improperly encoding later.
+                let Ok(trimmed_stdout) = String::from_utf8(output.stdout) else {
+                    tracing::error!("Failed to parse ffi output");
+                    return
+                };
+                let trimmed_stdout = trimmed_stdout.trim();
+                let encoded_stdout =
+                    if let Ok(hex) = hex::decode(trimmed_stdout.trim_start_matches("0x")) {
+                        hex
+                    } else {
+                        trimmed_stdout.as_bytes().to_vec()
+                    };
+
+                let ffi_result = FfiResult {
+                    exitCode: output.status.code().unwrap_or(69), // Default from foundry
+                    stdout: encoded_stdout,
+                    stderr: output.stderr,
+                };
+                let encoded_ffi_result: Vec<u8> = ffi_result.abi_encode();
+                let return_data: Vec<U256> =
+                    encoded_ffi_result.chunks(32).map(|b| b.into()).collect_vec();
+                self.return_data = Some(return_data);
+            }
             warp(warpCall { newTimestamp: new_timestamp }) => {
                 tracing::info!("👷 Setting block timestamp {}", new_timestamp);
 
@@ -473,6 +583,49 @@ impl CheatcodeTracer {
                     u256_to_h256(pack_block_info(block_number, new_timestamp.as_limbs()[0])),
                     &mut storage,
                 );
+            }
+            writeFile(writeFileCall { path, data }) => {
+                tracing::info!("👷 Writing data to file in path {}", path);
+                if fs::write(path, data).is_err() {
+                    tracing::error!("Failed to write file");
+                }
+            }
+            writeJson_0(writeJson_0Call { json, path }) => {
+                tracing::info!("👷 Writing json data to file in path {}", path);
+                let Ok(json) = serde_json::from_str::<serde_json::Value>(&json) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                let Ok(formatted_json) = serde_json::to_string_pretty(&json) else {
+                    tracing::error!("Failed to format json");
+                    return
+                };
+                if fs::write(path, formatted_json).is_err() {
+                    tracing::error!("Failed to write file");
+                }
+            }
+            writeJson_1(writeJson_1Call { json, path, valueKey: value_key }) => {
+                tracing::info!("👷 Writing json data to file in path {path} with key {value_key}");
+                let Ok(file) = fs::read_to_string(&path) else {
+                    tracing::error!("Failed to read file");
+                    return
+                };
+                let Ok(mut file_json) = serde_json::from_str::<serde_json::Value>(&file) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                let Ok(json) = serde_json::from_str::<serde_json::Value>(&json) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                file_json[value_key] = json;
+                let Ok(formatted_json) = serde_json::to_string_pretty(&file_json) else {
+                    tracing::error!("Failed to format json");
+                    return
+                };
+                if fs::write(path, formatted_json).is_err() {
+                    tracing::error!("Failed to write file");
+                }
             }
             _ => {
                 tracing::error!("👷 Unrecognized cheatcode");

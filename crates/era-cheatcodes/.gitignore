@@ -1,6 +1,8 @@
 /target
 /Cargo.lock
 tests/*
+tests/src/fixtures/File/write_file.txt
+tests/src/fixtures/Json/write_test.json
 !tests/src
 !tests/lib
 !tests/test.sh
