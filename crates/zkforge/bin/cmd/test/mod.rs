@@ -177,7 +177,7 @@ impl TestArgs {
         };
 
         let mut zksolc = ZkSolc::new(zksolc_opts, project);
-        let output = match zksolc.compile() {
+        let (output, contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
@@ -209,12 +209,13 @@ impl TestArgs {
             .with_cheats_config(CheatsConfig::new(&config, evm_opts.clone()))
             .with_test_options(test_options.clone());
 
-        let runner = runner_builder.clone().build(
+        let mut runner = runner_builder.clone().build(
             project_root,
             output.clone(),
             env.clone(),
             evm_opts.clone(),
         )?;
+        runner.contract_bytecodes = contract_bytecodes;
 
         if should_debug {
             filter.args_mut().test_pattern = self.debug.clone();

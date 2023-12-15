@@ -7,7 +7,7 @@ use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes};
 use parking_lot::RwLock;
 use proptest::prelude::*;
-use std::{rc::Rc, sync::Arc};
+use std::{rc::Rc, str::FromStr, sync::Arc};
 
 /// Given a target address, we generate random calldata.
 pub fn override_call_strat(
@@ -105,7 +105,13 @@ fn select_random_sender(
         ),
     ])
     // Too many exclusions can slow down testing.
-    .prop_filter("senders not allowed", move |addr| !senders_ref.excluded.contains(addr))
+    .prop_filter("senders not allowed", move |addr| {
+        // zksync-era reserves addresses below 2^16 so we filter them out
+        let is_reserved = addr
+            .bit_and(Address::from_str("ffffffffffffffffffffffffffffffffffff0000").unwrap())
+            .is_zero();
+        !senders_ref.excluded.contains(addr) && !is_reserved
+    })
     .boxed();
     if !senders.targeted.is_empty() {
         any::<prop::sample::Selector>()

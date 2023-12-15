@@ -12,9 +12,9 @@ use crate::inspectors::{
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, U256};
-use ethers_core::types::Log;
+use ethers_core::types::{Log, H256};
 use ethers_signers::LocalWallet;
-use foundry_common::{abi::IntoFunction, evm::Breakpoints};
+use foundry_common::{abi::IntoFunction, conversion_utils::address_to_h160, evm::Breakpoints};
 use foundry_evm_core::{
     backend::{Backend, DatabaseError, DatabaseExt, DatabaseResult, FuzzBackendWrapper},
     constants::{CALLER, CHEATCODE_ADDRESS},
@@ -739,11 +739,12 @@ fn calc_stipend(calldata: &[u8], spec: SpecId) -> u64 {
 /// Converts the data aggregated in the `inspector` and `call` to a `RawCallResult`
 fn convert_executed_result(
     env: Env,
-    inspector: InspectorStack,
+    mut inspector: InspectorStack,
     result: ResultAndState,
     has_snapshot_failure: bool,
 ) -> eyre::Result<RawCallResult> {
     let ResultAndState { result: exec_result, state: state_changeset } = result;
+    let exec_logs = exec_result.logs().clone();
     let (exit_reason, gas_refunded, gas_used, out) = match exec_result {
         ExecutionResult::Success { reason, gas_used, gas_refunded, output, .. } => {
             (eval_to_instruction_result(reason), gas_refunded, gas_used, Some(output))
@@ -763,6 +764,17 @@ fn convert_executed_result(
         Some(Output::Create(ref data, _)) => data.to_owned(),
         _ => Bytes::default(),
     };
+
+    // append era-test-node events
+    if let Some(lc) = inspector.log_collector.as_mut() {
+        lc.logs.extend(exec_logs.into_iter().enumerate().map(|(index, log)| Log {
+            address: address_to_h160(log.address),
+            topics: log.topics.into_iter().map(|topic| H256::from(topic.0)).collect(),
+            data: ethers_core::types::Bytes(log.data.0),
+            log_index: Some(ethers_core::types::U256::from(index)),
+            ..Default::default()
+        }));
+    }
 
     let InspectorData {
         logs,

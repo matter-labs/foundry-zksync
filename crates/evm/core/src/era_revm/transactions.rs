@@ -6,6 +6,7 @@ use era_test_node::{
     system_contracts,
 };
 use ethers_core::abi::ethabi::{self, ParamType};
+use itertools::Itertools;
 use multivm::{
     interface::VmExecutionResultAndLogs,
     vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer},
@@ -194,11 +195,22 @@ where
 
     let execution_result = match tx_result.result {
         multivm::interface::ExecutionResult::Success { output, .. } => {
+            let logs = tx_result
+                .logs
+                .events
+                .clone()
+                .into_iter()
+                .map(|event| revm::primitives::Log {
+                    address: h160_to_address(event.address),
+                    topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
+                    data: event.value.into(),
+                })
+                .collect_vec();
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
                 gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
-                logs: vec![],
+                logs,
                 output: revm::primitives::Output::Create(
                     Bytes::from(decode_l2_tx_result(output)),
                     maybe_contract_address.map(h160_to_address),

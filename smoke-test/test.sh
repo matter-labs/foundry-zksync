@@ -5,11 +5,11 @@ set -o pipefail -e
 
 SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
-BINARY_PATH="../target/release/zkforge"
+BINARY_PATH="../target/debug/zkforge"
 
 function cleanup() {
   echo "Cleaning up..."
-  rm -f "./${SOLC}"
+  #rm -f "./${SOLC}"
 }
 
 function success() {
@@ -55,7 +55,7 @@ function wait_for_build() {
 # See https://unix.stackexchange.com/questions/312631/bash-script-with-set-e-doesnt-stop-on-command
 function build_zkforge() {
   echo "Building..."
-  cargo build --manifest-path="../Cargo.toml" --release
+  cargo build --manifest-path="../Cargo.toml" #--release
   wait_for_build 30
 }
 
@@ -98,5 +98,8 @@ RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}" --match-test 'testFail_In
 
 echo "[5] Check fuzz test works"
 RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}" --match-test 'testFuzz_Increment' &>run.log || fail "zkforge fuzz test failed"
+
+echo "[6] Check invariant test works"
+RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}" --match-test 'invariant_alwaysIncrements' &>run.log || fail "zkforge invariant test failed"
 
 success

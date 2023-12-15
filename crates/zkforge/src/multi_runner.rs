@@ -40,6 +40,8 @@ pub struct MultiContractRunner {
     pub contracts: DeployableContracts,
     /// Compiled contracts by name that have an Abi and runtime bytecode
     pub known_contracts: ContractsByArtifact,
+    /// Compiled contracts bytecodes by name
+    pub contract_bytecodes: BTreeMap<String, String>,
     /// The EVM instance used in the test runner
     pub evm_opts: EvmOpts,
     /// The configured evm
@@ -220,6 +222,7 @@ impl MultiContractRunner {
             executor,
             contract,
             deploy_code,
+            self.contract_bytecodes.clone(),
             self.evm_opts.initial_balance,
             self.sender,
             self.errors.as_ref(),
@@ -351,6 +354,7 @@ impl MultiContractRunnerBuilder {
         Ok(MultiContractRunner {
             contracts: deployable_contracts,
             known_contracts,
+            contract_bytecodes: Default::default(),
             evm_opts,
             env,
             evm_spec: self.evm_spec.unwrap_or(SpecId::MERGE),

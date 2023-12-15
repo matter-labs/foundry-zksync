@@ -297,11 +297,12 @@ impl ZkSolc {
     /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the
     /// versioned sources. These modified values can be accessed after the compilation process
     /// for further processing or analysis.
-    pub fn compile(&mut self) -> Result<ProjectCompileOutput> {
+    pub fn compile(&mut self) -> Result<(ProjectCompileOutput, BTreeMap<String, String>)> {
         let mut displayed_warnings = HashSet::new();
         let mut data = BTreeMap::new();
         // Step 1: Collect Source Files
         let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
+        let mut contract_bytecodes = BTreeMap::new();
 
         // Step 2: Compile Contracts for Each Source
         for (_solc, version) in sources {
@@ -390,21 +391,20 @@ impl ZkSolc {
                 };
 
                 // Step 6: Handle Output (Errors and Warnings)
-                data.insert(
-                    filename.clone(),
-                    ZkSolc::handle_output(
-                        output,
-                        &filename,
-                        &mut displayed_warnings,
-                        &contract_hash,
-                        maybe_artifact_paths,
-                    ),
+                let (artifacts, bytecodes) = ZkSolc::handle_output(
+                    output,
+                    &filename,
+                    &mut displayed_warnings,
+                    &contract_hash,
+                    maybe_artifact_paths,
                 );
+                data.insert(filename.clone(), artifacts);
+                contract_bytecodes.extend(bytecodes);
             }
         }
         let mut result = ProjectCompileOutput::default();
         result.set_compiled_artifacts(Artifacts(data));
-        Ok(result)
+        Ok((result, contract_bytecodes))
     }
 
     /// Checks if the contract has already been compiled for the given input contract hash.
@@ -521,7 +521,8 @@ impl ZkSolc {
         displayed_warnings: &mut HashSet<String>,
         contract_hash: &str,
         write_artifacts: Option<ZkSolcArtifactPaths>,
-    ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
+    ) -> (BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>>, BTreeMap<String, String>)
+    {
         // Deserialize the compiler output into a serde_json::Value object
         let compiler_output: ZkSolcCompilerOutput = match serde_json::from_slice(&output) {
             Ok(output) => output,
@@ -565,6 +566,7 @@ impl ZkSolc {
         }
 
         let mut result = BTreeMap::new();
+        let mut contract_bytecodes = BTreeMap::new();
 
         // Get the bytecode hashes for each contract in the output
         for key in compiler_output.contracts.keys() {
@@ -582,6 +584,8 @@ impl ZkSolc {
                         contract_name,
                         contract.hash.as_ref().unwrap()
                     );
+                    contract_bytecodes
+                        .insert(contract.hash.clone().unwrap(), contract_name.clone());
 
                     let factory_deps: Vec<String> = contract
                         .factory_dependencies
@@ -661,7 +665,7 @@ impl ZkSolc {
                 .unwrap_or_else(|e| panic!("Could not write contract_hash file: {}", e));
         }
 
-        result
+        (result, contract_bytecodes)
     }
 
     /// Handles the errors and warnings present in the output JSON from the compiler.
