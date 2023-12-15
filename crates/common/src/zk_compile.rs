@@ -1139,7 +1139,7 @@ mod tests {
             include_str!("../../../testdata/artifacts-counter/artifacts.json").as_bytes().to_vec();
         let mut displayed_warnings = HashSet::new();
         let source = "src/Counter.sol".to_owned();
-        let result = ZkSolc::handle_output(data, &source, &mut displayed_warnings, "", None);
+        let (result, _) = ZkSolc::handle_output(data, &source, &mut displayed_warnings, "", None);
 
         let artifacts = result.get("Counter").unwrap();
         assert_eq!(artifacts.len(), 1);
