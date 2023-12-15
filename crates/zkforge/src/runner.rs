@@ -6,7 +6,7 @@ use crate::{
 };
 use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, U256};
-use ethers_core::types::{H160, H256};
+use ethers_core::types::H256;
 use eyre::Result;
 use foundry_common::{
     contracts::{ContractsByAddress, ContractsByArtifact},
@@ -306,7 +306,7 @@ impl<'a> ContractRunner<'a> {
                                     "using invaraint contract {} ({:?}) with hash 0x{}",
                                     name, addr, bytecode_hash
                                 );
-                                (addr, (name.clone(), abi.clone()))
+                                (addr.to_owned(), (name.clone(), abi.clone()))
                             })
                     })
                 })
