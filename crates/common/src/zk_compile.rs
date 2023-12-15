@@ -57,6 +57,9 @@ use std::{
     process::{exit, Command, Stdio},
 };
 
+/// Mapping of bytecodes to the respective contract name
+pub type ContractBytecodes = BTreeMap<String, String>;
+
 #[derive(Debug, Default, Clone)]
 pub struct ZkSolcArtifactPaths {
     artifact: PathBuf,
@@ -297,7 +300,7 @@ impl ZkSolc {
     /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the
     /// versioned sources. These modified values can be accessed after the compilation process
     /// for further processing or analysis.
-    pub fn compile(&mut self) -> Result<(ProjectCompileOutput, BTreeMap<String, String>)> {
+    pub fn compile(&mut self) -> Result<(ProjectCompileOutput, ContractBytecodes)> {
         let mut displayed_warnings = HashSet::new();
         let mut data = BTreeMap::new();
         // Step 1: Collect Source Files
@@ -521,7 +524,7 @@ impl ZkSolc {
         displayed_warnings: &mut HashSet<String>,
         contract_hash: &str,
         write_artifacts: Option<ZkSolcArtifactPaths>,
-    ) -> (BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>>, BTreeMap<String, String>)
+    ) -> (BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>>, ContractBytecodes)
     {
         // Deserialize the compiler output into a serde_json::Value object
         let compiler_output: ZkSolcCompilerOutput = match serde_json::from_slice(&output) {

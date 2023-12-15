@@ -8,7 +8,7 @@ use crate::{
 use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
-use foundry_common::{ContractsByArtifact, TestFunctionExt};
+use foundry_common::{zk_compile::ContractBytecodes, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
     artifacts::CompactContractBytecode, contracts::ArtifactContracts, Artifact, ArtifactId,
     ArtifactOutput, ProjectCompileOutput,
@@ -41,7 +41,7 @@ pub struct MultiContractRunner {
     /// Compiled contracts by name that have an Abi and runtime bytecode
     pub known_contracts: ContractsByArtifact,
     /// Compiled contracts bytecodes by name
-    pub contract_bytecodes: BTreeMap<String, String>,
+    pub contract_bytecodes: ContractBytecodes,
     /// The EVM instance used in the test runner
     pub evm_opts: EvmOpts,
     /// The configured evm

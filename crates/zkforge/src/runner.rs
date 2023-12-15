@@ -11,6 +11,7 @@ use eyre::Result;
 use foundry_common::{
     contracts::{ContractsByAddress, ContractsByArtifact},
     conversion_utils::{address_to_h160, h256_to_h160},
+    zk_compile::ContractBytecodes,
     TestFunctionExt,
 };
 use foundry_config::{FuzzConfig, InvariantConfig};
@@ -45,7 +46,7 @@ pub struct ContractRunner<'a> {
     /// The deployed contract's code
     pub code: Bytes,
     /// Bytecodes of the deployed contracts
-    pub contract_bytecodes: BTreeMap<String, String>,
+    pub contract_bytecodes: ContractBytecodes,
     /// The test contract's ABI
     pub contract: &'a Abi,
     /// All known errors, used to decode reverts
@@ -65,7 +66,7 @@ impl<'a> ContractRunner<'a> {
         executor: Executor,
         contract: &'a Abi,
         code: Bytes,
-        contract_bytecodes: BTreeMap<String, String>,
+        contract_bytecodes: ContractBytecodes,
         initial_balance: U256,
         sender: Option<Address>,
         errors: Option<&'a Abi>,
