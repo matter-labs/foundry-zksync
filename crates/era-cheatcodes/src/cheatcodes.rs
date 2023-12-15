@@ -341,7 +341,7 @@ impl CheatcodeTracer {
             }
             getRecordedLogs(getRecordedLogsCall {}) => {
                 tracing::info!("👷 Getting recorded logs");
-                let log_vector: Vec<Log> = self
+                let logs: Vec<Log> = self
                     .recorded_logs
                     .iter()
                     .map(|log| Log {
@@ -350,11 +350,8 @@ impl CheatcodeTracer {
                         emitter: log.emitter.to_fixed_bytes().into(),
                     })
                     .collect_vec();
-                //keep only first element for testing purposes
 
-                let result = getRecordedLogsReturn { logs: log_vector };
-
-                println!("👷 Returndata is {:?}", result);
+                let result = getRecordedLogsReturn { logs };
 
                 let return_data: Vec<U256> =
                     result.logs.abi_encode().chunks(32).map(|b| b.into()).collect_vec();
@@ -753,7 +750,12 @@ impl CheatcodeTracer {
 fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> {
     events
         .iter()
-        .filter(|event| event.address == zksync_types::EVENT_WRITER_ADDRESS)
-        .map(|event| LogEntry::new(u256_to_h256(event.key), u256_to_h256(event.value), emitter))
+        .filter_map(|event| {
+            if event.address == zksync_types::EVENT_WRITER_ADDRESS {
+                Some(LogEntry::new(u256_to_h256(event.key), u256_to_h256(event.value), emitter))
+            } else {
+                None
+            }
+        })
         .collect()
 }
