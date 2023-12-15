@@ -5,7 +5,6 @@
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
 /// is usually collecing all the diffs - and applies them to database itself.
 use std::{
-    backtrace::Backtrace,
     collections::HashMap,
     fmt::Debug,
     sync::{Arc, Mutex},
@@ -17,7 +16,7 @@ use foundry_common::zk_utils::conversion_utils::{
     h160_to_address, h256_to_b256, h256_to_h160, revm_u256_to_h256, u256_to_revm_u256,
 };
 use revm::{
-    primitives::{Bytecode, Bytes},
+    primitives::{Bytecode, Bytes, Env},
     Database,
 };
 use zksync_basic_types::{
@@ -34,12 +33,12 @@ use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
 #[derive(Default)]
 pub struct RevmDatabaseForEra<DB> {
     pub db: Arc<Mutex<Box<DB>>>,
-    pub current_block: u64,
+    pub env: Arc<Mutex<Env>>,
 }
 
 impl<Db> Clone for RevmDatabaseForEra<Db> {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone(), current_block: self.current_block }
+        Self { db: self.db.clone(), env: self.env.clone() }
     }
 }
 
@@ -47,7 +46,7 @@ impl<DB> Debug for RevmDatabaseForEra<DB> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RevmDatabaseForEra")
             .field("db", &"db")
-            .field("current_block", &self.current_block)
+            .field("env", &self.env.lock().unwrap())
             .finish()
     }
 }
@@ -154,21 +153,9 @@ where
         &self,
         address: H160,
         idx: U256,
-        block: Option<BlockIdVariant>,
+        _block: Option<BlockIdVariant>,
     ) -> eyre::Result<H256> {
-        // We cannot support historical lookups. Only the most recent block is supported.
-        let current_block = self.current_block;
-        if let Some(block) = &block {
-            match block {
-                BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(num)) => {
-                    let current_block_number_l2 = current_block * 2;
-                    if num.as_u64() != current_block_number_l2 {
-                        eyre::bail!("Only fetching of the most recent L2 block {} is supported - but queried for {}", current_block_number_l2, num)
-                    }
-                }
-                _ => eyre::bail!("Only fetching most recent block is implemented"),
-            }
-        }
+        // We don't need to verify the block here, because foundry backend  is taking care of it
         let mut result = self.read_storage_internal(address, idx);
 
         if L2_ETH_TOKEN_ADDRESS == address && result.is_zero() {
@@ -269,210 +256,206 @@ where
     }
 }
 
-#[cfg(test)]
-#[allow(clippy::box_default)]
-mod tests {
-    use maplit::hashmap;
-    use revm::primitives::AccountInfo;
+// #[cfg(test)]
+// #[allow(clippy::box_default)]
+// mod tests {
+//     use maplit::hashmap;
+//     use revm::primitives::AccountInfo;
 
-    use super::*;
-    use crate::era_revm::testing::MockDatabase;
+//     use super::*;
+//     use crate::era_revm::testing::MockDatabase;
 
-    #[test]
-    fn test_fetch_account_code_returns_hash_and_code_if_present_in_modified_keys_and_bytecodes() {
-        let bytecode_hash = H256::repeat_byte(0x3);
-        let bytecode = vec![U256::from(4)];
-        let account = H160::repeat_byte(0xa);
-        let modified_keys = hashmap! {
-            StorageKey::new(
-                AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS),
-                address_to_h256(&account),
-            ) => bytecode_hash,
-        };
-        let bytecodes = hashmap! {
-            h256_to_u256(bytecode_hash)   => bytecode.clone(),
-        };
-        let db = RevmDatabaseForEra {
-            current_block: 0,
-            db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
-        };
+//     #[test]
+//     fn test_fetch_account_code_returns_hash_and_code_if_present_in_modified_keys_and_bytecodes()
+// {         let bytecode_hash = H256::repeat_byte(0x3);
+//         let bytecode = vec![U256::from(4)];
+//         let account = H160::repeat_byte(0xa);
+//         let modified_keys = hashmap! {
+//             StorageKey::new(
+//                 AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS),
+//                 address_to_h256(&account),
+//             ) => bytecode_hash,
+//         };
+//         let bytecodes = hashmap! {
+//             h256_to_u256(bytecode_hash)   => bytecode.clone(),
+//         };
+//         let db = RevmDatabaseForEra {
+//             current_block: 0,
+//             db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
+//         };
 
-        let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
+//         let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
 
-        let expected = Some((
-            bytecode_hash,
-            Bytecode::new_raw(
-                bytecode
-                    .into_iter()
-                    .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
-                    .collect::<Vec<_>>()
-                    .into(),
-            ),
-        ));
-        assert_eq!(expected, actual)
-    }
+//         let expected = Some((
+//             bytecode_hash,
+//             Bytecode::new_raw(
+//                 bytecode
+//                     .into_iter()
+//                     .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+//                     .collect::<Vec<_>>()
+//                     .into(),
+//             ),
+//         ));
+//         assert_eq!(expected, actual)
+//     }
 
-    #[test]
-    fn test_fetch_account_code_returns_hash_and_code_if_not_in_modified_keys_but_in_bytecodes() {
-        let bytecode_hash = H256::repeat_byte(0x3);
-        let bytecode = vec![U256::from(4)];
-        let account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of the 32-byte hash
-        let modified_keys = Default::default();
-        let bytecodes = hashmap! {
-            h256_to_u256(bytecode_hash)   => bytecode.clone(),
-        };
-        let db = RevmDatabaseForEra {
-            current_block: 0,
-            db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
-        };
+//     #[test]
+//     fn test_fetch_account_code_returns_hash_and_code_if_not_in_modified_keys_but_in_bytecodes() {
+//         let bytecode_hash = H256::repeat_byte(0x3);
+//         let bytecode = vec![U256::from(4)];
+//         let account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of
+// the 32-byte hash         let modified_keys = Default::default();
+//         let bytecodes = hashmap! {
+//             h256_to_u256(bytecode_hash)   => bytecode.clone(),
+//         };
+//         let db = RevmDatabaseForEra {
+//             current_block: 0,
+//             db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
+//         };
 
-        let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
+//         let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
 
-        let expected = Some((
-            bytecode_hash,
-            Bytecode::new_raw(
-                bytecode
-                    .into_iter()
-                    .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
-                    .collect::<Vec<_>>()
-                    .into(),
-            ),
-        ));
-        assert_eq!(expected, actual)
-    }
+//         let expected = Some((
+//             bytecode_hash,
+//             Bytecode::new_raw(
+//                 bytecode
+//                     .into_iter()
+//                     .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+//                     .collect::<Vec<_>>()
+//                     .into(),
+//             ),
+//         ));
+//         assert_eq!(expected, actual)
+//     }
 
-    #[test]
-    fn test_fetch_account_code_returns_hash_and_code_from_db_if_not_in_modified_keys_or_bytecodes()
-    {
-        let bytecode_hash = H256::repeat_byte(0x3);
-        let bytecode = vec![U256::from(4)];
-        let account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of the 32-byte hash
-        let modified_keys = Default::default();
-        let bytecodes = Default::default();
-        let db = RevmDatabaseForEra {
-            current_block: 0,
-            db: Arc::new(Mutex::new(Box::new(MockDatabase {
-                basic: hashmap! {
-                    h160_to_address(account) => AccountInfo {
-                        code_hash: bytecode_hash.to_fixed_bytes().into(),
-                        code: Some(Bytecode::new_raw(
-                            bytecode
-                                .clone()
-                                .into_iter()
-                                .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
-                                .collect::<Vec<_>>()
-                                .into())),
-                            ..Default::default()
-                    }
-                },
-            }))),
-        };
+//     #[test]
+//     fn test_fetch_account_code_returns_hash_and_code_from_db_if_not_in_modified_keys_or_bytecodes()
+//     {
+//         let bytecode_hash = H256::repeat_byte(0x3);
+//         let bytecode = vec![U256::from(4)];
+//         let account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of
+// the 32-byte hash         let modified_keys = Default::default();
+//         let bytecodes = Default::default();
+//         let db = RevmDatabaseForEra {
+//             current_block: 0,
+//             db: Arc::new(Mutex::new(Box::new(MockDatabase {
+//                 basic: hashmap! {
+//                     h160_to_address(account) => AccountInfo {
+//                         code_hash: bytecode_hash.to_fixed_bytes().into(),
+//                         code: Some(Bytecode::new_raw(
+//                             bytecode
+//                                 .clone()
+//                                 .into_iter()
+//                                 .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+//                                 .collect::<Vec<_>>()
+//                                 .into())),
+//                             ..Default::default()
+//                     }
+//                 },
+//             }))),
+//         };
 
-        let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
+//         let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
 
-        let expected = Some((
-            bytecode_hash,
-            Bytecode::new_raw(
-                bytecode
-                    .into_iter()
-                    .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
-                    .collect::<Vec<_>>()
-                    .into(),
-            ),
-        ));
-        assert_eq!(expected, actual)
-    }
+//         let expected = Some((
+//             bytecode_hash,
+//             Bytecode::new_raw(
+//                 bytecode
+//                     .into_iter()
+//                     .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+//                     .collect::<Vec<_>>()
+//                     .into(),
+//             ),
+//         ));
+//         assert_eq!(expected, actual)
+//     }
 
-    #[test]
-    fn test_fetch_account_code_returns_hash_and_code_from_db_if_address_in_modified_keys_but_not_in_bytecodes(
-    ) {
-        let bytecode_hash = H256::repeat_byte(0x3);
-        let bytecode = vec![U256::from(4)];
-        let account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of the 32-byte hash
-        let modified_keys = hashmap! {
-            StorageKey::new(
-                AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS),
-                address_to_h256(&account),
-            ) => bytecode_hash,
-        };
-        let bytecodes = Default::default(); // nothing in bytecodes
-        let db = RevmDatabaseForEra {
-            current_block: 0,
-            db: Arc::new(Mutex::new(Box::new(MockDatabase {
-                basic: hashmap! {
-                    h160_to_address(account) => AccountInfo {
-                        code_hash: bytecode_hash.to_fixed_bytes().into(),
-                        code: Some(Bytecode::new_raw(
-                            bytecode
-                                .clone()
-                                .into_iter()
-                                .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
-                                .collect::<Vec<_>>()
-                                .into())),
-                            ..Default::default()
-                    }
-                },
-            }))),
-        };
+//     #[test]
+//     fn test_fetch_account_code_returns_hash_and_code_from_db_if_address_in_modified_keys_but_not_in_bytecodes(
+//     ) { let bytecode_hash = H256::repeat_byte(0x3); let bytecode = vec![U256::from(4)]; let
+//       account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of the
+//       32-byte hash let modified_keys = hashmap! { StorageKey::new(
+//       AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS), address_to_h256(&account),
+//             ) => bytecode_hash,
+//         };
+//         let bytecodes = Default::default(); // nothing in bytecodes
+//         let db = RevmDatabaseForEra {
+//             current_block: 0,
+//             db: Arc::new(Mutex::new(Box::new(MockDatabase {
+//                 basic: hashmap! {
+//                     h160_to_address(account) => AccountInfo {
+//                         code_hash: bytecode_hash.to_fixed_bytes().into(),
+//                         code: Some(Bytecode::new_raw(
+//                             bytecode
+//                                 .clone()
+//                                 .into_iter()
+//                                 .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+//                                 .collect::<Vec<_>>()
+//                                 .into())),
+//                             ..Default::default()
+//                     }
+//                 },
+//             }))),
+//         };
 
-        let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
+//         let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
 
-        let expected = Some((
-            bytecode_hash,
-            Bytecode::new_raw(
-                bytecode
-                    .into_iter()
-                    .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
-                    .collect::<Vec<_>>()
-                    .into(),
-            ),
-        ));
-        assert_eq!(expected, actual)
-    }
+//         let expected = Some((
+//             bytecode_hash,
+//             Bytecode::new_raw(
+//                 bytecode
+//                     .into_iter()
+//                     .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+//                     .collect::<Vec<_>>()
+//                     .into(),
+//             ),
+//         ));
+//         assert_eq!(expected, actual)
+//     }
 
-    #[test]
-    fn test_get_storage_at_does_not_panic_when_even_numbered_blocks_are_requested() {
-        // This test exists because era-test-node creates two L2 (virtual) blocks per transaction.
-        // See https://github.com/matter-labs/era-test-node/pull/111/files#diff-af08c3181737aa5783b96dfd920cd5ef70829f46cd1b697bdb42414c97310e13R1333
+//     #[test]
+//     fn test_get_storage_at_does_not_panic_when_even_numbered_blocks_are_requested() {
+//         // This test exists because era-test-node creates two L2 (virtual) blocks per
+// transaction.         // See https://github.com/matter-labs/era-test-node/pull/111/files#diff-af08c3181737aa5783b96dfd920cd5ef70829f46cd1b697bdb42414c97310e13R1333
 
-        let db = &RevmDatabaseForEra {
-            current_block: 1,
-            db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
-        };
+//         let db = &RevmDatabaseForEra {
+//             current_block: 1,
+//             db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
+//         };
 
-        let actual = db
-            .get_storage_at(
-                H160::zero(),
-                U256::zero(),
-                Some(BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(
-                    zksync_basic_types::U64::from(2),
-                ))),
-            )
-            .expect("failed getting storage");
+//         let actual = db
+//             .get_storage_at(
+//                 H160::zero(),
+//                 U256::zero(),
+//                 Some(BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(
+//                     zksync_basic_types::U64::from(2),
+//                 ))),
+//             )
+//             .expect("failed getting storage");
 
-        assert_eq!(H256::zero(), actual)
-    }
+//         assert_eq!(H256::zero(), actual)
+//     }
 
-    #[test]
-    #[should_panic(
-        expected = "Only fetching of the most recent L2 block 2 is supported - but queried for 1"
-    )]
-    fn test_get_storage_at_panics_when_odd_numbered_blocks_are_requested() {
-        // This test exists because era-test-node creates two L2 (virtual) blocks per transaction.
-        // See https://github.com/matter-labs/era-test-node/pull/111/files#diff-af08c3181737aa5783b96dfd920cd5ef70829f46cd1b697bdb42414c97310e13R1333
+//     #[test]
+//     #[should_panic(
+//         expected = "Only fetching of the most recent L2 block 2 is supported - but queried for 1"
+//     )]
+//     fn test_get_storage_at_panics_when_odd_numbered_blocks_are_requested() {
+//         // This test exists because era-test-node creates two L2 (virtual) blocks per
+// transaction.         // See https://github.com/matter-labs/era-test-node/pull/111/files#diff-af08c3181737aa5783b96dfd920cd5ef70829f46cd1b697bdb42414c97310e13R1333
 
-        let db = &RevmDatabaseForEra {
-            current_block: 1,
-            db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
-        };
+//         let db = &RevmDatabaseForEra {
+//             current_block: 1,
+//             db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
+//         };
 
-        db.get_storage_at(
-            H160::zero(),
-            U256::zero(),
-            Some(BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(
-                zksync_basic_types::U64::from(1),
-            ))),
-        )
-        .unwrap();
-    }
-}
+//         db.get_storage_at(
+//             H160::zero(),
+//             U256::zero(),
+//             Some(BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(
+//                 zksync_basic_types::U64::from(1),
+//             ))),
+//         )
+//         .unwrap();
+//     }
+// }

@@ -12,16 +12,17 @@ use ethers_core::{
     utils::GenesisAccount,
 };
 use foundry_common::{
+    conversion_utils::h160_to_address,
     is_known_system_sender,
     types::{ToAlloy, ToEthers},
     SYSTEM_TRANSACTION_TYPE,
 };
 use revm::{
-    db::{self, CacheDB, DatabaseRef},
+    db::{CacheDB, DatabaseRef},
     inspectors::NoOpInspector,
     precompile::{Precompiles, SpecId},
     primitives::{
-        Account, AccountInfo, Bytecode, CreateScheme, EVMError, EVMResult, Env, HashMap as Map,
+        Account, AccountInfo, Bytecode, CreateScheme, EVMError, Env, HashMap as Map,
         Log, ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, Inspector, JournaledState, EVM,
@@ -314,7 +315,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> {
         Ok(())
     }
 
-    fn set_modified_keys(&mut self, keys: HashMap<StorageKey, StorageValue>) {}
+    fn set_modified_keys(&mut self, _keys: HashMap<StorageKey, StorageValue>) {}
 }
 
 /// Provides the underlying `revm::Database` implementation.
@@ -672,7 +673,7 @@ impl Backend {
     ) {
         if let Some((_, fork_idx)) = self.active_fork_ids.as_ref() {
             let active = self.inner.get_fork(*fork_idx);
-            merge_account_data(accounts, &active.db, active_journaled_state, target_fork)
+            merge_account_data(accounts, &active.db, active_journaled_state, target_fork);
         } else {
             merge_account_data(accounts, &self.mem_db, active_journaled_state, target_fork)
         }
@@ -1115,6 +1116,11 @@ impl DatabaseExt for Backend {
             }
 
             self.update_fork_db(active_journaled_state, &mut fork);
+            // // Remove system context for enforcong it to be loaded from the fork
+            // let system_context = foundry_common::zk_utils::conversion_utils::h160_to_address(
+            //     zksync_types::SYSTEM_CONTEXT_ADDRESS,
+            // );
+            // fork.db.accounts.remove(&system_context);
 
             // insert the fork back
             self.inner.set_fork(idx, fork);
@@ -1809,6 +1815,8 @@ pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
     }
 
     *active_journaled_state = target_fork.journaled_state.clone();
+
+    target_fork.db.accounts.remove(&h160_to_address(zksync_types::SYSTEM_CONTEXT_ADDRESS));
 }
 
 /// Clones the account data from the `active_journaled_state`  into the `fork_journaled_state`

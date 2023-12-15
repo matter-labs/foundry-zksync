@@ -141,7 +141,10 @@ where
     INSP: ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>,
 {
     let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
-    let era_db = RevmDatabaseForEra { db: Arc::new(Mutex::new(Box::new(db))), current_block: num };
+    let era_db = RevmDatabaseForEra {
+        db: Arc::new(Mutex::new(Box::new(db))),
+        env: Arc::new(Mutex::new(env.clone())),
+    };
 
     let nonces = era_db.get_nonce_for_address(address_to_h160(env.tx.caller));
 
@@ -166,7 +169,7 @@ where
         31337
     };
 
-    let (l2_num, l2_ts) = (num * 2, ts * 2);
+    let (l2_num, l2_ts) = (num, ts * 2);
     let fork_details = ForkDetails {
         fork_source: era_db.clone(),
         l1_block: L1BatchNumber(num as u32),

@@ -10,7 +10,7 @@ use alloy_primitives::{Address, B256, U256};
 use ethers_core::utils::GenesisAccount;
 use revm::{
     db::DatabaseRef,
-    primitives::{AccountInfo, Bytecode, EVMError, EVMResult, Env, ResultAndState},
+    primitives::{AccountInfo, Bytecode, EVMError, Env, ResultAndState},
     Database, Inspector, JournaledState,
 };
 use std::{borrow::Cow, collections::HashMap};

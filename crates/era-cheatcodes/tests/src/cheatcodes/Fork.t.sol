@@ -14,9 +14,10 @@ contract ForkTest is Test {
             abi.encodeWithSignature("decimals()")
         );
         uint256 decimals_before = uint256(bytes32(data));
+        console.log("block", block.number);
         console.log("decimals_before:", decimals_before);
          (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("createSelectFork(string,uint256)", "mainnet", 243698)
+            abi.encodeWithSignature("createSelectFork(string,uint256)", "mainnet", 19579636)
         );
         require(decimals_before == 0, "Contract exists locally");
         require(success1, "fork failed");   
@@ -28,6 +29,7 @@ contract ForkTest is Test {
             abi.encodeWithSignature("decimals()")
         );
         uint256 decimals_after = uint256(bytes32(data2));
+        console.log("block", block.number);
         console.log("decimals_after:", decimals_after);
         require(decimals_after == 6, "Contract dosent exists in fork");
 

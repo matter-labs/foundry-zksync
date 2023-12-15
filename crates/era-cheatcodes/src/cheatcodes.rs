@@ -91,7 +91,6 @@ pub struct CheatcodeTracer {
     near_calls: usize,
     serialized_objects: HashMap<String, String>,
     env: OnceCell<EraEnv>,
-    /// Additional, user configurable context this Inspector has access to when inspecting a call
     config: Arc<CheatsConfig>,
 }
 
@@ -151,7 +150,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 tracing::error!("cheatcode triggered, but no calldata or ergs available");
                 return
             }
-            tracing::info!("near call: cheatcode triggered");
+            tracing::info!("far call: cheatcode triggered");
             let calldata = {
                 let ptr = state.vm_local_state.registers
                     [CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
@@ -216,11 +215,17 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
-                    let modified_storage: HashMap<StorageKey, H256> =
-                        storage.borrow_mut().modified_storage_keys().clone();
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .borrow_mut()
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
-                        let handle = &storage.borrow_mut().storage_handle;
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                            &storage.borrow_mut().storage_handle;
                         let mut fork_storage = handle.inner.write().unwrap();
                         fork_storage.value_read_cache.clear();
                         let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
@@ -231,24 +236,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             .collect();
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-
                         let state =
                             storage_to_state(modified_storage.clone(), bytecodes, era_db.clone());
                         *journaled_state.state() = state;
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
-                        // let mut era_rpc = HashMap::new();
-                        // era_rpc.insert(
-                        //     "mainnet".to_string(),
-                        //     "https://mainnet.era.zksync.io:443".to_string(),
-                        // );
-                        // era_rpc.insert(
-                        //     "testnet".to_string(),
-                        //     "https://testnet.era.zksync.dev:443".to_string(),
-                        // );
-                        let mut env = into_revm_env(&era_env);
-                        db.create_select_fork(
+                        let mut env = into_revm_env(era_env);
+                        let res = db.create_select_fork(
                             create_fork_request(
                                 era_env,
                                 self.config.clone(),
@@ -257,9 +252,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             ),
                             &mut env,
                             &mut journaled_state,
-                        )
+                        );
+                        drop(db);
+                        let mut db_env = era_db.env.lock().unwrap();
+                        *db_env = env;
+                        res
                     };
                     storage.borrow_mut().modified_storage_keys = modified_storage;
+
                     self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
                 }
             }
@@ -619,9 +619,9 @@ fn into_revm_env(env: &EraEnv) -> Env {
     use foundry_common::zk_utils::conversion_utils::h160_to_address;
     use revm::primitives::U256;
     let block = BlockEnv {
-        number: U256::from(env.l1_batch_env.number.0),
+        number: U256::from(env.l1_batch_env.first_l2_block.number),
         coinbase: h160_to_address(env.l1_batch_env.fee_account),
-        timestamp: U256::from(env.l1_batch_env.timestamp),
+        timestamp: U256::from(env.l1_batch_env.first_l2_block.timestamp),
         gas_limit: U256::from(env.system_env.gas_limit),
         basefee: U256::from(env.l1_batch_env.base_fee()),
         ..Default::default()
@@ -643,7 +643,7 @@ fn create_fork_request(
     use revm::primitives::Address as revmAddress;
 
     let url = config.rpc_url(url_or_alias).unwrap();
-    let env = into_revm_env(&env);
+    let env = into_revm_env(env);
     let opts_env = Env {
         gas_limit: u64::MAX,
         chain_id: None,

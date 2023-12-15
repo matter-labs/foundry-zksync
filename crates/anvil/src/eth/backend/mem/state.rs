@@ -7,7 +7,9 @@ use ethers::{
     types::H256,
     utils::{rlp, rlp::RlpStream},
 };
-use foundry_common::types::{ToAlloy, ToEthers};
+use foundry_common::{
+    types::{ToAlloy, ToEthers},
+};
 use foundry_evm::{
     backend::DatabaseError,
     hashbrown::HashMap as Map,

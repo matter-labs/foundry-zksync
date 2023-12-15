@@ -2,19 +2,17 @@
 use crate::{
     backend::{DatabaseError, DatabaseResult},
     fork::{cache::FlushJsonBlockCacheDB, BlockchainDb},
-    utils::CallKind,
 };
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use ethers_core::{
     abi::ethereum_types::BigEndianHash,
     types::{Block, BlockId, NameOrAddress, Transaction},
 };
-use ethers_providers::Middleware;
 use foundry_common::{
     types::{ToAlloy, ToEthers},
     NON_ARCHIVE_NODE_WARNING,
 };
-use foundry_compilers::artifacts::bytecode;
+
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
     stream::Stream,
@@ -195,6 +193,7 @@ where
     fn request_account_storage(&mut self, address: Address, idx: U256, listener: StorageSender) {
         match self.storage_requests.entry((address, idx)) {
             Entry::Occupied(mut entry) => {
+                println!("occupied {:?}, {:?}, {:?}", &address, &idx, &self.block_id);
                 entry.get_mut().push(listener);
             }
             Entry::Vacant(entry) => {
@@ -715,7 +714,7 @@ impl DatabaseRef for SharedBackend {
 
     fn storage_ref(&self, address: Address, index: U256) -> Result<U256, Self::Error> {
         trace!(target: "sharedbackend", "request storage {:?} at {:?}", address, index);
-        let res = match self.do_get_storage(address, index).map_err(|err| {
+        match self.do_get_storage(address, index).map_err(|err| {
             error!(target: "sharedbackend", %err, %address, %index, "Failed to send/recv `storage`");
             if err.is_possibly_non_archive_node_error() {
                 error!(target: "sharedbackend", "{NON_ARCHIVE_NODE_WARNING}");
@@ -724,8 +723,7 @@ impl DatabaseRef for SharedBackend {
         }) {
             Ok(val) => Ok(val),
             Err(err) => Err(err),
-        };
-        res
+        }
     }
 
     fn block_hash_ref(&self, number: U256) -> Result<B256, Self::Error> {
@@ -756,6 +754,7 @@ mod tests {
         fork::{BlockchainDbMeta, CreateFork, JsonBlockCacheDB},
         opts::EvmOpts,
     };
+    use ethers_providers::Middleware;
     use foundry_common::get_http_provider;
     use foundry_config::{Config, NamedChain};
     use std::{collections::BTreeSet, path::PathBuf, sync::Arc};

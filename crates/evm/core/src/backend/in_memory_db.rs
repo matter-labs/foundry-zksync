@@ -38,6 +38,7 @@ impl DatabaseRef for MemDb {
     }
 
     fn storage_ref(&self, address: Address, index: U256) -> Result<U256, Self::Error> {
+        println!("memdb");
         DatabaseRef::storage_ref(&self.inner, address, index)
     }
 
