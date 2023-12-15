@@ -200,6 +200,7 @@ enum ActionOnReturn {
 #[derive(Debug, Default, Clone)]
 struct FinishCyclePermanentActions {
     start_prank: Option<StartPrankOpts>,
+    broadcast: Option<BroadcastOpts>,
 }
 
 #[derive(Debug, Clone)]
@@ -239,6 +240,11 @@ enum ExpectedCallType {
     NonCount,
     /// The exact number of calls expected.
     Count,
+}
+
+#[derive(Debug, Clone)]
+struct BroadcastOpts {
+    original_origin: H160,
 }
 
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
@@ -1256,6 +1262,22 @@ impl CheatcodeTracer {
                 tracing::info!("👷 Creating snapshot");
                 self.one_time_actions.push(FinishCycleOneTimeActions::Snapshot);
             }
+            startBroadcast_0(startBroadcast_0Call {}) => self.apply_broadcast(
+                state
+                    .vm_local_state
+                    .callstack
+                    .inner
+                    .first()
+                    .unwrap_or(&state.vm_local_state.callstack.current)
+                    .msg_sender,
+                &mut storage.borrow_mut(),
+            ),
+            startBroadcast_1(startBroadcast_1Call { signer }) => {
+                self.apply_broadcast(signer.to_h160(), &mut storage.borrow_mut())
+            }
+            startBroadcast_2(startBroadcast_2Call { privateKey }) => {
+                todo!("start broadcast with private key")
+            }
             startPrank_0(startPrank_0Call { msgSender: msg_sender }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?}");
                 self.permanent_actions.start_prank =
@@ -1274,6 +1296,17 @@ impl CheatcodeTracer {
                     sender: msg_sender.to_h160(),
                     origin: Some(original_tx_origin),
                 });
+            }
+            stopBroadcast(stopBroadcastCall {}) => {
+                tracing::info!("👷 Stopping broadcast");
+
+                if let Some(origin) = self.permanent_actions.broadcast.take() {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                    );
+                    self.write_storage(key, origin, &mut storage.borrow_mut());
+                }
             }
             stopPrank(stopPrankCall {}) => {
                 tracing::info!("👷 Stopping prank");
@@ -1737,6 +1770,18 @@ impl CheatcodeTracer {
             }
             RetOpcode::Panic => (),
         }
+    }
+
+    fn apply_broadcast<S: WriteStorage>(&mut self, origin: H160, storage: &mut RefMut<S>) {
+        let key = StorageKey::new(
+            AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+            zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+        );
+        let original_tx_origin = storage.read_value(&key);
+        self.write_storage(key, origin.into(), storage);
+
+        self.permanent_actions.broadcast =
+            Some(BroadcastOpts { original_origin: original_tx_origin.into() })
     }
 }
 
