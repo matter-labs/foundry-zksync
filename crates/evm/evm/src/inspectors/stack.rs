@@ -587,6 +587,6 @@ impl<DB: DatabaseExt + Send>
         StorageView<ForkStorage<RevmDatabaseForEra<DB>>>,
         HistoryDisabled,
     > {
-        CheatcodeTracer::new().into_tracer_pointer()
+        CheatcodeTracer::new(self.cheatcodes.as_ref().unwrap().config.clone()).into_tracer_pointer()
     }
 }

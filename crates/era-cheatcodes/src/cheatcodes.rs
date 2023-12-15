@@ -4,6 +4,7 @@ use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
 use ethers::utils::to_checksum;
+use foundry_cheatcodes::CheatsConfig;
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{
     backend::DatabaseExt,
@@ -33,6 +34,7 @@ use std::{
     cell::{OnceCell, RefMut},
     collections::HashMap,
     fmt::Debug,
+    sync::Arc,
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -89,6 +91,8 @@ pub struct CheatcodeTracer {
     near_calls: usize,
     serialized_objects: HashMap<String, String>,
     env: OnceCell<EraEnv>,
+    /// Additional, user configurable context this Inspector has access to when inspecting a call
+    config: Arc<CheatsConfig>,
 }
 
 #[derive(Debug, Clone)]
@@ -234,22 +238,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
-                        let mut era_rpc = HashMap::new();
-                        era_rpc.insert(
-                            "mainnet".to_string(),
-                            "https://mainnet.era.zksync.io:443".to_string(),
-                        );
-                        era_rpc.insert(
-                            "testnet".to_string(),
-                            "https://testnet.era.zksync.dev:443".to_string(),
-                        );
+                        // let mut era_rpc = HashMap::new();
+                        // era_rpc.insert(
+                        //     "mainnet".to_string(),
+                        //     "https://mainnet.era.zksync.io:443".to_string(),
+                        // );
+                        // era_rpc.insert(
+                        //     "testnet".to_string(),
+                        //     "https://testnet.era.zksync.dev:443".to_string(),
+                        // );
                         let mut env = into_revm_env(&era_env);
                         db.create_select_fork(
                             create_fork_request(
                                 era_env,
-                                &era_rpc,
+                                self.config.clone(),
                                 Some(block_number),
-                                url_or_alias,
+                                &url_or_alias,
                             ),
                             &mut env,
                             &mut journaled_state,
@@ -289,7 +293,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 }
 
 impl CheatcodeTracer {
-    pub fn new() -> Self {
+    pub fn new(cheatcodes_config: Arc<CheatsConfig>) -> Self {
         CheatcodeTracer {
             one_time_actions: vec![],
             permanent_actions: FinishCyclePermanentActions { start_prank: None },
@@ -298,6 +302,7 @@ impl CheatcodeTracer {
             return_ptr: None,
             serialized_objects: HashMap::new(),
             env: OnceCell::default(),
+            config: cheatcodes_config,
         }
     }
 
@@ -630,13 +635,14 @@ fn into_revm_env(env: &EraEnv) -> Env {
 
 fn create_fork_request(
     env: &EraEnv,
-    era_rpc: &HashMap<String, String>,
+    config: Arc<CheatsConfig>,
     block_number: Option<u64>,
-    url_or_alias: String,
+    url_or_alias: &str,
 ) -> CreateFork {
     use foundry_evm_core::opts::Env;
     use revm::primitives::Address as revmAddress;
-    let url = &era_rpc[&url_or_alias];
+
+    let url = config.rpc_url(url_or_alias).unwrap();
     let env = into_revm_env(&env);
     let opts_env = Env {
         gas_limit: u64::MAX,
@@ -653,5 +659,10 @@ fn create_fork_request(
         ..Default::default()
     };
 
-    CreateFork { enable_caching: true, url: url.clone(), env, evm_opts }
+    CreateFork {
+        enable_caching: config.rpc_storage_caching.enable_for_endpoint(&url),
+        url,
+        env,
+        evm_opts,
+    }
 }

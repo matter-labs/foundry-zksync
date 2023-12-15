@@ -3274,6 +3274,7 @@ dependencies = [
  "ethabi 18.0.0",
  "ethers",
  "eyre",
+ "foundry-cheatcodes",
  "foundry-cheatcodes-spec",
  "foundry-common",
  "foundry-evm-core",

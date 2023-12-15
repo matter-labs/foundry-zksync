@@ -22,6 +22,7 @@ zksync_utils.workspace = true
 foundry-evm-core.workspace = true
 foundry-common.workspace = true
 foundry-cheatcodes-spec.workspace = true
+foundry-cheatcodes.workspace = true
 alloy-sol-types = { workspace = true, features = ["json"] }
 
 ethabi = "18.0.0"
