@@ -275,6 +275,44 @@ impl CheatcodeTracer {
                 let value = storage.read_value(&key);
                 self.return_data = Some(vec![h256_to_u256(value)]);
             }
+            readCallers(readCallersCall {}) => {
+                tracing::info!("👷 Reading callers");
+
+                // state.vm_local_state.callstack.current.msg_sender
+                // doesn't seem to be the right value
+                let current_origin = {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                    );
+
+                    storage.borrow_mut().read_value(&key)
+                };
+
+                let mut mode = CallerMode::None;
+                let mut new_caller = current_origin;
+                if let Some(prank) = &self.permanent_actions.start_prank {
+                    //TODO: vm.prank -> CallerMode::Prank
+                    mode = CallerMode::RecurrentPrank;
+                    new_caller = prank.sender.into();
+                }
+                // TODO: vm.broadcast / vm.startBroadcast section
+                // else if let Some(broadcast) = broadcast {
+                //     mode = if broadcast.single_call {
+                //         CallerMode::Broadcast
+                //     } else {
+                //         CallerMode::RecurrentBroadcast
+                //     };
+                //     new_caller = &broadcast.new_origin;
+                //     new_origin = &broadcast.new_origin;
+                // }
+
+                let caller_mode = (mode as u8).into();
+                let message_sender = h256_to_u256(new_caller);
+                let tx_origin = h256_to_u256(current_origin);
+
+                self.return_data = Some(vec![caller_mode, message_sender, tx_origin]);
+            }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
                 let key = StorageKey::new(
