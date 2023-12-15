@@ -28,10 +28,9 @@ contract LogsTest is Test {
             .call(abi.encodeWithSignature("getRecordedLogs()"));
         require(success2, "getRecordedLogs failed");
 
-        Log memory log = abi.decode(rawData, (Log));
-        require(log.topics.length == 1, "wrong number of topics");
-
-        console.log("failed?", failed());
+        Log[] memory logs = abi.decode(rawData, (Log[]));
+        console.log("logs length: %d", logs.length);
+        require(logs.length == 8, "logs length should be 8");
     }
 
     function trimReturnBytes(
