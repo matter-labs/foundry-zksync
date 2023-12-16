@@ -3298,6 +3298,7 @@ dependencies = [
 [[package]]
 name = "era_test_node"
 version = "0.1.0-alpha.12"
+source = "git+https://github.com/matter-labs/era-test-node.git?branch=deniallugo-move-storage-view#fbe272ea3a1ae343b002a061237da631a692d8ee"
 dependencies = [
  "anyhow",
  "bigdecimal",
