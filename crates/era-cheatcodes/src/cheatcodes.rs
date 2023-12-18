@@ -29,7 +29,7 @@ use multivm::{
     },
 };
 use revm::{
-    primitives::{BlockEnv, CfgEnv, Env, SpecId},
+    primitives::{BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
     JournaledState,
 };
 use serde::Serialize;
@@ -118,7 +118,9 @@ impl LogEntry {
 enum FinishCycleOneTimeActions {
     StorageWrite { key: StorageKey, read_value: H256, write_value: H256 },
     StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
-    CreateFork { url_or_alias: String, block_number: u64 },
+    CreateSelectFork { url_or_alias: String, block_number: Option<u64> },
+    CreateFork { url_or_alias: String, block_number: Option<u64> },
+    SelectFork { fork_id: U256 },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -251,7 +253,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
-                FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
+                FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
                     let modified_storage: HashMap<StorageKey, H256> = storage
                         .borrow_mut()
                         .modified_storage_keys()
@@ -284,7 +286,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             create_fork_request(
                                 era_env,
                                 self.config.clone(),
-                                Some(block_number),
+                                block_number,
                                 &url_or_alias,
                             ),
                             &mut env,
@@ -298,6 +300,65 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.borrow_mut().modified_storage_keys = modified_storage;
 
                     self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                }
+                FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
+                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                        &storage.borrow_mut().storage_handle;
+                    let era_db =
+                        handle.inner.write().unwrap().fork.as_ref().unwrap().fork_source.clone();
+
+                    let mut db = era_db.db.lock().unwrap();
+                    let era_env = self.env.get().unwrap();
+                    let fork_id = db.create_fork(create_fork_request(
+                        era_env,
+                        self.config.clone(),
+                        block_number,
+                        &url_or_alias,
+                    ));
+                    self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                }
+                FinishCycleOneTimeActions::SelectFork { fork_id } => {
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .borrow_mut()
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+                    {
+                        storage.borrow_mut().clean_cache();
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                            &storage.borrow_mut().storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state =
+                            storage_to_state(modified_storage.clone(), bytecodes, era_db.clone());
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        db.select_fork(
+                            rU256::from(fork_id.as_u128()),
+                            &mut env,
+                            &mut journaled_state,
+                        )
+                        .unwrap();
+                        drop(db);
+                        let mut db_env = era_db.env.lock().unwrap();
+                        *db_env = env;
+                    }
+                    storage.borrow_mut().modified_storage_keys = modified_storage;
+
+                    self.return_data = Some(vec![fork_id]);
                 }
             }
         }
@@ -748,14 +809,47 @@ impl CheatcodeTracer {
                     &mut storage,
                 );
             }
-            createSelectFork_1(createSelectFork_1Call { urlOrAlias, blockNumber }) => {
+            createSelectFork_0(createSelectFork_0Call { urlOrAlias }) => {
                 tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
 
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: None,
+                });
+            }
+            createSelectFork_1(createSelectFork_1Call { urlOrAlias, blockNumber }) => {
                 let block_number = blockNumber.to_u256().as_u64();
+                tracing::info!(
+                    "👷 Creating and selecting fork {} for block number {}",
+                    urlOrAlias,
+                    block_number
+                );
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: Some(block_number),
+                });
+            }
+            createFork_0(createFork_0Call { urlOrAlias }) => {
+                tracing::info!("👷 Creating fork {}", urlOrAlias,);
+
                 self.one_time_actions.push(FinishCycleOneTimeActions::CreateFork {
                     url_or_alias: urlOrAlias,
-                    block_number,
+                    block_number: None,
                 });
+            }
+            createFork_1(createFork_1Call { urlOrAlias, blockNumber }) => {
+                let block_number = blockNumber.to_u256().as_u64();
+                tracing::info!("👷 Creating fork {} for block number {}", urlOrAlias, block_number);
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: Some(block_number),
+                });
+            }
+            selectFork(selectForkCall { forkId }) => {
+                tracing::info!("👷 Selecting fork {}", forkId);
+
+                self.one_time_actions
+                    .push(FinishCycleOneTimeActions::SelectFork { fork_id: forkId.to_u256() });
             }
             writeFile(writeFileCall { path, data }) => {
                 tracing::info!("👷 Writing data to file in path {}", path);

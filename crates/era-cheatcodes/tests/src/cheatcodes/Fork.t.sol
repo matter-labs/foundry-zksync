@@ -35,4 +35,28 @@ contract ForkTest is Test {
         require(block.number == FORK_BLOCK + 1, "ENV for blocks is not set correctly");
 
     }
+
+    function testCreateSelectFork() public{
+        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("createFork(string,uint256)", "mainnet", FORK_BLOCK + 100)
+        );
+        require(success, "fork failed");
+
+        uint256 forkId = uint256(bytes32(data));
+        (bool success1, bytes memory data1) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("selectFork(uint256)", forkId)
+        );
+        require(success1, "select fork failed");
+
+
+        /// After createSelect fork the decimals  should exist
+        (bool success2, bytes memory data2) = TOKEN_ADDRESS.call(
+            abi.encodeWithSignature("decimals()")
+        );
+        uint256 decimals_after = uint256(bytes32(data2));
+        console.log("decimals_after", decimals_after);  
+        console.log("block ", block.number);  
+        require(decimals_after == TOKEN_DECIMALS, "Contract dosent exists in fork");
+        require(block.number == FORK_BLOCK + 100, "ENV for blocks is not set correctly");
+    }
 }
