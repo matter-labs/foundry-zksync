@@ -6,7 +6,7 @@ use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
-use ethers::utils::to_checksum;
+use ethers::{signers::Signer, utils::to_checksum};
 use foundry_cheatcodes::CheatsConfig;
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{
@@ -1262,21 +1262,35 @@ impl CheatcodeTracer {
                 tracing::info!("👷 Creating snapshot");
                 self.one_time_actions.push(FinishCycleOneTimeActions::Snapshot);
             }
-            startBroadcast_0(startBroadcast_0Call {}) => self.apply_broadcast(
-                state
+            startBroadcast_0(startBroadcast_0Call {}) => {
+                let origin = state
                     .vm_local_state
                     .callstack
                     .inner
                     .first()
                     .unwrap_or(&state.vm_local_state.callstack.current)
-                    .msg_sender,
-                &mut storage.borrow_mut(),
-            ),
+                    .msg_sender;
+                tracing::info!("👷 Starting broadcast with default origin: {origin}");
+
+                self.apply_broadcast(origin, &mut storage.borrow_mut())
+            }
             startBroadcast_1(startBroadcast_1Call { signer }) => {
-                self.apply_broadcast(signer.to_h160(), &mut storage.borrow_mut())
+                let origin = signer.to_h160();
+                tracing::info!("👷 Starting broadcast with given origin: {origin}");
+                self.apply_broadcast(origin, &mut storage.borrow_mut())
             }
             startBroadcast_2(startBroadcast_2Call { privateKey }) => {
-                todo!("start broadcast with private key")
+                let chain_id = self.env.get().unwrap().system_env.chain_id.as_u64();
+                let Some(wallet) =
+                    crate::utils::parse_wallet(&privateKey).map(|w| w.with_chain_id(chain_id))
+                else {
+                    tracing::error!(cheatcode = "startBroadcast", "unable to parse private key");
+                    return
+                };
+
+                let origin = wallet.address();
+                tracing::info!("👷 Starting broadcast with origin from private key: {origin}");
+                self.apply_broadcast(origin.into(), &mut storage.borrow_mut())
             }
             startPrank_0(startPrank_0Call { msgSender: msg_sender }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?}");
@@ -1300,12 +1314,16 @@ impl CheatcodeTracer {
             stopBroadcast(stopBroadcastCall {}) => {
                 tracing::info!("👷 Stopping broadcast");
 
-                if let Some(origin) = self.permanent_actions.broadcast.take() {
+                if let Some(broadcast) = self.permanent_actions.broadcast.take() {
                     let key = StorageKey::new(
                         AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
                         zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
                     );
-                    self.write_storage(key, origin, &mut storage.borrow_mut());
+                    self.write_storage(
+                        key,
+                        broadcast.original_origin.into(),
+                        &mut storage.borrow_mut(),
+                    );
                 }
             }
             stopPrank(stopPrankCall {}) => {
