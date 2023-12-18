@@ -1116,11 +1116,6 @@ impl DatabaseExt for Backend {
             }
 
             self.update_fork_db(active_journaled_state, &mut fork);
-            // // Remove system context for enforcong it to be loaded from the fork
-            // let system_context = foundry_common::zk_utils::conversion_utils::h160_to_address(
-            //     zksync_types::SYSTEM_CONTEXT_ADDRESS,
-            // );
-            // fork.db.accounts.remove(&system_context);
 
             // insert the fork back
             self.inner.set_fork(idx, fork);
@@ -1400,6 +1395,7 @@ impl DatabaseExt for Backend {
     fn has_cheatcode_access(&self, account: Address) -> bool {
         self.inner.cheatcode_access_accounts.contains(&account)
     }
+
     fn set_modified_keys(&mut self, keys: HashMap<StorageKey, StorageValue>) {
         self.modified_storage_keys = keys;
     }

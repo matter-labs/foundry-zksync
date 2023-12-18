@@ -1,5 +1,5 @@
 use crate::utils::{ToH160, ToH256, ToU256};
-use alloy_sol_types::SolInterface;
+use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
@@ -19,6 +19,7 @@ use multivm::{
         BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
     },
     zk_evm_1_4_0::{
+        reference_impls::event_sink::EventMessage,
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::PrimitiveValue,
         zkevm_opcode_defs::{
@@ -31,10 +32,12 @@ use revm::{
     primitives::{BlockEnv, CfgEnv, Env, SpecId},
     JournaledState,
 };
+use serde::Serialize;
 use std::{
     cell::{OnceCell, RefMut},
-    collections::HashMap,
-    fmt::Debug,
+    collections::{HashMap, HashSet},
+    fs,
+    process::Command,
     sync::Arc,
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
@@ -93,6 +96,22 @@ pub struct CheatcodeTracer {
     serialized_objects: HashMap<String, String>,
     env: OnceCell<EraEnv>,
     config: Arc<CheatsConfig>,
+    recorded_logs: HashSet<LogEntry>,
+    recording_logs: bool,
+    recording_timestamp: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
+struct LogEntry {
+    topic: H256,
+    data: H256,
+    emitter: H160,
+}
+
+impl LogEntry {
+    fn new(topic: H256, data: H256, emitter: H160) -> Self {
+        LogEntry { topic, data, emitter }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -195,6 +214,23 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         bootloader_state: &mut BootloaderState,
         storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
+        let emitter = state.local_state.callstack.current.this_address;
+        if self.recording_logs {
+            let logs = transform_to_logs(
+                state
+                    .event_sink
+                    .get_events_and_l2_l1_logs_after_timestamp(Timestamp(self.recording_timestamp))
+                    .0,
+                emitter,
+            );
+            if !logs.is_empty() {
+                let mut unique_set: HashSet<LogEntry> = HashSet::new();
+
+                // Filter out duplicates and extend the unique entries to the vector
+                self.recorded_logs
+                    .extend(logs.into_iter().filter(|log| unique_set.insert(log.clone())));
+            }
+        }
         while let Some(action) = self.one_time_actions.pop() {
             match action {
                 FinishCycleOneTimeActions::StorageWrite { key, read_value, write_value } => {
@@ -304,12 +340,15 @@ impl CheatcodeTracer {
             serialized_objects: HashMap::new(),
             env: OnceCell::default(),
             config: cheatcodes_config,
+            recorded_logs: HashSet::new(),
+            recording_logs: false,
+            recording_timestamp: 0,
         }
     }
 
     pub fn dispatch_cheatcode<S: DatabaseExt + Send, H: HistoryMode>(
         &mut self,
-        _state: VmLocalStateData<'_>,
+        state: VmLocalStateData<'_>,
         _data: AfterExecutionData,
         _memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
@@ -343,6 +382,34 @@ impl CheatcodeTracer {
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
             }
+            ffi(ffiCall { commandInput: command_input }) => {
+                tracing::info!("👷 Running ffi: {command_input:?}");
+                let Some(first_arg) = command_input.get(0) else {
+                    tracing::error!("Failed to run ffi: no args");
+                    return
+                };
+                // TODO: set directory to root
+                let Ok(output) = Command::new(first_arg).args(&command_input[1..]).output() else {
+                    tracing::error!("Failed to run ffi");
+                    return
+                };
+
+                // The stdout might be encoded on valid hex, or it might just be a string,
+                // so we need to determine which it is to avoid improperly encoding later.
+                let Ok(trimmed_stdout) = String::from_utf8(output.stdout) else {
+                    tracing::error!("Failed to parse ffi output");
+                    return
+                };
+                let trimmed_stdout = trimmed_stdout.trim();
+                let encoded_stdout =
+                    if let Ok(hex) = hex::decode(trimmed_stdout.trim_start_matches("0x")) {
+                        hex
+                    } else {
+                        trimmed_stdout.as_bytes().to_vec()
+                    };
+
+                self.add_trimmed_return_data(&encoded_stdout);
+            }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
                 let mut storage = storage.borrow_mut();
@@ -358,12 +425,92 @@ impl CheatcodeTracer {
                 tracing::info!("👷 Returndata is {:?}", account_nonce);
                 self.return_data = Some(vec![account_nonce]);
             }
+            getRecordedLogs(getRecordedLogsCall {}) => {
+                tracing::info!("👷 Getting recorded logs");
+                let logs: Vec<Log> = self
+                    .recorded_logs
+                    .iter()
+                    .map(|log| Log {
+                        topics: vec![log.topic.to_fixed_bytes().into()],
+                        data: log.data.to_fixed_bytes().into(),
+                        emitter: log.emitter.to_fixed_bytes().into(),
+                    })
+                    .collect_vec();
+
+                let result = getRecordedLogsReturn { logs };
+
+                let return_data: Vec<U256> =
+                    result.logs.abi_encode().chunks(32).map(|b| b.into()).collect_vec();
+
+                self.return_data = Some(return_data);
+
+                //clean up logs
+                self.recorded_logs = HashSet::new();
+                //disable flag of recording logs
+                self.recording_logs = false;
+            }
             load(loadCall { target, slot }) => {
                 tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
                 let key = StorageKey::new(AccountTreeId::new(target.to_h160()), H256(*slot));
                 let mut storage = storage.borrow_mut();
                 let value = storage.read_value(&key);
                 self.return_data = Some(vec![h256_to_u256(value)]);
+            }
+            recordLogs(recordLogsCall {}) => {
+                tracing::info!("👷 Recording logs");
+                tracing::info!(
+                    "👷 Logs will be with the timestamp {}",
+                    state.vm_local_state.timestamp
+                );
+
+                self.recording_timestamp = state.vm_local_state.timestamp;
+                self.recording_logs = true;
+            }
+            readCallers(readCallersCall {}) => {
+                tracing::info!("👷 Reading callers");
+
+                let current_origin = {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                    );
+
+                    storage.borrow_mut().read_value(&key)
+                };
+
+                let mut mode = CallerMode::None;
+                let mut new_caller = current_origin;
+
+                if let Some(prank) = &self.permanent_actions.start_prank {
+                    //TODO: vm.prank -> CallerMode::Prank
+                    println!("PRANK");
+                    mode = CallerMode::RecurrentPrank;
+                    new_caller = prank.sender.into();
+                }
+                // TODO: vm.broadcast / vm.startBroadcast section
+                // else if let Some(broadcast) = broadcast {
+                //     mode = if broadcast.single_call {
+                //         CallerMode::Broadcast
+                //     } else {
+                //         CallerMode::RecurrentBroadcast
+                //     };
+                //     new_caller = &broadcast.new_origin;
+                //     new_origin = &broadcast.new_origin;
+                // }
+
+                let caller_mode = (mode as u8).into();
+                let message_sender = h256_to_u256(new_caller);
+                let tx_origin = h256_to_u256(current_origin);
+
+                self.return_data = Some(vec![caller_mode, message_sender, tx_origin]);
+            }
+            readFile(readFileCall { path }) => {
+                tracing::info!("👷 Reading file in path {}", path);
+                let Ok(data) = fs::read(path) else {
+                    tracing::error!("Failed to read file");
+                    return
+                };
+                self.add_trimmed_return_data(&data);
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
@@ -549,6 +696,43 @@ impl CheatcodeTracer {
                 let int_value = value.to_string();
                 self.add_trimmed_return_data(int_value.as_bytes());
             }
+
+            tryFfi(tryFfiCall { commandInput: command_input }) => {
+                tracing::info!("👷 Running try ffi: {command_input:?}");
+                let Some(first_arg) = command_input.get(0) else {
+                    tracing::error!("Failed to run ffi: no args");
+                    return
+                };
+                // TODO: set directory to root
+                let Ok(output) = Command::new(first_arg).args(&command_input[1..]).output() else {
+                    tracing::error!("Failed to run ffi");
+                    return
+                };
+
+                // The stdout might be encoded on valid hex, or it might just be a string,
+                // so we need to determine which it is to avoid improperly encoding later.
+                let Ok(trimmed_stdout) = String::from_utf8(output.stdout) else {
+                    tracing::error!("Failed to parse ffi output");
+                    return
+                };
+                let trimmed_stdout = trimmed_stdout.trim();
+                let encoded_stdout =
+                    if let Ok(hex) = hex::decode(trimmed_stdout.trim_start_matches("0x")) {
+                        hex
+                    } else {
+                        trimmed_stdout.as_bytes().to_vec()
+                    };
+
+                let ffi_result = FfiResult {
+                    exitCode: output.status.code().unwrap_or(69), // Default from foundry
+                    stdout: encoded_stdout,
+                    stderr: output.stderr,
+                };
+                let encoded_ffi_result: Vec<u8> = ffi_result.abi_encode();
+                let return_data: Vec<U256> =
+                    encoded_ffi_result.chunks(32).map(|b| b.into()).collect_vec();
+                self.return_data = Some(return_data);
+            }
             warp(warpCall { newTimestamp: new_timestamp }) => {
                 tracing::info!("👷 Setting block timestamp {}", new_timestamp);
 
@@ -572,6 +756,49 @@ impl CheatcodeTracer {
                     url_or_alias: urlOrAlias,
                     block_number,
                 });
+            }
+            writeFile(writeFileCall { path, data }) => {
+                tracing::info!("👷 Writing data to file in path {}", path);
+                if fs::write(path, data).is_err() {
+                    tracing::error!("Failed to write file");
+                }
+            }
+            writeJson_0(writeJson_0Call { json, path }) => {
+                tracing::info!("👷 Writing json data to file in path {}", path);
+                let Ok(json) = serde_json::from_str::<serde_json::Value>(&json) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                let Ok(formatted_json) = serde_json::to_string_pretty(&json) else {
+                    tracing::error!("Failed to format json");
+                    return
+                };
+                if fs::write(path, formatted_json).is_err() {
+                    tracing::error!("Failed to write file");
+                }
+            }
+            writeJson_1(writeJson_1Call { json, path, valueKey: value_key }) => {
+                tracing::info!("👷 Writing json data to file in path {path} with key {value_key}");
+                let Ok(file) = fs::read_to_string(&path) else {
+                    tracing::error!("Failed to read file");
+                    return
+                };
+                let Ok(mut file_json) = serde_json::from_str::<serde_json::Value>(&file) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                let Ok(json) = serde_json::from_str::<serde_json::Value>(&json) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                file_json[value_key] = json;
+                let Ok(formatted_json) = serde_json::to_string_pretty(&file_json) else {
+                    tracing::error!("Failed to format json");
+                    return
+                };
+                if fs::write(path, formatted_json).is_err() {
+                    tracing::error!("Failed to write file");
+                }
             }
             _ => {
                 tracing::error!("👷 Unrecognized cheatcode");
@@ -614,6 +841,18 @@ impl CheatcodeTracer {
 
         self.return_data = Some(data);
     }
+}
+fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> {
+    events
+        .iter()
+        .filter_map(|event| {
+            if event.address == zksync_types::EVENT_WRITER_ADDRESS {
+                Some(LogEntry::new(u256_to_h256(event.key), u256_to_h256(event.value), emitter))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn into_revm_env(env: &EraEnv) -> Env {

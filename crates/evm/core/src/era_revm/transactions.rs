@@ -29,9 +29,7 @@ use zksync_types::{
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
 use foundry_common::zk_utils::{
-    conversion_utils::{
-        address_to_h160, h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
-    },
+    conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
     factory_deps::PackedEraBytecode,
 };
 
@@ -146,16 +144,8 @@ where
         env: Arc::new(Mutex::new(env.clone())),
     };
 
-    let nonces = era_db.get_nonce_for_address(address_to_h160(env.tx.caller));
-
-    debug!(
-        "*** Starting ERA transaction: block: {:?} timestamp: {:?} - but using {:?} and {:?} instead with nonce {:?}",
-        env.block.number.to::<u32>(),
-        env.block.timestamp.to::<u64>(),
-        num,
-        ts,
-        nonces
-    );
+    let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
+    debug!("Starting ERA transaction: block={:?} timestamp={:?} nonce={:?}", num, ts, nonce);
 
     // Update the environment timestamp and block number.
     // Check if this should be done at the end?
@@ -169,14 +159,14 @@ where
         31337
     };
 
-    let (l2_num, l2_ts) = (num, ts * 2);
     let fork_details = ForkDetails {
         fork_source: era_db.clone(),
+        // It will be set properly later
         l1_block: L1BatchNumber(num as u32),
         l2_block: Block::default(),
-        l2_miniblock: l2_num,
+        l2_miniblock: num,
         l2_miniblock_hash: Default::default(),
-        block_timestamp: l2_ts,
+        block_timestamp: ts,
         overwrite_chain_id: Some(L2ChainId::from(chain_id_u32)),
         // Make sure that l1 gas price is set to reasonable values.
         l1_gas_price: u64::max(env.block.basefee.to::<u64>(), 1000),
@@ -192,7 +182,7 @@ where
     };
     let node = InMemoryNode::new(Some(fork_details), None, config);
 
-    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonces);
+    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
 
     if l2_tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -206,6 +196,7 @@ where
             multivm::interface::TxExecutionMode::VerifyExecute,
             vec![tracer],
             modified_storage,
+            false,
         )
         .unwrap();
 
