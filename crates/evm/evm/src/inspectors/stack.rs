@@ -575,7 +575,7 @@ use foundry_evm_core::era_revm::db::RevmDatabaseForEra;
 
 use era_cheatcodes::cheatcodes::CheatcodeTracer;
 use era_test_node::deps::storage_view::StorageView;
-use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
+use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
 
 impl<DB: DatabaseExt + Send>
     ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>
@@ -583,7 +583,7 @@ impl<DB: DatabaseExt + Send>
 {
     fn into_tracer_pointer(
         self,
-    ) -> multivm::vm_refunds_enhancement::TracerPointer<
+    ) -> multivm::vm_latest::TracerPointer<
         StorageView<ForkStorage<RevmDatabaseForEra<DB>>>,
         HistoryDisabled,
     > {

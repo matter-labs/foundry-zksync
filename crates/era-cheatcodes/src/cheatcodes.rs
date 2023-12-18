@@ -14,10 +14,11 @@ use foundry_evm_core::{
 };
 use itertools::Itertools;
 use multivm::{
-    interface::{dyn_tracers::vm_1_3_3::DynTracer, tracer::TracerExecutionStatus},
-    vm_latest::{L1BatchEnv, SystemEnv},
-    vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
-    zk_evm_1_3_3::{
+    interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus},
+    vm_latest::{
+        BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
+    },
+    zk_evm_1_4_0::{
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::PrimitiveValue,
         zkevm_opcode_defs::{

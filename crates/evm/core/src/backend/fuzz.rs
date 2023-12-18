@@ -18,7 +18,7 @@ use zksync_types::{StorageKey, StorageValue};
 
 use crate::era_revm::db::RevmDatabaseForEra;
 use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
-use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
+use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///

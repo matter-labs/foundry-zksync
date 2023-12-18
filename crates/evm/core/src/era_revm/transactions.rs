@@ -9,7 +9,7 @@ use era_test_node::{
 use ethers_core::abi::ethabi::{self, ParamType};
 use multivm::{
     interface::VmExecutionResultAndLogs,
-    vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer},
+    vm_latest::{HistoryDisabled, ToTracerPointer},
 };
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
@@ -355,8 +355,8 @@ where
 mod tests {
     use core::marker::PhantomData;
     use multivm::{
-        interface::dyn_tracers::vm_1_3_3::DynTracer,
-        vm_refunds_enhancement::{HistoryMode, SimpleMemory, VmTracer},
+        interface::dyn_tracers::vm_1_4_0::DynTracer,
+        vm_latest::{HistoryMode, SimpleMemory, VmTracer},
     };
     use zksync_state::WriteStorage;
 

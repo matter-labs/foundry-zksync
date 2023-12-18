@@ -22,8 +22,8 @@ use revm::{
     inspectors::NoOpInspector,
     precompile::{Precompiles, SpecId},
     primitives::{
-        Account, AccountInfo, Bytecode, CreateScheme, EVMError, Env, HashMap as Map,
-        Log, ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
+        Account, AccountInfo, Bytecode, CreateScheme, EVMError, Env, HashMap as Map, Log,
+        ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, Inspector, JournaledState, EVM,
 };
@@ -31,7 +31,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::era_revm::db::RevmDatabaseForEra;
 use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
-use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
+use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
 use zksync_types::{StorageKey, StorageValue};
 
 mod diagnostic;

@@ -160,12 +160,12 @@ solang-parser = "=0.3.3"
 
 ## zksync 
 era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , branch = "deniallugo-move-storage-view"}
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "1e18d256be8eaaf4696b8432e6122aba57ae1af0" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "1e18d256be8eaaf4696b8432e6122aba57ae1af0" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "1e18d256be8eaaf4696b8432e6122aba57ae1af0" }
-multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "1e18d256be8eaaf4696b8432e6122aba57ae1af0" }
-zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "1e18d256be8eaaf4696b8432e6122aba57ae1af0" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "1e18d256be8eaaf4696b8432e6122aba57ae1af0" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "357957df341820a30521c9a9c8df7c805a6ba43e" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "357957df341820a30521c9a9c8df7c805a6ba43e" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "357957df341820a30521c9a9c8df7c805a6ba43e" }
+multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "357957df341820a30521c9a9c8df7c805a6ba43e" }
+zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "357957df341820a30521c9a9c8df7c805a6ba43e" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "357957df341820a30521c9a9c8df7c805a6ba43e" }
 
 ## misc
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
