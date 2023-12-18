@@ -296,7 +296,6 @@ impl DatabaseRef for StateDb {
     }
 
     fn storage_ref(&self, address: B160, index: rU256) -> DatabaseResult<rU256> {
-        println!("statedb");
         self.0.storage_ref(address, index)
     }
 

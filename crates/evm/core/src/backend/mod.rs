@@ -673,7 +673,7 @@ impl Backend {
     ) {
         if let Some((_, fork_idx)) = self.active_fork_ids.as_ref() {
             let active = self.inner.get_fork(*fork_idx);
-            merge_account_data(accounts, &active.db, active_journaled_state, target_fork);
+            merge_account_data(accounts, &active.db, active_journaled_state, target_fork)
         } else {
             merge_account_data(accounts, &self.mem_db, active_journaled_state, target_fork)
         }
