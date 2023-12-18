@@ -8,16 +8,17 @@ import {Constants} from "./Constants.sol";
 contract ForkTest is Test {
     /// USDC TOKEN 
     address constant TOKEN_ADDRESS = 0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4;
+    uint256 constant TOKEN_DECIMALS = 6;
+    uint256 constant FORK_BLOCK = 19579636;
     function setUp() public {
         /// USDC TOKEN doesn't exists locally
         (bool success, bytes memory data) = TOKEN_ADDRESS.call(
             abi.encodeWithSignature("decimals()")
         );
         uint256 decimals_before = uint256(bytes32(data));
-        console.log("block", block.number);
-        console.log("decimals_before:", decimals_before);
+        require(block.number < 1000, "Local node doesn't have blocks above 1000");
          (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("createSelectFork(string,uint256)", "mainnet", 19579636)
+            abi.encodeWithSignature("createSelectFork(string,uint256)", "mainnet", FORK_BLOCK)
         );
         require(decimals_before == 0, "Contract exists locally");
         require(success1, "fork failed");   
@@ -29,9 +30,9 @@ contract ForkTest is Test {
             abi.encodeWithSignature("decimals()")
         );
         uint256 decimals_after = uint256(bytes32(data2));
-        console.log("block", block.number);
-        console.log("decimals_after:", decimals_after);
-        require(decimals_after == 6, "Contract dosent exists in fork");
+        console.log("decimals_after", decimals_after);  
+        require(decimals_after == TOKEN_DECIMALS, "Contract dosent exists in fork");
+        require(block.number == FORK_BLOCK + 1, "ENV for blocks is not set correctly");
 
     }
 }
