@@ -177,7 +177,7 @@ contract ExpectRevertTest is Test {
 
         Dummy dummy = new Dummy();
         cheatcodes.expectRevert();
-        reverter.callThenRevert(dummy, "revert message 4 i ran out of synonims for also");
+        reverter.callThenRevert(dummy, "this as well is a revert message");
 
         cheatcodes.expectRevert();
         reverter.revertWithoutReason();
