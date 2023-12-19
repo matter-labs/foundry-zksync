@@ -80,6 +80,7 @@ pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
     pub is_system: bool,
     pub force_evmla: bool,
+    pub missing_deps: bool,
     pub remappings: Vec<RelativeRemapping>,
 }
 
@@ -161,6 +162,7 @@ pub struct ZkSolc {
     compiler_path: PathBuf,
     is_system: bool,
     force_evmla: bool,
+    missing_deps: bool,
     standard_json: Option<StandardJsonCompilerInput>,
     remappings: Vec<RelativeRemapping>,
 }
@@ -199,6 +201,7 @@ pub fn compile_smart_contracts(
         compiler_path: zksolc_manager.get_full_compiler_path(),
         is_system,
         force_evmla: is_legacy,
+        missing_deps: true,
         remappings,
     };
 
@@ -222,6 +225,7 @@ impl ZkSolc {
             compiler_path: opts.compiler_path,
             is_system: opts.is_system,
             force_evmla: opts.force_evmla,
+            missing_deps: opts.missing_deps,
             standard_json: None,
             remappings: opts.remappings,
         }
@@ -372,6 +376,11 @@ impl ZkSolc {
                         let output =
                             child.wait_with_output().wrap_err("Could not run compiler cmd")?;
 
+                        println!(
+                            "Compiled {} with {:?} {:?}",
+                            filename, self.compiler_path, comp_args
+                        );
+
                         if !output.status.success() {
                             // Skip this file if the compiler output is empty
                             // currently zksolc returns false for success if output is empty
@@ -466,6 +475,10 @@ impl ZkSolc {
         // Check if system mode is enabled or if the source path contains "is-system"
         if self.is_system || contract_path.to_str().unwrap().contains("is-system") {
             comp_args.push("--system-mode".to_string());
+        }
+
+        if self.missing_deps {
+            comp_args.push("--detect-missing-libraries".to_string());
         }
 
         // Check if force-evmla is enabled
