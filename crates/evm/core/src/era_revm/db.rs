@@ -17,24 +17,27 @@ use revm::{
     primitives::{Bytecode, Bytes, Env},
     Database,
 };
-use zksync_basic_types::{web3::signing::keccak256, AccountTreeId, H160, H256, U256};
+use zksync_basic_types::{web3::signing::keccak256, AccountTreeId, L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
-    self, StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    self, get_code_key, get_system_context_init_logs, StorageKey, StorageLog, StorageLogKind,
+    ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
 };
 
-use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
+use super::storage_view::StorageView;
+use zksync_utils::{address_to_h256, bytecode::hash_bytecode, h256_to_u256, u256_to_h256};
 
 #[derive(Default)]
 pub struct RevmDatabaseForEra<DB> {
     pub db: Arc<Mutex<Box<DB>>>,
     pub env: Arc<Mutex<Env>>,
+    pub factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 impl<Db> Clone for RevmDatabaseForEra<Db> {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone(), env: self.env.clone() }
+        Self { db: self.db.clone(), env: self.env.clone(), factory_deps: self.factory_deps.clone() }
     }
 }
 
@@ -51,6 +54,40 @@ impl<DB: Database + Send> RevmDatabaseForEra<DB>
 where
     <DB as revm::Database>::Error: Debug,
 {
+    pub fn into_storage_view_with_system_contracts(
+        mut self,
+        mut modified_keys: HashMap<StorageKey, H256>,
+    ) -> StorageView<Self> {
+        let contracts = era_test_node::system_contracts::get_deployed_contracts(
+            &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
+        );
+
+        let chain_id = { L2ChainId::try_from(self.env.lock().unwrap().cfg.chain_id).unwrap() };
+        let system_context_init_log = get_system_context_init_logs(chain_id);
+
+        contracts
+            .iter()
+            .map(|contract| {
+                let deployer_code_key = get_code_key(contract.account_id.address());
+                StorageLog::new_write_log(deployer_code_key, hash_bytecode(&contract.bytecode))
+            })
+            .chain(system_context_init_log)
+            .for_each(|log| {
+                (log.kind == StorageLogKind::Write)
+                    .then_some(modified_keys.insert(log.key, log.value));
+            });
+
+        let factory_deps = contracts
+            .into_iter()
+            .map(|contract| (hash_bytecode(&contract.bytecode), contract.bytecode))
+            .collect();
+
+        self.factory_deps = factory_deps;
+        let mut storage_view = StorageView::new(self);
+        storage_view.modified_storage_keys = modified_keys;
+        storage_view
+    }
+
     /// Returns the current L1 block number and timestamp from the database.
     /// Reads it directly from the SYSTEM_CONTEXT storage.
     pub fn get_l1_block_number_and_timestamp(&self) -> (u64, u64) {
@@ -150,6 +187,10 @@ where
             })
             .flatten()
     }
+
+    pub fn store_factory_dep(&mut self, hash: H256, bytecode: Vec<u8>) {
+        self.factory_deps.insert(hash, bytecode);
+    }
 }
 
 impl<DB> ReadStorage for RevmDatabaseForEra<DB>
@@ -158,6 +199,7 @@ where
     <DB as revm::Database>::Error: Debug,
 {
     fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
+        dbg!(&key);
         let mut result = self.read_storage_internal(*key.address(), h256_to_u256(*key.key()));
         if L2_ETH_TOKEN_ADDRESS == *key.address() && result.is_zero() {
             // TODO: here we should read the account information from the Database trait
@@ -167,17 +209,21 @@ where
             // So for now - simply assume that every user has infinite money.
             result = u256_to_h256(U256::from(9_223_372_036_854_775_808_u64));
         }
+        dbg!(&result);
         result
     }
 
     fn is_write_initial(&mut self, _key: &StorageKey) -> bool {
-        true
+        false
     }
 
     fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
         let mut db = self.db.lock().unwrap();
-        let result = db.code_by_hash(h256_to_b256(hash)).unwrap();
-        Some(result.bytecode.to_vec())
+        let result = db.code_by_hash(h256_to_b256(hash));
+        match result {
+            Ok(bytecode) => Some(bytecode.bytecode.to_vec()),
+            Err(_) => self.factory_deps.get(&hash).cloned(),
+        }
     }
 
     fn get_enumeration_index(&mut self, _key: &StorageKey) -> Option<u64> {

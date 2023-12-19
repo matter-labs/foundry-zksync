@@ -137,6 +137,7 @@ where
     let era_db = RevmDatabaseForEra {
         db: Arc::new(Mutex::new(Box::new(db))),
         env: Arc::new(Mutex::new(env.clone())),
+        factory_deps: Default::default(),
     };
 
     let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
@@ -162,8 +163,7 @@ where
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
     let tracer = inspector.into_tracer_pointer();
-    let mut storage = StorageView::new(era_db.clone());
-    storage.modified_storage_keys = modified_storage;
+    let storage = era_db.clone().into_storage_view_with_system_contracts(modified_storage);
 
     let storage_ptr = storage.into_rc_ptr();
     let (tx_result, bytecodes) = run_l2_tx_raw(
