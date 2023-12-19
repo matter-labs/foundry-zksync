@@ -291,7 +291,6 @@ impl<'a> ContractRunner<'a> {
             .collect::<BTreeMap<_, _>>();
 
         if has_invariants {
-            // let mut identified_contracts = BTreeMap::new();
             let identified_contracts = setup
                 .labeled_addresses
                 .iter()
