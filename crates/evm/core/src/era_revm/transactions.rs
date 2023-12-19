@@ -170,8 +170,7 @@ where
         l2_tx,
         storage_ptr.clone(),
         L2ChainId::from(chain_id_u32),
-        // TODO Set l1 gas price
-        10000,
+        u64::max(env.block.basefee.to::<u64>(), 1000),
         vec![tracer],
     );
 
