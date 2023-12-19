@@ -99,4 +99,7 @@ RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}" --match-test 'testFail_In
 echo "[5] Check fuzz test works"
 RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}" --match-test 'testFuzz_Increment' &>run.log || fail "zkforge fuzz test failed"
 
+echo "[6] Check invariant test works"
+RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}" --match-test 'invariant_alwaysIncrements' &>run.log || fail "zkforge invariant test failed"
+
 success

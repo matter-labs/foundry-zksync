@@ -6,16 +6,12 @@ import {Test, console} from "forge-std/Test.sol";
 contract Counter {
     uint256 public number = 0;
 
-    function setNumber(uint256 newNumber) public {
-        number = newNumber;
-    }
-
     function increment() public {
         console.log("increment");
         number += 1;
     }
 
-    function incrementBy(uint64 amount) public {
+    function incrementBy(uint8 amount) public {
         console.log("incrementBy");
         number += uint256(amount);
     }
@@ -26,6 +22,11 @@ contract CounterTest is Test {
 
     function setUp() public {
         counter = new Counter();
+
+        // exclude these contract addresses from invariant testing
+        // using these addresses causes VM to halt.
+        excludeSender(address(this));
+        excludeSender(address(counter));
     }
 
     function test_Increment() public {
@@ -47,10 +48,20 @@ contract CounterTest is Test {
         assertEq(counter.number(), 200);
     }
 
-    function testFuzz_Increment(uint64 amount) public {
+    function testFuzz_Increment(uint8 amount) public {
         uint256 numBefore = counter.number();
         counter.incrementBy(amount);
         uint256 numAfter = counter.number();
         assertEq(numBefore + amount, numAfter);
+    }
+
+    function invariant_alwaysIncrements() external {
+        uint256 numBefore = counter.number();
+        counter.incrementBy(10);
+        uint256 numAfter = counter.number();
+        assertGt(numAfter, numBefore);
+        counter.increment();
+        uint256 numAfterAgain = counter.number();
+        assertGt(numAfterAgain, numAfter);
     }
 }
