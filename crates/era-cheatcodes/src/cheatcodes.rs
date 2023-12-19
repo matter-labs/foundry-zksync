@@ -1,14 +1,12 @@
 use crate::utils::{ToH160, ToH256, ToU256};
 use alloy_sol_types::{SolInterface, SolValue};
-use era_test_node::{
-    deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
-};
+use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::utils::to_checksum;
 use foundry_cheatcodes::CheatsConfig;
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{
     backend::DatabaseExt,
-    era_revm::{db::RevmDatabaseForEra, transactions::storage_to_state},
+    era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
     opts::EvmOpts,
 };
@@ -50,7 +48,7 @@ use zksync_types::{
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
-type EraDb<DB> = StorageView<ForkStorage<RevmDatabaseForEra<DB>>>;
+type EraDb<DB> = StorageView<RevmDatabaseForEra<DB>>;
 
 // address(uint160(uint256(keccak256('hevm cheat code'))))
 const CHEATCODE_ADDRESS: H160 = H160([
@@ -263,11 +261,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         .collect();
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
-                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                            &storage.borrow_mut().storage_handle;
-                        let mut fork_storage = handle.inner.write().unwrap();
-                        fork_storage.value_read_cache.clear();
-                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let era_db = &storage.borrow_mut().storage_handle;
                         let bytecodes = bootloader_state
                             .get_last_tx_compressed_bytecodes()
                             .iter()
@@ -302,11 +296,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
-                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                        &storage.borrow_mut().storage_handle;
-                    let era_db =
-                        handle.inner.write().unwrap().fork.as_ref().unwrap().fork_source.clone();
-
+                    let era_db = &storage.borrow_mut().storage_handle;
                     let mut db = era_db.db.lock().unwrap();
                     let era_env = self.env.get().unwrap();
                     let fork_id = db.create_fork(create_fork_request(
@@ -327,11 +317,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         .collect();
                     {
                         storage.borrow_mut().clean_cache();
-                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                            &storage.borrow_mut().storage_handle;
-                        let mut fork_storage = handle.inner.write().unwrap();
-                        fork_storage.value_read_cache.clear();
-                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let era_db = &storage.borrow_mut().storage_handle;
                         let bytecodes = bootloader_state
                             .get_last_tx_compressed_bytecodes()
                             .iter()

@@ -10,8 +10,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use era_test_node::fork::ForkSource;
-use eyre::ErrReport;
 use foundry_common::zk_utils::conversion_utils::{
     h160_to_address, h256_to_b256, h256_to_h160, revm_u256_to_h256, u256_to_revm_u256,
 };
@@ -19,12 +17,10 @@ use revm::{
     primitives::{Bytecode, Bytes, Env},
     Database,
 };
-use zksync_basic_types::{
-    web3::signing::keccak256, AccountTreeId, MiniblockNumber, H160, H256, U256,
-};
+use zksync_basic_types::{web3::signing::keccak256, AccountTreeId, H160, H256, U256};
+use zksync_state::ReadStorage;
 use zksync_types::{
-    api::{BlockIdVariant, Transaction, TransactionDetails},
-    StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    self, StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
 };
 
@@ -156,22 +152,14 @@ where
     }
 }
 
-impl<DB: Database + Send> ForkSource for RevmDatabaseForEra<DB>
+impl<DB> ReadStorage for RevmDatabaseForEra<DB>
 where
+    DB: Database + Send,
     <DB as revm::Database>::Error: Debug,
 {
-    fn get_storage_at(
-        &self,
-        address: H160,
-        idx: U256,
-        _block: Option<BlockIdVariant>,
-    ) -> eyre::Result<H256> {
-        // We don't need to verify the block here, because foundry backend
-        //   is taking care of it
-
-        let mut result = self.read_storage_internal(address, idx);
-
-        if L2_ETH_TOKEN_ADDRESS == address && result.is_zero() {
+    fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
+        let mut result = self.read_storage_internal(*key.address(), h256_to_u256(*key.key()));
+        if L2_ETH_TOKEN_ADDRESS == *key.address() && result.is_zero() {
             // TODO: here we should read the account information from the Database trait
             // and lookup how many token it holds.
             // Unfortunately the 'idx' here is a hash of the account and Database doesn't
@@ -179,92 +167,20 @@ where
             // So for now - simply assume that every user has infinite money.
             result = u256_to_h256(U256::from(9_223_372_036_854_775_808_u64));
         }
-        Ok(result)
+        result
     }
 
-    fn get_raw_block_transactions(
-        &self,
-        _block_number: MiniblockNumber,
-    ) -> eyre::Result<Vec<zksync_types::Transaction>> {
-        todo!()
+    fn is_write_initial(&mut self, _key: &StorageKey) -> bool {
+        true
     }
 
-    fn get_bytecode_by_hash(&self, hash: H256) -> eyre::Result<Option<Vec<u8>>> {
+    fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
         let mut db = self.db.lock().unwrap();
         let result = db.code_by_hash(h256_to_b256(hash)).unwrap();
-        Ok(Some(result.bytecode.to_vec()))
+        Some(result.bytecode.to_vec())
     }
 
-    fn get_transaction_by_hash(&self, _hash: H256) -> eyre::Result<Option<Transaction>> {
-        todo!()
-    }
-
-    fn get_transaction_details(
-        &self,
-        _hash: H256,
-    ) -> Result<std::option::Option<TransactionDetails>, ErrReport> {
-        todo!()
-    }
-
-    fn get_block_by_hash(
-        &self,
-        _hash: H256,
-        _full_transactions: bool,
-    ) -> eyre::Result<Option<zksync_types::api::Block<zksync_types::api::TransactionVariant>>> {
-        todo!()
-    }
-
-    fn get_block_by_number(
-        &self,
-        _block_number: zksync_types::api::BlockNumber,
-        _full_transactions: bool,
-    ) -> eyre::Result<Option<zksync_types::api::Block<zksync_types::api::TransactionVariant>>> {
-        todo!()
-    }
-
-    fn get_block_details(
-        &self,
-        _miniblock: MiniblockNumber,
-    ) -> eyre::Result<Option<zksync_types::api::BlockDetails>> {
-        todo!()
-    }
-
-    fn get_block_transaction_count_by_hash(&self, _block_hash: H256) -> eyre::Result<Option<U256>> {
-        todo!()
-    }
-
-    fn get_block_transaction_count_by_number(
-        &self,
-        _block_number: zksync_types::api::BlockNumber,
-    ) -> eyre::Result<Option<U256>> {
-        todo!()
-    }
-
-    fn get_transaction_by_block_hash_and_index(
-        &self,
-        _block_hash: H256,
-        _index: zksync_basic_types::web3::types::Index,
-    ) -> eyre::Result<Option<Transaction>> {
-        todo!()
-    }
-
-    fn get_transaction_by_block_number_and_index(
-        &self,
-        _block_number: zksync_types::api::BlockNumber,
-        _index: zksync_basic_types::web3::types::Index,
-    ) -> eyre::Result<Option<Transaction>> {
-        todo!()
-    }
-
-    fn get_bridge_contracts(&self) -> eyre::Result<zksync_types::api::BridgeAddresses> {
-        todo!()
-    }
-
-    fn get_confirmed_tokens(
-        &self,
-        _from: u32,
-        _limit: u8,
-    ) -> eyre::Result<Vec<zksync_web3_decl::types::Token>> {
-        todo!()
+    fn get_enumeration_index(&mut self, _key: &StorageKey) -> Option<u64> {
+        Some(0_u64)
     }
 }

@@ -1,11 +1,3 @@
-use era_test_node::{
-    deps::storage_view::StorageView,
-    fork::{ForkDetails, ForkStorage},
-    node::{
-        InMemoryNode, InMemoryNodeConfig, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails,
-    },
-    system_contracts,
-};
 use ethers_core::abi::ethabi::{self, ParamType};
 use multivm::{
     interface::VmExecutionResultAndLogs,
@@ -21,10 +13,10 @@ use std::{
     fmt::Debug,
     sync::{Arc, Mutex},
 };
-use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
+use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
 use zksync_types::{
-    api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
-    StorageKey, StorageLogQueryType, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
+    fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
+    StorageLogQueryType, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
@@ -34,7 +26,10 @@ use foundry_common::zk_utils::{
 };
 
 use super::db::RevmDatabaseForEra;
-use crate::backend::DatabaseExt;
+use crate::{
+    backend::DatabaseExt,
+    era_revm::{node::run_l2_tx_raw, storage_view::StorageView},
+};
 
 fn contract_address_from_tx_result(execution_result: &VmExecutionResultAndLogs) -> Option<H160> {
     for query in execution_result.logs.storage_logs.iter().rev() {
@@ -136,7 +131,7 @@ pub fn run_era_transaction<DB, E, INSP>(
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
-    INSP: ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>,
+    INSP: ToTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>,
 {
     let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
     let era_db = RevmDatabaseForEra {
@@ -159,29 +154,6 @@ where
         31337
     };
 
-    let fork_details = ForkDetails {
-        fork_source: era_db.clone(),
-        // It will be set properly later
-        l1_block: L1BatchNumber(num as u32),
-        l2_block: Block::default(),
-        l2_miniblock: num,
-        l2_miniblock_hash: Default::default(),
-        block_timestamp: ts,
-        overwrite_chain_id: Some(L2ChainId::from(chain_id_u32)),
-        // Make sure that l1 gas price is set to reasonable values.
-        l1_gas_price: u64::max(env.block.basefee.to::<u64>(), 1000),
-    };
-
-    let config = InMemoryNodeConfig {
-        show_calls: ShowCalls::None,
-        show_storage_logs: ShowStorageLogs::None,
-        show_vm_details: ShowVMDetails::None,
-        show_gas_details: ShowGasDetails::None,
-        resolve_hashes: false,
-        system_contracts_options: system_contracts::Options::BuiltInWithoutSecurity,
-    };
-    let node = InMemoryNode::new(Some(fork_details), None, config);
-
     let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
 
     if l2_tx.common_data.signature.is_empty() {
@@ -190,18 +162,19 @@ where
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
     let tracer = inspector.into_tracer_pointer();
-    let era_execution_result = node
-        .run_l2_tx_raw(
-            l2_tx,
-            multivm::interface::TxExecutionMode::VerifyExecute,
-            vec![tracer],
-            modified_storage,
-            false,
-        )
-        .unwrap();
+    let mut storage = StorageView::new(era_db.clone());
+    storage.modified_storage_keys = modified_storage;
 
-    let (modified_keys, tx_result, _call_traces, _block, bytecodes, _block_ctx) =
-        era_execution_result;
+    let storage_ptr = storage.into_rc_ptr();
+    let (tx_result, bytecodes) = run_l2_tx_raw(
+        l2_tx,
+        storage_ptr.clone(),
+        L2ChainId::from(chain_id_u32),
+        // TODO Set l1 gas price
+        10000,
+        vec![tracer],
+    );
+
     let maybe_contract_address = contract_address_from_tx_result(&tx_result);
 
     let execution_result = match tx_result.result {
@@ -245,8 +218,9 @@ where
         }
     };
 
+    let modified_keys = &storage_ptr.borrow_mut().modified_storage_keys;
     let state = storage_to_state(modified_keys.clone(), bytecodes, era_db.clone());
-    era_db.db.lock().unwrap().set_modified_keys(modified_keys);
+    era_db.db.lock().unwrap().set_modified_keys(modified_keys.clone());
     Ok(ResultAndState { result: execution_result, state })
 }
 
