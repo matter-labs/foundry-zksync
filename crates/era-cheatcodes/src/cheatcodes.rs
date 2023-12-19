@@ -10,7 +10,7 @@ use multivm::{
     vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
     zk_evm_1_3_3::{
         tracing::{AfterExecutionData, VmLocalStateData},
-        vm_state::PrimitiveValue,
+        vm_state::{CallStackEntry, PrimitiveValue},
         zkevm_opcode_defs::{
             FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
             RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
@@ -41,6 +41,10 @@ type EraDb<DB> = StorageView<ForkStorage<RevmDatabaseForEra<DB>>>;
 const CHEATCODE_ADDRESS: H160 = H160([
     113, 9, 112, 158, 207, 169, 26, 128, 98, 111, 243, 152, 157, 104, 246, 127, 91, 29, 209, 45,
 ]);
+
+// 0x2e1908b13b8b625ed13ecf03c87d45c499d1f325
+const TEST_ADDRESS: H160 =
+    H160([46, 25, 8, 177, 59, 139, 98, 94, 209, 62, 207, 3, 200, 125, 69, 196, 153, 209, 243, 37]);
 
 const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     zksync_types::BOOTLOADER_ADDRESS,
@@ -76,6 +80,13 @@ pub struct CheatcodeTracer {
     recorded_logs: HashSet<LogEntry>,
     recording_logs: bool,
     recording_timestamp: u32,
+    expected_calls: Vec<ExpectCallOpts>,
+    expected_calls_checked: bool,
+    test_status: TestStatus,
+    callstacks: Vec<CallStackEntry>,
+    test_callstacks: Vec<u64>,
+    test_number: u64,
+    callstack_depth: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
@@ -108,6 +119,23 @@ struct StartPrankOpts {
     origin: Option<H256>,
 }
 
+#[derive(Debug, Clone)]
+struct ExpectCallOpts {
+    callee: H160,
+    data: Vec<u8>,
+    matches_found: u32,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+enum TestStatus {
+    #[default]
+    NotStarted,
+    Running {
+        call_depth: usize,
+    },
+    Finished,
+}
+
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     for CheatcodeTracer
 {
@@ -118,6 +146,100 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
+        let calldata = get_calldata(&state, memory);
+
+        // Keep track of calls to detect if test started and stuff
+        match data.opcode.variant.opcode {
+            Opcode::NearCall(_) => {
+                let current = state.vm_local_state.callstack.current;
+                // if current.code_address == TEST_ADDRESS {
+                println!(
+                    "// near_call {:?} depth {}",
+                    current,
+                    state.vm_local_state.callstack.depth()
+                );
+                println!("// calldata: {}", hex::encode(calldata));
+                self.test_number += 1;
+                self.test_callstacks.push(self.test_number);
+                println!("// test_number: {}", self.test_number);
+                self.callstacks.push(current);
+                // }
+            }
+            Opcode::FarCall(_) => {
+                let current = state.vm_local_state.callstack.current;
+                // if current.code_address == TEST_ADDRESS {
+                println!(
+                    "// far_call {:?} depth {}",
+                    current,
+                    state.vm_local_state.callstack.depth()
+                );
+                println!("// calldata: {}", hex::encode(calldata));
+                self.test_number += 1;
+                self.test_callstacks.push(self.test_number);
+                self.callstacks.push(current);
+                println!("// test_number: {}", self.test_number);
+                if self.test_status == TestStatus::NotStarted &&
+                    current.code_address == TEST_ADDRESS
+                {
+                    println!("TEST STARTED");
+                    self.test_status =
+                        TestStatus::Running { call_depth: state.vm_local_state.callstack.depth() };
+                }
+                // }
+            }
+            Opcode::Ret(_) => {
+                let current = state.vm_local_state.callstack.current;
+                // if current.code_address == TEST_ADDRESS {
+                println!(
+                    "// ret_call {:?} depth {}",
+                    current,
+                    state.vm_local_state.callstack.depth()
+                );
+                println!("// calldata: {}", hex::encode(calldata));
+                self.callstacks.pop();
+                println!("// popped test_number: {:?}", self.test_callstacks.pop());
+                println!("// test_number_length: {}", self.test_callstacks.len());
+                if self.test_callstacks.len() < 10 {
+                    println!("// test_callstacks: {:?}", self.test_callstacks);
+                }
+
+                // Check ret opcode has 2 lower depth than
+                if let Some(callstack_depth) = self.callstack_depth {
+                    if state.vm_local_state.callstack.depth() == callstack_depth - 4 {
+                        println!("// TEST FINISHED FOR REAL");
+
+                        for expected_call in &mut self.expected_calls {
+                            if expected_call.matches_found == 0 {
+                                println!("EXPECTED CALL NOT FOUND");
+                                println!("callee {:?}", expected_call.callee);
+                                println!("data {:?}", expected_call.data);
+                                // panic!("Expected call not found");
+                            }
+                        }
+                    }
+                }
+
+                // }
+            }
+            _ => {}
+        }
+
+        // Checks contract calls for expectCall cheatcode
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.current;
+            let calldata = get_calldata(&state, memory);
+
+            for expected_call in &mut self.expected_calls {
+                if expected_call.callee == current.code_address && expected_call.data == calldata {
+                    println!("MATCH FOUND");
+                    println!("current {:?}", current);
+                    println!("calldata {:?}", calldata);
+                    expected_call.matches_found += 1;
+                    return
+                }
+            }
+        }
+
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
                 if self.near_calls == 0 {
@@ -147,17 +269,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 return
             }
             tracing::info!("near call: cheatcode triggered");
-            let calldata = {
-                let ptr = state.vm_local_state.registers
-                    [CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
-                assert!(ptr.is_pointer);
-                let fat_data_pointer = FatPointer::from_u256(ptr.value);
-                memory.read_unaligned_bytes(
-                    fat_data_pointer.memory_page as usize,
-                    fat_data_pointer.start as usize,
-                    fat_data_pointer.length as usize,
-                )
-            };
+            let calldata = get_calldata(&state, memory);
 
             // try to dispatch the cheatcode
             if let Ok(call) = Vm::VmCalls::abi_decode(&calldata, true) {
@@ -257,6 +369,13 @@ impl CheatcodeTracer {
             recorded_logs: HashSet::new(),
             recording_logs: false,
             recording_timestamp: 0,
+            expected_calls: vec![],
+            test_status: TestStatus::NotStarted,
+            expected_calls_checked: false,
+            callstacks: vec![],
+            test_callstacks: vec![],
+            test_number: 0,
+            callstack_depth: None,
         }
     }
 
@@ -295,6 +414,15 @@ impl CheatcodeTracer {
                 let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+            }
+            expectCall_0(expectCall_0Call { callee, data }) => {
+                tracing::info!("👷 Setting expected call to {callee:?}");
+                self.expected_calls.push(ExpectCallOpts {
+                    callee: callee.to_h160(),
+                    data,
+                    matches_found: 0,
+                });
+                self.callstack_depth = Some(state.vm_local_state.callstack.depth());
             }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
@@ -758,4 +886,18 @@ fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> 
             }
         })
         .collect()
+}
+
+fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMemory<H>) -> Vec<u8> {
+    let ptr = state.vm_local_state.registers[CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
+    if !ptr.is_pointer {
+        return vec![]
+    }
+    // assert!(ptr.is_pointer);
+    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+    memory.read_unaligned_bytes(
+        fat_data_pointer.memory_page as usize,
+        fat_data_pointer.start as usize,
+        fat_data_pointer.length as usize,
+    )
 }
