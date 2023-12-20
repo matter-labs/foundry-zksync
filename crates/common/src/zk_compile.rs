@@ -325,7 +325,7 @@ impl ZkSolc {
                     .any(|ancestor| ancestor.starts_with(&self.project.paths.sources));
 
                 // Skip this file if it's not in the 'sources' directory or its subdirectories
-                if !is_in_sources_dir && !is_in_scripts_dir {
+                if !is_in_sources_dir {
                     continue
                 }
 
@@ -931,10 +931,8 @@ impl ZkSolc {
     fn get_versioned_sources(&mut self) -> Result<BTreeMap<Solc, SolidityVersionSources>> {
         // Step 1: Retrieve Project Sources
         let sources = self.project.sources().wrap_err("Could not get project sources")?;
-        let scripts = self.project.scripts().wrap_err("Could not get project scripts")?;
-        let all_files = self.project.paths.input_files_iter().collect::<Vec<_>>();
         // Step 2: Resolve Graph of Sources and Versions
-        let graph = Graph::resolve_sources(&self.project.paths, all_files)
+        let graph = Graph::resolve_sources(&self.project.paths, sources)
             .wrap_err("Could not resolve sources")?;
 
         // Step 3: Extract Versions and Edges
