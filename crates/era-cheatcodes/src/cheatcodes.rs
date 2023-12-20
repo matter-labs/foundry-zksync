@@ -1,7 +1,10 @@
 use crate::utils::{ToH160, ToH256};
 use alloy_sol_types::SolInterface;
 use era_test_node::{fork::ForkStorage, utils::bytecode_to_factory_dep};
-use ethers::utils::to_checksum;
+use ethers::{
+    abi::{AbiDecode, AbiEncode},
+    utils::to_checksum,
+};
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{backend::DatabaseExt, era_revm::db::RevmDatabaseForEra};
 use itertools::Itertools;
@@ -10,9 +13,9 @@ use multivm::{
     vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
     zk_evm_1_3_3::{
         tracing::{AfterExecutionData, VmLocalStateData},
-        vm_state::PrimitiveValue,
+        vm_state::{PrimitiveValue, VmLocalState},
         zkevm_opcode_defs::{
-            FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
+            self, FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
             RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
         },
     },
@@ -214,35 +217,43 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
-                FinishCycleOneTimeActions::ForceReturn { data: _ } => {
+                FinishCycleOneTimeActions::ForceReturn { mut data } => {
+                    tracing::warn!("!!!! FORCING RETURN");
+
                     //TODO: override return data with the given one and force return (instead of
                     // revert)
+                    self.add_trimmed_return_data(data.as_slice());
+                    let ptr = state.local_state.registers
+                        [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+                    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+
+                    Self::set_return(
+                        fat_data_pointer,
+                        self.return_data.take().unwrap(),
+                        &mut state.local_state,
+                        &mut state.memory,
+                    );
+
+                    return TracerExecutionStatus::Continue
                 }
                 FinishCycleOneTimeActions::ForceRevert { error } => {
-                    return TracerExecutionStatus::Stop(
-                        multivm::interface::tracer::TracerExecutionStopReason::Abort(
-                            multivm::interface::Halt::Unknown(VmRevertReason::from(
-                                error.as_slice(),
-                            )),
-                        ),
-                    )
+                    use multivm::interface::{
+                        tracer::TracerExecutionStopReason, Halt, VmRevertReason,
+                    };
+
+                    tracing::warn!("!!! FORCING REVERT");
+                    return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
+                        Halt::Unknown(VmRevertReason::from(error.as_slice())),
+                    ))
                 }
             }
         }
 
         // Set return data, if any
         if let Some(mut fat_pointer) = self.return_ptr.take() {
-            let timestamp = Timestamp(state.local_state.timestamp);
-
             let elements = self.return_data.take().unwrap();
-            fat_pointer.length = (elements.len() as u32) * 32;
-            state.local_state.registers[RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize] =
-                PrimitiveValue { value: fat_pointer.to_u256(), is_pointer: true };
-            state.memory.populate_page(
-                fat_pointer.memory_page as usize,
-                elements.into_iter().enumerate().collect_vec(),
-                timestamp,
-            );
+
+            Self::set_return(fat_pointer, elements, &mut state.local_state, &mut state.memory);
         }
 
         // Sets the sender address for startPrank cheatcode
@@ -307,13 +318,23 @@ impl CheatcodeTracer {
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
             }
             expectRevert_0(expectRevert_0Call {}) => {
-                self.add_except_revert(None, state.vm_local_sate.callstack.depth())
+                let callstack = state.vm_local_state.callstack.get_current_stack();
+                let depth = state.vm_local_state.callstack.depth();
+                tracing::info!(%depth, "👷 Setting up expectRevert for any reason");
+                self.add_except_revert(None, depth)
             }
-            expectRevert_1(expectRevert_1Call { revertData }) |
-            expectRevert_2(expectRevert_2Call { revertData }) => self.add_except_revert(
-                Some(revertData.to_vec()),
-                state.vm_local_sate.callstack.depth(),
-            ),
+            expectRevert_1(expectRevert_1Call { revertData }) => {
+                let callstack = state.vm_local_state.callstack.get_current_stack();
+                let depth = state.vm_local_state.callstack.depth();
+                tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with bytes4 reason");
+                self.add_except_revert(Some(revertData.to_vec()), depth)
+            }
+            expectRevert_2(expectRevert_2Call { revertData }) => {
+                let callstack = state.vm_local_state.callstack.get_current_stack();
+                let depth = state.vm_local_state.callstack.depth();
+                tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with reason");
+                self.add_except_revert(Some(revertData.to_vec()), depth)
+            }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
                 let mut storage = storage.borrow_mut();
@@ -577,9 +598,28 @@ impl CheatcodeTracer {
         self.return_data = Some(data);
     }
 
+    fn set_return<H: HistoryMode>(
+        mut fat_pointer: FatPointer,
+        elements: Vec<U256>,
+        state: &mut VmLocalState,
+        memory: &mut SimpleMemory<H>,
+    ) {
+        let timestamp = Timestamp(state.timestamp);
+
+        fat_pointer.length = (elements.len() as u32) * 32;
+        state.registers[RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize] =
+            PrimitiveValue { value: fat_pointer.to_u256(), is_pointer: true };
+        memory.populate_page(
+            fat_pointer.memory_page as usize,
+            elements.into_iter().enumerate().collect_vec(),
+            timestamp,
+        );
+    }
+
     fn add_except_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
+        //-2: possibly for EfficientCall.call EfficientCall.rawCall ? not confirmed
         self.next_execution_actions
-            .push(NextExecutionOneTimeActions::ExpectRevert { reason, depth });
+            .push(NextExecutionOneTimeActions::ExpectRevert { reason, depth: depth - 2 });
     }
 
     fn handle_except_revert<H: HistoryMode>(
@@ -592,7 +632,7 @@ impl CheatcodeTracer {
             (zkevm_opcode_defs::RetOpcode::Revert, Some(expected_reason)) => {
                 let retdata = {
                     let ptr = state.vm_local_state.registers
-                        [CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
+                        [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
                     assert!(ptr.is_pointer);
                     let fat_data_pointer = FatPointer::from_u256(ptr.value);
                     memory.read_unaligned_bytes(
@@ -602,6 +642,7 @@ impl CheatcodeTracer {
                     )
                 };
 
+                tracing::debug!(?expected_reason, ?retdata);
                 if !expected_reason.is_empty() && retdata.is_empty() {
                     return Err("call reverted as expected, but without data".to_string().into())
                 }
@@ -637,8 +678,12 @@ impl CheatcodeTracer {
                     .into())
                 }
             }
-            (zkevm_opcode_defs::RetOpcode::Revert, None) => Ok(()),
+            (zkevm_opcode_defs::RetOpcode::Revert, None) => {
+                tracing::debug!("any revert accepted");
+                Ok(())
+            }
             (zkevm_opcode_defs::RetOpcode::Ok, _) => {
+                tracing::debug!("expected revert but call succeeded");
                 Err("expected revert but call succeeded".to_string().into())
             }
             (zkevm_opcode_defs::RetOpcode::Panic, _) => todo!("ignore/return error ?"),
