@@ -30,7 +30,7 @@
 ///
 /// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods
 ///   construct the path and file for saving the compiler output artifacts.
-use crate::{term, zksolc_manager::ZkSolcManager};
+use crate::zksolc_manager::ZkSolcManager;
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::Bytes;
 use ansi_term::Colour::{Red, Yellow};
@@ -204,16 +204,9 @@ pub fn compile_smart_contracts(
 
     let mut zksolc = ZkSolc::new(zksolc_opts, project);
 
-    let now = std::time::Instant::now();
-    match term::with_spinner_reporter(|| zksolc.compile()) {
+    match zksolc.compile() {
         Ok(_) => {
-            let elapsed = now.elapsed();
-            println!(
-                "zksolc {} finished in {:.2}s",
-                zksolc_manager.get_zksolc_version(),
-                elapsed.as_secs_f32()
-            );
-            println!("Compiler run successful!");
+            info!("Compiled Successfully");
             Ok(())
         }
         Err(err) => {
