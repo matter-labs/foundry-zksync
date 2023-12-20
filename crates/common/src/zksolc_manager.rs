@@ -61,9 +61,12 @@ pub enum ZkSolcVersion {
     V1313,
     V1314,
     V1316,
+    V1317,
+    V1318,
+    V1319,
 }
 
-pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.3.16";
+pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.3.19";
 
 /// `parse_version` parses a string representation of a `zksolc` compiler version
 /// and returns the `ZkSolcVersion` enum variant if it matches a supported version.
@@ -88,6 +91,9 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.13" => Ok(ZkSolcVersion::V1313),
         "v1.3.14" => Ok(ZkSolcVersion::V1314),
         "v1.3.16" => Ok(ZkSolcVersion::V1316),
+        "v1.3.17" => Ok(ZkSolcVersion::V1317),
+        "v1.3.18" => Ok(ZkSolcVersion::V1318),
+        "v1.3.19" => Ok(ZkSolcVersion::V1319),
         _ => Err(Error::msg(
             "ZkSolc compiler version not supported. Proper version format: 'v1.3.x'",
         )),
@@ -112,6 +118,9 @@ impl ZkSolcVersion {
             ZkSolcVersion::V1313 => "v1.3.13",
             ZkSolcVersion::V1314 => "v1.3.14",
             ZkSolcVersion::V1316 => "v1.3.16",
+            ZkSolcVersion::V1317 => "v1.3.17",
+            ZkSolcVersion::V1318 => "v1.3.18",
+            ZkSolcVersion::V1319 => "v1.3.19",
         }
     }
 }
@@ -218,7 +227,7 @@ impl ZkSolcManagerOpts {
 ///
 /// ```ignore
 /// use zkforge::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
-/// let opts = ZkSolcManagerOpts::new("v1.3.16")
+/// let opts = ZkSolcManagerOpts::new("v1.3.19")
 /// let zk_solc_manager = ZkSolcManagerBuilder::new(opts)
 ///     .build()
 ///     .expect("Failed to build ZkSolcManager");
@@ -350,8 +359,8 @@ impl ZkSolcManagerBuilder {
 /// ```ignore
 /// let compilers_path = PathBuf::from("/path/to/compilers");
 /// let version = ZkSolcVersion::V139;
-/// let compiler = "zksolc-linux-amd64-musl-v1.3.9".to_string();
-/// let download_url = Url::parse("https://github.com/matter-labs/zksolc-bin/raw/main").unwrap();
+/// let compiler = "zksolc-linux-amd64-musl-v1.3.19".to_string();
+/// let download_url = Url::parse("https://github.com/matter-labs/zksolc-bin/releases/download/").unwrap();
 ///
 /// let zksolc_manager = ZkSolcManager::new(compilers_path, version, compiler, download_url);
 /// ```
