@@ -199,7 +199,6 @@ where
     <DB as revm::Database>::Error: Debug,
 {
     fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
-        dbg!(&key);
         let mut result = self.read_storage_internal(*key.address(), h256_to_u256(*key.key()));
         if L2_ETH_TOKEN_ADDRESS == *key.address() && result.is_zero() {
             // TODO: here we should read the account information from the Database trait
@@ -209,7 +208,6 @@ where
             // So for now - simply assume that every user has infinite money.
             result = u256_to_h256(U256::from(9_223_372_036_854_775_808_u64));
         }
-        dbg!(&result);
         result
     }
 
@@ -220,10 +218,16 @@ where
     fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
         let mut db = self.db.lock().unwrap();
         let result = db.code_by_hash(h256_to_b256(hash));
-        match result {
-            Ok(bytecode) => Some(bytecode.bytecode.to_vec()),
+        let res = match result {
+            Ok(bytecode) => {
+                if bytecode.is_empty() {
+                    return self.factory_deps.get(&hash).cloned()
+                }
+                Some(bytecode.bytecode.to_vec())
+            }
             Err(_) => self.factory_deps.get(&hash).cloned(),
-        }
+        };
+        res
     }
 
     fn get_enumeration_index(&mut self, _key: &StorageKey) -> Option<u64> {

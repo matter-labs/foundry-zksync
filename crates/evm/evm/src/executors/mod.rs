@@ -366,6 +366,7 @@ impl Executor {
 
         let address = match exit_reason {
             return_ok!() => {
+                dbg!(&out);
                 if let Some(Output::Create(_, Some(addr))) = out {
                     addr
                 } else {

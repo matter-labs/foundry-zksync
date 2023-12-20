@@ -45,7 +45,7 @@ pub fn run_l2_tx_raw<S: ReadStorage>(
 ) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>) {
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price);
 
-    let system_contracts = SystemContracts::from_options(&Options::BuiltIn);
+    let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity);
     let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);
 
     dbg!(&batch_env, &system_env);

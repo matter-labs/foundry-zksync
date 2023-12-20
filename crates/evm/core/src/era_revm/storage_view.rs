@@ -62,13 +62,13 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     fn read_value(&mut self, key: &StorageKey) -> StorageValue {
         let value = self.get_value_no_log(key);
 
-        tracing::trace!(
-            "read value {:?} {:?} ({:?}/{:?})",
-            key.hashed_key().0,
-            value.0,
-            key.address(),
-            key.key()
-        );
+        // tracing::trace!(
+        //     "read value {:?} {:?} ({:?}/{:?})",
+        //     key.hashed_key().0,
+        //     value.0,
+        //     key.address(),
+        //     key.key()
+        // );
 
         value
     }
