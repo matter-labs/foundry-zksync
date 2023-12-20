@@ -137,12 +137,15 @@ impl ZkBuildArgs {
             project = config.project()?;
             zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         }
+
         // TODO: revisit to remove zksolc_manager and move binary installation to zksolc_config
         let compiler_path = setup_zksolc_manager(self.args.use_zksolc.clone())?;
         zksolc_cfg.compiler_path = compiler_path;
 
         // TODO: add filter support
-        foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project)
+        let _ = foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project);
+
+        Ok(())
     }
     /// Returns the `Project` for the current workspace
     ///

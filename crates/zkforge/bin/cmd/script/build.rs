@@ -5,16 +5,16 @@ use foundry_cli::utils::get_cached_entry_by_name;
 use foundry_common::{
     compact_to_contract,
     compile::{self, ContractSources},
-    fs,
+    fs, zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION}, zk_compile::{ZkSolcOpts, ZkSolc},
 };
 use foundry_compilers::{
     artifacts::{CompactContractBytecode, ContractBytecode, ContractBytecodeSome, Libraries},
     cache::SolFilesCache,
     contracts::ArtifactContracts,
     info::ContractInfo,
-    ArtifactId, Project, ProjectCompileOutput,
+    ArtifactId, Project, ProjectCompileOutput, remappings::RelativeRemapping,
 };
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr, path::{Path, PathBuf}};
 use zkforge::link::{link_with_nonce_or_address, PostLinkInput, ResolvedDependency};
 
 impl ScriptArgs {
@@ -31,12 +31,15 @@ impl ScriptArgs {
         let output = output.with_stripped_file_prefixes(project.root());
 
         let mut sources: ContractSources = Default::default();
+        // println!("I'm IN BUILD");
 
         let contracts = output
             .into_artifacts()
             .map(|(id, artifact)| -> Result<_> {
                 // Sources are only required for the debugger, but it *might* mean that there's
                 // something wrong with the build and/or artifacts.
+                // println!("id.name : {}", id.name);
+                // println!("id.path : {:?}", id.path);
                 if let Some(source) = artifact.source_file() {
                     let path = source
                         .ast
@@ -85,8 +88,20 @@ impl ScriptArgs {
         let mut run_dependencies = vec![];
         let mut contract = CompactContractBytecode::default();
         let mut highlevel_known_contracts = BTreeMap::new();
+        let contract_info = ContractInfo::from_str(&self.path)?;
 
-        let mut target_fname = dunce::canonicalize(&self.path)
+        // // // println!("self.path : {}", &self.path);
+        // // // println!("self.target_contract : {:?}", &self.target_contract);
+        // // // println!("project.root() : {:?}", project.root());
+        // // // println!("contract_info.path : {:?}", contract_info.path);
+        // let _absolute_path = match dunce::canonicalize(contract_info.path.unwrap_or_default()) {
+        //     Ok(path) => path,
+        //     Err(e) => {
+        //         println!("absolute path broke: {}", e);
+        //         return Err(eyre::eyre!("Couldn't convert contract path to absolute path: {}", e))
+        //     },
+        // };
+        let mut target_fname = dunce::canonicalize(contract_info.path.unwrap_or_default())
             .wrap_err("Couldn't convert contract path to absolute path.")?
             .strip_prefix(project.root())
             .wrap_err("Couldn't strip project root from contract path.")?
@@ -100,6 +115,9 @@ impl ScriptArgs {
         } else {
             true
         };
+
+        // println!("target_fname : {}", target_fname);
+        // println!("no_target_name : {}", no_target_name);
 
         let mut extra_info = ExtraLinkingInfo {
             no_target_name,
@@ -169,7 +187,30 @@ impl ScriptArgs {
                         .rsplit_once(':')
                         .expect("The target specifier is malformed.");
                     let path = std::path::Path::new(path);
-                    if path == id.source && name == id.name {
+
+
+
+                    let mut new_path = PathBuf::from("");
+
+                    if path.starts_with("script/") {
+                        // Strip the "script/" part and then iterate over the remaining components
+                        for component in path.strip_prefix("script/").unwrap().iter() {
+                            new_path.push(component);
+                        }
+                    } else {
+                        // If the path doesn't start with "script/", just use the original path
+                        new_path = path.to_path_buf();
+                    }
+
+
+
+
+
+                    // // println!("new_path : {:?}", new_path);
+                    // // println!("id.source : {:?}", id.source);
+                    // // println!("name : {}", name);
+                    // // println!("id.name : {}", id.name);
+                    if new_path == id.source && name == id.name {
                         *extra.dependencies = unique_deps(dependencies);
                         *extra.contract = contract.clone();
                         extra.matched = true;
@@ -215,59 +256,119 @@ impl ScriptArgs {
         &mut self,
         script_config: &ScriptConfig,
     ) -> Result<(Project, ProjectCompileOutput)> {
+        // // println!("IM IN get_project_and_output");
         let project = script_config.config.project()?;
+        // // println!("Project Paths");
+        // // println!("{}", project.paths);
+        // // println!("sources_path : {:?}", project.sources_path());
 
-        let filters = self.opts.skip.clone().unwrap_or_default();
-        // We received a valid file path.
-        // If this file does not exist, `dunce::canonicalize` will
-        // result in an error and it will be handled below.
-        if let Ok(target_contract) = dunce::canonicalize(&self.path) {
-            let output = compile::compile_target_with_filter(
-                &target_contract,
-                &project,
-                self.opts.args.silent,
-                self.verify,
-                filters,
-            )?;
-            return Ok((project, output))
-        }
+        let zksolc_manager = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned())?;
 
-        if !project.paths.has_input_files() {
-            eyre::bail!("The project doesn't have any input files. Make sure the `script` directory is configured properly in foundry.toml. Otherwise, provide the path to the file.")
-        }
+        let zksolc_opts = ZkSolcOpts {
+            compiler_path: zksolc_manager.get_full_compiler_path(),
+            is_system: false,
+            force_evmla: false,
+            remappings: project.paths.remappings.clone()
+                .into_iter()
+                .map(|remapping| RelativeRemapping::new(remapping, Path::new(".")))
+                .collect(),
+        };
+
+        let mut zksolc = ZkSolc::new(zksolc_opts, project);
+        let (output, _) = match zksolc.compile() {
+            Ok(compiled) => compiled,
+            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
+        };
 
         let contract = ContractInfo::from_str(&self.path)?;
         self.target_contract = Some(contract.name.clone());
 
-        // We received `contract_path:contract_name`
-        if let Some(path) = contract.path {
-            let path =
-                dunce::canonicalize(path).wrap_err("Could not canonicalize the target path")?;
-            let output = compile::compile_target_with_filter(
-                &path,
-                &project,
-                self.opts.args.silent,
-                self.verify,
-                filters,
-            )?;
-            self.path = path.to_string_lossy().to_string();
-            return Ok((project, output))
-        }
+        // // println!("contract path: {:?}", contract.path);
+        // // println!("target_contract: {:?}", self.target_contract);
 
-        // We received `contract_name`, and need to find its file path.
-        let output = if self.opts.args.silent {
-            compile::suppress_compile(&project)
-        } else {
-            compile::compile(&project, false, false)
-        }?;
-        let cache =
-            SolFilesCache::read_joined(&project.paths).wrap_err("Could not open compiler cache")?;
+        // Ok((script_config.config.project()?, output))
 
-        let (path, _) = get_cached_entry_by_name(&cache, &contract.name)
-            .wrap_err("Could not find target contract in cache")?;
-        self.path = path.to_string_lossy().to_string();
 
-        Ok((project, output))
+
+
+        // let zksolc_manager = setup_zksolc_manager("v1.3.16".into())?;
+        // println!("project: {:?}", project);
+
+        // //let filters = self.opts.skip.clone().unwrap_or_default();
+        // // We received a valid file path.
+        // // If this file does not exist, `dunce::canonicalize` will
+        // // result in an error and it will be handled below.
+        // if let Ok(target_contract) = dunce::canonicalize(&self.path) {
+        //     let output = foundry_common::zk_compile::compile_smart_contracts(
+        //         false,
+        //         true,
+        //         zksolc_manager,
+        //         project,
+        //         script_config.config.remappings.clone(),
+        //     )?;
+        //     // let output = compile::compile_target_with_filter(
+        //     //     &target_contract,
+        //     //     &project,
+        //     //     self.opts.args.silent,
+        //     //     self.verify,
+        //     //     filters,
+        //     // )?;
+        //     return Ok((script_config.config.project()?, output.0))
+        // }
+        // let project = script_config.config.project()?;
+
+        // let filters = self.opts.skip.clone().unwrap_or_default();
+        // // We received a valid file path.
+        // // If this file does not exist, `dunce::canonicalize` will
+        // // result in an error and it will be handled below.
+        // if let Ok(target_contract) = dunce::canonicalize(&self.path) {
+        //     let output = compile::compile_target_with_filter(
+        //         &target_contract,
+        //         &project,
+        //         self.opts.args.silent,
+        //         self.verify,
+        //         filters,
+        //     )?;
+        //     return Ok((project, output))
+        // }
+
+        // if !project.paths.has_input_files() {
+        //     eyre::bail!("The project doesn't have any input files. Make sure the `script` directory is configured properly in foundry.toml. Otherwise, provide the path to the file.")
+        // }
+
+        // let contract = ContractInfo::from_str(&self.path)?;
+        // self.target_contract = Some(contract.name.clone());
+
+        // // We received `contract_path:contract_name`
+        // if let Some(path) = contract.path {
+        //     let path =
+        //         dunce::canonicalize(path).wrap_err("Could not canonicalize the target path")?;
+        //     let output = compile::compile_target_with_filter(
+        //         &path,
+        //         &project,
+        //         self.opts.args.silent,
+        //         self.verify,
+        //         filters,
+        //     )?;
+        //     self.path = path.to_string_lossy().to_string();
+        //     return Ok((project, output))
+        // }
+
+        // // We received `contract_name`, and need to find its file path.
+        // let output = if self.opts.args.silent {
+        //     compile::suppress_compile(&project)
+        // } else {
+        //     compile::compile(&project, false, false)
+        // }?;
+        // let cache =
+        //     SolFilesCache::read_joined(&project.paths).wrap_err("Could not open compiler cache")?;
+
+        // let (path, _) = get_cached_entry_by_name(&cache, &contract.name)
+        //     .wrap_err("Could not find target contract in cache")?;
+        // self.path = path.to_string_lossy().to_string();
+
+        // Ok((project, Default::default()))
+        Ok((script_config.config.project()?, output))
     }
 }
 

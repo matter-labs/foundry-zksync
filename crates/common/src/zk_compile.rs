@@ -181,13 +181,16 @@ impl fmt::Display for ZkSolc {
 ///
 /// The function returns `Ok(())` if the compilation process completes successfully, or an error
 /// if it fails.
-pub fn compile_smart_contracts(zksolc_cfg: ZkSolcConfig, project: Project) -> eyre::Result<()> {
+pub fn compile_smart_contracts(
+    zksolc_cfg: ZkSolcConfig,
+    project: Project,
+) -> eyre::Result<(ProjectCompileOutput, ContractBytecodes)> {
+    //TODO: use remappings
     let mut zksolc = ZkSolc::new(zksolc_cfg, project);
-
     match zksolc.compile() {
-        Ok(_) => {
+        Ok(output) => {
             info!("Compiled Successfully");
-            Ok(())
+            Ok(output)
         }
         Err(err) => {
             eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
@@ -277,7 +280,14 @@ impl ZkSolc {
         let mut displayed_warnings = HashSet::new();
         let mut data = BTreeMap::new();
         // Step 1: Collect Source Files
-        let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
+        let sources = match self.get_versioned_sources() {
+            Ok(sources) => sources,
+            Err(e) => {
+                println!("Could not resolve sources: {}", e);
+                return Err(eyre::eyre!("Could not resolve sources: {}", e))
+            }
+        };
+        // let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
         let mut contract_bytecodes = BTreeMap::new();
 
         // Step 2: Compile Contracts for Each Source
@@ -285,6 +295,20 @@ impl ZkSolc {
             info!("\nCompiling {} files...", version.1.len());
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
+                // Check if the contract_path is in 'sources' directory or its subdirectories
+                let is_in_sources_dir = contract_path
+                    .ancestors()
+                    .any(|ancestor| ancestor.starts_with(&self.project.paths.sources));
+
+                let is_in_scripts_dir = contract_path
+                    .ancestors()
+                    .any(|ancestor| ancestor.starts_with(&self.project.paths.scripts));
+
+                // Skip this file if it's not in the 'sources' directory or its subdirectories
+                if !is_in_sources_dir && !is_in_scripts_dir {
+                    continue
+                }
+
                 // Step 3: Parse JSON Input for each Source
                 self.prepare_compiler_input(&contract_path).wrap_err(format!(
                     "Failed to prepare inputs when compiling {:?}",
@@ -913,19 +937,64 @@ impl ZkSolc {
     /// The versioned sources can then be used for further processing or analysis.
     fn get_versioned_sources(&mut self) -> Result<BTreeMap<Solc, SolidityVersionSources>> {
         // Step 1: Retrieve Project Sources
-        let sources = self.project.paths.read_input_files()?;
+        let mut sources = match self.project.sources() {
+            Ok(sources) => sources,
+            Err(e) => {
+                println!("sources broke");
+                return Err(eyre::eyre!("Could not get project sources: {}", e))
+            }
+        };
+
+        let mut script_path = PathBuf::from(self.project.sources_path());
+
+        // Pop the last component ("/src") and then push the new component ("/scripts")
+        if script_path.ends_with("src") {
+            script_path.pop();
+            script_path.push("script");
+        }
+        // println!("script_path : {:?}", script_path);
+        let sources_two = Source::read_all_from(script_path)?;
+        // map1.extend(map2.into_iter());
+        sources.extend(sources_two.into_iter());
+
+        // let sources = self.project.sources()
+        //     .wrap_err("Could not get project sources")?;
 
         // Step 2: Resolve Graph of Sources and Versions
-        let graph = Graph::resolve_sources(&self.project.paths, sources)
-            .wrap_err("Could not resolve sources")?;
+        // println!("sources : {:?}", sources);
+        let graph = match Graph::resolve_sources(&self.project.paths, sources) {
+            Ok(graph) => graph,
+            Err(e) => {
+                println!("graph broke");
+                return Err(eyre::eyre!("Could not resolve sources: {}", e))
+            }
+        };
+        // println!("graph: {:?}", graph);
+        // let graph = Graph::resolve_sources(&self.project.paths, sources)
+        //     .wrap_err("Could not resolve sources")?;
 
         // Step 3: Extract Versions and Edges
-        let (versions, _edges) = graph
-            .into_sources_by_version(self.project.offline)
-            .wrap_err("Could not match solc versions to files")?;
+        let (versions, _edges) = match graph.into_sources_by_version(self.project.offline) {
+            Ok(sources) => sources,
+            Err(e) => {
+                println!("Versions and Edges");
+                return Err(eyre::eyre!("Could not match solc versions to files: {}", e))
+            }
+        };
+        // let (versions, _edges) = graph
+        //     .into_sources_by_version(self.project.offline)
+        //     .wrap_err("Could not match solc versions to files")?;
 
         // Step 4: Retrieve Solc Version
-        versions.get(&self.project).wrap_err("Could not get solc")
+        // println!("{:?}", versions);
+        return match versions.get(&self.project) {
+            Ok(solc) => Ok(solc),
+            Err(e) => {
+                println!("solc broke");
+                Err(eyre::eyre!("Could not get solc: {}", e))
+            }
+        }
+        // versions.get(&self.project).wrap_err("Could not get solc")
     }
 
     /// Builds the path for saving the artifacts (compiler output) of a contract based on the

@@ -623,12 +623,16 @@ impl ZkSolcManager {
     pub fn download(&self) -> Result<()> {
         if self.exists() {
             // TODO: figure out better don't download if compiler is downloaded
+            println!("ALREADY DOWNLOADED ZKSOLC... SKIPPING");
             return Ok(())
         }
 
         let url = self
             .get_full_download_url()
             .map_err(|e| Error::msg(format!("Could not get full download url: {}", e)))?;
+
+        println!("Starting the client");
+        println!("{}", url);
 
         let client = Client::new();
         let mut response = client
@@ -637,6 +641,7 @@ impl ZkSolcManager {
             .map_err(|e| Error::msg(format!("Failed to download file: {}", e)))?;
 
         if response.status().is_success() {
+            println!("SUCCESS!!!!");
             let mut output_file = File::create(self.get_full_compiler_path())
                 .map_err(|e| Error::msg(format!("Failed to create output file: {}", e)))?;
 
@@ -648,6 +653,7 @@ impl ZkSolcManager {
                 Error::msg(format!("Failed to set zksync compiler permissions: {e}"))
             })?;
         } else {
+            println!("FAILURE");
             return Err(Error::msg(format!(
                 "Failed to download file: status code {}",
                 response.status()
