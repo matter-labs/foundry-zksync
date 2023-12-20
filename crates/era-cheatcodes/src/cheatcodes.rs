@@ -64,7 +64,8 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
     one_time_actions: Vec<FinishCycleOneTimeActions>,
-    next_execution_actions: Vec<NextExecutionOneTimeActions>,
+    recurring_actions: Vec<FinishCycleRecurringAction>,
+    delayed_actions: Vec<DelayedNextStatementAction>,
     permanent_actions: FinishCyclePermanentActions,
     return_data: Option<Vec<U256>>,
     return_ptr: Option<FatPointer>,
@@ -81,7 +82,16 @@ enum FinishCycleOneTimeActions {
 }
 
 #[derive(Debug, Clone)]
-enum NextExecutionOneTimeActions {
+struct DelayedNextStatementAction {
+    /// Target depth where the next statement would be
+    target_depth: usize,
+    statements_to_skip_count: usize,
+    /// Action to queue when the condition is satisfied
+    action: FinishCycleRecurringAction,
+}
+
+#[derive(Debug, Clone)]
+enum FinishCycleRecurringAction {
     ExpectRevert { reason: Option<Vec<u8>>, depth: usize },
 }
 
@@ -106,36 +116,52 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
-        //Only execute "next execution" actions when a cheatcode isn't being invoked
-        if state.vm_local_state.callstack.current.code_address != CHEATCODE_ADDRESS {
-            // in `handle_action`, when true is returned the current action will
-            // be kept in the queue
-            let handle_action = |action: &NextExecutionOneTimeActions| match action {
-                NextExecutionOneTimeActions::ExpectRevert { reason, depth }
-                    if state.vm_local_state.callstack.depth() > *depth =>
-                {
-                    match data.opcode.variant.opcode {
-                        Opcode::Ret(op) => {
-                            self.one_time_actions.push(
-                                Self::handle_except_revert(reason.as_ref(), op, &state, memory)
-                                    .map(|_| FinishCycleOneTimeActions::ForceReturn {
-                                        //dummy data
-                                        data: vec![0u8; 8192],
-                                    })
-                                    .unwrap_or_else(|error| {
-                                        FinishCycleOneTimeActions::ForceRevert { error }
-                                    }),
-                            );
-                            false
-                        }
-                        _ => true,
-                    }
-                }
-                _ => true,
-            };
+        // in `handle_action`, when true is returned the current action will
+        // be kept in the queue
+        let handle_recurring_action = |action: &FinishCycleRecurringAction| match action {
+            FinishCycleRecurringAction::ExpectRevert { reason, depth }
+                if state.vm_local_state.callstack.depth() <= *depth =>
+            {
+                let callstack_depth = state.vm_local_state.callstack.depth();
+                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
 
-            self.next_execution_actions.retain(handle_action);
-        }
+                match data.opcode.variant.opcode {
+                    Opcode::Ret(op) => {
+                        self.one_time_actions.push(
+                            Self::handle_except_revert(reason.as_ref(), op, &state, memory)
+                                .map(|_| FinishCycleOneTimeActions::ForceReturn {
+                                    //dummy data
+                                    data: vec![0u8; 8192],
+                                })
+                                .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
+                                    error,
+                                }),
+                        );
+                        false
+                    }
+                    _ => true,
+                }
+            }
+            _ => true,
+        };
+        self.recurring_actions.retain(handle_recurring_action);
+
+        // process delayed actions after to avoid new recurring actions to be
+        // executed immediately (thus nullifying the delay)
+        let process_delayed_action = |action: &mut DelayedNextStatementAction| {
+            if depth != action.target_depth {
+                return true
+            }
+            if action.statements_to_skip_count != 0 {
+                action.statements_to_skip_count -= 1;
+                return true
+            }
+
+            tracing::debug!(?action, "delay completed");
+            self.recurring_actions.push(action.action.clone());
+            false
+        };
+        self.delayed_actions.retain_mut(process_delayed_action);
 
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -272,7 +298,8 @@ impl CheatcodeTracer {
     pub fn new() -> Self {
         CheatcodeTracer {
             one_time_actions: vec![],
-            next_execution_actions: vec![],
+            delayed_actions: vec![],
+            recurring_actions: vec![],
             permanent_actions: FinishCyclePermanentActions { start_prank: None },
             near_calls: 0,
             return_data: None,
@@ -618,8 +645,13 @@ impl CheatcodeTracer {
 
     fn add_except_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
         //-2: possibly for EfficientCall.call EfficientCall.rawCall ? not confirmed
-        self.next_execution_actions
-            .push(NextExecutionOneTimeActions::ExpectRevert { reason, depth: depth - 2 });
+        let action = FinishCycleRecurringAction::ExpectRevert { reason, depth: depth - 2 };
+        let delay = DelayedNextStatementAction {
+            target_depth: depth - 2,
+            statements_to_skip_count: 0,
+            action,
+        };
+        self.delayed_actions.push(delay);
     }
 
     fn handle_except_revert<H: HistoryMode>(
