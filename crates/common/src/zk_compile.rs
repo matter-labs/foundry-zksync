@@ -30,7 +30,7 @@
 ///
 /// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods
 ///   construct the path and file for saving the compiler output artifacts.
-use crate::zksolc_manager::ZkSolcManager;
+use crate::{term, zksolc_manager::ZkSolcManager};
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::Bytes;
 use ansi_term::Colour::{Red, Yellow};
@@ -53,7 +53,7 @@ use std::{
     fmt, fs,
     fs::File,
     io::{Read, Write},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process::{exit, Command, Stdio},
 };
 
@@ -80,7 +80,6 @@ pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
     pub is_system: bool,
     pub force_evmla: bool,
-    pub missing_deps: bool,
     pub remappings: Vec<RelativeRemapping>,
 }
 
@@ -162,7 +161,6 @@ pub struct ZkSolc {
     compiler_path: PathBuf,
     is_system: bool,
     force_evmla: bool,
-    missing_deps: bool,
     standard_json: Option<StandardJsonCompilerInput>,
     remappings: Vec<RelativeRemapping>,
 }
@@ -201,15 +199,21 @@ pub fn compile_smart_contracts(
         compiler_path: zksolc_manager.get_full_compiler_path(),
         is_system,
         force_evmla: is_legacy,
-        missing_deps: true,
         remappings,
     };
 
     let mut zksolc = ZkSolc::new(zksolc_opts, project);
 
-    match zksolc.compile() {
+    let now = std::time::Instant::now();
+    match term::with_spinner_reporter(|| zksolc.compile()) {
         Ok(_) => {
-            info!("Compiled Successfully");
+            let elapsed = now.elapsed();
+            println!(
+                "zksolc {} finished in {:.2}s",
+                zksolc_manager.get_zksolc_version(),
+                elapsed.as_secs_f32()
+            );
+            println!("Compiler run successful!");
             Ok(())
         }
         Err(err) => {
@@ -225,7 +229,6 @@ impl ZkSolc {
             compiler_path: opts.compiler_path,
             is_system: opts.is_system,
             force_evmla: opts.force_evmla,
-            missing_deps: opts.missing_deps,
             standard_json: None,
             remappings: opts.remappings,
         }
@@ -313,6 +316,7 @@ impl ZkSolc {
 
         // Step 2: Compile Contracts for Each Source
         for (_solc, version) in sources {
+            println!("\nCompiling {} files...", version.1.len());
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
                 // Check if the contract_path is in 'sources' directory or its subdirectories
@@ -321,7 +325,7 @@ impl ZkSolc {
                     .any(|ancestor| ancestor.starts_with(&self.project.paths.sources));
 
                 // Skip this file if it's not in the 'sources' directory or its subdirectories
-                if !is_in_sources_dir {
+                if !is_in_sources_dir && !is_in_scripts_dir {
                     continue
                 }
 
@@ -375,11 +379,6 @@ impl ZkSolc {
 
                         let output =
                             child.wait_with_output().wrap_err("Could not run compiler cmd")?;
-
-                        println!(
-                            "Compiled {} with {:?} {:?}",
-                            filename, self.compiler_path, comp_args
-                        );
 
                         if !output.status.success() {
                             // Skip this file if the compiler output is empty
@@ -477,14 +476,11 @@ impl ZkSolc {
             comp_args.push("--system-mode".to_string());
         }
 
-        if self.missing_deps {
-            comp_args.push("--detect-missing-libraries".to_string());
-        }
-
         // Check if force-evmla is enabled
         if self.force_evmla {
             comp_args.push("--force-evmla".to_string());
         }
+
         comp_args
     }
 
@@ -591,15 +587,9 @@ impl ZkSolc {
                 for (contract_name, contract) in contracts_in_file {
                     // if contract hash is empty, skip
                     if contract.hash.is_none() {
-                        println!("{} -> empty contract.hash", contract_name);
                         continue
                     }
 
-                    info!(
-                        "{} -> Bytecode Hash: {} ",
-                        contract_name,
-                        contract.hash.as_ref().unwrap()
-                    );
                     contract_bytecodes
                         .insert(contract.hash.clone().unwrap(), contract_name.clone());
 
@@ -726,7 +716,7 @@ impl ZkSolc {
                 let main_message = formatted_message.lines().next().unwrap_or("").to_string();
                 if !displayed_warnings.contains(&main_message) {
                     displayed_warnings.insert(main_message);
-                    println!("{}", Yellow.paint(formatted_message));
+                    println!("\n{}", Yellow.paint(formatted_message));
                     has_warning = true;
                 }
             } else {
@@ -749,7 +739,7 @@ impl ZkSolc {
         for error in errors {
             if error.severity.eq_ignore_ascii_case("error") {
                 let error_message = &error.formatted_message;
-                error!("{}", Red.paint(error_message));
+                error!("\n{}", Red.paint(error_message));
                 if let Some(code) = &error.error_code {
                     error_codes.push(code.clone());
                 }
@@ -822,25 +812,9 @@ impl ZkSolc {
     fn prepare_compiler_input(&mut self, contract_path: &PathBuf) -> Result<()> {
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
-        file_output_selection.insert(
-            "*".to_string(),
-            vec![
-                "abi".to_string(),
-                "evm.methodIdentifiers".to_string(),
-                // "evm.legacyAssembly".to_string(),
-            ],
-        );
-        file_output_selection.insert(
-            "".to_string(),
-            vec![
-                "metadata".to_string(),
-                // "ast".to_string(),
-                // "userdoc".to_string(),
-                // "devdoc".to_string(),
-                // "storageLayout".to_string(),
-                // "irOptimized".to_string(),
-            ],
-        );
+        file_output_selection
+            .insert("*".to_string(), vec!["abi".to_string(), "evm.methodIdentifiers".to_string()]);
+        file_output_selection.insert("".to_string(), vec!["metadata".to_string()]);
 
         // Step 2: Configure Solidity Compiler
         // zksolc requires metadata to be 'None'
@@ -861,7 +835,6 @@ impl ZkSolc {
             .wrap_err("Could not get standard json input")
             .unwrap();
 
-        // Apply remappings for each contract dependency
         for (_path, _source) in &mut standard_json.sources {
             remap_source_path(_path, &self.remappings);
             _source.content = self.remap_source_content(_source.content.to_string()).into();
@@ -958,9 +931,10 @@ impl ZkSolc {
     fn get_versioned_sources(&mut self) -> Result<BTreeMap<Solc, SolidityVersionSources>> {
         // Step 1: Retrieve Project Sources
         let sources = self.project.sources().wrap_err("Could not get project sources")?;
-
+        let scripts = self.project.scripts().wrap_err("Could not get project scripts")?;
+        let all_files = self.project.paths.input_files_iter().collect::<Vec<_>>();
         // Step 2: Resolve Graph of Sources and Versions
-        let graph = Graph::resolve_sources(&self.project.paths, sources)
+        let graph = Graph::resolve_sources(&self.project.paths, all_files)
             .wrap_err("Could not resolve sources")?;
 
         // Step 3: Extract Versions and Edges
@@ -1029,80 +1003,75 @@ impl ZkSolc {
 }
 // TODO:
 // This approach will need to be refactored and improved
-// It solves the import path issue but should be revisited before production
+// It solves the import path issue but should be revisited
 fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRemapping]) -> String {
     let mut replaced_content = content;
 
-    // Iterate through the remappings
     for (i, remapping) in remappings.iter().enumerate() {
         let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
-
-        // Define a pattern that matches the import statement, capturing the rest of the path
-        let pattern = format!(
-            r#"import\s+((?:\{{.*?\}}\s+from\s+)?)\s*"{}(?P<rest>[^"]*)""#,
+        let pattern = Regex::new(&format!(
+            r#"import\s+(\{{.*?\}}\s+from\s+)?["']{}([^"']*)["']"#,
             regex::escape(&remapping.name)
-        );
+        ))
+        .unwrap();
 
-        let replacement = format!(r#"import {}"{}$rest""#, "$1", placeholder);
-
+        let replacement = if remapping.name.contains("/") {
+            format!(r#"import $1"{}$2""#, placeholder) // For paths with '/'
+        } else {
+            format!(r#"import {}$1$2""#, placeholder) // For paths without '/'
+        };
         replaced_content =
-            Regex::new(&pattern).unwrap().replace_all(&replaced_content, replacement).into_owned();
+            pattern.replace_all(&replaced_content, replacement.as_str()).into_owned();
     }
 
     replaced_content
 }
 // TODO:
 // This approach will need to be refactored and improved
-// It solves the import path issue but should be revisited before production
+// It solves the import path issue but should be revisited
 fn substitute_remapped_paths(content: String, remappings: &[RelativeRemapping]) -> String {
     let mut substituted = content;
 
-    loop {
-        let mut made_replacements = false;
+    for (i, remapping) in remappings.iter().enumerate() {
+        let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
+        let import_path = remapping.path.path.to_str().unwrap();
 
-        for (i, r) in remappings.iter().enumerate() {
-            let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
-            let import_path = r.path.path.to_str().unwrap();
-
-            let new_substituted = substituted.replace(&placeholder, import_path);
-
-            if new_substituted != substituted {
-                made_replacements = true;
-                substituted = new_substituted;
-            }
-        }
-
-        // Exit the loop if no more replacements were made
-        if !made_replacements {
-            break
-        }
+        substituted = substituted.replace(&placeholder, import_path);
     }
 
     substituted
 }
 // TODO:
 // This approach will need to be refactored and improved
-// It solves the import path issue but should be revisited before production
+// It solves the import path issue but should be revisited
 fn remap_source_path(source_path: &mut PathBuf, remappings: &[RelativeRemapping]) {
     let source_path_str = source_path.to_str().expect("Failed to convert path to str");
 
     for r in remappings.iter() {
         let prefix = &r.name;
+        let remapped_path = &r.path.path;
 
-        let mut parts = source_path_str.splitn(2, prefix);
-
-        if let Some(_before) = parts.next() {
-            if let Some(after) = parts.next() {
-                let temp_path = r.path.path.join(after);
-
-                *source_path =
-                    PathBuf::from(temp_path.to_str().unwrap().replace("src/src/", "src/"));
-                break
-            }
+        if source_path_str.starts_with(prefix) {
+            let relative_path = source_path_str.strip_prefix(prefix).unwrap();
+            *source_path = remapped_path.join(relative_path);
+            normalize_source_path(source_path);
+            break
         }
     }
 }
-
+fn normalize_source_path(source_path: &mut PathBuf) {
+    let normalized = source_path.components().fold(PathBuf::new(), |mut acc, comp| {
+        match comp {
+            Component::Normal(part) => acc.push(part),
+            Component::ParentDir => {
+                acc.pop();
+            }
+            _ => {}
+        }
+        acc
+    });
+    *source_path = normalized;
+}
 #[derive(Debug, Deserialize)]
 pub struct ZkSolcCompilerOutput {
     // Map from file name -> (Contract name -> Contract)

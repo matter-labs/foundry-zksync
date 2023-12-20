@@ -499,6 +499,10 @@ impl ZkSolcManager {
     pub fn get_full_compiler(&self) -> String {
         format!("{}{}", self.compiler, self.version.get_version())
     }
+    /// Returns the version of the `zksolc` compiler.
+    pub fn get_zksolc_version(&self) -> String {
+        self.version.get_version().to_string()
+    }
 
     /// Returns the full download URL for the `zksolc` compiler binary based on the current
     /// operating system.
