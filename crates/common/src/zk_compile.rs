@@ -206,7 +206,7 @@ pub fn compile_smart_contracts(
 
     match zksolc.compile() {
         Ok(_) => {
-            println!("Compiled Successfully");
+            info!("Compiled Successfully");
             Ok(())
         }
         Err(err) => {
