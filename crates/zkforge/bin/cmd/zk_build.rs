@@ -169,7 +169,6 @@ impl ZkBuildArgs {
         }
 
         let zksolc_manager = setup_zksolc_manager(self.use_zksolc.clone())?;
-        let remappings = config.remappings;
 
         // TODO: add filter support
 
@@ -178,7 +177,6 @@ impl ZkBuildArgs {
             self.force_evmla,
             zksolc_manager,
             project,
-            remappings,
         )
     }
     /// Returns the `Project` for the current workspace
