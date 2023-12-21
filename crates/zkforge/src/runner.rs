@@ -6,9 +6,12 @@ use crate::{
 };
 use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, U256};
+use ethers_core::types::H256;
 use eyre::Result;
 use foundry_common::{
     contracts::{ContractsByAddress, ContractsByArtifact},
+    conversion_utils::{address_to_h160, h256_to_h160},
+    zk_compile::ContractBytecodes,
     TestFunctionExt,
 };
 use foundry_config::{FuzzConfig, InvariantConfig};
@@ -22,12 +25,13 @@ use foundry_evm::{
         CallResult, EvmError, ExecutionErr, Executor,
     },
     fuzz::{invariant::InvariantContract, CounterExample},
-    traces::{load_contracts, TraceKind},
+    traces::TraceKind,
 };
 use proptest::test_runner::{TestError, TestRunner};
 use rayon::prelude::*;
 use std::{
     collections::{BTreeMap, HashMap},
+    str::FromStr,
     time::Instant,
 };
 
@@ -41,6 +45,8 @@ pub struct ContractRunner<'a> {
     pub predeploy_libs: &'a [Bytes],
     /// The deployed contract's code
     pub code: Bytes,
+    /// Bytecodes of the deployed contracts
+    pub contract_bytecodes: ContractBytecodes,
     /// The test contract's ABI
     pub contract: &'a Abi,
     /// All known errors, used to decode reverts
@@ -60,6 +66,7 @@ impl<'a> ContractRunner<'a> {
         executor: Executor,
         contract: &'a Abi,
         code: Bytes,
+        contract_bytecodes: ContractBytecodes,
         initial_balance: U256,
         sender: Option<Address>,
         errors: Option<&'a Abi>,
@@ -71,6 +78,7 @@ impl<'a> ContractRunner<'a> {
             executor,
             contract,
             code,
+            contract_bytecodes,
             initial_balance,
             sender: sender.unwrap_or_default(),
             errors,
@@ -146,7 +154,7 @@ impl<'a> ContractRunner<'a> {
         // Optionally call the `setUp` function
         let setup = if setup {
             trace!("setting up");
-            let (setup_logs, setup_traces, labeled_addresses, reason, coverage) = match self
+            let (setup_logs, setup_traces, mut labeled_addresses, reason, coverage) = match self
                 .executor
                 .setup(None, address)
             {
@@ -164,6 +172,24 @@ impl<'a> ContractRunner<'a> {
                     (Vec::new(), None, BTreeMap::new(), Some(format!("setup failed: {err}")), None)
                 }
             };
+
+            setup_logs.iter().for_each(|log| {
+                if log.address == zksync_types::CONTRACT_DEPLOYER_ADDRESS && log.topics.len() == 4 {
+                    let l2_event_hash = H256::from_str(
+                        "290afdae231a3fc0bbae8b1af63698b0a1d79b21ad17df0342dfb952fe74f8e5",
+                    )
+                    .unwrap();
+
+                    if log.topics[0] == l2_event_hash &&
+                        h256_to_h160(&log.topics[1]) == address_to_h160(address)
+                    {
+                        labeled_addresses.insert(
+                            Address::from(h256_to_h160(&log.topics[3]).0),
+                            hex::encode(log.topics[2]),
+                        );
+                    }
+                }
+            });
             traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
             logs.extend(setup_logs);
 
@@ -253,7 +279,7 @@ impl<'a> ContractRunner<'a> {
             .filter(|&&func| func.is_test() && filter.matches_test(&func.signature()))
             .map(|&func| {
                 let should_fail = func.is_test_fail();
-                let res = if func.is_fuzz_test() {
+                let res: TestResult = if func.is_fuzz_test() {
                     let runner = test_options.fuzz_runner(self.name, &func.name);
                     let fuzz_config = test_options.fuzz_config(self.name, &func.name);
                     self.run_fuzz_test(func, should_fail, runner, setup.clone(), *fuzz_config)
@@ -265,7 +291,26 @@ impl<'a> ContractRunner<'a> {
             .collect::<BTreeMap<_, _>>();
 
         if has_invariants {
-            let identified_contracts = load_contracts(setup.traces.clone(), known_contracts);
+            let identified_contracts = setup
+                .labeled_addresses
+                .iter()
+                .filter_map(|(addr, bytecode_hash)| {
+                    self.contract_bytecodes.get(bytecode_hash).and_then(|name| {
+                        known_contracts
+                            .and_then(|known_contracts| {
+                                known_contracts.find_by_name_or_identifier(name).ok().flatten()
+                            })
+                            .map(|(_, (abi, _))| {
+                                info!(
+                                    "using invaraint contract {} ({:?}) with hash 0x{}",
+                                    name, addr, bytecode_hash
+                                );
+                                (addr.to_owned(), (name.clone(), abi.clone()))
+                            })
+                    })
+                })
+                .collect::<BTreeMap<_, _>>();
+
             let results: Vec<_> = functions
                 .par_iter()
                 .filter(|&&func| func.is_invariant_test() && filter.matches_test(&func.signature()))
