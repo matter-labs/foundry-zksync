@@ -98,6 +98,7 @@ enum FinishCycleRecurringAction {
     ExpectRevert {
         reason: Option<Vec<u8>>,
         depth: usize,
+        prev_continue_pc: Option<PcOrImm>,
         prev_exception_handler_pc: Option<PcOrImm>,
     },
 }
@@ -126,13 +127,24 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         //store the current exception handler in expect revert
         // to be used to force a revert
         if let Some(FinishCycleRecurringAction::ExpectRevert {
-            prev_exception_handler_pc, ..
+            prev_exception_handler_pc,
+            prev_continue_pc,
+            ..
         }) = self.current_expect_revert()
         {
             if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
-                tracing::debug!("storing exception handler");
-                prev_exception_handler_pc
-                    .replace(state.vm_local_state.callstack.current.exception_handler_location);
+                let current = state.vm_local_state.callstack.current;
+                let is_to_label = data.opcode.variant.flags
+                    [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
+                    current.is_local_frame;
+                tracing::debug!(%is_to_label, ?current, "storing continuations");
+
+                if is_to_label {
+                    prev_continue_pc.replace(data.opcode.imm_0);
+                } else {
+                    prev_continue_pc.replace(current.pc);
+                }
+                prev_exception_handler_pc.replace(current.exception_handler_location);
             }
         }
     }
@@ -151,14 +163,17 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 reason,
                 depth,
                 prev_exception_handler_pc: exception_handler,
+                prev_continue_pc: continue_pc,
             } if state.vm_local_state.callstack.depth() < *depth => {
                 let callstack_depth = state.vm_local_state.callstack.depth();
                 tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
 
                 match data.opcode.variant.opcode {
                     Opcode::Ret(op) => {
-                        let Some(exception_handler) = *exception_handler else {
-                            tracing::error!("exceptRevert had exception_handler stored");
+                        let (Some(exception_handler), Some(continue_pc)) =
+                            (*exception_handler, *continue_pc)
+                        else {
+                            tracing::error!("exceptRevert missing stored continuations");
                             return false
                         };
 
@@ -168,7 +183,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                     //dummy data
                                     data: // vec![0u8; 8192]
                                         [0xde, 0xad, 0xbe, 0xef].to_vec(),
-                                    continue_pc: data.opcode.imm_0,
+                                    continue_pc,
                                 })
                                 .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
                                     error,
@@ -302,6 +317,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     //change current stack pc to label
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
+                    state.local_state.pending_exception = false;
 
                     // return TracerExecutionStatus::Continue
                 }
@@ -327,6 +343,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.is_triggered_this_cycle = false;
                     //change current stack pc to exception handler
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
+                    state.local_state.pending_exception = true;
 
                     // return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
                     //     Halt::Unknown(VmRevertReason::from(error.as_slice())),
@@ -726,6 +743,7 @@ impl CheatcodeTracer {
             reason,
             depth: depth - 2,
             prev_exception_handler_pc: None,
+            prev_continue_pc: None,
         };
         let delay = DelayedNextStatementAction {
             target_depth: depth - 2,
