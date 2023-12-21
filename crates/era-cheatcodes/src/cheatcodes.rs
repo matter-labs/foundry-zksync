@@ -15,7 +15,9 @@ use multivm::{
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::{PrimitiveValue, VmLocalState},
         zkevm_opcode_defs::{
-            self, FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
+            self,
+            decoding::{EncodingModeProduction, VmEncodingMode},
+            FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
             RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
         },
     },
@@ -32,6 +34,7 @@ use zksync_types::{
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
 type EraDb<DB> = StorageView<ForkStorage<RevmDatabaseForEra<DB>>>;
+type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
 
 // address(uint160(uint256(keccak256('hevm cheat code'))))
 const CHEATCODE_ADDRESS: H160 = H160([
@@ -77,8 +80,8 @@ pub struct CheatcodeTracer {
 enum FinishCycleOneTimeActions {
     StorageWrite { key: StorageKey, read_value: H256, write_value: H256 },
     StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
-    ForceRevert { error: Vec<u8> },
-    ForceReturn { data: Vec<u8> },
+    ForceRevert { error: Vec<u8>, exception_handler: PcOrImm },
+    ForceReturn { data: Vec<u8>, continue_pc: PcOrImm },
 }
 
 #[derive(Debug, Clone)]
@@ -92,7 +95,11 @@ struct DelayedNextStatementAction {
 
 #[derive(Debug, Clone)]
 enum FinishCycleRecurringAction {
-    ExpectRevert { reason: Option<Vec<u8>>, depth: usize },
+    ExpectRevert {
+        reason: Option<Vec<u8>>,
+        depth: usize,
+        prev_exception_handler_pc: Option<PcOrImm>,
+    },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -109,6 +116,27 @@ struct StartPrankOpts {
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     for CheatcodeTracer
 {
+    fn before_execution(
+        &mut self,
+        state: VmLocalStateData<'_>,
+        data: multivm::zk_evm_1_3_3::tracing::BeforeExecutionData,
+        memory: &SimpleMemory<H>,
+        _storage: StoragePtr<EraDb<S>>,
+    ) {
+        //store the current exception handler in expect revert
+        // to be used to force a revert
+        if let Some(FinishCycleRecurringAction::ExpectRevert {
+            prev_exception_handler_pc, ..
+        }) = self.current_expect_revert()
+        {
+            if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
+                tracing::debug!("storing exception handler");
+                prev_exception_handler_pc
+                    .replace(state.vm_local_state.callstack.current.exception_handler_location);
+            }
+        }
+    }
+
     fn after_execution(
         &mut self,
         state: VmLocalStateData<'_>,
@@ -119,22 +147,32 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         // in `handle_action`, when true is returned the current action will
         // be kept in the queue
         let handle_recurring_action = |action: &FinishCycleRecurringAction| match action {
-            FinishCycleRecurringAction::ExpectRevert { reason, depth }
-                if state.vm_local_state.callstack.depth() <= *depth =>
-            {
+            FinishCycleRecurringAction::ExpectRevert {
+                reason,
+                depth,
+                prev_exception_handler_pc: exception_handler,
+            } if state.vm_local_state.callstack.depth() < *depth => {
                 let callstack_depth = state.vm_local_state.callstack.depth();
                 tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
 
                 match data.opcode.variant.opcode {
                     Opcode::Ret(op) => {
+                        let Some(exception_handler) = *exception_handler else {
+                            tracing::error!("exceptRevert had exception_handler stored");
+                            return false
+                        };
+
                         self.one_time_actions.push(
                             Self::handle_except_revert(reason.as_ref(), op, &state, memory)
                                 .map(|_| FinishCycleOneTimeActions::ForceReturn {
                                     //dummy data
-                                    data: vec![0u8; 8192],
+                                    data: // vec![0u8; 8192]
+                                        [0xde, 0xad, 0xbe, 0xef].to_vec(),
+                                    continue_pc: data.opcode.imm_0,
                                 })
                                 .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
                                     error,
+                                    exception_handler,
                                 }),
                         );
                         false
@@ -149,7 +187,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         // process delayed actions after to avoid new recurring actions to be
         // executed immediately (thus nullifying the delay)
         let process_delayed_action = |action: &mut DelayedNextStatementAction| {
-            if depth != action.target_depth {
+            if state.vm_local_state.callstack.depth() != action.target_depth {
                 return true
             }
             if action.statements_to_skip_count != 0 {
@@ -243,7 +281,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
-                FinishCycleOneTimeActions::ForceReturn { mut data } => {
+                FinishCycleOneTimeActions::ForceReturn { mut data, continue_pc: pc } => {
                     tracing::warn!("!!!! FORCING RETURN");
 
                     //TODO: override return data with the given one and force return (instead of
@@ -260,17 +298,40 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &mut state.memory,
                     );
 
-                    return TracerExecutionStatus::Continue
+                    self.is_triggered_this_cycle = false;
+
+                    //change current stack pc to label
+                    state.local_state.callstack.get_current_stack_mut().pc = pc;
+
+                    // return TracerExecutionStatus::Continue
                 }
-                FinishCycleOneTimeActions::ForceRevert { error } => {
+                FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
                     use multivm::interface::{
                         tracer::TracerExecutionStopReason, Halt, VmRevertReason,
                     };
 
                     tracing::warn!("!!! FORCING REVERT");
-                    return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
-                        Halt::Unknown(VmRevertReason::from(error.as_slice())),
-                    ))
+
+                    self.add_trimmed_return_data(error.as_slice());
+                    let ptr = state.local_state.registers
+                        [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+                    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+
+                    Self::set_return(
+                        fat_data_pointer,
+                        self.return_data.take().unwrap(),
+                        &mut state.local_state,
+                        &mut state.memory,
+                    );
+
+                    self.is_triggered_this_cycle = false;
+                    //change current stack pc to exception handler
+                    state.local_state.callstack.get_current_stack_mut().pc = pc;
+
+                    // return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
+                    //     Halt::Unknown(VmRevertReason::from(error.as_slice())),
+                    // ))
+                    // return TracerExecutionStatus::Continue
                 }
             }
         }
@@ -643,9 +704,29 @@ impl CheatcodeTracer {
         );
     }
 
+    fn current_expect_revert(&mut self) -> Option<&mut FinishCycleRecurringAction> {
+        let delayed_expect_revert = self
+            .delayed_actions
+            .iter_mut()
+            .find(|action| matches!(action.action, FinishCycleRecurringAction::ExpectRevert { .. }))
+            .map(|act| &mut act.action);
+
+        delayed_expect_revert.or_else(|| {
+            self.recurring_actions
+                .iter_mut()
+                .find(|act| matches!(act, FinishCycleRecurringAction::ExpectRevert { .. }))
+        })
+    }
+
     fn add_except_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
+        //TODO: check if an expect revert is already set
+
         //-2: possibly for EfficientCall.call EfficientCall.rawCall ? not confirmed
-        let action = FinishCycleRecurringAction::ExpectRevert { reason, depth: depth - 2 };
+        let action = FinishCycleRecurringAction::ExpectRevert {
+            reason,
+            depth: depth - 2,
+            prev_exception_handler_pc: None,
+        };
         let delay = DelayedNextStatementAction {
             target_depth: depth - 2,
             statements_to_skip_count: 0,
