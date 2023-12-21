@@ -12832,6 +12832,7 @@ dependencies = [
  "yansi 0.5.1",
  "zkcast",
  "zksync-web3-rs",
+ "zksync_types",
 ]
 
 [[package]]

@@ -7,6 +7,9 @@ libs = ['lib']
 local = "${ERA_TEST_NODE_RPC_URL}"
 
 [invariant]
-fail_on_revert = false
+runs = 25
+depth = 10
+fail_on_revert = true
+
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
