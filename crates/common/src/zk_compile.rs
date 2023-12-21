@@ -206,7 +206,7 @@ pub fn compile_smart_contracts(
 
     match zksolc.compile() {
         Ok(_) => {
-            info!("Compiled Successfully");
+            println!("Compiled Successfully");
             Ok(())
         }
         Err(err) => {
@@ -312,13 +312,22 @@ impl ZkSolc {
             info!("\nCompiling {} files...", version.1.len());
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
+
                 // Check if the contract_path is in 'sources' directory or its subdirectories
                 // let is_in_sources_dir = contract_path
                 //     .ancestors()
                 //     .any(|ancestor| ancestor.starts_with(&self.project.paths.sources));
 
-                // // Skip this file if it's not in the 'sources' directory or its subdirectories
-                // if !is_in_sources_dir {
+                // let is_in_tests_dir = contract_path
+                //     .ancestors()
+                //     .any(|ancestor| ancestor.starts_with(&self.project.paths.tests));
+
+                // let is_in_scripts_dir = contract_path
+                //     .ancestors()
+                //     .any(|ancestor| ancestor.starts_with(&self.project.paths.scripts));
+
+                // // // Skip this file if it's not in the 'sources' directory or its subdirectories
+                // if !is_in_sources_dir && !is_in_tests_dir && !is_in_scripts_dir {
                 //     continue
                 // }
 
@@ -946,7 +955,7 @@ impl ZkSolc {
     fn get_versioned_sources(&mut self) -> Result<BTreeMap<Solc, SolidityVersionSources>> {
         // Step 1: Retrieve Project Sources
         let sources = self.project.paths.read_input_files()?;
-        
+
         // Step 2: Resolve Graph of Sources and Versions
         let graph = Graph::resolve_sources(&self.project.paths, sources)
             .wrap_err("Could not resolve sources")?;
