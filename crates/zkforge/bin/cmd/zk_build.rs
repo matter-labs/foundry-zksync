@@ -143,8 +143,8 @@ impl ZkBuildArgs {
         zksolc_cfg.compiler_path = compiler_path;
 
         // TODO: add filter support
+        // TODO: add remappings?
         let _ = foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project);
-
         Ok(())
     }
     /// Returns the `Project` for the current workspace

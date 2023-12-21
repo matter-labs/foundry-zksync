@@ -63,8 +63,12 @@ impl ScriptArgs {
         script_config.called_function = Some(func);
 
         // Only call the method if `setUp()` succeeded.
+        println!("result.success : {}", result.success);
         if result.success {
+            println!("address : {}", address);
+            println!("calldata : {:?}", calldata);
             let script_result = runner.script(address, calldata)?;
+            println!("script_result.success : {}", script_result.success);
 
             result.success &= script_result.success;
             result.gas_used = script_result.gas_used;
