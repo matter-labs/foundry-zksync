@@ -312,25 +312,6 @@ impl ZkSolc {
             info!("\nCompiling {} files...", version.1.len());
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
-
-                // Check if the contract_path is in 'sources' directory or its subdirectories
-                // let is_in_sources_dir = contract_path
-                //     .ancestors()
-                //     .any(|ancestor| ancestor.starts_with(&self.project.paths.sources));
-
-                // let is_in_tests_dir = contract_path
-                //     .ancestors()
-                //     .any(|ancestor| ancestor.starts_with(&self.project.paths.tests));
-
-                // let is_in_scripts_dir = contract_path
-                //     .ancestors()
-                //     .any(|ancestor| ancestor.starts_with(&self.project.paths.scripts));
-
-                // // // Skip this file if it's not in the 'sources' directory or its subdirectories
-                // if !is_in_sources_dir && !is_in_tests_dir && !is_in_scripts_dir {
-                //     continue
-                // }
-
                 // Step 3: Parse JSON Input for each Source
                 self.prepare_compiler_input(&contract_path).wrap_err(format!(
                     "Failed to prepare inputs when compiling {:?}",
@@ -858,12 +839,6 @@ impl ZkSolc {
             .wrap_err("Could not get standard json input")
             .unwrap();
 
-        // Apply remappings for each contract dependency
-        for (_path, _source) in &mut standard_json.sources {
-            remap_source_path(_path, &self.remappings);
-            _source.content = self.remap_source_content(_source.content.to_string()).into();
-        }
-
         // Store the generated standard JSON input in the ZkSolc instance
         self.standard_json = Some(standard_json.to_owned());
 
@@ -1010,93 +985,6 @@ impl ZkSolc {
         let path = self.project.paths.artifacts.join(filename);
         fs::create_dir_all(&path).wrap_err("Could not create artifacts directory")?;
         Ok(path)
-    }
-
-    fn remap_source_content(&mut self, source_content: String) -> String {
-        let content = source_content;
-
-        // Get relative remappings
-        let remappings = &self.remappings;
-
-        // Replace imports with placeholders
-        let content = replace_imports_with_placeholders(content, remappings);
-
-        substitute_remapped_paths(content, remappings)
-    }
-}
-// TODO:
-// This approach will need to be refactored and improved
-// It solves the import path issue but should be revisited before production
-fn replace_imports_with_placeholders(content: String, remappings: &[RelativeRemapping]) -> String {
-    let mut replaced_content = content;
-
-    // Iterate through the remappings
-    for (i, remapping) in remappings.iter().enumerate() {
-        let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
-
-        // Define a pattern that matches the import statement, capturing the rest of the path
-        let pattern = format!(
-            r#"import\s+((?:\{{.*?\}}\s+from\s+)?)\s*"{}(?P<rest>[^"]*)""#,
-            regex::escape(&remapping.name)
-        );
-
-        let replacement = format!(r#"import {}"{}$rest""#, "$1", placeholder);
-
-        replaced_content =
-            Regex::new(&pattern).unwrap().replace_all(&replaced_content, replacement).into_owned();
-    }
-
-    replaced_content
-}
-// TODO:
-// This approach will need to be refactored and improved
-// It solves the import path issue but should be revisited before production
-fn substitute_remapped_paths(content: String, remappings: &[RelativeRemapping]) -> String {
-    let mut substituted = content;
-
-    loop {
-        let mut made_replacements = false;
-
-        for (i, r) in remappings.iter().enumerate() {
-            let placeholder = format!("REMAP_PLACEHOLDER_{}", i);
-            let import_path = r.path.path.to_str().unwrap();
-
-            let new_substituted = substituted.replace(&placeholder, import_path);
-
-            if new_substituted != substituted {
-                made_replacements = true;
-                substituted = new_substituted;
-            }
-        }
-
-        // Exit the loop if no more replacements were made
-        if !made_replacements {
-            break
-        }
-    }
-
-    substituted
-}
-// TODO:
-// This approach will need to be refactored and improved
-// It solves the import path issue but should be revisited before production
-fn remap_source_path(source_path: &mut PathBuf, remappings: &[RelativeRemapping]) {
-    let source_path_str = source_path.to_str().expect("Failed to convert path to str");
-
-    for r in remappings.iter() {
-        let prefix = &r.name;
-
-        let mut parts = source_path_str.splitn(2, prefix);
-
-        if let Some(_before) = parts.next() {
-            if let Some(after) = parts.next() {
-                let temp_path = r.path.path.join(after);
-
-                *source_path =
-                    PathBuf::from(temp_path.to_str().unwrap().replace("src/src/", "src/"));
-                break
-            }
-        }
     }
 }
 
