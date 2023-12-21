@@ -1,5 +1,5 @@
 //! Support for compiling [foundry_compilers::Project]
-use crate::{compact_to_contract, glob::GlobMatcher, term, TestFunctionExt, zk_compile::{ZkSolc, ZkSolcOpts}};
+use crate::{compact_to_contract, glob::GlobMatcher, term, TestFunctionExt};
 use comfy_table::{presets::ASCII_MARKDOWN, *};
 use eyre::Result;
 use foundry_block_explorers::contract::Metadata;
@@ -52,19 +52,11 @@ impl ProjectCompiler {
     pub fn compile(self, project: &Project) -> Result<ProjectCompileOutput> {
         let filters = self.filters.clone();
         self.compile_with(project, |prj| {
-            // let opts = ZkSolcOpts {
-            //     compiler_path: PathBuf::from("/path/to/zksolc"),
-            //     is_system: false,
-            //     force_evmla: true,
-            //     remappings: Default::default(),
-            // };
-            // let mut zksolc = ZkSolc::new(opts, prj);
             let output = if filters.is_empty() {
                 prj.compile()
             } else {
                 prj.compile_sparse(SkipBuildFilters(filters))
             }?;
-            // let output = zksolc.compile()?.0;
             Ok(output)
         })
     }

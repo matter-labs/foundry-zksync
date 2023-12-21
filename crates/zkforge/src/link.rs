@@ -172,8 +172,6 @@ pub fn link_with_nonce_or_address<T, U>(
     };
 
     for (id, contract) in contracts.into_iter() {
-        // println!("link-loop id.source : {:?}", id.source);
-        // println!("link-loop id.name : {}", id.name);
         let (abi, maybe_deployment_bytes, maybe_runtime) = (
             contract.abi.as_ref(),
             contract.bytecode.as_ref(),

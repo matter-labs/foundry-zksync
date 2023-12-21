@@ -282,12 +282,8 @@ impl ZkSolc {
         // Step 1: Collect Source Files
         let sources = match self.get_versioned_sources() {
             Ok(sources) => sources,
-            Err(e) => {
-                println!("Could not resolve sources: {}", e);
-                return Err(eyre::eyre!("Could not resolve sources: {}", e))
-            }
+            Err(e) => return Err(eyre::eyre!("Could not resolve sources: {}", e)),
         };
-        // let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
         let mut contract_bytecodes = BTreeMap::new();
 
         // Step 2: Compile Contracts for Each Source
@@ -939,10 +935,7 @@ impl ZkSolc {
         // Step 1: Retrieve Project Sources
         let mut sources = match self.project.sources() {
             Ok(sources) => sources,
-            Err(e) => {
-                println!("sources broke");
-                return Err(eyre::eyre!("Could not get project sources: {}", e))
-            }
+            Err(e) => return Err(eyre::eyre!("Could not get project sources: {}", e)),
         };
 
         let mut script_path = PathBuf::from(self.project.sources_path());
@@ -952,47 +945,24 @@ impl ZkSolc {
             script_path.pop();
             script_path.push("script");
         }
-        // println!("script_path : {:?}", script_path);
         let sources_two = Source::read_all_from(script_path)?;
-        // map1.extend(map2.into_iter());
         sources.extend(sources_two.into_iter());
-
-        // let sources = self.project.sources()
-        //     .wrap_err("Could not get project sources")?;
-
         // Step 2: Resolve Graph of Sources and Versions
-        // println!("sources : {:?}", sources);
         let graph = match Graph::resolve_sources(&self.project.paths, sources) {
             Ok(graph) => graph,
-            Err(e) => {
-                println!("graph broke");
-                return Err(eyre::eyre!("Could not resolve sources: {}", e))
-            }
+            Err(e) => return Err(eyre::eyre!("Could not resolve sources: {}", e)),
         };
-        // println!("graph: {:?}", graph);
-        // let graph = Graph::resolve_sources(&self.project.paths, sources)
-        //     .wrap_err("Could not resolve sources")?;
 
         // Step 3: Extract Versions and Edges
         let (versions, _edges) = match graph.into_sources_by_version(self.project.offline) {
             Ok(sources) => sources,
-            Err(e) => {
-                println!("Versions and Edges");
-                return Err(eyre::eyre!("Could not match solc versions to files: {}", e))
-            }
+            Err(e) => return Err(eyre::eyre!("Could not match solc versions to files: {}", e)),
         };
-        // let (versions, _edges) = graph
-        //     .into_sources_by_version(self.project.offline)
-        //     .wrap_err("Could not match solc versions to files")?;
 
         // Step 4: Retrieve Solc Version
-        // println!("{:?}", versions);
         return match versions.get(&self.project) {
             Ok(solc) => Ok(solc),
-            Err(e) => {
-                println!("solc broke");
-                Err(eyre::eyre!("Could not get solc: {}", e))
-            }
+            Err(e) => Err(eyre::eyre!("Could not get solc: {}", e)),
         }
         // versions.get(&self.project).wrap_err("Could not get solc")
     }
