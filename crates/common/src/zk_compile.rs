@@ -309,17 +309,18 @@ impl ZkSolc {
 
         // Step 2: Compile Contracts for Each Source
         for (_solc, version) in sources {
+            info!("\nCompiling {} files...", version.1.len());
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
                 // Check if the contract_path is in 'sources' directory or its subdirectories
-                let is_in_sources_dir = contract_path
-                    .ancestors()
-                    .any(|ancestor| ancestor.starts_with(&self.project.paths.sources));
+                // let is_in_sources_dir = contract_path
+                //     .ancestors()
+                //     .any(|ancestor| ancestor.starts_with(&self.project.paths.sources));
 
-                // Skip this file if it's not in the 'sources' directory or its subdirectories
-                if !is_in_sources_dir {
-                    continue
-                }
+                // // Skip this file if it's not in the 'sources' directory or its subdirectories
+                // if !is_in_sources_dir {
+                //     continue
+                // }
 
                 // Step 3: Parse JSON Input for each Source
                 self.prepare_compiler_input(&contract_path).wrap_err(format!(
