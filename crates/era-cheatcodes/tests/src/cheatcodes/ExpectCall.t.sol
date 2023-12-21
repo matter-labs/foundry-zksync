@@ -45,7 +45,7 @@ contract NestedContract {
         return "hi";
     }
 
-    function sumInPlace(uint256 a, uint256 b) public view returns (uint256) {
+    function sumInPlace(uint256 a, uint256 b) public pure returns (uint256) {
         return a + b + 42;
     }
 }
@@ -56,7 +56,7 @@ contract ExpectCallTest is Test {
         uint256 a,
         uint256 b,
         uint256 times
-    ) public {
+    ) public pure {
         for (uint256 i = 0; i < times; i++) {
             target.add(a, b);
         }
@@ -70,20 +70,8 @@ contract ExpectCallTest is Test {
         target.pay{value: value}(amount);
     }
 
-    function foo(uint256 input) public returns (uint256) {
-        return input + 1;
-    }
-
-    function testExpectCallWithData() public returns (uint256) {
+    function testExpectCallWithData() public {
         Contract target = new Contract();
-
-        uint256 fooRes = foo(254);
-
-        console.log("foo", fooRes);
-
-        console.log("target_address", address(target));
-        console.log("contract_address", address(this));
-        console.log("msg_sender", msg.sender);
 
         (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature(
@@ -95,132 +83,314 @@ contract ExpectCallTest is Test {
         require(success, "expectCall failed");
 
         this.exposed_callTargetNTimes(target, 1, 2, 1);
-
-        return 255;
     }
 
-    // function testExpectMultipleCallsWithData() public {
-    //     Contract target = new Contract();
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-    //     // Even though we expect one call, we're using additive behavior, so getting more than one call is okay.
-    //     this.exposed_callTargetNTimes(target, 1, 2, 2);
-    // }
+    function testExpectMultipleCallsWithData() public {
+        Contract target = new Contract();
 
-    // function testExpectMultipleCallsWithDataAdditive() public {
-    //     Contract target = new Contract();
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-    //     this.exposed_callTargetNTimes(target, 1, 2, 2);
-    // }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2)
+            )
+        );
+        require(success, "expectCall failed");
 
-    // function testExpectMultipleCallsWithDataAdditiveLowerBound() public {
-    //     Contract target = new Contract();
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-    //     this.exposed_callTargetNTimes(target, 1, 2, 3);
-    // }
+        // Even though we expect one call, we're using additive behavior, so getting more than one call is okay.
+        this.exposed_callTargetNTimes(target, 1, 2, 2);
+    }
 
+    function testExpectMultipleCallsWithDataAdditive() public {
+        Contract target = new Contract();
+
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2)
+            )
+        );
+        require(success, "expectCall failed");
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2)
+            )
+        );
+        require(success, "expectCall failed");
+
+        this.exposed_callTargetNTimes(target, 1, 2, 2);
+    }
+
+    function testExpectMultipleCallsWithDataAdditiveLowerBound() public {
+        Contract target = new Contract();
+
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2)
+            )
+        );
+        require(success, "expectCall failed");
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2)
+            )
+        );
+        require(success, "expectCall failed");
+
+        this.exposed_callTargetNTimes(target, 1, 2, 3);
+    }
+
+    // TODO: uncomment once we have working reverts
     // function testFailExpectMultipleCallsWithDataAdditive() public {
     //     Contract target = new Contract();
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
+
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,bytes)",
+    //             address(target),
+    //             abi.encodeWithSelector(target.add.selector, 1, 2)
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
+    //     (success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,bytes)",
+    //             address(target),
+    //             abi.encodeWithSelector(target.add.selector, 1, 2)
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
+    //     (success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,bytes)",
+    //             address(target),
+    //             abi.encodeWithSelector(target.add.selector, 1, 2)
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
+
     //     // Not enough calls to satisfy the additive expectCall, which expects 3 calls.
     //     this.exposed_callTargetNTimes(target, 1, 2, 2);
     // }
 
+    // TODO: uncomment once we have working reverts
     // function testFailExpectCallWithData() public {
     //     Contract target = new Contract();
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 1);
+
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,bytes,uint64)",
+    //             address(target),
+    //             abi.encodeWithSelector(target.add.selector, 1, 2),
+    //             1
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
+
     //     this.exposed_callTargetNTimes(target, 3, 3, 1);
     // }
 
-    // function testExpectInnerCall() public {
-    //     Contract inner = new Contract();
-    //     NestedContract target = new NestedContract(inner);
-    //     vm.expectCall(address(inner), abi.encodeWithSelector(inner.numberB.selector));
-    //     this.exposed_expectInnerCall(target);
-    // }
+    function testExpectInnerCall() public {
+        Contract inner = new Contract();
+        NestedContract target = new NestedContract(inner);
 
-    // function exposed_expectInnerCall(NestedContract target) public {
-    //     target.sum();
-    // }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(inner),
+                abi.encodeWithSelector(inner.numberB.selector)
+            )
+        );
+        require(success, "expectCall failed");
 
+        this.exposed_expectInnerCall(target);
+    }
+
+    function exposed_expectInnerCall(NestedContract target) public view {
+        target.sum();
+    }
+
+    // TODO: uncomment once we have working reverts
     // function testFailExpectInnerCall() public {
     //     Contract inner = new Contract();
     //     NestedContract target = new NestedContract(inner);
 
-    //     vm.expectCall(address(inner), abi.encodeWithSelector(inner.numberB.selector));
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,bytes)",
+    //             address(inner),
+    //             abi.encodeWithSelector(inner.numberB.selector)
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
 
     //     this.exposed_failExpectInnerCall(target);
     // }
 
-    // function exposed_failExpectInnerCall(NestedContract target) public {
-    //     // this function does not call inner
-    //     target.hello();
-    // }
+    function exposed_failExpectInnerCall(NestedContract target) public pure {
+        // this function does not call inner
+        target.hello();
+    }
 
-    // // We should be able to match whichever function is called inside of the next call.
-    // // Even multiple functions.
-    // function testExpectCallMultipleFunctions() public {
-    //     Contract inner = new Contract();
-    //     NestedContract target = new NestedContract(inner);
+    // We should be able to match whichever function is called inside of the next call.
+    // Even multiple functions.
+    function testExpectCallMultipleFunctions() public {
+        Contract inner = new Contract();
+        NestedContract target = new NestedContract(inner);
 
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.forwardPay.selector));
-    //     vm.expectCall(address(inner), abi.encodeWithSelector(inner.pay.selector));
-    //     this.exposed_forwardPay(target);
-    // }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.forwardPay.selector)
+            )
+        );
+        require(success, "expectCall failed");
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(inner),
+                abi.encodeWithSelector(inner.pay.selector)
+            )
+        );
+        require(success, "expectCall failed");
 
-    // // We should also be able to match multiple functions that happen one after another,
-    // // but inside the next call.
-    // function testExpectCallMultipleFunctionsFlattened() public {
-    //     Contract inner = new Contract();
-    //     NestedContract target = new NestedContract(inner);
+        this.exposed_forwardPay(target);
+    }
 
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.sumInPlace.selector));
-    //     vm.expectCall(address(inner), abi.encodeWithSelector(inner.add.selector));
-    //     this.exposed_expectCallMultipleFunctionsFlattened(target, inner);
-    // }
+    // We should also be able to match multiple functions that happen one after another,
+    // but inside the next call.
+    function testExpectCallMultipleFunctionsFlattened() public {
+        Contract inner = new Contract();
+        NestedContract target = new NestedContract(inner);
 
-    // function exposed_expectCallMultipleFunctionsFlattened(NestedContract target, Contract inner) public {
-    //     target.sumInPlace(1, 1);
-    //     inner.add(1, 1);
-    // }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.sumInPlace.selector)
+            )
+        );
+        require(success, "expectCall failed");
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(inner),
+                abi.encodeWithSelector(inner.add.selector)
+            )
+        );
+        require(success, "expectCall failed");
 
-    // function testExpectSelectorCall() public {
-    //     Contract target = new Contract();
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector));
-    //     this.exposed_callTargetNTimes(target, 5, 5, 1);
-    // }
+        this.exposed_expectCallMultipleFunctionsFlattened(target, inner);
+    }
 
+    function exposed_expectCallMultipleFunctionsFlattened(
+        NestedContract target,
+        Contract inner
+    ) public pure {
+        target.sumInPlace(1, 1);
+        inner.add(1, 1);
+    }
+
+    function testExpectSelectorCall() public {
+        Contract target = new Contract();
+
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector)
+            )
+        );
+        require(success, "expectCall failed");
+
+        this.exposed_callTargetNTimes(target, 5, 5, 1);
+    }
+
+    // TODO: uncomment once we have working reverts
     // function testFailExpectSelectorCall() public {
     //     Contract target = new Contract();
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector));
+
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,bytes)",
+    //             address(target),
+    //             abi.encodeWithSelector(target.add.selector)
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
     // }
 
+    // TODO: uncomment once we have working reverts
     // function testFailExpectCallWithMoreParameters() public {
     //     Contract target = new Contract();
-    //     vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 3, 3, 3));
+
+    //         (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //             abi.encodeWithSignature(
+    //                 "expectCall(address,bytes)",
+    //                 address(target),
+    //                 abi.encodeWithSelector(target.add.selector, 3, 3, 3)
+    //             )
+    //         );
+    //         require(success, "expectCall failed");
+
     //     target.add(3, 3);
     //     this.exposed_callTargetNTimes(target, 3, 3, 1);
     // }
 
-    // function testExpectCallWithValue() public {
-    //     Contract target = new Contract();
-    //     vm.expectCall(address(target), 1, abi.encodeWithSelector(target.pay.selector, 2));
-    //     this.exposed_expectCallWithValue(target, 1, 2);
-    // }
+    function testExpectCallWithValue() public {
+        Contract target = new Contract();
 
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,uint256,bytes)",
+                address(target),
+                1,
+                abi.encodeWithSelector(target.pay.selector, 2)
+            )
+        );
+        require(success, "expectCall failed");
+
+        this.exposed_expectCallWithValue(target, 1, 2);
+    }
+
+    // TODO: uncomment once we have working reverts
     // function testFailExpectCallValue() public {
     //     Contract target = new Contract();
-    //     vm.expectCall(address(target), 1, abi.encodeWithSelector(target.pay.selector, 2));
+
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,uint256,bytes)",
+    //             address(target),
+    //             1,
+    //             abi.encodeWithSelector(target.pay.selector, 2)
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
     // }
 
-    // function testExpectCallWithValueWithoutParameters() public {
-    //     Contract target = new Contract();
-    //     vm.expectCall(address(target), 3, abi.encodeWithSelector(target.pay.selector));
-    //     this.exposed_expectCallWithValue(target, 3, 100);
-    // }
+    function testExpectCallWithValueWithoutParameters() public {
+        Contract target = new Contract();
+
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,uint256,bytes)",
+                address(target),
+                3,
+                abi.encodeWithSelector(target.pay.selector)
+            )
+        );
+        require(success, "expectCall failed");
+
+        this.exposed_expectCallWithValue(target, 3, 100);
+    }
 
     // function testExpectCallWithValueAndGas() public {
     //     Contract inner = new Contract();
@@ -229,9 +399,9 @@ contract ExpectCallTest is Test {
     //     this.exposed_forwardPay(target);
     // }
 
-    // function exposed_forwardPay(NestedContract target) public {
-    //     target.forwardPay{value: 1}();
-    // }
+    function exposed_forwardPay(NestedContract target) public {
+        target.forwardPay{value: 1}();
+    }
 
     // function testExpectCallWithNoValueAndGas() public {
     //     Contract inner = new Contract();
@@ -281,224 +451,380 @@ contract ExpectCallTest is Test {
     // }
 }
 
-// contract ExpectCallCountTest is Test {
-//     function testExpectCallCountWithData() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), abi.encodeWithSelector(Contract.add.selector, 1, 2), 3);
-//         this.exposed_expectCallCountWithData(target);
-//     }
+contract ExpectCallCountTest is Test {
+    function testExpectCallCountWithData() public {
+        Contract target = new Contract();
 
-//     function exposed_expectCallCountWithData(Contract target) public {
-//         target.add(1, 2);
-//         target.add(1, 2);
-//         target.add(1, 2);
-//     }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes,uint64)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2),
+                3
+            )
+        );
+        require(success, "expectCall failed");
 
-//     function testExpectZeroCallCountAssert() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 0);
-//         target.add(3, 3);
-//     }
+        this.exposed_expectCallCountWithData(target);
+    }
 
-//     function testFailExpectCallCountWithWrongCount() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
-//         target.add(1, 2);
-//     }
+    function exposed_expectCallCountWithData(Contract target) public pure {
+        target.add(1, 2);
+        target.add(1, 2);
+        target.add(1, 2);
+    }
 
-//     function testExpectCountInnerCall() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCall(address(inner), abi.encodeWithSelector(inner.numberB.selector), 1);
-//         target.sum();
-//     }
+    function testExpectZeroCallCountAssert() public {
+        Contract target = new Contract();
 
-//     function testFailExpectCountInnerCall() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes,uint64)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2),
+                0
+            )
+        );
+        require(success, "expectCall failed");
+        target.add(3, 3);
+    }
 
-//         vm.expectCall(address(inner), abi.encodeWithSelector(inner.numberB.selector), 1);
+    // TODO: uncomment once we have working reverts
+    // function testFailExpectCallCountWithWrongCount() public {
+    //     Contract target = new Contract();
 
-//         // this function does not call inner
-//         target.hello();
-//     }
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,bytes,uint64)",
+    //             address(target),
+    //             abi.encodeWithSelector(target.add.selector, 1, 2),
+    //             2
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
 
-//     function testExpectCountInnerAndOuterCalls() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCall(address(inner), abi.encodeWithSelector(inner.numberB.selector), 2);
-//         this.exposed_expectCountInnerAndOuterCalls(inner, target);
-//     }
+    //     target.add(1, 2);
+    // }
 
-//     function exposed_expectCountInnerAndOuterCalls(Contract inner, NestedContract target) public {
-//         inner.numberB();
-//         target.sum();
-//     }
+    function testExpectCountInnerCall() public {
+        Contract inner = new Contract();
+        NestedContract target = new NestedContract(inner);
 
-//     function exposed_pay(Contract target, uint256 value, uint256 amount) public payable {
-//         target.pay{value: value}(amount);
-//     }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes,uint64)",
+                address(inner),
+                abi.encodeWithSelector(inner.numberB.selector),
+                1
+            )
+        );
+        require(success, "expectCall failed");
 
-//     function testExpectCallCountWithValue() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), 1, abi.encodeWithSelector(target.pay.selector, 2), 1);
-//         this.exposed_pay{value: 1}(target, 1, 2);
-//     }
+        target.sum();
+    }
 
-//     function testExpectZeroCallCountValue() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), 1, abi.encodeWithSelector(target.pay.selector, 2), 0);
-//         this.exposed_pay{value: 2}(target, 2, 2);
-//     }
+    // TODO: uncomment once we have working reverts
+    // function testFailExpectCountInnerCall() public {
+    //     Contract inner = new Contract();
+    //     NestedContract target = new NestedContract(inner);
 
-//     function testFailExpectCallCountValue() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), 1, abi.encodeWithSelector(target.pay.selector, 2), 1);
-//         this.exposed_pay{value: 2}(target, 2, 2);
-//     }
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,bytes,uint64)",
+    //             address(inner),
+    //             abi.encodeWithSelector(inner.numberB.selector),
+    //             1
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
 
-//     function testExpectCallCountWithValueWithoutParameters() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), 3, abi.encodeWithSelector(target.pay.selector), 3);
-//         this.exposed_expectCallCountWithValueWithoutParameters(target);
-//     }
+    //     // this function does not call inner
+    //     target.hello();
+    // }
 
-//     function exposed_expectCallCountWithValueWithoutParameters(Contract target) public {
-//         target.pay{value: 3}(100);
-//         target.pay{value: 3}(100);
-//         target.pay{value: 3}(100);
-//     }
+    function testExpectCountInnerAndOuterCalls() public {
+        Contract inner = new Contract();
+        NestedContract target = new NestedContract(inner);
 
-//     function testExpectCallCountWithValueAndGas() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCall(address(inner), 1, 50_000, abi.encodeWithSelector(inner.pay.selector, 1), 2);
-//         this.exposed_expectCallCountWithValueAndGas(target);
-//     }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes,uint64)",
+                address(inner),
+                abi.encodeWithSelector(inner.numberB.selector),
+                2
+            )
+        );
+        require(success, "expectCall failed");
 
-//     function exposed_expectCallCountWithValueAndGas(NestedContract target) public {
-//         target.forwardPay{value: 1}();
-//         target.forwardPay{value: 1}();
-//     }
+        this.exposed_expectCountInnerAndOuterCalls(inner, target);
+    }
 
-//     function exposed_addHardGasLimit(NestedContract target, uint256 times) public {
-//         for (uint256 i = 0; i < times; i++) {
-//             target.addHardGasLimit();
-//         }
-//     }
+    function exposed_expectCountInnerAndOuterCalls(
+        Contract inner,
+        NestedContract target
+    ) public view {
+        inner.numberB();
+        target.sum();
+    }
 
-//     function testExpectCallCountWithNoValueAndGas() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCall(address(inner), 0, 50_000, abi.encodeWithSelector(inner.add.selector, 1, 1), 1);
-//         this.exposed_addHardGasLimit(target, 1);
-//     }
+    function exposed_pay(
+        Contract target,
+        uint256 value,
+        uint256 amount
+    ) public payable {
+        target.pay{value: value}(amount);
+    }
 
-//     function testExpectZeroCallCountWithNoValueAndWrongGas() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCall(address(inner), 0, 25_000, abi.encodeWithSelector(inner.add.selector, 1, 1), 0);
-//         this.exposed_addHardGasLimit(target, 1);
-//     }
+    function testExpectCallCountWithValue() public {
+        Contract target = new Contract();
 
-//     function testFailExpectCallCountWithNoValueAndWrongGas() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCall(address(inner), 0, 25_000, abi.encodeWithSelector(inner.add.selector, 1, 1), 2);
-//         this.exposed_addHardGasLimit(target, 2);
-//     }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,uint256,bytes,uint64)",
+                address(target),
+                1,
+                abi.encodeWithSelector(target.pay.selector, 2),
+                1
+            )
+        );
+        require(success, "expectCall failed");
 
-//     function testExpectCallCountWithValueAndMinGas() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCallMinGas(address(inner), 1, 50_000, abi.encodeWithSelector(inner.pay.selector, 1), 1);
-//         this.exposed_forwardPay(target);
-//     }
+        this.exposed_pay{value: 1}(target, 1, 2);
+    }
 
-//     function exposed_forwardPay(NestedContract target) public {
-//         target.forwardPay{value: 1}();
-//     }
+    function testExpectZeroCallCountValue() public {
+        Contract target = new Contract();
 
-//     function testExpectCallCountWithNoValueAndMinGas() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCallMinGas(address(inner), 0, 25_000, abi.encodeWithSelector(inner.add.selector, 1, 1), 2);
-//         this.exposed_addHardGasLimit(target, 2);
-//     }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,uint256,bytes,uint64)",
+                address(target),
+                1,
+                abi.encodeWithSelector(target.pay.selector, 2),
+                0
+            )
+        );
+        require(success, "expectCall failed");
 
-//     function testExpectCallZeroCountWithNoValueAndWrongMinGas() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCallMinGas(address(inner), 0, 50_001, abi.encodeWithSelector(inner.add.selector, 1, 1), 0);
-//         this.exposed_addHardGasLimit(target, 1);
-//     }
+        this.exposed_pay{value: 2}(target, 2, 2);
+    }
 
-//     function testFailExpectCallCountWithNoValueAndWrongMinGas() public {
-//         Contract inner = new Contract();
-//         NestedContract target = new NestedContract(inner);
-//         vm.expectCallMinGas(address(inner), 0, 50_001, abi.encodeWithSelector(inner.add.selector, 1, 1), 1);
-//         this.exposed_addHardGasLimit(target, 1);
-//     }
-// }
+    // TODO: uncomment once we have working reverts
+    // function testFailExpectCallCountValue() public {
+    //     Contract target = new Contract();
 
-// contract ExpectCallMixedTest is Test {
-//     function exposed_callTargetNTimes(Contract target, uint256 a, uint256 b, uint256 times) public {
-//         for (uint256 i = 0; i < times; i++) {
-//             target.add(1, 2);
-//         }
-//     }
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectCall(address,uint256,bytes,uint64)",
+    //             address(target),
+    //             1,
+    //             abi.encodeWithSelector(target.pay.selector, 2),
+    //             1
+    //         )
+    //     );
+    //     require(success, "expectCall failed");
 
-//     function testFailOverrideNoCountWithCount() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-//         // You should not be able to overwrite a expectCall that had no count with some count.
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
-//         this.exposed_callTargetNTimes(target, 1, 2, 2);
-//     }
+    //     this.exposed_pay{value: 2}(target, 2, 2);
+    // }
 
-//     function testFailOverrideCountWithCount() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
-//         // You should not be able to overwrite a expectCall that had a count with some count.
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 1);
-//         target.add(1, 2);
-//         target.add(1, 2);
-//     }
+    function testExpectCallCountWithValueWithoutParameters() public {
+        Contract target = new Contract();
 
-//     function testFailOverrideCountWithNoCount() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
-//         // You should not be able to overwrite a expectCall that had a count with no count.
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-//         target.add(1, 2);
-//         target.add(1, 2);
-//     }
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,uint256,bytes,uint64)",
+                address(target),
+                3,
+                abi.encodeWithSelector(target.pay.selector),
+                3
+            )
+        );
+        require(success, "expectCall failed");
 
-//     function testExpectMatchPartialAndFull() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector), 2);
-//         // Even if a partial match is specified, you should still be able to look for full matches
-//         // as one does not override the other.
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
-//         this.exposed_expectMatchPartialAndFull(target);
-//     }
+        this.exposed_expectCallCountWithValueWithoutParameters(target);
+    }
 
-//     function exposed_expectMatchPartialAndFull(Contract target) public {
-//         target.add(1, 2);
-//         target.add(1, 2);
-//     }
+    function exposed_expectCallCountWithValueWithoutParameters(
+        Contract target
+    ) public {
+        target.pay{value: 3}(100);
+        target.pay{value: 3}(100);
+        target.pay{value: 3}(100);
+    }
 
-//     function testExpectMatchPartialAndFullFlipped() public {
-//         Contract target = new Contract();
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector));
-//         // Even if a partial match is specified, you should still be able to look for full matches
-//         // as one does not override the other.
-//         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
-//         this.exposed_expectMatchPartialAndFullFlipped(target);
-//     }
+    //     function testExpectCallCountWithValueAndGas() public {
+    //         Contract inner = new Contract();
+    //         NestedContract target = new NestedContract(inner);
+    //         vm.expectCall(address(inner), 1, 50_000, abi.encodeWithSelector(inner.pay.selector, 1), 2);
+    //         this.exposed_expectCallCountWithValueAndGas(target);
+    //     }
 
-//     function exposed_expectMatchPartialAndFullFlipped(Contract target) public {
-//         target.add(1, 2);
-//         target.add(1, 2);
-//     }
-// }
+    //     function exposed_expectCallCountWithValueAndGas(NestedContract target) public {
+    //         target.forwardPay{value: 1}();
+    //         target.forwardPay{value: 1}();
+    //     }
+
+    //     function exposed_addHardGasLimit(NestedContract target, uint256 times) public {
+    //         for (uint256 i = 0; i < times; i++) {
+    //             target.addHardGasLimit();
+    //         }
+    //     }
+
+    //     function testExpectCallCountWithNoValueAndGas() public {
+    //         Contract inner = new Contract();
+    //         NestedContract target = new NestedContract(inner);
+    //         vm.expectCall(address(inner), 0, 50_000, abi.encodeWithSelector(inner.add.selector, 1, 1), 1);
+    //         this.exposed_addHardGasLimit(target, 1);
+    //     }
+
+    //     function testExpectZeroCallCountWithNoValueAndWrongGas() public {
+    //         Contract inner = new Contract();
+    //         NestedContract target = new NestedContract(inner);
+    //         vm.expectCall(address(inner), 0, 25_000, abi.encodeWithSelector(inner.add.selector, 1, 1), 0);
+    //         this.exposed_addHardGasLimit(target, 1);
+    //     }
+
+    //     function testFailExpectCallCountWithNoValueAndWrongGas() public {
+    //         Contract inner = new Contract();
+    //         NestedContract target = new NestedContract(inner);
+    //         vm.expectCall(address(inner), 0, 25_000, abi.encodeWithSelector(inner.add.selector, 1, 1), 2);
+    //         this.exposed_addHardGasLimit(target, 2);
+    //     }
+
+    //     function testExpectCallCountWithValueAndMinGas() public {
+    //         Contract inner = new Contract();
+    //         NestedContract target = new NestedContract(inner);
+    //         vm.expectCallMinGas(address(inner), 1, 50_000, abi.encodeWithSelector(inner.pay.selector, 1), 1);
+    //         this.exposed_forwardPay(target);
+    //     }
+
+    //     function exposed_forwardPay(NestedContract target) public {
+    //         target.forwardPay{value: 1}();
+    //     }
+
+    //     function testExpectCallCountWithNoValueAndMinGas() public {
+    //         Contract inner = new Contract();
+    //         NestedContract target = new NestedContract(inner);
+    //         vm.expectCallMinGas(address(inner), 0, 25_000, abi.encodeWithSelector(inner.add.selector, 1, 1), 2);
+    //         this.exposed_addHardGasLimit(target, 2);
+    //     }
+
+    //     function testExpectCallZeroCountWithNoValueAndWrongMinGas() public {
+    //         Contract inner = new Contract();
+    //         NestedContract target = new NestedContract(inner);
+    //         vm.expectCallMinGas(address(inner), 0, 50_001, abi.encodeWithSelector(inner.add.selector, 1, 1), 0);
+    //         this.exposed_addHardGasLimit(target, 1);
+    //     }
+
+    //     function testFailExpectCallCountWithNoValueAndWrongMinGas() public {
+    //         Contract inner = new Contract();
+    //         NestedContract target = new NestedContract(inner);
+    //         vm.expectCallMinGas(address(inner), 0, 50_001, abi.encodeWithSelector(inner.add.selector, 1, 1), 1);
+    //         this.exposed_addHardGasLimit(target, 1);
+    //     }
+}
+
+contract ExpectCallMixedTest is Test {
+    function exposed_callTargetNTimes(
+        Contract target,
+        uint256 a,
+        uint256 b,
+        uint256 times
+    ) public pure {
+        for (uint256 i = 0; i < times; i++) {
+            target.add(1, 2);
+        }
+    }
+
+    //     function testFailOverrideNoCountWithCount() public {
+    //         Contract target = new Contract();
+    //         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
+    //         // You should not be able to overwrite a expectCall that had no count with some count.
+    //         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
+    //         this.exposed_callTargetNTimes(target, 1, 2, 2);
+    //     }
+
+    //     function testFailOverrideCountWithCount() public {
+    //         Contract target = new Contract();
+    //         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
+    //         // You should not be able to overwrite a expectCall that had a count with some count.
+    //         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 1);
+    //         target.add(1, 2);
+    //         target.add(1, 2);
+    //     }
+
+    //     function testFailOverrideCountWithNoCount() public {
+    //         Contract target = new Contract();
+    //         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
+    //         // You should not be able to overwrite a expectCall that had a count with no count.
+    //         vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
+    //         target.add(1, 2);
+    //         target.add(1, 2);
+    //     }
+
+    function testExpectMatchPartialAndFull() public {
+        Contract target = new Contract();
+
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes,uint64)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector),
+                2
+            )
+        );
+        require(success, "expectCall failed");
+
+        // Even if a partial match is specified, you should still be able to look for full matches
+        // as one does not override the other.
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2)
+            )
+        );
+        require(success, "expectCall failed");
+
+        this.exposed_expectMatchPartialAndFull(target);
+    }
+
+    function exposed_expectMatchPartialAndFull(Contract target) public pure {
+        target.add(1, 2);
+        target.add(1, 2);
+    }
+
+    function testExpectMatchPartialAndFullFlipped() public {
+        Contract target = new Contract();
+
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector)
+            )
+        );
+        require(success, "expectCall failed");
+
+        // Even if a partial match is specified, you should still be able to look for full matches
+        // as one does not override the other.
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectCall(address,bytes,uint64)",
+                address(target),
+                abi.encodeWithSelector(target.add.selector, 1, 2),
+                2
+            )
+        );
+        require(success, "expectCall failed");
+
+        this.exposed_expectMatchPartialAndFullFlipped(target);
+    }
+
+    function exposed_expectMatchPartialAndFullFlipped(
+        Contract target
+    ) public pure {
+        target.add(1, 2);
+        target.add(1, 2);
+    }
+}
