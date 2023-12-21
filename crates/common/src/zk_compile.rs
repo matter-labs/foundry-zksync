@@ -40,11 +40,9 @@ use foundry_compilers::{
         output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode, Source,
         StandardJsonCompilerInput,
     },
-    remappings::RelativeRemapping,
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
 };
-use regex::Regex;
 use semver::Version;
 use serde::Deserialize;
 use serde_json::Value;
@@ -80,7 +78,6 @@ pub struct ZkSolcOpts {
     pub compiler_path: PathBuf,
     pub is_system: bool,
     pub force_evmla: bool,
-    pub remappings: Vec<RelativeRemapping>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -162,7 +159,6 @@ pub struct ZkSolc {
     is_system: bool,
     force_evmla: bool,
     standard_json: Option<StandardJsonCompilerInput>,
-    remappings: Vec<RelativeRemapping>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -193,13 +189,11 @@ pub fn compile_smart_contracts(
     is_legacy: bool,
     zksolc_manager: ZkSolcManager,
     project: Project,
-    remappings: Vec<RelativeRemapping>,
 ) -> eyre::Result<()> {
     let zksolc_opts = ZkSolcOpts {
         compiler_path: zksolc_manager.get_full_compiler_path(),
         is_system,
         force_evmla: is_legacy,
-        remappings,
     };
 
     let mut zksolc = ZkSolc::new(zksolc_opts, project);
@@ -223,7 +217,6 @@ impl ZkSolc {
             is_system: opts.is_system,
             force_evmla: opts.force_evmla,
             standard_json: None,
-            remappings: opts.remappings,
         }
     }
 
@@ -833,7 +826,7 @@ impl ZkSolc {
             .insert("*".to_string(), file_output_selection.clone());
 
         // Step 4: Generate Standard JSON Input
-        let mut standard_json = self
+        let standard_json = self
             .project
             .standard_json_input(contract_path)
             .wrap_err("Could not get standard json input")
