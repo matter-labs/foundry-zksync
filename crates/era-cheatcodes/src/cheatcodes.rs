@@ -69,13 +69,6 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     H160::zero(),
 ];
 
-// fn truncate(s: String, max_chars: usize) -> String {
-//     match s.char_indices().nth(max_chars) {
-//         None => s,
-//         Some((idx, _)) => format!("{}...", &s[..idx]),
-//     }
-// }
-
 /// Represents the state of a foundry test function, i.e. functions
 /// prefixed with "testXXX"
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -165,49 +158,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             // reset the test state to avoid checking again
             self.reset_test_status();
         }
-
-        // let calldata = get_calldata(&state, memory);
-        // let current = state.vm_local_state.callstack.current;
-        // let depth = state.vm_local_state.callstack.depth();
-        // match data.opcode.variant.opcode {
-        //     Opcode::NearCall(_) => {
-        //         for _ in 1..=depth {
-        //             print!("  ");
-        //         }
-        //         println!(
-        //             "NearCall {:?} -> {:?} [{}] | {}",
-        //             current.msg_sender,
-        //             current.this_address,
-        //             depth,
-        //             truncate(hex::encode(calldata), 100),
-        //         );
-        //     }
-        //     Opcode::FarCall(_) => {
-        //         for _ in 1..=depth {
-        //             print!("  ");
-        //         }
-        //         println!(
-        //             "FarCall {:?} -> {:?} [{}] | {}",
-        //             current.msg_sender,
-        //             current.this_address,
-        //             depth,
-        //             truncate(hex::encode(calldata), 100),
-        //         );
-        //     }
-        //     Opcode::Ret(_) => {
-        //         for _ in 1..=depth {
-        //             print!("  ");
-        //         }
-        //         println!(
-        //             "Ret {:?} -> {:?} [{}] | {}",
-        //             current.msg_sender,
-        //             current.this_address,
-        //             depth,
-        //             truncate(hex::encode(calldata), 100),
-        //         );
-        //     }
-        //     _ => (),
-        // }
 
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
