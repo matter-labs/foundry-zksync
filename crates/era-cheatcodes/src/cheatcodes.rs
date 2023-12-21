@@ -10,7 +10,7 @@ use multivm::{
     vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
     zk_evm_1_3_3::{
         tracing::{AfterExecutionData, VmLocalStateData},
-        vm_state::{CallStackEntry, PrimitiveValue},
+        vm_state::PrimitiveValue,
         zkevm_opcode_defs::{
             FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
             RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
@@ -69,6 +69,26 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     H160::zero(),
 ];
 
+// fn truncate(s: String, max_chars: usize) -> String {
+//     match s.char_indices().nth(max_chars) {
+//         None => s,
+//         Some((idx, _)) => format!("{}...", &s[..idx]),
+//     }
+// }
+
+/// Represents the state of a foundry test function, i.e. functions
+/// prefixed with "testXXX"
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+enum FoundryTestState {
+    /// The test function is not yet running
+    #[default]
+    NotStarted,
+    /// The test function is now running at the specified call depth
+    Running { call_depth: usize },
+    /// The test function has finished executing
+    Finished,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
     one_time_actions: Vec<FinishCycleOneTimeActions>,
@@ -81,11 +101,7 @@ pub struct CheatcodeTracer {
     recording_logs: bool,
     recording_timestamp: u32,
     expected_calls: Vec<ExpectCallOpts>,
-    expected_calls_checked: bool,
-    test_status: TestStatus,
-    callstacks: Vec<CallStackEntry>,
-    test_callstacks: Vec<u64>,
-    test_number: u64,
+    test_status: FoundryTestState,
     callstack_depth: Option<usize>,
 }
 
@@ -126,16 +142,6 @@ struct ExpectCallOpts {
     matches_found: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-enum TestStatus {
-    #[default]
-    NotStarted,
-    Running {
-        call_depth: usize,
-    },
-    Finished,
-}
-
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     for CheatcodeTracer
 {
@@ -146,83 +152,62 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
-        let calldata = get_calldata(&state, memory);
-
-        // Keep track of calls to detect if test started and stuff
-        match data.opcode.variant.opcode {
-            Opcode::NearCall(_) => {
-                let current = state.vm_local_state.callstack.current;
-                // if current.code_address == TEST_ADDRESS {
-                println!(
-                    "// near_call {:?} depth {}",
-                    current,
-                    state.vm_local_state.callstack.depth()
-                );
-                println!("// calldata: {}", hex::encode(calldata));
-                self.test_number += 1;
-                self.test_callstacks.push(self.test_number);
-                println!("// test_number: {}", self.test_number);
-                self.callstacks.push(current);
-                // }
-            }
-            Opcode::FarCall(_) => {
-                let current = state.vm_local_state.callstack.current;
-                // if current.code_address == TEST_ADDRESS {
-                println!(
-                    "// far_call {:?} depth {}",
-                    current,
-                    state.vm_local_state.callstack.depth()
-                );
-                println!("// calldata: {}", hex::encode(calldata));
-                self.test_number += 1;
-                self.test_callstacks.push(self.test_number);
-                self.callstacks.push(current);
-                println!("// test_number: {}", self.test_number);
-                if self.test_status == TestStatus::NotStarted &&
-                    current.code_address == TEST_ADDRESS
-                {
-                    println!("TEST STARTED");
-                    self.test_status =
-                        TestStatus::Running { call_depth: state.vm_local_state.callstack.depth() };
+        if self.update_test_status(&state, &data) == &FoundryTestState::Finished {
+            for expected_call in &mut self.expected_calls {
+                if expected_call.matches_found == 0 {
+                    println!("EXPECTED CALL NOT FOUND");
+                    println!("callee {:?}", expected_call.callee);
+                    println!("data {:?}", expected_call.data);
+                    // panic!("Expected call not found");
                 }
-                // }
             }
-            Opcode::Ret(_) => {
-                let current = state.vm_local_state.callstack.current;
-                // if current.code_address == TEST_ADDRESS {
-                println!(
-                    "// ret_call {:?} depth {}",
-                    current,
-                    state.vm_local_state.callstack.depth()
-                );
-                println!("// calldata: {}", hex::encode(calldata));
-                self.callstacks.pop();
-                println!("// popped test_number: {:?}", self.test_callstacks.pop());
-                println!("// test_number_length: {}", self.test_callstacks.len());
-                if self.test_callstacks.len() < 10 {
-                    println!("// test_callstacks: {:?}", self.test_callstacks);
-                }
 
-                // Check ret opcode has 2 lower depth than
-                if let Some(callstack_depth) = self.callstack_depth {
-                    if state.vm_local_state.callstack.depth() == callstack_depth - 4 {
-                        println!("// TEST FINISHED FOR REAL");
-
-                        for expected_call in &mut self.expected_calls {
-                            if expected_call.matches_found == 0 {
-                                println!("EXPECTED CALL NOT FOUND");
-                                println!("callee {:?}", expected_call.callee);
-                                println!("data {:?}", expected_call.data);
-                                // panic!("Expected call not found");
-                            }
-                        }
-                    }
-                }
-
-                // }
-            }
-            _ => {}
+            // reset the test state to avoid checking again
+            self.reset_test_status();
         }
+
+        // let calldata = get_calldata(&state, memory);
+        // let current = state.vm_local_state.callstack.current;
+        // let depth = state.vm_local_state.callstack.depth();
+        // match data.opcode.variant.opcode {
+        //     Opcode::NearCall(_) => {
+        //         for _ in 1..=depth {
+        //             print!("  ");
+        //         }
+        //         println!(
+        //             "NearCall {:?} -> {:?} [{}] | {}",
+        //             current.msg_sender,
+        //             current.this_address,
+        //             depth,
+        //             truncate(hex::encode(calldata), 100),
+        //         );
+        //     }
+        //     Opcode::FarCall(_) => {
+        //         for _ in 1..=depth {
+        //             print!("  ");
+        //         }
+        //         println!(
+        //             "FarCall {:?} -> {:?} [{}] | {}",
+        //             current.msg_sender,
+        //             current.this_address,
+        //             depth,
+        //             truncate(hex::encode(calldata), 100),
+        //         );
+        //     }
+        //     Opcode::Ret(_) => {
+        //         for _ in 1..=depth {
+        //             print!("  ");
+        //         }
+        //         println!(
+        //             "Ret {:?} -> {:?} [{}] | {}",
+        //             current.msg_sender,
+        //             current.this_address,
+        //             depth,
+        //             truncate(hex::encode(calldata), 100),
+        //         );
+        //     }
+        //     _ => (),
+        // }
 
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
@@ -370,13 +355,52 @@ impl CheatcodeTracer {
             recording_logs: false,
             recording_timestamp: 0,
             expected_calls: vec![],
-            test_status: TestStatus::NotStarted,
-            expected_calls_checked: false,
-            callstacks: vec![],
-            test_callstacks: vec![],
-            test_number: 0,
+            test_status: FoundryTestState::NotStarted,
             callstack_depth: None,
         }
+    }
+
+    /// Resets the test state to [TestStatus::NotStarted]
+    fn reset_test_status(&mut self) {
+        self.test_status = FoundryTestState::NotStarted;
+    }
+
+    /// Updates and keeps track of the test status.
+    ///
+    /// A foundry test starting with "testXXX" prefix is said to running when it is first called
+    /// with the test selector as calldata. The test finishes when the calldepth reaches the same
+    /// depth as when it started, i.e. when the test function returns. The retun value is stored
+    /// in the calldata.
+    fn update_test_status(
+        &mut self,
+        state: &VmLocalStateData<'_>,
+        data: &AfterExecutionData,
+    ) -> &FoundryTestState {
+        match data.opcode.variant.opcode {
+            Opcode::FarCall(_) => {
+                if self.test_status == FoundryTestState::NotStarted &&
+                    state.vm_local_state.callstack.current.code_address == TEST_ADDRESS
+                {
+                    self.test_status = FoundryTestState::Running {
+                        call_depth: state.vm_local_state.callstack.depth(),
+                    };
+                    tracing::info!("Test started");
+                }
+            }
+            Opcode::Ret(_) => {
+                if let FoundryTestState::Running { call_depth } = self.test_status {
+                    // As we are checking the calldepth after execution, the stack has already been
+                    // popped (so reduced by 1) and must be accounted for.
+                    if call_depth == state.vm_local_state.callstack.depth() + 1 {
+                        self.test_status = FoundryTestState::Finished;
+                        tracing::info!("Test finished");
+                    }
+                }
+            }
+            _ => (),
+        }
+
+        &self.test_status
     }
 
     pub fn dispatch_cheatcode<S: DatabaseExt + Send, H: HistoryMode>(
