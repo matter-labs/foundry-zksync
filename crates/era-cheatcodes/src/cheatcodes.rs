@@ -1,4 +1,4 @@
-use crate::utils::{ToH160, ToH256};
+use crate::utils::{ToH160, ToH256, ToU256};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{fork::ForkStorage, utils::bytecode_to_factory_dep};
 use ethers::utils::to_checksum;
@@ -20,7 +20,7 @@ use multivm::{
 use serde::Serialize;
 use std::{
     cell::RefMut,
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Debug,
     fs,
     process::Command,
@@ -41,6 +41,10 @@ type EraDb<DB> = StorageView<ForkStorage<RevmDatabaseForEra<DB>>>;
 const CHEATCODE_ADDRESS: H160 = H160([
     113, 9, 112, 158, 207, 169, 26, 128, 98, 111, 243, 152, 157, 104, 246, 127, 91, 29, 209, 45,
 ]);
+
+// 0x2e1908b13b8b625ed13ecf03c87d45c499d1f325
+const TEST_ADDRESS: H160 =
+    H160([46, 25, 8, 177, 59, 139, 98, 94, 209, 62, 207, 3, 200, 125, 69, 196, 153, 209, 243, 37]);
 
 const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     zksync_types::BOOTLOADER_ADDRESS,
@@ -65,6 +69,19 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     H160::zero(),
 ];
 
+/// Represents the state of a foundry test function, i.e. functions
+/// prefixed with "testXXX"
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+enum FoundryTestState {
+    /// The test function is not yet running
+    #[default]
+    NotStarted,
+    /// The test function is now running at the specified call depth
+    Running { call_depth: usize },
+    /// The test function has finished executing
+    Finished,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
     one_time_actions: Vec<FinishCycleOneTimeActions>,
@@ -76,6 +93,8 @@ pub struct CheatcodeTracer {
     recorded_logs: HashSet<LogEntry>,
     recording_logs: bool,
     recording_timestamp: u32,
+    expected_calls: ExpectedCallsTracker,
+    test_status: FoundryTestState,
 }
 
 #[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
@@ -108,6 +127,39 @@ struct StartPrankOpts {
     origin: Option<H256>,
 }
 
+/// Tracks the expected calls per address.
+///
+/// For each address, we track the expected calls per call data. We track it in such manner
+/// so that we don't mix together calldatas that only contain selectors and calldatas that contain
+/// selector and arguments (partial and full matches).
+///
+/// This then allows us to customize the matching behavior for each call data on the
+/// `ExpectedCallData` struct and track how many times we've actually seen the call on the second
+/// element of the tuple.
+type ExpectedCallsTracker = HashMap<H160, HashMap<Vec<u8>, (ExpectedCallData, u64)>>;
+
+#[derive(Debug, Clone)]
+struct ExpectedCallData {
+    /// The expected value sent in the call
+    value: Option<U256>,
+    /// The number of times the call is expected to be made.
+    /// If the type of call is `NonCount`, this is the lower bound for the number of calls
+    /// that must be seen.
+    /// If the type of call is `Count`, this is the exact number of calls that must be seen.
+    count: u64,
+    /// The type of expected call.
+    call_type: ExpectedCallType,
+}
+
+/// The type of expected call.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ExpectedCallType {
+    /// The call is expected to be made at least once.
+    NonCount,
+    /// The exact number of calls expected.
+    Count,
+}
+
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     for CheatcodeTracer
 {
@@ -118,6 +170,59 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
+        if self.update_test_status(&state, &data) == &FoundryTestState::Finished {
+            for (address, expected_calls_for_target) in &self.expected_calls {
+                for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
+                    let failed = match expected.call_type {
+                        // If the cheatcode was called with a `count` argument,
+                        // we must check that the EVM performed a CALL with this calldata exactly
+                        // `count` times.
+                        ExpectedCallType::Count => expected.count != *actual_count,
+                        // If the cheatcode was called without a `count` argument,
+                        // we must check that the EVM performed a CALL with this calldata at least
+                        // `count` times. The amount of times to check was
+                        // the amount of time the cheatcode was called.
+                        ExpectedCallType::NonCount => expected.count > *actual_count,
+                    };
+                    // TODO: change to proper revert
+                    assert!(
+                        !failed,
+                        "Expected call to {:?} with data {:?} was found {} times, expected {}",
+                        address, expected_calldata, actual_count, expected.count
+                    );
+                }
+            }
+
+            // reset the test state to avoid checking again
+            self.reset_test_status();
+        }
+
+        // Checks contract calls for expectCall cheatcode
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.current;
+            if let Some(expected_calls_for_target) =
+                self.expected_calls.get_mut(&current.code_address)
+            {
+                let calldata = get_calldata(&state, memory);
+                // Match every partial/full calldata
+                for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
+                    // Increment actual times seen if...
+                    // The calldata is at most, as big as this call's input, and
+                    if expected_calldata.len() <= calldata.len() &&
+                        // Both calldata match, taking the length of the assumed smaller one (which will have at least the selector), and
+                        *expected_calldata == calldata[..expected_calldata.len()] &&
+                        // The value matches, if provided
+                        expected
+                            .value
+                            .map_or(true, |value|{
+                                 value == current.context_u128_value.into()})
+                    {
+                        *actual_count += 1;
+                    }
+                }
+            }
+        }
+
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
                 if self.near_calls == 0 {
@@ -147,17 +252,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 return
             }
             tracing::info!("near call: cheatcode triggered");
-            let calldata = {
-                let ptr = state.vm_local_state.registers
-                    [CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
-                assert!(ptr.is_pointer);
-                let fat_data_pointer = FatPointer::from_u256(ptr.value);
-                memory.read_unaligned_bytes(
-                    fat_data_pointer.memory_page as usize,
-                    fat_data_pointer.start as usize,
-                    fat_data_pointer.length as usize,
-                )
-            };
+            let calldata = get_calldata(&state, memory);
 
             // try to dispatch the cheatcode
             if let Ok(call) = Vm::VmCalls::abi_decode(&calldata, true) {
@@ -247,17 +342,50 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
 impl CheatcodeTracer {
     pub fn new() -> Self {
-        CheatcodeTracer {
-            one_time_actions: vec![],
-            permanent_actions: FinishCyclePermanentActions { start_prank: None },
-            near_calls: 0,
-            return_data: None,
-            return_ptr: None,
-            serialized_objects: HashMap::new(),
-            recorded_logs: HashSet::new(),
-            recording_logs: false,
-            recording_timestamp: 0,
+        CheatcodeTracer::default()
+    }
+
+    /// Resets the test state to [TestStatus::NotStarted]
+    fn reset_test_status(&mut self) {
+        self.test_status = FoundryTestState::NotStarted;
+    }
+
+    /// Updates and keeps track of the test status.
+    ///
+    /// A foundry test starting with "testXXX" prefix is said to running when it is first called
+    /// with the test selector as calldata. The test finishes when the calldepth reaches the same
+    /// depth as when it started, i.e. when the test function returns. The retun value is stored
+    /// in the calldata.
+    fn update_test_status(
+        &mut self,
+        state: &VmLocalStateData<'_>,
+        data: &AfterExecutionData,
+    ) -> &FoundryTestState {
+        match data.opcode.variant.opcode {
+            Opcode::FarCall(_) => {
+                if self.test_status == FoundryTestState::NotStarted &&
+                    state.vm_local_state.callstack.current.code_address == TEST_ADDRESS
+                {
+                    self.test_status = FoundryTestState::Running {
+                        call_depth: state.vm_local_state.callstack.depth(),
+                    };
+                    tracing::info!("Test started");
+                }
+            }
+            Opcode::Ret(_) => {
+                if let FoundryTestState::Running { call_depth } = self.test_status {
+                    // As we are checking the calldepth after execution, the stack has already been
+                    // popped (so reduced by 1) and must be accounted for.
+                    if call_depth == state.vm_local_state.callstack.depth() + 1 {
+                        self.test_status = FoundryTestState::Finished;
+                        tracing::info!("Test finished");
+                    }
+                }
+            }
+            _ => (),
         }
+
+        &self.test_status
     }
 
     pub fn dispatch_cheatcode<S: DatabaseExt + Send, H: HistoryMode>(
@@ -295,6 +423,37 @@ impl CheatcodeTracer {
                 let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+            }
+            expectCall_0(expectCall_0Call { callee, data }) => {
+                tracing::info!("👷 Setting expected call to {callee:?}");
+                self.expect_call(&callee.to_h160(), &data, None, 1, ExpectedCallType::NonCount);
+            }
+            expectCall_1(expectCall_1Call { callee, data, count }) => {
+                tracing::info!("👷 Setting expected call to {callee:?} with count {count}");
+                self.expect_call(&callee.to_h160(), &data, None, count, ExpectedCallType::Count);
+            }
+            expectCall_2(expectCall_2Call { callee, msgValue, data }) => {
+                tracing::info!("👷 Setting expected call to {callee:?} with value {msgValue}");
+                self.expect_call(
+                    &callee.to_h160(),
+                    &data,
+                    Some(msgValue.to_u256()),
+                    1,
+                    ExpectedCallType::NonCount,
+                );
+            }
+            expectCall_3(expectCall_3Call { callee, msgValue, data, count }) => {
+                tracing::info!(
+                    "👷 Setting expected call to {callee:?} with value {msgValue} and count
+                {count}"
+                );
+                self.expect_call(
+                    &callee.to_h160(),
+                    &data,
+                    Some(msgValue.to_u256()),
+                    count,
+                    ExpectedCallType::Count,
+                );
             }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
@@ -746,7 +905,54 @@ impl CheatcodeTracer {
 
         self.return_data = Some(data);
     }
+
+    /// Adds an expectCall to the tracker.
+    #[allow(clippy::too_many_arguments)]
+    fn expect_call(
+        &mut self,
+        callee: &H160,
+        calldata: &Vec<u8>,
+        value: Option<U256>,
+        count: u64,
+        call_type: ExpectedCallType,
+    ) {
+        let expecteds = self.expected_calls.entry(*callee).or_default();
+
+        match call_type {
+            ExpectedCallType::Count => {
+                // Get the expected calls for this target.
+                // In this case, as we're using counted expectCalls, we should not be able to set
+                // them more than once.
+                assert!(
+                    !expecteds.contains_key(calldata),
+                    "counted expected calls can only bet set once"
+                );
+                expecteds
+                    .insert(calldata.to_vec(), (ExpectedCallData { value, count, call_type }, 0));
+            }
+            ExpectedCallType::NonCount => {
+                // Check if the expected calldata exists.
+                // If it does, increment the count by one as we expect to see it one more time.
+                match expecteds.entry(calldata.clone()) {
+                    Entry::Occupied(mut entry) => {
+                        let (expected, _) = entry.get_mut();
+                        // Ensure we're not overwriting a counted expectCall.
+                        assert!(
+                            expected.call_type == ExpectedCallType::NonCount,
+                            "cannot overwrite a counted expectCall with a non-counted expectCall"
+                        );
+                        expected.count += 1;
+                    }
+                    // If it does not exist, then create it.
+                    Entry::Vacant(entry) => {
+                        entry.insert((ExpectedCallData { value, count, call_type }, 0));
+                    }
+                }
+            }
+        }
+    }
 }
+
 fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> {
     events
         .iter()
@@ -758,4 +964,15 @@ fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> 
             }
         })
         .collect()
+}
+
+fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMemory<H>) -> Vec<u8> {
+    let ptr = state.vm_local_state.registers[CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
+    assert!(ptr.is_pointer);
+    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+    memory.read_unaligned_bytes(
+        fat_data_pointer.memory_page as usize,
+        fat_data_pointer.start as usize,
+        fat_data_pointer.length as usize,
+    )
 }
