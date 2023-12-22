@@ -330,7 +330,7 @@ where
                         .collect()
                 });
 
-            let account_code = era_db.fetch_account_code(*account, &modified_keys, &bytecodes);
+            let account_code = era_db.fetch_account_code(*account, modified_keys, &bytecodes);
 
             let (code_hash, code) = account_code
                 .map(|(hash, bytecode)| (B256::from(&hash.0), Some(bytecode)))
