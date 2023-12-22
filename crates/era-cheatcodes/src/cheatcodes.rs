@@ -156,6 +156,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
+        let current = state.vm_local_state.callstack.get_current_stack();
         // in `handle_action`, when true is returned the current action will
         // be kept in the queue
         let handle_recurring_action = |action: &FinishCycleRecurringAction| match action {
@@ -164,12 +165,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 depth,
                 prev_exception_handler_pc: exception_handler,
                 prev_continue_pc: continue_pc,
-            } if state.vm_local_state.callstack.depth() < *depth => {
+            } /* if state.vm_local_state.callstack.depth() < *depth */ => {
                 let callstack_depth = state.vm_local_state.callstack.depth();
                 tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
 
                 match data.opcode.variant.opcode {
-                    Opcode::Ret(op) => {
+                    Opcode::Ret(op @ RetOpcode::Revert) => {
                         let (Some(exception_handler), Some(continue_pc)) =
                             (*exception_handler, *continue_pc)
                         else {
@@ -177,6 +178,18 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             return false
                         };
 
+                        let current_continue_pc = {
+                            let current = state.vm_local_state.callstack.current;
+                            let is_to_label = data.opcode.variant.flags
+                                [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
+                                current.is_local_frame;
+
+                            if is_to_label {
+                                data.opcode.imm_0
+                            } else {
+                                current.pc
+                            }
+                        };
                         self.one_time_actions.push(
                             Self::handle_except_revert(reason.as_ref(), op, &state, memory)
                                 .map(|_| FinishCycleOneTimeActions::ForceReturn {
@@ -192,6 +205,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         );
                         false
                     }
+                    Opcode::Ret(RetOpcode::Ok) => true, //TODO: reintegrate with above
                     _ => true,
                 }
             }
@@ -214,7 +228,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             self.recurring_actions.push(action.action.clone());
             false
         };
-        self.delayed_actions.retain_mut(process_delayed_action);
+        //skip delayed actions if a cheatcode is invoked
+        if current.code_address != CHEATCODE_ADDRESS {
+            self.delayed_actions.retain_mut(process_delayed_action);
+        }
 
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -236,7 +253,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }
 
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let current = state.vm_local_state.callstack.current;
             if current.code_address != CHEATCODE_ADDRESS {
                 return
             }
