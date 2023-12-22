@@ -142,10 +142,6 @@ type ExpectedCallsTracker = HashMap<H160, HashMap<Vec<u8>, (ExpectedCallData, u6
 struct ExpectedCallData {
     /// The expected value sent in the call
     value: Option<U256>,
-    /// The expected gas supplied to the call
-    gas: Option<u64>,
-    /// The expected *minimum* gas supplied to the call
-    min_gas: Option<u64>,
     /// The number of times the call is expected to be made.
     /// If the type of call is `NonCount`, this is the lower bound for the number of calls
     /// that must be seen.
@@ -220,12 +216,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             .value
                             .map_or(true, |value|{
                                  value == current.context_u128_value.into()})
-                    // TODO: uncomment when gas is implemented
-                    //&&
-                    // // The gas matches, if provided
-                    // expected.gas.map_or(true, |gas| gas == calldata.gas_limit) &&
-                    // // The minimum gas matches, if provided
-                    // expected.min_gas.map_or(true, |min_gas| min_gas <= calldata.gas_limit)
                     {
                         *actual_count += 1;
                     }
@@ -436,27 +426,11 @@ impl CheatcodeTracer {
             }
             expectCall_0(expectCall_0Call { callee, data }) => {
                 tracing::info!("👷 Setting expected call to {callee:?}");
-                self.expect_call(
-                    &callee.to_h160(),
-                    &data,
-                    None,
-                    None,
-                    None,
-                    1,
-                    ExpectedCallType::NonCount,
-                );
+                self.expect_call(&callee.to_h160(), &data, None, 1, ExpectedCallType::NonCount);
             }
             expectCall_1(expectCall_1Call { callee, data, count }) => {
                 tracing::info!("👷 Setting expected call to {callee:?} with count {count}");
-                self.expect_call(
-                    &callee.to_h160(),
-                    &data,
-                    None,
-                    None,
-                    None,
-                    count,
-                    ExpectedCallType::Count,
-                );
+                self.expect_call(&callee.to_h160(), &data, None, count, ExpectedCallType::Count);
             }
             expectCall_2(expectCall_2Call { callee, msgValue, data }) => {
                 tracing::info!("👷 Setting expected call to {callee:?} with value {msgValue}");
@@ -464,8 +438,6 @@ impl CheatcodeTracer {
                     &callee.to_h160(),
                     &data,
                     Some(msgValue.to_u256()),
-                    None,
-                    None,
                     1,
                     ExpectedCallType::NonCount,
                 );
@@ -479,8 +451,6 @@ impl CheatcodeTracer {
                     &callee.to_h160(),
                     &data,
                     Some(msgValue.to_u256()),
-                    None,
-                    None,
                     count,
                     ExpectedCallType::Count,
                 );
@@ -943,8 +913,6 @@ impl CheatcodeTracer {
         callee: &H160,
         calldata: &Vec<u8>,
         value: Option<U256>,
-        gas: Option<u64>,
-        min_gas: Option<u64>,
         count: u64,
         call_type: ExpectedCallType,
     ) {
@@ -959,10 +927,8 @@ impl CheatcodeTracer {
                     !expecteds.contains_key(calldata),
                     "counted expected calls can only bet set once"
                 );
-                expecteds.insert(
-                    calldata.to_vec(),
-                    (ExpectedCallData { value, gas, min_gas, count, call_type }, 0),
-                );
+                expecteds
+                    .insert(calldata.to_vec(), (ExpectedCallData { value, count, call_type }, 0));
             }
             ExpectedCallType::NonCount => {
                 // Check if the expected calldata exists.
@@ -979,10 +945,7 @@ impl CheatcodeTracer {
                     }
                     // If it does not exist, then create it.
                     Entry::Vacant(entry) => {
-                        entry.insert((
-                            ExpectedCallData { value, gas, min_gas, count, call_type },
-                            0,
-                        ));
+                        entry.insert((ExpectedCallData { value, count, call_type }, 0));
                     }
                 }
             }
