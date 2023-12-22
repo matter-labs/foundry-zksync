@@ -1,3 +1,4 @@
+use core::panic;
 use era_test_node::{
     fork::{ForkDetails, ForkStorage},
     node::{

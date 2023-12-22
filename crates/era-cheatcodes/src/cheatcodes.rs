@@ -69,6 +69,7 @@ pub struct CheatcodeTracer {
     one_time_actions: Vec<FinishCycleOneTimeActions>,
     recurring_actions: Vec<FinishCycleRecurringAction>,
     delayed_actions: Vec<DelayedNextStatementAction>,
+    expect_revert: Option<ExpectRevert>,
     permanent_actions: FinishCyclePermanentActions,
     return_data: Option<Vec<U256>>,
     return_ptr: Option<FatPointer>,
@@ -91,6 +92,14 @@ struct DelayedNextStatementAction {
     statements_to_skip_count: usize,
     /// Action to queue when the condition is satisfied
     action: FinishCycleRecurringAction,
+}
+
+#[derive(Debug, Clone)]
+struct ExpectRevert {
+    reason: Option<Vec<u8>>,
+    depth: usize,
+    prev_continue_pc: Option<PcOrImm>,
+    prev_exception_handler_pc: Option<PcOrImm>,
 }
 
 #[derive(Debug, Clone)]
@@ -126,18 +135,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     ) {
         //store the current exception handler in expect revert
         // to be used to force a revert
-        if let Some(FinishCycleRecurringAction::ExpectRevert {
-            prev_exception_handler_pc,
-            prev_continue_pc,
-            ..
-        }) = self.current_expect_revert()
+        if let Some(ExpectRevert { prev_exception_handler_pc, prev_continue_pc, .. }) =
+            self.current_expect_revert()
         {
             if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
                 let current = state.vm_local_state.callstack.current;
                 let is_to_label = data.opcode.variant.flags
                     [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
                     current.is_local_frame;
-                tracing::debug!(%is_to_label, ?current, "storing continuations");
+                // tracing::debug!(%is_to_label, ?current, "storing continuations");
 
                 if is_to_label {
                     prev_continue_pc.replace(data.opcode.imm_0);
@@ -156,65 +162,98 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
-        // in `handle_action`, when true is returned the current action will
-        // be kept in the queue
-        let handle_recurring_action = |action: &FinishCycleRecurringAction| match action {
-            FinishCycleRecurringAction::ExpectRevert {
-                reason,
-                depth,
-                prev_exception_handler_pc: exception_handler,
-                prev_continue_pc: continue_pc,
-            } if state.vm_local_state.callstack.depth() < *depth => {
-                let callstack_depth = state.vm_local_state.callstack.depth();
-                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
+        if let Opcode::FarCall(_call) = &data.opcode.variant.opcode {
+            dbg!(_call);
+            dbg!(state.vm_local_state.callstack.depth());
+            // dbg!(&data);
+        }
+        if let Opcode::NearCall(_call) = &data.opcode.variant.opcode {
+            dbg!(_call);
+            dbg!(state.vm_local_state.callstack.depth());
+            // dbg!(&data);
+        }
 
-                match data.opcode.variant.opcode {
-                    Opcode::Ret(op) => {
-                        let (Some(exception_handler), Some(continue_pc)) =
-                            (*exception_handler, *continue_pc)
-                        else {
-                            tracing::error!("exceptRevert missing stored continuations");
-                            return false
-                        };
-
-                        self.one_time_actions.push(
-                            Self::handle_except_revert(reason.as_ref(), op, &state, memory)
-                                .map(|_| FinishCycleOneTimeActions::ForceReturn {
-                                    //dummy data
-                                    data: // vec![0u8; 8192]
-                                        [0xde, 0xad, 0xbe, 0xef].to_vec(),
-                                    continue_pc,
-                                })
-                                .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
-                                    error,
-                                    exception_handler,
-                                }),
-                        );
-                        false
-                    }
-                    _ => true,
+        if let Opcode::Ret(op) = &data.opcode.variant.opcode {
+            dbg!(op);
+            dbg!(state.vm_local_state.callstack.depth());
+            if op == &zkevm_opcode_defs::RetOpcode::Revert {
+                dbg!(&data);
+                if let Some(ExpectRevert {
+                    reason,
+                    depth,
+                    prev_continue_pc,
+                    prev_exception_handler_pc,
+                }) = &self.expect_revert
+                {
+                    dbg!(&prev_exception_handler_pc);
+                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                        error: reason.clone().unwrap_or_default(),
+                        exception_handler: prev_continue_pc.unwrap_or_default(),
+                    });
                 }
             }
-            _ => true,
-        };
-        self.recurring_actions.retain(handle_recurring_action);
+        }
 
-        // process delayed actions after to avoid new recurring actions to be
-        // executed immediately (thus nullifying the delay)
-        let process_delayed_action = |action: &mut DelayedNextStatementAction| {
-            if state.vm_local_state.callstack.depth() != action.target_depth {
-                return true
-            }
-            if action.statements_to_skip_count != 0 {
-                action.statements_to_skip_count -= 1;
-                return true
-            }
+        // // in `handle_action`, when true is returned the current action will
+        // // be kept in the queue
+        // let handle_recurring_action = |action: &FinishCycleRecurringAction| match action {
+        //     FinishCycleRecurringAction::ExpectRevert {
+        //         reason,
+        //         depth,
+        //         prev_exception_handler_pc: exception_handler,
+        //         prev_continue_pc: continue_pc,
+        //     } if state.vm_local_state.callstack.depth() < *depth => {
+        //         let callstack_depth = state.vm_local_state.callstack.depth();
+        //         tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode =
+        // ?data.opcode.variant.opcode, "expectRevert");
 
-            tracing::debug!(?action, "delay completed");
-            self.recurring_actions.push(action.action.clone());
-            false
-        };
-        self.delayed_actions.retain_mut(process_delayed_action);
+        //         match data.opcode.variant.opcode {
+        //             Opcode::Ret(op) => {
+        //                 let (Some(exception_handler), Some(continue_pc)) =
+        //                     (*exception_handler, *continue_pc)
+        //                 else {
+        //                     tracing::error!("exceptRevert missing stored continuations");
+        //                     return false
+        //                 };
+
+        //                 self.one_time_actions.push(
+        //                     Self::handle_except_revert(reason.as_ref(), op, &state, memory)
+        //                         .map(|_| FinishCycleOneTimeActions::ForceReturn {
+        //                             //dummy data
+        //                             data: // vec![0u8; 8192]
+        //                                 [0xde, 0xad, 0xbe, 0xef].to_vec(),
+        //                             continue_pc,
+        //                         })
+        //                         .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
+        //                             error,
+        //                             exception_handler,
+        //                         }),
+        //                 );
+        //                 false
+        //             }
+        //             _ => true,
+        //         }
+        //     }
+        //     _ => true,
+        // };
+        // self.recurring_actions.retain(handle_recurring_action);
+
+        // // process delayed actions after to avoid new recurring actions to be
+        // // executed immediately (thus nullifying the delay)
+        // let process_delayed_action = |action: &mut DelayedNextStatementAction| {
+        //     if state.vm_local_state.callstack.depth() != action.target_depth {
+        //         return true
+        //     }
+        //     if action.statements_to_skip_count != 0 {
+        //         action.statements_to_skip_count -= 1;
+        //         return true
+        //     }
+
+        //     // tracing::debug!(?action, "delay completed");
+        //     self.recurring_actions.push(action.action.clone());
+        //     false
+        // };
+        // self.delayed_actions.retain_mut(process_delayed_action);
 
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -313,7 +352,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &mut state.memory,
                     );
 
-                    self.is_triggered_this_cycle = false;
+                    // self.is_triggered_this_cycle = false;
 
                     //change current stack pc to label
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
@@ -339,11 +378,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &mut state.local_state,
                         &mut state.memory,
                     );
+                    self.expect_revert = None;
 
-                    self.is_triggered_this_cycle = false;
+                    // self.is_triggered_this_cycle = false;
                     //change current stack pc to exception handler
+                    println!("Set pc to: {:?}", pc);
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
-                    state.local_state.pending_exception = true;
+                    state.local_state.pending_exception = false;
 
                     // return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
                     //     Halt::Unknown(VmRevertReason::from(error.as_slice())),
@@ -383,6 +424,7 @@ impl CheatcodeTracer {
             return_data: None,
             return_ptr: None,
             serialized_objects: HashMap::new(),
+            expect_revert: None,
         }
     }
 
@@ -721,35 +763,44 @@ impl CheatcodeTracer {
         );
     }
 
-    fn current_expect_revert(&mut self) -> Option<&mut FinishCycleRecurringAction> {
-        let delayed_expect_revert = self
-            .delayed_actions
-            .iter_mut()
-            .find(|action| matches!(action.action, FinishCycleRecurringAction::ExpectRevert { .. }))
-            .map(|act| &mut act.action);
+    fn current_expect_revert(&mut self) -> Option<&mut ExpectRevert> {
+        self.expect_revert.as_mut()
+        // let delayed_expect_revert: Option<&mut FinishCycleRecurringAction> = self
+        //     .delayed_actions
+        //     .iter_mut()
+        //     .find(|action| matches!(action.action, FinishCycleRecurringAction::ExpectRevert { ..
+        // }))     .map(|act| &mut act.action);
 
-        delayed_expect_revert.or_else(|| {
-            self.recurring_actions
-                .iter_mut()
-                .find(|act| matches!(act, FinishCycleRecurringAction::ExpectRevert { .. }))
-        })
+        // delayed_expect_revert.or_else(|| {
+        //     self.recurring_actions
+        //         .iter_mut()
+        //         .find(|act| matches!(act, FinishCycleRecurringAction::ExpectRevert { .. }))
+        // })
     }
 
     fn add_except_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
         //TODO: check if an expect revert is already set
 
-        //-2: possibly for EfficientCall.call EfficientCall.rawCall ? not confirmed
-        let action = FinishCycleRecurringAction::ExpectRevert {
+        self.expect_revert = Some(ExpectRevert {
             reason,
-            depth: depth - 2,
+            depth,
+            prev_continue_pc: None,
             prev_exception_handler_pc: None,
-        };
-        let delay = DelayedNextStatementAction {
-            target_depth: depth - 2,
-            statements_to_skip_count: 0,
-            action,
-        };
-        self.delayed_actions.push(delay);
+        });
+
+        //-2: possibly for EfficientCall.call EfficientCall.rawCall ? not confirmed
+        // let action = FinishCycleRecurringAction::ExpectRevert {
+        //     reason,
+        //     depth: depth - 1,
+        //     prev_exception_handler_pc: None,
+        //     prev_continue_pc: None,
+        // };
+        // let delay = DelayedNextStatementAction {
+        //     target_depth: depth - 1,
+        //     statements_to_skip_count: 0,
+        //     action,
+        // };
+        // self.delayed_actions.push(delay);
     }
 
     fn handle_except_revert<H: HistoryMode>(
