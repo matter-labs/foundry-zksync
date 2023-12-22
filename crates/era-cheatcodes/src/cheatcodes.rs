@@ -485,18 +485,6 @@ impl CheatcodeTracer {
                     ExpectedCallType::Count,
                 );
             }
-            expectCall_4(_) => {
-                unimplemented!()
-            }
-            expectCall_5(_) => {
-                unimplemented!()
-            }
-            expectCallMinGas_0(_) => {
-                unimplemented!()
-            }
-            expectCallMinGas_1(_) => {
-                unimplemented!()
-            }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
