@@ -39,7 +39,6 @@ pub struct RevmDatabaseForEra<DB> {
 impl<Db> Clone for RevmDatabaseForEra<Db> {
     fn clone(&self) -> Self {
         Self { db: self.db.clone(), current_block: self.current_block }
-        // Self { db: self.db.clone(), env: self.env.clone(), current_block: self.current_block }
     }
 }
 
@@ -47,7 +46,6 @@ impl<DB> Debug for RevmDatabaseForEra<DB> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RevmDatabaseForEra")
             .field("db", &"db")
-            // .field("env", &self.env.lock().unwrap())
             .field("current_block", &self.current_block)
             .finish()
     }
@@ -71,7 +69,6 @@ where
             u64::from_be_bytes(num)
         };
 
-        // Self { db, env, current_block }
         Self { db, current_block }
     }
 
