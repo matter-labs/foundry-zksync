@@ -159,7 +159,7 @@ alloy-rlp = "0.3.3"
 solang-parser = "=0.3.3"
 
 ## zksync 
-era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , branch = "deniallugo-move-storage-view"}
+era_test_node = { git="https://github.com/Moonsong-Labs/era-test-node.git" , branch = "nish-deniallugo-move-storage-view"}
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
 zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
@@ -175,6 +175,7 @@ eyre = "0.6"
 hex = { package = "const-hex", version = "1.6", features = ["hex"] }
 itertools = "0.11"
 jsonpath_lib = "0.3"
+maplit = "1"
 pretty_assertions = "1.4"
 protobuf = "=3.2.0"
 rand = "0.8"

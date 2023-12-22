@@ -14,7 +14,6 @@ use revm::{
     Database, Inspector, JournaledState,
 };
 use std::{borrow::Cow, collections::HashMap};
-use zksync_types::{StorageKey, StorageValue};
 
 use crate::era_revm::db::RevmDatabaseForEra;
 use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
@@ -66,9 +65,8 @@ impl<'a> FuzzBackendWrapper<'a> {
     {
         self.is_initialized = false;
 
-        let keys = self.backend.modified_storage_keys.clone();
         let result: Result<ResultAndState, EVMError<DatabaseError>> =
-            crate::era_revm::transactions::run_era_transaction(env, self, inspector, keys);
+            crate::era_revm::transactions::run_era_transaction(env, self, inspector);
 
         Ok(result.unwrap())
     }
@@ -222,10 +220,6 @@ impl<'a> DatabaseExt for FuzzBackendWrapper<'a> {
 
     fn has_cheatcode_access(&self, account: Address) -> bool {
         self.backend.has_cheatcode_access(account)
-    }
-
-    fn set_modified_keys(&mut self, keys: HashMap<StorageKey, StorageValue>) {
-        self.backend.to_mut().set_modified_keys(keys)
     }
 }
 

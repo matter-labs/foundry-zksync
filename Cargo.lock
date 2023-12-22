@@ -3298,7 +3298,7 @@ dependencies = [
 [[package]]
 name = "era_test_node"
 version = "0.1.0-alpha.12"
-source = "git+https://github.com/matter-labs/era-test-node.git?branch=deniallugo-move-storage-view#f06f6729990ba707fb95caafaed45a0a280bec53"
+source = "git+https://github.com/Moonsong-Labs/era-test-node.git?branch=nish-deniallugo-move-storage-view#2934a9c0f60fac4588f235986865136ccea7431e"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -4430,6 +4430,7 @@ dependencies = [
  "foundry-macros",
  "futures 0.3.29",
  "itertools 0.11.0",
+ "maplit",
  "multivm",
  "once_cell",
  "parking_lot 0.12.1",

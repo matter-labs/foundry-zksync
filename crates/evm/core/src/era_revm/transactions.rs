@@ -128,28 +128,30 @@ pub enum DatabaseError {
     MissingCode(bool),
 }
 
-pub fn run_era_transaction<DB, E, INSP>(
-    env: &mut Env,
-    db: DB,
-    inspector: INSP,
-    modified_storage: HashMap<StorageKey, StorageValue>,
-) -> EVMResult<E>
+pub struct EraTransactionResult {
+    pub evm_result: ResultAndState,
+    pub modified_storage_keys: HashMap<StorageKey, StorageValue>,
+}
+
+pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, inspector: INSP) -> EVMResult<E>
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
     INSP: ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>,
 {
-    let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
-    let era_db = RevmDatabaseForEra {
-        db: Arc::new(Mutex::new(Box::new(db))),
-        env: Arc::new(Mutex::new(env.clone())),
-    };
-
+    let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
+    let (num, ts) = era_db.get_l2_block_number_and_timestamp();
+    let l1_num = num;
     let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
-    debug!("Starting ERA transaction: block={:?} timestamp={:?} nonce={:?}", num, ts, nonce);
+
+    info!(
+        "Starting ERA transaction: block={:?} timestamp={:?} nonce={:?} | l1_block={}",
+        num, ts, nonce, l1_num
+    );
 
     // Update the environment timestamp and block number.
     // Check if this should be done at the end?
+    // In general, we do not rely on env as it's consistently maintained in foundry
     env.block.number = env.block.number.saturating_add(rU256::from(1));
     env.block.timestamp = env.block.timestamp.saturating_add(rU256::from(1));
 
@@ -163,7 +165,7 @@ where
     let fork_details = ForkDetails {
         fork_source: era_db.clone(),
         // It will be set properly later
-        l1_block: L1BatchNumber(num as u32),
+        l1_block: L1BatchNumber(l1_num as u32),
         l2_block: Block::default(),
         l2_miniblock: num,
         l2_miniblock_hash: Default::default(),
@@ -196,7 +198,6 @@ where
             l2_tx,
             multivm::interface::TxExecutionMode::VerifyExecute,
             vec![tracer],
-            modified_storage,
             false,
         )
         .unwrap();
@@ -257,9 +258,10 @@ where
         }
     };
 
-    let state = storage_to_state(modified_keys.clone(), bytecodes, era_db.clone());
-    era_db.db.lock().unwrap().set_modified_keys(modified_keys);
-    Ok(ResultAndState { result: execution_result, state })
+    Ok(ResultAndState {
+        result: execution_result,
+        state: storage_to_state(&era_db, &modified_keys, bytecodes),
+    })
 }
 
 fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
@@ -270,10 +272,11 @@ fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
         .unwrap_or_default()
 }
 
+/// Converts the zksync era's modified keys to the revm state.
 pub fn storage_to_state<DB>(
-    modified_keys: HashMap<StorageKey, StorageValue>,
+    era_db: &RevmDatabaseForEra<DB>,
+    modified_keys: &HashMap<StorageKey, StorageValue>,
     bytecodes: HashMap<U256, Vec<U256>>,
-    era_db: RevmDatabaseForEra<DB>,
 ) -> rHashMap<Address, Account>
 where
     DB: DatabaseExt + Send,
@@ -393,13 +396,8 @@ mod tests {
         };
         let mock_db = MockDatabase::default();
 
-        let res = run_era_transaction::<_, ResultAndState, _>(
-            &mut env,
-            mock_db,
-            Noop::default(),
-            Default::default(),
-        )
-        .expect("failed executing");
+        let res = run_era_transaction::<_, ResultAndState, _>(&mut env, mock_db, Noop::default())
+            .expect("failed executing");
 
         assert!(!res.state.is_empty(), "unexpected failure: no states were touched");
         for (address, account) in res.state {

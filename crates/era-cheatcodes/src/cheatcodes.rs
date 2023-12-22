@@ -275,14 +275,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             .collect();
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state =
-                            storage_to_state(modified_storage.clone(), bytecodes, era_db.clone());
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
                         *journaled_state.state() = state;
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
                         let mut env = into_revm_env(era_env);
-                        let res = db.create_select_fork(
+                        db.create_select_fork(
                             create_fork_request(
                                 era_env,
                                 self.config.clone(),
@@ -291,11 +290,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             ),
                             &mut env,
                             &mut journaled_state,
-                        );
-                        drop(db);
-                        let mut db_env = era_db.env.lock().unwrap();
-                        *db_env = env;
-                        res
+                        )
                     };
                     storage.borrow_mut().modified_storage_keys = modified_storage;
 
@@ -339,8 +334,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             .collect();
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state =
-                            storage_to_state(modified_storage.clone(), bytecodes, era_db.clone());
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
                         *journaled_state.state() = state;
 
                         let mut db = era_db.db.lock().unwrap();
@@ -352,9 +346,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             &mut journaled_state,
                         )
                         .unwrap();
-                        drop(db);
-                        let mut db_env = era_db.env.lock().unwrap();
-                        *db_env = env;
                     }
                     storage.borrow_mut().modified_storage_keys = modified_storage;
 
