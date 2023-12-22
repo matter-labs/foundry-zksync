@@ -33,7 +33,6 @@ use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
 #[derive(Default)]
 pub struct RevmDatabaseForEra<DB> {
     pub db: Arc<Mutex<Box<DB>>>,
-    // pub env: Arc<Mutex<Env>>,
     current_block: u64,
 }
 
