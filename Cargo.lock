@@ -3297,8 +3297,8 @@ dependencies = [
 
 [[package]]
 name = "era_test_node"
-version = "0.1.0-alpha.12"
-source = "git+https://github.com/Moonsong-Labs/era-test-node.git?branch=nish-deniallugo-move-storage-view#2934a9c0f60fac4588f235986865136ccea7431e"
+version = "0.1.0-alpha.14"
+source = "git+https://github.com/Moonsong-Labs/era-test-node.git?branch=nish-deniallugo-move-storage-view#79088a735d383969160abbd27d698548dcc7d64f"
 dependencies = [
  "anyhow",
  "bigdecimal",
