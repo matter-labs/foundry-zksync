@@ -32,6 +32,5 @@ contract StoreTest is Test {
         require(success, "store failed");
         assertEq(store.slot0(), 1, "store failed");
         assertEq(store.slot1(), 20, "store failed");
-        console.log("failed?", failed());
     }
 }

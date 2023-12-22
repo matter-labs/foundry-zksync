@@ -25,6 +25,5 @@ contract CheatcodeDealTest is Test {
         require(balanceAfter == NEW_BALANCE, "balance mismatch");
         require(balanceAfter != balanceBefore, "balance unchanged");
         require(success, "deal failed");
-        console.log("failed?", failed());
     }
 }

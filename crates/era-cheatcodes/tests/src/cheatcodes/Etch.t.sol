@@ -23,6 +23,5 @@ contract CheatcodeEtchTest is Test {
             abi.encodeWithSignature("setGreeting(string)", "hello world")
         );
         require(success, "setGreeting failed");
-        console.log("failed?", failed());
     }
 }
