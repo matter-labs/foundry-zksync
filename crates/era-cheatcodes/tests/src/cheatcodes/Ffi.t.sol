@@ -25,8 +25,6 @@ contract FfiTest is Test {
             keccak256(bytes(output)) == keccak256(bytes("ffi works")),
             "ffi failed"
         );
-
-        console.log("failed?", failed());
     }
 
     function testFfiString() public {

@@ -1,14 +1,25 @@
 use crate::utils::{ToH160, ToH256, ToU256};
 use alloy_sol_types::{SolInterface, SolValue};
-use era_test_node::{fork::ForkStorage, utils::bytecode_to_factory_dep};
+use era_test_node::{
+    deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
+};
 use ethers::utils::to_checksum;
+use foundry_cheatcodes::CheatsConfig;
 use foundry_cheatcodes_spec::Vm;
-use foundry_evm_core::{backend::DatabaseExt, era_revm::db::RevmDatabaseForEra};
+use foundry_evm_core::{
+    backend::DatabaseExt,
+    era_revm::{db::RevmDatabaseForEra, transactions::storage_to_state},
+    fork::CreateFork,
+    opts::EvmOpts,
+};
 use itertools::Itertools;
 use multivm::{
-    interface::{dyn_tracers::vm_1_3_3::DynTracer, tracer::TracerExecutionStatus},
-    vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
-    zk_evm_1_3_3::{
+    interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus},
+    vm_latest::{
+        BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
+    },
+    zk_evm_1_4_0::{
+        reference_impls::event_sink::EventMessage,
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::PrimitiveValue,
         zkevm_opcode_defs::{
@@ -17,21 +28,26 @@ use multivm::{
         },
     },
 };
+use revm::{
+    primitives::{BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
+    JournaledState,
+};
 use serde::Serialize;
 use std::{
-    cell::RefMut,
+    cell::{OnceCell, RefMut},
     collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Debug,
     fs,
     process::Command,
+    sync::Arc,
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
-use zksync_state::{ReadStorage, StoragePtr, StorageView, WriteStorage};
+use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    EventMessage, LogQuery, StorageKey, Timestamp,
+    LogQuery, StorageKey, Timestamp,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
@@ -69,6 +85,12 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     H160::zero(),
 ];
 
+#[derive(Debug, Clone)]
+struct EraEnv {
+    l1_batch_env: L1BatchEnv,
+    system_env: SystemEnv,
+}
+
 /// Represents the state of a foundry test function, i.e. functions
 /// prefixed with "testXXX"
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -90,6 +112,8 @@ pub struct CheatcodeTracer {
     return_ptr: Option<FatPointer>,
     near_calls: usize,
     serialized_objects: HashMap<String, String>,
+    env: OnceCell<EraEnv>,
+    config: Arc<CheatsConfig>,
     recorded_logs: HashSet<LogEntry>,
     recording_logs: bool,
     recording_timestamp: u32,
@@ -114,6 +138,9 @@ impl LogEntry {
 enum FinishCycleOneTimeActions {
     StorageWrite { key: StorageKey, read_value: H256, write_value: H256 },
     StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
+    CreateSelectFork { url_or_alias: String, block_number: Option<u64> },
+    CreateFork { url_or_alias: String, block_number: Option<u64> },
+    SelectFork { fork_id: U256 },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -251,7 +278,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 tracing::error!("cheatcode triggered, but no calldata or ergs available");
                 return
             }
-            tracing::info!("near call: cheatcode triggered");
+            tracing::info!("far call: cheatcode triggered");
             let calldata = get_calldata(&state, memory);
 
             // try to dispatch the cheatcode
@@ -268,10 +295,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 }
 
 impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeTracer {
+    fn initialize_tracer(
+        &mut self,
+        _state: &mut ZkSyncVmState<EraDb<S>, H>,
+        l1_batch_env: &L1BatchEnv,
+        system_env: &SystemEnv,
+    ) {
+        self.env
+            .set(EraEnv { l1_batch_env: l1_batch_env.clone(), system_env: system_env.clone() })
+            .unwrap();
+    }
+
     fn finish_cycle(
         &mut self,
         state: &mut ZkSyncVmState<EraDb<S>, H>,
-        _bootloader_state: &mut BootloaderState,
+        bootloader_state: &mut BootloaderState,
+        storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
         let emitter = state.local_state.callstack.current.this_address;
         if self.recording_logs {
@@ -310,6 +349,104 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
+                FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .borrow_mut()
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+                    storage.borrow_mut().clean_cache();
+                    let fork_id = {
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                            &storage.borrow_mut().storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        db.create_select_fork(
+                            create_fork_request(
+                                era_env,
+                                self.config.clone(),
+                                block_number,
+                                &url_or_alias,
+                            ),
+                            &mut env,
+                            &mut journaled_state,
+                        )
+                    };
+                    storage.borrow_mut().modified_storage_keys = modified_storage;
+
+                    self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                }
+                FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
+                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                        &storage.borrow_mut().storage_handle;
+                    let era_db =
+                        handle.inner.write().unwrap().fork.as_ref().unwrap().fork_source.clone();
+
+                    let mut db = era_db.db.lock().unwrap();
+                    let era_env = self.env.get().unwrap();
+                    let fork_id = db.create_fork(create_fork_request(
+                        era_env,
+                        self.config.clone(),
+                        block_number,
+                        &url_or_alias,
+                    ));
+                    self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                }
+                FinishCycleOneTimeActions::SelectFork { fork_id } => {
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .borrow_mut()
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+                    {
+                        storage.borrow_mut().clean_cache();
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                            &storage.borrow_mut().storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        db.select_fork(
+                            rU256::from(fork_id.as_u128()),
+                            &mut env,
+                            &mut journaled_state,
+                        )
+                        .unwrap();
+                    }
+                    storage.borrow_mut().modified_storage_keys = modified_storage;
+
+                    self.return_data = Some(vec![fork_id]);
+                }
             }
         }
 
@@ -341,8 +478,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 }
 
 impl CheatcodeTracer {
-    pub fn new() -> Self {
-        CheatcodeTracer::default()
+    pub fn new(cheatcodes_config: Arc<CheatsConfig>) -> Self {
+        Self { config: cheatcodes_config, ..Default::default() }
     }
 
     /// Resets the test state to [TestStatus::NotStarted]
@@ -821,6 +958,48 @@ impl CheatcodeTracer {
                     &mut storage,
                 );
             }
+            createSelectFork_0(createSelectFork_0Call { urlOrAlias }) => {
+                tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
+
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: None,
+                });
+            }
+            createSelectFork_1(createSelectFork_1Call { urlOrAlias, blockNumber }) => {
+                let block_number = blockNumber.to_u256().as_u64();
+                tracing::info!(
+                    "👷 Creating and selecting fork {} for block number {}",
+                    urlOrAlias,
+                    block_number
+                );
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: Some(block_number),
+                });
+            }
+            createFork_0(createFork_0Call { urlOrAlias }) => {
+                tracing::info!("👷 Creating fork {}", urlOrAlias,);
+
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: None,
+                });
+            }
+            createFork_1(createFork_1Call { urlOrAlias, blockNumber }) => {
+                let block_number = blockNumber.to_u256().as_u64();
+                tracing::info!("👷 Creating fork {} for block number {}", urlOrAlias, block_number);
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: Some(block_number),
+                });
+            }
+            selectFork(selectForkCall { forkId }) => {
+                tracing::info!("👷 Selecting fork {}", forkId);
+
+                self.one_time_actions
+                    .push(FinishCycleOneTimeActions::SelectFork { fork_id: forkId.to_u256() });
+            }
             writeFile(writeFileCall { path, data }) => {
                 tracing::info!("👷 Writing data to file in path {}", path);
                 if fs::write(path, data).is_err() {
@@ -964,6 +1143,58 @@ fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> 
             }
         })
         .collect()
+}
+
+fn into_revm_env(env: &EraEnv) -> Env {
+    use foundry_common::zk_utils::conversion_utils::h160_to_address;
+    use revm::primitives::U256;
+    let block = BlockEnv {
+        number: U256::from(env.l1_batch_env.first_l2_block.number),
+        coinbase: h160_to_address(env.l1_batch_env.fee_account),
+        timestamp: U256::from(env.l1_batch_env.first_l2_block.timestamp),
+        gas_limit: U256::from(env.system_env.gas_limit),
+        basefee: U256::from(env.l1_batch_env.base_fee()),
+        ..Default::default()
+    };
+
+    let mut cfg = CfgEnv::default();
+    cfg.chain_id = env.system_env.chain_id.as_u64();
+
+    Env { block, cfg, ..Default::default() }
+}
+
+fn create_fork_request(
+    env: &EraEnv,
+    config: Arc<CheatsConfig>,
+    block_number: Option<u64>,
+    url_or_alias: &str,
+) -> CreateFork {
+    use foundry_evm_core::opts::Env;
+    use revm::primitives::Address as revmAddress;
+
+    let url = config.rpc_url(url_or_alias).unwrap();
+    let env = into_revm_env(env);
+    let opts_env = Env {
+        gas_limit: u64::MAX,
+        chain_id: None,
+        tx_origin: revmAddress::ZERO,
+        block_number: 0,
+        block_timestamp: 0,
+        ..Default::default()
+    };
+    let evm_opts = EvmOpts {
+        env: opts_env,
+        fork_url: Some(url.clone()),
+        fork_block_number: block_number,
+        ..Default::default()
+    };
+
+    CreateFork {
+        enable_caching: config.rpc_storage_caching.enable_for_endpoint(&url),
+        url,
+        env,
+        evm_opts,
+    }
 }
 
 fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMemory<H>) -> Vec<u8> {

@@ -41,8 +41,6 @@ contract CheatcodeReadCallers is Test {
         require(mode == 4, "recurrent prank call mode");
         require(sender == TEST_ADDRESS, "sender overridden");
         require(origin == tx.origin, "origin not overridden");
-
-        console.log("failed?", failed());
     }
 
     function testFullyPrankedReadCallers() public {
@@ -60,7 +58,5 @@ contract CheatcodeReadCallers is Test {
         require(mode == 4, "recurrent prank call mode");
         require(sender == TEST_ADDRESS, "sender overridden");
         require(origin == TEST_ORIGIN, "origin overridden");
-
-        console.log("failed?", failed());
     }
 }

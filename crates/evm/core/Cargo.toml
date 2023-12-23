@@ -40,7 +40,6 @@ zksync_types.workspace = true
 era_test_node.workspace = true
 zksync_utils.workspace = true
 zksync_web3_decl.workspace = true
-zksync_state.workspace = true
 
 derive_more.workspace = true
 eyre = "0.6"
@@ -56,6 +55,8 @@ tokio = { version = "1", features = ["time", "macros"] }
 tracing = "0.1"
 url = "2"
 auto_impl = "1"
+async-trait = "0.1"
 
 [dev-dependencies]
-maplit = "1"
+zksync_state.workspace = true
+maplit.workspace = true

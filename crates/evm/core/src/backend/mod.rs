@@ -12,6 +12,7 @@ use ethers_core::{
     utils::GenesisAccount,
 };
 use foundry_common::{
+    conversion_utils::h160_to_address,
     is_known_system_sender,
     types::{ToAlloy, ToEthers},
     SYSTEM_TRANSACTION_TYPE,
@@ -29,9 +30,8 @@ use revm::{
 use std::collections::{HashMap, HashSet};
 
 use crate::era_revm::db::RevmDatabaseForEra;
-use era_test_node::fork::ForkStorage;
-use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
-use zksync_state::StorageView;
+use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
+use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -1799,6 +1799,8 @@ pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
     }
 
     *active_journaled_state = target_fork.journaled_state.clone();
+
+    target_fork.db.accounts.remove(&h160_to_address(zksync_types::SYSTEM_CONTEXT_ADDRESS));
 }
 
 /// Clones the account data from the `active_journaled_state`  into the `fork_journaled_state`

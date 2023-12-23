@@ -17,6 +17,5 @@ contract CheatcodeSetNonceTest is Test {
             )
         );
         require(success, "setNonce failed");
-        console.log("failed?", failed());
     }
 }

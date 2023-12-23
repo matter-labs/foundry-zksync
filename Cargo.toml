@@ -159,13 +159,13 @@ alloy-rlp = "0.3.3"
 solang-parser = "=0.3.3"
 
 ## zksync 
-era_test_node = { git = "https://github.com/matter-labs/era-test-node.git", rev = "21b48af90a9f9d98ec38cb93a32c119a3266f401" }
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
-multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
-zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "bd268ac02bc3530c1d3247cb9496c3e13c2e52d9" }
+era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "6ee7d29e876b75506f58355218e1ea755a315d17" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
+multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
+zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3c669e7b0caf6515ad865f4cba5ea6fb36c33811" }
 
 ## misc
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
@@ -175,6 +175,7 @@ eyre = "0.6"
 hex = { package = "const-hex", version = "1.6", features = ["hex"] }
 itertools = "0.11"
 jsonpath_lib = "0.3"
+maplit = "1"
 pretty_assertions = "1.4"
 protobuf = "=3.2.0"
 rand = "0.8"

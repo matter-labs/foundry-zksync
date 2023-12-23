@@ -25,7 +25,6 @@ contract CheatcodeSerializeTest is Test {
                 keccak256(bytes("0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a")),
             "serializeAddress mismatch"
         );
-        console.log("failed?", failed());
     }
 
     function testSerializeBool() external {
@@ -44,7 +43,6 @@ contract CheatcodeSerializeTest is Test {
             keccak256(bytes(testString)) == keccak256(bytes("true")),
             "serializeBool mismatch"
         );
-        console.log("failed?", failed());
     }
 
     function testSerializeUint() external {
@@ -63,6 +61,5 @@ contract CheatcodeSerializeTest is Test {
             keccak256(bytes(testString)) == keccak256(bytes("99")),
             "serializeUint mismatch"
         );
-        console.log("failed?", failed());
     }
 }

@@ -732,7 +732,7 @@ contract ExpectCallMixedTest is Test {
         uint256 times
     ) public pure {
         for (uint256 i = 0; i < times; i++) {
-            target.add(1, 2);
+            target.add(a, b);
         }
     }
 
