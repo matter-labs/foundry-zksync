@@ -128,11 +128,6 @@ pub enum DatabaseError {
     MissingCode(bool),
 }
 
-pub struct EraTransactionResult {
-    pub evm_result: ResultAndState,
-    pub modified_storage_keys: HashMap<StorageKey, StorageValue>,
-}
-
 pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, inspector: INSP) -> EVMResult<E>
 where
     DB: DatabaseExt + Send,
@@ -164,7 +159,6 @@ where
 
     let fork_details = ForkDetails {
         fork_source: era_db.clone(),
-        // It will be set properly later
         l1_block: L1BatchNumber(l1_num as u32),
         l2_block: Block::default(),
         l2_miniblock: num,
