@@ -426,6 +426,10 @@ impl CheatcodeTracer {
                 };
                 self.add_trimmed_return_data(&data);
             }
+            prank_0(prank_0Call {msgSender}) => {
+                tracing::info!("👷 Starting pank to {msgSender:?}");
+
+            }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
                 let key = StorageKey::new(
