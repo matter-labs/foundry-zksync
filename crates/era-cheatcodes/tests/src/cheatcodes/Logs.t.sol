@@ -11,7 +11,7 @@ struct Log {
 }
 
 contract LogsTest is Test {
-    event LogTopic1(uint256 indexed topic1, bytes data);
+    event LogTopic1(uint256 indexed topic1, uint256 topic2, bytes data);
 
     function testRecordAndGetLogs() public {
         bytes memory testData1 = "test";
@@ -21,7 +21,7 @@ contract LogsTest is Test {
         );
         require(success, "recordLogs failed");
 
-        emit LogTopic1(1, testData1);
+        emit LogTopic1(2, 1, testData1);
 
         (bool success2, bytes memory rawData) = Constants
             .CHEATCODE_ADDRESS
@@ -29,8 +29,9 @@ contract LogsTest is Test {
         require(success2, "getRecordedLogs failed");
 
         Log[] memory logs = abi.decode(rawData, (Log[]));
-        console.log("logs length: %d", logs.length);
-        require(logs.length == 8, "logs length should be 8");
+        require(logs.length == 1, "logs length should be 1");
+        // the first topic is the hash of the event signature
+        require(logs[0].topics.length == 3, "topics length should be 3");
     }
 
     function trimReturnBytes(

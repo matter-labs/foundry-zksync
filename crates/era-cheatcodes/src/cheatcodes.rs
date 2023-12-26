@@ -119,18 +119,19 @@ pub struct CheatcodeTracer {
     recording_timestamp: u32,
     expected_calls: ExpectedCallsTracker,
     test_status: FoundryTestState,
+    expected_emits: Vec<ExpectedEmit>,
 }
 
 #[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
 struct LogEntry {
-    topic: H256,
+    topics: Vec<H256>,
     data: H256,
     emitter: H160,
 }
 
 impl LogEntry {
-    fn new(topic: H256, data: H256, emitter: H160) -> Self {
-        LogEntry { topic, data, emitter }
+    fn new(topics: Vec<H256>, data: H256, emitter: H160) -> Self {
+        LogEntry { topics, data, emitter }
     }
 }
 
@@ -185,6 +186,25 @@ enum ExpectedCallType {
     NonCount,
     /// The exact number of calls expected.
     Count,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExpectedEmit {
+    /// The depth at which we expect this emit to have occurred
+    pub depth: u64,
+    /// The log we expect
+    pub log: Option<LogEntry>,
+    /// The checks to perform:
+    /// ```text
+    /// ┌───────┬───────┬───────┬────┐
+    /// │topic 1│topic 2│topic 3│data│
+    /// └───────┴───────┴───────┴────┘
+    /// ```
+    pub checks: [bool; 4],
+    /// If present, check originating address against this
+    pub address: Option<H160>,
+    /// Whether the log was actually found in the subcalls
+    pub found: bool,
 }
 
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
@@ -312,14 +332,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         bootloader_state: &mut BootloaderState,
         storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
-        let emitter = state.local_state.callstack.current.this_address;
         if self.recording_logs {
             let logs = transform_to_logs(
                 state
                     .event_sink
                     .get_events_and_l2_l1_logs_after_timestamp(Timestamp(self.recording_timestamp))
                     .0,
-                emitter,
             );
             if !logs.is_empty() {
                 let mut unique_set: HashSet<LogEntry> = HashSet::new();
@@ -329,6 +347,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .extend(logs.into_iter().filter(|log| unique_set.insert(log.clone())));
             }
         }
+
+        // Check if we have any expected emits
+
         while let Some(action) = self.one_time_actions.pop() {
             match action {
                 FinishCycleOneTimeActions::StorageWrite { key, read_value, write_value } => {
@@ -592,6 +613,10 @@ impl CheatcodeTracer {
                     ExpectedCallType::Count,
                 );
             }
+            expectEmit_2(expectEmit_2Call {}) => {
+                tracing::info!("👷 Setting expected emit");
+                self.expect_emit(None, None);
+            }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
@@ -640,8 +665,13 @@ impl CheatcodeTracer {
                 let logs: Vec<Log> = self
                     .recorded_logs
                     .iter()
+                    .filter(|log| log.data != H256::zero())
                     .map(|log| Log {
-                        topics: vec![log.topic.to_fixed_bytes().into()],
+                        topics: log
+                            .topics
+                            .iter()
+                            .map(|topic| topic.to_fixed_bytes().into())
+                            .collect(),
                         data: log.data.to_fixed_bytes().into(),
                         emitter: log.emitter.to_fixed_bytes().into(),
                     })
@@ -1085,6 +1115,10 @@ impl CheatcodeTracer {
         self.return_data = Some(data);
     }
 
+    fn expect_emit(&mut self, topic: Option<H256>, data: Option<H256>) {
+        tracing::info!("👷 Setting expected emit");
+    }
+
     /// Adds an expectCall to the tracker.
     #[allow(clippy::too_many_arguments)]
     fn expect_call(
@@ -1132,17 +1166,39 @@ impl CheatcodeTracer {
     }
 }
 
-fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> {
-    events
-        .iter()
-        .filter_map(|event| {
-            if event.address == zksync_types::EVENT_WRITER_ADDRESS {
-                Some(LogEntry::new(u256_to_h256(event.key), u256_to_h256(event.value), emitter))
+fn transform_to_logs(events: Vec<EventMessage>) -> Vec<LogEntry> {
+    let mut log_entries: Vec<LogEntry> = Vec::new();
+
+    // Skip the first event (is_first: true) and the next event
+    let mut events_iter = events.into_iter().skip_while(|e| e.is_first);
+    let mut topics: Vec<H256> = Vec::new();
+    let mut data = H256::default();
+
+    while let Some(event) = events_iter.next() {
+        // we look for this particular event key or value which indicates that the next element is the data
+        if event.key == "0x00000000000000000000000000000000000000000000000000000000000004".into() ||
+            event.value ==
+                "0x00000000000000000000000000000000000000000000000000000000000004".into()
+        {
+            data = if event.key ==
+                "0x00000000000000000000000000000000000000000000000000000000000004".into()
+            {
+                u256_to_h256(event.value.clone())
             } else {
-                None
-            }
-        })
-        .collect()
+                u256_to_h256(event.key.clone())
+            };
+            break
+        } else {
+            topics.push(u256_to_h256(event.key.clone()));
+            topics.push(u256_to_h256(event.value.clone()));
+        }
+    }
+    if !topics.is_empty() {
+        //remove last element from topics. This is not a real topic. 
+        topics.pop();
+        log_entries.push(LogEntry { topics, data, emitter: zksync_types::EVENT_WRITER_ADDRESS });
+    }
+    log_entries
 }
 
 fn into_revm_env(env: &EraEnv) -> Env {
