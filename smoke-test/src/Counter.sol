@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test, console2 as console} from "forge-std/Test.sol";
 
 contract Counter {
     uint256 public number = 0;
@@ -12,7 +12,7 @@ contract Counter {
     }
 
     function incrementBy(uint8 amount) public {
-        console.log("incrementBy");
+        console.log("incrementBy", amount);
         number += uint256(amount);
     }
 }

@@ -354,6 +354,7 @@ impl<'a> ContractRunner<'a> {
     /// similar to `eth_call`.
     #[instrument(name = "test", skip_all, fields(name = %func.signature(), %should_fail))]
     pub fn run_test(&self, func: &Function, should_fail: bool, setup: TestSetup) -> TestResult {
+        trace!("executing test {:?}", func.name);
         let TestSetup {
             address, mut logs, mut traces, mut labeled_addresses, mut coverage, ..
         } = setup;

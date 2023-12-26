@@ -25,7 +25,7 @@ use zksync_basic_types::{
 use zksync_types::{
     api::{BlockIdVariant, Transaction, TransactionDetails},
     StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-    SYSTEM_CONTEXT_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION,
 };
 
 use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
@@ -55,7 +55,7 @@ impl<DB: Database + Send> RevmDatabaseForEra<DB>
 where
     <DB as revm::Database>::Error: Debug,
 {
-    /// Create a new instance of [RevmDatabaseForEra] caching the current l2 block.
+    /// Create a new instance of [RevmDatabaseForEra].
     pub fn new(db: Arc<Mutex<Box<DB>>>) -> Self {
         let db_inner = db.clone();
         let current_block = {
@@ -86,7 +86,10 @@ where
     /// Returns the current L2 block number and timestamp from the database.
     /// Reads it directly from the SYSTEM_CONTEXT storage.
     pub fn get_l2_block_number_and_timestamp(&self) -> (u64, u64) {
-        let num_and_ts = self.read_storage_internal(SYSTEM_CONTEXT_ADDRESS, U256::from(9));
+        let num_and_ts = self.read_storage_internal(
+            SYSTEM_CONTEXT_ADDRESS,
+            h256_to_u256(SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION),
+        );
         let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
         let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
         let ts: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
@@ -194,6 +197,7 @@ where
                 _ => eyre::bail!("Only fetching most recent block is implemented"),
             }
         }
+
         let mut result = self.read_storage_internal(address, idx);
 
         if L2_ETH_TOKEN_ADDRESS == address && result.is_zero() {

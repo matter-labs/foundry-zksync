@@ -15,6 +15,5 @@ contract AddrTest is Test {
         require(success, "addr failed");
         address addr = abi.decode(data, (address));
         assertEq(addr, expected, "expected address did not match");
-        console.log("failed?", failed());
     }
 }

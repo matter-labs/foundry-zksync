@@ -19,7 +19,6 @@ contract CheatcodeToStringTest is Test {
                 keccak256(bytes("0x413D15117be7a498e68A64FcfdB22C6e2AaE1808")),
             "toString mismatch"
         );
-        console.log("failed?", failed());
     }
 
     function testToStringFromBool() external {
@@ -44,7 +43,6 @@ contract CheatcodeToStringTest is Test {
             keccak256(bytes(testString)) == keccak256(bytes("true")),
             "toString mismatch"
         );
-        console.log("failed?", failed());
     }
 
     function testToStringFromUint256() external {
@@ -60,7 +58,6 @@ contract CheatcodeToStringTest is Test {
             keccak256(bytes(testString)) == keccak256(bytes(stringValue)),
             "toString mismatch"
         );
-        console.log("failed?", failed());
     }
 
     function testToStringFromInt256() external {
@@ -76,7 +73,6 @@ contract CheatcodeToStringTest is Test {
             keccak256(bytes(testString)) == keccak256(bytes(stringValue)),
             "toString mismatch"
         );
-        console.log("failed?", failed());
     }
 
     function testToStringFromBytes32() external {
@@ -96,7 +92,6 @@ contract CheatcodeToStringTest is Test {
                 ),
             "toString mismatch"
         );
-        console.log("failed?", failed());
     }
 
     function testToStringFromBytes() external {
@@ -117,6 +112,5 @@ contract CheatcodeToStringTest is Test {
                 ),
             "toString mismatch"
         );
-        console.log("failed?", failed());
     }
 }

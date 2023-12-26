@@ -64,7 +64,6 @@ contract CheatcodeStartPrankTest is Test {
             "startPrank failed: victim.assertCallerAndOrigin failed"
         );
 
-        console.log("failed?", failed());
     }
 
     function testStartPrankWithOrigin() external {
@@ -126,8 +125,6 @@ contract CheatcodeStartPrankTest is Test {
             original_tx_origin,
             "startPrank failed: victim.assertCallerAndOrigin failed"
         );
-
-        console.log("failed?", failed());
     }
 }
 

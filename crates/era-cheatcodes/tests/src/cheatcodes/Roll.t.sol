@@ -28,6 +28,5 @@ contract CheatcodeRollTest is Test {
             finalBlockNumber == NEW_BLOCK_NUMBER,
             "block number was not changed"
         );
-        console.log("failed?", failed());
     }
 }

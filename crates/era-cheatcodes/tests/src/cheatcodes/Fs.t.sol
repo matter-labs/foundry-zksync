@@ -21,7 +21,6 @@ contract FsTest is Test {
                 keccak256("hello readable world\nthis is the second line!\n"),
             "read data did not match expected data"
         );
-        console.log("failed?", failed());
     }
 
     function testWriteFile() public {
@@ -45,6 +44,5 @@ contract FsTest is Test {
             keccak256(readData) == keccak256(bytes(writeData)),
             "read data did not match write data"
         );
-        console.log("failed?", failed());
     }
 }
