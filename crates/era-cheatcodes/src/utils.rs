@@ -31,3 +31,13 @@ impl ToH160 for Address {
         H160::from_slice(self.as_slice())
     }
 }
+
+pub trait ToUint256_4 {
+    fn to_uint256_4(&self) -> Uint<256, 4>;
+}
+
+impl ToUint256_4 for U256 {
+    fn to_uint256_4(&self) -> Uint<256, 4> {
+        Uint::from_limbs(self.0)
+    }
+}

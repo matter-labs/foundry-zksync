@@ -1,4 +1,4 @@
-use crate::utils::{ToH160, ToH256, ToU256};
+use crate::utils::{ToH160, ToH256, ToU256, ToUint256_4};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
@@ -119,6 +119,12 @@ pub struct CheatcodeTracer {
     recording_timestamp: u32,
     expected_calls: ExpectedCallsTracker,
     test_status: FoundryTestState,
+    saved_snapshots: HashMap<U256, SavedSnapshot>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SavedSnapshot {
+    modified_storage: HashMap<StorageKey, H256>,
 }
 
 #[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
@@ -141,6 +147,8 @@ enum FinishCycleOneTimeActions {
     CreateSelectFork { url_or_alias: String, block_number: Option<u64> },
     CreateFork { url_or_alias: String, block_number: Option<u64> },
     SelectFork { fork_id: U256 },
+    RevertToSnapshot { snapshot_id: U256 },
+    Snapshot,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -447,6 +455,84 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     self.return_data = Some(vec![fork_id]);
                 }
+                FinishCycleOneTimeActions::RevertToSnapshot { snapshot_id } => {
+                    let mut storage = storage.borrow_mut();
+
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+
+                    storage.clean_cache();
+
+                    {
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        db.revert(snapshot_id.to_uint256_4(), &journaled_state, &mut env);
+                    }
+
+                    storage.modified_storage_keys =
+                        self.saved_snapshots.remove(&snapshot_id).unwrap().modified_storage;
+                }
+                FinishCycleOneTimeActions::Snapshot => {
+                    let mut storage = storage.borrow_mut();
+
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+
+                    storage.clean_cache();
+
+                    let snapshot_id = {
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let env = into_revm_env(era_env);
+                        let snapshot_id = db.snapshot(&journaled_state, &env);
+
+                        self.saved_snapshots.insert(
+                            snapshot_id.to_u256(),
+                            SavedSnapshot { modified_storage: modified_storage.clone() },
+                        );
+                        snapshot_id
+                    };
+
+                    storage.modified_storage_keys = modified_storage;
+                    self.return_data = Some(vec![snapshot_id.to_u256()]);
+                }
             }
         }
 
@@ -725,6 +811,12 @@ impl CheatcodeTracer {
                 };
                 self.add_trimmed_return_data(&data);
             }
+            revertTo(revertToCall { snapshotId }) => {
+                tracing::info!("👷 Reverting to snapshot {}", snapshotId);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RevertToSnapshot {
+                    snapshot_id: snapshotId.to_u256(),
+                });
+            }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
                 let key = StorageKey::new(
@@ -833,6 +925,10 @@ impl CheatcodeTracer {
                     new_nonce
                 );
                 self.write_storage(nonce_key, u256_to_h256(enforced_full_nonce), &mut storage);
+            }
+            snapshot(snapshotCall {}) => {
+                tracing::info!("👷 Creating snapshot");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Snapshot);
             }
             startPrank_0(startPrank_0Call { msgSender: msg_sender }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?}");
