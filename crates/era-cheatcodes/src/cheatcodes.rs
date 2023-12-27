@@ -598,8 +598,11 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to run ffi: no args");
                     return
                 };
-                // TODO: set directory to root
-                let Ok(output) = Command::new(first_arg).args(&command_input[1..]).output() else {
+                let Ok(output) = Command::new(first_arg)
+                    .args(&command_input[1..])
+                    .current_dir(&self.config.root)
+                    .output()
+                else {
                     tracing::error!("Failed to run ffi");
                     return
                 };
@@ -913,8 +916,11 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to run ffi: no args");
                     return
                 };
-                // TODO: set directory to root
-                let Ok(output) = Command::new(first_arg).args(&command_input[1..]).output() else {
+                let Ok(output) = Command::new(first_arg)
+                    .args(&command_input[1..])
+                    .current_dir(&self.config.root)
+                    .output()
+                else {
                     tracing::error!("Failed to run ffi");
                     return
                 };
