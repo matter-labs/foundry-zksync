@@ -120,6 +120,7 @@ pub struct CheatcodeTracer {
     expected_calls: ExpectedCallsTracker,
     test_status: FoundryTestState,
     expected_emits: Vec<ExpectedEmit>,
+    expect_emits_since: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
@@ -615,6 +616,7 @@ impl CheatcodeTracer {
             }
             expectEmit_2(expectEmit_2Call {}) => {
                 tracing::info!("👷 Setting expected emit");
+                self.expect_emits_since = state.vm_local_state.timestamp;
                 self.expect_emit(None, None);
             }
             ffi(ffiCall { commandInput: command_input }) => {
@@ -1117,6 +1119,7 @@ impl CheatcodeTracer {
 
     fn expect_emit(&mut self, topic: Option<H256>, data: Option<H256>) {
         tracing::info!("👷 Setting expected emit");
+        // self.expected_emits.push(ExpectedEmit { topic, data });
     }
 
     /// Adds an expectCall to the tracker.
@@ -1175,27 +1178,21 @@ fn transform_to_logs(events: Vec<EventMessage>) -> Vec<LogEntry> {
     let mut data = H256::default();
 
     while let Some(event) = events_iter.next() {
-        // we look for this particular event key or value which indicates that the next element is the data
-        if event.key == "0x00000000000000000000000000000000000000000000000000000000000004".into() ||
-            event.value ==
-                "0x00000000000000000000000000000000000000000000000000000000000004".into()
-        {
-            data = if event.key ==
-                "0x00000000000000000000000000000000000000000000000000000000000004".into()
-            {
-                u256_to_h256(event.value.clone())
-            } else {
-                u256_to_h256(event.key.clone())
-            };
+        if is_data_lenght(event.key) {
+            data = events_iter.next().map(|e| u256_to_h256(e.key.clone())).unwrap_or_default();
             break
-        } else {
-            topics.push(u256_to_h256(event.key.clone()));
-            topics.push(u256_to_h256(event.value.clone()));
         }
+
+        if is_data_lenght(event.value) {
+            topics.push(u256_to_h256(event.key.clone()));
+            data = events_iter.next().map(|e| u256_to_h256(e.value.clone())).unwrap_or_default();
+            break
+        }
+        topics.push(u256_to_h256(event.key.clone()));
+        topics.push(u256_to_h256(event.value.clone()));
     }
     if !topics.is_empty() {
-        //remove last element from topics. This is not a real topic. 
-        topics.pop();
+        //remove last element from topics. This is not a real topic.
         log_entries.push(LogEntry { topics, data, emitter: zksync_types::EVENT_WRITER_ADDRESS });
     }
     log_entries
@@ -1262,4 +1259,10 @@ fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMem
         fat_data_pointer.start as usize,
         fat_data_pointer.length as usize,
     )
+}
+
+fn is_data_lenght(data: U256) -> bool {
+    data == "0x00000000000000000000000000000000000000000000000000000000000020".into() ||
+        data == "0x00000000000000000000000000000000000000000000000000000000000040".into() ||
+        data == "0x00000000000000000000000000000000000000000000000000000000000060".into()
 }
