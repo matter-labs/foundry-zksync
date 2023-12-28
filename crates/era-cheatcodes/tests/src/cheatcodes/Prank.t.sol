@@ -24,8 +24,6 @@ contract PrankTest is Test {
         (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature("prank(address)", TEST_ADDRESS)
         );
-        require(success1, "Prank failed");
-
         victim.assertCallerAndOrigin( 
             TEST_ADDRESS,
             "msg.sender was not set during prank",

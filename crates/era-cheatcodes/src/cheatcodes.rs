@@ -108,6 +108,7 @@ enum FoundryTestState {
 pub struct CheatcodeTracer {
     one_time_actions: Vec<FinishCycleOneTimeActions>,
     permanent_actions: FinishCyclePermanentActions,
+    next_call_action: NextCallPrank,
     return_data: Option<Vec<U256>>,
     return_ptr: Option<FatPointer>,
     near_calls: usize,
@@ -152,6 +153,13 @@ struct FinishCyclePermanentActions {
 struct StartPrankOpts {
     sender: H160,
     origin: Option<H256>,
+}
+
+#[derive(Debug, Default, Clone)]
+struct NextCallPrank {
+    next_call: bool,
+    prank_ops: Option<StartPrankOpts>,
+    current_depth: usize,
 }
 
 /// Tracks the expected calls per address.
@@ -464,6 +472,25 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 timestamp,
             );
         }
+        println!("HOHJOHOHOHOOH");
+        if let Some(prank_ops) = &self.next_call_action.prank_ops {
+            println!("CUALQUIERA DEPTH {:?}", state.local_state.callstack.depth());
+
+            if self.next_call_action.next_call {
+                if self.next_call_action.current_depth == state.local_state.callstack.depth() {
+                    println!("HOLAAAA");
+                    println!("PRIMER DEPTH {:?}", state.local_state.callstack.depth());
+                    state.local_state.callstack.current.msg_sender = prank_ops.sender;
+                    self.next_call_action.prank_ops = None;
+                    self.next_call_action.next_call = false;
+                }
+            } else {
+                println!("HOLA");
+                println!("SEGUNDO DEPTH {:?}", state.local_state.callstack.depth());
+                self.next_call_action.next_call = true;
+                self.next_call_action.current_depth = state.local_state.callstack.depth(); 
+            }
+        }
 
         // Sets the sender address for startPrank cheatcode
         if let Some(start_prank_call) = &self.permanent_actions.start_prank {
@@ -722,9 +749,9 @@ impl CheatcodeTracer {
                 };
                 self.add_trimmed_return_data(&data);
             }
-            prank_0(prank_0Call {msgSender}) => {
-                tracing::info!("👷 Starting pank to {msgSender:?}");
-
+            prank_0(prank_0Call {msgSender: msg_sender}) => {
+                tracing::info!("👷 Starting pank to {msg_sender:?}");
+                self.next_call_action =  NextCallPrank {next_call: false, prank_ops: Some(StartPrankOpts{ sender: msg_sender.to_h160(), origin: None }), current_depth: 0 };
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
