@@ -1,4 +1,4 @@
-use crate::utils::{ToH160, ToH256, ToU256, ToUint256_4};
+use crate::utils::{ToH160, ToH256, ToU256};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
@@ -29,7 +29,7 @@ use multivm::{
     },
 };
 use revm::{
-    primitives::{BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
+    primitives::{ruint::Uint, BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
     JournaledState,
 };
 use serde::Serialize;
@@ -485,7 +485,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
                         let mut env = into_revm_env(era_env);
-                        db.revert(snapshot_id.to_uint256_4(), &journaled_state, &mut env);
+                        db.revert(Uint::from_limbs(snapshot_id.0), &journaled_state, &mut env);
                     }
 
                     storage.modified_storage_keys =
