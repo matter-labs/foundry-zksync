@@ -6,8 +6,8 @@ use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
-use ethers::{signers::Signer, utils::to_checksum};
-use foundry_cheatcodes::CheatsConfig;
+use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
+use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{
     backend::DatabaseExt,
@@ -21,6 +21,7 @@ use multivm::{
     vm_latest::{
         BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
     },
+    zk_evm_1_3_3::zkevm_opcode_defs::FarCallABI,
     zk_evm_1_4_0::{
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::{PrimitiveValue, VmLocalState},
@@ -130,6 +131,7 @@ pub struct CheatcodeTracer {
     test_status: FoundryTestState,
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
+    broadcastable_transactions: Vec<BroadcastableTransaction>,
 }
 
 #[derive(Debug, Clone)]
@@ -176,6 +178,7 @@ enum FinishCycleOneTimeActions {
     SelectFork { fork_id: U256 },
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
+    SetOrigin { origin: H160 },
 }
 
 #[derive(Debug, Clone)]
@@ -206,7 +209,7 @@ struct FinishCyclePermanentActions {
 #[derive(Debug, Clone)]
 struct StartPrankOpts {
     sender: H160,
-    origin: Option<H256>,
+    origin: Option<H160>,
 }
 
 /// Tracks the expected calls per address.
@@ -245,6 +248,10 @@ enum ExpectedCallType {
 #[derive(Debug, Clone)]
 struct BroadcastOpts {
     original_origin: H160,
+    original_caller: H160,
+    new_origin: H160,
+    depth: usize,
+    nonce: u64,
 }
 
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
@@ -396,6 +403,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
         }
 
+        if let Opcode::Ret(_) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.current;
+            if current.code_address != CHEATCODE_ADDRESS {
+                if let Some(broadcast) = &self.permanent_actions.broadcast {
+                    if state.vm_local_state.callstack.depth() == broadcast.depth - 1 {
+                        //when the test ends, just make sure the tx origin is set to the original
+                        // one (should never get here unless .stopBroadcast
+                        // wasn't called)
+                        self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
+                            origin: broadcast.original_origin,
+                        });
+                    }
+                }
+            }
+        }
+
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
             if self.return_data.is_some() {
                 self.near_calls += 1;
@@ -415,6 +438,62 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
 
             if current.code_address != CHEATCODE_ADDRESS {
+                if let Some(broadcast) = &mut self.permanent_actions.broadcast {
+                    let prev_cs = state
+                        .vm_local_state
+                        .callstack
+                        .inner
+                        .last()
+                        .expect("callstack before the current");
+
+                    if state.vm_local_state.callstack.depth() == broadcast.depth + 1 &&
+                        prev_cs.this_address == broadcast.original_caller
+                    {
+                        self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
+                            origin: broadcast.new_origin,
+                        });
+
+                        let revm_db_for_era = storage
+                            .borrow_mut()
+                            .storage_handle
+                            .inner
+                            .read()
+                            .unwrap()
+                            .fork
+                            .as_ref()
+                            .unwrap()
+                            .fork_source
+                            .clone();
+                        let rpc = revm_db_for_era.db.lock().unwrap().active_fork_url();
+
+                        let farcall_abi = {
+                            let src0_idx = data.opcode.src0_reg_idx as usize;
+                            let src0 = state.vm_local_state.registers[src0_idx];
+
+                            FarCallABI::from_u256(src0.value)
+                        };
+
+                        self.broadcastable_transactions.push(BroadcastableTransaction {
+                            rpc,
+                            transaction:
+                                ethers::types::transaction::eip2718::TypedTransaction::Legacy(
+                                    TransactionRequest {
+                                        from: Some(broadcast.new_origin),
+                                        to: Some(ethers::types::NameOrAddress::Address(
+                                            current.code_address,
+                                        )),
+                                        gas: None, //FIXME: call.gas_limit if set from script
+                                        value: Some(farcall_abi.ergs_passed.into()),
+                                        data: Some(get_calldata(&state, &memory).into()),
+                                        nonce: Some(broadcast.nonce.into()),
+                                        ..Default::default()
+                                    },
+                                ),
+                        });
+                        self.broadcastable_transactions.push(tx);
+                        broadcast.nonce += 1;
+                    }
+                }
                 return
             }
             if current.code_page.0 == 0 || current.ergs_remaining == 0 {
@@ -754,6 +833,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     //change current stack pc to exception handler
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
+                }
+                FinishCycleOneTimeActions::SetOrigin { origin } => {
+                    let prev = state
+                        .local_state
+                        .callstack
+                        .inner
+                        .last_mut()
+                        .expect("callstack before the current");
+                    prev.this_address = origin;
+
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                    );
+
+                    storage.borrow_mut().set_value(key, origin.into());
                 }
             }
         }
@@ -1263,21 +1358,14 @@ impl CheatcodeTracer {
                 self.one_time_actions.push(FinishCycleOneTimeActions::Snapshot);
             }
             startBroadcast_0(startBroadcast_0Call {}) => {
-                let origin = state
-                    .vm_local_state
-                    .callstack
-                    .inner
-                    .first()
-                    .unwrap_or(&state.vm_local_state.callstack.current)
-                    .msg_sender;
-                tracing::info!("👷 Starting broadcast with default origin: {origin}");
+                tracing::info!("👷 Starting broadcast with default origin");
 
-                self.apply_broadcast(origin, &mut storage.borrow_mut())
+                self.start_broadcast(&storage, &state, None)
             }
             startBroadcast_1(startBroadcast_1Call { signer }) => {
                 let origin = signer.to_h160();
                 tracing::info!("👷 Starting broadcast with given origin: {origin}");
-                self.apply_broadcast(origin, &mut storage.borrow_mut())
+                self.start_broadcast(&storage, &state, Some(origin))
             }
             startBroadcast_2(startBroadcast_2Call { privateKey }) => {
                 let chain_id = self.env.get().unwrap().system_env.chain_id.as_u64();
@@ -1290,56 +1378,23 @@ impl CheatcodeTracer {
 
                 let origin = wallet.address();
                 tracing::info!("👷 Starting broadcast with origin from private key: {origin}");
-                self.apply_broadcast(origin.into(), &mut storage.borrow_mut())
+                self.start_broadcast(&storage, &state, Some(origin))
             }
             startPrank_0(startPrank_0Call { msgSender: msg_sender }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?}");
-                self.permanent_actions.start_prank =
-                    Some(StartPrankOpts { sender: msg_sender.to_h160(), origin: None });
+                self.start_prank(&storage, msg_sender.to_h160(), None);
             }
             startPrank_1(startPrank_1Call { msgSender: msg_sender, txOrigin: tx_origin }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?} with origin {tx_origin:?}");
-                let key = StorageKey::new(
-                    AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                    zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
-                );
-                let original_tx_origin = storage.borrow_mut().read_value(&key);
-                self.write_storage(key, tx_origin.to_h160().into(), &mut storage.borrow_mut());
-
-                self.permanent_actions.start_prank = Some(StartPrankOpts {
-                    sender: msg_sender.to_h160(),
-                    origin: Some(original_tx_origin),
-                });
+                self.start_prank(&storage, msg_sender.to_h160(), Some(tx_origin.to_h160()))
             }
             stopBroadcast(stopBroadcastCall {}) => {
                 tracing::info!("👷 Stopping broadcast");
-
-                if let Some(broadcast) = self.permanent_actions.broadcast.take() {
-                    let key = StorageKey::new(
-                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
-                    );
-                    self.write_storage(
-                        key,
-                        broadcast.original_origin.into(),
-                        &mut storage.borrow_mut(),
-                    );
-                }
+                self.stop_broadcast();
             }
             stopPrank(stopPrankCall {}) => {
                 tracing::info!("👷 Stopping prank");
-
-                if let Some(origin) =
-                    self.permanent_actions.start_prank.as_ref().and_then(|v| v.origin)
-                {
-                    let key = StorageKey::new(
-                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
-                    );
-                    self.write_storage(key, origin, &mut storage.borrow_mut());
-                }
-
-                self.permanent_actions.start_prank = None;
+                self.stop_prank(&storage);
             }
             store(storeCall { target, slot, value }) => {
                 tracing::info!(
@@ -1440,10 +1495,14 @@ impl CheatcodeTracer {
             createSelectFork_0(createSelectFork_0Call { urlOrAlias }) => {
                 tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
 
-                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
-                    url_or_alias: urlOrAlias,
-                    block_number: None,
-                });
+                if self.permanent_actions.broadcast.is_none() {
+                    self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                        url_or_alias: urlOrAlias,
+                        block_number: None,
+                    });
+                } else {
+                    tracing::error!("cannot select fork during a broadcast")
+                }
             }
             createSelectFork_1(createSelectFork_1Call { urlOrAlias, blockNumber }) => {
                 let block_number = blockNumber.to_u256().as_u64();
@@ -1452,10 +1511,15 @@ impl CheatcodeTracer {
                     urlOrAlias,
                     block_number
                 );
-                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
-                    url_or_alias: urlOrAlias,
-                    block_number: Some(block_number),
-                });
+
+                if self.permanent_actions.broadcast.is_none() {
+                    self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                        url_or_alias: urlOrAlias,
+                        block_number: Some(block_number),
+                    });
+                } else {
+                    tracing::error!("cannot select fork during a broadcast")
+                }
             }
             createFork_0(createFork_0Call { urlOrAlias }) => {
                 tracing::info!("👷 Creating fork {}", urlOrAlias,);
@@ -1476,8 +1540,12 @@ impl CheatcodeTracer {
             selectFork(selectForkCall { forkId }) => {
                 tracing::info!("👷 Selecting fork {}", forkId);
 
-                self.one_time_actions
-                    .push(FinishCycleOneTimeActions::SelectFork { fork_id: forkId.to_u256() });
+                if self.permanent_actions.broadcast.is_none() {
+                    self.one_time_actions
+                        .push(FinishCycleOneTimeActions::SelectFork { fork_id: forkId.to_u256() });
+                } else {
+                    tracing::error!("cannot select fork during broadcast")
+                }
             }
             writeFile(writeFileCall { path, data }) => {
                 tracing::info!("👷 Writing data to file in path {}", path);
@@ -1790,16 +1858,97 @@ impl CheatcodeTracer {
         }
     }
 
-    fn apply_broadcast<S: WriteStorage>(&mut self, origin: H160, storage: &mut RefMut<S>) {
+    fn start_prank<S: DatabaseExt + Send>(
+        &mut self,
+        storage: &StoragePtr<EraDb<S>>,
+        sender: H160,
+        origin: Option<H160>,
+    ) {
+        if self.permanent_actions.broadcast.is_some() {
+            tracing::error!("prank is incompatible with broadcast");
+            return
+        }
+
+        match origin {
+            None => {
+                self.permanent_actions.start_prank.replace(StartPrankOpts { sender, origin: None });
+            }
+            Some(tx_origin) => {
+                let key = StorageKey::new(
+                    AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                    zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                );
+                let storage = &mut storage.borrow_mut();
+                let original_tx_origin = storage.read_value(&key);
+                self.write_storage(key, tx_origin.into(), storage);
+
+                self.permanent_actions
+                    .start_prank
+                    .replace(StartPrankOpts { sender, origin: Some(original_tx_origin.into()) });
+            }
+        }
+    }
+
+    fn stop_prank<S: DatabaseExt + Send>(&mut self, storage: &StoragePtr<EraDb<S>>) {
+        if let Some(original_tx_origin) =
+            self.permanent_actions.start_prank.take().and_then(|v| v.origin)
+        {
+            let key = StorageKey::new(
+                AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+            );
+            self.write_storage(key, original_tx_origin.into(), &mut storage.borrow_mut());
+        }
+    }
+
+    fn start_broadcast<S: DatabaseExt + Send>(
+        &mut self,
+        storage: &StoragePtr<EraDb<S>>,
+        state: &VmLocalStateData<'_>,
+        new_origin: Option<H160>,
+    ) {
+        if self.permanent_actions.start_prank.is_some() {
+            tracing::error!("broadcast is incompatible with prank");
+            return
+        }
+
+        let depth = state.vm_local_state.callstack.depth() - 2;
+
         let key = StorageKey::new(
             AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
             zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
         );
-        let original_tx_origin = storage.read_value(&key);
-        self.write_storage(key, origin.into(), storage);
 
-        self.permanent_actions.broadcast =
-            Some(BroadcastOpts { original_origin: original_tx_origin.into() })
+        let mut storage = storage.borrow_mut();
+
+        let original_tx_origin = storage.read_value(&key);
+        let new_origin = new_origin.unwrap_or(original_tx_origin.into());
+
+        let nonce = storage
+            .storage_handle
+            .inner
+            .read()
+            .unwrap()
+            .fork
+            .as_ref()
+            .unwrap()
+            .fork_source
+            .get_nonce_for_address(new_origin);
+
+        self.permanent_actions.broadcast = Some(BroadcastOpts {
+            new_origin,
+            original_origin: original_tx_origin.into(),
+            original_caller: state.vm_local_state.callstack.current.msg_sender.into(),
+            depth,
+            nonce,
+        })
+    }
+
+    fn stop_broadcast(&mut self) {
+        if let Some(broadcast) = self.permanent_actions.broadcast.take() {
+            self.one_time_actions
+                .push(FinishCycleOneTimeActions::SetOrigin { origin: broadcast.original_origin });
+        }
     }
 }
 
