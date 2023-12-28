@@ -58,7 +58,6 @@ contract SnapshotTest is Test {
     function testBlockValues() public {
         uint256 num = block.number;
         uint256 time = block.timestamp;
-        // uint256 prevrandao = block.prevrandao;
 
         (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature("snapshot()")
@@ -79,9 +78,6 @@ contract SnapshotTest is Test {
         require(success, "roll failed");
         assertEq(block.number, 99);
 
-        // vm.prevrandao(bytes32(uint256(123)));
-        // assertEq(block.prevrandao, 123);
-
         (success, ) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature("revertTo(uint256)", snapshot)
         );
@@ -97,11 +93,5 @@ contract SnapshotTest is Test {
             time,
             "snapshot revert for block.timestamp unsuccessful"
         );
-
-        // assertEq(
-        //     block.prevrandao,
-        //     prevrandao,
-        //     "snapshot revert for block.prevrandao unsuccessful"
-        // );
     }
 }
