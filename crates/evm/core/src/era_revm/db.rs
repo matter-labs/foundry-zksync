@@ -65,7 +65,7 @@ where
                 .unwrap();
             let num_and_ts = revm_u256_to_h256(result);
             let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-            let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
+            let num: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
             u64::from_be_bytes(num)
         };
 
@@ -91,8 +91,8 @@ where
             h256_to_u256(SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION),
         );
         let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-        let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-        let ts: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
+        let num: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
+        let ts: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
 
         (u64::from_be_bytes(num), u64::from_be_bytes(ts))
     }
