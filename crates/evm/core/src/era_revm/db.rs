@@ -24,8 +24,10 @@ use zksync_basic_types::{
 };
 use zksync_types::{
     api::{BlockIdVariant, Transaction, TransactionDetails},
+    block::unpack_block_info,
     StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-    SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION,
+    SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
+    SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION,
 };
 
 use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
@@ -64,9 +66,8 @@ where
                 .storage(h160_to_address(SYSTEM_CONTEXT_ADDRESS), u256_to_revm_u256(U256::from(9)))
                 .unwrap();
             let num_and_ts = revm_u256_to_h256(result);
-            let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-            let num: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
-            u64::from_be_bytes(num)
+            let (num, _) = unpack_block_info(h256_to_u256(num_and_ts));
+            num
         };
 
         Self { db, current_block }
@@ -75,12 +76,12 @@ where
     /// Returns the current L1 block number and timestamp from the database.
     /// Reads it directly from the SYSTEM_CONTEXT storage.
     pub fn get_l1_block_number_and_timestamp(&self) -> (u64, u64) {
-        let num_and_ts = self.read_storage_internal(SYSTEM_CONTEXT_ADDRESS, U256::from(7));
-        let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-        let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-        let ts: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
-
-        (u64::from_be_bytes(num), u64::from_be_bytes(ts))
+        let num_and_ts = self.read_storage_internal(
+            SYSTEM_CONTEXT_ADDRESS,
+            h256_to_u256(SYSTEM_CONTEXT_BLOCK_INFO_POSITION),
+        );
+        let (num, ts) = unpack_block_info(h256_to_u256(num_and_ts));
+        (num, ts)
     }
 
     /// Returns the current L2 block number and timestamp from the database.
@@ -90,11 +91,8 @@ where
             SYSTEM_CONTEXT_ADDRESS,
             h256_to_u256(SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION),
         );
-        let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-        let num: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
-        let ts: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-
-        (u64::from_be_bytes(num), u64::from_be_bytes(ts))
+        let (num, ts) = unpack_block_info(h256_to_u256(num_and_ts));
+        (num, ts)
     }
 
     /// Returns the nonce for a given account from NonceHolder storage.
