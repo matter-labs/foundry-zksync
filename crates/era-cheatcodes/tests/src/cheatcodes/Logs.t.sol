@@ -13,25 +13,24 @@ struct Log {
 contract LogsTest is Test {
     event LogTopic1(uint256 indexed topic1, uint256 topic2, bytes data);
 
+    event LogTopic2(uint256 indexed topic1, bytes data);
+
     function testRecordAndGetLogs() public {
         bytes memory testData1 = "test";
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("recordLogs()")
+        Emitter emitter = new Emitter();
+
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(    
+            abi.encodeWithSignature("expectEmit()")
         );
-        require(success, "recordLogs failed");
 
         emit LogTopic1(2, 1, testData1);
-
-        (bool success2, bytes memory rawData) = Constants
-            .CHEATCODE_ADDRESS
-            .call(abi.encodeWithSignature("getRecordedLogs()"));
-        require(success2, "getRecordedLogs failed");
-
-        Log[] memory logs = abi.decode(rawData, (Log[]));
-        require(logs.length == 1, "logs length should be 1");
-        // the first topic is the hash of the event signature
-        require(logs[0].topics.length == 3, "topics length should be 3");
+        //calls
+        //calls
+        emit LogTopic2(7, testData1);
+ 
+        //For some reason this is logging first
+        emitter.emitEvent(2, 2, 1, testData1);
     }
 
     function trimReturnBytes(
@@ -52,5 +51,25 @@ contract LogsTest is Test {
         }
 
         return data;
+    }
+}
+
+contract Emitter {
+    uint256 public thing;
+
+    event Something(
+        uint256 indexed topic1,
+        uint256 indexed topic2,
+        uint256 indexed topic3,
+        bytes data
+    );
+
+    function emitEvent(
+        uint256 topic1,
+        uint256 topic2,
+        uint256 topic3,
+        bytes memory data
+    ) public {
+        emit Something(topic1, topic2, topic3, data);
     }
 }

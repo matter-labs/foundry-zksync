@@ -3,9 +3,12 @@ use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
+use ethabi::Hash;
 use ethers::utils::to_checksum;
+use fnv::FnvBuildHasher;
 use foundry_cheatcodes::CheatsConfig;
 use foundry_cheatcodes_spec::Vm;
+use foundry_common::shell::println;
 use foundry_evm_core::{
     backend::DatabaseExt,
     era_revm::{db::RevmDatabaseForEra, transactions::storage_to_state},
@@ -13,6 +16,7 @@ use foundry_evm_core::{
     opts::EvmOpts,
 };
 use itertools::Itertools;
+use linked_hash_set::LinkedHashSet;
 use multivm::{
     interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus},
     vm_latest::{
@@ -38,6 +42,7 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Debug,
     fs,
+    hash::{BuildHasherDefault, Hasher},
     process::Command,
     sync::Arc,
 };
@@ -119,8 +124,29 @@ pub struct CheatcodeTracer {
     recording_timestamp: u32,
     expected_calls: ExpectedCallsTracker,
     test_status: FoundryTestState,
-    expected_emits: Vec<ExpectedEmit>,
+    emit_config: EmitConfig,
+}
+
+#[derive(Debug, Clone, Default)]
+struct EmitConfig {
+    expected_logs: LinkedHashSet<LogEntry>,
+    actual_logs: LinkedHashSet<LogEntry>,
+    expected_emit_state: ExpectedEmitState,
     expect_emits_since: u32,
+    expect_emits_until: u32,
+    call_emits_since: u32,
+    call_emits_until: u32,
+    call_depth: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq, Default)]
+
+enum ExpectedEmitState {
+    #[default]
+    NotStarted,
+    ExpectedEmitTriggered,
+    CallTriggered,
+    Finished,
 }
 
 #[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
@@ -191,8 +217,6 @@ enum ExpectedCallType {
 
 #[derive(Clone, Debug)]
 pub struct ExpectedEmit {
-    /// The depth at which we expect this emit to have occurred
-    pub depth: u64,
     /// The log we expect
     pub log: Option<LogEntry>,
     /// The checks to perform:
@@ -218,6 +242,33 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
+        let current = state.vm_local_state.callstack.get_current_stack();
+
+        if current.code_address != CHEATCODE_ADDRESS &&
+            !INTERNAL_CONTRACT_ADDRESSES.contains(&current.code_address) &&
+            &current.code_address >
+                &H160([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        {
+            if self.emit_config.expected_emit_state == ExpectedEmitState::ExpectedEmitTriggered {
+                //cheatcode triggered, waiting for far call
+                if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+                    println!("current FarCall {:?}", current);
+                    self.emit_config.call_emits_since = state.vm_local_state.timestamp;
+                    self.emit_config.expect_emits_until = state.vm_local_state.timestamp;
+                    self.emit_config.expected_emit_state = ExpectedEmitState::CallTriggered;
+                    self.emit_config.call_depth = state.vm_local_state.callstack.depth();
+                }
+            }
+
+            if self.emit_config.expected_emit_state == ExpectedEmitState::CallTriggered {
+                if state.vm_local_state.callstack.depth() < self.emit_config.call_depth {
+                    //call triggered and finished
+                    self.emit_config.call_emits_until = state.vm_local_state.timestamp;
+                    self.emit_config.expected_emit_state = ExpectedEmitState::Finished;
+                }
+            }
+        }
+
         if self.update_test_status(&state, &data) == &FoundryTestState::Finished {
             for (address, expected_calls_for_target) in &self.expected_calls {
                 for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
@@ -333,23 +384,126 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         bootloader_state: &mut BootloaderState,
         storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
-        if self.recording_logs {
-            let logs = transform_to_logs(
-                state
-                    .event_sink
-                    .get_events_and_l2_l1_logs_after_timestamp(Timestamp(self.recording_timestamp))
-                    .0,
-            );
-            if !logs.is_empty() {
-                let mut unique_set: HashSet<LogEntry> = HashSet::new();
+        // if self.recording_logs {
+        //     let logs = transform_to_logs(
+        //         state
+        //             .event_sink
+        //             .get_events_and_l2_l1_logs_after_timestamp(Timestamp(self.recording_timestamp))
+        //             .0,
+        //     );
+        //     if !logs.is_empty() {
+        //         let mut unique_set: HashSet<LogEntry> = HashSet::new();
 
-                // Filter out duplicates and extend the unique entries to the vector
-                self.recorded_logs
-                    .extend(logs.into_iter().filter(|log| unique_set.insert(log.clone())));
+        //         // Filter out duplicates and extend the unique entries to the vector
+        //         self.recorded_logs
+        //             .extend(logs.into_iter().filter(|log| unique_set.insert(log.clone())));
+        //     }
+        // }
+
+        if !INTERNAL_CONTRACT_ADDRESSES.contains(&state.local_state.callstack.current.this_address)
+        {
+            if self.emit_config.expected_emit_state == ExpectedEmitState::Finished {
+                println!(
+                    "Events {:?}",
+                    state
+                        .event_sink
+                        .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
+                            self.emit_config.expect_emits_since,
+                        ))
+                );
+                // let mut emits_since_expect_emit: LinkedHashSet<LogEntry> = LinkedHashSet::new();
+                let logs_since_expect = transform_to_logs(
+                    state
+                        .event_sink
+                        .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
+                            self.emit_config.expect_emits_since,
+                        ))
+                        .0,
+                );
+
+                // println!("logs_since_expect {:?}", logs_since_expect);
+
+                // let logs_until_expect = transform_to_logs(
+                //     state
+                //         .event_sink
+                //         .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
+                //             self.emit_config.expect_emits_until,
+                //         ))
+                //         .0,
+                // );
+
+                // emits_since_expect_emit.extend(
+                //     logs_since_expect.into_iter().filter(|log| !logs_until_expect.contains(log)),
+                // );
+                // // logs_since_expect - logs_until_expect
+
+                // self.emit_config.expected_logs.extend(emits_since_expect_emit.clone());
+
+                // let mut emits_since_call: LinkedHashSet<LogEntry> = LinkedHashSet::default();
+                // let logs_since_call = transform_to_logs(
+                //     state
+                //         .event_sink
+                //         .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
+                //             self.emit_config.call_emits_since,
+                //         ))
+                //         .0,
+                // );
+
+                // let logs_until_call = transform_to_logs(
+                //     state
+                //         .event_sink
+                //         .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
+                //             self.emit_config.call_emits_until,
+                //         ))
+                //         .0,
+                // );
+
+                // // logs_since_expect - logs_until_expect
+
+                // emits_since_call.extend(
+                //     logs_since_call.into_iter().filter(|log| !logs_until_call.contains(log)),
+                // );
+
+                // self.emit_config.actual_logs.extend(emits_since_call.clone());
+                //compare emits_since_expect_emit with emits_since_call
+                // let bool =
+                //     logs_match(&self.emit_config.actual_logs, &self.emit_config.expected_logs);
             }
         }
 
-        // Check if we have any expected emits
+        fn logs_match(
+            actual: &LinkedHashSet<LogEntry>,
+            expected: &LinkedHashSet<LogEntry>,
+        ) -> bool {
+            println!("expected: {:?}", expected);
+            println!("actual: {:?}", actual);
+
+            let mut actual_iter = actual.iter();
+
+            for expected_entry in expected {
+                println!("expected_entry: {:?}", expected_entry);
+
+                // Find the next matching entry in `actual`
+                let mut found_match = false;
+                while let Some(actual_entry) = actual_iter.next() {
+                    if actual_entry == expected_entry {
+                        println!(
+                            "actual and expected {:?}, {:?} match",
+                            actual_entry, expected_entry
+                        );
+                        found_match = true;
+                        break
+                    }
+                }
+
+                if !found_match {
+                    panic!("Expected log entry {:?} not found in actual logs", expected_entry);
+                    return false
+                }
+            }
+
+            true
+        }
 
         while let Some(action) = self.one_time_actions.pop() {
             match action {
@@ -616,8 +770,8 @@ impl CheatcodeTracer {
             }
             expectEmit_2(expectEmit_2Call {}) => {
                 tracing::info!("👷 Setting expected emit");
-                self.expect_emits_since = state.vm_local_state.timestamp;
-                self.expect_emit(None, None);
+                self.emit_config.expected_emit_state = ExpectedEmitState::ExpectedEmitTriggered;
+                self.emit_config.expect_emits_since = 0;
             }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
@@ -1117,9 +1271,14 @@ impl CheatcodeTracer {
         self.return_data = Some(data);
     }
 
-    fn expect_emit(&mut self, topic: Option<H256>, data: Option<H256>) {
+    fn expect_emit(&mut self) {
         tracing::info!("👷 Setting expected emit");
-        // self.expected_emits.push(ExpectedEmit { topic, data });
+        // self.expected_emits.push(ExpectedEmit {
+        //     log: None,
+        //     checks: [true, true, true, true],
+        //     address: None,
+        //     found: false,
+        // });
     }
 
     /// Adds an expectCall to the tracker.
@@ -1171,7 +1330,6 @@ impl CheatcodeTracer {
 
 fn transform_to_logs(events: Vec<EventMessage>) -> Vec<LogEntry> {
     let mut log_entries: Vec<LogEntry> = Vec::new();
-
     // Skip the first event (is_first: true) and the next event
     let mut events_iter = events.into_iter().skip_while(|e| e.is_first);
     let mut topics: Vec<H256> = Vec::new();
