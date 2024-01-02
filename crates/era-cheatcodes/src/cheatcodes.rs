@@ -9,7 +9,7 @@ use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{backend::DatabaseExt, era_revm::db::RevmDatabaseForEra};
 use itertools::Itertools;
 use multivm::{
-    interface::{dyn_tracers::vm_1_3_3::DynTracer, tracer::TracerExecutionStatus},
+    interface::{dyn_tracers::vm_1_3_3::DynTracer, tracer::TracerExecutionStatus, VmRevertReason},
     vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
     zk_evm_1_3_3::{
         tracing::{AfterExecutionData, VmLocalStateData},
@@ -17,7 +17,7 @@ use multivm::{
         zkevm_opcode_defs::{
             self,
             decoding::{EncodingModeProduction, VmEncodingMode},
-            FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
+            FatPointer, Opcode, RetOpcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
             RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
         },
     },
@@ -147,6 +147,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 prev_exception_handler_pc.replace(current.exception_handler_location);
             }
         }
+        if let Opcode::Ret(call) = data.opcode.variant.opcode {
+            println!("ret : {} {:?}", state.vm_local_state.callstack.depth(), call);
+        }
     }
 
     fn after_execution(
@@ -165,12 +168,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 depth,
                 prev_exception_handler_pc: exception_handler,
                 prev_continue_pc: continue_pc,
-            } /* if state.vm_local_state.callstack.depth() < *depth */ => {
+            } if state.vm_local_state.callstack.depth() < *depth => {
                 let callstack_depth = state.vm_local_state.callstack.depth();
-                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
 
                 match data.opcode.variant.opcode {
                     Opcode::Ret(op @ RetOpcode::Revert) => {
+                        tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
                         let (Some(exception_handler), Some(continue_pc)) =
                             (*exception_handler, *continue_pc)
                         else {
@@ -205,7 +208,28 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         );
                         false
                     }
-                    Opcode::Ret(RetOpcode::Ok) => true, //TODO: reintegrate with above
+                    Opcode::Ret(RetOpcode::Ok) => {
+                        tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
+                        let (Some(exception_handler), Some(continue_pc)) =
+                            (*exception_handler, *continue_pc)
+                        else {
+                            tracing::error!("exceptRevert missing stored continuations");
+                            return false
+                        };
+                        if let Err(err) = Self::handle_except_revert(
+                            reason.as_ref(),
+                            RetOpcode::Ok,
+                            &state,
+                            memory,
+                        ) {
+                            tracing::error!(?err, "unexpected opcode");
+                            self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                                error: err,
+                                exception_handler,
+                            });
+                        }
+                        false
+                    }
                     _ => true,
                 }
             }
@@ -247,12 +271,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }
 
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
+            println!("near call: {}", state.vm_local_state.callstack.depth());
             if self.return_data.is_some() {
                 self.near_calls += 1;
             }
         }
 
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            println!("far call: {}", state.vm_local_state.callstack.depth());
             if current.code_address != CHEATCODE_ADDRESS {
                 return
             }
@@ -329,7 +355,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &mut state.memory,
                     );
 
-                    self.is_triggered_this_cycle = false;
+                    // self.is_triggered_this_cycle = false;
 
                     //change current stack pc to label
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
@@ -356,10 +382,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &mut state.memory,
                     );
 
-                    self.is_triggered_this_cycle = false;
+                    // self.is_triggered_this_cycle = false;
                     //change current stack pc to exception handler
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
-                    state.local_state.pending_exception = true;
+                    // state.local_state.pending_exception = true;
 
                     // return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
                     //     Halt::Unknown(VmRevertReason::from(error.as_slice())),
@@ -775,6 +801,7 @@ impl CheatcodeTracer {
         state: &VmLocalStateData<'_>,
         memory: &SimpleMemory<H>,
     ) -> Result<(), Vec<u8>> {
+        println!("handle except revert {:?}, {:?}", &reason, &op);
         match (op, reason) {
             (zkevm_opcode_defs::RetOpcode::Revert, Some(expected_reason)) => {
                 let retdata = {
@@ -794,33 +821,18 @@ impl CheatcodeTracer {
                     return Err("call reverted as expected, but without data".to_string().into())
                 }
 
-                let mut actual_revert: Vec<u8> = retdata.into();
+                let actual_revert = match VmRevertReason::from(retdata.as_slice()) {
+                    VmRevertReason::General { msg, data: _ } => msg,
+                    _ => panic!("unexpected revert reason"),
+                };
 
-                // Try decoding as known errors
-                // alloy_sol_types::Revert = "Error(string)" => [0x08, 0xc3, 0x79, 0xa0]
-                // CheatCodeError = "CheatcodeError(string)" => [0xee, 0xaa, 0x9e, 0x6f]
-                if matches!(
-                    actual_revert.get(..4),
-                    Some(&[0x08, 0xc3, 0x79, 0xa0] | &[0xee, 0xaa, 0x9e, 0x6f])
-                ) {
-                    if let Ok(decoded) = Vec::<u8>::decode(&actual_revert[4..]) {
-                        actual_revert = decoded;
-                    }
-                }
-
-                if &actual_revert == expected_reason {
+                let expected_reason = String::from_utf8_lossy(expected_reason).to_string();
+                if &actual_revert == &expected_reason {
                     Ok(())
                 } else {
-                    let stringify = |data: &[u8]| {
-                        String::decode(data)
-                            .ok()
-                            .or_else(|| std::str::from_utf8(data).ok().map(ToOwned::to_owned))
-                            .unwrap_or_else(|| data.to_vec().encode_hex())
-                    };
                     Err(format!(
                         "Error != expected error: {} != {}",
-                        stringify(&actual_revert),
-                        stringify(expected_reason),
+                        &actual_revert, expected_reason,
                     )
                     .into())
                 }
