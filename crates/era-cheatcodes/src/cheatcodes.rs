@@ -407,7 +407,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             let current = state.vm_local_state.callstack.current;
             if current.code_address != CHEATCODE_ADDRESS {
                 if let Some(broadcast) = &self.permanent_actions.broadcast {
-                    if state.vm_local_state.callstack.depth() == broadcast.depth - 1 {
+                    if state.vm_local_state.callstack.depth() == broadcast.depth
+                    // - 1
+                    {
                         //when the test ends, just make sure the tx origin is set to the original
                         // one (should never get here unless .stopBroadcast
                         // wasn't called)
@@ -446,7 +448,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         .last()
                         .expect("callstack before the current");
 
-                    if state.vm_local_state.callstack.depth() == broadcast.depth + 1 &&
+                    if state.vm_local_state.callstack.depth() == broadcast.depth // + 1
+                        &&
                         prev_cs.this_address == broadcast.original_caller
                     {
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
@@ -473,7 +476,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             FarCallABI::from_u256(src0.value)
                         };
 
-                        self.broadcastable_transactions.push(BroadcastableTransaction {
+                        let tx = BroadcastableTransaction {
                             rpc,
                             transaction:
                                 ethers::types::transaction::eip2718::TypedTransaction::Legacy(
@@ -489,7 +492,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                         ..Default::default()
                                     },
                                 ),
-                        });
+                        };
                         self.broadcastable_transactions.push(tx);
                         broadcast.nonce += 1;
                     }
@@ -1912,7 +1915,8 @@ impl CheatcodeTracer {
             return
         }
 
-        let depth = state.vm_local_state.callstack.depth() - 2;
+        let depth = state.vm_local_state.callstack.depth() // - 2
+            ;
 
         let key = StorageKey::new(
             AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
