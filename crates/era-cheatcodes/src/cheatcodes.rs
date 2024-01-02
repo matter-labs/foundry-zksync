@@ -834,7 +834,7 @@ impl CheatcodeTracer {
             }
             rpcUrl(rpcUrlCall { rpcAlias }) => {
                 tracing::info!("👷 Getting rpc url of {}", rpcAlias);
-                let rpc_endpoints = self.config.rpc_endpoints.clone();
+                let rpc_endpoints = &self.config.rpc_endpoints;
                 let rpc_url = match rpc_endpoints.get(&rpcAlias) {
                     Some(Ok(url)) => Some(url.clone()),
                     _ => None,
@@ -848,7 +848,7 @@ impl CheatcodeTracer {
             }
             rpcUrls(rpcUrlsCall {}) => {
                 tracing::info!("👷 Getting rpc urls");
-                let rpc_endpoints = self.config.rpc_endpoints.clone();
+                let rpc_endpoints = &self.config.rpc_endpoints;
                 let rpc_urls: Vec<String> = rpc_endpoints
                     .iter()
                     .map(|(alias, url)| match url {
