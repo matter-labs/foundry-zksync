@@ -45,7 +45,7 @@ use foundry_compilers::{
 };
 use semver::Version;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt, fs,
@@ -200,7 +200,7 @@ pub fn compile_smart_contracts(
 
     match zksolc.compile() {
         Ok(_) => {
-            info!("Compiled Successfully");
+            println!("Compiled Successfully");
             Ok(())
         }
         Err(err) => {
@@ -299,7 +299,7 @@ impl ZkSolc {
         // Step 1: Collect Source Files
         let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
         let mut contract_bytecodes = BTreeMap::new();
-
+        self.project.solc_config.settings.optimizer.enable();
         // Step 2: Compile Contracts for Each Source
         for (_solc, version) in sources {
             info!("\nCompiling {} files...", version.1.len());
@@ -350,7 +350,29 @@ impl ZkSolc {
 
                         let stdin = child.stdin.take().expect("Stdin exists.");
 
-                        serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
+                        let mut stdjson =
+                            serde_json::to_value(&self.standard_json.clone().unwrap())
+                                .wrap_err("Could not serialize JSON input")?;
+
+                        // Replaces the solc optimization settings with zksolc expected optimization
+                        // settings Set the LLVM optimization parameter to
+                        // `z` for minimal size. TODO: This should be
+                        // handled properly and avoid directly modifying the standard json.
+                        let z = 'z';
+                        if let Value::Object(ref mut stdjson_map) = stdjson {
+                            if let Some(Value::Object(ref mut settings)) =
+                                stdjson_map.get_mut("settings")
+                            {
+                                let optimizer = json!({
+                                    "enabled": true,
+                                    "mode": z,
+                                    "details": serde_json::Value::Null
+                                });
+                                settings.insert("optimizer".to_string(), optimizer);
+                            }
+                        }
+
+                        serde_json::to_writer(stdin, &stdjson)
                             .wrap_err("Could not assign standard_json to writer")?;
 
                         let output =
