@@ -30,7 +30,7 @@ contract LogsTest is Test {
         emit LogTopic2(7, testData1);
  
         //For some reason this is logging first
-        emitter.emitEvent(2, 2, 1, testData1);
+        emitter.emitEvent(1, 254, 255, testData1);
     }
 
     function trimReturnBytes(

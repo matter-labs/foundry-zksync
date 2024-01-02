@@ -1,4 +1,7 @@
-use crate::utils::{ToH160, ToH256, ToU256};
+use crate::{
+    events::LogEntry,
+    utils::{ToH160, ToH256, ToU256},
+};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
@@ -43,7 +46,9 @@ use std::{
     fmt::Debug,
     fs,
     hash::{BuildHasherDefault, Hasher},
+    ops::BitAnd,
     process::Command,
+    str::FromStr,
     sync::Arc,
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
@@ -129,8 +134,7 @@ pub struct CheatcodeTracer {
 
 #[derive(Debug, Clone, Default)]
 struct EmitConfig {
-    expected_logs: LinkedHashSet<LogEntry>,
-    actual_logs: LinkedHashSet<LogEntry>,
+    expected_logs: Vec<LogEntry>,
     expected_emit_state: ExpectedEmitState,
     expect_emits_since: u32,
     expect_emits_until: u32,
@@ -146,20 +150,8 @@ enum ExpectedEmitState {
     NotStarted,
     ExpectedEmitTriggered,
     CallTriggered,
+    Assert,
     Finished,
-}
-
-#[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
-struct LogEntry {
-    topics: Vec<H256>,
-    data: H256,
-    emitter: H160,
-}
-
-impl LogEntry {
-    fn new(topics: Vec<H256>, data: H256, emitter: H160) -> Self {
-        LogEntry { topics, data, emitter }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -243,11 +235,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         storage: StoragePtr<EraDb<S>>,
     ) {
         let current = state.vm_local_state.callstack.get_current_stack();
+        let is_reserved_addr = current
+            .code_address
+            .bitand(H160::from_str("ffffffffffffffffffffffffffffffffffff0000").unwrap())
+            .is_zero();
 
         if current.code_address != CHEATCODE_ADDRESS &&
             !INTERNAL_CONTRACT_ADDRESSES.contains(&current.code_address) &&
-            &current.code_address >
-                &H160([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+            !is_reserved_addr
         {
             if self.emit_config.expected_emit_state == ExpectedEmitState::ExpectedEmitTriggered {
                 //cheatcode triggered, waiting for far call
@@ -264,12 +259,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 if state.vm_local_state.callstack.depth() < self.emit_config.call_depth {
                     //call triggered and finished
                     self.emit_config.call_emits_until = state.vm_local_state.timestamp;
-                    self.emit_config.expected_emit_state = ExpectedEmitState::Finished;
+                    // self.emit_config.expected_emit_state = ExpectedEmitState::Finished;
                 }
             }
         }
 
         if self.update_test_status(&state, &data) == &FoundryTestState::Finished {
+            // Trigger assert for emit_logs
+            self.emit_config.expected_emit_state = ExpectedEmitState::Assert;
+
             for (address, expected_calls_for_target) in &self.expected_calls {
                 for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
                     let failed = match expected.call_type {
@@ -384,125 +382,19 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         bootloader_state: &mut BootloaderState,
         storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
-        // if self.recording_logs {
-        //     let logs = transform_to_logs(
-        //         state
-        //             .event_sink
-        //             .get_events_and_l2_l1_logs_after_timestamp(Timestamp(self.recording_timestamp))
-        //             .0,
-        //     );
-        //     if !logs.is_empty() {
-        //         let mut unique_set: HashSet<LogEntry> = HashSet::new();
-
-        //         // Filter out duplicates and extend the unique entries to the vector
-        //         self.recorded_logs
-        //             .extend(logs.into_iter().filter(|log| unique_set.insert(log.clone())));
-        //     }
-        // }
-
-        if !INTERNAL_CONTRACT_ADDRESSES.contains(&state.local_state.callstack.current.this_address)
-        {
-            if self.emit_config.expected_emit_state == ExpectedEmitState::Finished {
-                println!(
-                    "Events {:?}",
-                    state
-                        .event_sink
-                        .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
-                            self.emit_config.expect_emits_since,
-                        ))
-                );
-                // let mut emits_since_expect_emit: LinkedHashSet<LogEntry> = LinkedHashSet::new();
-                let logs_since_expect = transform_to_logs(
-                    state
-                        .event_sink
-                        .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
-                            self.emit_config.expect_emits_since,
-                        ))
-                        .0,
-                );
-
-                // println!("logs_since_expect {:?}", logs_since_expect);
-
-                // let logs_until_expect = transform_to_logs(
-                //     state
-                //         .event_sink
-                //         .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
-                //             self.emit_config.expect_emits_until,
-                //         ))
-                //         .0,
-                // );
-
-                // emits_since_expect_emit.extend(
-                //     logs_since_expect.into_iter().filter(|log| !logs_until_expect.contains(log)),
-                // );
-                // // logs_since_expect - logs_until_expect
-
-                // self.emit_config.expected_logs.extend(emits_since_expect_emit.clone());
-
-                // let mut emits_since_call: LinkedHashSet<LogEntry> = LinkedHashSet::default();
-                // let logs_since_call = transform_to_logs(
-                //     state
-                //         .event_sink
-                //         .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
-                //             self.emit_config.call_emits_since,
-                //         ))
-                //         .0,
-                // );
-
-                // let logs_until_call = transform_to_logs(
-                //     state
-                //         .event_sink
-                //         .get_events_and_l2_l1_logs_after_timestamp(Timestamp(
-                //             self.emit_config.call_emits_until,
-                //         ))
-                //         .0,
-                // );
-
-                // // logs_since_expect - logs_until_expect
-
-                // emits_since_call.extend(
-                //     logs_since_call.into_iter().filter(|log| !logs_until_call.contains(log)),
-                // );
-
-                // self.emit_config.actual_logs.extend(emits_since_call.clone());
-                //compare emits_since_expect_emit with emits_since_call
-                // let bool =
-                //     logs_match(&self.emit_config.actual_logs, &self.emit_config.expected_logs);
-            }
-        }
-
-        fn logs_match(
-            actual: &LinkedHashSet<LogEntry>,
-            expected: &LinkedHashSet<LogEntry>,
-        ) -> bool {
-            println!("expected: {:?}", expected);
-            println!("actual: {:?}", actual);
-
-            let mut actual_iter = actual.iter();
-
-            for expected_entry in expected {
-                println!("expected_entry: {:?}", expected_entry);
-
-                // Find the next matching entry in `actual`
-                let mut found_match = false;
-                while let Some(actual_entry) = actual_iter.next() {
-                    if actual_entry == expected_entry {
-                        println!(
-                            "actual and expected {:?}, {:?} match",
-                            actual_entry, expected_entry
-                        );
-                        found_match = true;
-                        break
-                    }
-                }
-
-                if !found_match {
-                    panic!("Expected log entry {:?} not found in actual logs", expected_entry);
-                    return false
+        // This assert is triggered only once after the test execution finishes
+        // And is used to assert that all logs exist
+        if self.emit_config.expected_emit_state == ExpectedEmitState::Assert {
+            self.emit_config.expected_emit_state = ExpectedEmitState::Finished;
+            let (events, _) =
+                state.event_sink.get_events_and_l2_l1_logs_after_timestamp(Timestamp::empty());
+            let logs = crate::events::parse_events(events);
+            for log in &logs {
+                println!("Log from {:#?}", log.address);
+                for topic in &log.topics {
+                    println!("\t{}", hex::encode(topic));
                 }
             }
-
-            true
         }
 
         while let Some(action) = self.one_time_actions.pop() {
@@ -769,9 +661,9 @@ impl CheatcodeTracer {
                 );
             }
             expectEmit_2(expectEmit_2Call {}) => {
-                tracing::info!("👷 Setting expected emit");
+                tracing::info!("👷 Setting expected emit at {}", state.vm_local_state.timestamp);
                 self.emit_config.expected_emit_state = ExpectedEmitState::ExpectedEmitTriggered;
-                self.emit_config.expect_emits_since = 0;
+                self.emit_config.expect_emits_since = state.vm_local_state.timestamp;
             }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
@@ -821,15 +713,15 @@ impl CheatcodeTracer {
                 let logs: Vec<Log> = self
                     .recorded_logs
                     .iter()
-                    .filter(|log| log.data != H256::zero())
+                    .filter(|log| !log.data.is_empty())
                     .map(|log| Log {
                         topics: log
                             .topics
                             .iter()
                             .map(|topic| topic.to_fixed_bytes().into())
                             .collect(),
-                        data: log.data.to_fixed_bytes().into(),
-                        emitter: log.emitter.to_fixed_bytes().into(),
+                        data: log.data.clone(),
+                        emitter: log.address.to_fixed_bytes().into(),
                     })
                     .collect_vec();
 
@@ -1328,34 +1220,6 @@ impl CheatcodeTracer {
     }
 }
 
-fn transform_to_logs(events: Vec<EventMessage>) -> Vec<LogEntry> {
-    let mut log_entries: Vec<LogEntry> = Vec::new();
-    // Skip the first event (is_first: true) and the next event
-    let mut events_iter = events.into_iter().skip_while(|e| e.is_first);
-    let mut topics: Vec<H256> = Vec::new();
-    let mut data = H256::default();
-
-    while let Some(event) = events_iter.next() {
-        if is_data_lenght(event.key) {
-            data = events_iter.next().map(|e| u256_to_h256(e.key.clone())).unwrap_or_default();
-            break
-        }
-
-        if is_data_lenght(event.value) {
-            topics.push(u256_to_h256(event.key.clone()));
-            data = events_iter.next().map(|e| u256_to_h256(e.value.clone())).unwrap_or_default();
-            break
-        }
-        topics.push(u256_to_h256(event.key.clone()));
-        topics.push(u256_to_h256(event.value.clone()));
-    }
-    if !topics.is_empty() {
-        //remove last element from topics. This is not a real topic.
-        log_entries.push(LogEntry { topics, data, emitter: zksync_types::EVENT_WRITER_ADDRESS });
-    }
-    log_entries
-}
-
 fn into_revm_env(env: &EraEnv) -> Env {
     use foundry_common::zk_utils::conversion_utils::h160_to_address;
     use revm::primitives::U256;
@@ -1417,10 +1281,4 @@ fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMem
         fat_data_pointer.start as usize,
         fat_data_pointer.length as usize,
     )
-}
-
-fn is_data_lenght(data: U256) -> bool {
-    data == "0x00000000000000000000000000000000000000000000000000000000000020".into() ||
-        data == "0x00000000000000000000000000000000000000000000000000000000000040".into() ||
-        data == "0x00000000000000000000000000000000000000000000000000000000000060".into()
 }
