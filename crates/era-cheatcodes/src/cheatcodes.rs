@@ -849,14 +849,14 @@ impl CheatcodeTracer {
             rpcUrls(rpcUrlsCall {}) => {
                 tracing::info!("👷 Getting rpc urls");
                 let rpc_endpoints = &self.config.rpc_endpoints;
-                let rpc_urls: Vec<String> = rpc_endpoints
+                let rpc_urls = rpc_endpoints
                     .iter()
                     .map(|(alias, url)| match url {
                         Ok(url) => format!("{}:{}", alias, url),
                         Err(_) => alias.clone(),
                     })
-                    .collect();
-                let rpc_urls = rpc_urls.join(",");
+                    .collect::<Vec<String>>()
+                    .join(",");
                 self.add_trimmed_return_data(rpc_urls.as_bytes());
             }
             serializeAddress_0(serializeAddress_0Call {
