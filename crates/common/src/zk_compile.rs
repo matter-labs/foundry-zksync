@@ -356,17 +356,17 @@ impl ZkSolc {
 
                         // Replaces the solc optimization settings with zksolc expected optimization
                         // settings Set the LLVM optimization parameter to
-                        // `z` for minimal size. TODO: This should be
-                        // handled properly and avoid directly modifying the standard json.
-                        let z = 'z';
+                        // `true` for `fallbackToOptimizingForSize` which will fallback to optimizing for size if the bytecode is too large.
+                        // TODO: This should be handled properly and avoid directly modifying the standard json.
                         if let Value::Object(ref mut stdjson_map) = stdjson {
                             if let Some(Value::Object(ref mut settings)) =
                                 stdjson_map.get_mut("settings")
                             {
                                 let optimizer = json!({
                                     "enabled": true,
-                                    "mode": z,
-                                    "details": serde_json::Value::Null
+                                    "mode": serde_json::Value::Null,
+                                    "details": serde_json::Value::Null,
+                                    "fallbackToOptimizingForSize": true
                                 });
                                 settings.insert("optimizer".to_string(), optimizer);
                             }
