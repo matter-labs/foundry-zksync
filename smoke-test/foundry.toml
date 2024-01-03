@@ -5,6 +5,11 @@ libs = ['lib']
 
 [rpc_endpoints]
 local = "${ERA_TEST_NODE_RPC_URL}"
-mainnet = "https://mainnet.era.zksync.io:443"
-testnet = "https://testnet.era.zksync.dev:443"
+
+[invariant]
+runs = 25
+depth = 10
+fail_on_revert = true
+
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

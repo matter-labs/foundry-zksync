@@ -24,8 +24,10 @@ use zksync_basic_types::{
 };
 use zksync_types::{
     api::{BlockIdVariant, Transaction, TransactionDetails},
+    block::unpack_block_info,
     StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-    SYSTEM_CONTEXT_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
+    SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION,
 };
 
 use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
@@ -33,7 +35,7 @@ use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
 #[derive(Default)]
 pub struct RevmDatabaseForEra<DB> {
     pub db: Arc<Mutex<Box<DB>>>,
-    pub current_block: u64,
+    current_block: u64,
 }
 
 impl<Db> Clone for RevmDatabaseForEra<Db> {
@@ -55,15 +57,42 @@ impl<DB: Database + Send> RevmDatabaseForEra<DB>
 where
     <DB as revm::Database>::Error: Debug,
 {
-    /// Returns the current block number and timestamp from the database.
-    /// Reads it directly from the SYSTEM_CONTEXT storage.
-    pub fn block_number_and_timestamp(&self) -> (u64, u64) {
-        let num_and_ts = self.read_storage_internal(SYSTEM_CONTEXT_ADDRESS, U256::from(7));
-        let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-        let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-        let ts: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
+    /// Create a new instance of [RevmDatabaseForEra].
+    pub fn new(db: Arc<Mutex<Box<DB>>>) -> Self {
+        let db_inner = db.clone();
+        let current_block = {
+            let mut db = db_inner.lock().expect("failed aquiring lock on the database");
+            let result = db
+                .storage(h160_to_address(SYSTEM_CONTEXT_ADDRESS), u256_to_revm_u256(U256::from(9)))
+                .unwrap();
+            let num_and_ts = revm_u256_to_h256(result);
+            let (num, _) = unpack_block_info(h256_to_u256(num_and_ts));
+            num
+        };
 
-        (u64::from_be_bytes(num), u64::from_be_bytes(ts))
+        Self { db, current_block }
+    }
+
+    /// Returns the current L1 block number and timestamp from the database.
+    /// Reads it directly from the SYSTEM_CONTEXT storage.
+    pub fn get_l1_block_number_and_timestamp(&self) -> (u64, u64) {
+        let num_and_ts = self.read_storage_internal(
+            SYSTEM_CONTEXT_ADDRESS,
+            h256_to_u256(SYSTEM_CONTEXT_BLOCK_INFO_POSITION),
+        );
+        let (num, ts) = unpack_block_info(h256_to_u256(num_and_ts));
+        (num, ts)
+    }
+
+    /// Returns the current L2 block number and timestamp from the database.
+    /// Reads it directly from the SYSTEM_CONTEXT storage.
+    pub fn get_l2_block_number_and_timestamp(&self) -> (u64, u64) {
+        let num_and_ts = self.read_storage_internal(
+            SYSTEM_CONTEXT_ADDRESS,
+            h256_to_u256(SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION),
+        );
+        let (num, ts) = unpack_block_info(h256_to_u256(num_and_ts));
+        (num, ts)
     }
 
     /// Returns the nonce for a given account from NonceHolder storage.
@@ -155,19 +184,18 @@ where
         idx: U256,
         block: Option<BlockIdVariant>,
     ) -> eyre::Result<H256> {
-        // We cannot support historical lookups. Only the most recent block is supported.
-        let current_block = self.current_block;
+        // We cannot support historical lookups. Only the most recent L2 block is supported.
         if let Some(block) = &block {
             match block {
                 BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(num)) => {
-                    let current_block_number_l2 = current_block * 2;
-                    if num.as_u64() != current_block_number_l2 {
-                        eyre::bail!("Only fetching of the most recent L2 block {} is supported - but queried for {}", current_block_number_l2, num)
+                    if num.as_u64() != self.current_block {
+                        eyre::bail!("Only fetching of the most recent L2 block {} is supported - but queried for {}", self.current_block, num)
                     }
                 }
                 _ => eyre::bail!("Only fetching most recent block is implemented"),
             }
         }
+
         let mut result = self.read_storage_internal(address, idx);
 
         if L2_ETH_TOKEN_ADDRESS == address && result.is_zero() {

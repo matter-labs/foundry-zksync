@@ -1,19 +1,29 @@
-use crate::utils::{ToH160, ToH256};
-use alloy_sol_types::SolInterface;
+use crate::utils::{ToH160, ToH256, ToU256};
+use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
-    fork::ForkStorage, system_contracts::SystemContracts, utils::bytecode_to_factory_dep,
+    deps::storage_view::StorageView, fork::ForkStorage, system_contracts::SystemContracts,
+    utils::bytecode_to_factory_dep,
 };
 use ethers::{
     abi::{AbiDecode, AbiEncode},
     utils::to_checksum,
 };
+use foundry_cheatcodes::CheatsConfig;
 use foundry_cheatcodes_spec::Vm;
-use foundry_evm_core::{backend::DatabaseExt, era_revm::db::RevmDatabaseForEra};
+use foundry_evm_core::{
+    backend::DatabaseExt,
+    era_revm::{db::RevmDatabaseForEra, transactions::storage_to_state},
+    fork::CreateFork,
+    opts::EvmOpts,
+};
 use itertools::Itertools;
 use multivm::{
-    interface::{dyn_tracers::vm_1_3_3::DynTracer, tracer::TracerExecutionStatus, VmRevertReason},
-    vm_refunds_enhancement::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
-    zk_evm_1_3_3::{
+    interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus, VmRevertReason},
+    vm_latest::{
+        BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
+    },
+    zk_evm_1_4_0::{
+        reference_impls::event_sink::EventMessage,
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::{PrimitiveValue, VmLocalState},
         zkevm_opcode_defs::{
@@ -24,9 +34,21 @@ use multivm::{
         },
     },
 };
-use std::{cell::RefMut, collections::HashMap, fmt::Debug};
+use revm::{
+    primitives::{ruint::Uint, BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
+    JournaledState,
+};
+use serde::Serialize;
+use std::{
+    cell::{OnceCell, RefMut},
+    collections::{hash_map::Entry, HashMap, HashSet},
+    fmt::Debug,
+    fs,
+    process::Command,
+    sync::Arc,
+};
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
-use zksync_state::{ReadStorage, StoragePtr, StorageView, WriteStorage};
+use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
@@ -42,6 +64,10 @@ type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
 const CHEATCODE_ADDRESS: H160 = H160([
     113, 9, 112, 158, 207, 169, 26, 128, 98, 111, 243, 152, 157, 104, 246, 127, 91, 29, 209, 45,
 ]);
+
+// 0x2e1908b13b8b625ed13ecf03c87d45c499d1f325
+const TEST_ADDRESS: H160 =
+    H160([46, 25, 8, 177, 59, 139, 98, 94, 209, 62, 207, 3, 200, 125, 69, 196, 153, 209, 243, 37]);
 
 const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     zksync_types::BOOTLOADER_ADDRESS,
@@ -66,6 +92,25 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     H160::zero(),
 ];
 
+#[derive(Debug, Clone)]
+struct EraEnv {
+    l1_batch_env: L1BatchEnv,
+    system_env: SystemEnv,
+}
+
+/// Represents the state of a foundry test function, i.e. functions
+/// prefixed with "testXXX"
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+enum FoundryTestState {
+    /// The test function is not yet running
+    #[default]
+    NotStarted,
+    /// The test function is now running at the specified call depth
+    Running { call_depth: usize },
+    /// The test function has finished executing
+    Finished,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
     one_time_actions: Vec<FinishCycleOneTimeActions>,
@@ -76,6 +121,32 @@ pub struct CheatcodeTracer {
     return_ptr: Option<FatPointer>,
     near_calls: usize,
     serialized_objects: HashMap<String, String>,
+    env: OnceCell<EraEnv>,
+    config: Arc<CheatsConfig>,
+    recorded_logs: HashSet<LogEntry>,
+    recording_logs: bool,
+    recording_timestamp: u32,
+    expected_calls: ExpectedCallsTracker,
+    test_status: FoundryTestState,
+    saved_snapshots: HashMap<U256, SavedSnapshot>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SavedSnapshot {
+    modified_storage: HashMap<StorageKey, H256>,
+}
+
+#[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
+struct LogEntry {
+    topic: H256,
+    data: H256,
+    emitter: H160,
+}
+
+impl LogEntry {
+    fn new(topic: H256, data: H256, emitter: H160) -> Self {
+        LogEntry { topic, data, emitter }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +155,11 @@ enum FinishCycleOneTimeActions {
     StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
     ForceRevert { error: Vec<u8>, exception_handler: PcOrImm },
     ForceReturn { data: Vec<u8>, continue_pc: PcOrImm },
+    CreateSelectFork { url_or_alias: String, block_number: Option<u64> },
+    CreateFork { url_or_alias: String, block_number: Option<u64> },
+    SelectFork { fork_id: U256 },
+    RevertToSnapshot { snapshot_id: U256 },
+    Snapshot,
 }
 
 #[derive(Debug, Clone)]
@@ -116,13 +192,46 @@ struct StartPrankOpts {
     origin: Option<H256>,
 }
 
+/// Tracks the expected calls per address.
+///
+/// For each address, we track the expected calls per call data. We track it in such manner
+/// so that we don't mix together calldatas that only contain selectors and calldatas that contain
+/// selector and arguments (partial and full matches).
+///
+/// This then allows us to customize the matching behavior for each call data on the
+/// `ExpectedCallData` struct and track how many times we've actually seen the call on the second
+/// element of the tuple.
+type ExpectedCallsTracker = HashMap<H160, HashMap<Vec<u8>, (ExpectedCallData, u64)>>;
+
+#[derive(Debug, Clone)]
+struct ExpectedCallData {
+    /// The expected value sent in the call
+    value: Option<U256>,
+    /// The number of times the call is expected to be made.
+    /// If the type of call is `NonCount`, this is the lower bound for the number of calls
+    /// that must be seen.
+    /// If the type of call is `Count`, this is the exact number of calls that must be seen.
+    count: u64,
+    /// The type of expected call.
+    call_type: ExpectedCallType,
+}
+
+/// The type of expected call.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ExpectedCallType {
+    /// The call is expected to be made at least once.
+    NonCount,
+    /// The exact number of calls expected.
+    Count,
+}
+
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     for CheatcodeTracer
 {
     fn before_execution(
         &mut self,
         state: VmLocalStateData<'_>,
-        data: multivm::zk_evm_1_3_3::tracing::BeforeExecutionData,
+        data: multivm::zk_evm_1_4_0::tracing::BeforeExecutionData,
         memory: &SimpleMemory<H>,
         _storage: StoragePtr<EraDb<S>>,
     ) {
@@ -167,6 +276,59 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
+        if self.update_test_status(&state, &data) == &FoundryTestState::Finished {
+            for (address, expected_calls_for_target) in &self.expected_calls {
+                for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
+                    let failed = match expected.call_type {
+                        // If the cheatcode was called with a `count` argument,
+                        // we must check that the EVM performed a CALL with this calldata exactly
+                        // `count` times.
+                        ExpectedCallType::Count => expected.count != *actual_count,
+                        // If the cheatcode was called without a `count` argument,
+                        // we must check that the EVM performed a CALL with this calldata at least
+                        // `count` times. The amount of times to check was
+                        // the amount of time the cheatcode was called.
+                        ExpectedCallType::NonCount => expected.count > *actual_count,
+                    };
+                    // TODO: change to proper revert
+                    assert!(
+                        !failed,
+                        "Expected call to {:?} with data {:?} was found {} times, expected {}",
+                        address, expected_calldata, actual_count, expected.count
+                    );
+                }
+            }
+
+            // reset the test state to avoid checking again
+            self.reset_test_status();
+        }
+
+        // Checks contract calls for expectCall cheatcode
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.current;
+            if let Some(expected_calls_for_target) =
+                self.expected_calls.get_mut(&current.code_address)
+            {
+                let calldata = get_calldata(&state, memory);
+                // Match every partial/full calldata
+                for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
+                    // Increment actual times seen if...
+                    // The calldata is at most, as big as this call's input, and
+                    if expected_calldata.len() <= calldata.len() &&
+                        // Both calldata match, taking the length of the assumed smaller one (which will have at least the selector), and
+                        *expected_calldata == calldata[..expected_calldata.len()] &&
+                        // The value matches, if provided
+                        expected
+                            .value
+                            .map_or(true, |value|{
+                                 value == current.context_u128_value.into()})
+                    {
+                        *actual_count += 1;
+                    }
+                }
+            }
+        }
+
         let current = state.vm_local_state.callstack.get_current_stack();
         // in `handle_action`, when true is returned the current action will
         // be kept in the queue
@@ -177,7 +339,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 prev_exception_handler_pc: exception_handler,
                 prev_continue_pc: continue_pc,
             } if state.vm_local_state.callstack.depth() == *depth &&
-                state.vm_local_state.callstack.current.this_address !=
+                state.vm_local_state.callstack.current.code_address !=
                     zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS =>
             {
                 // dbg!(state.vm_local_state.callstack.current);
@@ -255,8 +417,11 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             if state.vm_local_state.callstack.depth() != action.target_depth {
                 return true
             }
+
             if action.statements_to_skip_count != 0 {
-                action.statements_to_skip_count -= 1;
+                if let Opcode::Ret(_call) = data.opcode.variant.opcode {
+                    action.statements_to_skip_count -= 1;
+                }
                 return true
             }
 
@@ -308,18 +473,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 tracing::error!("cheatcode triggered, but no calldata or ergs available");
                 return
             }
-            tracing::info!("near call: cheatcode triggered");
-            let calldata = {
-                let ptr = state.vm_local_state.registers
-                    [CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
-                assert!(ptr.is_pointer);
-                let fat_data_pointer = FatPointer::from_u256(ptr.value);
-                memory.read_unaligned_bytes(
-                    fat_data_pointer.memory_page as usize,
-                    fat_data_pointer.start as usize,
-                    fat_data_pointer.length as usize,
-                )
-            };
+            tracing::info!("far call: cheatcode triggered");
+            let calldata = get_calldata(&state, memory);
 
             // try to dispatch the cheatcode
             if let Ok(call) = Vm::VmCalls::abi_decode(&calldata, true) {
@@ -335,11 +490,40 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 }
 
 impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeTracer {
+    fn initialize_tracer(
+        &mut self,
+        _state: &mut ZkSyncVmState<EraDb<S>, H>,
+        l1_batch_env: &L1BatchEnv,
+        system_env: &SystemEnv,
+    ) {
+        self.env
+            .set(EraEnv { l1_batch_env: l1_batch_env.clone(), system_env: system_env.clone() })
+            .unwrap();
+    }
+
     fn finish_cycle(
         &mut self,
         state: &mut ZkSyncVmState<EraDb<S>, H>,
-        _bootloader_state: &mut BootloaderState,
+        bootloader_state: &mut BootloaderState,
+        storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
+        let emitter = state.local_state.callstack.current.this_address;
+        if self.recording_logs {
+            let logs = transform_to_logs(
+                state
+                    .event_sink
+                    .get_events_and_l2_l1_logs_after_timestamp(Timestamp(self.recording_timestamp))
+                    .0,
+                emitter,
+            );
+            if !logs.is_empty() {
+                let mut unique_set: HashSet<LogEntry> = HashSet::new();
+
+                // Filter out duplicates and extend the unique entries to the vector
+                self.recorded_logs
+                    .extend(logs.into_iter().filter(|log| unique_set.insert(log.clone())));
+            }
+        }
         while let Some(action) = self.one_time_actions.pop() {
             match action {
                 FinishCycleOneTimeActions::StorageWrite { key, read_value, write_value } => {
@@ -360,6 +544,182 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
+                FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .borrow_mut()
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+                    storage.borrow_mut().clean_cache();
+                    let fork_id = {
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                            &storage.borrow_mut().storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        db.create_select_fork(
+                            create_fork_request(
+                                era_env,
+                                self.config.clone(),
+                                block_number,
+                                &url_or_alias,
+                            ),
+                            &mut env,
+                            &mut journaled_state,
+                        )
+                    };
+                    storage.borrow_mut().modified_storage_keys = modified_storage;
+
+                    self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                }
+                FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
+                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                        &storage.borrow_mut().storage_handle;
+                    let era_db =
+                        handle.inner.write().unwrap().fork.as_ref().unwrap().fork_source.clone();
+
+                    let mut db = era_db.db.lock().unwrap();
+                    let era_env = self.env.get().unwrap();
+                    let fork_id = db.create_fork(create_fork_request(
+                        era_env,
+                        self.config.clone(),
+                        block_number,
+                        &url_or_alias,
+                    ));
+                    self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                }
+                FinishCycleOneTimeActions::SelectFork { fork_id } => {
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .borrow_mut()
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+                    {
+                        storage.borrow_mut().clean_cache();
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                            &storage.borrow_mut().storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        db.select_fork(
+                            rU256::from(fork_id.as_u128()),
+                            &mut env,
+                            &mut journaled_state,
+                        )
+                        .unwrap();
+                    }
+                    storage.borrow_mut().modified_storage_keys = modified_storage;
+
+                    self.return_data = Some(vec![fork_id]);
+                }
+                FinishCycleOneTimeActions::RevertToSnapshot { snapshot_id } => {
+                    let mut storage = storage.borrow_mut();
+
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+
+                    storage.clean_cache();
+
+                    {
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        db.revert(Uint::from_limbs(snapshot_id.0), &journaled_state, &mut env);
+                    }
+
+                    storage.modified_storage_keys =
+                        self.saved_snapshots.remove(&snapshot_id).unwrap().modified_storage;
+                }
+                FinishCycleOneTimeActions::Snapshot => {
+                    let mut storage = storage.borrow_mut();
+
+                    let modified_storage: HashMap<StorageKey, H256> = storage
+                        .modified_storage_keys()
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect();
+
+                    storage.clean_cache();
+
+                    let snapshot_id = {
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let env = into_revm_env(era_env);
+                        let snapshot_id = db.snapshot(&journaled_state, &env);
+
+                        self.saved_snapshots.insert(
+                            snapshot_id.to_u256(),
+                            SavedSnapshot { modified_storage: modified_storage.clone() },
+                        );
+                        snapshot_id
+                    };
+
+                    storage.modified_storage_keys = modified_storage;
+                    self.return_data = Some(vec![snapshot_id.to_u256()]);
+                }
                 FinishCycleOneTimeActions::ForceReturn { mut data, continue_pc: pc } => {
                     tracing::warn!("!!!! FORCING RETURN");
 
@@ -406,7 +766,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     // self.is_triggered_this_cycle = false;
                     //change current stack pc to exception handler
-                    // state.local_state.callstack.get_current_stack_mut().pc = pc;
+                    state.local_state.callstack.get_current_stack_mut().pc = pc;
                     // state.local_state.pending_exception = true;
 
                     // return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
@@ -437,17 +797,51 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 }
 
 impl CheatcodeTracer {
-    pub fn new() -> Self {
-        CheatcodeTracer {
-            one_time_actions: vec![],
-            delayed_actions: vec![],
-            recurring_actions: vec![],
-            permanent_actions: FinishCyclePermanentActions { start_prank: None },
-            near_calls: 0,
-            return_data: None,
-            return_ptr: None,
-            serialized_objects: HashMap::new(),
+    pub fn new(cheatcodes_config: Arc<CheatsConfig>) -> Self {
+        Self { config: cheatcodes_config, ..Default::default() }
+    }
+
+    /// Resets the test state to [TestStatus::NotStarted]
+    fn reset_test_status(&mut self) {
+        self.test_status = FoundryTestState::NotStarted;
+    }
+
+    /// Updates and keeps track of the test status.
+    ///
+    /// A foundry test starting with "testXXX" prefix is said to running when it is first called
+    /// with the test selector as calldata. The test finishes when the calldepth reaches the same
+    /// depth as when it started, i.e. when the test function returns. The retun value is stored
+    /// in the calldata.
+    fn update_test_status(
+        &mut self,
+        state: &VmLocalStateData<'_>,
+        data: &AfterExecutionData,
+    ) -> &FoundryTestState {
+        match data.opcode.variant.opcode {
+            Opcode::FarCall(_) => {
+                if self.test_status == FoundryTestState::NotStarted &&
+                    state.vm_local_state.callstack.current.code_address == TEST_ADDRESS
+                {
+                    self.test_status = FoundryTestState::Running {
+                        call_depth: state.vm_local_state.callstack.depth(),
+                    };
+                    tracing::info!("Test started depth {}", state.vm_local_state.callstack.depth());
+                }
+            }
+            Opcode::Ret(_) => {
+                if let FoundryTestState::Running { call_depth } = self.test_status {
+                    // As we are checking the calldepth after execution, the stack has already been
+                    // popped (so reduced by 1) and must be accounted for.
+                    if call_depth == state.vm_local_state.callstack.depth() + 1 {
+                        self.test_status = FoundryTestState::Finished;
+                        tracing::info!("Test finished {}", state.vm_local_state.callstack.depth());
+                    }
+                }
+            }
+            _ => (),
         }
+
+        &self.test_status
     }
 
     pub fn dispatch_cheatcode<S: DatabaseExt + Send, H: HistoryMode>(
@@ -504,6 +898,68 @@ impl CheatcodeTracer {
                 tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with reason");
                 self.add_except_revert(Some(revertData.to_vec()), depth)
             }
+            expectCall_0(expectCall_0Call { callee, data }) => {
+                tracing::info!("👷 Setting expected call to {callee:?}");
+                self.expect_call(&callee.to_h160(), &data, None, 1, ExpectedCallType::NonCount);
+            }
+            expectCall_1(expectCall_1Call { callee, data, count }) => {
+                tracing::info!("👷 Setting expected call to {callee:?} with count {count}");
+                self.expect_call(&callee.to_h160(), &data, None, count, ExpectedCallType::Count);
+            }
+            expectCall_2(expectCall_2Call { callee, msgValue, data }) => {
+                tracing::info!("👷 Setting expected call to {callee:?} with value {msgValue}");
+                self.expect_call(
+                    &callee.to_h160(),
+                    &data,
+                    Some(msgValue.to_u256()),
+                    1,
+                    ExpectedCallType::NonCount,
+                );
+            }
+            expectCall_3(expectCall_3Call { callee, msgValue, data, count }) => {
+                tracing::info!(
+                    "👷 Setting expected call to {callee:?} with value {msgValue} and count
+                {count}"
+                );
+                self.expect_call(
+                    &callee.to_h160(),
+                    &data,
+                    Some(msgValue.to_u256()),
+                    count,
+                    ExpectedCallType::Count,
+                );
+            }
+            ffi(ffiCall { commandInput: command_input }) => {
+                tracing::info!("👷 Running ffi: {command_input:?}");
+                let Some(first_arg) = command_input.get(0) else {
+                    tracing::error!("Failed to run ffi: no args");
+                    return
+                };
+                let Ok(output) = Command::new(first_arg)
+                    .args(&command_input[1..])
+                    .current_dir(&self.config.root)
+                    .output()
+                else {
+                    tracing::error!("Failed to run ffi");
+                    return
+                };
+
+                // The stdout might be encoded on valid hex, or it might just be a string,
+                // so we need to determine which it is to avoid improperly encoding later.
+                let Ok(trimmed_stdout) = String::from_utf8(output.stdout) else {
+                    tracing::error!("Failed to parse ffi output");
+                    return
+                };
+                let trimmed_stdout = trimmed_stdout.trim();
+                let encoded_stdout =
+                    if let Ok(hex) = hex::decode(trimmed_stdout.trim_start_matches("0x")) {
+                        hex
+                    } else {
+                        trimmed_stdout.as_bytes().to_vec()
+                    };
+
+                self.add_trimmed_return_data(&encoded_stdout);
+            }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
                 let mut storage = storage.borrow_mut();
@@ -519,12 +975,98 @@ impl CheatcodeTracer {
                 tracing::info!("👷 Returndata is {:?}", account_nonce);
                 self.return_data = Some(vec![account_nonce]);
             }
+            getRecordedLogs(getRecordedLogsCall {}) => {
+                tracing::info!("👷 Getting recorded logs");
+                let logs: Vec<Log> = self
+                    .recorded_logs
+                    .iter()
+                    .map(|log| Log {
+                        topics: vec![log.topic.to_fixed_bytes().into()],
+                        data: log.data.to_fixed_bytes().into(),
+                        emitter: log.emitter.to_fixed_bytes().into(),
+                    })
+                    .collect_vec();
+
+                let result = getRecordedLogsReturn { logs };
+
+                let return_data: Vec<U256> =
+                    result.logs.abi_encode().chunks(32).map(|b| b.into()).collect_vec();
+
+                self.return_data = Some(return_data);
+
+                //clean up logs
+                self.recorded_logs = HashSet::new();
+                //disable flag of recording logs
+                self.recording_logs = false;
+            }
             load(loadCall { target, slot }) => {
                 tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
                 let key = StorageKey::new(AccountTreeId::new(target.to_h160()), H256(*slot));
                 let mut storage = storage.borrow_mut();
                 let value = storage.read_value(&key);
                 self.return_data = Some(vec![h256_to_u256(value)]);
+            }
+            recordLogs(recordLogsCall {}) => {
+                tracing::info!("👷 Recording logs");
+                tracing::info!(
+                    "👷 Logs will be with the timestamp {}",
+                    state.vm_local_state.timestamp
+                );
+
+                self.recording_timestamp = state.vm_local_state.timestamp;
+                self.recording_logs = true;
+            }
+            readCallers(readCallersCall {}) => {
+                tracing::info!("👷 Reading callers");
+
+                let current_origin = {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                    );
+
+                    storage.borrow_mut().read_value(&key)
+                };
+
+                let mut mode = CallerMode::None;
+                let mut new_caller = current_origin;
+
+                if let Some(prank) = &self.permanent_actions.start_prank {
+                    //TODO: vm.prank -> CallerMode::Prank
+                    println!("PRANK");
+                    mode = CallerMode::RecurrentPrank;
+                    new_caller = prank.sender.into();
+                }
+                // TODO: vm.broadcast / vm.startBroadcast section
+                // else if let Some(broadcast) = broadcast {
+                //     mode = if broadcast.single_call {
+                //         CallerMode::Broadcast
+                //     } else {
+                //         CallerMode::RecurrentBroadcast
+                //     };
+                //     new_caller = &broadcast.new_origin;
+                //     new_origin = &broadcast.new_origin;
+                // }
+
+                let caller_mode = (mode as u8).into();
+                let message_sender = h256_to_u256(new_caller);
+                let tx_origin = h256_to_u256(current_origin);
+
+                self.return_data = Some(vec![caller_mode, message_sender, tx_origin]);
+            }
+            readFile(readFileCall { path }) => {
+                tracing::info!("👷 Reading file in path {}", path);
+                let Ok(data) = fs::read(path) else {
+                    tracing::error!("Failed to read file");
+                    return
+                };
+                self.add_trimmed_return_data(&data);
+            }
+            revertTo(revertToCall { snapshotId }) => {
+                tracing::info!("👷 Reverting to snapshot {}", snapshotId);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RevertToSnapshot {
+                    snapshot_id: snapshotId.to_u256(),
+                });
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
@@ -635,6 +1177,10 @@ impl CheatcodeTracer {
                 );
                 self.write_storage(nonce_key, u256_to_h256(enforced_full_nonce), &mut storage);
             }
+            snapshot(snapshotCall {}) => {
+                tracing::info!("👷 Creating snapshot");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Snapshot);
+            }
             startPrank_0(startPrank_0Call { msgSender: msg_sender }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?}");
                 self.permanent_actions.start_prank =
@@ -710,6 +1256,46 @@ impl CheatcodeTracer {
                 let int_value = value.to_string();
                 self.add_trimmed_return_data(int_value.as_bytes());
             }
+
+            tryFfi(tryFfiCall { commandInput: command_input }) => {
+                tracing::info!("👷 Running try ffi: {command_input:?}");
+                let Some(first_arg) = command_input.get(0) else {
+                    tracing::error!("Failed to run ffi: no args");
+                    return
+                };
+                let Ok(output) = Command::new(first_arg)
+                    .args(&command_input[1..])
+                    .current_dir(&self.config.root)
+                    .output()
+                else {
+                    tracing::error!("Failed to run ffi");
+                    return
+                };
+
+                // The stdout might be encoded on valid hex, or it might just be a string,
+                // so we need to determine which it is to avoid improperly encoding later.
+                let Ok(trimmed_stdout) = String::from_utf8(output.stdout) else {
+                    tracing::error!("Failed to parse ffi output");
+                    return
+                };
+                let trimmed_stdout = trimmed_stdout.trim();
+                let encoded_stdout =
+                    if let Ok(hex) = hex::decode(trimmed_stdout.trim_start_matches("0x")) {
+                        hex
+                    } else {
+                        trimmed_stdout.as_bytes().to_vec()
+                    };
+
+                let ffi_result = FfiResult {
+                    exitCode: output.status.code().unwrap_or(69), // Default from foundry
+                    stdout: encoded_stdout,
+                    stderr: output.stderr,
+                };
+                let encoded_ffi_result: Vec<u8> = ffi_result.abi_encode();
+                let return_data: Vec<U256> =
+                    encoded_ffi_result.chunks(32).map(|b| b.into()).collect_vec();
+                self.return_data = Some(return_data);
+            }
             warp(warpCall { newTimestamp: new_timestamp }) => {
                 tracing::info!("👷 Setting block timestamp {}", new_timestamp);
 
@@ -724,6 +1310,91 @@ impl CheatcodeTracer {
                     u256_to_h256(pack_block_info(block_number, new_timestamp.as_limbs()[0])),
                     &mut storage,
                 );
+            }
+            createSelectFork_0(createSelectFork_0Call { urlOrAlias }) => {
+                tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
+
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: None,
+                });
+            }
+            createSelectFork_1(createSelectFork_1Call { urlOrAlias, blockNumber }) => {
+                let block_number = blockNumber.to_u256().as_u64();
+                tracing::info!(
+                    "👷 Creating and selecting fork {} for block number {}",
+                    urlOrAlias,
+                    block_number
+                );
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: Some(block_number),
+                });
+            }
+            createFork_0(createFork_0Call { urlOrAlias }) => {
+                tracing::info!("👷 Creating fork {}", urlOrAlias,);
+
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: None,
+                });
+            }
+            createFork_1(createFork_1Call { urlOrAlias, blockNumber }) => {
+                let block_number = blockNumber.to_u256().as_u64();
+                tracing::info!("👷 Creating fork {} for block number {}", urlOrAlias, block_number);
+                self.one_time_actions.push(FinishCycleOneTimeActions::CreateFork {
+                    url_or_alias: urlOrAlias,
+                    block_number: Some(block_number),
+                });
+            }
+            selectFork(selectForkCall { forkId }) => {
+                tracing::info!("👷 Selecting fork {}", forkId);
+
+                self.one_time_actions
+                    .push(FinishCycleOneTimeActions::SelectFork { fork_id: forkId.to_u256() });
+            }
+            writeFile(writeFileCall { path, data }) => {
+                tracing::info!("👷 Writing data to file in path {}", path);
+                if fs::write(path, data).is_err() {
+                    tracing::error!("Failed to write file");
+                }
+            }
+            writeJson_0(writeJson_0Call { json, path }) => {
+                tracing::info!("👷 Writing json data to file in path {}", path);
+                let Ok(json) = serde_json::from_str::<serde_json::Value>(&json) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                let Ok(formatted_json) = serde_json::to_string_pretty(&json) else {
+                    tracing::error!("Failed to format json");
+                    return
+                };
+                if fs::write(path, formatted_json).is_err() {
+                    tracing::error!("Failed to write file");
+                }
+            }
+            writeJson_1(writeJson_1Call { json, path, valueKey: value_key }) => {
+                tracing::info!("👷 Writing json data to file in path {path} with key {value_key}");
+                let Ok(file) = fs::read_to_string(&path) else {
+                    tracing::error!("Failed to read file");
+                    return
+                };
+                let Ok(mut file_json) = serde_json::from_str::<serde_json::Value>(&file) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                let Ok(json) = serde_json::from_str::<serde_json::Value>(&json) else {
+                    tracing::error!("Failed to parse json");
+                    return
+                };
+                file_json[value_key] = json;
+                let Ok(formatted_json) = serde_json::to_string_pretty(&file_json) else {
+                    tracing::error!("Failed to format json");
+                    return
+                };
+                if fs::write(path, formatted_json).is_err() {
+                    tracing::error!("Failed to write file");
+                }
             }
             _ => {
                 tracing::error!("👷 Unrecognized cheatcode");
@@ -805,13 +1476,13 @@ impl CheatcodeTracer {
         //-2: possibly for EfficientCall.call EfficientCall.rawCall ? not confirmed
         let action = FinishCycleRecurringAction::ExpectRevert {
             reason,
-            depth: depth - 2,
+            depth: depth - 1,
             prev_exception_handler_pc: None,
             prev_continue_pc: None,
         };
         let delay = DelayedNextStatementAction {
-            target_depth: depth - 2,
-            statements_to_skip_count: 0,
+            target_depth: depth - 1,
+            statements_to_skip_count: 2,
             action,
         };
         self.delayed_actions.push(delay);
@@ -870,4 +1541,126 @@ impl CheatcodeTracer {
             (zkevm_opcode_defs::RetOpcode::Panic, _) => todo!("ignore/return error ?"),
         }
     }
+
+    /// Adds an expectCall to the tracker.
+    #[allow(clippy::too_many_arguments)]
+    fn expect_call(
+        &mut self,
+        callee: &H160,
+        calldata: &Vec<u8>,
+        value: Option<U256>,
+        count: u64,
+        call_type: ExpectedCallType,
+    ) {
+        let expecteds = self.expected_calls.entry(*callee).or_default();
+
+        match call_type {
+            ExpectedCallType::Count => {
+                // Get the expected calls for this target.
+                // In this case, as we're using counted expectCalls, we should not be able to set
+                // them more than once.
+                assert!(
+                    !expecteds.contains_key(calldata),
+                    "counted expected calls can only bet set once"
+                );
+                expecteds
+                    .insert(calldata.to_vec(), (ExpectedCallData { value, count, call_type }, 0));
+            }
+            ExpectedCallType::NonCount => {
+                // Check if the expected calldata exists.
+                // If it does, increment the count by one as we expect to see it one more time.
+                match expecteds.entry(calldata.clone()) {
+                    Entry::Occupied(mut entry) => {
+                        let (expected, _) = entry.get_mut();
+                        // Ensure we're not overwriting a counted expectCall.
+                        assert!(
+                            expected.call_type == ExpectedCallType::NonCount,
+                            "cannot overwrite a counted expectCall with a non-counted expectCall"
+                        );
+                        expected.count += 1;
+                    }
+                    // If it does not exist, then create it.
+                    Entry::Vacant(entry) => {
+                        entry.insert((ExpectedCallData { value, count, call_type }, 0));
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> {
+    events
+        .iter()
+        .filter_map(|event| {
+            if event.address == zksync_types::EVENT_WRITER_ADDRESS {
+                Some(LogEntry::new(u256_to_h256(event.key), u256_to_h256(event.value), emitter))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn into_revm_env(env: &EraEnv) -> Env {
+    use foundry_common::zk_utils::conversion_utils::h160_to_address;
+    use revm::primitives::U256;
+    let block = BlockEnv {
+        number: U256::from(env.l1_batch_env.first_l2_block.number),
+        coinbase: h160_to_address(env.l1_batch_env.fee_account),
+        timestamp: U256::from(env.l1_batch_env.first_l2_block.timestamp),
+        gas_limit: U256::from(env.system_env.gas_limit),
+        basefee: U256::from(env.l1_batch_env.base_fee()),
+        ..Default::default()
+    };
+
+    let mut cfg = CfgEnv::default();
+    cfg.chain_id = env.system_env.chain_id.as_u64();
+
+    Env { block, cfg, ..Default::default() }
+}
+
+fn create_fork_request(
+    env: &EraEnv,
+    config: Arc<CheatsConfig>,
+    block_number: Option<u64>,
+    url_or_alias: &str,
+) -> CreateFork {
+    use foundry_evm_core::opts::Env;
+    use revm::primitives::Address as revmAddress;
+
+    let url = config.rpc_url(url_or_alias).unwrap();
+    let env = into_revm_env(env);
+    let opts_env = Env {
+        gas_limit: u64::MAX,
+        chain_id: None,
+        tx_origin: revmAddress::ZERO,
+        block_number: 0,
+        block_timestamp: 0,
+        ..Default::default()
+    };
+    let evm_opts = EvmOpts {
+        env: opts_env,
+        fork_url: Some(url.clone()),
+        fork_block_number: block_number,
+        ..Default::default()
+    };
+
+    CreateFork {
+        enable_caching: config.rpc_storage_caching.enable_for_endpoint(&url),
+        url,
+        env,
+        evm_opts,
+    }
+}
+
+fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMemory<H>) -> Vec<u8> {
+    let ptr = state.vm_local_state.registers[CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
+    assert!(ptr.is_pointer);
+    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+    memory.read_unaligned_bytes(
+        fat_data_pointer.memory_page as usize,
+        fat_data_pointer.start as usize,
+        fat_data_pointer.length as usize,
+    )
 }

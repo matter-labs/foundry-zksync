@@ -1,4 +1,5 @@
 use era_test_node::{
+    deps::storage_view::StorageView,
     fork::{ForkDetails, ForkStorage},
     node::{
         InMemoryNode, InMemoryNodeConfig, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails,
@@ -6,9 +7,10 @@ use era_test_node::{
     system_contracts,
 };
 use ethers_core::abi::ethabi::{self, ParamType};
+use itertools::Itertools;
 use multivm::{
     interface::VmExecutionResultAndLogs,
-    vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer},
+    vm_latest::{HistoryDisabled, ToTracerPointer},
 };
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
@@ -21,17 +23,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
-use zksync_state::StorageView;
 use zksync_types::{
     api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
-    StorageKey, StorageLogQueryType, ACCOUNT_CODE_STORAGE_ADDRESS,
+    StorageKey, StorageLogQueryType, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
 use foundry_common::zk_utils::{
-    conversion_utils::{
-        address_to_h160, h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
-    },
+    conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
     factory_deps::PackedEraBytecode,
 };
 
@@ -135,22 +134,19 @@ where
     <DB as revm::Database>::Error: Debug,
     INSP: ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>,
 {
-    let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
-    let era_db = RevmDatabaseForEra { db: Arc::new(Mutex::new(Box::new(db))), current_block: num };
+    let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
+    let (num, ts) = era_db.get_l2_block_number_and_timestamp();
+    let l1_num = num;
+    let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
 
-    let nonces = era_db.get_nonce_for_address(address_to_h160(env.tx.caller));
-
-    debug!(
-        "*** Starting ERA transaction: block: {:?} timestamp: {:?} - but using {:?} and {:?} instead with nonce {:?}",
-        env.block.number.to::<u32>(),
-        env.block.timestamp.to::<u64>(),
-        num,
-        ts,
-        nonces
+    info!(
+        "Starting ERA transaction: block={:?} timestamp={:?} nonce={:?} | l1_block={}",
+        num, ts, nonce, l1_num
     );
 
     // Update the environment timestamp and block number.
     // Check if this should be done at the end?
+    // In general, we do not rely on env as it's consistently maintained in foundry
     env.block.number = env.block.number.saturating_add(rU256::from(1));
     env.block.timestamp = env.block.timestamp.saturating_add(rU256::from(1));
 
@@ -161,14 +157,13 @@ where
         31337
     };
 
-    let (l2_num, l2_ts) = (num * 2, ts * 2);
     let fork_details = ForkDetails {
         fork_source: era_db.clone(),
-        l1_block: L1BatchNumber(num as u32),
+        l1_block: L1BatchNumber(l1_num as u32),
         l2_block: Block::default(),
-        l2_miniblock: l2_num,
+        l2_miniblock: num,
         l2_miniblock_hash: Default::default(),
-        block_timestamp: l2_ts,
+        block_timestamp: ts,
         overwrite_chain_id: Some(L2ChainId::from(chain_id_u32)),
         // Make sure that l1 gas price is set to reasonable values.
         l1_gas_price: u64::max(env.block.basefee.to::<u64>(), 1000),
@@ -184,7 +179,7 @@ where
     };
     let node = InMemoryNode::new(Some(fork_details), None, config);
 
-    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonces);
+    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
 
     if l2_tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -193,7 +188,12 @@ where
     }
     let tracer = inspector.into_tracer_pointer();
     let era_execution_result = node
-        .run_l2_tx_raw(l2_tx, multivm::interface::TxExecutionMode::VerifyExecute, vec![tracer])
+        .run_l2_tx_raw(
+            l2_tx,
+            multivm::interface::TxExecutionMode::VerifyExecute,
+            vec![tracer],
+            false,
+        )
         .unwrap();
 
     let (modified_keys, tx_result, _call_traces, _block, bytecodes, _block_ctx) =
@@ -202,11 +202,22 @@ where
 
     let execution_result = match tx_result.result {
         multivm::interface::ExecutionResult::Success { output, .. } => {
+            let logs = tx_result
+                .logs
+                .events
+                .clone()
+                .into_iter()
+                .map(|event| revm::primitives::Log {
+                    address: h160_to_address(event.address),
+                    topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
+                    data: event.value.into(),
+                })
+                .collect_vec();
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
                 gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
-                logs: vec![],
+                logs,
                 output: revm::primitives::Output::Create(
                     Bytes::from(decode_l2_tx_result(output)),
                     maybe_contract_address.map(h160_to_address),
@@ -241,6 +252,30 @@ where
         }
     };
 
+    Ok(ResultAndState {
+        result: execution_result,
+        state: storage_to_state(&era_db, &modified_keys, bytecodes),
+    })
+}
+
+fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
+    ethabi::decode(&[ParamType::Bytes], &output)
+        .ok()
+        .and_then(|result| result.first().cloned())
+        .and_then(|result| result.into_bytes())
+        .unwrap_or_default()
+}
+
+/// Converts the zksync era's modified keys to the revm state.
+pub fn storage_to_state<DB>(
+    era_db: &RevmDatabaseForEra<DB>,
+    modified_keys: &HashMap<StorageKey, StorageValue>,
+    bytecodes: HashMap<U256, Vec<U256>>,
+) -> rHashMap<Address, Account>
+where
+    DB: DatabaseExt + Send,
+    <DB as revm::Database>::Error: Debug,
+{
     let account_to_keys: HashMap<H160, HashMap<StorageKey, H256>> =
         modified_keys.iter().fold(HashMap::new(), |mut acc, (storage_key, value)| {
             acc.entry(*storage_key.address()).or_default().insert(*storage_key, *value);
@@ -289,7 +324,7 @@ where
                         .collect()
                 });
 
-            let account_code = era_db.fetch_account_code(*account, &modified_keys, &bytecodes);
+            let account_code = era_db.fetch_account_code(*account, modified_keys, &bytecodes);
 
             let (code_hash, code) = account_code
                 .map(|(hash, bytecode)| (B256::from(&hash.0), Some(bytecode)))
@@ -313,24 +348,15 @@ where
             )
         })
         .collect();
-
-    Ok(ResultAndState { result: execution_result, state })
-}
-
-fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
-    ethabi::decode(&[ParamType::Bytes], &output)
-        .ok()
-        .and_then(|result| result.first().cloned())
-        .and_then(|result| result.into_bytes())
-        .unwrap_or_default()
+    state
 }
 
 #[cfg(test)]
 mod tests {
     use core::marker::PhantomData;
     use multivm::{
-        interface::dyn_tracers::vm_1_3_3::DynTracer,
-        vm_refunds_enhancement::{HistoryMode, SimpleMemory, VmTracer},
+        interface::dyn_tracers::vm_1_4_0::DynTracer,
+        vm_latest::{HistoryMode, SimpleMemory, VmTracer},
     };
     use zksync_state::WriteStorage;
 

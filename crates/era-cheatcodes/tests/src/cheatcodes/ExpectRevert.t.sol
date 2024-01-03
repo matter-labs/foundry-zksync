@@ -78,7 +78,7 @@ contract ExpectRevertTest is Test {
             abi.encodeWithSignature(
                 "expectRevert(bytes)",
                 "revert"));
-        // require(success, "expectRevert failed");
+        require(success, "expectRevert failed");
         reverter.revertWithMessage("revert");
     }
 
@@ -164,8 +164,8 @@ contract ExpectRevertTest is Test {
     //     (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
 
     //     (success, data) = revAddr.call(reverterFunc);
-    //     console.log(success);
-    //     // require(success, "expectRevert failed");
+    //     // console.log(success);
+    //     require(success, "expectRevert failed");
     //     return (success, 42);
     // }
 

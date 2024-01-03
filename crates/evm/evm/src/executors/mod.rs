@@ -12,9 +12,9 @@ use crate::inspectors::{
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, U256};
-use ethers_core::types::Log;
+use ethers_core::types::{Log, H256};
 use ethers_signers::LocalWallet;
-use foundry_common::{abi::IntoFunction, evm::Breakpoints};
+use foundry_common::{abi::IntoFunction, conversion_utils::address_to_h160, evm::Breakpoints};
 use foundry_evm_core::{
     backend::{Backend, DatabaseError, DatabaseExt, DatabaseResult, FuzzBackendWrapper},
     constants::{CALLER, CHEATCODE_ADDRESS},
@@ -147,15 +147,6 @@ impl Executor {
         self
     }
 
-    // Record any changes made to the block's environment during setup,
-    // and also the chainid, which can be set manually.
-    pub fn record_env_changes(&mut self, env: &Env) {
-        // record any changes made to the block's environment during setup
-        self.env.block = env.block.clone();
-        // and also the chainid, which can be set manually
-        self.env.cfg.chain_id = env.cfg.chain_id;
-    }
-
     /// Calls the `setUp()` function on a contract.
     ///
     /// This will commit any state changes to the underlying database.
@@ -169,7 +160,10 @@ impl Executor {
         self.backend.set_test_contract(to).set_caller(from);
         let res = self.call_committing::<_, _>(from, to, "setUp()", vec![], U256::ZERO, None)?;
 
-        self.record_env_changes(&res.env);
+        // record any changes made to the block's environment during setup
+        self.env.block = res.env.block.clone();
+        // and also the chainid, which can be set manually
+        self.env.cfg.chain_id = res.env.cfg.chain_id;
 
         match res.state_changeset.as_ref() {
             Some(changeset) => {
@@ -249,7 +243,6 @@ impl Executor {
         // execute the call
         let env = self.build_test_env(from, TransactTo::Call(test_contract), calldata, value);
         let call_result = self.call_raw_with_env(env)?;
-        self.record_env_changes(&call_result.env);
         convert_call_result(abi, &func, call_result)
     }
 
@@ -432,12 +425,7 @@ impl Executor {
         abi: Option<&Abi>,
     ) -> Result<DeployResult, EvmError> {
         let env = self.build_test_env(from, TransactTo::Create(CreateScheme::Create), code, value);
-        let res = self.deploy_with_env(env, abi);
-        if let Ok(DeployResult { env, .. }) = &res {
-            self.record_env_changes(env);
-        }
-
-        res
+        self.deploy_with_env(env, abi)
     }
 
     /// Check if a call to a test contract was successful.
@@ -751,11 +739,12 @@ fn calc_stipend(calldata: &[u8], spec: SpecId) -> u64 {
 /// Converts the data aggregated in the `inspector` and `call` to a `RawCallResult`
 fn convert_executed_result(
     env: Env,
-    inspector: InspectorStack,
+    mut inspector: InspectorStack,
     result: ResultAndState,
     has_snapshot_failure: bool,
 ) -> eyre::Result<RawCallResult> {
     let ResultAndState { result: exec_result, state: state_changeset } = result;
+    let exec_logs = exec_result.logs().clone();
     let (exit_reason, gas_refunded, gas_used, out) = match exec_result {
         ExecutionResult::Success { reason, gas_used, gas_refunded, output, .. } => {
             (eval_to_instruction_result(reason), gas_refunded, gas_used, Some(output))
@@ -775,6 +764,17 @@ fn convert_executed_result(
         Some(Output::Create(ref data, _)) => data.to_owned(),
         _ => Bytes::default(),
     };
+
+    // append era-test-node events
+    if let Some(lc) = inspector.log_collector.as_mut() {
+        lc.logs.extend(exec_logs.into_iter().enumerate().map(|(index, log)| Log {
+            address: address_to_h160(log.address),
+            topics: log.topics.into_iter().map(|topic| H256::from(topic.0)).collect(),
+            data: ethers_core::types::Bytes(log.data.0),
+            log_index: Some(ethers_core::types::U256::from(index)),
+            ..Default::default()
+        }));
+    }
 
     let InspectorData {
         logs,

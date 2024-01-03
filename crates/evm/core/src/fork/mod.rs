@@ -11,6 +11,7 @@ mod cache;
 pub use cache::{BlockchainDb, BlockchainDbMeta, JsonBlockCacheDB, MemDb};
 
 pub mod database;
+pub mod zksync_provider;
 
 mod multi;
 pub use multi::{ForkId, MultiFork, MultiForkHandler};
