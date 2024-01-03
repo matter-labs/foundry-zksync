@@ -263,12 +263,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 }
             }
 
-            if self.emit_config.expected_emit_state == ExpectedEmitState::CallTriggered {
-                if state.vm_local_state.callstack.depth() < self.emit_config.call_depth {
-                    //call triggered and finished
-                    self.emit_config.call_emits_until = state.vm_local_state.timestamp;
-                    // self.emit_config.expected_emit_state = ExpectedEmitState::Finished;
-                }
+            if self.emit_config.expected_emit_state == ExpectedEmitState::CallTriggered &&
+                state.vm_local_state.callstack.depth() < self.emit_config.call_depth
+            {
+                self.emit_config.call_emits_until = state.vm_local_state.timestamp;
             }
         }
 
