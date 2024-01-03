@@ -31,6 +31,23 @@ contract ExpectEmitTest is Test {
         emitter.emitEvent(2, 2, 1, testData1);
     }
 
+        function testExpectEmitWithAddress() public {
+        address EMITTER_ADDRESS = 0xB669bd94992d4dfb4DE8EAbc32c0c9AfFedF4774;
+        bytes memory testData1 = "test2";
+
+        Emitter emitter = new Emitter();
+
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(    
+            abi.encodeWithSignature("expectEmit(bool,bool,bool,bool,address)", true, true, true, true, EMITTER_ADDRESS)
+        );
+
+        require(success, "expectEmit failed");
+
+        emit LogTopic1(2, 2, 1, testData1);
+ 
+        emitter.emitEvent(2, 2, 1, testData1);
+    }
+
     function trimReturnBytes(
         bytes memory rawData
     ) internal pure returns (bytes memory) {

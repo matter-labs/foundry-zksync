@@ -134,6 +134,14 @@ struct EmitConfig {
     call_emits_since: u32,
     call_emits_until: u32,
     call_depth: usize,
+    checks: EmitChecks,
+}
+
+#[derive(Debug, Clone, Default)]
+struct EmitChecks {
+    address: Option<H160>,
+    topics: [bool; 3],
+    data: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq, Default)]
@@ -374,16 +382,16 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         bootloader_state: &mut BootloaderState,
         storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
-            if self.recording_logs {
-                let (events, _) = state.event_sink.get_events_and_l2_l1_logs_after_timestamp(
-                    zksync_types::Timestamp(self.recording_timestamp),
-                );
-                let logs = crate::events::parse_events(events);
-                //insert logs in the hashset
-                for log in logs {
-                    self.recorded_logs.insert(log);
-                }
+        if self.recording_logs {
+            let (events, _) = state.event_sink.get_events_and_l2_l1_logs_after_timestamp(
+                zksync_types::Timestamp(self.recording_timestamp),
+            );
+            let logs = crate::events::parse_events(events);
+            //insert logs in the hashset
+            for log in logs {
+                self.recorded_logs.insert(log);
             }
+        }
 
         // This assert is triggered only once after the test execution finishes
         // And is used to assert that all logs exist
@@ -430,7 +438,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 .collect::<Vec<_>>();
             let actual_logs = crate::events::parse_events(actual_events);
 
-            assert!(compare_logs(&expected_logs, &actual_logs));
+            assert!(compare_logs(&expected_logs, &actual_logs, self.emit_config.checks.clone()));
         }
 
         while let Some(action) = self.one_time_actions.pop() {
@@ -696,10 +704,52 @@ impl CheatcodeTracer {
                     ExpectedCallType::Count,
                 );
             }
+            expectEmit_0(expectEmit_0Call { checkTopic1, checkTopic2, checkTopic3, checkData }) => {
+                tracing::info!(
+                    "👷 Setting expected emit with checks {:?}, {:?}, {:?}, {:?}",
+                    checkTopic1,
+                    checkTopic2,
+                    checkTopic3,
+                    checkData
+                );
+                self.emit_config.expected_emit_state = ExpectedEmitState::ExpectedEmitTriggered;
+                self.emit_config.expect_emits_since = state.vm_local_state.timestamp;
+                self.emit_config.checks = EmitChecks {
+                    address: None,
+                    topics: [checkTopic1, checkTopic2, checkTopic3],
+                    data: checkData,
+                };
+            }
+            expectEmit_1(expectEmit_1Call {
+                checkTopic1,
+                checkTopic2,
+                checkTopic3,
+                checkData,
+                emitter,
+            }) => {
+                tracing::info!(
+                    "👷 Setting expected emit with checks {:?}, {:?}, {:?}, {:?} from emitter {:?}",
+                    checkTopic1,
+                    checkTopic2,
+                    checkTopic3,
+                    checkData,
+                    emitter
+                );
+                self.emit_config.expected_emit_state = ExpectedEmitState::ExpectedEmitTriggered;
+                self.emit_config.expect_emits_since = state.vm_local_state.timestamp;
+                self.emit_config.checks = EmitChecks {
+                    address: Some(emitter.to_h160()),
+                    topics: [checkTopic1, checkTopic2, checkTopic3],
+                    data: checkData,
+                };
+                self.emit_config.call_depth = state.vm_local_state.callstack.depth();
+            }
             expectEmit_2(expectEmit_2Call {}) => {
                 tracing::info!("👷 Setting expected emit at {}", state.vm_local_state.timestamp);
                 self.emit_config.expected_emit_state = ExpectedEmitState::ExpectedEmitTriggered;
                 self.emit_config.expect_emits_since = state.vm_local_state.timestamp;
+                self.emit_config.checks =
+                    EmitChecks { address: None, topics: [true; 3], data: true };
             }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
@@ -1308,14 +1358,16 @@ fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMem
     )
 }
 
-pub fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry]) -> bool {
+fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry], checks: EmitChecks) -> bool {
     let mut expected_iter = expected_logs.iter().peekable();
     let mut actual_iter = actual_logs.iter();
 
     while let Some(expected_log) = expected_iter.peek() {
         if let Some(actual_log) = actual_iter.next() {
-            if are_logs_equal(expected_log, actual_log) {
+            if are_logs_equal(expected_log, actual_log, &checks) {
                 expected_iter.next(); // Move to the next expected log
+            } else {
+                return false
             }
         } else {
             // No more actual logs to compare
@@ -1326,6 +1378,21 @@ pub fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry]) -> boo
     true
 }
 
-fn are_logs_equal(a: &LogEntry, b: &LogEntry) -> bool {
-    a.topics == b.topics && a.data == b.data
+fn are_logs_equal(a: &LogEntry, b: &LogEntry, emit_checks: &EmitChecks) -> bool {
+    let address_match = match emit_checks.address {
+        Some(address) => b.address == address,
+        None => true,
+    };
+
+    let topics_match = emit_checks.topics.iter().enumerate().all(|(i, &check)| {
+        if check {
+            a.topics.get(i) == b.topics.get(i)
+        } else {
+            true
+        }
+    });
+
+    let data_match = if emit_checks.data { a.data == b.data } else { true };
+
+    address_match && topics_match && data_match
 }
