@@ -200,7 +200,7 @@ pub fn compile_smart_contracts(
 
     match zksolc.compile() {
         Ok(_) => {
-            println!("Compiled Successfully");
+            info!("Compiled Successfully");
             Ok(())
         }
         Err(err) => {
@@ -299,7 +299,7 @@ impl ZkSolc {
         // Step 1: Collect Source Files
         let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
         let mut contract_bytecodes = BTreeMap::new();
-        self.project.solc_config.settings.optimizer.enable();
+
         // Step 2: Compile Contracts for Each Source
         for (_solc, version) in sources {
             info!("\nCompiling {} files...", version.1.len());
@@ -815,25 +815,9 @@ impl ZkSolc {
     fn prepare_compiler_input(&mut self, contract_path: &PathBuf) -> Result<()> {
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
-        file_output_selection.insert(
-            "*".to_string(),
-            vec![
-                "abi".to_string(),
-                "evm.methodIdentifiers".to_string(),
-                // "evm.legacyAssembly".to_string(),
-            ],
-        );
-        file_output_selection.insert(
-            "".to_string(),
-            vec![
-                "metadata".to_string(),
-                // "ast".to_string(),
-                // "userdoc".to_string(),
-                // "devdoc".to_string(),
-                // "storageLayout".to_string(),
-                // "irOptimized".to_string(),
-            ],
-        );
+        file_output_selection
+            .insert("*".to_string(), vec!["abi".to_string(), "evm.methodIdentifiers".to_string()]);
+        file_output_selection.insert("".to_string(), vec!["metadata".to_string()]);
 
         // Step 2: Configure Solidity Compiler
         // zksolc requires metadata to be 'None'
