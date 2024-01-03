@@ -832,6 +832,33 @@ impl CheatcodeTracer {
                     &mut storage,
                 );
             }
+            rpcUrl(rpcUrlCall { rpcAlias }) => {
+                tracing::info!("👷 Getting rpc url of {}", rpcAlias);
+                let rpc_endpoints = &self.config.rpc_endpoints;
+                let rpc_url = match rpc_endpoints.get(&rpcAlias) {
+                    Some(Ok(url)) => Some(url.clone()),
+                    _ => None,
+                };
+                //this should revert but we don't have reverts yet
+                assert!(
+                    rpc_url.is_some(),
+                    "Failed to resolve env var `${rpcAlias}`: environment variable not found"
+                );
+                self.add_trimmed_return_data(rpc_url.unwrap().as_bytes());
+            }
+            rpcUrls(rpcUrlsCall {}) => {
+                tracing::info!("👷 Getting rpc urls");
+                let rpc_endpoints = &self.config.rpc_endpoints;
+                let rpc_urls = rpc_endpoints
+                    .iter()
+                    .map(|(alias, url)| match url {
+                        Ok(url) => format!("{}:{}", alias, url),
+                        Err(_) => alias.clone(),
+                    })
+                    .collect::<Vec<String>>()
+                    .join(",");
+                self.add_trimmed_return_data(rpc_urls.as_bytes());
+            }
             serializeAddress_0(serializeAddress_0Call {
                 objectKey: object_key,
                 valueKey: value_key,
