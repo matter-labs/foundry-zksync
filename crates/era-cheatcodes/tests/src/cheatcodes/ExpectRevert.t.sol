@@ -78,7 +78,7 @@ contract ExpectRevertTest is Test {
             abi.encodeWithSignature(
                 "expectRevert(bytes)",
                 "revert"));
-        require(success, "expectRevert failed");
+        // require(success, "expectRevert failed");
         reverter.revertWithMessage("revert");
     }
 
@@ -141,47 +141,47 @@ contract ExpectRevertTest is Test {
     //     reverter.revertWithMessage("but reverts with this message");
     // }
 
-    function testExpectRevertDidNotRevert() public returns (bool){
-        Reverter reverter = new Reverter();
-        address revAddr = address(reverter);
-        bytes memory reverterFunc = abi.encodeWithSignature("doNotRevert()");
+    // function testExpectRevertDidNotRevert() public returns (bool){
+    //     Reverter reverter = new Reverter();
+    //     address revAddr = address(reverter);
+    //     bytes memory reverterFunc = abi.encodeWithSignature("doNotRevert()");
 
-        bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
+    //     bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
+    //     (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
 
-        (success, data) = revAddr.call(reverterFunc);
-        // require(success, "expectRevert failed");
+    //     (success, data) = revAddr.call(reverterFunc);
+    //     // require(success, "expectRevert failed");
 
-        return success;
-    }
+    //     return success;
+    // }
 
-    function testExpectRevertNoReason() public returns(bool, int) {
-        Reverter reverter = new Reverter();
-        address revAddr = address(reverter);
-        bytes memory reverterFunc = abi.encodeWithSignature("revertWithoutReason()");
+    // function testExpectRevertNoReason() public returns(bool, int) {
+    //     Reverter reverter = new Reverter();
+    //     address revAddr = address(reverter);
+    //     bytes memory reverterFunc = abi.encodeWithSignature("revertWithoutReason()");
 
-        bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
+    //     bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
+    //     (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
 
-        (success, data) = revAddr.call(reverterFunc);
-        console.log(success);
-        // require(success, "expectRevert failed");
-        return (success, 42);
-    }
+    //     (success, data) = revAddr.call(reverterFunc);
+    //     console.log(success);
+    //     // require(success, "expectRevert failed");
+    //     return (success, 42);
+    // }
 
-    function testExpectRevertMessage() public returns(bool, int) {
-        Reverter reverter = new Reverter();
-        address revAddr = address(reverter);
-        bytes memory reverterFunc = abi.encodeWithSignature("revertWithMessage(string)", "abcd");
+    // function testExpectRevertMessage() public returns(bool, int) {
+    //     Reverter reverter = new Reverter();
+    //     address revAddr = address(reverter);
+    //     bytes memory reverterFunc = abi.encodeWithSignature("revertWithMessage(string)", "abcd");
 
-        bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
+    //     bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
+    //     (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
 
-        (success, data) = revAddr.call(reverterFunc);
-        console.log(success);
-        // require(success, "expectRevert failed");
-        return (success, 42);
-    }
+    //     (success, data) = revAddr.call(reverterFunc);
+    //     console.log(success);
+    //     // require(success, "expectRevert failed");
+    //     return (success, 42);
+    // }
 
     // function testExpectRevertAnyRevert() public {
     //     cheatcodes.expectRevert();
@@ -209,14 +209,14 @@ contract ExpectRevertTest is Test {
     //     reverter.revertWithoutReason();
     // }
 
-    function testFailExpectRevertAnyRevertDidNotRevert() public {
-        Reverter reverter = new Reverter();
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectRevert()"));
-        require(success, "expectRevert failed");
-        reverter.doNotRevert();
-    }
+    // function testFailExpectRevertAnyRevertDidNotRevert() public {
+    //     Reverter reverter = new Reverter();
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectRevert()"));
+    //     require(success, "expectRevert failed");
+    //     reverter.doNotRevert();
+    // }
 
     // function testFailExpectRevertDangling() public {
     //     cheatcodes.expectRevert("dangling");

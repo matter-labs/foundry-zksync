@@ -1,6 +1,8 @@
 use crate::utils::{ToH160, ToH256};
 use alloy_sol_types::SolInterface;
-use era_test_node::{fork::ForkStorage, utils::bytecode_to_factory_dep};
+use era_test_node::{
+    fork::ForkStorage, system_contracts::SystemContracts, utils::bytecode_to_factory_dep,
+};
 use ethers::{
     abi::{AbiDecode, AbiEncode},
     utils::to_checksum,
@@ -144,11 +146,17 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 } else {
                     prev_continue_pc.replace(current.pc);
                 }
+                // prev_continue_pc.replace(current.exception_handler_location);
                 prev_exception_handler_pc.replace(current.exception_handler_location);
             }
         }
         if let Opcode::Ret(call) = data.opcode.variant.opcode {
-            println!("ret : {} {:?}", state.vm_local_state.callstack.depth(), call);
+            println!(
+                "ret : {} {:?} {}",
+                state.vm_local_state.callstack.depth(),
+                call,
+                state.vm_local_state.callstack.current.code_address
+            );
         }
     }
 
@@ -168,7 +176,11 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 depth,
                 prev_exception_handler_pc: exception_handler,
                 prev_continue_pc: continue_pc,
-            } if state.vm_local_state.callstack.depth() < *depth => {
+            } if state.vm_local_state.callstack.depth() == *depth &&
+                state.vm_local_state.callstack.current.this_address !=
+                    zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS =>
+            {
+                // dbg!(state.vm_local_state.callstack.current);
                 let callstack_depth = state.vm_local_state.callstack.depth();
 
                 match data.opcode.variant.opcode {
@@ -271,14 +283,24 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }
 
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
-            println!("near call: {}", state.vm_local_state.callstack.depth());
+            println!(
+                "near call: {} {} {}",
+                state.vm_local_state.callstack.depth(),
+                state.vm_local_state.callstack.current.this_address,
+                state.vm_local_state.callstack.current.pc
+            );
             if self.return_data.is_some() {
                 self.near_calls += 1;
             }
         }
 
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            println!("far call: {}", state.vm_local_state.callstack.depth());
+            println!(
+                "far call: {} {} {}",
+                state.vm_local_state.callstack.depth(),
+                state.vm_local_state.callstack.current.this_address,
+                state.vm_local_state.callstack.current.pc
+            );
             if current.code_address != CHEATCODE_ADDRESS {
                 return
             }
@@ -359,7 +381,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     //change current stack pc to label
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
-                    state.local_state.pending_exception = false;
+                    // state.local_state.pending_exception = false;
 
                     // return TracerExecutionStatus::Continue
                 }
@@ -384,7 +406,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     // self.is_triggered_this_cycle = false;
                     //change current stack pc to exception handler
-                    state.local_state.callstack.get_current_stack_mut().pc = pc;
+                    // state.local_state.callstack.get_current_stack_mut().pc = pc;
                     // state.local_state.pending_exception = true;
 
                     // return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
