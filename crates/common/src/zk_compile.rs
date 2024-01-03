@@ -354,10 +354,13 @@ impl ZkSolc {
                             serde_json::to_value(&self.standard_json.clone().unwrap())
                                 .wrap_err("Could not serialize JSON input")?;
 
-                        // Replaces the solc optimization settings with zksolc expected optimization
-                        // settings Set the LLVM optimization parameter to
-                        // `true` for `fallbackToOptimizingForSize` which will fallback to optimizing for size if the bytecode is too large.
-                        // TODO: This should be handled properly and avoid directly modifying the standard json.
+                        // Temporary fix: Override solc optimization settings with zksolc-specific
+                        // ones. Sets 'fallbackToOptimizingForSize' to
+                        // `true` to enable size-based optimization
+                        // when bytecode exceeds size limits.
+                        // TODO: re-structure compiler configuration / settings to avoid direct
+                        // modification of standard json and eliminate
+                        // dependency on the `Project` struct from the foundry-compilers library.
                         if let Value::Object(ref mut stdjson_map) = stdjson {
                             if let Some(Value::Object(ref mut settings)) =
                                 stdjson_map.get_mut("settings")
