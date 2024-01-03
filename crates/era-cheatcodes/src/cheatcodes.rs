@@ -216,23 +216,6 @@ enum ExpectedCallType {
     Count,
 }
 
-#[derive(Clone, Debug)]
-pub struct ExpectedEmit {
-    /// The log we expect
-    pub log: Option<LogEntry>,
-    /// The checks to perform:
-    /// ```text
-    /// ┌───────┬───────┬───────┬────┐
-    /// │topic 1│topic 2│topic 3│data│
-    /// └───────┴───────┴───────┴────┘
-    /// ```
-    pub checks: [bool; 4],
-    /// If present, check originating address against this
-    pub address: Option<H160>,
-    /// Whether the log was actually found in the subcalls
-    pub found: bool,
-}
-
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     for CheatcodeTracer
 {
