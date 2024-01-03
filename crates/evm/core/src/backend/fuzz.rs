@@ -10,7 +10,7 @@ use alloy_primitives::{Address, B256, U256};
 use ethers_core::utils::GenesisAccount;
 use revm::{
     db::DatabaseRef,
-    primitives::{AccountInfo, Bytecode, EVMError, Env, ResultAndState},
+    primitives::{AccountInfo, Bytecode, EVMResult, Env, ResultAndState},
     Database, Inspector, JournaledState,
 };
 use std::{borrow::Cow, collections::HashMap};
@@ -65,7 +65,7 @@ impl<'a> FuzzBackendWrapper<'a> {
     {
         self.is_initialized = false;
 
-        let result: Result<ResultAndState, EVMError<DatabaseError>> =
+        let result: EVMResult<DatabaseError> =
             crate::era_revm::transactions::run_era_transaction(env, self, inspector);
 
         Ok(result.unwrap())

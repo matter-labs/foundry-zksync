@@ -33,14 +33,12 @@ use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
 #[derive(Default)]
 pub struct RevmDatabaseForEra<DB> {
     pub db: Arc<Mutex<Box<DB>>>,
-    // pub env: Arc<Mutex<Env>>,
     current_block: u64,
 }
 
 impl<Db> Clone for RevmDatabaseForEra<Db> {
     fn clone(&self) -> Self {
         Self { db: self.db.clone(), current_block: self.current_block }
-        // Self { db: self.db.clone(), env: self.env.clone(), current_block: self.current_block }
     }
 }
 
@@ -48,7 +46,6 @@ impl<DB> Debug for RevmDatabaseForEra<DB> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RevmDatabaseForEra")
             .field("db", &"db")
-            // .field("env", &self.env.lock().unwrap())
             .field("current_block", &self.current_block)
             .finish()
     }
@@ -72,7 +69,6 @@ where
             u64::from_be_bytes(num)
         };
 
-        // Self { db, env, current_block }
         Self { db, current_block }
     }
 
