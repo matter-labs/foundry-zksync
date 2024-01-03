@@ -2,7 +2,7 @@ use foundry_common::conversion_utils::h256_to_h160;
 use multivm::zk_evm_1_4_0::reference_impls::event_sink::EventMessage;
 use zksync_basic_types::{H160, H256};
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct LogEntry {
     pub address: H160,
     pub topics: Vec<H256>,

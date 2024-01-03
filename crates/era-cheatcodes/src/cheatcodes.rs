@@ -6,12 +6,9 @@ use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
-use ethabi::Hash;
 use ethers::utils::to_checksum;
-use fnv::FnvBuildHasher;
 use foundry_cheatcodes::CheatsConfig;
 use foundry_cheatcodes_spec::Vm;
-use foundry_common::shell::println;
 use foundry_evm_core::{
     backend::DatabaseExt,
     era_revm::{db::RevmDatabaseForEra, transactions::storage_to_state},
@@ -19,14 +16,12 @@ use foundry_evm_core::{
     opts::EvmOpts,
 };
 use itertools::Itertools;
-use linked_hash_set::LinkedHashSet;
 use multivm::{
     interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus},
     vm_latest::{
         BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
     },
     zk_evm_1_4_0::{
-        reference_impls::event_sink::EventMessage,
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::PrimitiveValue,
         zkevm_opcode_defs::{
@@ -45,7 +40,6 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Debug,
     fs,
-    hash::{BuildHasherDefault, Hasher},
     ops::BitAnd,
     process::Command,
     str::FromStr,
@@ -134,7 +128,6 @@ pub struct CheatcodeTracer {
 
 #[derive(Debug, Clone, Default)]
 struct EmitConfig {
-    expected_logs: Vec<LogEntry>,
     expected_emit_state: ExpectedEmitState,
     expect_emits_since: u32,
     expect_emits_until: u32,
@@ -247,7 +240,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             if self.emit_config.expected_emit_state == ExpectedEmitState::ExpectedEmitTriggered {
                 //cheatcode triggered, waiting for far call
                 if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-                    println!("current FarCall {:?}", current);
                     self.emit_config.call_emits_since = state.vm_local_state.timestamp;
                     self.emit_config.expect_emits_until = state.vm_local_state.timestamp;
                     self.emit_config.expected_emit_state = ExpectedEmitState::CallTriggered;
@@ -382,19 +374,63 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         bootloader_state: &mut BootloaderState,
         storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
+            if self.recording_logs {
+                let (events, _) = state.event_sink.get_events_and_l2_l1_logs_after_timestamp(
+                    zksync_types::Timestamp(self.recording_timestamp),
+                );
+                let logs = crate::events::parse_events(events);
+                //insert logs in the hashset
+                for log in logs {
+                    self.recorded_logs.insert(log);
+                }
+            }
+
         // This assert is triggered only once after the test execution finishes
         // And is used to assert that all logs exist
         if self.emit_config.expected_emit_state == ExpectedEmitState::Assert {
             self.emit_config.expected_emit_state = ExpectedEmitState::Finished;
-            let (events, _) =
-                state.event_sink.get_events_and_l2_l1_logs_after_timestamp(Timestamp::empty());
-            let logs = crate::events::parse_events(events);
-            for log in &logs {
-                println!("Log from {:#?}", log.address);
-                for topic in &log.topics {
-                    println!("\t{}", hex::encode(topic));
-                }
-            }
+
+            let (expected_events_initial_dimension, _) =
+                state.event_sink.get_events_and_l2_l1_logs_after_timestamp(
+                    zksync_types::Timestamp(self.emit_config.expect_emits_since),
+                );
+            let expected_events_surplus = state
+                .event_sink
+                .get_events_and_l2_l1_logs_after_timestamp(zksync_types::Timestamp(
+                    self.emit_config.expect_emits_until,
+                ))
+                .0
+                .len();
+
+            //remove n surplus events from the end of expected_events_initial_dimension
+            let expected_events = expected_events_initial_dimension
+                .clone()
+                .into_iter()
+                .take(expected_events_initial_dimension.len() - expected_events_surplus)
+                .collect::<Vec<_>>();
+            let expected_logs = crate::events::parse_events(expected_events);
+
+            let (actual_events_initial_dimension, _) =
+                state.event_sink.get_events_and_l2_l1_logs_after_timestamp(
+                    zksync_types::Timestamp(self.emit_config.call_emits_since),
+                );
+            let actual_events_surplus = state
+                .event_sink
+                .get_events_and_l2_l1_logs_after_timestamp(zksync_types::Timestamp(
+                    self.emit_config.call_emits_until,
+                ))
+                .0
+                .len();
+
+            //remove n surplus events from the end of actual_events_initial_dimension
+            let actual_events = actual_events_initial_dimension
+                .clone()
+                .into_iter()
+                .take(actual_events_initial_dimension.len() - actual_events_surplus)
+                .collect::<Vec<_>>();
+            let actual_logs = crate::events::parse_events(actual_events);
+
+            assert!(compare_logs(&expected_logs, &actual_logs));
         }
 
         while let Some(action) = self.one_time_actions.pop() {
@@ -771,7 +807,6 @@ impl CheatcodeTracer {
 
                 if let Some(prank) = &self.permanent_actions.start_prank {
                     //TODO: vm.prank -> CallerMode::Prank
-                    println!("PRANK");
                     mode = CallerMode::RecurrentPrank;
                     new_caller = prank.sender.into();
                 }
@@ -1163,16 +1198,6 @@ impl CheatcodeTracer {
         self.return_data = Some(data);
     }
 
-    fn expect_emit(&mut self) {
-        tracing::info!("👷 Setting expected emit");
-        // self.expected_emits.push(ExpectedEmit {
-        //     log: None,
-        //     checks: [true, true, true, true],
-        //     address: None,
-        //     found: false,
-        // });
-    }
-
     /// Adds an expectCall to the tracker.
     #[allow(clippy::too_many_arguments)]
     fn expect_call(
@@ -1281,4 +1306,26 @@ fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMem
         fat_data_pointer.start as usize,
         fat_data_pointer.length as usize,
     )
+}
+
+pub fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry]) -> bool {
+    let mut expected_iter = expected_logs.iter().peekable();
+    let mut actual_iter = actual_logs.iter();
+
+    while let Some(expected_log) = expected_iter.peek() {
+        if let Some(actual_log) = actual_iter.next() {
+            if are_logs_equal(expected_log, actual_log) {
+                expected_iter.next(); // Move to the next expected log
+            }
+        } else {
+            // No more actual logs to compare
+            return false
+        }
+    }
+
+    true
+}
+
+fn are_logs_equal(a: &LogEntry, b: &LogEntry) -> bool {
+    a.topics == b.topics && a.data == b.data
 }
