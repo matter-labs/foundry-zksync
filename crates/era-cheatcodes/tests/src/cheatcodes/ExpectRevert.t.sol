@@ -80,11 +80,17 @@ contract ExpectRevertTest is Test {
                 "revert"));
         require(success, "expectRevert failed");
         reverter.revertWithMessage("revert");
+        // console.log("testExpectRevertString");  
+        // require(false, "should have reverted");
     }
 
     // function testFailExpectRevertWrongString() public {
-    //     Reverter reverter = new Reverter();
-    //     cheatcodes.expectRevert("my not so cool error");
+    //      Reverter reverter = new Reverter();
+    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+    //         abi.encodeWithSignature(
+    //             "expectRevert(bytes)",
+    //             "my not so cool error"));
+    //     require(success, "expectRevert failed");
     //     reverter.revertWithMessage("my cool error");
     // }
 
@@ -150,7 +156,7 @@ contract ExpectRevertTest is Test {
     //     (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
 
     //     (success, data) = revAddr.call(reverterFunc);
-    //     // require(success, "expectRevert failed");
+    //     require(success, "expectRevert failed");
 
     //     return success;
     // }

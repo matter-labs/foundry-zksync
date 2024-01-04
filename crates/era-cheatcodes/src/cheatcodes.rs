@@ -53,7 +53,7 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, Timestamp,
+    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
@@ -244,26 +244,30 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }) = self.current_expect_revert()
         {
             if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
-                let current = state.vm_local_state.callstack.current;
+                let current = state.vm_local_state.callstack.inner.last().unwrap();
                 let is_to_label = data.opcode.variant.flags
                     [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
                     current.is_local_frame;
-                tracing::debug!(%is_to_label, ?current, "storing continuations");
+                tracing::debug!(%is_to_label, ?current, ?data,  "storing continuations");
 
                 if is_to_label {
                     prev_continue_pc.replace(data.opcode.imm_0);
                 } else {
                     prev_continue_pc.replace(current.pc);
                 }
+
+                dbg!(prev_continue_pc);
                 // prev_continue_pc.replace(current.exception_handler_location);
                 prev_exception_handler_pc.replace(current.exception_handler_location);
+                dbg!(prev_exception_handler_pc);
             }
         }
         if let Opcode::Ret(call) = data.opcode.variant.opcode {
             println!(
-                "ret : {} {:?} {}",
+                "ret : {} {:?} {:?} {:?}",
                 state.vm_local_state.callstack.depth(),
                 call,
+                state.vm_local_state.callstack.current.this_address,
                 state.vm_local_state.callstack.current.code_address
             );
         }
@@ -414,6 +418,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         // process delayed actions after to avoid new recurring actions to be
         // executed immediately (thus nullifying the delay)
         let process_delayed_action = |action: &mut DelayedNextStatementAction| {
+            // dbg!(&state.vm_local_state.callstack.current.this_address);
+            // if state.vm_local_state.callstack.current.this_address !=
+            // ACCOUNT_CODE_STORAGE_ADDRESS {     return true
+            // }
             if state.vm_local_state.callstack.depth() != action.target_depth {
                 return true
             }
@@ -430,7 +438,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             false
         };
         //skip delayed actions if a cheatcode is invoked
-        if current.code_address != CHEATCODE_ADDRESS {
+        if current.code_address != CHEATCODE_ADDRESS &&
+            current.code_address != ACCOUNT_CODE_STORAGE_ADDRESS
+        {
             self.delayed_actions.retain_mut(process_delayed_action);
         }
 
@@ -449,9 +459,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
             println!(
-                "near call: {} {} {}",
+                "near call: {} {:?} {:?} {}",
                 state.vm_local_state.callstack.depth(),
                 state.vm_local_state.callstack.current.this_address,
+                state.vm_local_state.callstack.current.code_address,
                 state.vm_local_state.callstack.current.pc
             );
             if self.return_data.is_some() {
@@ -461,9 +472,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             println!(
-                "far call: {} {} {}",
+                "far call: {} {:?} {:?} {}",
                 state.vm_local_state.callstack.depth(),
                 state.vm_local_state.callstack.current.this_address,
+                state.vm_local_state.callstack.current.code_address,
                 state.vm_local_state.callstack.current.pc
             );
             if current.code_address != CHEATCODE_ADDRESS {
@@ -725,21 +737,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     //TODO: override return data with the given one and force return (instead of
                     // revert)
-                    self.add_trimmed_return_data(data.as_slice());
-                    let ptr = state.local_state.registers
-                        [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
-                    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+                    // self.add_trimmed_return_data(data.as_slice());
+                    // let ptr = state.local_state.registers
+                    //     [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+                    // let fat_data_pointer = FatPointer::from_u256(ptr.value);
 
-                    Self::set_return(
-                        fat_data_pointer,
-                        self.return_data.take().unwrap(),
-                        &mut state.local_state,
-                        &mut state.memory,
-                    );
+                    // Self::set_return(
+                    //     fat_data_pointer,
+                    //     self.return_data.take().unwrap(),
+                    //     &mut state.local_state,
+                    //     &mut state.memory,
+                    // );
 
                     // self.is_triggered_this_cycle = false;
 
                     //change current stack pc to label
+                    dbg!(pc);
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
                     // state.local_state.pending_exception = false;
 
@@ -766,7 +779,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     // self.is_triggered_this_cycle = false;
                     //change current stack pc to exception handler
-                    state.local_state.callstack.get_current_stack_mut().pc = pc;
+                    // state.local_state.callstack.get_current_stack_mut().pc = pc;
                     // state.local_state.pending_exception = true;
 
                     // return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
