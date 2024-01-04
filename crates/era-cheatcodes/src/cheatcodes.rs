@@ -151,7 +151,6 @@ struct EmitChecks {
 }
 
 #[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq, Default)]
-
 enum ExpectedEmitState {
     #[default]
     NotStarted,
