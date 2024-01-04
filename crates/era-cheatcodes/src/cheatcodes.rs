@@ -407,9 +407,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             let current = state.vm_local_state.callstack.current;
             if current.code_address != CHEATCODE_ADDRESS {
                 if let Some(broadcast) = &self.permanent_actions.broadcast {
-                    if state.vm_local_state.callstack.depth() == broadcast.depth
-                    // - 1
-                    {
+                    if state.vm_local_state.callstack.depth() == broadcast.depth {
                         //when the test ends, just make sure the tx origin is set to the original
                         // one (should never get here unless .stopBroadcast
                         // wasn't called)
@@ -493,8 +491,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                         gas: Some(gas_limit.into()),
                                         //FIXME: retrieve proper value
                                         value: Some(farcall_abi.ergs_passed.into()),
-                                        data: Some(get_calldata(&state, &memory).into()),
-                                        nonce: Some(nonce.into()),
+                                        data: Some(get_calldata(&state, memory).into()),
+                                        nonce: Some(nonce),
                                         ..Default::default()
                                     },
                                 ),
@@ -1620,7 +1618,7 @@ impl CheatcodeTracer {
         let key = get_nonce_key(&account);
         let full_nonce = storage.read_value(&key);
 
-        return decompose_full_nonce(h256_to_u256(full_nonce))
+        decompose_full_nonce(h256_to_u256(full_nonce))
     }
 
     /// Sets a given account's nonces
@@ -1655,7 +1653,7 @@ impl CheatcodeTracer {
         let new_full_nonce = nonces_to_full_nonce(account_nonce, deployment_nonce);
         self.write_storage(key, u256_to_h256(new_full_nonce), storage);
 
-        return Some((account_nonce, deployment_nonce))
+        Some((account_nonce, deployment_nonce))
     }
 
     fn add_trimmed_return_data(&mut self, data: &[u8]) {
@@ -1957,8 +1955,7 @@ impl CheatcodeTracer {
             return
         }
 
-        let depth = state.vm_local_state.callstack.depth() // - 2
-            ;
+        let depth = state.vm_local_state.callstack.depth();
 
         let key = StorageKey::new(
             AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
@@ -1970,21 +1967,10 @@ impl CheatcodeTracer {
         let original_tx_origin = storage.read_value(&key);
         let new_origin = new_origin.unwrap_or(original_tx_origin.into());
 
-        let nonce = storage
-            .storage_handle
-            .inner
-            .read()
-            .unwrap()
-            .fork
-            .as_ref()
-            .unwrap()
-            .fork_source
-            .get_nonce_for_address(new_origin);
-
         self.permanent_actions.broadcast = Some(BroadcastOpts {
             new_origin,
             original_origin: original_tx_origin.into(),
-            original_caller: state.vm_local_state.callstack.current.msg_sender.into(),
+            original_caller: state.vm_local_state.callstack.current.msg_sender,
             depth,
         })
     }
