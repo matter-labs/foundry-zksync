@@ -1,13 +1,9 @@
 use crate::utils::{ToH160, ToH256, ToU256};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
-    deps::storage_view::StorageView, fork::ForkStorage, system_contracts::SystemContracts,
-    utils::bytecode_to_factory_dep,
+    deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
-use ethers::{
-    abi::{AbiDecode, AbiEncode},
-    utils::to_checksum,
-};
+use ethers::utils::to_checksum;
 use foundry_cheatcodes::CheatsConfig;
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{
@@ -232,7 +228,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         &mut self,
         state: VmLocalStateData<'_>,
         data: multivm::zk_evm_1_4_0::tracing::BeforeExecutionData,
-        memory: &SimpleMemory<H>,
+        _memory: &SimpleMemory<H>,
         _storage: StoragePtr<EraDb<S>>,
     ) {
         //store the current exception handler in expect revert
@@ -244,30 +240,21 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }) = self.current_expect_revert()
         {
             if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
-                let current = state.vm_local_state.callstack.inner.last().unwrap();
+                let last = state.vm_local_state.callstack.inner.last().unwrap();
+                let current = &state.vm_local_state.callstack.current;
                 let is_to_label: bool = data.opcode.variant.flags
                     [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
                     state.vm_local_state.callstack.current.is_local_frame;
-                tracing::debug!(%is_to_label, ?current, "storing continuations");
+                tracing::debug!(%is_to_label, ?last, "storing continuations");
 
                 if is_to_label {
                     prev_continue_pc.replace(data.opcode.imm_0);
                 } else {
-                    prev_continue_pc.replace(current.pc);
+                    prev_continue_pc.replace(last.pc);
                 }
 
-                // prev_continue_pc.replace(current.exception_handler_location);
                 prev_exception_handler_pc.replace(current.exception_handler_location);
             }
-        }
-        if let Opcode::Ret(call) = data.opcode.variant.opcode {
-            println!(
-                "ret : {} {:?} {:?} {:?}",
-                state.vm_local_state.callstack.depth(),
-                call,
-                state.vm_local_state.callstack.current.this_address,
-                state.vm_local_state.callstack.current.code_address
-            );
         }
     }
 
@@ -344,7 +331,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 state.vm_local_state.callstack.current.code_address !=
                     zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS =>
             {
-                // dbg!(state.vm_local_state.callstack.current);
                 let callstack_depth = state.vm_local_state.callstack.depth();
 
                 match data.opcode.variant.opcode {
@@ -442,13 +428,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }
 
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
-            println!(
-                "near call: {} {:?} {:?} {}",
-                state.vm_local_state.callstack.depth(),
-                state.vm_local_state.callstack.current.this_address,
-                state.vm_local_state.callstack.current.code_address,
-                state.vm_local_state.callstack.current.pc
-            );
             if self.return_data.is_some() {
                 self.near_calls += 1;
             }
@@ -736,14 +715,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &mut state.memory,
                     );
 
-                    // self.is_triggered_this_cycle = false;
-
                     //change current stack pc to label
-                    dbg!(pc);
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
-                    // state.local_state.pending_exception = false;
-
-                    // return TracerExecutionStatus::Continue
                 }
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
                     tracing::warn!("!!! FORCING REVERT");
@@ -760,21 +733,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &mut state.memory,
                     );
 
-                    // self.is_triggered_this_cycle = false;
                     //change current stack pc to exception handler
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
-                    // state.local_state.pending_exception = true;
-
-                    // return TracerExecutionStatus::Stop(TracerExecutionStopReason::Abort(
-                    //     Halt::Unknown(VmRevertReason::from(error.as_slice())),
-                    // ))
-                    // return TracerExecutionStatus::Continue
                 }
             }
         }
 
         // Set return data, if any
-        if let Some(mut fat_pointer) = self.return_ptr.take() {
+        if let Some(fat_pointer) = self.return_ptr.take() {
             let elements = self.return_data.take().unwrap();
 
             Self::set_return(fat_pointer, elements, &mut state.local_state, &mut state.memory);
@@ -1470,7 +1436,7 @@ impl CheatcodeTracer {
     fn add_except_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
         //TODO: check if an expect revert is already set
 
-        //-2: possibly for EfficientCall.call EfficientCall.rawCall ? not confirmed
+        //-1: Because we are working with return opcode and it pops the stack after execution
         let action = FinishCycleRecurringAction::ExpectRevert {
             reason,
             depth: depth - 1,
@@ -1489,7 +1455,6 @@ impl CheatcodeTracer {
         state: &VmLocalStateData<'_>,
         memory: &SimpleMemory<H>,
     ) -> Result<(), Vec<u8>> {
-        println!("handle except revert {:?}, {:?}", &reason, &op);
         match (op, reason) {
             (zkevm_opcode_defs::RetOpcode::Revert, Some(expected_reason)) => {
                 let retdata = {
