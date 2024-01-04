@@ -80,19 +80,17 @@ contract ExpectRevertTest is Test {
                 "revert"));
         require(success, "expectRevert failed");
         reverter.revertWithMessage("revert");
-        // console.log("testExpectRevertString");  
-        // require(false, "should have reverted");
     }
 
-    // function testFailExpectRevertWrongString() public {
-    //      Reverter reverter = new Reverter();
-    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-    //         abi.encodeWithSignature(
-    //             "expectRevert(bytes)",
-    //             "my not so cool error"));
-    //     require(success, "expectRevert failed");
-    //     reverter.revertWithMessage("my cool error");
-    // }
+    function testFailExpectRevertWrongString() public {
+         Reverter reverter = new Reverter();
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectRevert(bytes)",
+                "my not so cool error"));
+        require(success, "expectRevert failed");
+        reverter.revertWithMessage("my cool error");
+    }
 
     // function testFailRevertNotOnImmediateNextCall() public {
     //     Reverter reverter = new Reverter();
@@ -215,14 +213,14 @@ contract ExpectRevertTest is Test {
     //     reverter.revertWithoutReason();
     // }
 
-    // function testFailExpectRevertAnyRevertDidNotRevert() public {
-    //     Reverter reverter = new Reverter();
-    //     (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-    //         abi.encodeWithSignature(
-    //             "expectRevert()"));
-    //     require(success, "expectRevert failed");
-    //     reverter.doNotRevert();
-    // }
+    function testFailExpectRevertAnyRevertDidNotRevert() public {
+        Reverter reverter = new Reverter();
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectRevert()"));
+        require(success, "expectRevert failed");
+        reverter.doNotRevert();
+    }
 
     // function testFailExpectRevertDangling() public {
     //     cheatcodes.expectRevert("dangling");
