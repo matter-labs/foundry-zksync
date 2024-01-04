@@ -16,6 +16,10 @@ contract ATest is Test {
         return b;
     }
 
+    function pt(uint256 a) public payable returns (uint256) {
+        return t(a);
+    }
+
     function inc() public returns (uint256) {
         changed += 1;
     }
@@ -56,6 +60,54 @@ contract BroadcastTest is Test {
         require(success, "startBroadcast failed");
 
         test.t(2);
+
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("stopBroadcast()")
+        );
+        require(success, "stopBroadcast failed");
+    }
+
+    function test_BroadcastValue() public {
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("startBroadcast(address)", ACCOUNT_A)
+        );
+        require(success, "startBroadcast failed");
+
+        ATest test = new ATest();
+        test.pt{ value: 42 }(16);
+
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("stopBroadcast()")
+        );
+        require(success, "stopBroadcast failed");
+    }
+
+    function test_BroadcastGasLimit() public {
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("startBroadcast()")
+        );
+        require(success, "startBroadcast failed");
+
+        ATest test = new ATest();
+        test.t{gas: 12345678}(12345678);
+
+        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("stopBroadcast()")
+        );
+        require(success, "stopBroadcast failed");
+    }
+
+    function test_BroadcastNonces() public {
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("startBroadcast(address)", ACCOUNT_B)
+        );
+        require(success, "startBroadcast failed");
+
+        ATest test = new ATest();
+        test.t(1);
+        test.t(2);
+        test.t(3);
+        test.t(4);
 
         (success, ) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature("stopBroadcast()")

@@ -62,6 +62,7 @@ type EraDb<DB> = StorageView<ForkStorage<RevmDatabaseForEra<DB>>>;
 type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
 
 // address(uint160(uint256(keccak256('hevm cheat code'))))
+// 0x7109709ecfa91a80626ff3989d68f67f5b1dd12d
 const CHEATCODE_ADDRESS: H160 = H160([
     113, 9, 112, 158, 207, 169, 26, 128, 98, 111, 243, 152, 157, 104, 246, 127, 91, 29, 209, 45,
 ]);
@@ -251,7 +252,6 @@ struct BroadcastOpts {
     original_caller: H160,
     new_origin: H160,
     depth: usize,
-    nonce: u64,
 }
 
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
@@ -440,7 +440,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
 
             if current.code_address != CHEATCODE_ADDRESS {
-                if let Some(broadcast) = &mut self.permanent_actions.broadcast {
+                if let Some(broadcast) = self.permanent_actions.broadcast.as_ref() {
                     let prev_cs = state
                         .vm_local_state
                         .callstack
@@ -456,6 +456,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             origin: broadcast.new_origin,
                         });
 
+                        let new_origin = broadcast.new_origin;
                         let revm_db_for_era = storage
                             .borrow_mut()
                             .storage_handle
@@ -476,25 +477,37 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             FarCallABI::from_u256(src0.value)
                         };
 
+                        let gas_limit = current.ergs_remaining;
+                        let (nonce, _) = Self::get_nonce(new_origin, &mut storage.borrow_mut());
+
                         let tx = BroadcastableTransaction {
                             rpc,
                             transaction:
                                 ethers::types::transaction::eip2718::TypedTransaction::Legacy(
                                     TransactionRequest {
-                                        from: Some(broadcast.new_origin),
+                                        from: Some(new_origin),
                                         to: Some(ethers::types::NameOrAddress::Address(
                                             current.code_address,
                                         )),
-                                        gas: None, //FIXME: call.gas_limit if set from script
+                                        //FIXME: set only if set manually by user
+                                        gas: Some(gas_limit.into()),
+                                        //FIXME: retrieve proper value
                                         value: Some(farcall_abi.ergs_passed.into()),
                                         data: Some(get_calldata(&state, &memory).into()),
-                                        nonce: Some(broadcast.nonce.into()),
+                                        nonce: Some(nonce.into()),
                                         ..Default::default()
                                     },
                                 ),
                         };
+                        tracing::debug!(?tx, "storing for broadcast");
+
                         self.broadcastable_transactions.push(tx);
-                        broadcast.nonce += 1;
+                        //FIXME: detect if this is a deployment and increase the other nonce too
+                        self.set_nonce(
+                            new_origin,
+                            (Some(nonce + 1), None),
+                            &mut storage.borrow_mut(),
+                        );
                     }
                 }
                 return
@@ -1110,10 +1123,8 @@ impl CheatcodeTracer {
             }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
-                let mut storage = storage.borrow_mut();
-                let nonce_key = get_nonce_key(&account.to_h160());
-                let full_nonce = storage.read_value(&nonce_key);
-                let (account_nonce, _) = decompose_full_nonce(h256_to_u256(full_nonce));
+                let (account_nonce, _) =
+                    Self::get_nonce(account.to_h160(), &mut storage.borrow_mut());
                 tracing::info!(
                     "👷 Nonces for account {:?} are {}",
                     account,
@@ -1325,36 +1336,21 @@ impl CheatcodeTracer {
             }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
-                let mut storage = storage.borrow_mut();
-                let nonce_key = get_nonce_key(&account.to_h160());
-                let full_nonce = storage.read_value(&nonce_key);
-                let (mut account_nonce, mut deployment_nonce) =
-                    decompose_full_nonce(h256_to_u256(full_nonce));
-                if account_nonce.as_u64() >= new_nonce {
-                    tracing::error!(
-                      "SetNonce cheatcode failed: Account nonce is already set to a higher value ({}, requested {})",
-                      account_nonce,
-                      new_nonce
-                  );
-                    return
-                }
-                account_nonce = new_nonce.into();
-                if deployment_nonce.as_u64() >= new_nonce {
-                    tracing::error!(
-                      "SetNonce cheatcode failed: Deployment nonce is already set to a higher value ({}, requested {})",
-                      deployment_nonce,
-                      new_nonce
-                  );
-                    return
-                }
-                deployment_nonce = new_nonce.into();
-                let enforced_full_nonce = nonces_to_full_nonce(account_nonce, deployment_nonce);
-                tracing::info!(
-                    "👷 Nonces for account {:?} have been set to {}",
-                    account,
-                    new_nonce
+                let new_full_nonce = self.set_nonce(
+                    account.to_h160(),
+                    (Some(new_nonce.into()), Some(new_nonce.into())),
+                    &mut storage.borrow_mut(),
                 );
-                self.write_storage(nonce_key, u256_to_h256(enforced_full_nonce), &mut storage);
+
+                if new_full_nonce.is_some() {
+                    tracing::info!(
+                        "👷 Nonces for account {:?} have been set to {}",
+                        account,
+                        new_nonce
+                    );
+                } else {
+                    tracing::error!("👷 Setting nonces failed")
+                }
             }
             snapshot(snapshotCall {}) => {
                 tracing::info!("👷 Creating snapshot");
@@ -1614,6 +1610,52 @@ impl CheatcodeTracer {
             read_value: storage.read_value(&key),
             write_value,
         });
+    }
+
+    /// Returns a given account's nonce
+    ///
+    /// The first item of the tuple represents the total number of transactions,
+    /// meanwhile the second represents the number of contract deployed
+    fn get_nonce<S: ReadStorage>(account: H160, storage: &mut RefMut<S>) -> (U256, U256) {
+        let key = get_nonce_key(&account);
+        let full_nonce = storage.read_value(&key);
+
+        return decompose_full_nonce(h256_to_u256(full_nonce))
+    }
+
+    /// Sets a given account's nonces
+    ///
+    /// Returns the new nonce
+    fn set_nonce<S: WriteStorage>(
+        &mut self,
+        account: H160,
+        (tx_nonce, deploy_nonce): (Option<U256>, Option<U256>),
+        storage: &mut RefMut<S>,
+    ) -> Option<(U256, U256)> {
+        let key = get_nonce_key(&account);
+        let (mut account_nonce, mut deployment_nonce) = Self::get_nonce(account, storage);
+        if let Some(tx_nonce) = tx_nonce {
+            if account_nonce >= tx_nonce {
+                tracing::error!(?account, value = ?account_nonce, requested = ?tx_nonce, "account nonce is already set to a higher value");
+                return None
+            }
+
+            account_nonce = tx_nonce;
+        }
+
+        if let Some(deploy_nonce) = deploy_nonce {
+            if deployment_nonce >= deploy_nonce {
+                tracing::error!(?account, value = ?deployment_nonce, requested = ?deploy_nonce, "deployment nonce is already set to a higher value");
+                return None
+            }
+
+            deployment_nonce = deploy_nonce;
+        }
+
+        let new_full_nonce = nonces_to_full_nonce(account_nonce, deployment_nonce);
+        self.write_storage(key, u256_to_h256(new_full_nonce), storage);
+
+        return Some((account_nonce, deployment_nonce))
     }
 
     fn add_trimmed_return_data(&mut self, data: &[u8]) {
@@ -1944,7 +1986,6 @@ impl CheatcodeTracer {
             original_origin: original_tx_origin.into(),
             original_caller: state.vm_local_state.callstack.current.msg_sender.into(),
             depth,
-            nonce,
         })
     }
 
