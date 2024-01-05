@@ -16,7 +16,7 @@ contract Create2Test is Test {
         // We are hardcoding this since using `type(Counter).creationCode` returns the stored
         // bytecodeHash with 0 padding instead of the actual bytecode stored for the contract.
         // The actual bytecode is stored in factory deps so is unavailable.
-        bytes32 codeHash = 0x0100001936df07a6c3d4492da5abea4e1b3fb7e6a07cfeaa938af4d12366b59b;
+        bytes32 codeHash = 0x0100001919b82aa7fb17f35b1dc3548475002d6b000ac4a3818dc64b461a2deb;
         bytes memory expectedCreationCode = bytes.concat(
             bytes4(0x0000),
             bytes32(
