@@ -1676,6 +1676,7 @@ impl CheatcodeTracer {
                             exception_handler,
                         }),
                 );
+                self.next_return_action = None;
             }
             RetOpcode::Ok => {
                 let Some(exception_handler) = *exception_handler else {
@@ -1690,11 +1691,10 @@ impl CheatcodeTracer {
                         exception_handler,
                     });
                 }
+                self.next_return_action = None;
             }
             RetOpcode::Panic => return,
         }
-
-        // self.recurring_actions.push(action.action.clone());
     }
 }
 
