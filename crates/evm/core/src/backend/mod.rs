@@ -31,7 +31,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::era_revm::db::RevmDatabaseForEra;
 use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
-use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
+use multivm::vm_latest::HistoryDisabled;
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;

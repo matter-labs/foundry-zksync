@@ -412,14 +412,37 @@ mod tests {
 
     struct Noop<S, H> {
         _phantom: PhantomData<(S, H)>,
+        modified_storage_keys: HashMap<StorageKey, StorageValue>,
     }
 
     impl<S, H> Default for Noop<S, H> {
         fn default() -> Self {
-            Self { _phantom: Default::default() }
+            Self { _phantom: Default::default(), modified_storage_keys: Default::default() }
+        }
+    }
+
+    impl<S, H> Clone for Noop<S, H> {
+        fn clone(&self) -> Self {
+            Self {
+                _phantom: self._phantom,
+                modified_storage_keys: self.modified_storage_keys.clone(),
+            }
         }
     }
 
     impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Noop<S, H> {}
     impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for Noop<S, H> {}
+    impl<S: WriteStorage + 'static, H: HistoryMode + 'static> AsTracerPointer<S, H> for Noop<S, H> {
+        fn as_tracer_pointer(&self) -> multivm::vm_latest::TracerPointer<S, H> {
+            Box::new(self.clone())
+        }
+    }
+
+    impl<S, H> StorageModificationRecorder for Noop<S, H> {
+        fn record_modified_keys(&mut self, _modified_keys: &HashMap<StorageKey, StorageValue>) {}
+
+        fn get(&self) -> &HashMap<StorageKey, StorageValue> {
+            &self.modified_storage_keys
+        }
+    }
 }

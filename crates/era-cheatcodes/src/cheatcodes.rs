@@ -53,7 +53,7 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS
+    LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
