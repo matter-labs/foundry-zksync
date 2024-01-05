@@ -17,15 +17,17 @@ use foundry_evm_core::{
 };
 use itertools::Itertools;
 use multivm::{
-    interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus},
+    interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus, VmRevertReason},
     vm_latest::{
         BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
     },
     zk_evm_1_4_0::{
         tracing::{AfterExecutionData, VmLocalStateData},
-        vm_state::PrimitiveValue,
+        vm_state::{PrimitiveValue, VmLocalState},
         zkevm_opcode_defs::{
-            FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
+            self,
+            decoding::{EncodingModeProduction, VmEncodingMode},
+            FatPointer, Opcode, RetOpcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
             RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
         },
     },
@@ -51,11 +53,12 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, StorageValue, Timestamp,
+    LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
 type EraDb<DB> = StorageView<ForkStorage<RevmDatabaseForEra<DB>>>;
+type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
 
 // address(uint160(uint256(keccak256('hevm cheat code'))))
 const CHEATCODE_ADDRESS: H160 = H160([
@@ -112,6 +115,7 @@ enum FoundryTestState {
 pub struct CheatcodeTracer {
     modified_storage_keys: HashMap<StorageKey, StorageValue>,
     one_time_actions: Vec<FinishCycleOneTimeActions>,
+    next_return_action: Option<NextReturnAction>,
     permanent_actions: FinishCyclePermanentActions,
     return_data: Option<Vec<U256>>,
     return_ptr: Option<FatPointer>,
@@ -165,11 +169,32 @@ enum ExpectedEmitState {
 enum FinishCycleOneTimeActions {
     StorageWrite { key: StorageKey, read_value: H256, write_value: H256 },
     StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
+    ForceRevert { error: Vec<u8>, exception_handler: PcOrImm },
+    ForceReturn { data: Vec<u8>, continue_pc: PcOrImm },
     CreateSelectFork { url_or_alias: String, block_number: Option<u64> },
     CreateFork { url_or_alias: String, block_number: Option<u64> },
     SelectFork { fork_id: U256 },
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
+}
+
+#[derive(Debug, Clone)]
+struct NextReturnAction {
+    /// Target depth where the next statement would be
+    target_depth: usize,
+    /// Action to queue when the condition is satisfied
+    action: ActionOnReturn,
+    returns_to_skip: usize,
+}
+
+#[derive(Debug, Clone)]
+enum ActionOnReturn {
+    ExpectRevert {
+        reason: Option<Vec<u8>>,
+        depth: usize,
+        prev_continue_pc: Option<PcOrImm>,
+        prev_exception_handler_pc: Option<PcOrImm>,
+    },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -219,6 +244,44 @@ enum ExpectedCallType {
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     for CheatcodeTracer
 {
+    fn before_execution(
+        &mut self,
+        state: VmLocalStateData<'_>,
+        data: multivm::zk_evm_1_4_0::tracing::BeforeExecutionData,
+        _memory: &SimpleMemory<H>,
+        _storage: StoragePtr<EraDb<S>>,
+    ) {
+        //store the current exception handler in expect revert
+        // to be used to force a revert
+        if let Some(ActionOnReturn::ExpectRevert {
+            prev_exception_handler_pc,
+            prev_continue_pc,
+            ..
+        }) = self.current_expect_revert()
+        {
+            if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
+                // Callstack on the desired depth, it has the correct pc for continue
+                let last = state.vm_local_state.callstack.inner.last().unwrap();
+                // Callstack on the current depth, it has the correct pc for exception handler and
+                // is_local_frame
+                let current = &state.vm_local_state.callstack.current;
+                let is_to_label: bool = data.opcode.variant.flags
+                    [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
+                    state.vm_local_state.callstack.current.is_local_frame;
+                tracing::debug!(%is_to_label, ?last, "storing continuations");
+
+                // The source https://github.com/matter-labs/era-zk_evm/blob/763ef5dfd52fecde36bfdd01d47589b61eabf118/src/opcodes/execution/ret.rs#L242
+                if is_to_label {
+                    prev_continue_pc.replace(data.opcode.imm_0);
+                } else {
+                    prev_continue_pc.replace(last.pc);
+                }
+
+                prev_exception_handler_pc.replace(current.exception_handler_location);
+            }
+        }
+    }
+
     fn after_execution(
         &mut self,
         state: VmLocalStateData<'_>,
@@ -283,6 +346,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             self.reset_test_status();
         }
 
+        // Checks returns from caontracts for expectRevert cheatcode
+        self.handle_return(&state, &data, memory);
+
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
@@ -309,6 +375,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
         }
 
+        let current = state.vm_local_state.callstack.get_current_stack();
+
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
                 if self.near_calls == 0 {
@@ -329,7 +397,17 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }
 
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let current = state.vm_local_state.callstack.current;
+            if current.code_address == ACCOUNT_CODE_STORAGE_ADDRESS {
+                if let Some(action) = &mut self.next_return_action {
+                    // if the call is to the account storage contract, we need to skip the next
+                    // return and our code assumes that we are working with return opcode, so we
+                    // have to increase target depth
+                    if action.target_depth + 1 == state.vm_local_state.callstack.depth() {
+                        action.returns_to_skip += 1;
+                    }
+                }
+            }
+
             if current.code_address != CHEATCODE_ADDRESS {
                 return
             }
@@ -625,22 +703,50 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.modified_storage_keys = modified_storage;
                     self.return_data = Some(vec![snapshot_id.to_u256()]);
                 }
+                FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
+                    tracing::debug!("!!!! FORCING RETURN");
+
+                    self.add_trimmed_return_data(data.as_slice());
+                    let ptr = state.local_state.registers
+                        [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+                    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+
+                    Self::set_return(
+                        fat_data_pointer,
+                        self.return_data.take().unwrap(),
+                        &mut state.local_state,
+                        &mut state.memory,
+                    );
+
+                    //change current stack pc to label
+                    state.local_state.callstack.get_current_stack_mut().pc = pc;
+                }
+                FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
+                    tracing::debug!("!!! FORCING REVERT");
+
+                    self.add_trimmed_return_data(error.as_slice());
+                    let ptr = state.local_state.registers
+                        [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+                    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+
+                    Self::set_return(
+                        fat_data_pointer,
+                        self.return_data.take().unwrap(),
+                        &mut state.local_state,
+                        &mut state.memory,
+                    );
+
+                    //change current stack pc to exception handler
+                    state.local_state.callstack.get_current_stack_mut().pc = pc;
+                }
             }
         }
 
         // Set return data, if any
-        if let Some(mut fat_pointer) = self.return_ptr.take() {
-            let timestamp = Timestamp(state.local_state.timestamp);
-
+        if let Some(fat_pointer) = self.return_ptr.take() {
             let elements = self.return_data.take().unwrap();
-            fat_pointer.length = (elements.len() as u32) * 32;
-            state.local_state.registers[RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize] =
-                PrimitiveValue { value: fat_pointer.to_u256(), is_pointer: true };
-            state.memory.populate_page(
-                fat_pointer.memory_page as usize,
-                elements.into_iter().enumerate().collect_vec(),
-                timestamp,
-            );
+
+            Self::set_return(fat_pointer, elements, &mut state.local_state, &mut state.memory);
         }
 
         // Sets the sender address for startPrank cheatcode
@@ -691,7 +797,7 @@ impl CheatcodeTracer {
                     self.test_status = FoundryTestState::Running {
                         call_depth: state.vm_local_state.callstack.depth(),
                     };
-                    tracing::info!("Test started");
+                    tracing::info!("Test started depth {}", state.vm_local_state.callstack.depth());
                 }
             }
             Opcode::Ret(_) => {
@@ -700,7 +806,8 @@ impl CheatcodeTracer {
                     // popped (so reduced by 1) and must be accounted for.
                     if call_depth == state.vm_local_state.callstack.depth() + 1 {
                         self.test_status = FoundryTestState::Finished;
-                        tracing::info!("Test finished");
+                        tracing::info!("Test finished {}", state.vm_local_state.callstack.depth());
+                        // panic!("Test finished")
                     }
                 }
             }
@@ -745,6 +852,21 @@ impl CheatcodeTracer {
                 let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+            }
+            expectRevert_0(expectRevert_0Call {}) => {
+                let depth = state.vm_local_state.callstack.depth();
+                tracing::info!(%depth, "👷 Setting up expectRevert for any reason");
+                self.add_expect_revert(None, depth)
+            }
+            expectRevert_1(expectRevert_1Call { revertData }) => {
+                let depth = state.vm_local_state.callstack.depth();
+                tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with bytes4 reason");
+                self.add_expect_revert(Some(revertData.to_vec()), depth)
+            }
+            expectRevert_2(expectRevert_2Call { revertData }) => {
+                let depth = state.vm_local_state.callstack.depth();
+                tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with reason");
+                self.add_expect_revert(Some(revertData.to_vec()), depth)
             }
             expectCall_0(expectCall_0Call { callee, data }) => {
                 tracing::info!("👷 Setting expected call to {callee:?}");
@@ -1364,8 +1486,117 @@ impl CheatcodeTracer {
         self.return_data = Some(data);
     }
 
+    fn set_return<H: HistoryMode>(
+        mut fat_pointer: FatPointer,
+        elements: Vec<U256>,
+        state: &mut VmLocalState,
+        memory: &mut SimpleMemory<H>,
+    ) {
+        let timestamp = Timestamp(state.timestamp);
+
+        fat_pointer.length = (elements.len() as u32) * 32;
+        state.registers[RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize] =
+            PrimitiveValue { value: fat_pointer.to_u256(), is_pointer: true };
+        memory.populate_page(
+            fat_pointer.memory_page as usize,
+            elements.into_iter().enumerate().collect_vec(),
+            timestamp,
+        );
+    }
+
+    fn current_expect_revert(&mut self) -> Option<&mut ActionOnReturn> {
+        self.next_return_action.as_mut().map(|action| &mut action.action)
+    }
+
+    fn add_expect_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
+        if self.current_expect_revert().is_some() {
+            panic!("expectRevert already set")
+        }
+
+        //-1: Because we are working with return opcode and it pops the stack after execution
+        let action = ActionOnReturn::ExpectRevert {
+            reason,
+            depth: depth - 1,
+            prev_exception_handler_pc: None,
+            prev_continue_pc: None,
+        };
+
+        // We have to skip at least one return from CHEATCODES contract
+        self.next_return_action =
+            Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 1 });
+    }
+
+    fn handle_except_revert<H: HistoryMode>(
+        reason: Option<&Vec<u8>>,
+        op: zkevm_opcode_defs::RetOpcode,
+        state: &VmLocalStateData<'_>,
+        memory: &SimpleMemory<H>,
+    ) -> Result<(), Vec<u8>> {
+        match (op, reason) {
+            (zkevm_opcode_defs::RetOpcode::Revert, Some(expected_reason)) => {
+                let retdata = {
+                    let ptr = state.vm_local_state.registers
+                        [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+                    assert!(ptr.is_pointer);
+                    let fat_data_pointer = FatPointer::from_u256(ptr.value);
+                    memory.read_unaligned_bytes(
+                        fat_data_pointer.memory_page as usize,
+                        fat_data_pointer.start as usize,
+                        fat_data_pointer.length as usize,
+                    )
+                };
+
+                tracing::debug!(?expected_reason, ?retdata);
+                if !expected_reason.is_empty() && retdata.is_empty() {
+                    return Err("call reverted as expected, but without data".to_string().into())
+                }
+
+                match VmRevertReason::from(retdata.as_slice()) {
+                    VmRevertReason::General { msg, data: _ } => {
+                        let expected_reason = String::from_utf8_lossy(expected_reason).to_string();
+                        if msg == expected_reason {
+                            Ok(())
+                        } else {
+                            Err(format!(
+                                "Error != expected error: {} != {}",
+                                &msg, expected_reason,
+                            )
+                            .into())
+                        }
+                    }
+                    VmRevertReason::Unknown { function_selector: _, data } => {
+                        if &data == expected_reason {
+                            Ok(())
+                        } else {
+                            Err(format!(
+                                "Error != expected error: {:?} != {:?}",
+                                &data, expected_reason,
+                            )
+                            .into())
+                        }
+                    }
+                    _ => {
+                        tracing::error!("unexpected revert reason");
+                        Err("unexpected revert reason".to_string().into())
+                    }
+                }
+            }
+            (zkevm_opcode_defs::RetOpcode::Revert, None) => {
+                tracing::debug!("any revert accepted");
+                Ok(())
+            }
+            (zkevm_opcode_defs::RetOpcode::Ok, _) => {
+                tracing::debug!("expected revert but call succeeded");
+                Err("expected revert but call succeeded".to_string().into())
+            }
+            (zkevm_opcode_defs::RetOpcode::Panic, _) => {
+                tracing::error!("Vm panicked it should have never happened");
+                Err("expected revert but call Panicked".to_string().into())
+            }
+        }
+    }
+
     /// Adds an expectCall to the tracker.
-    #[allow(clippy::too_many_arguments)]
     fn expect_call(
         &mut self,
         callee: &H160,
@@ -1407,6 +1638,77 @@ impl CheatcodeTracer {
                     }
                 }
             }
+        }
+    }
+
+    fn handle_return<H: HistoryMode>(
+        &mut self,
+        state: &VmLocalStateData<'_>,
+        data: &AfterExecutionData,
+        memory: &SimpleMemory<H>,
+    ) {
+        // Skip check if there are no expected actions
+        let Some(action) = self.next_return_action.as_mut() else { return };
+        // We only care about the certain depth
+        let callstack_depth = state.vm_local_state.callstack.depth();
+        if callstack_depth != action.target_depth {
+            return
+        }
+
+        // Skip check if opcode is not Ret
+        let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
+        // Check how many retunrs we need to skip before finding the actual one
+        if action.returns_to_skip != 0 {
+            action.returns_to_skip -= 1;
+            return
+        }
+
+        // The desired return opcode was found
+        let ActionOnReturn::ExpectRevert {
+            reason,
+            depth,
+            prev_exception_handler_pc: exception_handler,
+            prev_continue_pc: continue_pc,
+        } = &action.action;
+        match op {
+            RetOpcode::Revert => {
+                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
+                let (Some(exception_handler), Some(continue_pc)) =
+                    (*exception_handler, *continue_pc)
+                else {
+                    tracing::error!("exceptRevert missing stored continuations");
+                    return
+                };
+
+                self.one_time_actions.push(
+                    Self::handle_except_revert(reason.as_ref(), op, state, memory)
+                        .map(|_| FinishCycleOneTimeActions::ForceReturn {
+                                //dummy data
+                                data: // vec![0u8; 8192]
+                                    [0xde, 0xad, 0xbe, 0xef].to_vec(),
+                                continue_pc,
+                            })
+                        .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
+                            error,
+                            exception_handler,
+                        }),
+                );
+                self.next_return_action = None;
+            }
+            RetOpcode::Ok => {
+                let Some(exception_handler) = *exception_handler else {
+                    tracing::error!("exceptRevert missing stored continuations");
+                    return
+                };
+                if let Err(err) = Self::handle_except_revert(reason.as_ref(), op, state, memory) {
+                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                        error: err,
+                        exception_handler,
+                    });
+                }
+                self.next_return_action = None;
+            }
+            RetOpcode::Panic => (),
         }
     }
 }
