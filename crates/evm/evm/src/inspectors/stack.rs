@@ -603,9 +603,7 @@ impl<DB: DatabaseExt + Send>
 
 impl StorageModificationRecorder for &mut InspectorStack {
     fn record_modified_keys(&mut self, modified_keys: &HashMap<StorageKey, StorageValue>) {
-        for (k, v) in modified_keys {
-            self.modified_storage_keys.insert(*k, *v);
-        }
+        self.modified_storage_keys.extend(modified_keys);
     }
 
     fn get(&self) -> &HashMap<StorageKey, StorageValue> {
