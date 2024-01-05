@@ -716,14 +716,19 @@ impl CheatcodeTracer {
         match call {
             activeFork(activeForkCall {}) => {
                 tracing::info!("👷 Getting active fork");
-                let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.borrow_mut().storage_handle;
+                let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                    &storage.borrow_mut().storage_handle;
                 let fork_storage = handle.inner.read().unwrap();
-                let fork_id = fork_storage.fork.as_ref().unwrap().fork_source.db.lock().unwrap().active_fork_id();
-                assert!(
-                    fork_id.is_some(),
-                    "No active fork found. Please create a fork first."
-                );
-                println!("Active fork: {}", fork_id.unwrap());
+                let fork_id = fork_storage
+                    .fork
+                    .as_ref()
+                    .unwrap()
+                    .fork_source
+                    .db
+                    .lock()
+                    .unwrap()
+                    .active_fork_id();
+                assert!(fork_id.is_some(), "No active fork found. Please create a fork first.");
                 self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
             }
             addr(addrCall { privateKey: private_key }) => {
