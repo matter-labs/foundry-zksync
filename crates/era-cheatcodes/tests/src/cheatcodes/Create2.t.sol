@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console2 as console} from "forge-std/Test.sol";
 import {Counter} from "./Counter.sol";
 
 contract Create2Test is Test {
@@ -12,29 +12,21 @@ contract Create2Test is Test {
     }
 
     function testDeterministicDeploy() public {
-        // Bytecode hash for Counter.sol
-        // We are hardcoding this since using `type(Counter).creationCode` returns the stored
-        // bytecodeHash with 0 padding instead of the actual bytecode stored for the contract.
-        // The actual bytecode is stored in factory deps so is unavailable.
-        bytes32 codeHash = 0x0100001919b82aa7fb17f35b1dc3548475002d6b000ac4a3818dc64b461a2deb;
-        bytes memory expectedCreationCode = bytes.concat(
-            bytes4(0x0000),
-            bytes32(
-                0x0000000000000000000000000000000000000000000000000000000000000000
-            ),
-            codeHash,
-            bytes32(
-                0x0000000000000000000000000000000000000000000000000000000000000000
-            ),
+        // Bytecode hash for Counter.sol needs to be parsed from the following format
+        //   0x0000
+        //   0x0000000000000000000000000000000000000000000000000000000000000000
+        //   BYTE_CODE
+        //   0x0000000000000000000000000000000000000000000000000000000000000000
+        //   0x0000000000000000000000000000000000000000000000000000000000000000
+        bytes memory creationCode = type(Counter).creationCode;
+        bytes memory bytecodeHash = abi.encodePacked(
             bytes32(
                 0x0000000000000000000000000000000000000000000000000000000000000000
             )
         );
-        require(
-            keccak256(type(Counter).creationCode) ==
-                keccak256(expectedCreationCode),
-            "Counter.sol bytecode mismatch"
-        );
+        for (uint8 i = 0; i < 32; i++) {
+            bytecodeHash[i] = creationCode[4 + 32 + i];
+        }
 
         address sender = address(this);
         bytes32 salt = "12345";
@@ -42,7 +34,7 @@ contract Create2Test is Test {
         address expectedDeployedAddress = computeCreate2Address(
             sender,
             salt,
-            codeHash,
+            bytes32(bytecodeHash),
             constructorInputHash
         );
 
