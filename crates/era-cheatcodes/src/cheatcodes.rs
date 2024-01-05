@@ -259,13 +259,17 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }) = self.current_expect_revert()
         {
             if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
+                // Callstack on the desired depth, it has the correct pc for continue
                 let last = state.vm_local_state.callstack.inner.last().unwrap();
+                // Callstack on the current depth, it has the correct pc for exception handler and
+                // is_local_frame
                 let current = &state.vm_local_state.callstack.current;
                 let is_to_label: bool = data.opcode.variant.flags
                     [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
                     state.vm_local_state.callstack.current.is_local_frame;
                 tracing::debug!(%is_to_label, ?last, "storing continuations");
 
+                // The source https://github.com/matter-labs/era-zk_evm/blob/763ef5dfd52fecde36bfdd01d47589b61eabf118/src/opcodes/execution/ret.rs#L242
                 if is_to_label {
                     prev_continue_pc.replace(data.opcode.imm_0);
                 } else {
@@ -700,10 +704,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(vec![snapshot_id.to_u256()]);
                 }
                 FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
-                    tracing::warn!("!!!! FORCING RETURN");
+                    tracing::debug!("!!!! FORCING RETURN");
 
-                    //TODO: override return data with the given one and force return (instead of
-                    // revert)
                     self.add_trimmed_return_data(data.as_slice());
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
@@ -720,7 +722,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
                 }
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
-                    tracing::warn!("!!! FORCING REVERT");
+                    tracing::debug!("!!! FORCING REVERT");
 
                     self.add_trimmed_return_data(error.as_slice());
                     let ptr = state.local_state.registers
@@ -1496,7 +1498,7 @@ impl CheatcodeTracer {
     }
 
     fn current_expect_revert(&mut self) -> Option<&mut ActionOnReturn> {
-        self.next_return_action.as_mut().and_then(|action| Some(&mut action.action))
+        self.next_return_action.as_mut().map(|action| &mut action.action)
     }
 
     fn add_except_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
@@ -1545,7 +1547,7 @@ impl CheatcodeTracer {
                 match VmRevertReason::from(retdata.as_slice()) {
                     VmRevertReason::General { msg, data: _ } => {
                         let expected_reason = String::from_utf8_lossy(expected_reason).to_string();
-                        if &msg == &expected_reason {
+                        if msg == expected_reason {
                             Ok(())
                         } else {
                             Err(format!(
@@ -1635,18 +1637,23 @@ impl CheatcodeTracer {
         data: &AfterExecutionData,
         memory: &SimpleMemory<H>,
     ) {
+        // Skip check if there are no expected actions
         let Some(action) = self.next_return_action.as_mut() else { return };
+        // We only care about the certain depth
         let callstack_depth = state.vm_local_state.callstack.depth();
         if callstack_depth != action.target_depth {
             return
         }
 
+        // Skip check if opcode is not Ret
         let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
+        // Check how many retunrs we need to skip before finding the actual one
         if action.returns_to_skip != 0 {
             action.returns_to_skip -= 1;
             return
         }
 
+        // The desired return opcode was found
         let ActionOnReturn::ExpectRevert {
             reason,
             depth,
@@ -1664,7 +1671,7 @@ impl CheatcodeTracer {
                 };
 
                 self.one_time_actions.push(
-                    Self::handle_except_revert(reason.as_ref(), op, &state, memory)
+                    Self::handle_except_revert(reason.as_ref(), op, state, memory)
                         .map(|_| FinishCycleOneTimeActions::ForceReturn {
                                 //dummy data
                                 data: // vec![0u8; 8192]
@@ -1684,7 +1691,7 @@ impl CheatcodeTracer {
                     return
                 };
                 if let Err(err) =
-                    Self::handle_except_revert(reason.as_ref(), RetOpcode::Ok, &state, memory)
+                    Self::handle_except_revert(reason.as_ref(), RetOpcode::Ok, state, memory)
                 {
                     self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
                         error: err,
@@ -1693,7 +1700,7 @@ impl CheatcodeTracer {
                 }
                 self.next_return_action = None;
             }
-            RetOpcode::Panic => return,
+            RetOpcode::Panic => (),
         }
     }
 }
