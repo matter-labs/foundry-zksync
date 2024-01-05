@@ -15,7 +15,7 @@ use foundry_common::{
     conversion_utils::h160_to_address,
     is_known_system_sender,
     types::{ToAlloy, ToEthers},
-    SYSTEM_TRANSACTION_TYPE,
+    AsTracerPointer, StorageModificationRecorder, SYSTEM_TRANSACTION_TYPE,
 };
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -769,10 +769,10 @@ impl Backend {
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + ToTracerPointer<
+            + AsTracerPointer<
                 StorageView<ForkStorage<RevmDatabaseForEra<&'a mut Self>>>,
                 HistoryDisabled,
-            >,
+            > + StorageModificationRecorder,
     {
         self.initialize(env);
 

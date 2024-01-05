@@ -51,7 +51,7 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, Timestamp,
+    LogQuery, StorageKey, StorageValue, Timestamp,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
@@ -110,6 +110,7 @@ enum FoundryTestState {
 
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
+    modified_storage_keys: HashMap<StorageKey, StorageValue>,
     one_time_actions: Vec<FinishCycleOneTimeActions>,
     permanent_actions: FinishCyclePermanentActions,
     return_data: Option<Vec<U256>>,
@@ -450,13 +451,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
-                    let modified_storage: HashMap<StorageKey, H256> = storage
-                        .borrow_mut()
-                        .modified_storage_keys()
+                    let modified_storage = self
+                        .modified_storage_keys
                         .clone()
                         .into_iter()
                         .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect();
+                        .collect::<HashMap<_, _>>();
+
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
                         let handle: &ForkStorage<RevmDatabaseForEra<S>> =
@@ -509,13 +510,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
-                    let modified_storage: HashMap<StorageKey, H256> = storage
-                        .borrow_mut()
-                        .modified_storage_keys()
+                    let modified_storage = self
+                        .modified_storage_keys
                         .clone()
                         .into_iter()
                         .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect();
+                        .collect::<HashMap<_, _>>();
                     {
                         storage.borrow_mut().clean_cache();
                         let handle: &ForkStorage<RevmDatabaseForEra<S>> =
@@ -656,8 +656,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 }
 
 impl CheatcodeTracer {
-    pub fn new(cheatcodes_config: Arc<CheatsConfig>) -> Self {
-        Self { config: cheatcodes_config, ..Default::default() }
+    pub fn new(
+        cheatcodes_config: Arc<CheatsConfig>,
+        modified_keys: HashMap<StorageKey, StorageValue>,
+    ) -> Self {
+        Self {
+            config: cheatcodes_config,
+            modified_storage_keys: modified_keys,
+            ..Default::default()
+        }
     }
 
     /// Resets the test state to [TestStatus::NotStarted]
