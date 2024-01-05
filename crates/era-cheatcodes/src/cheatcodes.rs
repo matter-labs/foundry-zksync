@@ -849,17 +849,17 @@ impl CheatcodeTracer {
             expectRevert_0(expectRevert_0Call {}) => {
                 let depth = state.vm_local_state.callstack.depth();
                 tracing::info!(%depth, "👷 Setting up expectRevert for any reason");
-                self.add_except_revert(None, depth)
+                self.add_expect_revert(None, depth)
             }
             expectRevert_1(expectRevert_1Call { revertData }) => {
                 let depth = state.vm_local_state.callstack.depth();
                 tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with bytes4 reason");
-                self.add_except_revert(Some(revertData.to_vec()), depth)
+                self.add_expect_revert(Some(revertData.to_vec()), depth)
             }
             expectRevert_2(expectRevert_2Call { revertData }) => {
                 let depth = state.vm_local_state.callstack.depth();
                 tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with reason");
-                self.add_except_revert(Some(revertData.to_vec()), depth)
+                self.add_expect_revert(Some(revertData.to_vec()), depth)
             }
             expectCall_0(expectCall_0Call { callee, data }) => {
                 tracing::info!("👷 Setting expected call to {callee:?}");
@@ -1501,7 +1501,7 @@ impl CheatcodeTracer {
         self.next_return_action.as_mut().map(|action| &mut action.action)
     }
 
-    fn add_except_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
+    fn add_expect_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
         if self.current_expect_revert().is_some() {
             panic!("expectRevert already set")
         }
@@ -1582,7 +1582,10 @@ impl CheatcodeTracer {
                 tracing::debug!("expected revert but call succeeded");
                 Err("expected revert but call succeeded".to_string().into())
             }
-            (zkevm_opcode_defs::RetOpcode::Panic, _) => todo!("ignore/return error ?"),
+            (zkevm_opcode_defs::RetOpcode::Panic, _) => {
+                tracing::error!("Vm panicked it should have never happened");
+                Err("expected revert but call Panicked".to_string().into())
+            }
         }
     }
 
@@ -1690,9 +1693,7 @@ impl CheatcodeTracer {
                     tracing::error!("exceptRevert missing stored continuations");
                     return
                 };
-                if let Err(err) =
-                    Self::handle_except_revert(reason.as_ref(), RetOpcode::Ok, state, memory)
-                {
+                if let Err(err) = Self::handle_except_revert(reason.as_ref(), op, state, memory) {
                     self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
                         error: err,
                         exception_handler,
