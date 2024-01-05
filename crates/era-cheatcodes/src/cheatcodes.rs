@@ -529,12 +529,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
-                    let modified_storage = self
+                    let mut modified_storage = self
                         .modified_storage_keys
                         .clone()
                         .into_iter()
                         .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
                         .collect::<HashMap<_, _>>();
+                    modified_storage.extend(&storage.borrow().modified_storage_keys);
 
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
@@ -588,12 +589,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
-                    let modified_storage = self
+                    let mut modified_storage = self
                         .modified_storage_keys
                         .clone()
                         .into_iter()
                         .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
                         .collect::<HashMap<_, _>>();
+                    modified_storage.extend(&storage.borrow().modified_storage_keys);
                     {
                         storage.borrow_mut().clean_cache();
                         let handle: &ForkStorage<RevmDatabaseForEra<S>> =
