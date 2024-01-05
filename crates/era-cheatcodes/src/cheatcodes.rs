@@ -409,10 +409,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         false
                     }
                     Opcode::Ret(RetOpcode::Ok) => {
-                        tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
-                        let (Some(exception_handler), Some(continue_pc)) =
-                            (*exception_handler, *continue_pc)
-                        else {
+                        let Some(exception_handler) = *exception_handler else {
                             tracing::error!("exceptRevert missing stored continuations");
                             return false
                         };
@@ -422,7 +419,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             &state,
                             memory,
                         ) {
-                            tracing::error!(?err, "unexpected opcode");
                             self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
                                 error: err,
                                 exception_handler,
@@ -790,7 +786,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.modified_storage_keys = modified_storage;
                     self.return_data = Some(vec![snapshot_id.to_u256()]);
                 }
-                FinishCycleOneTimeActions::ForceReturn { mut data, continue_pc: pc } => {
+                FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
                     tracing::warn!("!!!! FORCING RETURN");
 
                     //TODO: override return data with the given one and force return (instead of
@@ -936,19 +932,16 @@ impl CheatcodeTracer {
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
             }
             expectRevert_0(expectRevert_0Call {}) => {
-                let callstack = state.vm_local_state.callstack.get_current_stack();
                 let depth = state.vm_local_state.callstack.depth();
                 tracing::info!(%depth, "👷 Setting up expectRevert for any reason");
                 self.add_except_revert(None, depth)
             }
             expectRevert_1(expectRevert_1Call { revertData }) => {
-                let callstack = state.vm_local_state.callstack.get_current_stack();
                 let depth = state.vm_local_state.callstack.depth();
                 tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with bytes4 reason");
                 self.add_except_revert(Some(revertData.to_vec()), depth)
             }
             expectRevert_2(expectRevert_2Call { revertData }) => {
-                let callstack = state.vm_local_state.callstack.get_current_stack();
                 let depth = state.vm_local_state.callstack.depth();
                 tracing::info!(%depth, reason = ?revertData, "👷 Setting up expectRevert with reason");
                 self.add_except_revert(Some(revertData.to_vec()), depth)
