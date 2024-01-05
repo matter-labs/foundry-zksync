@@ -712,7 +712,7 @@ impl CheatcodeTracer {
         call: Vm::VmCalls,
     ) {
         use Vm::{VmCalls::*, *};
-        
+
         match call {
             activeFork(activeForkCall {}) => {
                 tracing::info!("👷 Getting active fork");
