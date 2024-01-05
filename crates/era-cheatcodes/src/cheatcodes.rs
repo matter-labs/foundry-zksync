@@ -535,7 +535,11 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         .into_iter()
                         .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
                         .collect::<HashMap<_, _>>();
-                    modified_storage.extend(&storage.borrow().modified_storage_keys);
+                    modified_storage.extend(
+                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
+                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
+                        }),
+                    );
 
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
@@ -595,7 +599,11 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         .into_iter()
                         .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
                         .collect::<HashMap<_, _>>();
-                    modified_storage.extend(&storage.borrow().modified_storage_keys);
+                    modified_storage.extend(
+                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
+                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
+                        }),
+                    );
                     {
                         storage.borrow_mut().clean_cache();
                         let handle: &ForkStorage<RevmDatabaseForEra<S>> =
