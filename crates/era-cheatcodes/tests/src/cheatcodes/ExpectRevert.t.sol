@@ -5,7 +5,7 @@ import {Test, console2 as console} from "../../lib/forge-std/src/Test.sol";
 import {Constants} from "./Constants.sol";
 
 contract Reverter {
-    error CustomError();
+    error CustomError(uint256 a);
 
     function revertWithMessage(string memory message) public pure {
         revert(message);
@@ -17,8 +17,8 @@ contract Reverter {
         return uint256(100) - uint256(101);
     }
 
-    function revertWithCustomError() public pure {
-        revert CustomError();
+    function revertWithCustomError(uint256 a) public pure {
+        revert CustomError(a);
     }
 
     function nestedRevert(Reverter inner, string memory message) public pure {
@@ -92,6 +92,25 @@ contract ExpectRevertTest is Test {
         reverter.revertWithMessage("my cool error");
     }
 
+    function testExpectRevertCustomError() public {
+         Reverter reverter = new Reverter();
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectRevert(bytes)",
+                    abi.encodeWithSelector(Reverter.CustomError.selector, 1)));
+        require(success, "expectRevert failed");
+        reverter.revertWithCustomError(1);
+    }
+
+    function testFailExpectRevertCustomError() public {
+         Reverter reverter = new Reverter();
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "expectRevert(bytes)",
+                    abi.encodeWithSelector(Reverter.CustomError.selector, 1)));
+        require(success, "expectRevert failed");
+        reverter.revertWithCustomError(2);
+    }
     // function testFailRevertNotOnImmediateNextCall() public {
     //     Reverter reverter = new Reverter();
     //     // expectRevert should only work for the next call. However,

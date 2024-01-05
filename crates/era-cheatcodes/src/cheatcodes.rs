@@ -1500,7 +1500,9 @@ impl CheatcodeTracer {
     }
 
     fn add_except_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
-        //TODO: check if an expect revert is already set
+        if self.current_expect_revert().is_some() {
+            panic!("expectRevert already set")
+        }
 
         //-1: Because we are working with return opcode and it pops the stack after execution
         let action = ActionOnReturn::ExpectRevert {
@@ -1509,6 +1511,7 @@ impl CheatcodeTracer {
             prev_exception_handler_pc: None,
             prev_continue_pc: None,
         };
+
         // We have to skip at least one return from CHEATCODES contract
         self.next_return_action =
             Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 1 });
@@ -1539,20 +1542,34 @@ impl CheatcodeTracer {
                     return Err("call reverted as expected, but without data".to_string().into())
                 }
 
-                let actual_revert = match VmRevertReason::from(retdata.as_slice()) {
-                    VmRevertReason::General { msg, data: _ } => msg,
-                    _ => panic!("unexpected revert reason"),
-                };
-
-                let expected_reason = String::from_utf8_lossy(expected_reason).to_string();
-                if &actual_revert == &expected_reason {
-                    Ok(())
-                } else {
-                    Err(format!(
-                        "Error != expected error: {} != {}",
-                        &actual_revert, expected_reason,
-                    )
-                    .into())
+                match VmRevertReason::from(retdata.as_slice()) {
+                    VmRevertReason::General { msg, data: _ } => {
+                        let expected_reason = String::from_utf8_lossy(expected_reason).to_string();
+                        if &msg == &expected_reason {
+                            Ok(())
+                        } else {
+                            Err(format!(
+                                "Error != expected error: {} != {}",
+                                &msg, expected_reason,
+                            )
+                            .into())
+                        }
+                    }
+                    VmRevertReason::Unknown { function_selector: _, data } => {
+                        if &data == expected_reason {
+                            Ok(())
+                        } else {
+                            Err(format!(
+                                "Error != expected error: {:?} != {:?}",
+                                &data, expected_reason,
+                            )
+                            .into())
+                        }
+                    }
+                    _ => {
+                        tracing::error!("unexpected revert reason");
+                        Err("unexpected revert reason".to_string().into())
+                    }
                 }
             }
             (zkevm_opcode_defs::RetOpcode::Revert, None) => {
