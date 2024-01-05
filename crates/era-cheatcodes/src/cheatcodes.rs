@@ -1,4 +1,7 @@
-use crate::utils::{ToH160, ToH256, ToU256};
+use crate::{
+    events::LogEntry,
+    utils::{ToH160, ToH256, ToU256},
+};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
@@ -19,7 +22,6 @@ use multivm::{
         BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
     },
     zk_evm_1_4_0::{
-        reference_impls::event_sink::EventMessage,
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::{PrimitiveValue, VmLocalState},
         zkevm_opcode_defs::{
@@ -40,7 +42,9 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Debug,
     fs,
+    ops::BitAnd,
     process::Command,
+    str::FromStr,
     sync::Arc,
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
@@ -124,6 +128,7 @@ pub struct CheatcodeTracer {
     recording_timestamp: u32,
     expected_calls: ExpectedCallsTracker,
     test_status: FoundryTestState,
+    emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
 }
 
@@ -132,17 +137,32 @@ pub struct SavedSnapshot {
     modified_storage: HashMap<StorageKey, H256>,
 }
 
-#[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq)]
-struct LogEntry {
-    topic: H256,
-    data: H256,
-    emitter: H160,
+#[derive(Debug, Clone, Default)]
+struct EmitConfig {
+    expected_emit_state: ExpectedEmitState,
+    expect_emits_since: u32,
+    expect_emits_until: u32,
+    call_emits_since: u32,
+    call_emits_until: u32,
+    call_depth: usize,
+    checks: EmitChecks,
 }
 
-impl LogEntry {
-    fn new(topic: H256, data: H256, emitter: H160) -> Self {
-        LogEntry { topic, data, emitter }
-    }
+#[derive(Debug, Clone, Default)]
+struct EmitChecks {
+    address: Option<H160>,
+    topics: [bool; 3],
+    data: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Eq, Hash, PartialEq, Default)]
+enum ExpectedEmitState {
+    #[default]
+    NotStarted,
+    ExpectedEmitTriggered,
+    CallTriggered,
+    Assert,
+    Finished,
 }
 
 #[derive(Debug, Clone)]
@@ -265,7 +285,37 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
+        let current = state.vm_local_state.callstack.get_current_stack();
+        let is_reserved_addr = current
+            .code_address
+            .bitand(H160::from_str("ffffffffffffffffffffffffffffffffffff0000").unwrap())
+            .is_zero();
+
+        if current.code_address != CHEATCODE_ADDRESS &&
+            !INTERNAL_CONTRACT_ADDRESSES.contains(&current.code_address) &&
+            !is_reserved_addr
+        {
+            if self.emit_config.expected_emit_state == ExpectedEmitState::ExpectedEmitTriggered {
+                //cheatcode triggered, waiting for far call
+                if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+                    self.emit_config.call_emits_since = state.vm_local_state.timestamp;
+                    self.emit_config.expect_emits_until = state.vm_local_state.timestamp;
+                    self.emit_config.expected_emit_state = ExpectedEmitState::CallTriggered;
+                    self.emit_config.call_depth = state.vm_local_state.callstack.depth();
+                }
+            }
+
+            if self.emit_config.expected_emit_state == ExpectedEmitState::CallTriggered &&
+                state.vm_local_state.callstack.depth() < self.emit_config.call_depth
+            {
+                self.emit_config.call_emits_until = state.vm_local_state.timestamp;
+            }
+        }
+
         if self.update_test_status(&state, &data) == &FoundryTestState::Finished {
+            // Trigger assert for emit_logs
+            self.emit_config.expected_emit_state = ExpectedEmitState::Assert;
+
             for (address, expected_calls_for_target) in &self.expected_calls {
                 for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
                     let failed = match expected.call_type {
@@ -485,23 +535,65 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         bootloader_state: &mut BootloaderState,
         storage: StoragePtr<EraDb<S>>,
     ) -> TracerExecutionStatus {
-        let emitter = state.local_state.callstack.current.this_address;
         if self.recording_logs {
-            let logs = transform_to_logs(
-                state
-                    .event_sink
-                    .get_events_and_l2_l1_logs_after_timestamp(Timestamp(self.recording_timestamp))
-                    .0,
-                emitter,
+            let (events, _) = state.event_sink.get_events_and_l2_l1_logs_after_timestamp(
+                zksync_types::Timestamp(self.recording_timestamp),
             );
-            if !logs.is_empty() {
-                let mut unique_set: HashSet<LogEntry> = HashSet::new();
-
-                // Filter out duplicates and extend the unique entries to the vector
-                self.recorded_logs
-                    .extend(logs.into_iter().filter(|log| unique_set.insert(log.clone())));
+            let logs = crate::events::parse_events(events);
+            //insert logs in the hashset
+            for log in logs {
+                self.recorded_logs.insert(log);
             }
         }
+
+        // This assert is triggered only once after the test execution finishes
+        // And is used to assert that all logs exist
+        if self.emit_config.expected_emit_state == ExpectedEmitState::Assert {
+            self.emit_config.expected_emit_state = ExpectedEmitState::Finished;
+
+            let (expected_events_initial_dimension, _) =
+                state.event_sink.get_events_and_l2_l1_logs_after_timestamp(
+                    zksync_types::Timestamp(self.emit_config.expect_emits_since),
+                );
+            let expected_events_surplus = state
+                .event_sink
+                .get_events_and_l2_l1_logs_after_timestamp(zksync_types::Timestamp(
+                    self.emit_config.expect_emits_until,
+                ))
+                .0
+                .len();
+
+            //remove n surplus events from the end of expected_events_initial_dimension
+            let expected_events = expected_events_initial_dimension
+                .clone()
+                .into_iter()
+                .take(expected_events_initial_dimension.len() - expected_events_surplus)
+                .collect::<Vec<_>>();
+            let expected_logs = crate::events::parse_events(expected_events);
+
+            let (actual_events_initial_dimension, _) =
+                state.event_sink.get_events_and_l2_l1_logs_after_timestamp(
+                    zksync_types::Timestamp(self.emit_config.call_emits_since),
+                );
+            let actual_events_surplus = state
+                .event_sink
+                .get_events_and_l2_l1_logs_after_timestamp(zksync_types::Timestamp(
+                    self.emit_config.call_emits_until,
+                ))
+                .0
+                .len();
+
+            //remove n surplus events from the end of actual_events_initial_dimension
+            let actual_events = actual_events_initial_dimension
+                .clone()
+                .into_iter()
+                .take(actual_events_initial_dimension.len() - actual_events_surplus)
+                .collect::<Vec<_>>();
+            let actual_logs = crate::events::parse_events(actual_events);
+
+            assert!(compare_logs(&expected_logs, &actual_logs, self.emit_config.checks.clone()));
+        }
+
         while let Some(action) = self.one_time_actions.pop() {
             match action {
                 FinishCycleOneTimeActions::StorageWrite { key, read_value, write_value } => {
@@ -892,6 +984,53 @@ impl CheatcodeTracer {
                     ExpectedCallType::Count,
                 );
             }
+            expectEmit_0(expectEmit_0Call { checkTopic1, checkTopic2, checkTopic3, checkData }) => {
+                tracing::info!(
+                    "👷 Setting expected emit with checks {:?}, {:?}, {:?}, {:?}",
+                    checkTopic1,
+                    checkTopic2,
+                    checkTopic3,
+                    checkData
+                );
+                self.emit_config.expected_emit_state = ExpectedEmitState::ExpectedEmitTriggered;
+                self.emit_config.expect_emits_since = state.vm_local_state.timestamp;
+                self.emit_config.checks = EmitChecks {
+                    address: None,
+                    topics: [checkTopic1, checkTopic2, checkTopic3],
+                    data: checkData,
+                };
+            }
+            expectEmit_1(expectEmit_1Call {
+                checkTopic1,
+                checkTopic2,
+                checkTopic3,
+                checkData,
+                emitter,
+            }) => {
+                tracing::info!(
+                    "👷 Setting expected emit with checks {:?}, {:?}, {:?}, {:?} from emitter {:?}",
+                    checkTopic1,
+                    checkTopic2,
+                    checkTopic3,
+                    checkData,
+                    emitter
+                );
+                self.emit_config.expected_emit_state = ExpectedEmitState::ExpectedEmitTriggered;
+                self.emit_config.expect_emits_since = state.vm_local_state.timestamp;
+                self.emit_config.checks = EmitChecks {
+                    address: Some(emitter.to_h160()),
+                    topics: [checkTopic1, checkTopic2, checkTopic3],
+                    data: checkData,
+                };
+                self.emit_config.call_depth = state.vm_local_state.callstack.depth();
+            }
+            expectEmit_2(expectEmit_2Call {}) => {
+                tracing::info!("👷 Setting expected emit at {}", state.vm_local_state.timestamp);
+                self.emit_config.expected_emit_state = ExpectedEmitState::ExpectedEmitTriggered;
+                self.emit_config.expect_emits_since = state.vm_local_state.timestamp;
+                self.emit_config.checks =
+                    EmitChecks { address: None, topics: [true; 3], data: true };
+            }
             ffi(ffiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
@@ -943,10 +1082,15 @@ impl CheatcodeTracer {
                 let logs: Vec<Log> = self
                     .recorded_logs
                     .iter()
+                    .filter(|log| !log.data.is_empty())
                     .map(|log| Log {
-                        topics: vec![log.topic.to_fixed_bytes().into()],
-                        data: log.data.to_fixed_bytes().into(),
-                        emitter: log.emitter.to_fixed_bytes().into(),
+                        topics: log
+                            .topics
+                            .iter()
+                            .map(|topic| topic.to_fixed_bytes().into())
+                            .collect(),
+                        data: log.data.clone(),
+                        emitter: log.address.to_fixed_bytes().into(),
                     })
                     .collect_vec();
 
@@ -996,7 +1140,6 @@ impl CheatcodeTracer {
 
                 if let Some(prank) = &self.permanent_actions.start_prank {
                     //TODO: vm.prank -> CallerMode::Prank
-                    println!("PRANK");
                     mode = CallerMode::RecurrentPrank;
                     new_caller = prank.sender.into();
                 }
@@ -1045,6 +1188,33 @@ impl CheatcodeTracer {
                     u256_to_h256(pack_block_info(new_height.as_limbs()[0], block_timestamp)),
                     &mut storage,
                 );
+            }
+            rpcUrl(rpcUrlCall { rpcAlias }) => {
+                tracing::info!("👷 Getting rpc url of {}", rpcAlias);
+                let rpc_endpoints = &self.config.rpc_endpoints;
+                let rpc_url = match rpc_endpoints.get(&rpcAlias) {
+                    Some(Ok(url)) => Some(url.clone()),
+                    _ => None,
+                };
+                //this should revert but we don't have reverts yet
+                assert!(
+                    rpc_url.is_some(),
+                    "Failed to resolve env var `${rpcAlias}`: environment variable not found"
+                );
+                self.add_trimmed_return_data(rpc_url.unwrap().as_bytes());
+            }
+            rpcUrls(rpcUrlsCall {}) => {
+                tracing::info!("👷 Getting rpc urls");
+                let rpc_endpoints = &self.config.rpc_endpoints;
+                let rpc_urls = rpc_endpoints
+                    .iter()
+                    .map(|(alias, url)| match url {
+                        Ok(url) => format!("{}:{}", alias, url),
+                        Err(_) => alias.clone(),
+                    })
+                    .collect::<Vec<String>>()
+                    .join(",");
+                self.add_trimmed_return_data(rpc_urls.as_bytes());
             }
             serializeAddress_0(serializeAddress_0Call {
                 objectKey: object_key,
@@ -1549,19 +1719,6 @@ impl CheatcodeTracer {
     }
 }
 
-fn transform_to_logs(events: Vec<EventMessage>, emitter: H160) -> Vec<LogEntry> {
-    events
-        .iter()
-        .filter_map(|event| {
-            if event.address == zksync_types::EVENT_WRITER_ADDRESS {
-                Some(LogEntry::new(u256_to_h256(event.key), u256_to_h256(event.value), emitter))
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
 fn into_revm_env(env: &EraEnv) -> Env {
     use foundry_common::zk_utils::conversion_utils::h160_to_address;
     use revm::primitives::U256;
@@ -1623,4 +1780,43 @@ fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMem
         fat_data_pointer.start as usize,
         fat_data_pointer.length as usize,
     )
+}
+
+fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry], checks: EmitChecks) -> bool {
+    let mut expected_iter = expected_logs.iter().peekable();
+    let mut actual_iter = actual_logs.iter();
+
+    while let Some(expected_log) = expected_iter.peek() {
+        if let Some(actual_log) = actual_iter.next() {
+            if are_logs_equal(expected_log, actual_log, &checks) {
+                expected_iter.next(); // Move to the next expected log
+            } else {
+                return false
+            }
+        } else {
+            // No more actual logs to compare
+            return false
+        }
+    }
+
+    true
+}
+
+fn are_logs_equal(a: &LogEntry, b: &LogEntry, emit_checks: &EmitChecks) -> bool {
+    let address_match = match emit_checks.address {
+        Some(address) => b.address == address,
+        None => true,
+    };
+
+    let topics_match = emit_checks.topics.iter().enumerate().all(|(i, &check)| {
+        if check {
+            a.topics.get(i) == b.topics.get(i)
+        } else {
+            true
+        }
+    });
+
+    let data_match = if emit_checks.data { a.data == b.data } else { true };
+
+    address_match && topics_match && data_match
 }
