@@ -452,7 +452,7 @@ impl ZkSolc {
                         .optimizer
                         .details
                         .as_ref()
-                        .map(|details| serde_json::to_value(details))
+                        .map(serde_json::to_value)
                         .transpose()?
                         .unwrap_or(serde_json::Value::Null);
 
