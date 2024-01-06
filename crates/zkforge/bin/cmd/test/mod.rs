@@ -8,7 +8,7 @@ use foundry_cli::{
 };
 use foundry_common::{
     compact_to_contract, compile::ContractSources, evm::EvmArgs, get_contract_name, get_file_name,
-    shell, zk_compile::ZkSolcOpts,
+    shell,
 };
 use foundry_config::{
     figment,
@@ -16,7 +16,7 @@ use foundry_config::{
         value::{Dict, Map},
         Metadata, Profile, Provider,
     },
-    get_available_profiles, zksolc_config, Config,
+    get_available_profiles, Config,
 };
 use foundry_debugger::Debugger;
 use regex::Regex;

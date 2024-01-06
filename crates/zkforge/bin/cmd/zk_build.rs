@@ -28,7 +28,7 @@
 use super::{install, watch::WatchArgs};
 use clap::Parser;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
-use foundry_common::zksolc_manager::{ensure_zksolc, DEFAULT_ZKSOLC_VERSION};
+use foundry_common::zksolc_manager::ensure_zksolc;
 use foundry_compilers::Project;
 use foundry_config::{
     figment::{
@@ -37,7 +37,7 @@ use foundry_config::{
         value::{Dict, Map, Value},
         Metadata, Profile, Provider,
     },
-    zksolc_config, Config,
+    Config,
 };
 use serde::Serialize;
 use std::fmt::Debug;

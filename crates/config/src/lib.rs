@@ -646,7 +646,7 @@ impl Config {
     /// let zksolc = config.zk_solc_config();
     /// ```
     pub fn zk_solc_config(&self) -> Result<ZkSolcConfig, String> {
-        self.create_zk_solc_config()
+        self.create_zksolc_config()
     }
 
     /// Same as [`Self::project()`] but sets configures the project to not emit artifacts and ignore
@@ -688,7 +688,7 @@ impl Config {
         Ok(project)
     }
 
-    fn create_zk_solc_config(&self) -> Result<ZkSolcConfig, String> {
+    fn create_zksolc_config(&self) -> Result<ZkSolcConfig, String> {
         let zksolc_config = ZkSolcConfigBuilder::new()
             .compiler_path(self.compiler_path.clone())
             .settings(self.zksolc_settings()?)
