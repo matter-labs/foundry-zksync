@@ -86,7 +86,7 @@ pub struct CompilerArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
 
-    /// Try to recompile with -Oz if the bytecode is too large.
+    /// Enables optimizations
     #[clap(help_heading = "zkSync Compiler options", long = "zk-optimizer")]
     #[serde(skip)]
     pub zk_optimizer: bool,
