@@ -16,7 +16,7 @@ use foundry_config::{
         value::{Dict, Map},
         Metadata, Profile, Provider,
     },
-    get_available_profiles, Config,
+    get_available_profiles, zksolc_config, Config,
 };
 use foundry_debugger::Debugger;
 use regex::Regex;
@@ -42,7 +42,7 @@ use summary::TestSummaryReporter;
 pub use filter::FilterArgs;
 use foundry_common::{
     zk_compile::ZkSolc,
-    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
+    zksolc_manager::{ensure_zksolc, DEFAULT_ZKSOLC_VERSION},
 };
 
 // Loads project's figment and merges the build cli arguments into it
@@ -149,6 +149,7 @@ impl TestArgs {
 
         // Set up the project
         let mut project = config.project()?;
+        let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
 
@@ -159,6 +160,7 @@ impl TestArgs {
             // need to re-configure here to also catch additional remappings
             config = self.load_config();
             project = config.project()?;
+            zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         }
 
         // Create test options from general project settings
@@ -167,15 +169,10 @@ impl TestArgs {
         let toml = config.get_config_path();
         let profiles = get_available_profiles(toml)?;
 
-        let zksolc_manager = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned())?;
+        let compiler_path = ensure_zksolc(DEFAULT_ZKSOLC_VERSION.to_owned())?;
+        zksolc_cfg.compiler_path = compiler_path;
 
-        let zksolc_opts = ZkSolcOpts {
-            compiler_path: zksolc_manager.get_full_compiler_path(),
-            is_system: false,
-            force_evmla: false,
-        };
-
-        let mut zksolc = ZkSolc::new(zksolc_opts, project);
+        let mut zksolc = ZkSolc::new(zksolc_cfg, project);
         let (output, contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),

@@ -43,6 +43,7 @@ use foundry_compilers::{
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
 };
+use foundry_config::zksolc_config::ZkSolcConfig;
 use semver::Version;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -54,7 +55,6 @@ use std::{
     path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
-
 /// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
 
@@ -154,10 +154,8 @@ type SolidityVersionSources = (Version, BTreeMap<PathBuf, Source>);
 /// resulting errors are handled accordingly.
 #[derive(Debug)]
 pub struct ZkSolc {
+    config: ZkSolcConfig,
     project: Project,
-    compiler_path: PathBuf,
-    is_system: bool,
-    force_evmla: bool,
     standard_json: Option<StandardJsonCompilerInput>,
 }
 
@@ -169,7 +167,7 @@ impl fmt::Display for ZkSolc {
                 compiler_path: {},
                 output_path: {},
             )",
-            self.compiler_path.display(),
+            self.config.compiler_path.display(),
             self.project.paths.artifacts.display(),
         )
     }
@@ -184,19 +182,8 @@ impl fmt::Display for ZkSolc {
 ///
 /// The function returns `Ok(())` if the compilation process completes successfully, or an error
 /// if it fails.
-pub fn compile_smart_contracts(
-    is_system: bool,
-    is_legacy: bool,
-    zksolc_manager: ZkSolcManager,
-    project: Project,
-) -> eyre::Result<()> {
-    let zksolc_opts = ZkSolcOpts {
-        compiler_path: zksolc_manager.get_full_compiler_path(),
-        is_system,
-        force_evmla: is_legacy,
-    };
-
-    let mut zksolc = ZkSolc::new(zksolc_opts, project);
+pub fn compile_smart_contracts(zksolc_cfg: ZkSolcConfig, project: Project) -> eyre::Result<()> {
+    let mut zksolc = ZkSolc::new(zksolc_cfg, project);
 
     match zksolc.compile() {
         Ok(_) => {
@@ -210,14 +197,8 @@ pub fn compile_smart_contracts(
 }
 
 impl ZkSolc {
-    pub fn new(opts: ZkSolcOpts, project: Project) -> Self {
-        Self {
-            project,
-            compiler_path: opts.compiler_path,
-            is_system: opts.is_system,
-            force_evmla: opts.force_evmla,
-            standard_json: None,
-        }
+    pub fn new(config: ZkSolcConfig, project: Project) -> Self {
+        Self { config, project, standard_json: None }
     }
 
     /// Compiles the Solidity contracts in the project's 'sources' directory and its subdirectories
@@ -339,7 +320,7 @@ impl ZkSolc {
                         (output, None)
                     }
                     None => {
-                        let mut cmd = Command::new(&self.compiler_path);
+                        let mut cmd = Command::new(&self.config.compiler_path);
                         let mut child = cmd
                             .args(&comp_args)
                             .stdin(Stdio::piped())
@@ -361,19 +342,8 @@ impl ZkSolc {
                         // TODO: re-structure compiler configuration / settings to avoid direct
                         // modification of standard json and eliminate
                         // dependency on the `Project` struct from the foundry-compilers library.
-                        if let Value::Object(ref mut stdjson_map) = stdjson {
-                            if let Some(Value::Object(ref mut settings)) =
-                                stdjson_map.get_mut("settings")
-                            {
-                                let optimizer = json!({
-                                    "enabled": true,
-                                    "mode": serde_json::Value::Null,
-                                    "details": serde_json::Value::Null,
-                                    "fallbackToOptimizingForSize": true
-                                });
-                                settings.insert("optimizer".to_string(), optimizer);
-                            }
-                        }
+                        self.check_for_zksolc_optimization_settings(&mut stdjson)
+                            .wrap_err("Could not check for zksolc optimization settings")?;
 
                         serde_json::to_writer(stdin, &stdjson)
                             .wrap_err("Could not assign standard_json to writer")?;
@@ -392,7 +362,7 @@ impl ZkSolc {
                             eyre::bail!(
                                     "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
                                     String::from_utf8(output.stderr).unwrap_or_default(),
-                                    self.compiler_path,
+                                    self.config.compiler_path,
                                     contract_path,
                                     &comp_args
                                 );
@@ -451,6 +421,54 @@ impl ZkSolc {
             None
         }
     }
+    // Checks if optimization settings are set in the config and adds them to the standard json
+    // TODO: re-structure compiler configuration / settings to avoid direct modification of standard
+    // json
+    fn check_for_zksolc_optimization_settings(&self, stdjson: &mut Value) -> Result<()> {
+        if self.config.settings.optimizer.mode.is_some() ||
+            self.config.settings.optimizer.fallback_to_optimizing_for_size.is_some()
+        {
+            if let Value::Object(stdjson_map) = stdjson {
+                if let Some(Value::Object(settings)) = stdjson_map.get_mut("settings") {
+                    let optimizer_mode = self
+                        .config
+                        .settings
+                        .optimizer
+                        .mode
+                        .as_ref()
+                        .map(|mode| serde_json::Value::String(mode.clone()))
+                        .unwrap_or(serde_json::Value::Null);
+
+                    let fallback_to_optimizing_for_size = serde_json::Value::Bool(
+                        self.config
+                            .settings
+                            .optimizer
+                            .fallback_to_optimizing_for_size
+                            .unwrap_or(true),
+                    );
+
+                    let optimizer_details = self
+                        .config
+                        .settings
+                        .optimizer
+                        .details
+                        .as_ref()
+                        .map(|details| serde_json::to_value(details))
+                        .transpose()?
+                        .unwrap_or(serde_json::Value::Null);
+
+                    let optimizer = json!({
+                        "enabled": true,
+                        "mode": optimizer_mode,
+                        "details": optimizer_details,
+                        "fallbackToOptimizingForSize": fallback_to_optimizing_for_size
+                    });
+                    settings.insert("optimizer".to_string(), optimizer);
+                }
+            }
+        }
+        Ok(())
+    }
 
     /// Builds the compiler arguments for the Solidity compiler based on the provided versioned
     /// source and solc instance. The compiler arguments specify options and settings for the
@@ -473,12 +491,12 @@ impl ZkSolc {
         let mut comp_args = vec!["--standard-json".to_string(), "--solc".to_string(), solc_path];
 
         // Check if system mode is enabled or if the source path contains "is-system"
-        if self.is_system || contract_path.to_str().unwrap().contains("is-system") {
+        if self.config.settings.is_system || contract_path.to_str().unwrap().contains("is-system") {
             comp_args.push("--system-mode".to_string());
         }
 
         // Check if force-evmla is enabled
-        if self.force_evmla {
+        if self.config.settings.force_evmla {
             comp_args.push("--force-evmla".to_string());
         }
         comp_args
