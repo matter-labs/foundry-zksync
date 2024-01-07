@@ -169,7 +169,7 @@ impl TestArgs {
         let toml = config.get_config_path();
         let profiles = get_available_profiles(toml)?;
 
-        let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned())?;
+        let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
         let mut zksolc = ZkSolc::new(zksolc_cfg, project);

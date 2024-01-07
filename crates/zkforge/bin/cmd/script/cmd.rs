@@ -38,7 +38,7 @@ impl ScriptArgs {
             script_config.config.libraries = Default::default();
         }
 
-        let build_output = self.compile(&mut script_config)?;
+        let build_output = self.compile(&mut script_config).await?;
 
         let mut verify = VerifyBundle::new(
             &build_output.project,

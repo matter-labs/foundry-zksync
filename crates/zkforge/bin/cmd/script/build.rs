@@ -5,29 +5,36 @@ use foundry_cli::utils::get_cached_entry_by_name;
 use foundry_common::{
     compact_to_contract,
     compile::{self, ContractSources},
-    fs, zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION}, zk_compile::{ZkSolcOpts, ZkSolc},
+    fs,
+    zk_compile::{ZkSolc, ZkSolcOpts},
+    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
 };
 use foundry_compilers::{
     artifacts::{CompactContractBytecode, ContractBytecode, ContractBytecodeSome, Libraries},
     cache::SolFilesCache,
     contracts::ArtifactContracts,
     info::ContractInfo,
-    ArtifactId, Project, ProjectCompileOutput, remappings::RelativeRemapping,
+    remappings::RelativeRemapping,
+    ArtifactId, Project, ProjectCompileOutput,
 };
-use std::{collections::BTreeMap, str::FromStr, path::{Path, PathBuf}};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use zkforge::link::{link_with_nonce_or_address, PostLinkInput, ResolvedDependency};
 
 impl ScriptArgs {
     /// Compiles the file or project and the verify metadata.
-    pub fn compile(&mut self, script_config: &mut ScriptConfig) -> Result<BuildOutput> {
+    pub async fn compile(&mut self, script_config: &mut ScriptConfig) -> Result<BuildOutput> {
         trace!(target: "script", "compiling script");
 
-        self.build(script_config)
+        self.build(script_config).await
     }
 
     /// Compiles the file with auto-detection and compiler params.
-    pub fn build(&mut self, script_config: &mut ScriptConfig) -> Result<BuildOutput> {
-        let (project, output) = self.get_project_and_output(script_config)?;
+    pub async fn build(&mut self, script_config: &mut ScriptConfig) -> Result<BuildOutput> {
+        let (project, output) = self.get_project_and_output(script_config).await?;
         let output = output.with_stripped_file_prefixes(project.root());
 
         let mut sources: ContractSources = Default::default();
@@ -225,22 +232,17 @@ impl ScriptArgs {
         })
     }
 
-    pub fn get_project_and_output(
+    pub async fn get_project_and_output(
         &mut self,
         script_config: &ScriptConfig,
     ) -> Result<(Project, ProjectCompileOutput)> {
         let project = script_config.config.project()?;
 
-        let zksolc_manager = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned())?;
-        let relative_remappings = project.paths.remappings.clone()
-            .into_iter()
-            .map(|remapping| RelativeRemapping::new(remapping, Path::new(".")))
-            .collect();
+        let zksolc_manager = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         let zksolc_opts = ZkSolcOpts {
             compiler_path: zksolc_manager.get_full_compiler_path(),
             is_system: false,
             force_evmla: false,
-            remappings: relative_remappings,
         };
 
         let mut zksolc = ZkSolc::new(zksolc_opts, project);
@@ -259,7 +261,8 @@ impl ScriptArgs {
         //     compile::compile(&project, false, false)
         // }?;
         // let cache =
-        //     SolFilesCache::read_joined(&project.paths).wrap_err("Could not open compiler cache")?;
+        //     SolFilesCache::read_joined(&project.paths).wrap_err("Could not open compiler
+        // cache")?;
 
         // let (path, _) = get_cached_entry_by_name(&cache, &contract.name)
         //     .wrap_err("Could not find target contract in cache")?;
