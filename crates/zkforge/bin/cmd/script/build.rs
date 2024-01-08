@@ -17,6 +17,7 @@ use foundry_compilers::{
     remappings::RelativeRemapping,
     ArtifactId, Project, ProjectCompileOutput,
 };
+use foundry_config::zksolc_config::ZkSolcConfig;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -237,15 +238,14 @@ impl ScriptArgs {
         script_config: &ScriptConfig,
     ) -> Result<(Project, ProjectCompileOutput)> {
         let project = script_config.config.project()?;
+        let mut zksolc_cfg = script_config.config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
 
-        let zksolc_manager = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
-        let zksolc_opts = ZkSolcOpts {
-            compiler_path: zksolc_manager.get_full_compiler_path(),
-            is_system: false,
-            force_evmla: false,
-        };
+        let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
+        zksolc_cfg.compiler_path = compiler_path;
+        zksolc_cfg.settings.is_system = false;
+        zksolc_cfg.settings.force_evmla = false;
 
-        let mut zksolc = ZkSolc::new(zksolc_opts, project);
+        let mut zksolc = ZkSolc::new(zksolc_cfg, project);
         let (output, _) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
