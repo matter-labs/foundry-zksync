@@ -6,8 +6,8 @@ use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
-use ethers::utils::to_checksum;
-use foundry_cheatcodes::CheatsConfig;
+use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
+use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{
     backend::DatabaseExt,
@@ -21,6 +21,7 @@ use multivm::{
     vm_latest::{
         BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
     },
+    zk_evm_1_3_3::zkevm_opcode_defs::CALL_SYSTEM_ABI_REGISTERS,
     zk_evm_1_4_0::{
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::{PrimitiveValue, VmLocalState},
@@ -54,6 +55,7 @@ use zksync_types::{
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
     LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
+    MSG_VALUE_SIMULATOR_ADDRESS,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
@@ -61,6 +63,7 @@ type EraDb<DB> = StorageView<ForkStorage<RevmDatabaseForEra<DB>>>;
 type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
 
 // address(uint160(uint256(keccak256('hevm cheat code'))))
+// 0x7109709ecfa91a80626ff3989d68f67f5b1dd12d
 const CHEATCODE_ADDRESS: H160 = H160([
     113, 9, 112, 158, 207, 169, 26, 128, 98, 111, 243, 152, 157, 104, 246, 127, 91, 29, 209, 45,
 ]);
@@ -130,6 +133,7 @@ pub struct CheatcodeTracer {
     test_status: FoundryTestState,
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
+    broadcastable_transactions: Vec<BroadcastableTransaction>,
 }
 
 #[derive(Debug, Clone)]
@@ -176,6 +180,7 @@ enum FinishCycleOneTimeActions {
     SelectFork { fork_id: U256 },
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
+    SetOrigin { origin: H160 },
 }
 
 #[derive(Debug, Clone)]
@@ -200,12 +205,13 @@ enum ActionOnReturn {
 #[derive(Debug, Default, Clone)]
 struct FinishCyclePermanentActions {
     start_prank: Option<StartPrankOpts>,
+    broadcast: Option<BroadcastOpts>,
 }
 
 #[derive(Debug, Clone)]
 struct StartPrankOpts {
     sender: H160,
-    origin: Option<H256>,
+    origin: Option<H160>,
 }
 
 /// Tracks the expected calls per address.
@@ -239,6 +245,14 @@ enum ExpectedCallType {
     NonCount,
     /// The exact number of calls expected.
     Count,
+}
+
+#[derive(Debug, Clone)]
+struct BroadcastOpts {
+    original_origin: H160,
+    original_caller: H160,
+    new_origin: H160,
+    depth: usize,
 }
 
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
@@ -390,6 +404,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
         }
 
+        if let Opcode::Ret(_) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.current;
+            if current.code_address != CHEATCODE_ADDRESS {
+                if let Some(broadcast) = &self.permanent_actions.broadcast {
+                    if state.vm_local_state.callstack.depth() == broadcast.depth {
+                        //when the test ends, just make sure the tx origin is set to the original
+                        // one (should never get here unless .stopBroadcast
+                        // wasn't called)
+                        self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
+                            origin: broadcast.original_origin,
+                        });
+                    }
+                }
+            }
+        }
+
         if let Opcode::NearCall(_call) = data.opcode.variant.opcode {
             if self.return_data.is_some() {
                 self.near_calls += 1;
@@ -409,6 +439,90 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
 
             if current.code_address != CHEATCODE_ADDRESS {
+                if let Some(broadcast) = self.permanent_actions.broadcast.as_ref() {
+                    let prev_cs = state
+                        .vm_local_state
+                        .callstack
+                        .inner
+                        .last()
+                        .expect("callstack before the current");
+
+                    if state.vm_local_state.callstack.depth() == broadcast.depth &&
+                        prev_cs.this_address == broadcast.original_caller
+                    {
+                        self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
+                            origin: broadcast.new_origin,
+                        });
+
+                        let new_origin = broadcast.new_origin;
+                        let revm_db_for_era = storage
+                            .borrow_mut()
+                            .storage_handle
+                            .inner
+                            .read()
+                            .unwrap()
+                            .fork
+                            .as_ref()
+                            .unwrap()
+                            .fork_source
+                            .clone();
+                        let rpc = revm_db_for_era.db.lock().unwrap().active_fork_url();
+
+                        let gas_limit = current.ergs_remaining;
+                        let (nonce, _) = Self::get_nonce(new_origin, &mut storage.borrow_mut());
+
+                        let (value, to) = if current.code_address == MSG_VALUE_SIMULATOR_ADDRESS {
+                            //when some eth is sent to an address in zkevm the call is replaced
+                            // with a call to MsgValueSimulator, which does a mimic_call later
+                            // to the original destination
+                            // The value is stored in the 1st system abi register, and the
+                            // original address is stored in the 2nd register
+                            // see: https://github.com/matter-labs/era-test-node/blob/6ee7d29e876b75506f58355218e1ea755a315d17/etc/system-contracts/contracts/MsgValueSimulator.sol#L26-L27
+                            let msg_value_simulator_value_reg_idx = CALL_SYSTEM_ABI_REGISTERS.start;
+                            let msg_value_simulator_address_reg_idx =
+                                msg_value_simulator_value_reg_idx + 1;
+                            let value = state.vm_local_state.registers
+                                [msg_value_simulator_value_reg_idx as usize];
+
+                            let address = state.vm_local_state.registers
+                                [msg_value_simulator_address_reg_idx as usize];
+
+                            let mut bytes = [0u8; 32];
+                            address.value.to_big_endian(&mut bytes);
+                            let address = H256::from(bytes);
+
+                            (Some(value.value), address.into())
+                        } else {
+                            (None, current.code_address)
+                        };
+
+                        let tx = BroadcastableTransaction {
+                            rpc,
+                            transaction:
+                                ethers::types::transaction::eip2718::TypedTransaction::Legacy(
+                                    TransactionRequest {
+                                        from: Some(new_origin),
+                                        to: Some(ethers::types::NameOrAddress::Address(to)),
+                                        //FIXME: set only if set manually by user
+                                        gas: Some(gas_limit.into()),
+                                        value,
+                                        data: Some(get_calldata(&state, memory).into()),
+                                        nonce: Some(nonce),
+                                        ..Default::default()
+                                    },
+                                ),
+                        };
+                        tracing::debug!(?tx, "storing for broadcast");
+
+                        self.broadcastable_transactions.push(tx);
+                        //FIXME: detect if this is a deployment and increase the other nonce too
+                        self.set_nonce(
+                            new_origin,
+                            (Some(nonce + 1), None),
+                            &mut storage.borrow_mut(),
+                        );
+                    }
+                }
                 return
             }
             if current.code_page.0 == 0 || current.ergs_remaining == 0 {
@@ -749,6 +863,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     //change current stack pc to exception handler
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
                 }
+                FinishCycleOneTimeActions::SetOrigin { origin } => {
+                    let prev = state
+                        .local_state
+                        .callstack
+                        .inner
+                        .last_mut()
+                        .expect("callstack before the current");
+                    prev.this_address = origin;
+
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                    );
+
+                    storage.borrow_mut().set_value(key, origin.into());
+                }
             }
         }
 
@@ -1006,10 +1136,8 @@ impl CheatcodeTracer {
             }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
-                let mut storage = storage.borrow_mut();
-                let nonce_key = get_nonce_key(&account.to_h160());
-                let full_nonce = storage.read_value(&nonce_key);
-                let (account_nonce, _) = decompose_full_nonce(h256_to_u256(full_nonce));
+                let (account_nonce, _) =
+                    Self::get_nonce(account.to_h160(), &mut storage.borrow_mut());
                 tracing::info!(
                     "👷 Nonces for account {:?} are {}",
                     account,
@@ -1221,74 +1349,64 @@ impl CheatcodeTracer {
             }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
-                let mut storage = storage.borrow_mut();
-                let nonce_key = get_nonce_key(&account.to_h160());
-                let full_nonce = storage.read_value(&nonce_key);
-                let (mut account_nonce, mut deployment_nonce) =
-                    decompose_full_nonce(h256_to_u256(full_nonce));
-                if account_nonce.as_u64() >= new_nonce {
-                    tracing::error!(
-                      "SetNonce cheatcode failed: Account nonce is already set to a higher value ({}, requested {})",
-                      account_nonce,
-                      new_nonce
-                  );
-                    return
-                }
-                account_nonce = new_nonce.into();
-                if deployment_nonce.as_u64() >= new_nonce {
-                    tracing::error!(
-                      "SetNonce cheatcode failed: Deployment nonce is already set to a higher value ({}, requested {})",
-                      deployment_nonce,
-                      new_nonce
-                  );
-                    return
-                }
-                deployment_nonce = new_nonce.into();
-                let enforced_full_nonce = nonces_to_full_nonce(account_nonce, deployment_nonce);
-                tracing::info!(
-                    "👷 Nonces for account {:?} have been set to {}",
-                    account,
-                    new_nonce
+                let new_full_nonce = self.set_nonce(
+                    account.to_h160(),
+                    (Some(new_nonce.into()), Some(new_nonce.into())),
+                    &mut storage.borrow_mut(),
                 );
-                self.write_storage(nonce_key, u256_to_h256(enforced_full_nonce), &mut storage);
+
+                if new_full_nonce.is_some() {
+                    tracing::info!(
+                        "👷 Nonces for account {:?} have been set to {}",
+                        account,
+                        new_nonce
+                    );
+                } else {
+                    tracing::error!("👷 Setting nonces failed")
+                }
             }
             snapshot(snapshotCall {}) => {
                 tracing::info!("👷 Creating snapshot");
                 self.one_time_actions.push(FinishCycleOneTimeActions::Snapshot);
             }
+            startBroadcast_0(startBroadcast_0Call {}) => {
+                tracing::info!("👷 Starting broadcast with default origin");
+
+                self.start_broadcast(&storage, &state, None)
+            }
+            startBroadcast_1(startBroadcast_1Call { signer }) => {
+                let origin = signer.to_h160();
+                tracing::info!("👷 Starting broadcast with given origin: {origin}");
+                self.start_broadcast(&storage, &state, Some(origin))
+            }
+            startBroadcast_2(startBroadcast_2Call { privateKey }) => {
+                let chain_id = self.env.get().unwrap().system_env.chain_id.as_u64();
+                let Some(wallet) =
+                    crate::utils::parse_wallet(&privateKey).map(|w| w.with_chain_id(chain_id))
+                else {
+                    tracing::error!(cheatcode = "startBroadcast", "unable to parse private key");
+                    return
+                };
+
+                let origin = wallet.address();
+                tracing::info!("👷 Starting broadcast with origin from private key: {origin}");
+                self.start_broadcast(&storage, &state, Some(origin))
+            }
             startPrank_0(startPrank_0Call { msgSender: msg_sender }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?}");
-                self.permanent_actions.start_prank =
-                    Some(StartPrankOpts { sender: msg_sender.to_h160(), origin: None });
+                self.start_prank(&storage, msg_sender.to_h160(), None);
             }
             startPrank_1(startPrank_1Call { msgSender: msg_sender, txOrigin: tx_origin }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?} with origin {tx_origin:?}");
-                let key = StorageKey::new(
-                    AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                    zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
-                );
-                let original_tx_origin = storage.borrow_mut().read_value(&key);
-                self.write_storage(key, tx_origin.to_h160().into(), &mut storage.borrow_mut());
-
-                self.permanent_actions.start_prank = Some(StartPrankOpts {
-                    sender: msg_sender.to_h160(),
-                    origin: Some(original_tx_origin),
-                });
+                self.start_prank(&storage, msg_sender.to_h160(), Some(tx_origin.to_h160()))
+            }
+            stopBroadcast(stopBroadcastCall {}) => {
+                tracing::info!("👷 Stopping broadcast");
+                self.stop_broadcast();
             }
             stopPrank(stopPrankCall {}) => {
                 tracing::info!("👷 Stopping prank");
-
-                if let Some(origin) =
-                    self.permanent_actions.start_prank.as_ref().and_then(|v| v.origin)
-                {
-                    let key = StorageKey::new(
-                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                        zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
-                    );
-                    self.write_storage(key, origin, &mut storage.borrow_mut());
-                }
-
-                self.permanent_actions.start_prank = None;
+                self.stop_prank(&storage);
             }
             store(storeCall { target, slot, value }) => {
                 tracing::info!(
@@ -1389,10 +1507,14 @@ impl CheatcodeTracer {
             createSelectFork_0(createSelectFork_0Call { urlOrAlias }) => {
                 tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
 
-                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
-                    url_or_alias: urlOrAlias,
-                    block_number: None,
-                });
+                if self.permanent_actions.broadcast.is_none() {
+                    self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                        url_or_alias: urlOrAlias,
+                        block_number: None,
+                    });
+                } else {
+                    tracing::error!("cannot select fork during a broadcast")
+                }
             }
             createSelectFork_1(createSelectFork_1Call { urlOrAlias, blockNumber }) => {
                 let block_number = blockNumber.to_u256().as_u64();
@@ -1401,10 +1523,15 @@ impl CheatcodeTracer {
                     urlOrAlias,
                     block_number
                 );
-                self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
-                    url_or_alias: urlOrAlias,
-                    block_number: Some(block_number),
-                });
+
+                if self.permanent_actions.broadcast.is_none() {
+                    self.one_time_actions.push(FinishCycleOneTimeActions::CreateSelectFork {
+                        url_or_alias: urlOrAlias,
+                        block_number: Some(block_number),
+                    });
+                } else {
+                    tracing::error!("cannot select fork during a broadcast")
+                }
             }
             createFork_0(createFork_0Call { urlOrAlias }) => {
                 tracing::info!("👷 Creating fork {}", urlOrAlias,);
@@ -1425,8 +1552,12 @@ impl CheatcodeTracer {
             selectFork(selectForkCall { forkId }) => {
                 tracing::info!("👷 Selecting fork {}", forkId);
 
-                self.one_time_actions
-                    .push(FinishCycleOneTimeActions::SelectFork { fork_id: forkId.to_u256() });
+                if self.permanent_actions.broadcast.is_none() {
+                    self.one_time_actions
+                        .push(FinishCycleOneTimeActions::SelectFork { fork_id: forkId.to_u256() });
+                } else {
+                    tracing::error!("cannot select fork during broadcast")
+                }
             }
             writeFile(writeFileCall { path, data }) => {
                 tracing::info!("👷 Writing data to file in path {}", path);
@@ -1492,6 +1623,52 @@ impl CheatcodeTracer {
             read_value: storage.read_value(&key),
             write_value,
         });
+    }
+
+    /// Returns a given account's nonce
+    ///
+    /// The first item of the tuple represents the total number of transactions,
+    /// meanwhile the second represents the number of contract deployed
+    fn get_nonce<S: ReadStorage>(account: H160, storage: &mut RefMut<S>) -> (U256, U256) {
+        let key = get_nonce_key(&account);
+        let full_nonce = storage.read_value(&key);
+
+        decompose_full_nonce(h256_to_u256(full_nonce))
+    }
+
+    /// Sets a given account's nonces
+    ///
+    /// Returns the new nonce
+    fn set_nonce<S: WriteStorage>(
+        &mut self,
+        account: H160,
+        (tx_nonce, deploy_nonce): (Option<U256>, Option<U256>),
+        storage: &mut RefMut<S>,
+    ) -> Option<(U256, U256)> {
+        let key = get_nonce_key(&account);
+        let (mut account_nonce, mut deployment_nonce) = Self::get_nonce(account, storage);
+        if let Some(tx_nonce) = tx_nonce {
+            if account_nonce >= tx_nonce {
+                tracing::error!(?account, value = ?account_nonce, requested = ?tx_nonce, "account nonce is already set to a higher value");
+                return None
+            }
+
+            account_nonce = tx_nonce;
+        }
+
+        if let Some(deploy_nonce) = deploy_nonce {
+            if deployment_nonce >= deploy_nonce {
+                tracing::error!(?account, value = ?deployment_nonce, requested = ?deploy_nonce, "deployment nonce is already set to a higher value");
+                return None
+            }
+
+            deployment_nonce = deploy_nonce;
+        }
+
+        let new_full_nonce = nonces_to_full_nonce(account_nonce, deployment_nonce);
+        self.write_storage(key, u256_to_h256(new_full_nonce), storage);
+
+        Some((account_nonce, deployment_nonce))
     }
 
     fn add_trimmed_return_data(&mut self, data: &[u8]) {
@@ -1736,6 +1913,87 @@ impl CheatcodeTracer {
                 self.next_return_action = None;
             }
             RetOpcode::Panic => (),
+        }
+    }
+
+    fn start_prank<S: DatabaseExt + Send>(
+        &mut self,
+        storage: &StoragePtr<EraDb<S>>,
+        sender: H160,
+        origin: Option<H160>,
+    ) {
+        if self.permanent_actions.broadcast.is_some() {
+            tracing::error!("prank is incompatible with broadcast");
+            return
+        }
+
+        match origin {
+            None => {
+                self.permanent_actions.start_prank.replace(StartPrankOpts { sender, origin: None });
+            }
+            Some(tx_origin) => {
+                let key = StorageKey::new(
+                    AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                    zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                );
+                let storage = &mut storage.borrow_mut();
+                let original_tx_origin = storage.read_value(&key);
+                self.write_storage(key, tx_origin.into(), storage);
+
+                self.permanent_actions
+                    .start_prank
+                    .replace(StartPrankOpts { sender, origin: Some(original_tx_origin.into()) });
+            }
+        }
+    }
+
+    fn stop_prank<S: DatabaseExt + Send>(&mut self, storage: &StoragePtr<EraDb<S>>) {
+        if let Some(original_tx_origin) =
+            self.permanent_actions.start_prank.take().and_then(|v| v.origin)
+        {
+            let key = StorageKey::new(
+                AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+            );
+            self.write_storage(key, original_tx_origin.into(), &mut storage.borrow_mut());
+        }
+    }
+
+    fn start_broadcast<S: DatabaseExt + Send>(
+        &mut self,
+        storage: &StoragePtr<EraDb<S>>,
+        state: &VmLocalStateData<'_>,
+        new_origin: Option<H160>,
+    ) {
+        if self.permanent_actions.start_prank.is_some() {
+            tracing::error!("broadcast is incompatible with prank");
+            return
+        }
+
+        let depth = state.vm_local_state.callstack.depth();
+
+        let key = StorageKey::new(
+            AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+            zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+        );
+
+        let mut storage = storage.borrow_mut();
+
+        let original_tx_origin = storage.read_value(&key);
+        let new_origin = new_origin.unwrap_or(original_tx_origin.into());
+
+        self.permanent_actions.broadcast = Some(BroadcastOpts {
+            new_origin,
+            original_origin: original_tx_origin.into(),
+            original_caller: state.vm_local_state.callstack.current.msg_sender,
+            depth,
+        })
+    }
+
+    fn stop_broadcast(&mut self) {
+        if let Some(broadcast) = self.permanent_actions.broadcast.take() {
+            self.one_time_actions
+                .push(FinishCycleOneTimeActions::SetOrigin { origin: broadcast.original_origin });
         }
     }
 }
