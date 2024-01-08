@@ -49,3 +49,4 @@ tracing = "0.1"
 multivm.workspace = true
 era_cheatcodes.workspace = true
 era_test_node.workspace = true
+zksync_types.workspace = true

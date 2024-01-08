@@ -281,6 +281,7 @@ impl Executor {
         let mut inspector = self.inspector.clone();
         // Build VM
         let mut env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
+
         let mut db = FuzzBackendWrapper::new(&self.backend);
         let result = db.inspect_ref(&mut env, &mut inspector)?;
 
@@ -301,6 +302,10 @@ impl Executor {
         // execute the call
         let mut inspector = self.inspector.clone();
         let result = self.backend.inspect_ref(&mut env, &mut inspector)?;
+        // record storage modifications
+        if result.result.is_success() {
+            self.inspector.modified_storage_keys = inspector.modified_storage_keys.clone();
+        }
         convert_executed_result(env, inspector, result, self.backend.has_snapshot_failure())
     }
 

@@ -4267,6 +4267,7 @@ dependencies = [
  "foundry-macros",
  "glob",
  "globset",
+ "multivm",
  "once_cell",
  "pretty_assertions",
  "rand 0.8.5",
@@ -4286,6 +4287,7 @@ dependencies = [
  "yansi 0.5.1",
  "zksync-web3-rs",
  "zksync_basic_types",
+ "zksync_types",
  "zksync_utils",
 ]
 
@@ -4405,6 +4407,7 @@ dependencies = [
  "revm",
  "thiserror",
  "tracing",
+ "zksync_types",
 ]
 
 [[package]]
