@@ -42,7 +42,7 @@ contract ForkTest is Test {
         console.log("decimals_after", decimals_after);
         require(
             decimals_after == TOKEN_DECIMALS,
-            "Contract dosent exists in fork"
+            "Contract doesn't exists in fork"
         );
         require(
             block.number == FORK_BLOCK + 1,
@@ -82,5 +82,29 @@ contract ForkTest is Test {
             block.number == FORK_BLOCK + 100,
             "ENV for blocks is not set correctly"
         );
+    }
+
+    function testActiveFork() public {
+        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature(
+                "createFork(string,uint256)",
+                "mainnet",
+                FORK_BLOCK + 100
+            )
+        );
+        require(success, "fork failed");
+
+        uint256 forkId = uint256(bytes32(data));
+        (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
+            abi.encodeWithSignature("selectFork(uint256)", forkId)
+        );
+        require(success1, "select fork failed");
+
+        (bool success3, bytes memory activeFork) = Constants
+            .CHEATCODE_ADDRESS
+            .call(abi.encodeWithSignature("activeFork()"));
+
+        console.log("activeFork", uint256(bytes32(activeFork)));
+        require(success3, "active fork failed");
     }
 }
