@@ -81,6 +81,7 @@ pub struct Settings {
 
 impl Settings {
     /// Creates a new `Settings` struct with the specified parameters.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         remappings: Vec<Remapping>,
         optimizer: Optimizer,
