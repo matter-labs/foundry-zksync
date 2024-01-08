@@ -42,7 +42,7 @@ use summary::TestSummaryReporter;
 pub use filter::FilterArgs;
 use foundry_common::{
     zk_compile::ZkSolc,
-    zksolc_manager::{ensure_zksolc, DEFAULT_ZKSOLC_VERSION},
+    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
 };
 
 // Loads project's figment and merges the build cli arguments into it
@@ -169,7 +169,7 @@ impl TestArgs {
         let toml = config.get_config_path();
         let profiles = get_available_profiles(toml)?;
 
-        let compiler_path = ensure_zksolc(DEFAULT_ZKSOLC_VERSION.to_owned())?;
+        let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned())?;
         zksolc_cfg.compiler_path = compiler_path;
 
         let mut zksolc = ZkSolc::new(zksolc_cfg, project);

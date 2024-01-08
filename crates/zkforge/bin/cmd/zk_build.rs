@@ -28,7 +28,7 @@
 use super::{install, watch::WatchArgs};
 use clap::Parser;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
-use foundry_common::zksolc_manager::ensure_zksolc;
+use foundry_common::zksolc_manager::setup_zksolc_manager;
 use foundry_compilers::Project;
 use foundry_config::{
     figment::{
@@ -138,7 +138,7 @@ impl ZkBuildArgs {
             zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         }
         // TODO: revisit to remove zksolc_manager and move binary installation to zksolc_config
-        let compiler_path = ensure_zksolc(self.args.use_zksolc.clone())?;
+        let compiler_path = setup_zksolc_manager(self.args.use_zksolc.clone())?;
         zksolc_cfg.compiler_path = compiler_path;
 
         // TODO: add filter support

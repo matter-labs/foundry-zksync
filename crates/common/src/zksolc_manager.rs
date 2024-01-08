@@ -422,7 +422,7 @@ impl fmt::Display for ZkSolcManager {
     }
 }
 
-/// The `ensure_zksolc` function creates and prepares an instance of `ZkSolcManager`.
+/// The `setup_zksolc_manager` function creates and prepares an instance of `ZkSolcManager`.
 ///
 /// It follows these steps:
 /// 1. Instantiate `ZkSolcManagerOpts` and `ZkSolcManagerBuilder` with the specified zkSync Solidity
@@ -434,7 +434,7 @@ impl fmt::Display for ZkSolcManager {
 ///
 /// The function returns the `ZkSolcManager` if all steps are successful, or an error if any
 /// step fails.
-pub fn ensure_zksolc(zksolc_version: String) -> eyre::Result<PathBuf> {
+pub fn setup_zksolc_manager(zksolc_version: String) -> eyre::Result<PathBuf> {
     let zksolc_manager_opts = ZkSolcManagerOpts::new(zksolc_version.clone());
     let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
     let zksolc_manager = zksolc_manager_builder.build().map_err(|e| {

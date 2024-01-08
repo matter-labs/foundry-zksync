@@ -79,36 +79,6 @@ pub struct Settings {
     pub contracts_to_compile: Vec<String>,
 }
 
-impl Settings {
-    /// Creates a new `Settings` struct with the specified parameters.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        remappings: Vec<Remapping>,
-        optimizer: Optimizer,
-        metadata: Option<SettingsMetadata>,
-        output_selection: OutputSelection,
-        libraries: Libraries,
-        is_system: bool,
-        force_evmla: bool,
-        missing_libraries_path: Option<String>,
-        are_libraries_missing: bool,
-        contracts_to_compile: Vec<String>,
-    ) -> Self {
-        Self {
-            remappings,
-            optimizer,
-            metadata,
-            output_selection,
-            libraries,
-            is_system,
-            force_evmla,
-            missing_libraries_path,
-            are_libraries_missing,
-            contracts_to_compile,
-        }
-    }
-}
-
 impl Default for Settings {
     fn default() -> Self {
         Self {
