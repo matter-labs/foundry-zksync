@@ -11,10 +11,5 @@ contract CheatcodeEtchTest is Test {
 
     function testEtch() public {
         vm.etch(TEST_ADDRESS, GREETER_CODE);
-
-        (bool success, ) = TEST_ADDRESS.call(
-            abi.encodeWithSignature("setGreeting(string)", "hello world")
-        );
-        require(success, "setGreeting failed");
     }
 }

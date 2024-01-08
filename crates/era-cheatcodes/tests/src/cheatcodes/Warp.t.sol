@@ -15,10 +15,7 @@ contract CheatcodeWarpTest is Test {
             "timestamp must be different than current block timestamp"
         );
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("warp(uint256)", NEW_BLOCK_TIMESTAMP)
-        );
-        require(success, "warp failed");
+        vm.warp(NEW_BLOCK_TIMESTAMP);
 
         uint256 finalTimestamp = block.timestamp;
         console.log("timestamp after:", finalTimestamp);

@@ -24,12 +24,7 @@ contract SnapshotTest is Test {
         store.slot0 = 10;
         store.slot1 = 20;
 
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("snapshot()")
-        );
-        require(success, "snapshot failed");
-
-        uint256 snapshot = abi.decode(data, (uint256));
+        uint256 snapshot = vm.snapshot();
 
         console.log("snapshot ", snapshot);
 
@@ -44,7 +39,8 @@ contract SnapshotTest is Test {
         console.log("store values: ", store.slot0, store.slot1);
         console.log("calling revertTo");
 
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+        //this still does not work with vm
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature("revertTo(uint256)", snapshot)
         );
         require(success, "revertTo failed");
@@ -59,26 +55,17 @@ contract SnapshotTest is Test {
         uint256 num = block.number;
         uint256 time = block.timestamp;
 
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("snapshot()")
-        );
-        require(success, "snapshot failed");
+        uint256 snapshot = vm.snapshot();
+        
+        vm.warp(1337);
 
-        uint256 snapshot = abi.decode(data, (uint256));
-
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("warp(uint256)", 1337)
-        );
-        require(success, "warp failed");
         assertEq(block.timestamp, 1337);
 
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("roll(uint256)", 99)
-        );
-        require(success, "roll failed");
+        vm.roll(99);
+
         assertEq(block.number, 99);
 
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
+        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature("revertTo(uint256)", snapshot)
         );
         require(success, "revertTo failed");

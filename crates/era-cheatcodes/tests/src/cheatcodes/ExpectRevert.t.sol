@@ -68,47 +68,39 @@ contract Dummy {
 }
 
 contract ExpectRevertTest is Test {
-    function shouldRevert() internal {
+    function shouldRevert() internal pure {
         revert();
     }
 
     function testExpectRevertString() public {
         Reverter reverter = new Reverter();
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectRevert(bytes)",
-                "revert"));
-        require(success, "expectRevert failed");
+
+        vm.expectRevert("revert");
+
         reverter.revertWithMessage("revert");
     }
 
     function testFailExpectRevertWrongString() public {
          Reverter reverter = new Reverter();
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectRevert(bytes)",
-                "my not so cool error"));
-        require(success, "expectRevert failed");
+
+        vm.expectRevert("my not so cool error");
+
         reverter.revertWithMessage("my cool error");
     }
 
     function testExpectRevertCustomError() public {
          Reverter reverter = new Reverter();
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectRevert(bytes)",
-                    abi.encodeWithSelector(Reverter.CustomError.selector, 1)));
-        require(success, "expectRevert failed");
+
+        vm.expectRevert(abi.encodeWithSelector(Reverter.CustomError.selector, 1));
+
         reverter.revertWithCustomError(1);
     }
 
     function testFailExpectRevertCustomError() public {
-         Reverter reverter = new Reverter();
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectRevert(bytes)",
-                    abi.encodeWithSelector(Reverter.CustomError.selector, 1)));
-        require(success, "expectRevert failed");
+        Reverter reverter = new Reverter();
+
+        vm.expectRevert(abi.encodeWithSelector(Reverter.CustomError.selector, 1));
+
         reverter.revertWithCustomError(2);
     }
     // function testFailRevertNotOnImmediateNextCall() public {
@@ -169,10 +161,9 @@ contract ExpectRevertTest is Test {
         address revAddr = address(reverter);
         bytes memory reverterFunc = abi.encodeWithSignature("doNotRevert()");
 
-        bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
+        vm.expectRevert();
 
-        (success, data) = revAddr.call(reverterFunc);
+        (bool success, ) = revAddr.call(reverterFunc);
         require(!success, "expectRevert failed");
 
         return success;
@@ -184,10 +175,9 @@ contract ExpectRevertTest is Test {
         address revAddr = address(reverter);
         bytes memory reverterFunc = abi.encodeWithSignature("revertWithoutReason()");
 
-        bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
+        vm.expectRevert();
 
-        (success, data) = revAddr.call(reverterFunc);
+        (bool success, ) = revAddr.call(reverterFunc);
         require(success, "expectRevert failed");
         return (success, 42);
     }
@@ -196,11 +186,10 @@ contract ExpectRevertTest is Test {
         Reverter reverter = new Reverter();
         address revAddr = address(reverter);
         bytes memory reverterFunc = abi.encodeWithSignature("revertWithMessage(string)", "abcd");
+        
+        vm.expectRevert();
 
-        bytes memory expectRevert = abi.encodeWithSignature("expectRevert()");
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(expectRevert);
-
-        (success, data) = revAddr.call(reverterFunc);
+        (bool success, ) = revAddr.call(reverterFunc);
         require(success, "expectRevert failed");
         return (success, 42);
     }
@@ -233,10 +222,7 @@ contract ExpectRevertTest is Test {
 
     function testFailExpectRevertAnyRevertDidNotRevert() public {
         Reverter reverter = new Reverter();
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectRevert()"));
-        require(success, "expectRevert failed");
+        vm.expectRevert();
         reverter.doNotRevert();
     }
 
