@@ -5,9 +5,10 @@ use crate::{
     TestFilter, TestOptions,
 };
 use alloy_json_abi::{Function, JsonAbi as Abi};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, Bytes, FixedBytes, U256};
 use ethers_core::types::H256;
 use eyre::Result;
+use forge::revm::primitives::Bytecode;
 use foundry_common::{
     contracts::{ContractsByAddress, ContractsByArtifact},
     conversion_utils::{address_to_h160, h256_to_h160},
@@ -16,7 +17,7 @@ use foundry_common::{
 };
 use foundry_config::{FuzzConfig, InvariantConfig};
 use foundry_evm::{
-    constants::CALLER,
+    constants::{CALLER, CHEATCODE_ADDRESS},
     coverage::HitMaps,
     decode::decode_console_logs,
     executors::{
@@ -34,6 +35,7 @@ use std::{
     str::FromStr,
     time::Instant,
 };
+use zksync_types::{ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS};
 
 /// A type that executes all tests of a contract
 #[derive(Debug, Clone)]
@@ -201,6 +203,51 @@ impl<'a> ContractRunner<'a> {
         Ok(setup)
     }
 
+    /// Sets up the cheatcode address with an empty contract so `vm.func()` calls do not panic.
+    fn setup_cheatcode_address(&mut self) {
+        // https://github.com/matter-labs/era-test-node/blob/main/etc/system-contracts/contracts/EmptyContract.sol
+        let empty_contract_code =  "0000000101200190000000040000c13d0000000001000019000000110001042e0000008001000039000000400010043f0000000001000416000000000101004b0000000e0000c13d0000002001000039000001000010044300000120000004430000000501000041000000110001042e000000000100001900000012000104300000001000000432000000110001042e00000012000104300000000000000000000000020000000000000000000000000000004000000100000000000000000037118ec7e34bf260c2f7d3550e644dc0205a8f0a595d95265b1c50edc1c831ba";
+        let empty_contract_code_hash =
+            "010000071c769e7601af2a7d3b28a37d270c6dcc3daae65344627c5f83180be6";
+
+        self.executor
+            .backend
+            .insert_account_storage(
+                Address::from_slice(&ACCOUNT_CODE_STORAGE_ADDRESS.0),
+                U256::from_be_slice(
+                    &hex::decode(format!(
+                        "000000000000000000000000{}",
+                        CHEATCODE_ADDRESS.to_string().trim_start_matches("0x")
+                    ))
+                    .unwrap(),
+                ),
+                U256::from_be_slice(&hex::decode(empty_contract_code_hash).unwrap()),
+            )
+            .unwrap();
+        self.executor
+            .backend
+            .insert_account_storage(
+                Address::from_slice(&KNOWN_CODES_STORAGE_ADDRESS.0),
+                U256::from_be_slice(&hex::decode(empty_contract_code_hash).unwrap()),
+                U256::from_be_slice(
+                    &hex::decode(
+                        "0000000000000000000000000000000000000000000000000000000000000001",
+                    )
+                    .unwrap(),
+                ),
+            )
+            .unwrap();
+
+        self.executor.backend.insert_account_info(
+            CHEATCODE_ADDRESS,
+            forge::revm::primitives::AccountInfo {
+                code_hash: FixedBytes::<32>::from_str(empty_contract_code_hash).unwrap(),
+                code: Some(Bytecode::new_raw(Bytes::from_str(empty_contract_code).unwrap())),
+                ..Default::default()
+            },
+        );
+    }
+
     /// Runs all tests for a contract whose names match the provided regular expression
     pub fn run_tests(
         mut self,
@@ -211,6 +258,8 @@ impl<'a> ContractRunner<'a> {
         info!("starting tests");
         let start = Instant::now();
         let mut warnings = Vec::new();
+
+        self.setup_cheatcode_address();
 
         let setup_fns: Vec<_> =
             self.contract.functions().filter(|func| func.name.is_setup()).collect();
