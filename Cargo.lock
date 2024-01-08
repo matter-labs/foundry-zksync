@@ -4408,6 +4408,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "zksync_types",
+ "zksync_utils",
 ]
 
 [[package]]
