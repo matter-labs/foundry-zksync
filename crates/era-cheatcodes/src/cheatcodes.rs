@@ -21,7 +21,7 @@ use multivm::{
     vm_latest::{
         BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
     },
-    zk_evm_1_3_3::zkevm_opcode_defs::FarCallABI,
+    zk_evm_1_3_3::zkevm_opcode_defs::CALL_SYSTEM_ABI_REGISTERS,
     zk_evm_1_4_0::{
         tracing::{AfterExecutionData, VmLocalStateData},
         vm_state::{PrimitiveValue, VmLocalState},
@@ -55,6 +55,7 @@ use zksync_types::{
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
     LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
+    MSG_VALUE_SIMULATOR_ADDRESS,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
@@ -446,8 +447,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         .last()
                         .expect("callstack before the current");
 
-                    if state.vm_local_state.callstack.depth() == broadcast.depth // + 1
-                        &&
+                    if state.vm_local_state.callstack.depth() == broadcast.depth &&
                         prev_cs.this_address == broadcast.original_caller
                     {
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
@@ -468,15 +468,33 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             .clone();
                         let rpc = revm_db_for_era.db.lock().unwrap().active_fork_url();
 
-                        let farcall_abi = {
-                            let src0_idx = data.opcode.src0_reg_idx as usize;
-                            let src0 = state.vm_local_state.registers[src0_idx];
-
-                            FarCallABI::from_u256(src0.value)
-                        };
-
                         let gas_limit = current.ergs_remaining;
                         let (nonce, _) = Self::get_nonce(new_origin, &mut storage.borrow_mut());
+
+                        let (value, to) = if current.code_address == MSG_VALUE_SIMULATOR_ADDRESS {
+                            //when some eth is sent to an address in zkevm the call is replaced
+                            // with a call to MsgValueSimulator, which does a mimic_call later
+                            // to the original destination
+                            // The value is stored in the 1st system abi register, and the
+                            // original address is stored in the 2nd register
+                            // see: https://github.com/matter-labs/era-test-node/blob/6ee7d29e876b75506f58355218e1ea755a315d17/etc/system-contracts/contracts/MsgValueSimulator.sol#L26-L27
+                            let msg_value_simulator_value_reg_idx = CALL_SYSTEM_ABI_REGISTERS.start;
+                            let msg_value_simulator_address_reg_idx =
+                                msg_value_simulator_value_reg_idx + 1;
+                            let value = state.vm_local_state.registers
+                                [msg_value_simulator_value_reg_idx as usize];
+
+                            let address = state.vm_local_state.registers
+                                [msg_value_simulator_address_reg_idx as usize];
+
+                            let mut bytes = [0u8; 32];
+                            address.value.to_big_endian(&mut bytes);
+                            let address = H256::from(bytes);
+
+                            (Some(value.value), address.into())
+                        } else {
+                            (None, current.code_address)
+                        };
 
                         let tx = BroadcastableTransaction {
                             rpc,
@@ -484,13 +502,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                 ethers::types::transaction::eip2718::TypedTransaction::Legacy(
                                     TransactionRequest {
                                         from: Some(new_origin),
-                                        to: Some(ethers::types::NameOrAddress::Address(
-                                            current.code_address,
-                                        )),
+                                        to: Some(ethers::types::NameOrAddress::Address(to)),
                                         //FIXME: set only if set manually by user
                                         gas: Some(gas_limit.into()),
-                                        //FIXME: retrieve proper value
-                                        value: Some(farcall_abi.ergs_passed.into()),
+                                        value,
                                         data: Some(get_calldata(&state, memory).into()),
                                         nonce: Some(nonce),
                                         ..Default::default()
