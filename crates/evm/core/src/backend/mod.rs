@@ -15,7 +15,7 @@ use foundry_common::{
     conversion_utils::h160_to_address,
     is_known_system_sender,
     types::{ToAlloy, ToEthers},
-    SYSTEM_TRANSACTION_TYPE,
+    AsTracerPointer, StorageModificationRecorder, SYSTEM_TRANSACTION_TYPE,
 };
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -31,7 +31,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::era_revm::db::RevmDatabaseForEra;
 use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
-use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
+use multivm::vm_latest::HistoryDisabled;
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -769,10 +769,10 @@ impl Backend {
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + ToTracerPointer<
+            + AsTracerPointer<
                 StorageView<ForkStorage<RevmDatabaseForEra<&'a mut Self>>>,
                 HistoryDisabled,
-            >,
+            > + StorageModificationRecorder,
     {
         self.initialize(env);
 

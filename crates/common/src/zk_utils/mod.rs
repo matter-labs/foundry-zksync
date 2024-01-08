@@ -29,8 +29,10 @@
 ///   with the decoded byte vector if successful, or a `ParseIntError` if the decoding fails.
 use eyre::Result;
 use foundry_config::Chain;
-use std::num::ParseIntError;
+use multivm::vm_latest::TracerPointer;
+use std::{collections::HashMap, num::ParseIntError};
 use url::Url;
+use zksync_types::{StorageKey, StorageValue};
 use zksync_web3_rs::types::H256;
 /// Utils for conversion between zksync types and revm types
 pub mod conversion_utils;
@@ -144,4 +146,20 @@ pub fn get_chain(chain: Option<Chain>) -> Result<Chain> {
 /// ```
 pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
+}
+
+/// Keeps track of storage modifications performed during test executions.
+/// This is especially important when forking to re-apply changes.
+pub trait StorageModificationRecorder {
+    /// Merge modified keys into the existing modifications
+    fn record_modified_keys(&mut self, modified_keys: &HashMap<StorageKey, StorageValue>);
+
+    /// Return all modified keys
+    fn get(&self) -> &HashMap<StorageKey, StorageValue>;
+}
+
+/// Converts a reference to self into a tracer pointer.
+pub trait AsTracerPointer<S, H> {
+    /// Returns reference to a [TracerPointer]
+    fn as_tracer_pointer(&self) -> TracerPointer<S, H>;
 }
