@@ -61,7 +61,7 @@ pub struct CoreBuildArgs {
 
     /// Specify the solc version, or a path to a local solc, to build with.
     ///
-    /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
+    /// Valid values are in the format `x.y.z`, `zksolc:x.y.z` or `path/to/zksolc`.
     #[clap(
     help_heading = "zkSync Compiler options",
     value_name = "ZK_SOLC_VERSION",
