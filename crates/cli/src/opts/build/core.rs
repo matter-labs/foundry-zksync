@@ -2,6 +2,7 @@ use super::ProjectPathsArgs;
 use crate::{opts::CompilerArgs, utils::LoadConfig};
 use clap::{Parser, ValueHint};
 use eyre::Result;
+use foundry_common::zksolc_manager::DEFAULT_ZKSOLC_VERSION;
 use foundry_compilers::{
     artifacts::RevertStrings, remappings::Remapping, utils::canonicalized, Project,
 };
@@ -57,6 +58,18 @@ pub struct CoreBuildArgs {
     #[clap(long = "use", help_heading = "Compiler options", value_name = "SOLC_VERSION")]
     #[serde(skip)]
     pub use_solc: Option<String>,
+
+    /// Specify the solc version, or a path to a local solc, to build with.
+    ///
+    /// Valid values are in the format `x.y.z`, `zksolc:x.y.z` or `path/to/zksolc`.
+    #[clap(
+    help_heading = "zkSync Compiler options",
+    value_name = "ZK_SOLC_VERSION",
+    long = "use-zksolc",
+    default_value = DEFAULT_ZKSOLC_VERSION
+    )]
+    #[serde(skip)]
+    pub use_zksolc: String,
 
     /// Do not access the network.
     ///
