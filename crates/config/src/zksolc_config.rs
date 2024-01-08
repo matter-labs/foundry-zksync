@@ -11,11 +11,16 @@
 //! This module also provides a builder pattern implementation (`ZkSolcConfigBuilder`) for
 //! constructing a `ZkSolcConfig` instance in a flexible and convenient manner.
 use foundry_compilers::{
-    artifacts::{output_selection::OutputSelection, Libraries, OptimizerDetails, SettingsMetadata},
+    artifacts::{
+        output_selection::OutputSelection, serde_helpers, Libraries, OptimizerDetails,
+        SettingsMetadata, Source,
+    },
     remappings::Remapping,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+const SOLIDITY: &str = "Solidity";
 /// Configuration for the zkSolc compiler.
 ///
 /// This struct holds the configuration settings used for the zkSolc compiler,
@@ -40,7 +45,6 @@ pub struct Settings {
     /// A list of remappings to apply to the source files.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remappings: Vec<Remapping>,
-
     /// The `zksolc` optimization settings.
     pub optimizer: Optimizer,
     /// Metadata settings
@@ -63,6 +67,16 @@ pub struct Settings {
     pub is_system: bool,
     /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
     pub force_evmla: bool,
+    /// Path to cache missing library dependencies, used for compiling and deploying libraries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub missing_libraries_path: Option<String>,
+    /// Flag to indicate if there are missing libraries, used to enable/disable logs for successful
+    /// compilation.
+    #[serde(default)]
+    pub are_libraries_missing: bool,
+    /// List of specific contracts to be compiled.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub contracts_to_compile: Vec<String>,
 }
 
 impl Settings {
@@ -75,6 +89,9 @@ impl Settings {
         libraries: Libraries,
         is_system: bool,
         force_evmla: bool,
+        missing_libraries_path: Option<String>,
+        are_libraries_missing: bool,
+        contracts_to_compile: Vec<String>,
     ) -> Self {
         Self {
             remappings,
@@ -84,6 +101,9 @@ impl Settings {
             libraries,
             is_system,
             force_evmla,
+            missing_libraries_path,
+            are_libraries_missing,
+            contracts_to_compile,
         }
     }
 }
@@ -98,6 +118,9 @@ impl Default for Settings {
             libraries: Default::default(),
             is_system: false,
             force_evmla: false,
+            missing_libraries_path: None,
+            are_libraries_missing: false,
+            contracts_to_compile: Default::default(),
         }
     }
 }
@@ -145,5 +168,28 @@ impl ZkSolcConfigBuilder {
     pub fn build(self) -> Result<ZkSolcConfig, String> {
         let settings = self.settings.unwrap_or_default();
         Ok(ZkSolcConfig { compiler_path: self.compiler_path, settings })
+    }
+}
+
+/// A `ZkStandardJsonCompilerInput` representation used for verify
+///
+/// This type is an alternative `ZkStandardJsonCompilerInput` but uses non-alphabetic ordering of
+/// the `sources` and instead emits the (Path -> Source) path in the same order as the pairs in the
+/// `sources` `Vec`. This is used over a map, so we can determine the order in which etherscan will
+/// display the verified contracts
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ZkStandardJsonCompilerInput {
+    /// The language used in the source files.
+    pub language: String,
+    /// A map of source file names to their corresponding source code.
+    #[serde(with = "serde_helpers::tuple_vec_map")]
+    pub sources: Vec<(PathBuf, Source)>,
+    /// The zksolc compiler settings.
+    pub settings: Settings,
+}
+impl ZkStandardJsonCompilerInput {
+    /// Creates a new `ZkStandardJsonCompilerInput` instance with the specified parameters.
+    pub fn new(sources: Vec<(PathBuf, Source)>, settings: Settings) -> Self {
+        Self { language: SOLIDITY.to_string(), sources, settings }
     }
 }

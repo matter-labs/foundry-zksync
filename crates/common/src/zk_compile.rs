@@ -42,10 +42,10 @@ use foundry_compilers::{
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
 };
-use foundry_config::zksolc_config::ZkSolcConfig;
+use foundry_config::zksolc_config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput};
 use semver::Version;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt, fs,
@@ -155,7 +155,7 @@ type SolidityVersionSources = (Version, BTreeMap<PathBuf, Source>);
 pub struct ZkSolc {
     config: ZkSolcConfig,
     project: Project,
-    standard_json: Option<StandardJsonCompilerInput>,
+    standard_json: Option<ZkStandardJsonCompilerInput>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -330,19 +330,8 @@ impl ZkSolc {
 
                         let stdin = child.stdin.take().expect("Stdin exists.");
 
-                        let mut stdjson =
-                            serde_json::to_value(&self.standard_json.clone().unwrap())
-                                .wrap_err("Could not serialize JSON input")?;
-
-                        // Temporary fix: Override solc optimization settings with zksolc-specific
-                        // ones. Sets 'fallbackToOptimizingForSize' to
-                        // `true` to enable size-based optimization
-                        // when bytecode exceeds size limits.
-                        // TODO: re-structure compiler configuration / settings to avoid direct
-                        // modification of standard json and eliminate
-                        // dependency on the `Project` struct from the foundry-compilers library.
-                        self.check_for_zksolc_optimization_settings(&mut stdjson)
-                            .wrap_err("Could not check for zksolc optimization settings")?;
+                        let stdjson = serde_json::to_value(&self.standard_json.clone().unwrap())
+                            .wrap_err("Could not serialize JSON input")?;
 
                         serde_json::to_writer(stdin, &stdjson)
                             .wrap_err("Could not assign standard_json to writer")?;
@@ -419,54 +408,6 @@ impl ZkSolc {
         } else {
             None
         }
-    }
-    // Checks if optimization settings are set in the config and adds them to the standard json
-    // TODO: re-structure compiler configuration / settings to avoid direct modification of standard
-    // json
-    fn check_for_zksolc_optimization_settings(&self, stdjson: &mut Value) -> Result<()> {
-        if self.config.settings.optimizer.mode.is_some() ||
-            self.config.settings.optimizer.fallback_to_optimizing_for_size.is_some()
-        {
-            if let Value::Object(stdjson_map) = stdjson {
-                if let Some(Value::Object(settings)) = stdjson_map.get_mut("settings") {
-                    let optimizer_mode = self
-                        .config
-                        .settings
-                        .optimizer
-                        .mode
-                        .as_ref()
-                        .map(|mode| serde_json::Value::String(mode.clone()))
-                        .unwrap_or(serde_json::Value::Null);
-
-                    let fallback_to_optimizing_for_size = serde_json::Value::Bool(
-                        self.config
-                            .settings
-                            .optimizer
-                            .fallback_to_optimizing_for_size
-                            .unwrap_or(true),
-                    );
-
-                    let optimizer_details = self
-                        .config
-                        .settings
-                        .optimizer
-                        .details
-                        .as_ref()
-                        .map(serde_json::to_value)
-                        .transpose()?
-                        .unwrap_or(serde_json::Value::Null);
-
-                    let optimizer = json!({
-                        "enabled": true,
-                        "mode": optimizer_mode,
-                        "details": optimizer_details,
-                        "fallbackToOptimizingForSize": fallback_to_optimizing_for_size
-                    });
-                    settings.insert("optimizer".to_string(), optimizer);
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Builds the compiler arguments for the Solidity compiler based on the provided versioned
@@ -855,11 +796,13 @@ impl ZkSolc {
         let standard_json = self
             .project
             .standard_json_input(contract_path)
-            .wrap_err("Could not get standard json input")
-            .unwrap();
+            .wrap_err("Could not get standard json input")?;
+        // Convert the standard JSON input to the zk-specific standard JSON format for further
+        // processing
+        let std_zk_json = self.convert_to_zk_standard_json(standard_json);
 
         // Store the generated standard JSON input in the ZkSolc instance
-        self.standard_json = Some(standard_json.to_owned());
+        self.standard_json = Some(std_zk_json.to_owned());
 
         // Step 5: Build Artifacts Path
         let artifact_path = &self.build_artifacts_path(contract_path)?;
@@ -867,12 +810,34 @@ impl ZkSolc {
         // Step 6: Save JSON Input
         let json_input_path = artifact_path.join("json_input.json");
         let stdjson =
-            serde_json::to_value(&standard_json).wrap_err("Could not serialize JSON input")?;
+            serde_json::to_value(&std_zk_json).wrap_err("Could not serialize JSON input")?;
 
-        std::fs::write(json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
+        std::fs::write(json_input_path, serde_json::to_string_pretty(&stdjson)?)
             .wrap_err("Could not write JSON input file")?;
 
         Ok(())
+    }
+
+    fn convert_to_zk_standard_json(
+        &self,
+        input: StandardJsonCompilerInput,
+    ) -> ZkStandardJsonCompilerInput {
+        ZkStandardJsonCompilerInput {
+            language: input.language,
+            sources: input.sources,
+            settings: Settings {
+                remappings: input.settings.remappings,
+                optimizer: self.config.settings.optimizer.clone(),
+                metadata: input.settings.metadata,
+                output_selection: input.settings.output_selection,
+                libraries: input.settings.libraries,
+                is_system: self.config.settings.is_system,
+                force_evmla: self.config.settings.force_evmla,
+                missing_libraries_path: self.config.settings.missing_libraries_path.clone(),
+                are_libraries_missing: self.config.settings.are_libraries_missing,
+                contracts_to_compile: self.config.settings.contracts_to_compile.clone(),
+            },
+        }
     }
 
     /// Retrieves the versioned sources for the Solidity contracts in the project. The versioned
