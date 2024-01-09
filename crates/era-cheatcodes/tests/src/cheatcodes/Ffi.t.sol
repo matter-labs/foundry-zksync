@@ -24,11 +24,7 @@ contract FfiTest is Test {
         inputs[1] = "-n";
         inputs[2] = "gm";
 
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("ffi(string[])", inputs)
-        );
-        require(success, "ffi failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        require(keccak256(data) == keccak256(bytes("gm")), "ffi failed");
+        bytes memory res = vm.ffi(inputs);
+        assertEq(string(res), "gm", "ffi failed");
     }
 }

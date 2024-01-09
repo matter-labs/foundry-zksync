@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.13;
 
 import {Test, console2 as console} from "../../lib/forge-std/src/Test.sol";
 import {Constants} from "./Constants.sol";
@@ -22,6 +22,7 @@ contract ATest is Test {
 
     function inc() public returns (uint256) {
         changed += 1;
+        return changed;
     }
 
     function multiple_arguments(uint256 a, address b, uint256[] memory c) public returns (uint256) {}
@@ -51,7 +52,7 @@ contract BroadcastTest is Test {
         require(success, "stopBroadcast failed");
 
         // this wont generate tx to sign
-        uint256 b = test.t(4);
+        test.t(4);
 
         // this will
         (success, ) = Constants.CHEATCODE_ADDRESS.call(

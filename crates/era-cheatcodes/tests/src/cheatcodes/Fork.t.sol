@@ -48,13 +48,7 @@ contract ForkTest is Test {
     function testCreateSelectFork() public {
         uint256 forkId = vm.createFork("mainnet", FORK_BLOCK + 100);
 
-        //this still does not work with vm
-        //vm.selectFork(forkId);
-
-        (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("selectFork(uint256)", forkId)
-        );
-        require(success1, "select fork failed");
+        vm.selectFork(forkId);
 
         /// After createSelect fork the decimals  should exist
         (bool success2, bytes memory data2) = TOKEN_ADDRESS.call(

@@ -40,6 +40,9 @@ contract SnapshotTest is Test {
         console.log("calling revertTo");
 
         //this still does not work with vm
+        // bool success = vm.revertTo(snapshot);
+        // require(success, "revertTo failed");
+
         (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
             abi.encodeWithSignature("revertTo(uint256)", snapshot)
         );

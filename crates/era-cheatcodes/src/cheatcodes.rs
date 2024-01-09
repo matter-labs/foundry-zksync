@@ -643,17 +643,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
-                    let mut modified_storage = self
-                        .modified_storage_keys
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect::<HashMap<_, _>>();
-                    modified_storage.extend(
-                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
-                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
-                        }),
-                    );
+                    let modified_storage =
+                        self.get_modified_storage(&storage.borrow_mut().modified_storage_keys());
 
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
@@ -707,17 +698,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
-                    let mut modified_storage = self
-                        .modified_storage_keys
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect::<HashMap<_, _>>();
-                    modified_storage.extend(
-                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
-                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
-                        }),
-                    );
+                    let modified_storage =
+                        self.get_modified_storage(&storage.borrow_mut().modified_storage_keys());
                     {
                         storage.borrow_mut().clean_cache();
                         let handle: &ForkStorage<RevmDatabaseForEra<S>> =
@@ -751,14 +733,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 }
                 FinishCycleOneTimeActions::RevertToSnapshot { snapshot_id } => {
                     let mut storage = storage.borrow_mut();
-
-                    let modified_storage: HashMap<StorageKey, H256> = storage
-                        .modified_storage_keys()
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect();
-
+                    let modified_storage =
+                        self.get_modified_storage(storage.modified_storage_keys());
                     storage.clean_cache();
 
                     {
@@ -787,13 +763,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 }
                 FinishCycleOneTimeActions::Snapshot => {
                     let mut storage = storage.borrow_mut();
-
-                    let modified_storage: HashMap<StorageKey, H256> = storage
-                        .modified_storage_keys()
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect();
+                    let modified_storage =
+                        self.get_modified_storage(storage.modified_storage_keys());
 
                     storage.clean_cache();
 
@@ -1132,7 +1103,7 @@ impl CheatcodeTracer {
                         trimmed_stdout.as_bytes().to_vec()
                     };
 
-                self.add_trimmed_return_data(&encoded_stdout);
+                self.add_abi_encoded_return_data(&encoded_stdout);
             }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
@@ -1177,11 +1148,15 @@ impl CheatcodeTracer {
                 self.recording_logs = false;
             }
             load(loadCall { target, slot }) => {
-                tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
-                let key = StorageKey::new(AccountTreeId::new(target.to_h160()), H256(*slot));
-                let mut storage = storage.borrow_mut();
-                let value = storage.read_value(&key);
-                self.return_data = Some(vec![h256_to_u256(value)]);
+                if H160(target.0 .0) != CHEATCODE_ADDRESS {
+                    tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
+                    let key = StorageKey::new(AccountTreeId::new(target.to_h160()), H256(*slot));
+                    let mut storage = storage.borrow_mut();
+                    let value = storage.read_value(&key);
+                    self.return_data = Some(vec![h256_to_u256(value)]);
+                } else {
+                    self.return_data = Some(vec![U256::zero()]);
+                }
             }
             recordLogs(recordLogsCall {}) => {
                 tracing::info!("👷 Recording logs");
@@ -1690,6 +1665,14 @@ impl CheatcodeTracer {
         self.return_data = Some(data);
     }
 
+    fn add_abi_encoded_return_data(&mut self, data: &[u8]) {
+        let abi_encoded_data = data.abi_encode();
+        assert!(abi_encoded_data.len() % 32 == 0, "length must be multiple of 32");
+
+        let data = abi_encoded_data.chunks(32).map(U256::from_big_endian).collect_vec();
+        self.return_data = Some(data);
+    }
+
     fn set_return<H: HistoryMode>(
         mut fat_pointer: FatPointer,
         elements: Vec<U256>,
@@ -1995,6 +1978,25 @@ impl CheatcodeTracer {
             self.one_time_actions
                 .push(FinishCycleOneTimeActions::SetOrigin { origin: broadcast.original_origin });
         }
+    }
+
+    /// Merge current modified storage with the entire storage modifications made so far in the test
+    fn get_modified_storage(
+        &self,
+        storage: &HashMap<StorageKey, H256>,
+    ) -> HashMap<StorageKey, H256> {
+        let mut modified_storage = self
+            .modified_storage_keys
+            .clone()
+            .into_iter()
+            .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+            .collect::<HashMap<_, _>>();
+        modified_storage.extend(
+            storage
+                .iter()
+                .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS),
+        );
+        modified_storage
     }
 }
 
