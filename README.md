@@ -50,7 +50,13 @@ While `foundry-zksync` is **in-development**, there are some limitations to be a
 - **Cheat Codes Support**: Not all cheat codes are fully supported. [View the list of supported cheat codes](./SUPPORTED_CHEATCODES.md).
 - **Script Command**: The `script` command is currently a work in progress.
 - **Compile Time**: Some users may experience slower compile times.
-- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment. [Learn more](https://era.zksync.io/docs/tools/hardhat/compiling-libraries.html).
+- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration like so:
+    ```
+    libraries = [
+        "src/MyLibrary.sol:MyLibrary:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4"
+    ]
+    ```
+[Learn more](https://era.zksync.io/docs/tools/hardhat/compiling-libraries.html).
 - **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://era.zksync.io/docs/reference/architecture/differences-with-ethereum.html#create-create2).
 
 For the most effective use of our library, we recommend familiarizing yourself with these features and limitations. 
