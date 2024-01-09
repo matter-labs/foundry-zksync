@@ -149,10 +149,11 @@ impl TestArgs {
 
         // Set up the project
         let mut project = config.project()?;
+        // load the zkSolc config
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
-        
+
         // install missing dependencies
         if install::install_missing_dependencies(&mut config, self.build_args().silent) &&
             config.auto_detect_remappings
