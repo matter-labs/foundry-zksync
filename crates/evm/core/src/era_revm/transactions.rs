@@ -219,7 +219,7 @@ where
                 .collect_vec();
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
-                gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                gas_used: tx_result.statistics.gas_used as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
                 logs,
                 output: revm::primitives::Output::Create(
