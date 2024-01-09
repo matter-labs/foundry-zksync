@@ -644,7 +644,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
                     let modified_storage =
-                        self.get_modified_storage(&storage.borrow_mut().modified_storage_keys());
+                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
 
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
@@ -699,7 +699,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
                     let modified_storage =
-                        self.get_modified_storage(&storage.borrow_mut().modified_storage_keys());
+                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
                     {
                         storage.borrow_mut().clean_cache();
                         let handle: &ForkStorage<RevmDatabaseForEra<S>> =
