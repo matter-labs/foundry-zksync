@@ -411,7 +411,7 @@ pub struct Config {
     pub is_system: bool,
     /// Force evmla for zkSync
     pub force_evmla: bool,
-    // Path to cache missing library dependencies, used for compiling and deploying libraries.
+    /// Path to cache missing library dependencies, used for compiling and deploying libraries.
     pub detect_missing_libraries: bool,
 }
 
@@ -1652,7 +1652,7 @@ impl From<Config> for Figment {
                 .cached(),
             profile.clone(),
         );
-        
+
         // merge environment variables
         figment = figment
             .merge(
