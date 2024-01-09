@@ -1652,6 +1652,7 @@ impl From<Config> for Figment {
                 .cached(),
             profile.clone(),
         );
+        
         // merge environment variables
         figment = figment
             .merge(
