@@ -53,6 +53,7 @@ pub struct CompilerArgs {
         long = "is-system",
         value_name = "SYSTEM_MODE"
     )]
+    #[serde(skip)]
     pub is_system: bool,
 
     /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
@@ -62,6 +63,7 @@ pub struct CompilerArgs {
         long = "force-evmla",
         value_name = "FORCE_EVMLA"
     )]
+    #[serde(skip)]
     pub force_evmla: bool,
 
     /// Try to recompile with -Oz if the bytecode is too large.
@@ -70,6 +72,7 @@ pub struct CompilerArgs {
         long = "fallback-oz",
         value_name = "FALLBACK_OZ"
     )]
+    #[serde(skip)]
     pub fallback_oz: bool,
 
     #[clap(help_heading = "zkSync Compiler options", long = "detect-missing-libraries")]

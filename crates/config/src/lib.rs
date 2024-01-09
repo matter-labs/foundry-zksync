@@ -411,6 +411,8 @@ pub struct Config {
     pub is_system: bool,
     /// Force evmla for zkSync
     pub force_evmla: bool,
+    // Path to cache missing library dependencies, used for compiling and deploying libraries.
+    pub detect_missing_libraries: bool,
 }
 
 /// Mapping of fallback standalone sections. See [`FallbackProfileProvider`]
@@ -1650,7 +1652,6 @@ impl From<Config> for Figment {
                 .cached(),
             profile.clone(),
         );
-
         // merge environment variables
         figment = figment
             .merge(
@@ -1923,6 +1924,7 @@ impl Default for Config {
             fallback_oz: false,
             force_evmla: false,
             is_system: false,
+            detect_missing_libraries: false,
         }
     }
 }
