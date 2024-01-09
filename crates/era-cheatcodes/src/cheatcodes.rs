@@ -7,7 +7,7 @@ use era_test_node::{
     deps::storage_view::StorageView, fork::ForkStorage, utils::bytecode_to_factory_dep,
 };
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
-use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
+use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_evm_core::{
     backend::DatabaseExt,
@@ -46,7 +46,7 @@ use std::{
     ops::BitAnd,
     process::Command,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -133,7 +133,7 @@ pub struct CheatcodeTracer {
     test_status: FoundryTestState,
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
-    broadcastable_transactions: Vec<BroadcastableTransaction>,
+    broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
 }
 
 #[derive(Debug, Clone)]
@@ -514,7 +514,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         };
                         tracing::debug!(?tx, "storing for broadcast");
 
-                        self.broadcastable_transactions.push(tx);
+                        self.broadcastable_transactions.write().unwrap().push_back(tx);
                         //FIXME: detect if this is a deployment and increase the other nonce too
                         self.set_nonce(
                             new_origin,
@@ -905,10 +905,12 @@ impl CheatcodeTracer {
     pub fn new(
         cheatcodes_config: Arc<CheatsConfig>,
         modified_keys: HashMap<StorageKey, StorageValue>,
+        broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
     ) -> Self {
         Self {
             config: cheatcodes_config,
             modified_storage_keys: modified_keys,
+            broadcastable_transactions,
             ..Default::default()
         }
     }
@@ -1602,8 +1604,8 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to write file");
                 }
             }
-            _ => {
-                tracing::error!("👷 Unrecognized cheatcode");
+            unknown => {
+                tracing::error!(?unknown, "👷 Unrecognized cheatcode");
             }
         };
     }

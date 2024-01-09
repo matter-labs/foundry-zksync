@@ -596,6 +596,10 @@ impl<DB: DatabaseExt + Send>
         CheatcodeTracer::new(
             self.cheatcodes.as_ref().map(|c| c.config.clone()).unwrap_or_default(),
             self.modified_storage_keys.clone(),
+            self.cheatcodes
+                .as_ref()
+                .map(|c| c.broadcastable_transactions.clone())
+                .unwrap_or_default(),
         )
         .into_tracer_pointer()
     }

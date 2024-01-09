@@ -342,7 +342,7 @@ impl Executor {
         let mut cheatcodes = result.cheatcodes.take();
         if let Some(cheats) = cheatcodes.as_mut() {
             // Clear broadcastable transactions
-            cheats.broadcastable_transactions.clear();
+            cheats.broadcastable_transactions.write().unwrap().clear();
             debug!(target: "evm::executors", "cleared broadcastable transactions");
 
             // corrected_nonce value is needed outside of this context (setUp), so we don't
@@ -814,8 +814,10 @@ fn convert_executed_result(
     } = inspector.collect();
 
     let transactions = match cheatcodes.as_ref() {
-        Some(cheats) if !cheats.broadcastable_transactions.is_empty() => {
-            Some(cheats.broadcastable_transactions.clone())
+        Some(cheats) => {
+            let broadcastable_transactions =
+                cheats.broadcastable_transactions.read().unwrap().clone();
+            Some(broadcastable_transactions)
         }
         _ => None,
     };

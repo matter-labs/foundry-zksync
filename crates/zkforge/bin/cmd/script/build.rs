@@ -4,9 +4,9 @@ use eyre::{Context, ContextCompat, Result};
 
 use foundry_common::{
     compact_to_contract,
-    compile::{ContractSources},
+    compile::ContractSources,
     fs,
-    zk_compile::{ZkSolc},
+    zk_compile::ZkSolc,
     zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
 };
 use foundry_compilers::{
@@ -16,11 +16,7 @@ use foundry_compilers::{
     ArtifactId, Project, ProjectCompileOutput,
 };
 
-use std::{
-    collections::BTreeMap,
-    path::{PathBuf},
-    str::FromStr,
-};
+use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
 use zkforge::link::{link_with_nonce_or_address, PostLinkInput, ResolvedDependency};
 
 impl ScriptArgs {
