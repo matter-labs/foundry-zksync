@@ -202,6 +202,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             let this_address = state.vm_local_state.callstack.current.this_address;
             if !INTERNAL_CONTRACT_ADDRESSES.contains(&this_address) {
                 println!("Entro al FARCALL Y NO INTERNALS");
+                println!("{:?}", state.vm_local_state.callstack.current.this_address);
+                println!("{:?}", state.vm_local_state.callstack.depth());
                 self.next_call_action = None;
             }
         }
@@ -486,6 +488,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             let this_address = state.local_state.callstack.current.this_address;
             if !INTERNAL_CONTRACT_ADDRESSES.contains(&this_address) {
                 println!("ENTROOO AL FINISH CYCLE");
+                println!("{:?}", state.local_state.callstack.depth());
                 state.local_state.callstack.current.msg_sender = prank_ops.sender;
        }
     }
@@ -750,6 +753,7 @@ impl CheatcodeTracer {
             prank_0(prank_0Call {msgSender: msg_sender}) => {
                 tracing::info!("👷 Starting pank to {msg_sender:?}");
                 println!("ENTRO A PRANK");
+                println!("{:?}", state.vm_local_state.callstack.depth());
                 self.next_call_action = Some(StartPrankOpts{ sender: msg_sender.to_h160(), origin: None });
             }
             roll(rollCall { newHeight: new_height }) => {
