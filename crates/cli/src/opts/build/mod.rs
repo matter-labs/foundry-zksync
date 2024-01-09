@@ -53,8 +53,8 @@ pub struct CompilerArgs {
         long = "is-system",
         value_name = "SYSTEM_MODE"
     )]
-    #[serde(skip)]
-    pub is_system: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_system: Option<bool>,
 
     /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
     #[clap(
@@ -63,8 +63,8 @@ pub struct CompilerArgs {
         long = "force-evmla",
         value_name = "FORCE_EVMLA"
     )]
-    #[serde(skip)]
-    pub force_evmla: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub force_evmla: Option<bool>,
 
     /// Try to recompile with -Oz if the bytecode is too large.
     #[clap(
@@ -72,9 +72,10 @@ pub struct CompilerArgs {
         long = "fallback-oz",
         value_name = "FALLBACK_OZ"
     )]
-    #[serde(skip)]
-    pub fallback_oz: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_oz: Option<bool>,
 
+    /// Path to cache missing library dependencies, used for compiling and deploying libraries.
     #[clap(help_heading = "zkSync Compiler options", long = "detect-missing-libraries")]
     pub detect_missing_libraries: bool,
 

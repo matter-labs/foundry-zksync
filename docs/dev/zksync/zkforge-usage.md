@@ -12,12 +12,22 @@
 zkforge zk-build [OPTIONS]
 ```
 
-**Options:**
+**zkSync Compiler Options:**
 
-- `--use-zksolc`: Specify zksolc compiler version (default if left blank).
-- `--is-system`: Enables system contract compilation mode.
-- `--force-evmla`: Forces the EVM legacy assembly pipeline.
-- `-h, --help`: Prints help.
+- `--use-zksolc <ZK_SOLC_VERSION>`: Specify the solc version or a path to a local solc for building. Valid values are in the format `x.y.z`, `zksolc:x.y.z`, or `path/to/zksolc`. Default is `v1.3.21`.
+
+- `--is-system <SYSTEM_MODE>`: Enable system contract compilation mode. Possible values are `true` or `false`.
+
+- `--force-evmla <FORCE_EVMLA>`: Forcibly switch to the EVM legacy assembly pipeline. Possible values are `true` or `false`.
+
+- `--fallback-oz <FALLBACK_OZ>`: Attempt to recompile with `-Oz` if the bytecode is too large. Possible values are `true` or `false`.
+
+- `--detect-missing-libraries`: Detects and reports missing libraries in the project.
+
+- `-O, --optimization <LEVEL>`: Set the LLVM optimization parameter `-O[0 | 1 | 2 | 3 | s | z]`. Use `3` for the best performance and `z` for minimal size.
+
+- `--zk-optimizer`: Enables specific optimizations for zkSync.
+
 
 **Note:** The `--is-system` flag is essential for contracts like factory contracts. These should be in `src/is-system/`. Create the folder if it doesn't exist.
 
@@ -25,7 +35,7 @@ zkforge zk-build [OPTIONS]
 
 **Example Usage:**
 
-Compile with default compiler options (v1.3.11).
+Compile with default compiler options (v1.3.21).
 
 ```sh
 zkforge zk-build
@@ -33,10 +43,10 @@ zkforge zk-build
 
 **Compiler Settings:**
 
-Set `zksolc` compiler version using `--use` flag.
+Set `zksolc` compiler version using `--use-zksolc` flag.
 
 ```bash
-zkforge zkb --use 0.8.19
+zkforge zkb --use-zksolc 1.3.21
 ```
 
 **Example Output:**
@@ -51,10 +61,6 @@ zkforge zkb --use 0.8.19
 Example terminal output:
 
 ![Terminal Output](https://user-images.githubusercontent.com/76663878/236305625-8c7519e2-0c5e-492f-a4bc-3b019a95e34f.png)
-
-**Important:** Until `forge remappings` are implemented, use relative import paths:
-
-![Import Paths](https://github.com/matter-labs/foundry-zksync/assets/76663878/490b34f4-e286-42a7-8570-d4b228ec10c7)
 
 `SimpleFactory.sol` and `AAFactory.sol` should be in `src/is-system/`.
 
