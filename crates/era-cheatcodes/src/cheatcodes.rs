@@ -20,7 +20,7 @@ use multivm::{
     },
     zk_evm_1_4_0::{
         reference_impls::event_sink::EventMessage,
-        tracing::{AfterExecutionData, VmLocalStateData},
+        tracing::{AfterExecutionData, VmLocalStateData, BeforeExecutionData},
         vm_state::PrimitiveValue,
         zkevm_opcode_defs::{
             FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
@@ -191,6 +191,22 @@ enum ExpectedCallType {
 impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     for CheatcodeTracer
 {
+    fn before_execution(
+        &mut self,
+        state: VmLocalStateData<'_>,
+        data: BeforeExecutionData,
+        _memory: &SimpleMemory<H>,
+        _storage: StoragePtr<EraDb<S>>,
+    ) {
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let this_address = state.vm_local_state.callstack.current.this_address;
+            if !INTERNAL_CONTRACT_ADDRESSES.contains(&this_address) {
+                println!("Entro al FARCALL Y NO INTERNALS");
+                self.next_call_action = None;
+            }
+        }
+    }
+
     fn after_execution(
         &mut self,
         state: VmLocalStateData<'_>,
@@ -467,9 +483,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         }
 
         if let Some(prank_ops) = &self.next_call_action {
-            println!("ENTROOO AL FINISH CYCLE");
             let this_address = state.local_state.callstack.current.this_address;
             if !INTERNAL_CONTRACT_ADDRESSES.contains(&this_address) {
+                println!("ENTROOO AL FINISH CYCLE");
                 state.local_state.callstack.current.msg_sender = prank_ops.sender;
        }
     }
