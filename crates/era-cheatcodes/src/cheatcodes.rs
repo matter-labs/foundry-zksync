@@ -467,7 +467,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         }
 
         if let Some(prank_ops) = &self.next_call_action.take() {
-            println!("ENTROOO");
+            println!("ENTROOO AL FINISH CYCLE");
             let this_address = state.local_state.callstack.current.this_address;
             if !INTERNAL_CONTRACT_ADDRESSES.contains(&this_address) {
                 state.local_state.callstack.current.msg_sender = prank_ops.sender;
@@ -733,6 +733,7 @@ impl CheatcodeTracer {
             }
             prank_0(prank_0Call {msgSender: msg_sender}) => {
                 tracing::info!("👷 Starting pank to {msg_sender:?}");
+                println!("ENTRO A PRANK");
                 self.next_call_action = Some(StartPrankOpts{ sender: msg_sender.to_h160(), origin: None });
             }
             roll(rollCall { newHeight: new_height }) => {
