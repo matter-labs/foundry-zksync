@@ -1,26 +1,24 @@
 use super::*;
 use alloy_primitives::{Address, Bytes};
 use eyre::{Context, ContextCompat, Result};
-use foundry_cli::utils::get_cached_entry_by_name;
+
 use foundry_common::{
     compact_to_contract,
-    compile::{self, ContractSources},
+    compile::{ContractSources},
     fs,
-    zk_compile::{ZkSolc, ZkSolcOpts},
+    zk_compile::{ZkSolc},
     zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
 };
 use foundry_compilers::{
     artifacts::{CompactContractBytecode, ContractBytecode, ContractBytecodeSome, Libraries},
-    cache::SolFilesCache,
     contracts::ArtifactContracts,
     info::ContractInfo,
-    remappings::RelativeRemapping,
     ArtifactId, Project, ProjectCompileOutput,
 };
-use foundry_config::zksolc_config::ZkSolcConfig;
+
 use std::{
     collections::BTreeMap,
-    path::{Path, PathBuf},
+    path::{PathBuf},
     str::FromStr,
 };
 use zkforge::link::{link_with_nonce_or_address, PostLinkInput, ResolvedDependency};

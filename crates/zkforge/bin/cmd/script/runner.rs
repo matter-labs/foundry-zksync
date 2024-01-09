@@ -80,7 +80,8 @@ impl ScriptRunner {
         // Deploy an instance of the contract
         // INVESTIGATE : We need to update/replace self.executor.deploy to execute against our zkevm
         //     Similar to ->
-        //     let result: EVMResult<DatabaseError> = crate::era_revm::transactions::run_era_transaction(env, self, inspector);
+        //     let result: EVMResult<DatabaseError> =
+        // crate::era_revm::transactions::run_era_transaction(env, self, inspector);
         let DeployResult {
             address,
             mut logs,

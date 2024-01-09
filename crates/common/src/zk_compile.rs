@@ -946,7 +946,7 @@ impl ZkSolc {
             script_path.push("script");
         }
         let sources_two = Source::read_all_from(script_path)?;
-        sources.extend(sources_two.into_iter());
+        sources.extend(sources_two);
         // Step 2: Resolve Graph of Sources and Versions
         let graph = match Graph::resolve_sources(&self.project.paths, sources) {
             Ok(graph) => graph,
@@ -960,7 +960,7 @@ impl ZkSolc {
         };
 
         // Step 4: Retrieve Solc Version
-        return match versions.get(&self.project) {
+        match versions.get(&self.project) {
             Ok(solc) => Ok(solc),
             Err(e) => Err(eyre::eyre!("Could not get solc: {}", e)),
         }

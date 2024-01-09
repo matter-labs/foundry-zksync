@@ -632,16 +632,24 @@ impl ZkSolcManager {
             .map_err(|e| Error::msg(format!("Could not get full download url: {}", e)))?;
 
         let client = Client::new();
-        let response = client.get(url).send().await
+        let response = client
+            .get(url)
+            .send()
+            .await
             .map_err(|e| Error::msg(format!("Failed to download file: {}", e)))?;
 
         if response.status().is_success() {
-            let mut output_file = File::create(self.get_full_compiler_path()).await
+            let mut output_file = File::create(self.get_full_compiler_path())
+                .await
                 .map_err(|e| Error::msg(format!("Failed to create output file: {}", e)))?;
 
-            let content = response.bytes().await.map_err(|e| Error::msg(format!("failed to download file: {}", e)))?;
+            let content = response
+                .bytes()
+                .await
+                .map_err(|e| Error::msg(format!("failed to download file: {}", e)))?;
 
-            copy(&mut content.as_ref(), &mut output_file).await
+            copy(&mut content.as_ref(), &mut output_file)
+                .await
                 .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
 
             let compiler_path = self.compilers_path.join(self.get_full_compiler());
