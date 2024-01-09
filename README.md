@@ -48,7 +48,6 @@ Please note that `foundry-zksync` is still in its **alpha** stage. Some features
 While `foundry-zksync` is **in-development**, there are some limitations to be aware of:
 
 - **Cheat Codes Support**: Not all cheat codes are fully supported. [View the list of supported cheat codes](./SUPPORTED_CHEATCODES.md).
-- **Script Command**: The `script` command is currently a work in progress.
 - **Compile Time**: Some users may experience slower compile times.
 - **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration like so:
     ```
