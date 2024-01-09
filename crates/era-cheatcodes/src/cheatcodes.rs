@@ -466,7 +466,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             );
         }
 
-        if let Some(prank_ops) = &self.next_call_action.take() {
+        if let Some(prank_ops) = &self.next_call_action {
             println!("ENTROOO AL FINISH CYCLE");
             let this_address = state.local_state.callstack.current.this_address;
             if !INTERNAL_CONTRACT_ADDRESSES.contains(&this_address) {
