@@ -15,9 +15,9 @@ Foundry consists of:
 
 Need help getting started with Foundry? Read the 📖 [Foundry Book](https://book.getfoundry.sh/) (WIP)!
 
-Foundry-zkSync adds:
+### Foundry-zkSync adds:
 
-- **zkForge:** zkSync testing framework (like Truffle, Hardhat and DappTools).
+- **zkForge:** zkSync testing framework (like Hardhat and DappTools).
 - **zkCast:** Swiss army knife for interacting with zkEVM smart contracts, sending transactions and getting chain data.
 
 Need help getting started with **Foundry-zkSync**? Read the 📖 [Usage Guides](./docs/dev/zksync/) (WIP)!
@@ -28,14 +28,37 @@ Please note that `foundry-zksync` is still in its **alpha** stage. Some features
 
 ## 📊 Features & Limitations
 
-| ✅ Features                                                                                     | 🚫 Limitations                                                         |
-|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| Compile smart contracts with the [zksolc compiler](https://github.com/matter-labs/zksolc-bin). | Can't find `test/` directory |
-| Deploy smart contracts to zkSync Era mainnet, testnet, or local test node.                     | `script` command lacks `zksolc` support.                               |
-| Bridge assets L1 <-> L2.                                                                       | Cheat codes are not supported.                                         |
-| Call deployed contracts on zkSync Era testnet or local test node.                              | Lacks advanced testing methods (e.g., variant testing).                |
-| Send transactions to deployed contracts on zkSync Era testnet or local test node.              |                                                                        |
-| Simple 'PASS / FAIL' testing.                                                                  |                                                                        |
+### Features
+
+`Foundry-zksync` offers a set of features designed to work with zkSync Era, providing a comprehensive toolkit for smart contract deployment and interaction:
+
+- **Smart Contract Deployment**: Easily deploy smart contracts to zkSync Era mainnet, testnet, or a local test node.
+- **Asset Bridging**: Bridge assets between L1 and L2, facilitating seamless transactions across layers.
+- **Contract Interaction**: Call and send transactions to deployed contracts on zkSync Era testnet or local test node.
+- **Solidity Testing**: Write tests in Solidity, similar to DappTools, for a familiar testing environment.
+- **Fuzz Testing**: Benefit from fuzz testing, complete with shrinking of inputs and printing of counter-examples.
+- **Remote RPC Forking**: Utilize remote RPC forking mode, leveraging Rust's asynchronous infrastructure like tokio.
+- **Flexible Debug Logging**: Choose your debugging style:
+  - DappTools-style: Utilize DsTest's emitted logs for debugging.
+  - Hardhat-style: Leverage the popular console.sol contract.
+- **Configurable Compiler Options**: Tailor compiler settings to your needs, including LLVM optimization modes.
+
+# Limitations
+
+While `foundry-zksync` is **in-development**, there are some limitations to be aware of:
+
+- **Cheat Codes Support**: Not all cheat codes are fully supported. [View the list of supported cheat codes](./SUPPORTED_CHEATCODES.md).
+- **Compile Time**: Some users may experience slower compile times.
+- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration like so:
+    ```
+    libraries = [
+        "src/MyLibrary.sol:MyLibrary:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4"
+    ]
+    ```
+[Learn more](https://era.zksync.io/docs/tools/hardhat/compiling-libraries.html).
+- **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://era.zksync.io/docs/reference/architecture/differences-with-ethereum.html#create-create2).
+
+For the most effective use of our library, we recommend familiarizing yourself with these features and limitations. 
 
 ## 📝 Prerequisites
 
@@ -77,13 +100,13 @@ cargo build --release
 
 Run:
 ``` 
-zkforge init --template https://github.com/dutterbutter/hello-foundry-zksync
+zkforge init hello_foundry
 ```
 
 Let's check out what zkforge generated for us:
 
 ```
-$ cd hello-foundry-zksync
+$ cd hello_foundry
 $ tree . -d -L 1
 .
 ├── abis
@@ -101,14 +124,6 @@ We can build the project with zkforge zkbuild:
 ```
 $ zkforge zkbuild
 Compiling smart contracts...
-Child -> Bytecode Hash: 010000410c1f3728a3887d9bc854d978ce441ccef394319cb26c58e0ba90df46
-Counter -> Bytecode Hash: 0100003bc44686be52940f3f2bd8a0feef17700663cba9edb978886c08123811
-Greeter -> Bytecode Hash: 0100008f03cbc9c98bb0a883736bf9c1d8801b74928ed78148ddbd5445defddf
-StepChild -> Bytecode Hash: 010000239f712c49b5804a34b1f995e034d853e2c6d2edcb60646f1bf9f057f2
-Compiler run completed with warnings
-TwoUserMultisig -> Bytecode Hash: 01000757a0867b6d7aba75853f126e7780bd893ae384a4718a2a03a6b53a5ee1
-AAFactory -> Bytecode Hash: 0100007b76ee1ed575d19043b0b995632ac07ae996aefbbc8238f490f492c793
-SimpleFactory -> Bytecode Hash: 0100021b7653e052f7f8218197d79e28de792ff243a30711fb63251644d47524
 Compiled Successfully
 ```
 
@@ -116,28 +131,17 @@ Compiled Successfully
 
 You can run the tests using `zkforge test`. 
 
->❗Known issue of not being able to find tests in the `/tests/` directory. 
-
 The command and its expected output are shown below:
 
 ```bash
 $ zkforge test
 
-Running 2 tests for Counter.sol:ContractBTest
-[PASS] test_CannotSubtract43() (gas: 9223372034707517612)
-[PASS] test_NumberIs42() (gas: 9223372034707517612)
-Test result: ok. 2 passed; 0 failed; 0 skipped; finished in 43.08ms
+Running 2 tests for Counter.t.sol:CounterTest
+[PASS] testFuzz_SetNumber(uint256) (runs: 256, μ: 9223372034707527035, ~: 9223372034707527076)
+[PASS] test_Increment() (gas: 9223372034707527339)
+Test result: ok. 2 passed; 0 failed; 0 skipped; finished in 5.15s
 
-Running 1 test for Counter.sol:OwnerUpOnlyTest
-[PASS] test_IncrementAsOwner() (gas: 9223372034707517612)
-Test result: ok. 1 passed; 0 failed; 0 skipped; finished in 43.46ms
-
-Running 2 tests for Counter.sol:CounterTest
-[PASS] test_Increment() (gas: 9223372034707517612)
-[PASS] test_Increment_twice() (gas: 9223372034707517612)
-Test result: ok. 2 passed; 0 failed; 0 skipped; finished in 47.81ms
-
-Ran 3 test suites: 5 tests passed, 0 failed, 0 skipped (5 total tests)
+Ran 1 test suites: 2 tests passed, 0 failed, 0 skipped (2 total tests)
 ```
 
 ## Configuration
@@ -154,11 +158,21 @@ You can select another profile using the `FOUNDRY_PROFILE` environment variable.
 
 To see your current configuration, run `zkforge config`. To see only basic options (as set with `zkforge init`), run `zkforge config --basic`. This can be used to create a new `foundry.toml` file with `zkforge config --basic > foundry.toml`.
 
-By default `zkforge config` shows the currently selected foundry profile and its values. It also accepts the same arguments as `zkforge build`.
+By default `zkforge config` shows the currently selected foundry profile and its values. It also accepts the same arguments as `zkforge build`. An example `foundry.toml` for zkSync with zksolc configurations may look like:
 
-### DappTools Compatibility
+```
+[profile.default]
+src = 'src'
+out = 'out'
+libs = ['lib']
 
-You can re-use your `.dapprc` environment variables by running `source .dapprc` before using a Foundry tool.
+[profile.zksync]
+src = 'src'
+libs = ['lib']
+fallback_oz = true
+is_system = true
+mode = "2"
+```
 
 ### Additional Configuration
 
@@ -185,27 +199,6 @@ Make sure that:
 
 If you get errors like `(code: -32601, message: Method not found, data: None)` - you are probably using a `send` method instead of `zksend`.
 
-### 'Could not get solc: Unknown version provided', 'checksum not found'
-
-These errors might show up on the Mac with ARM chip (M1, M2) due to the fact that most recent solc compilers are not auto-downloaded there.
-
-There are 2 workarounds:
-
- - Use an older compiler by adding `--use 0.8.19` flag to the `zk-build` command.
- - Download the compiler manually and then use the `--offline` mode. (Download the compiler into ~/.svm/VERSION/solc-VERSION -- for example ~/.svm/0.8.20/solc-0.8.20).
-
-You can get the latest compiler version for MacOs AARCH here: https://github.com/ethers-rs/solc-builds/tree/master/macosx/aarch64
-
-You might have to remove the `zkout` directory (that holds the compilation artifacts) and in some rare scenarios also cleanup the installed solc versions (by removing `~/.svm/` directory)
-
-### `solc` versions >0.8.19 are not supported, found 0.8.20
-
-This means that our zksync compiler doesn't support that version of solidity yet.
-
-In such case, please remove the artifacts (by removing `zkout` directory) and re-run with the older version of solidity (`--use 0.8.19`) for example.
-
-You might also have to remove the `~/.svm/0.8.20/solc-0.8.20` file.
-
 ## Acknowledgements
 
 -   Foundry is a clean-room rewrite of the testing framework [DappTools](https://github.com/dapphub/dapptools). None of this would have been possible without the DappHub team's work over the years.
@@ -213,6 +206,9 @@ You might also have to remove the `~/.svm/0.8.20/solc-0.8.20` file.
 -   [Rohit Narurkar](https://twitter.com/rohitnarurkar): Created the Rust Solidity version manager [svm-rs](https://github.com/roynalnaruto/svm-rs) which we use to auto-detect and manage multiple Solidity versions.
 -   [Brock Elmore](https://twitter.com/brockjelmore): For extending the VM's cheatcodes and implementing [structured call tracing](https://github.com/foundry-rs/foundry/pull/192), a critical feature for debugging smart contract calls.
 -   All the other [contributors](https://github.com/foundry-rs/foundry/graphs/contributors) to the [ethers-rs](https://github.com/gakonst/ethers-rs) & [foundry](https://github.com/foundry-rs/foundry) repositories and chatrooms.
+
+### foundry-zksync Acknowledgments
+- [Moonsong Labs](https://moonsonglabs.com/): Implemented [era-cheatcodes], and resolved a number of different challenges to enable zkSync support. 
 
 [foundry-book]: https://book.getfoundry.sh
 [foundry-gha]: https://github.com/foundry-rs/foundry-toolchain
