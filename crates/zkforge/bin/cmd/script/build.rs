@@ -12,7 +12,7 @@ use foundry_common::{
 use foundry_compilers::{
     artifacts::{CompactContractBytecode, ContractBytecode, ContractBytecodeSome, Libraries},
     contracts::ArtifactContracts,
-    info::ContractInfo,
+    info::{ContractInfo, FullContractInfo},
     ArtifactId, Project, ProjectCompileOutput,
 };
 
@@ -39,8 +39,6 @@ impl ScriptArgs {
             .map(|(id, artifact)| -> Result<_> {
                 // Sources are only required for the debugger, but it *might* mean that there's
                 // something wrong with the build and/or artifacts.
-                // println!("id.name : {}", id.name);
-                // println!("id.path : {:?}", id.path);
                 if let Some(source) = artifact.source_file() {
                     let path = source
                         .ast
@@ -89,15 +87,21 @@ impl ScriptArgs {
         let mut run_dependencies = vec![];
         let mut contract = CompactContractBytecode::default();
         let mut highlevel_known_contracts = BTreeMap::new();
+
+        //FIXME: remove - we temporarily parse this path:name (possibility)
+        // since we don't handle name-only contract for now
+        // otherwise self.path would be clean without the :name and we could
+        // use that directly
         let contract_info = ContractInfo::from_str(&self.path)?;
 
-        let mut target_fname = dunce::canonicalize(contract_info.path.unwrap_or_default())
-            .wrap_err("Couldn't convert contract path to absolute path.")?
-            .strip_prefix(project.root())
-            .wrap_err("Couldn't strip project root from contract path.")?
-            .to_str()
-            .wrap_err("Bad path to string.")?
-            .to_string();
+        let mut target_fname =
+            dunce::canonicalize(contract_info.path.wrap_err("unknown path for contract")?)
+                .wrap_err("Couldn't convert contract path to absolute path.")?
+                .strip_prefix(project.root())
+                .wrap_err("Couldn't strip project root from contract path.")?
+                .to_str()
+                .wrap_err("Bad path to string.")?
+                .to_string();
 
         let no_target_name = if let Some(target_name) = &self.target_contract {
             target_fname = target_fname + ":" + target_name;
@@ -169,13 +173,12 @@ impl ScriptArgs {
                         extra.target_id = Some(id.clone());
                     }
                 } else {
-                    let (path, name) = extra
-                        .target_fname
-                        .rsplit_once(':')
-                        .expect("The target specifier is malformed.");
-                    let path = std::path::Path::new(path);
+                    let FullContractInfo { path, name } =
+                        FullContractInfo::from_str(&extra.target_fname)
+                            .expect("The target specifier is malformed.");
+                    let path = std::path::Path::new(&path);
 
-                    // Handle files in script/ dir
+                    // Remove dir prefix for files in script/ dir
                     let mut new_path = PathBuf::from("");
                     if path.starts_with("script/") {
                         for component in path.strip_prefix("script/").unwrap().iter() {
@@ -234,35 +237,45 @@ impl ScriptArgs {
         let project = script_config.config.project()?;
         let mut zksolc_cfg = script_config.config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
 
+        let contract = ContractInfo::from_str(&self.path)?;
+        self.target_contract = Some(contract.name.clone());
+
+        // A contract was specified by path
+        // TODO: uncomment the `if let` block once we support script by contract name
+        // if let Ok(_) = dunce::canonicalize(&self.path) {
         let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         zksolc_cfg.compiler_path = compiler_path;
         zksolc_cfg.settings.is_system = false;
         zksolc_cfg.settings.force_evmla = false;
 
         let mut zksolc = ZkSolc::new(zksolc_cfg, project);
-        let (output, _) = match zksolc.compile() {
-            Ok(compiled) => compiled,
-            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
-        };
+        match zksolc.compile() {
+            Ok((output, _)) => Ok((script_config.config.project()?, output)),
+            Err(e) => eyre::bail!("Failed to compile with zksolc: {e}"),
+        }
+        // }
 
-        let contract = ContractInfo::from_str(&self.path)?;
-        self.target_contract = Some(contract.name.clone());
+        //FIXME: add support for specifying contract name only in `script` invocations
 
-        // // We received `contract_name`, and need to find its file path.
+        // // If we get here we received a contract name since the path wasn't valid.
+        // // Attempt to retrieve the contract by name instead
+
+        // ANNOTATED REFERENCE:
+        // // Compile the contract (will populate cache with compiled artifact and provenance)
         // let output = if self.opts.args.silent {
         //     compile::suppress_compile(&project)
         // } else {
         //     compile::compile(&project, false, false)
         // }?;
+        //
         // let cache =
         //     SolFilesCache::read_joined(&project.paths).wrap_err("Could not open compiler
         // cache")?;
 
+        // // Lookup in cache the contrace by name, storing the now known path
         // let (path, _) = get_cached_entry_by_name(&cache, &contract.name)
         //     .wrap_err("Could not find target contract in cache")?;
         // self.path = path.to_string_lossy().to_string();
-
-        Ok((script_config.config.project()?, output))
     }
 }
 
