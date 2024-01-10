@@ -9,17 +9,7 @@ contract CheatcodeSerializeTest is Test {
     address constant TEST_ADDRESS = 0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a;
 
     function testSerializeAddress() external {
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "serializeAddress(string,string,address)",
-                "obj1",
-                "address",
-                TEST_ADDRESS
-            )
-        );
-        require(success, "serializeAddress failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+        string memory testString = vm.serializeAddress("obj1", "address", TEST_ADDRESS);
         require(
             keccak256(bytes(testString)) ==
                 keccak256(bytes("0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a")),
@@ -28,17 +18,7 @@ contract CheatcodeSerializeTest is Test {
     }
 
     function testSerializeBool() external {
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "serializeBool(string,string,bool)",
-                "obj1",
-                "boolean",
-                true
-            )
-        );
-        require(success, "serializeBool failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+        string memory testString = vm.serializeBool("obj1", "boolean", true);
         require(
             keccak256(bytes(testString)) == keccak256(bytes("true")),
             "serializeBool mismatch"
@@ -46,17 +26,7 @@ contract CheatcodeSerializeTest is Test {
     }
 
     function testSerializeUint() external {
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "serializeUint(string,string,uint256)",
-                "obj1",
-                "uint",
-                99
-            )
-        );
-        require(success, "serializeUint failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+        string memory testString = vm.serializeUint("obj1", "uint", 99);
         require(
             keccak256(bytes(testString)) == keccak256(bytes("99")),
             "serializeUint mismatch"

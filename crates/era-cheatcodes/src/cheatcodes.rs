@@ -1211,7 +1211,7 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to read file");
                     return
                 };
-                self.add_trimmed_return_data(&data);
+                self.add_abi_encoded_return_data(&data);
             }
             revertTo(revertToCall { snapshotId }) => {
                 tracing::info!("👷 Reverting to snapshot {}", snapshotId);
@@ -1246,7 +1246,7 @@ impl CheatcodeTracer {
                     rpc_url.is_some(),
                     "Failed to resolve env var `${rpcAlias}`: environment variable not found"
                 );
-                self.add_trimmed_return_data(rpc_url.unwrap().as_bytes());
+                self.add_abi_encoded_return_data(rpc_url.unwrap().as_bytes());
             }
             rpcUrls(rpcUrlsCall {}) => {
                 tracing::info!("👷 Getting rpc urls");
@@ -1280,7 +1280,7 @@ impl CheatcodeTracer {
                 self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let address_with_checksum = to_checksum(&value.to_h160(), None);
-                self.add_trimmed_return_data(address_with_checksum.as_bytes());
+                self.add_abi_encoded_return_data(address_with_checksum.as_bytes());
             }
             serializeBool_0(serializeBool_0Call {
                 objectKey: object_key,
@@ -1300,7 +1300,7 @@ impl CheatcodeTracer {
                 self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let bool_value = value.to_string();
-                self.add_trimmed_return_data(bool_value.as_bytes());
+                self.add_abi_encoded_return_data(bool_value.as_bytes());
             }
             serializeUint_0(serializeUint_0Call {
                 objectKey: object_key,
@@ -1320,7 +1320,7 @@ impl CheatcodeTracer {
                 self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let uint_value = value.to_string();
-                self.add_trimmed_return_data(uint_value.as_bytes());
+                self.add_abi_encoded_return_data(uint_value.as_bytes());
             }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
@@ -1397,32 +1397,32 @@ impl CheatcodeTracer {
             toString_0(toString_0Call { value }) => {
                 tracing::info!("Converting address into string");
                 let address_with_checksum = to_checksum(&value.to_h160(), None);
-                self.add_trimmed_return_data(address_with_checksum.as_bytes());
+                self.add_abi_encoded_return_data(address_with_checksum.as_bytes());
             }
             toString_1(toString_1Call { value }) => {
                 tracing::info!("Converting bytes into string");
                 let bytes_value = format!("0x{}", hex::encode(value));
-                self.add_trimmed_return_data(bytes_value.as_bytes());
+                self.add_abi_encoded_return_data(bytes_value.as_bytes());
             }
             toString_2(toString_2Call { value }) => {
                 tracing::info!("Converting bytes32 into string");
                 let bytes_value = format!("0x{}", hex::encode(value));
-                self.add_trimmed_return_data(bytes_value.as_bytes());
+                self.add_abi_encoded_return_data(bytes_value.as_bytes());
             }
             toString_3(toString_3Call { value }) => {
                 tracing::info!("Converting bool into string");
                 let bool_value = value.to_string();
-                self.add_trimmed_return_data(bool_value.as_bytes());
+                self.add_abi_encoded_return_data(bool_value.as_bytes());
             }
             toString_4(toString_4Call { value }) => {
                 tracing::info!("Converting uint256 into string");
                 let uint_value = value.to_string();
-                self.add_trimmed_return_data(uint_value.as_bytes());
+                self.add_abi_encoded_return_data(uint_value.as_bytes());
             }
             toString_5(toString_5Call { value }) => {
                 tracing::info!("Converting int256 into string");
                 let int_value = value.to_string();
-                self.add_trimmed_return_data(int_value.as_bytes());
+                self.add_abi_encoded_return_data(int_value.as_bytes());
             }
 
             tryFfi(tryFfiCall { commandInput: command_input }) => {

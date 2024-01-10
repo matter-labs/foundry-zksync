@@ -6,14 +6,9 @@ import {Constants} from "./Constants.sol";
 import {Utils} from "./Utils.sol";
 
 contract CheatcodeToStringTest is Test {
-    function testToStringFromAddress() external {
+    function testToStringFromAddress() external pure {
         address testAddress = 0x413D15117be7a498e68A64FcfdB22C6e2AaE1808;
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("toString(address)", testAddress)
-        );
-        require(success, "toString failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+        string memory testString = vm.toString(testAddress);
         require(
             keccak256(bytes(testString)) ==
                 keccak256(bytes("0x413D15117be7a498e68A64FcfdB22C6e2AaE1808")),
@@ -21,68 +16,43 @@ contract CheatcodeToStringTest is Test {
         );
     }
 
-    function testToStringFromBool() external {
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("toString(bool)", false)
-        );
-        require(success, "toString failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+    function testToStringFromBool() external pure {
+        string memory testString = vm.toString(false);
         require(
             keccak256(bytes(testString)) == keccak256(bytes("false")),
             "toString mismatch"
         );
 
-        (success, rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("toString(bool)", true)
-        );
-        require(success, "toString failed");
-        data = Utils.trimReturnBytes(rawData);
-        testString = string(abi.encodePacked(data));
+        string memory testString2 = vm.toString(true);
         require(
-            keccak256(bytes(testString)) == keccak256(bytes("true")),
+            keccak256(bytes(testString2)) == keccak256(bytes("true")),
             "toString mismatch"
         );
     }
 
-    function testToStringFromUint256() external {
+    function testToStringFromUint256() external pure {
         uint256 value = 99;
         string memory stringValue = "99";
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("toString(uint256)", value)
-        );
-        require(success, "toString failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+        string memory testString = vm.toString(value);
         require(
             keccak256(bytes(testString)) == keccak256(bytes(stringValue)),
             "toString mismatch"
         );
     }
 
-    function testToStringFromInt256() external {
+    function testToStringFromInt256() external pure {
         int256 value = -99;
         string memory stringValue = "-99";
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("toString(int256)", value)
-        );
-        require(success, "toString failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+        string memory testString = vm.toString(value);
         require(
             keccak256(bytes(testString)) == keccak256(bytes(stringValue)),
             "toString mismatch"
         );
     }
 
-    function testToStringFromBytes32() external {
+    function testToStringFromBytes32() external pure {
         bytes32 testBytes = hex"4ec893b0a778b562e893cee722869c3e924e9ee46ec897cabda6b765a6624324";
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("toString(bytes32)", testBytes)
-        );
-        require(success, "toString failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+        string memory testString = vm.toString(testBytes);
         require(
             keccak256(bytes(testString)) ==
                 keccak256(
@@ -94,15 +64,10 @@ contract CheatcodeToStringTest is Test {
         );
     }
 
-    function testToStringFromBytes() external {
+    function testToStringFromBytes() external pure {
         bytes
             memory testBytes = hex"89987299ea14decf0e11d068474a6e459439802edca8aacf9644222e490d8ef6db";
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("toString(bytes)", testBytes)
-        );
-        require(success, "toString failed");
-        bytes memory data = Utils.trimReturnBytes(rawData);
-        string memory testString = string(abi.encodePacked(data));
+        string memory testString = vm.toString(testBytes);
         require(
             keccak256(bytes(testString)) ==
                 keccak256(

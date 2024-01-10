@@ -6,17 +6,10 @@ import {Constants} from "./Constants.sol";
 import {Utils} from "./Utils.sol";
 
 contract RpcUrlsTest is Test {
-    function testRpcUrl() public {
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("rpcUrl(string)", "mainnet")
-        );
-
-        bytes memory return_data = Utils.trimReturnBytes(rawData);
-        string memory rpc_url = string(return_data);
-        console.log("rpc_url", rpc_url);
-        require(success, "rpcUrl() failed");
+    function testRpcUrl() public view{
+        string memory rpc_url = vm.rpcUrl("mainnet");
         require(
-            keccak256(abi.encodePacked(rpc_url)) ==
+            keccak256(bytes(rpc_url)) ==
                 keccak256(
                     abi.encodePacked("https://mainnet.era.zksync.io:443")
                 ),

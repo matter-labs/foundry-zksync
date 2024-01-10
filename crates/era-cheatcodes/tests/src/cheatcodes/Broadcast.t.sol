@@ -39,70 +39,43 @@ contract BroadcastTest is Test {
     address public ACCOUNT_B = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
 
     function test_SimpleBroadcastDeploy() public {
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("startBroadcast(address)", ACCOUNT_A)
-        );
-        require(success, "startBroadcast failed");
+        vm.startBroadcast(ACCOUNT_A);
 
         ATest test = new ATest();
 
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("stopBroadcast()")
-        );
-        require(success, "stopBroadcast failed");
+        vm.stopBroadcast(); 
 
         // this wont generate tx to sign
         test.t(4);
 
         // this will
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("startBroadcast(address)", ACCOUNT_B)
-        );
-        require(success, "startBroadcast failed");
+        vm.startBroadcast(ACCOUNT_B);
 
         test.t(2);
 
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("stopBroadcast()")
-        );
-        require(success, "stopBroadcast failed");
+        vm.stopBroadcast();
     }
 
     function test_BroadcastValue() public {
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("startBroadcast(address)", ACCOUNT_A)
-        );
-        require(success, "startBroadcast failed");
+        vm.startBroadcast(ACCOUNT_A);
 
         ATest test = new ATest();
         test.pt{ value: 42 }(16);
 
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("stopBroadcast()")
-        );
-        require(success, "stopBroadcast failed");
+        vm.stopBroadcast();
     }
 
     function test_BroadcastGasLimit() public {
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("startBroadcast()")
-        );
-        require(success, "startBroadcast failed");
+        vm.startBroadcast();
 
         ATest test = new ATest();
         test.t{gas: 12345678}(12345678);
 
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("stopBroadcast()")
-        );
-        require(success, "stopBroadcast failed");
+        vm.stopBroadcast();
     }
 
     function test_BroadcastNonces() public {
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("startBroadcast(address)", ACCOUNT_B)
-        );
-        require(success, "startBroadcast failed");
+        vm.startBroadcast(ACCOUNT_B);
 
         ATest test = new ATest();
         test.t(1);
@@ -110,9 +83,6 @@ contract BroadcastTest is Test {
         test.t(3);
         test.t(4);
 
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("stopBroadcast()")
-        );
-        require(success, "stopBroadcast failed");
+       vm.stopBroadcast(); 
     }
 }
