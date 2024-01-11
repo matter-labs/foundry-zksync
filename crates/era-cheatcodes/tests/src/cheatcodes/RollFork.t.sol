@@ -17,12 +17,7 @@ contract RollForkTest is Test {
 
         uint256 mainBlock = block.number;
 
-        console.log("target block_number: ", block.number - 1);
-        console.log("before block_number: ", block.number);
-
         vm.rollFork(block.number - 1);
-
-        console.log("after block_number: ", block.number);
 
         assertEq(block.number, mainBlock - 1);
 
@@ -30,13 +25,9 @@ contract RollForkTest is Test {
         uint256 otherMain = vm.createFork("mainnet", block.number - 1);
         vm.rollFork(otherMain, mainBlock - 10);
 
-        console.log("same block_number: ", block.number);
         assertEq(block.number, mainBlock - 1); // should not have rolled
 
         vm.selectFork(otherMain);
-
-        console.log("target block_number: ", mainBlock - 10);
-        console.log("actual block_number: ", block.number);
 
         assertEq(block.number, mainBlock - 10);
     }
