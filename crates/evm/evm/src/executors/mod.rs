@@ -35,7 +35,7 @@ use std::collections::BTreeMap;
 use zksync_types::{
     AccountTreeId, StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
 };
-use zksync_utils::{address_to_u256, bytecode::hash_bytecode};
+use zksync_utils::bytecode::hash_bytecode;
 
 mod builder;
 pub use builder::ExecutorBuilder;
