@@ -32,7 +32,9 @@ use revm::{
     },
 };
 use std::collections::BTreeMap;
-use zksync_types::{ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS};
+use zksync_types::{
+    AccountTreeId, StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
+};
 use zksync_utils::bytecode::hash_bytecode;
 
 mod builder;
@@ -75,13 +77,26 @@ pub struct Executor {
 
 impl Executor {
     #[inline]
-    pub fn new(mut backend: Backend, env: Env, inspector: InspectorStack, gas_limit: U256) -> Self {
+    pub fn new(
+        mut backend: Backend,
+        env: Env,
+        mut inspector: InspectorStack,
+        gas_limit: U256,
+    ) -> Self {
         // Need to create a empty contract on the cheatcodes address so `extcodesize` checks
         // does not fail. Plus add necessary storage entries so zksync VM does not panic
         // https://github.com/matter-labs/era-test-node/blob/main/etc/system-contracts/contracts/EmptyContract.sol
         let empty_contract_code =  hex::decode("0000000101200190000000040000c13d0000000001000019000000110001042e0000008001000039000000400010043f0000000001000416000000000101004b0000000e0000c13d0000002001000039000001000010044300000120000004430000000501000041000000110001042e000000000100001900000012000104300000001000000432000000110001042e00000012000104300000000000000000000000020000000000000000000000000000004000000100000000000000000037118ec7e34bf260c2f7d3550e644dc0205a8f0a595d95265b1c50edc1c831ba").expect("failed decoding empty contract bytecode");
         let empty_contract_code_hash = hash_bytecode(&empty_contract_code);
 
+        backend.insert_account_info(
+            CHEATCODE_ADDRESS,
+            revm::primitives::AccountInfo {
+                code_hash: B256::from_slice(&empty_contract_code_hash.0),
+                code: Some(Bytecode::new_raw(Bytes::copy_from_slice(&empty_contract_code))),
+                ..Default::default()
+            },
+        );
         backend
             .insert_account_storage(
                 Address::from_slice(&ACCOUNT_CODE_STORAGE_ADDRESS.0),
@@ -96,13 +111,23 @@ impl Executor {
                 U256::from(1u64),
             )
             .expect("failed writing account storage for known codes storage address");
-        backend.insert_account_info(
-            CHEATCODE_ADDRESS,
-            revm::primitives::AccountInfo {
-                code_hash: B256::from_slice(&empty_contract_code_hash.0),
-                code: Some(Bytecode::new_raw(Bytes::copy_from_slice(&empty_contract_code))),
-                ..Default::default()
-            },
+
+        // setup modified keys in inspector to persist cheatcode address setup across forks
+        inspector.modified_storage_keys.insert(
+            StorageKey::new(
+                AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS),
+                H256::from_slice(
+                    FixedBytes::<32>::left_padding_from(&CHEATCODE_ADDRESS.0 .0).as_slice(),
+                ),
+            ),
+            H256::from_slice(&empty_contract_code_hash.0),
+        );
+        inspector.modified_storage_keys.insert(
+            StorageKey::new(
+                AccountTreeId::new(zksync_types::H160(CHEATCODE_ADDRESS.0 .0)),
+                H256::from_slice(&empty_contract_code_hash.0),
+            ),
+            H256::from_low_u64_be(1),
         );
 
         Executor { backend, env, inspector, gas_limit }

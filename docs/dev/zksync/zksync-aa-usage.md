@@ -15,7 +15,6 @@ First, compile `AAFactory.sol` using the `--is-system` flag because it interacts
 
 **Expected Output:**
 ```sh
-AAFactory -> Bytecode Hash: "010000791703a54dbe2502b00ee470989c267d0f6c0d12a9009a947715683744" 
 Compiled Successfully
 ```
 

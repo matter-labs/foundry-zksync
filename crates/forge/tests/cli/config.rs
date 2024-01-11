@@ -125,6 +125,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         fallback_oz: false,
         force_evmla: false,
         is_system: false,
+        detect_missing_libraries: false,
     };
     prj.write_config(input.clone());
     let config = cmd.config();
