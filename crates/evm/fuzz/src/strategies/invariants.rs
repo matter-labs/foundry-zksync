@@ -5,6 +5,7 @@ use crate::{
 };
 use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes};
+use foundry_evm_core::constants::CHEATCODE_ADDRESS;
 use parking_lot::RwLock;
 use proptest::prelude::*;
 use std::{rc::Rc, str::FromStr, sync::Arc};
@@ -110,7 +111,7 @@ fn select_random_sender(
         let is_reserved = addr
             .bit_and(Address::from_str("ffffffffffffffffffffffffffffffffffff0000").unwrap())
             .is_zero();
-        !senders_ref.excluded.contains(addr) && !is_reserved
+        !senders_ref.excluded.contains(addr) && !is_reserved && addr != &CHEATCODE_ADDRESS
     })
     .boxed();
     if !senders.targeted.is_empty() {

@@ -23,10 +23,7 @@ contract CheatcodeStartPrankTest is Test {
         );
 
         // Start prank without tx.origin
-        (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("startPrank(address)", TEST_ADDRESS)
-        );
-        require(success1, "startPrank failed");
+        vm.startPrank(TEST_ADDRESS);
 
         require(
             msg.sender == TEST_ADDRESS,
@@ -44,10 +41,7 @@ contract CheatcodeStartPrankTest is Test {
         );
 
         // Stop prank
-        (bool success2, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("stopPrank()")
-        );
-        require(success2, "stopPrank failed");
+        vm.stopPrank();
 
         require(
             msg.sender == original_msg_sender,
@@ -81,14 +75,7 @@ contract CheatcodeStartPrankTest is Test {
         );
 
         // Start prank with tx.origin
-        (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "startPrank(address,address)",
-                TEST_ADDRESS,
-                TEST_ORIGIN
-            )
-        );
-        require(success1, "startPrank failed");
+        vm.startPrank(TEST_ADDRESS, TEST_ORIGIN);
 
         require(
             msg.sender == TEST_ADDRESS,
@@ -106,10 +93,7 @@ contract CheatcodeStartPrankTest is Test {
         );
 
         // Stop prank
-        (bool success2, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("stopPrank()")
-        );
-        require(success2, "stopPrank failed");
+        vm.stopPrank();
 
         require(
             msg.sender == original_msg_sender,

@@ -20,16 +20,9 @@ contract StoreTest is Test {
     function testStore() public {
         assertEq(store.slot0(), 10, "initial value for slot 0 is incorrect");
         assertEq(store.slot1(), 20, "initial value for slot 1 is incorrect");
+    
+        vm.store(address(store), bytes32(0), bytes32(uint256(1)));
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "store(address,bytes32,bytes32)",
-                address(store),
-                bytes32(0),
-                bytes32(uint256(1))
-            )
-        );
-        require(success, "store failed");
         assertEq(store.slot0(), 1, "store failed");
         assertEq(store.slot1(), 20, "store failed");
     }

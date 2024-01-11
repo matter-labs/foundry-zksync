@@ -73,14 +73,7 @@ contract ExpectCallTest is Test {
     function testExpectCallWithData() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
 
         this.exposed_callTargetNTimes(target, 1, 2, 1);
     }
@@ -88,14 +81,7 @@ contract ExpectCallTest is Test {
     function testExpectMultipleCallsWithData() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
 
         // Even though we expect one call, we're using additive behavior, so getting more than one call is okay.
         this.exposed_callTargetNTimes(target, 1, 2, 2);
@@ -104,22 +90,9 @@ contract ExpectCallTest is Test {
     function testExpectMultipleCallsWithDataAdditive() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2)
-            )
-        );
-        require(success, "expectCall failed");
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
+
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
 
         this.exposed_callTargetNTimes(target, 1, 2, 2);
     }
@@ -127,22 +100,9 @@ contract ExpectCallTest is Test {
     function testExpectMultipleCallsWithDataAdditiveLowerBound() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2)
-            )
-        );
-        require(success, "expectCall failed");
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
+
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
 
         this.exposed_callTargetNTimes(target, 1, 2, 3);
     }
@@ -201,14 +161,7 @@ contract ExpectCallTest is Test {
         Contract inner = new Contract();
         NestedContract target = new NestedContract(inner);
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(inner),
-                abi.encodeWithSelector(inner.numberB.selector)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(inner), abi.encodeWithSelector(inner.numberB.selector));
 
         this.exposed_expectInnerCall(target);
     }
@@ -245,22 +198,9 @@ contract ExpectCallTest is Test {
         Contract inner = new Contract();
         NestedContract target = new NestedContract(inner);
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.forwardPay.selector)
-            )
-        );
-        require(success, "expectCall failed");
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(inner),
-                abi.encodeWithSelector(inner.pay.selector)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.forwardPay.selector));
+
+        vm.expectCall(address(inner), abi.encodeWithSelector(inner.pay.selector));
 
         this.exposed_forwardPay(target);
     }
@@ -271,22 +211,9 @@ contract ExpectCallTest is Test {
         Contract inner = new Contract();
         NestedContract target = new NestedContract(inner);
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.sumInPlace.selector)
-            )
-        );
-        require(success, "expectCall failed");
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(inner),
-                abi.encodeWithSelector(inner.add.selector)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.sumInPlace.selector));
+
+        vm.expectCall(address(inner), abi.encodeWithSelector(inner.add.selector));
 
         this.exposed_expectCallMultipleFunctionsFlattened(target, inner);
     }
@@ -302,14 +229,7 @@ contract ExpectCallTest is Test {
     function testExpectSelectorCall() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector));
 
         this.exposed_callTargetNTimes(target, 5, 5, 1);
     }
@@ -348,15 +268,7 @@ contract ExpectCallTest is Test {
     function testExpectCallWithValue() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,uint256,bytes)",
-                address(target),
-                1,
-                abi.encodeWithSelector(target.pay.selector, 2)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.pay.selector, 2));
 
         this.exposed_expectCallWithValue(target, 1, 2);
     }
@@ -379,15 +291,7 @@ contract ExpectCallTest is Test {
     function testExpectCallWithValueWithoutParameters() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,uint256,bytes)",
-                address(target),
-                3,
-                abi.encodeWithSelector(target.pay.selector)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.pay.selector));
 
         this.exposed_expectCallWithValue(target, 3, 100);
     }
@@ -455,15 +359,7 @@ contract ExpectCallCountTest is Test {
     function testExpectCallCountWithData() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes,uint64)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2),
-                3
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 3);
 
         this.exposed_expectCallCountWithData(target);
     }
@@ -477,15 +373,8 @@ contract ExpectCallCountTest is Test {
     function testExpectZeroCallCountAssert() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes,uint64)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2),
-                0
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 0);
+
         target.add(3, 3);
     }
 
@@ -510,15 +399,7 @@ contract ExpectCallCountTest is Test {
         Contract inner = new Contract();
         NestedContract target = new NestedContract(inner);
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes,uint64)",
-                address(inner),
-                abi.encodeWithSelector(inner.numberB.selector),
-                1
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(inner), abi.encodeWithSelector(inner.numberB.selector), 1);
 
         target.sum();
     }
@@ -546,15 +427,7 @@ contract ExpectCallCountTest is Test {
         Contract inner = new Contract();
         NestedContract target = new NestedContract(inner);
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes,uint64)",
-                address(inner),
-                abi.encodeWithSelector(inner.numberB.selector),
-                2
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(inner), abi.encodeWithSelector(inner.numberB.selector), 2);
 
         this.exposed_expectCountInnerAndOuterCalls(inner, target);
     }
@@ -578,16 +451,7 @@ contract ExpectCallCountTest is Test {
     function testExpectCallCountWithValue() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,uint256,bytes,uint64)",
-                address(target),
-                1,
-                abi.encodeWithSelector(target.pay.selector, 2),
-                1
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), 1, abi.encodeWithSelector(target.pay.selector, 2), 1);
 
         this.exposed_pay{value: 1}(target, 1, 2);
     }
@@ -595,16 +459,7 @@ contract ExpectCallCountTest is Test {
     function testExpectZeroCallCountValue() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,uint256,bytes,uint64)",
-                address(target),
-                1,
-                abi.encodeWithSelector(target.pay.selector, 2),
-                0
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), 1, abi.encodeWithSelector(target.pay.selector, 2), 0);
 
         this.exposed_pay{value: 2}(target, 2, 2);
     }
@@ -630,16 +485,7 @@ contract ExpectCallCountTest is Test {
     function testExpectCallCountWithValueWithoutParameters() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,uint256,bytes,uint64)",
-                address(target),
-                3,
-                abi.encodeWithSelector(target.pay.selector),
-                3
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), 3, abi.encodeWithSelector(target.pay.selector), 3);
 
         this.exposed_expectCallCountWithValueWithoutParameters(target);
     }
@@ -765,27 +611,13 @@ contract ExpectCallMixedTest is Test {
     function testExpectMatchPartialAndFull() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes,uint64)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector),
-                2
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector), 2);
 
         // Even if a partial match is specified, you should still be able to look for full matches
         // as one does not override the other.
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2)
-            )
-        );
-        require(success, "expectCall failed");
 
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2));
+        
         this.exposed_expectMatchPartialAndFull(target);
     }
 
@@ -797,26 +629,12 @@ contract ExpectCallMixedTest is Test {
     function testExpectMatchPartialAndFullFlipped() public {
         Contract target = new Contract();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector)
-            )
-        );
-        require(success, "expectCall failed");
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector));
 
         // Even if a partial match is specified, you should still be able to look for full matches
         // as one does not override the other.
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "expectCall(address,bytes,uint64)",
-                address(target),
-                abi.encodeWithSelector(target.add.selector, 1, 2),
-                2
-            )
-        );
-        require(success, "expectCall failed");
+
+        vm.expectCall(address(target), abi.encodeWithSelector(target.add.selector, 1, 2), 2);
 
         this.exposed_expectMatchPartialAndFullFlipped(target);
     }
