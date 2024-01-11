@@ -13,7 +13,7 @@ contract FfiTest is Test {
         inputs[2] =
             "echo -n 0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000966666920776f726b730000000000000000000000000000000000000000000000";
 
-         bytes memory res = vm.ffi(inputs);
+        bytes memory res = vm.ffi(inputs);
         (string memory output) = abi.decode(res, (string));
         assertEq(output, "ffi works", "ffi failed");
     }
