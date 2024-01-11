@@ -21,15 +21,10 @@ contract ForkTest is Test {
             block.number < 1000,
             "Local node doesn't have blocks above 1000"
         );
-        (bool success2, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "createSelectFork(string,uint256)",
-                "mainnet",
-                FORK_BLOCK
-            )
-        );
+
+        vm.createSelectFork("mainnet", FORK_BLOCK);
+
         require(decimals_before == 0, "Contract exists locally");
-        require(success2, "fork failed");
     }
 
     function testFork() public {
@@ -51,20 +46,9 @@ contract ForkTest is Test {
     }
 
     function testCreateSelectFork() public {
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "createFork(string,uint256)",
-                "mainnet",
-                FORK_BLOCK + 100
-            )
-        );
-        require(success, "fork failed");
+        uint256 forkId = vm.createFork("mainnet", FORK_BLOCK + 100);
 
-        uint256 forkId = uint256(bytes32(data));
-        (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("selectFork(uint256)", forkId)
-        );
-        require(success1, "select fork failed");
+        vm.selectFork(forkId);
 
         /// After createSelect fork the decimals  should exist
         (bool success2, bytes memory data2) = TOKEN_ADDRESS.call(
@@ -85,26 +69,13 @@ contract ForkTest is Test {
     }
 
     function testActiveFork() public {
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "createFork(string,uint256)",
-                "mainnet",
-                FORK_BLOCK + 100
-            )
-        );
-        require(success, "fork failed");
+        uint256 data = vm.createFork("mainnet", FORK_BLOCK + 100);
 
         uint256 forkId = uint256(bytes32(data));
-        (bool success1, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("selectFork(uint256)", forkId)
-        );
-        require(success1, "select fork failed");
+        vm.selectFork(forkId);
 
-        (bool success3, bytes memory activeFork) = Constants
-            .CHEATCODE_ADDRESS
-            .call(abi.encodeWithSignature("activeFork()"));
+        uint256 activeFork = vm.activeFork();
 
-        console.log("activeFork", uint256(bytes32(activeFork)));
-        require(success3, "active fork failed");
+        require(activeFork == forkId, "Active fork is not correct");
     }
 }

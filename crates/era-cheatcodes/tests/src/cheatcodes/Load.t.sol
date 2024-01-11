@@ -22,28 +22,15 @@ contract LoadTest is Test {
         assembly {
             slot := slot0.slot
         }
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "load(address,bytes32)",
-                address(this),
-                bytes32(slot)
-            )
-        );
-        require(success, "load failed");
-        uint256 val = abi.decode(data, (uint256));
-        assertEq(val, 20, "load failed");
+
+        bytes32 data = vm.load(address(this), bytes32(slot));
+
+        assertEq(uint256(data), 20, "load failed");
     }
 
     function testLoadOtherStorage() public {
-        (bool success, bytes memory data) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "load(address,bytes32)",
-                address(store),
-                bytes32(0)
-            )
-        );
-        require(success, "load failed");
-        uint256 val = abi.decode(data, (uint256));
-        assertEq(val, 10, "load failed");
+        bytes32 data = vm.load(address(store), bytes32(0));
+
+        assertEq(uint256(data), 10, "load failed");
     }
 }

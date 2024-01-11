@@ -22,14 +22,7 @@ contract ForkStorageTest is Test {
         // Contract gets successfully deployed
         require(255 == target.output(), "incorrect output");
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "createSelectFork(string,uint256)",
-                "mainnet",
-                FORK_BLOCK
-            )
-        );
-        require(success, "fork failed");
+        vm.createSelectFork("mainnet", FORK_BLOCK);
 
         // Contract is still deployed
         require(255 == target.output(), "incorrect output after fork");

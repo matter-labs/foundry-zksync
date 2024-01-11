@@ -20,11 +20,7 @@ contract ExpectEmitTest is Test {
 
         Emitter emitter = new Emitter();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(    
-            abi.encodeWithSignature("expectEmit()")
-        );
-
-        require(success, "expectEmit failed");
+        vm.expectEmit();
 
         emit LogTopic1(2, 2, 1, testData1);
  
@@ -37,11 +33,7 @@ contract ExpectEmitTest is Test {
 
         Emitter emitter = new Emitter();
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(    
-            abi.encodeWithSignature("expectEmit(bool,bool,bool,bool,address)", true, true, true, true, EMITTER_ADDRESS)
-        );
-
-        require(success, "expectEmit failed");
+        vm.expectEmit(true, true, true, true, EMITTER_ADDRESS);
 
         emit LogTopic1(2, 2, 1, testData1);
  

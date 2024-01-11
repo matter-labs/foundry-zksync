@@ -9,6 +9,7 @@ use era_test_node::{
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
 use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
+use foundry_common::conversion_utils::h160_to_address;
 use foundry_evm_core::{
     backend::DatabaseExt,
     era_revm::{db::RevmDatabaseForEra, transactions::storage_to_state},
@@ -643,17 +644,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
-                    let mut modified_storage = self
-                        .modified_storage_keys
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect::<HashMap<_, _>>();
-                    modified_storage.extend(
-                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
-                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
-                        }),
-                    );
+                    let modified_storage =
+                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
 
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
@@ -669,8 +661,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             .collect();
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
-                        *journaled_state.state() = state;
+                        journaled_state.state =
+                            storage_to_state(&era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -688,7 +680,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     };
                     storage.borrow_mut().modified_storage_keys = modified_storage;
 
-                    self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                    self.return_data = Some(fork_id.unwrap().to_return_data());
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
                     let handle: &ForkStorage<RevmDatabaseForEra<S>> =
@@ -704,20 +696,11 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         block_number,
                         &url_or_alias,
                     ));
-                    self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                    self.return_data = Some(fork_id.unwrap().to_return_data());
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
-                    let mut modified_storage = self
-                        .modified_storage_keys
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect::<HashMap<_, _>>();
-                    modified_storage.extend(
-                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
-                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
-                        }),
-                    );
+                    let modified_storage =
+                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
                     {
                         storage.borrow_mut().clean_cache();
                         let handle: &ForkStorage<RevmDatabaseForEra<S>> =
@@ -732,8 +715,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             .collect();
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
-                        *journaled_state.state() = state;
+                        journaled_state.state =
+                            storage_to_state(&era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -751,14 +734,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 }
                 FinishCycleOneTimeActions::RevertToSnapshot { snapshot_id } => {
                     let mut storage = storage.borrow_mut();
-
-                    let modified_storage: HashMap<StorageKey, H256> = storage
-                        .modified_storage_keys()
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect();
-
+                    let modified_storage =
+                        self.get_modified_storage(storage.modified_storage_keys());
                     storage.clean_cache();
 
                     {
@@ -773,8 +750,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             .collect();
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
-                        *journaled_state.state() = state;
+                        journaled_state.state =
+                            storage_to_state(&era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -787,13 +764,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 }
                 FinishCycleOneTimeActions::Snapshot => {
                     let mut storage = storage.borrow_mut();
-
-                    let modified_storage: HashMap<StorageKey, H256> = storage
-                        .modified_storage_keys()
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect();
+                    let modified_storage =
+                        self.get_modified_storage(storage.modified_storage_keys());
 
                     storage.clean_cache();
 
@@ -809,8 +781,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             .collect();
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
-                        *journaled_state.state() = state;
+                        journaled_state.state =
+                            storage_to_state(&era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -825,12 +797,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     };
 
                     storage.modified_storage_keys = modified_storage;
-                    self.return_data = Some(vec![snapshot_id.to_u256()]);
+                    self.return_data = Some(snapshot_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
                     tracing::debug!("!!!! FORCING RETURN");
 
-                    self.add_trimmed_return_data(data.as_slice());
+                    self.return_data = Some(data.to_return_data());
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
                     let fat_data_pointer = FatPointer::from_u256(ptr.value);
@@ -848,7 +820,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
                     tracing::debug!("!!! FORCING REVERT");
 
-                    self.add_trimmed_return_data(error.as_slice());
+                    self.return_data = Some(error.to_return_data());
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
                     let fat_data_pointer = FatPointer::from_u256(ptr.value);
@@ -983,7 +955,7 @@ impl CheatcodeTracer {
                     .unwrap()
                     .active_fork_id();
                 assert!(fork_id.is_some(), "No active fork found. Please create a fork first.");
-                self.return_data = Some(vec![fork_id.unwrap().to_u256()]);
+                self.return_data = Some(fork_id.unwrap().to_return_data());
             }
             addr(addrCall { privateKey: private_key }) => {
                 tracing::info!("👷 Getting address for private key");
@@ -993,7 +965,7 @@ impl CheatcodeTracer {
                     tracing::error!("Failed generating address for private key");
                     return
                 };
-                self.return_data = Some(vec![h256_to_u256(address.into())]);
+                self.return_data = Some(h160_to_address(address).to_return_data());
             }
             deal(dealCall { account, newBalance: new_balance }) => {
                 tracing::info!("👷 Setting balance for {account:?} to {new_balance}");
@@ -1132,7 +1104,7 @@ impl CheatcodeTracer {
                         trimmed_stdout.as_bytes().to_vec()
                     };
 
-                self.add_trimmed_return_data(&encoded_stdout);
+                self.return_data = Some(encoded_stdout.to_return_data());
             }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
@@ -1164,12 +1136,7 @@ impl CheatcodeTracer {
                     })
                     .collect_vec();
 
-                let result = getRecordedLogsReturn { logs };
-
-                let return_data: Vec<U256> =
-                    result.logs.abi_encode().chunks(32).map(|b| b.into()).collect_vec();
-
-                self.return_data = Some(return_data);
+                self.return_data = Some(logs.to_return_data());
 
                 //clean up logs
                 self.recorded_logs = HashSet::new();
@@ -1177,11 +1144,15 @@ impl CheatcodeTracer {
                 self.recording_logs = false;
             }
             load(loadCall { target, slot }) => {
-                tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
-                let key = StorageKey::new(AccountTreeId::new(target.to_h160()), H256(*slot));
-                let mut storage = storage.borrow_mut();
-                let value = storage.read_value(&key);
-                self.return_data = Some(vec![h256_to_u256(value)]);
+                if H160(target.0 .0) != CHEATCODE_ADDRESS {
+                    tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
+                    let key = StorageKey::new(AccountTreeId::new(target.to_h160()), H256(*slot));
+                    let mut storage = storage.borrow_mut();
+                    let value = storage.read_value(&key);
+                    self.return_data = Some(vec![h256_to_u256(value)]);
+                } else {
+                    self.return_data = Some(vec![U256::zero()]);
+                }
             }
             recordLogs(recordLogsCall {}) => {
                 tracing::info!("👷 Recording logs");
@@ -1236,13 +1207,14 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to read file");
                     return
                 };
-                self.add_trimmed_return_data(&data);
+                self.return_data = Some(data.to_return_data());
             }
             revertTo(revertToCall { snapshotId }) => {
                 tracing::info!("👷 Reverting to snapshot {}", snapshotId);
                 self.one_time_actions.push(FinishCycleOneTimeActions::RevertToSnapshot {
                     snapshot_id: snapshotId.to_u256(),
                 });
+                self.return_data = Some(true.to_return_data());
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
@@ -1263,28 +1235,33 @@ impl CheatcodeTracer {
                 tracing::info!("👷 Getting rpc url of {}", rpcAlias);
                 let rpc_endpoints = &self.config.rpc_endpoints;
                 let rpc_url = match rpc_endpoints.get(&rpcAlias) {
-                    Some(Ok(url)) => Some(url.clone()),
-                    _ => None,
+                    Some(Ok(url)) => url.clone(),
+                    _ => {
+                        //this should revert but we don't have reverts yet
+                        panic!(
+                            "Failed to resolve env var `{}`: environment variable not found",
+                            rpcAlias
+                        )
+                    }
                 };
-                //this should revert but we don't have reverts yet
-                assert!(
-                    rpc_url.is_some(),
-                    "Failed to resolve env var `${rpcAlias}`: environment variable not found"
-                );
-                self.add_trimmed_return_data(rpc_url.unwrap().as_bytes());
+
+                self.return_data = Some(rpc_url.to_return_data());
             }
             rpcUrls(rpcUrlsCall {}) => {
                 tracing::info!("👷 Getting rpc urls");
                 let rpc_endpoints = &self.config.rpc_endpoints;
-                let rpc_urls = rpc_endpoints
+                let urls = rpc_endpoints
                     .iter()
-                    .map(|(alias, url)| match url {
-                        Ok(url) => format!("{}:{}", alias, url),
-                        Err(_) => alias.clone(),
+                    .map(|(alias, url)| Rpc {
+                        key: alias.clone(),
+                        url: url
+                            .as_ref()
+                            .map(|value| value.clone())
+                            .unwrap_or_else(|_| alias.clone()),
                     })
-                    .collect::<Vec<String>>()
-                    .join(",");
-                self.add_trimmed_return_data(rpc_urls.as_bytes());
+                    .collect_vec();
+
+                self.return_data = Some(urls.to_return_data());
             }
             serializeAddress_0(serializeAddress_0Call {
                 objectKey: object_key,
@@ -1305,7 +1282,7 @@ impl CheatcodeTracer {
                 self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let address_with_checksum = to_checksum(&value.to_h160(), None);
-                self.add_trimmed_return_data(address_with_checksum.as_bytes());
+                self.return_data = Some(address_with_checksum.to_return_data());
             }
             serializeBool_0(serializeBool_0Call {
                 objectKey: object_key,
@@ -1325,7 +1302,7 @@ impl CheatcodeTracer {
                 self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let bool_value = value.to_string();
-                self.add_trimmed_return_data(bool_value.as_bytes());
+                self.return_data = Some(bool_value.to_return_data());
             }
             serializeUint_0(serializeUint_0Call {
                 objectKey: object_key,
@@ -1345,7 +1322,7 @@ impl CheatcodeTracer {
                 self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
                 let uint_value = value.to_string();
-                self.add_trimmed_return_data(uint_value.as_bytes());
+                self.return_data = Some(uint_value.to_return_data());
             }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
@@ -1422,32 +1399,32 @@ impl CheatcodeTracer {
             toString_0(toString_0Call { value }) => {
                 tracing::info!("Converting address into string");
                 let address_with_checksum = to_checksum(&value.to_h160(), None);
-                self.add_trimmed_return_data(address_with_checksum.as_bytes());
+                self.return_data = Some(address_with_checksum.to_return_data());
             }
             toString_1(toString_1Call { value }) => {
                 tracing::info!("Converting bytes into string");
                 let bytes_value = format!("0x{}", hex::encode(value));
-                self.add_trimmed_return_data(bytes_value.as_bytes());
+                self.return_data = Some(bytes_value.to_return_data());
             }
             toString_2(toString_2Call { value }) => {
                 tracing::info!("Converting bytes32 into string");
                 let bytes_value = format!("0x{}", hex::encode(value));
-                self.add_trimmed_return_data(bytes_value.as_bytes());
+                self.return_data = Some(bytes_value.to_return_data());
             }
             toString_3(toString_3Call { value }) => {
                 tracing::info!("Converting bool into string");
                 let bool_value = value.to_string();
-                self.add_trimmed_return_data(bool_value.as_bytes());
+                self.return_data = Some(bool_value.to_return_data());
             }
             toString_4(toString_4Call { value }) => {
                 tracing::info!("Converting uint256 into string");
                 let uint_value = value.to_string();
-                self.add_trimmed_return_data(uint_value.as_bytes());
+                self.return_data = Some(uint_value.to_return_data());
             }
             toString_5(toString_5Call { value }) => {
                 tracing::info!("Converting int256 into string");
                 let int_value = value.to_string();
-                self.add_trimmed_return_data(int_value.as_bytes());
+                self.return_data = Some(int_value.to_return_data());
             }
 
             tryFfi(tryFfiCall { commandInput: command_input }) => {
@@ -1484,10 +1461,7 @@ impl CheatcodeTracer {
                     stdout: encoded_stdout,
                     stderr: output.stderr,
                 };
-                let encoded_ffi_result: Vec<u8> = ffi_result.abi_encode();
-                let return_data: Vec<U256> =
-                    encoded_ffi_result.chunks(32).map(|b| b.into()).collect_vec();
-                self.return_data = Some(return_data);
+                self.return_data = Some(ffi_result.to_return_data());
             }
             warp(warpCall { newTimestamp: new_timestamp }) => {
                 tracing::info!("👷 Setting block timestamp {}", new_timestamp);
@@ -1669,25 +1643,6 @@ impl CheatcodeTracer {
         self.write_storage(key, u256_to_h256(new_full_nonce), storage);
 
         Some((account_nonce, deployment_nonce))
-    }
-
-    fn add_trimmed_return_data(&mut self, data: &[u8]) {
-        let data_length = data.len();
-        let mut data: Vec<U256> = data
-            .chunks(32)
-            .map(|b| {
-                // Copies the bytes into a 32 byte array
-                // padding with zeros to the right if necessary
-                let mut bytes = [0u8; 32];
-                bytes[..b.len()].copy_from_slice(b);
-                bytes.into()
-            })
-            .collect_vec();
-
-        // Add the length of the data to the end of the return data
-        data.push(data_length.into());
-
-        self.return_data = Some(data);
     }
 
     fn set_return<H: HistoryMode>(
@@ -1996,10 +1951,45 @@ impl CheatcodeTracer {
                 .push(FinishCycleOneTimeActions::SetOrigin { origin: broadcast.original_origin });
         }
     }
+
+    /// Merge current modified storage with the entire storage modifications made so far in the test
+    fn get_modified_storage(
+        &self,
+        storage: &HashMap<StorageKey, H256>,
+    ) -> HashMap<StorageKey, H256> {
+        let mut modified_storage = self
+            .modified_storage_keys
+            .clone()
+            .into_iter()
+            .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+            .collect::<HashMap<_, _>>();
+        modified_storage.extend(
+            storage
+                .iter()
+                .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS),
+        );
+        modified_storage
+    }
+}
+
+trait ToZkEvmResult {
+    /// Converts a [SolcValue] to return data for zkevm
+    fn to_return_data(&self) -> Vec<U256>;
+}
+
+impl<T> ToZkEvmResult for T
+where
+    T: SolValue,
+{
+    fn to_return_data(&self) -> Vec<U256> {
+        let abi_encoded_data = self.abi_encode();
+        assert!(abi_encoded_data.len() % 32 == 0, "length must be multiple of 32");
+
+        abi_encoded_data.chunks(32).map(U256::from_big_endian).collect_vec()
+    }
 }
 
 fn into_revm_env(env: &EraEnv) -> Env {
-    use foundry_common::zk_utils::conversion_utils::h160_to_address;
     use revm::primitives::U256;
     let block = BlockEnv {
         number: U256::from(env.l1_batch_env.first_l2_block.number),
