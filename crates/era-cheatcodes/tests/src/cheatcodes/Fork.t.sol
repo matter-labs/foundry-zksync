@@ -9,6 +9,7 @@ contract ForkTest is Test {
     address constant TOKEN_ADDRESS = 0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4;
     uint256 constant TOKEN_DECIMALS = 6;
     uint256 constant FORK_BLOCK = 19579636;
+    address constant DUMMY_ADDRESS = 0x1345df6d4C9c3035724fd0e3914dE96a5a83AAF4;
 
     function setUp() public {
         /// USDC TOKEN doesn't exists locally
@@ -77,5 +78,45 @@ contract ForkTest is Test {
         uint256 activeFork = vm.activeFork();
 
         require(activeFork == forkId, "Active fork is not correct");
+    }
+
+    /// checks that marking as persistent works
+    function testMarkPersistent() public {
+        require(vm.isPersistent(address(this)) == true, "should be persistent");
+
+        // the dummy address should not be persistent
+        require(
+            vm.isPersistent(DUMMY_ADDRESS) == false,
+            "should not be persistent"
+        );
+
+        // mark the dummy address as persistent
+        vm.makePersistent(DUMMY_ADDRESS);
+
+        // the dummy address should now be persistent
+        require(vm.isPersistent(DUMMY_ADDRESS) == true, "should be persistent");
+    }
+
+    function testRevokePersistent() public {
+        // the dummy address should not be persistent
+        require(
+            vm.isPersistent(DUMMY_ADDRESS) == false,
+            "should not be persistent"
+        );
+
+        // mark the dummy address as persistent
+        vm.makePersistent(DUMMY_ADDRESS);
+
+        // the dummy address should now be persistent
+        require(vm.isPersistent(DUMMY_ADDRESS) == true, "should be persistent");
+
+        // revoke the dummy address as persistent
+        vm.revokePersistent(DUMMY_ADDRESS);
+
+        // the dummy address should not be persistent anymore
+        require(
+            vm.isPersistent(DUMMY_ADDRESS) == false,
+            "should not be persistent"
+        );
     }
 }
