@@ -178,6 +178,7 @@ enum FinishCycleOneTimeActions {
     ForceReturn { data: Vec<u8>, continue_pc: PcOrImm },
     CreateSelectFork { url_or_alias: String, block_number: Option<u64> },
     CreateFork { url_or_alias: String, block_number: Option<u64> },
+    RollFork { block_number: Uint<256, 4>, fork_id: Option<Uint<256, 4>> },
     SelectFork { fork_id: U256 },
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
@@ -697,6 +698,44 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &url_or_alias,
                     ));
                     self.return_data = Some(fork_id.unwrap().to_return_data());
+                }
+                FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
+                    let mut modified_storage = self
+                        .modified_storage_keys
+                        .clone()
+                        .into_iter()
+                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
+                        .collect::<HashMap<_, _>>();
+                    modified_storage.extend(
+                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
+                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
+                        }),
+                    );
+
+                    storage.borrow_mut().clean_cache();
+                    {
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                            &storage.borrow_mut().storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journaled_state.state() = state;
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        db.roll_fork(fork_id, block_number, &mut env, &mut journaled_state)
+                            .unwrap();
+                    };
+                    storage.borrow_mut().modified_storage_keys = modified_storage;
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
                     let modified_storage =
@@ -1230,6 +1269,20 @@ impl CheatcodeTracer {
                     u256_to_h256(pack_block_info(new_height.as_limbs()[0], block_timestamp)),
                     &mut storage,
                 );
+            }
+            rollFork_0(rollFork_0Call { blockNumber }) => {
+                tracing::info!("👷 Rolling active fork to block number {}", blockNumber);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RollFork {
+                    block_number: blockNumber,
+                    fork_id: None,
+                });
+            }
+            rollFork_2(rollFork_2Call { blockNumber, forkId }) => {
+                tracing::info!("👷 Rolling fork {} to block number {}", forkId, blockNumber);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RollFork {
+                    block_number: blockNumber,
+                    fork_id: Some(forkId),
+                });
             }
             rpcUrl(rpcUrlCall { rpcAlias }) => {
                 tracing::info!("👷 Getting rpc url of {}", rpcAlias);
