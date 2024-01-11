@@ -1311,6 +1311,7 @@ impl CheatcodeTracer {
                 self.one_time_actions.push(FinishCycleOneTimeActions::RevertToSnapshot {
                     snapshot_id: snapshotId.to_u256(),
                 });
+                self.return_data = Some(vec![U256::from(true as u8)]);
             }
             revokePersistent_0(revokePersistent_0Call { account }) => {
                 tracing::info!("👷 Revoking persistence for account {:?}", account);
