@@ -7,7 +7,9 @@ use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
 use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
-use foundry_common::conversion_utils::h160_to_address;
+use foundry_common::{
+    conversion_utils::h160_to_address, AsTracerPointer, StorageModificationRecorder,
+};
 use foundry_evm_core::{
     backend::DatabaseExt,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
@@ -18,7 +20,8 @@ use itertools::Itertools;
 use multivm::{
     interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus, VmRevertReason},
     vm_latest::{
-        BootloaderState, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv, VmTracer, ZkSyncVmState,
+        BootloaderState, HistoryDisabled, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv,
+        ToTracerPointer, TracerPointer, VmTracer, ZkSyncVmState,
     },
     zk_evm_1_3_3::zkevm_opcode_defs::CALL_SYSTEM_ABI_REGISTERS,
     zk_evm_1_4_0::{
@@ -181,6 +184,8 @@ enum FinishCycleOneTimeActions {
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
     SetOrigin { origin: H160 },
+    SwitchToZkSync,
+    SwitchToREVM,
 }
 
 #[derive(Debug, Clone)]
@@ -856,6 +861,27 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     storage.borrow_mut().set_value(key, origin.into());
                 }
+                FinishCycleOneTimeActions::SwitchToZkSync => {
+                    let storage = storage.clone();
+                    // let mut storage: RefMut<'_, StorageView<ForkStorage<RevmDatabaseForEra<S>>>>
+                    // = storage.borrow_mut();
+
+                    // let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
+                    // let mut fork_storage = handle.inner.write().unwrap();
+                    // fork_storage.value_read_cache.clear();
+                    // let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                    // let mut db = era_db.db.lock().unwrap();
+                    // let era_env = self.env.get().unwrap();
+                    // let mut env = into_revm_env(era_env);
+                    // let cheatcode_tracer = self.clone();
+
+                    // let result = foundry_evm_core::era_revm::transactions::run_era_transaction(
+                    //     &mut env,
+                    //     db,
+                    //     cheatcode_tracer,
+                    // );
+                }
+                FinishCycleOneTimeActions::SwitchToREVM => todo!(),
             }
         }
 
@@ -1585,6 +1611,12 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to write file");
                 }
             }
+            switchToZkSync(switchToZkSyncCall {}) => {
+                tracing::info!("👷 Switching to zksync");
+
+                // inspector); self.one_time_actions.
+                self.one_time_actions.push(FinishCycleOneTimeActions::SwitchToZkSync);
+            }
             _ => {
                 tracing::error!("👷 Unrecognized cheatcode");
             }
@@ -2097,4 +2129,26 @@ fn are_logs_equal(a: &LogEntry, b: &LogEntry, emit_checks: &EmitChecks) -> bool 
     let data_match = if emit_checks.data { a.data == b.data } else { true };
 
     address_match && topics_match && data_match
+}
+
+impl<DB: DatabaseExt + Send>
+    AsTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>
+    for CheatcodeTracer
+{
+    fn as_tracer_pointer(
+        &self,
+    ) -> multivm::vm_latest::TracerPointer<
+        StorageView<ForkStorage<RevmDatabaseForEra<DB>>>,
+        HistoryDisabled,
+    > {
+        todo!()
+    }
+}
+
+impl StorageModificationRecorder for CheatcodeTracer {
+    fn record_modified_keys(&mut self, modified_keys: &HashMap<StorageKey, StorageValue>) {}
+
+    fn get(&self) -> &HashMap<StorageKey, StorageValue> {
+        todo!()
+    }
 }

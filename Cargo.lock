@@ -4252,6 +4252,7 @@ dependencies = [
  "ansi_term",
  "anyhow",
  "async-trait",
+ "auto_impl",
  "clap 4.4.6",
  "comfy-table",
  "const-hex",

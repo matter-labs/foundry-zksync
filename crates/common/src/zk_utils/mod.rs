@@ -150,6 +150,8 @@ pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
 
 /// Keeps track of storage modifications performed during test executions.
 /// This is especially important when forking to re-apply changes.
+
+#[auto_impl::auto_impl(Box)]
 pub trait StorageModificationRecorder {
     /// Merge modified keys into the existing modifications
     fn record_modified_keys(&mut self, modified_keys: &HashMap<StorageKey, StorageValue>);

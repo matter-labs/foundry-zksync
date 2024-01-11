@@ -1255,5 +1255,14 @@ interface Vm {
     /// Compute the address of a contract created with CREATE2 using the default CREATE2 deployer.
     #[cheatcode(group = Utilities)]
     function computeCreate2Address(bytes32 salt, bytes32 initCodeHash) external pure returns (address);
+
+    // --------  ZkSync Utilities --------
+    
+    /// Switch to Zksync VM
+    #[cheatcode(group = ZkSync, safety = Unsafe)]
+    function switchToREVM() external;
+    /// Switch to Zksync EVM
+    #[cheatcode(group = ZkSync, safety = Unsafe)]
+    function switchToZkSync() external;
 }
 }

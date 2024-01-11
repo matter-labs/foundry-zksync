@@ -109,6 +109,9 @@ pub enum Group {
     ///
     /// Safety: safe.
     Utilities,
+
+    /// Cheatcodes that interact with zkSync.
+    ZkSync,
 }
 
 impl Group {
@@ -119,7 +122,7 @@ impl Group {
     #[inline]
     pub const fn safety(self) -> Option<Safety> {
         match self {
-            Self::Evm | Self::Testing => None,
+            Self::Evm | Self::Testing | Self::ZkSync => None,
             Self::Scripting |
             Self::Filesystem |
             Self::Environment |
@@ -141,6 +144,7 @@ impl Group {
             Self::String => "string",
             Self::Json => "json",
             Self::Utilities => "utilities",
+            Self::ZkSync => "zksync",
         }
     }
 }

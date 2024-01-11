@@ -347,7 +347,7 @@ impl Executor {
     pub fn call_raw_with_env(&mut self, mut env: Env) -> eyre::Result<RawCallResult> {
         // execute the call
         let mut inspector = self.inspector.clone();
-        let result = self.backend.inspect_ref(&mut env, &mut inspector)?;
+        let result = self.backend.inspect_ref(&mut env, &mut inspector, true)?;
         // record storage modifications
         if result.result.is_success() {
             self.inspector.modified_storage_keys = inspector.modified_storage_keys.clone();

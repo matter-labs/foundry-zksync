@@ -34,6 +34,7 @@ mod script;
 mod string;
 mod test;
 mod utils;
+mod zksync;
 
 pub use test::expect::ExpectedCallTracker;
 

@@ -765,7 +765,8 @@ impl Backend {
     pub fn inspect_ref<'a, INSP>(
         &'a mut self,
         env: &'a mut Env,
-        inspector: INSP,
+        mut inspector: INSP,
+        use_zksync: bool,
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
@@ -774,10 +775,16 @@ impl Backend {
     {
         self.initialize(env);
 
-        let result: EVMResult<DatabaseError> =
-            crate::era_revm::transactions::run_era_transaction(env, self, inspector);
-
-        Ok(result.unwrap())
+        if use_zksync {
+            let result: EVMResult<DatabaseError> =
+                crate::era_revm::transactions::run_era_transaction(env, self, inspector);
+            Ok(result.unwrap())
+        } else {
+            match revm::evm_inner::<Self>(env, self, Some(&mut inspector)).transact() {
+                Ok(res) => Ok(res),
+                Err(e) => eyre::bail!("backend: failed while inspecting: {e}"),
+            }
+        }
     }
 
     /// Returns true if the address is a precompile

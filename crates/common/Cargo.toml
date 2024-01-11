@@ -59,6 +59,7 @@ url = "2"
 walkdir = "2"
 xxhash-rust = { version = "0.8.7", features = ["const_xxh3"] }
 yansi = "0.5"
+auto_impl = "1"
 
 [dev-dependencies]
 foundry-macros.workspace = true
