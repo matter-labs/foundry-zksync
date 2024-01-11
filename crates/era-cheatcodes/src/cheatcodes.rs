@@ -1218,6 +1218,7 @@ impl CheatcodeTracer {
                 self.one_time_actions.push(FinishCycleOneTimeActions::RevertToSnapshot {
                     snapshot_id: snapshotId.to_u256(),
                 });
+                self.return_data = Some(vec![U256::from(true as u8)]);
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);

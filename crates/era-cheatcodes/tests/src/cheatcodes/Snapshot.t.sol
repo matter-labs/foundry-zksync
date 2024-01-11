@@ -39,14 +39,7 @@ contract SnapshotTest is Test {
         console.log("store values: ", store.slot0, store.slot1);
         console.log("calling revertTo");
 
-        //this still does not work with vm
-        // bool success = vm.revertTo(snapshot);
-        // require(success, "revertTo failed");
-
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("revertTo(uint256)", snapshot)
-        );
-        require(success, "revertTo failed");
+        vm.revertTo(snapshot);
 
         console.log("store values: ", store.slot0, store.slot1);
 
@@ -68,10 +61,7 @@ contract SnapshotTest is Test {
 
         assertEq(block.number, 99);
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("revertTo(uint256)", snapshot)
-        );
-        require(success, "revertTo failed");
+        vm.revertTo(snapshot);
 
         assertEq(
             block.number,
