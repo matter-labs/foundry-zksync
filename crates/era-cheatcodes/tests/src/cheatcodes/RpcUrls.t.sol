@@ -6,7 +6,7 @@ import {Constants} from "./Constants.sol";
 import {Utils} from "./Utils.sol";
 
 contract RpcUrlsTest is Test {
-    function testRpcUrl() public view{
+    function testRpcUrl() public view {
         string memory rpc_url = vm.rpcUrl("mainnet");
         require(
             keccak256(bytes(rpc_url)) ==
@@ -17,25 +17,34 @@ contract RpcUrlsTest is Test {
         );
     }
 
-    function testRpcUrls() public {
-        (bool success, bytes memory rawData2) = Constants
-            .CHEATCODE_ADDRESS
-            .call(abi.encodeWithSignature("rpcUrls()"));
+    function testRpcUrls() public view {
+        string[2][] memory rpc_urls = vm.rpcUrls();
 
-        bytes memory return_data2 = Utils.trimReturnBytes(rawData2);
-        string memory rpc_urls = string(return_data2);
-
-        console.log("rpc_urls", rpc_urls);
-
-        require(success, "rpcUrls() failed");
         require(
-            keccak256(abi.encodePacked(rpc_urls)) ==
-                keccak256(
-                    abi.encodePacked(
-                        "local,mainnet:https://mainnet.era.zksync.io:443,testnet:https://testnet.era.zksync.dev:443"
-                    )
-                ),
-            "rpc urls retrieved does not match expected value"
+            keccak256(bytes(rpc_urls[0][0])) == keccak256("local"),
+            "invalid alias for [0]"
+        );
+        require(
+            keccak256(bytes(rpc_urls[0][1])) == keccak256("local"),
+            "invalid url for [0]"
+        );
+        require(
+            keccak256(bytes(rpc_urls[1][0])) == keccak256("mainnet"),
+            "invalid alias for [1]"
+        );
+        require(
+            keccak256(bytes(rpc_urls[1][1])) ==
+                keccak256("https://mainnet.era.zksync.io:443"),
+            "invalid url for [1]"
+        );
+        require(
+            keccak256(bytes(rpc_urls[2][0])) == keccak256("testnet"),
+            "invalid alias for [2]"
+        );
+        require(
+            keccak256(bytes(rpc_urls[2][1])) ==
+                keccak256("https://testnet.era.zksync.dev:443"),
+            "invalid url for [2]"
         );
     }
 }
