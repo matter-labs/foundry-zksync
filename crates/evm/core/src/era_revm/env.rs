@@ -5,6 +5,7 @@ use multivm::{
         constants::BLOCK_GAS_LIMIT, utils::l2_blocks::load_last_l2_block, TxExecutionMode,
     },
 };
+use revm::db;
 use zksync_basic_types::{AccountTreeId, L1BatchNumber, L2ChainId, MiniblockNumber, H160};
 use zksync_contracts::BaseSystemContracts;
 use zksync_state::{ReadStorage, StoragePtr};
@@ -34,8 +35,12 @@ pub fn create_l1_batch_env<ST: ReadStorage>(
             max_virtual_blocks_to_create: 1,
         }
     };
-    let (batch_number, batch_timestamp) =
-        if let Some(batch) = load_last_l1_batch(storage) { batch } else { (1, 1) };
+    let (mut batch_number, mut batch_timestamp) =
+        if let Some(batch) = load_last_l1_batch(storage) { batch } else { (0, 0) };
+
+    batch_number += 1;
+    batch_timestamp += 1;
+
     // let mut block_ctx = block_ctx.new_batch();
     first_l2_block.timestamp = std::cmp::max(batch_timestamp, first_l2_block.timestamp);
     let batch_env = L1BatchEnv {

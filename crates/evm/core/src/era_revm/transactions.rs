@@ -32,17 +32,6 @@ use crate::{
     era_revm::{node::run_l2_tx_raw, storage_view::StorageView},
 };
 
-fn contract_address_from_tx_result(execution_result: &VmExecutionResultAndLogs) -> Option<H160> {
-    for query in execution_result.logs.storage_logs.iter().rev() {
-        if query.log_type == StorageLogQueryType::InitialWrite &&
-            query.log_query.address == ACCOUNT_CODE_STORAGE_ADDRESS
-        {
-            return Some(h256_to_account_address(&u256_to_h256(query.log_query.key)))
-        }
-    }
-    None
-}
-
 /// Prepares calldata to invoke deployer contract.
 /// This method encodes parameters for the `create` method.
 pub fn encode_deploy_params_create(
@@ -168,8 +157,6 @@ where
         vec![tracer],
     );
 
-    let maybe_contract_address = contract_address_from_tx_result(&tx_result);
-
     // record storage modifications in the inspector
     inspector.record_modified_keys(&modified_storage);
 
@@ -186,14 +173,20 @@ where
                     data: event.value.into(),
                 })
                 .collect_vec();
+            let result = decode_l2_tx_result(output);
+            let address = if result.len() == 32 {
+                Some(h256_to_account_address(&H256::from_slice(&result)))
+            } else {
+                None
+            };
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
                 gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
                 logs,
                 output: revm::primitives::Output::Create(
-                    Bytes::from(decode_l2_tx_result(output)),
-                    maybe_contract_address.map(h160_to_address),
+                    Bytes::from(result),
+                    address.map(h160_to_address),
                 ),
             }
         }
@@ -363,13 +356,8 @@ mod tests {
         };
         let mock_db = MockDatabase::default();
 
-        let res = run_era_transaction::<_, ResultAndState, _>(
-            &mut env,
-            mock_db,
-            Noop::default(),
-            Default::default(),
-        )
-        .expect("failed executing");
+        let res = run_era_transaction::<_, ResultAndState, _>(&mut env, mock_db, Noop::default())
+            .expect("failed executing");
 
         assert!(!res.state.is_empty(), "unexpected failure: no states were touched");
         for (address, account) in res.state {
