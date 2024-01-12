@@ -81,20 +81,38 @@ contract ForkTest is Test {
     }
 
     /// checks that marking as persistent works
-    function testMarkPersistent() public {
-        require(vm.isPersistent(address(this)) == true, "should be persistent");
+    function testMakePersistent() public {
+        uint256 mainnetFork = vm.createFork("mainnet", FORK_BLOCK + 100);
+        uint256 optimismFork = vm.createFork("mainnet", FORK_BLOCK + 100);
 
-        // the dummy address should not be persistent
+       DummyContract dummy = new DummyContract();
+
         require(
-            vm.isPersistent(DUMMY_ADDRESS) == false,
+            vm.isPersistent(address(dummy)) == false,
             "should not be persistent"
         );
 
-        // mark the dummy address as persistent
-        vm.makePersistent(DUMMY_ADDRESS);
+        vm.selectFork(mainnetFork);
 
-        // the dummy address should now be persistent
-        require(vm.isPersistent(DUMMY_ADDRESS) == true, "should be persistent");
+        uint256 expectedValue = 99;
+        dummy.set(expectedValue);
+
+        vm.selectFork(optimismFork);
+
+        vm.selectFork(mainnetFork);
+
+        require(dummy.val() == expectedValue, "should be expected value"));
+
+        vm.makePersistent(address(dummy));
+        require(
+            vm.isPersistent(address(dummy)) == true,
+            "should be persistent"
+        );
+
+        vm.selectFork(optimismFork);
+        // the account is now marked as persistent and the contract is persistent across swaps
+        dummy.hello();
+        require(dummy.val() == expectedValue, "should be expected value");
     }
 
     function testRevokePersistent() public {
@@ -118,5 +136,17 @@ contract ForkTest is Test {
             vm.isPersistent(DUMMY_ADDRESS) == false,
             "should not be persistent"
         );
+    }
+}
+
+contract DummyContract {
+    uint256 public val;
+
+    function hello() external view returns (string memory) {
+        return "hello";
+    }
+
+    function set(uint256 _val) public {
+        val = _val;
     }
 }
