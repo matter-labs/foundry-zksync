@@ -211,8 +211,7 @@ where
                 let key = u256_to_h256(key);
                 let value = value
                     .into_iter()
-                    .map(|word| u256_to_h256(word).as_bytes().to_owned())
-                    .flatten()
+                    .flat_map(|word| u256_to_h256(word).as_bytes().to_owned())
                     .collect_vec();
                 (key, value)
             })
@@ -427,12 +426,12 @@ mod tests {
 
     struct Noop<S, H> {
         _phantom: PhantomData<(S, H)>,
-        modified_storage_keys: HashMap<StorageKey, StorageValue>,
+        storage_modifications: StorageModifications,
     }
 
     impl<S, H> Default for Noop<S, H> {
         fn default() -> Self {
-            Self { _phantom: Default::default(), modified_storage_keys: Default::default() }
+            Self { _phantom: Default::default(), storage_modifications: Default::default() }
         }
     }
 
@@ -440,7 +439,7 @@ mod tests {
         fn clone(&self) -> Self {
             Self {
                 _phantom: self._phantom,
-                modified_storage_keys: self.modified_storage_keys.clone(),
+                storage_modifications: self.storage_modifications.clone(),
             }
         }
     }
@@ -456,8 +455,8 @@ mod tests {
     impl<S, H> StorageModificationRecorder for Noop<S, H> {
         fn record_storage_modifications(&mut self, storage_modifications: StorageModifications) {}
 
-        fn get(&self) -> &HashMap<StorageKey, StorageValue> {
-            &self.modified_storage_keys
+        fn get(&self) -> &StorageModifications {
+            &self.storage_modifications
         }
     }
 }
