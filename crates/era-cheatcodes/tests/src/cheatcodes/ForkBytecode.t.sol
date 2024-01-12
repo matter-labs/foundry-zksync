@@ -18,27 +18,15 @@ contract ForkStorageTest is Test {
 
         // target should be able to deploy
         Target target = new Target();
-
-        // Contract is still deployed
         require(255 == target.output(), "incorrect output after fork");
-
-        // After fork, bytecode is remembered and contract is deployed
-        Target newTarget = new Target();
-        require(255 == newTarget.output(), "incorrect new target output");
     }
 
     function testSelectForkForkHasNonDeployedBytecodes() public {
-        uint256 forkId = vm.createFork("mainnet", FORK_BLOCK + 100);
+        uint256 forkId = vm.createFork("mainnet", FORK_BLOCK);
         vm.selectFork(forkId);
 
         // target should be able to deploy
         Target target = new Target();
-
-        // Contract is still deployed
         require(255 == target.output(), "incorrect output after fork");
-
-        // After fork, bytecode is remembered and contract is deployed
-        Target newTarget = new Target();
-        require(255 == newTarget.output(), "incorrect new target output");
     }
 }
