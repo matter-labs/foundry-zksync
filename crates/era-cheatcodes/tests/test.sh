@@ -6,7 +6,7 @@ set -o pipefail -e
 REPO_ROOT="../../.."
 SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
-BINARY_PATH="${REPO_ROOT}/target/debug/zkforge"
+BINARY_PATH="${REPO_ROOT}/target/release/zkforge"
 
 function download_solc() {
   case "$(uname -s)" in
@@ -35,7 +35,7 @@ function wait_for_build() {
 # See https://unix.stackexchange.com/questions/312631/bash-script-with-set-e-doesnt-stop-on-command
 function build_zkforge() {
   echo "Building ${1}..."
-  cargo build --manifest-path="${1}/Cargo.toml"
+  cargo build --release --manifest-path="${1}/Cargo.toml"
   wait_for_build 30
 }
 
@@ -58,6 +58,4 @@ command -v git &>/dev/null || {
 build_zkforge "${REPO_ROOT}"
 
 echo "Running tests..."
-RUST_LOG=info "${BINARY_PATH}" test --use "./${SOLC}"
-# RUST_LOG=era_test_node=debug,zkforge=trace "${BINARY_PATH}" test --use "./${SOLC}"
-# RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}"
+RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}"
