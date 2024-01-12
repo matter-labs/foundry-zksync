@@ -4433,6 +4433,7 @@ dependencies = [
  "foundry-macros",
  "futures 0.3.28",
  "itertools 0.11.0",
+ "maplit",
  "multivm",
  "once_cell",
  "parking_lot 0.12.1",

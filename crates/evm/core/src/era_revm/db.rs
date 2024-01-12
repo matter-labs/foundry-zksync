@@ -251,3 +251,169 @@ where
         Some(0_u64)
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::box_default)]
+mod tests {
+    use maplit::hashmap;
+    use revm::primitives::AccountInfo;
+
+    use super::*;
+    use crate::era_revm::testing::MockDatabase;
+
+    #[test]
+    fn test_fetch_account_code_returns_hash_and_code_if_present_in_modified_keys_and_bytecodes() {
+        let bytecode_hash = H256::repeat_byte(0x3);
+        let bytecode = vec![U256::from(4)];
+        let account = H160::repeat_byte(0xa);
+        let modified_keys = hashmap! {
+            StorageKey::new(
+                AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS),
+                address_to_h256(&account),
+            ) => bytecode_hash,
+        };
+        let bytecodes = hashmap! {
+            h256_to_u256(bytecode_hash)   => bytecode.clone(),
+        };
+        let db = RevmDatabaseForEra {
+            current_block: 0,
+            db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
+            factory_deps: Default::default(),
+        };
+
+        let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
+
+        let expected = Some((
+            bytecode_hash,
+            Bytecode::new_raw(
+                bytecode
+                    .into_iter()
+                    .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+        ));
+        assert_eq!(expected, actual)
+    }
+
+    #[test]
+    fn test_fetch_account_code_returns_hash_and_code_if_not_in_modified_keys_but_in_bytecodes() {
+        let bytecode_hash = H256::repeat_byte(0x3);
+        let bytecode = vec![U256::from(4)];
+        let account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of the 32-byte hash
+        let modified_keys = Default::default();
+        let bytecodes = hashmap! {
+            h256_to_u256(bytecode_hash)   => bytecode.clone(),
+        };
+        let db = RevmDatabaseForEra {
+            current_block: 0,
+            db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
+            factory_deps: Default::default(),
+        };
+
+        let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
+
+        let expected = Some((
+            bytecode_hash,
+            Bytecode::new_raw(
+                bytecode
+                    .into_iter()
+                    .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+        ));
+        assert_eq!(expected, actual)
+    }
+
+    #[test]
+    fn test_fetch_account_code_returns_hash_and_code_from_db_if_not_in_modified_keys_or_bytecodes()
+    {
+        let bytecode_hash = H256::repeat_byte(0x3);
+        let bytecode = vec![U256::from(4)];
+        let account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of the 32-byte hash
+        let modified_keys = Default::default();
+        let bytecodes = Default::default();
+        let db = RevmDatabaseForEra {
+            current_block: 0,
+            factory_deps: Default::default(),
+            db: Arc::new(Mutex::new(Box::new(MockDatabase {
+                basic: hashmap! {
+                    h160_to_address(account) => AccountInfo {
+                        code_hash: bytecode_hash.to_fixed_bytes().into(),
+                        code: Some(Bytecode::new_raw(
+                            bytecode
+                                .clone()
+                                .into_iter()
+                                .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+                                .collect::<Vec<_>>()
+                                .into())),
+                            ..Default::default()
+                    }
+                },
+            }))),
+        };
+
+        let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
+
+        let expected = Some((
+            bytecode_hash,
+            Bytecode::new_raw(
+                bytecode
+                    .into_iter()
+                    .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+        ));
+        assert_eq!(expected, actual)
+    }
+
+    #[test]
+    fn test_fetch_account_code_returns_hash_and_code_from_db_if_address_in_modified_keys_but_not_in_bytecodes(
+    ) {
+        let bytecode_hash = H256::repeat_byte(0x3);
+        let bytecode = vec![U256::from(4)];
+        let account = h256_to_h160(&bytecode_hash); // accounts are mapped as last 20 bytes of the 32-byte hash
+        let modified_keys = hashmap! {
+            StorageKey::new(
+                AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS),
+                address_to_h256(&account),
+            ) => bytecode_hash,
+        };
+        let bytecodes = Default::default(); // nothing in bytecodes
+        let db = RevmDatabaseForEra {
+            current_block: 0,
+            factory_deps: Default::default(),
+            db: Arc::new(Mutex::new(Box::new(MockDatabase {
+                basic: hashmap! {
+                    h160_to_address(account) => AccountInfo {
+                        code_hash: bytecode_hash.to_fixed_bytes().into(),
+                        code: Some(Bytecode::new_raw(
+                            bytecode
+                                .clone()
+                                .into_iter()
+                                .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+                                .collect::<Vec<_>>()
+                                .into())),
+                            ..Default::default()
+                    }
+                },
+            }))),
+        };
+
+        let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
+
+        let expected = Some((
+            bytecode_hash,
+            Bytecode::new_raw(
+                bytecode
+                    .into_iter()
+                    .flat_map(|v| u256_to_h256(v).to_fixed_bytes())
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+        ));
+        assert_eq!(expected, actual)
+    }
+}
