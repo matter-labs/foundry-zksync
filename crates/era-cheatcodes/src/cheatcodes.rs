@@ -1205,7 +1205,7 @@ impl CheatcodeTracer {
                 let is_persistent = db.is_persistent(&revm::primitives::Address::from(
                     account.to_h160().to_fixed_bytes(),
                 ));
-                self.return_data = Some(vec![U256::from(is_persistent as u8)]);
+                self.return_data = Some(is_persistent.to_return_data());
             }
             load(loadCall { target, slot }) => {
                 if H160(target.0 .0) != CHEATCODE_ADDRESS {
