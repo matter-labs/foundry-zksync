@@ -453,7 +453,7 @@ mod tests {
     }
 
     impl<S, H> StorageModificationRecorder for Noop<S, H> {
-        fn record_storage_modifications(&mut self, storage_modifications: StorageModifications) {}
+        fn record_storage_modifications(&mut self, _storage_modifications: StorageModifications) {}
 
         fn get(&self) -> &StorageModifications {
             &self.storage_modifications
