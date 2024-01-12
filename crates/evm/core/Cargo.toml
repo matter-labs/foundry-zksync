@@ -60,3 +60,4 @@ async-trait = "0.1"
 
 [dev-dependencies]
 zksync_state.workspace = true
+maplit.workspace = true

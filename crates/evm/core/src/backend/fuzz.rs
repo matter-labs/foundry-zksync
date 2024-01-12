@@ -9,6 +9,7 @@ use crate::{
 };
 use alloy_primitives::{Address, B256, U256};
 use ethers_core::utils::GenesisAccount;
+use foundry_common::{AsTracerPointer, StorageModificationRecorder};
 use revm::{
     db::DatabaseRef,
     primitives::{AccountInfo, Bytecode, EVMError, Env, ResultAndState},
@@ -18,7 +19,7 @@ use std::{borrow::Cow, collections::HashMap};
 use zksync_types::{StorageKey, StorageValue};
 
 use crate::era_revm::db::RevmDatabaseForEra;
-use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
+use multivm::vm_latest::HistoryDisabled;
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
@@ -59,7 +60,8 @@ impl<'a> FuzzBackendWrapper<'a> {
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + ToTracerPointer<StorageView<RevmDatabaseForEra<&'b mut Self>>, HistoryDisabled>,
+            + AsTracerPointer<StorageView<RevmDatabaseForEra<&'b mut Self>>, HistoryDisabled>
+            + StorageModificationRecorder,
     {
         self.is_initialized = false;
 

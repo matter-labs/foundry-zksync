@@ -3297,8 +3297,8 @@ dependencies = [
 
 [[package]]
 name = "era_test_node"
-version = "0.1.0-alpha.12"
-source = "git+https://github.com/matter-labs/era-test-node.git?branch=deniallugo-move-storage-view#f06f6729990ba707fb95caafaed45a0a280bec53"
+version = "0.1.0-alpha.14"
+source = "git+https://github.com/matter-labs/era-test-node.git?rev=6ee7d29e876b75506f58355218e1ea755a315d17#6ee7d29e876b75506f58355218e1ea755a315d17"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -4267,6 +4267,7 @@ dependencies = [
  "foundry-macros",
  "glob",
  "globset",
+ "multivm",
  "once_cell",
  "pretty_assertions",
  "rand 0.8.5",
@@ -4286,6 +4287,7 @@ dependencies = [
  "yansi 0.5.1",
  "zksync-web3-rs",
  "zksync_basic_types",
+ "zksync_types",
  "zksync_utils",
 ]
 
@@ -4386,7 +4388,6 @@ dependencies = [
  "alloy-sol-types",
  "const-hex",
  "era_cheatcodes",
- "era_test_node",
  "ethers-core",
  "ethers-signers",
  "eyre",
@@ -4405,6 +4406,8 @@ dependencies = [
  "revm",
  "thiserror",
  "tracing",
+ "zksync_types",
+ "zksync_utils",
 ]
 
 [[package]]
@@ -4430,6 +4433,7 @@ dependencies = [
  "foundry-macros",
  "futures 0.3.29",
  "itertools 0.11.0",
+ "maplit",
  "multivm",
  "once_cell",
  "parking_lot 0.12.1",
@@ -12797,6 +12801,7 @@ dependencies = [
  "yansi 0.5.1",
  "zkcast",
  "zksync-web3-rs",
+ "zksync_types",
 ]
 
 [[package]]

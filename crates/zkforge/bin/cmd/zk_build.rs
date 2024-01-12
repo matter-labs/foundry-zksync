@@ -28,7 +28,7 @@
 use super::{install, watch::WatchArgs};
 use clap::Parser;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
-use foundry_common::zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION};
+use foundry_common::zksolc_manager::setup_zksolc_manager;
 use foundry_compilers::Project;
 use foundry_config::{
     figment::{
@@ -86,38 +86,6 @@ pub struct ZkBuildArgs {
     #[serde(skip)]
     pub sizes: bool,
 
-    /// Specify the solc version, or a path to a local solc, to build with.
-    ///
-    /// Valid values are in the format `x.y.z`, `solc:x.y.z` or `path/to/solc`.
-    #[clap(
-    help_heading = "ZkSync Compiler options",
-    value_name = "ZK_SOLC_VERSION",
-    long = "use-zksolc",
-    default_value = DEFAULT_ZKSOLC_VERSION
-    )]
-    #[serde(skip)]
-    pub use_zksolc: String,
-
-    /// A flag indicating whether to enable the system contract compilation mode.
-    #[clap(
-        help_heading = "ZkSync Compiler options",
-        help = "Enable the system contract compilation mode. In this mode zkEVM extensions are enabled. For example, calls
-        to addresses `0xFFFF` and below are substituted by special zkEVM instructions.",
-        long = "is-system",
-        value_name = "SYSTEM_MODE"
-    )]
-    pub is_system: bool,
-
-    /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
-    #[clap(
-        help_heading = "ZkSync Compiler options",
-        help = "Forcibly switch to the EVM legacy assembly pipeline. It is useful for older revisions of `solc` 0.8, where
-        Yul was considered highly experimental and contained more bugs than today",
-        long = "force-evmla",
-        value_name = "FORCE_EVMLA"
-    )]
-    pub force_evmla: bool,
-
     /// Core build arguments encapsulated in the `CoreBuildArgs` struct.
     #[clap(flatten)]
     #[serde(flatten)]
@@ -155,6 +123,7 @@ impl ZkBuildArgs {
     pub fn run(self) -> eyre::Result<()> {
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
+        let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
 
         //set zk out path
         let zk_out_path = project.paths.root.join("zkout");
@@ -166,20 +135,14 @@ impl ZkBuildArgs {
             // need to re-configure here to also catch additional remappings
             config = self.load_config();
             project = config.project()?;
+            zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         }
-
-        let zksolc_manager = setup_zksolc_manager(self.use_zksolc.clone())?;
-        let remappings = config.remappings;
+        // TODO: revisit to remove zksolc_manager and move binary installation to zksolc_config
+        let compiler_path = setup_zksolc_manager(self.args.use_zksolc.clone())?;
+        zksolc_cfg.compiler_path = compiler_path;
 
         // TODO: add filter support
-
-        foundry_common::zk_compile::compile_smart_contracts(
-            self.is_system,
-            self.force_evmla,
-            zksolc_manager,
-            project,
-            remappings,
-        )
+        foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project)
     }
     /// Returns the `Project` for the current workspace
     ///

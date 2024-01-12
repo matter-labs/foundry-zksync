@@ -6,45 +6,29 @@ import {Constants} from "./Constants.sol";
 import {Utils} from "./Utils.sol";
 
 contract FsTest is Test {
-    function testReadFile() public {
+    function testReadFile() public view {
         string memory path = "src/fixtures/File/read.txt";
 
-        (bool success, bytes memory rawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("readFile(string)", path)
-        );
-        require(success, "readFile failed");
-
-        bytes memory data = Utils.trimReturnBytes(rawData);
+        string memory data = vm.readFile(path);
 
         require(
-            keccak256(data) ==
+            keccak256(bytes(data)) ==
                 keccak256("hello readable world\nthis is the second line!\n"),
             "read data did not match expected data"
         );
-        console.log("failed?", failed());
     }
 
     function testWriteFile() public {
         string memory path = "src/fixtures/File/write_file.txt";
         string memory writeData = "hello writable world";
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("writeFile(string,string)", path, writeData)
-        );
-        require(success, "writeFile failed");
+        vm.writeFile(path, writeData);
 
-        bytes memory readRawData;
-        (success, readRawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("readFile(string)", path)
-        );
-        require(success, "readFile failed");
-
-        bytes memory readData = Utils.trimReturnBytes(readRawData);
+        string memory readData = vm.readFile(path);
 
         require(
-            keccak256(readData) == keccak256(bytes(writeData)),
+            keccak256(bytes(readData)) == keccak256(bytes(writeData)),
             "read data did not match write data"
         );
-        console.log("failed?", failed());
     }
 }

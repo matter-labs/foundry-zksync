@@ -14,15 +14,16 @@ use foundry_common::zk_utils::conversion_utils::{
     h160_to_address, h256_to_b256, h256_to_h160, revm_u256_to_h256, u256_to_revm_u256,
 };
 use revm::{
-    primitives::{Bytecode, Bytes, Env},
+    primitives::{Bytecode, Bytes},
     Database,
 };
 use zksync_basic_types::{web3::signing::keccak256, AccountTreeId, L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
-    self, get_code_key, get_system_context_init_logs, StorageKey, StorageLog, StorageLogKind,
-    ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-    SYSTEM_CONTEXT_ADDRESS,
+    block::unpack_block_info, get_code_key, get_system_context_init_logs, StorageKey, StorageLog,
+    StorageLogKind, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
+    SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION,
 };
 
 use super::storage_view::StorageView;
@@ -31,13 +32,17 @@ use zksync_utils::{address_to_h256, bytecode::hash_bytecode, h256_to_u256, u256_
 #[derive(Default)]
 pub struct RevmDatabaseForEra<DB> {
     pub db: Arc<Mutex<Box<DB>>>,
-    pub env: Arc<Mutex<Env>>,
+    pub current_block: u64,
     pub factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 impl<Db> Clone for RevmDatabaseForEra<Db> {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone(), env: self.env.clone(), factory_deps: self.factory_deps.clone() }
+        Self {
+            db: self.db.clone(),
+            current_block: self.current_block,
+            factory_deps: self.factory_deps.clone(),
+        }
     }
 }
 
@@ -45,7 +50,7 @@ impl<DB> Debug for RevmDatabaseForEra<DB> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RevmDatabaseForEra")
             .field("db", &"db")
-            .field("env", &self.env.lock().unwrap())
+            // .field("env", &self.env.lock().unwrap())
             .finish()
     }
 }
@@ -54,6 +59,21 @@ impl<DB: Database + Send> RevmDatabaseForEra<DB>
 where
     <DB as revm::Database>::Error: Debug,
 {
+    /// Create a new instance of [RevmDatabaseForEra].
+    pub fn new(db: Arc<Mutex<Box<DB>>>) -> Self {
+        let db_inner = db.clone();
+        let current_block = {
+            let mut db = db_inner.lock().expect("failed aquiring lock on the database");
+            let result = db
+                .storage(h160_to_address(SYSTEM_CONTEXT_ADDRESS), u256_to_revm_u256(U256::from(9)))
+                .unwrap();
+            let num_and_ts = revm_u256_to_h256(result);
+            let (num, _) = unpack_block_info(h256_to_u256(num_and_ts));
+            num
+        };
+        Self { db, current_block: current_block as u64, factory_deps: HashMap::new() }
+    }
+
     pub fn into_storage_view_with_system_contracts(
         mut self,
         mut modified_keys: HashMap<StorageKey, H256>,
@@ -61,8 +81,8 @@ where
         let contracts = era_test_node::system_contracts::get_deployed_contracts(
             &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
         );
-
-        let chain_id = { L2ChainId::try_from(self.env.lock().unwrap().cfg.chain_id).unwrap() };
+        // TODO fix chain id
+        let chain_id = { L2ChainId::try_from(9u32).unwrap() };
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         contracts
@@ -91,23 +111,23 @@ where
     /// Returns the current L1 block number and timestamp from the database.
     /// Reads it directly from the SYSTEM_CONTEXT storage.
     pub fn get_l1_block_number_and_timestamp(&self) -> (u64, u64) {
-        let num_and_ts = self.read_storage_internal(SYSTEM_CONTEXT_ADDRESS, U256::from(7));
-        let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-        let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-        let ts: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
-
-        (u64::from_be_bytes(num), u64::from_be_bytes(ts))
+        let num_and_ts = self.read_storage_internal(
+            SYSTEM_CONTEXT_ADDRESS,
+            h256_to_u256(SYSTEM_CONTEXT_BLOCK_INFO_POSITION),
+        );
+        let (num, ts) = unpack_block_info(h256_to_u256(num_and_ts));
+        (num, ts)
     }
 
     /// Returns the current L2 block number and timestamp from the database.
     /// Reads it directly from the SYSTEM_CONTEXT storage.
     pub fn get_l2_block_number_and_timestamp(&self) -> (u64, u64) {
-        let num_and_ts = self.read_storage_internal(SYSTEM_CONTEXT_ADDRESS, U256::from(9));
-        let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-        let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-        let ts: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
-
-        (u64::from_be_bytes(num), u64::from_be_bytes(ts))
+        let num_and_ts = self.read_storage_internal(
+            SYSTEM_CONTEXT_ADDRESS,
+            h256_to_u256(SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION),
+        );
+        let (num, ts) = unpack_block_info(h256_to_u256(num_and_ts));
+        (num, ts)
     }
 
     /// Returns the nonce for a given account from NonceHolder storage.

@@ -26,6 +26,7 @@ foundry-config.workspace = true
 foundry-evm.workspace = true
 forge.workspace = true
 zkcast.workspace = true
+zksync_types.workspace = true
 
 ethers-contract.workspace = true
 ethers-core.workspace = true

@@ -1,8 +1,6 @@
 use ethers_core::abi::ethabi::{self, ParamType};
-use multivm::{
-    interface::VmExecutionResultAndLogs,
-    vm_latest::{HistoryDisabled, ToTracerPointer},
-};
+use itertools::Itertools;
+use multivm::{interface::VmExecutionResultAndLogs, vm_latest::HistoryDisabled};
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
     OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
@@ -20,9 +18,12 @@ use zksync_types::{
 };
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
-use foundry_common::zk_utils::{
-    conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
-    factory_deps::PackedEraBytecode,
+use foundry_common::{
+    zk_utils::{
+        conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
+        factory_deps::PackedEraBytecode,
+    },
+    AsTracerPointer, StorageModificationRecorder,
 };
 
 use super::db::RevmDatabaseForEra;
@@ -125,18 +126,19 @@ pub enum DatabaseError {
 pub fn run_era_transaction<DB, E, INSP>(
     env: &mut Env,
     db: DB,
-    inspector: INSP,
-    modified_storage: HashMap<StorageKey, StorageValue>,
+    mut inspector: INSP,
+    modified_storage: HashMap<StorageKey, H256>,
 ) -> EVMResult<E>
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
-    INSP: ToTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>,
+    INSP: AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
+        + StorageModificationRecorder,
 {
     let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
     let era_db = RevmDatabaseForEra {
         db: Arc::new(Mutex::new(Box::new(db))),
-        env: Arc::new(Mutex::new(env.clone())),
+        current_block: num,
         factory_deps: Default::default(),
     };
 
@@ -145,6 +147,7 @@ where
 
     // Update the environment timestamp and block number.
     // Check if this should be done at the end?
+    // In general, we do not rely on env as it's consistently maintained in foundry
     env.block.number = env.block.number.saturating_add(rU256::from(1));
     env.block.timestamp = env.block.timestamp.saturating_add(rU256::from(1));
 
@@ -162,8 +165,8 @@ where
         // Fails without a signature here: https://github.com/matter-labs/zksync-era/blob/73a1e8ff564025d06e02c2689da238ae47bb10c3/core/lib/types/src/transaction_request.rs#L381
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
-    let tracer = inspector.into_tracer_pointer();
-    let storage = era_db.clone().into_storage_view_with_system_contracts(modified_storage);
+    let tracer = inspector.as_tracer_pointer();
+    let storage = era_db.clone().into_storage_view_with_system_contracts(modified_storage.clone());
 
     let storage_ptr = storage.into_rc_ptr();
     let (tx_result, bytecodes) = run_l2_tx_raw(
@@ -176,13 +179,27 @@ where
 
     let maybe_contract_address = contract_address_from_tx_result(&tx_result);
 
+    // record storage modifications in the inspector
+    inspector.record_modified_keys(&modified_storage);
+
     let execution_result = match tx_result.result {
         multivm::interface::ExecutionResult::Success { output, .. } => {
+            let logs = tx_result
+                .logs
+                .events
+                .clone()
+                .into_iter()
+                .map(|event| revm::primitives::Log {
+                    address: h160_to_address(event.address),
+                    topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
+                    data: event.value.into(),
+                })
+                .collect_vec();
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
                 gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
-                logs: vec![],
+                logs,
                 output: revm::primitives::Output::Create(
                     Bytes::from(decode_l2_tx_result(output)),
                     maybe_contract_address.map(h160_to_address),
@@ -217,10 +234,10 @@ where
         }
     };
 
-    let modified_keys = &storage_ptr.borrow_mut().modified_storage_keys;
-    let state = storage_to_state(modified_keys.clone(), bytecodes, era_db.clone());
-    era_db.db.lock().unwrap().set_modified_keys(modified_keys.clone());
-    Ok(ResultAndState { result: execution_result, state })
+    Ok(ResultAndState {
+        result: execution_result,
+        state: storage_to_state(&era_db, &modified_storage, bytecodes),
+    })
 }
 
 fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
@@ -231,10 +248,11 @@ fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
         .unwrap_or_default()
 }
 
+/// Converts the zksync era's modified keys to the revm state.
 pub fn storage_to_state<DB>(
-    modified_keys: HashMap<StorageKey, StorageValue>,
+    era_db: &RevmDatabaseForEra<DB>,
+    modified_keys: &HashMap<StorageKey, StorageValue>,
     bytecodes: HashMap<U256, Vec<U256>>,
-    era_db: RevmDatabaseForEra<DB>,
 ) -> rHashMap<Address, Account>
 where
     DB: DatabaseExt + Send,
@@ -288,7 +306,7 @@ where
                         .collect()
                 });
 
-            let account_code = era_db.fetch_account_code(*account, &modified_keys, &bytecodes);
+            let account_code = era_db.fetch_account_code(*account, modified_keys, &bytecodes);
 
             let (code_hash, code) = account_code
                 .map(|(hash, bytecode)| (B256::from(&hash.0), Some(bytecode)))
@@ -377,14 +395,37 @@ mod tests {
 
     struct Noop<S, H> {
         _phantom: PhantomData<(S, H)>,
+        modified_storage_keys: HashMap<StorageKey, StorageValue>,
     }
 
     impl<S, H> Default for Noop<S, H> {
         fn default() -> Self {
-            Self { _phantom: Default::default() }
+            Self { _phantom: Default::default(), modified_storage_keys: Default::default() }
+        }
+    }
+
+    impl<S, H> Clone for Noop<S, H> {
+        fn clone(&self) -> Self {
+            Self {
+                _phantom: self._phantom,
+                modified_storage_keys: self.modified_storage_keys.clone(),
+            }
         }
     }
 
     impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Noop<S, H> {}
     impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for Noop<S, H> {}
+    impl<S: WriteStorage + 'static, H: HistoryMode + 'static> AsTracerPointer<S, H> for Noop<S, H> {
+        fn as_tracer_pointer(&self) -> multivm::vm_latest::TracerPointer<S, H> {
+            Box::new(self.clone())
+        }
+    }
+
+    impl<S, H> StorageModificationRecorder for Noop<S, H> {
+        fn record_modified_keys(&mut self, _modified_keys: &HashMap<StorageKey, StorageValue>) {}
+
+        fn get(&self) -> &HashMap<StorageKey, StorageValue> {
+            &self.modified_storage_keys
+        }
+    }
 }

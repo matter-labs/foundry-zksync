@@ -16,7 +16,7 @@ use foundry_common::{
     conversion_utils::h160_to_address,
     is_known_system_sender,
     types::{ToAlloy, ToEthers},
-    SYSTEM_TRANSACTION_TYPE,
+    AsTracerPointer, StorageModificationRecorder, SYSTEM_TRANSACTION_TYPE,
 };
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -31,7 +31,7 @@ use revm::{
 use std::collections::{HashMap, HashSet};
 
 use crate::era_revm::db::RevmDatabaseForEra;
-use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
+use multivm::vm_latest::HistoryDisabled;
 use zksync_types::{StorageKey, StorageValue};
 
 mod diagnostic;
@@ -776,7 +776,8 @@ impl Backend {
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + ToTracerPointer<StorageView<RevmDatabaseForEra<&'a mut Self>>, HistoryDisabled>,
+            + AsTracerPointer<StorageView<RevmDatabaseForEra<&'a mut Self>>, HistoryDisabled>
+            + StorageModificationRecorder,
     {
         self.initialize(env);
 

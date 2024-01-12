@@ -45,6 +45,55 @@ pub struct CompilerArgs {
     #[clap(long, num_args(1..), value_name = "SELECTOR")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub extra_output_files: Vec<ContractOutputSelection>,
+
+    /// A flag indicating whether to enable the system contract compilation mode.
+    #[clap(
+        help_heading = "zkSync Compiler options",
+        help = "Enable the system contract compilation mode.",
+        long = "is-system",
+        value_name = "SYSTEM_MODE"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_system: Option<bool>,
+
+    /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
+    #[clap(
+        help_heading = "zkSync Compiler options",
+        help = "Forcibly switch to the EVM legacy assembly pipeline.",
+        long = "force-evmla",
+        value_name = "FORCE_EVMLA"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub force_evmla: Option<bool>,
+
+    /// Try to recompile with -Oz if the bytecode is too large.
+    #[clap(
+        help_heading = "zkSync Compiler options",
+        long = "fallback-oz",
+        value_name = "FALLBACK_OZ"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_oz: Option<bool>,
+
+    /// Path to cache missing library dependencies, used for compiling and deploying libraries.
+    #[clap(help_heading = "zkSync Compiler options", long = "detect-missing-libraries")]
+    pub detect_missing_libraries: bool,
+
+    /// Set the LLVM optimization parameter `-O[0 | 1 | 2 | 3 | s | z]`.
+    /// Use `3` for best performance and `z` for minimal size.
+    #[clap(
+        help_heading = "zkSync Compiler options",
+        short = 'O',
+        long = "optimization",
+        value_name = "LEVEL"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+
+    /// Enables optimizations
+    #[clap(help_heading = "zkSync Compiler options", long = "zk-optimizer")]
+    #[serde(skip)]
+    pub zk_optimizer: bool,
 }
 
 #[cfg(test)]

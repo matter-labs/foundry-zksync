@@ -21,8 +21,10 @@ ethers-providers = { workspace = true, features = ["ws", "ipc"] }
 # zksync
 zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
 zksync_basic_types.workspace = true
+zksync_types.workspace = true
 zksync_utils.workspace = true
 revm.workspace = true
+multivm.workspace = true
 
 anyhow = {version = "1.0.70"}
 dirs = {version = "5.0.0"}
