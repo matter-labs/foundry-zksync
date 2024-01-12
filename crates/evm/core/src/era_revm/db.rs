@@ -74,10 +74,8 @@ where
         Self { db, current_block: current_block as u64, factory_deps: HashMap::new() }
     }
 
-    pub fn into_storage_view_with_system_contracts(
-        mut self,
-        mut modified_keys: HashMap<StorageKey, H256>,
-    ) -> StorageView<Self> {
+    pub fn into_storage_view_with_system_contracts(mut self) -> StorageView<Self> {
+        let mut modified_keys = HashMap::new();
         let contracts = era_test_node::system_contracts::get_deployed_contracts(
             &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
         );

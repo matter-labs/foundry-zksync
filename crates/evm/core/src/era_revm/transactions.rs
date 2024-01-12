@@ -123,12 +123,7 @@ pub enum DatabaseError {
     MissingCode(bool),
 }
 
-pub fn run_era_transaction<DB, E, INSP>(
-    env: &mut Env,
-    db: DB,
-    mut inspector: INSP,
-    modified_storage: HashMap<StorageKey, H256>,
-) -> EVMResult<E>
+pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, mut inspector: INSP) -> EVMResult<E>
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
@@ -136,11 +131,7 @@ where
         + StorageModificationRecorder,
 {
     let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
-    let era_db = RevmDatabaseForEra {
-        db: Arc::new(Mutex::new(Box::new(db))),
-        current_block: num,
-        factory_deps: Default::default(),
-    };
+    let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
 
     let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
     debug!("Starting ERA transaction: block={:?} timestamp={:?} nonce={:?}", num, ts, nonce);
@@ -166,10 +157,10 @@ where
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
     let tracer = inspector.as_tracer_pointer();
-    let storage = era_db.clone().into_storage_view_with_system_contracts(modified_storage.clone());
+    let storage = era_db.clone().into_storage_view_with_system_contracts();
 
     let storage_ptr = storage.into_rc_ptr();
-    let (tx_result, bytecodes) = run_l2_tx_raw(
+    let (tx_result, bytecodes, modified_storage) = run_l2_tx_raw(
         l2_tx,
         storage_ptr.clone(),
         L2ChainId::from(chain_id_u32),
