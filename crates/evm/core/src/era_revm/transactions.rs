@@ -1,6 +1,6 @@
 use ethers_core::abi::ethabi::{self, ParamType};
 use itertools::Itertools;
-use multivm::{interface::VmExecutionResultAndLogs, vm_latest::HistoryDisabled};
+use multivm::vm_latest::HistoryDisabled;
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
     OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
@@ -14,7 +14,7 @@ use std::{
 use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
 use zksync_types::{
     fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
-    StorageLogQueryType, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
+    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
