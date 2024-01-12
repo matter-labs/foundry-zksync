@@ -183,6 +183,7 @@ enum FinishCycleOneTimeActions {
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
     SetOrigin { origin: H160 },
+    Transact { fork_id: Option<U256>, tx_hash: H256 },
 }
 
 #[derive(Debug, Clone)]
@@ -890,6 +891,62 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     storage.borrow_mut().set_value(key, origin.into());
                 }
+                FinishCycleOneTimeActions::Transact { fork_id, tx_hash } => {
+                    let era_db = {
+                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
+                            &storage.borrow_mut().storage_handle;
+                        let mut fork_storage = handle.inner.write().unwrap();
+                        fork_storage.value_read_cache.clear();
+                        fork_storage.fork.as_ref().unwrap().fork_source.clone()
+                    };
+
+                    let mut journaled_state = {
+                        let mut modified_storage = self
+                            .modified_storage_keys
+                            .clone()
+                            .into_iter()
+                            .filter(|(key, _)| {
+                                key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
+                            })
+                            .collect::<HashMap<_, _>>();
+
+                        modified_storage.extend(
+                            storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
+                                key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
+                            }),
+                        );
+
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let mut journal = JournaledState::new(SpecId::LATEST, vec![]);
+
+                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        *journal.state() = state;
+
+                        journal
+                    };
+
+                    let mut db = era_db.db.lock().unwrap();
+                    let mut env = into_revm_env(self.env.get().unwrap());
+
+                    //FIXME: retrieving a tx fails
+                    db.transact(
+                        fork_id.map(|id| {
+                            let mut arr = [0; 32];
+                            id.to_big_endian(&mut arr);
+                            Uint::from_be_bytes(arr)
+                        }),
+                        tx_hash.to_fixed_bytes().into(),
+                        &mut env,
+                        &mut journaled_state,
+                        &mut revm::inspectors::NoOpInspector,
+                    )
+                    .unwrap();
+                }
             }
         }
 
@@ -1479,7 +1536,20 @@ impl CheatcodeTracer {
                 let int_value = value.to_string();
                 self.return_data = Some(int_value.to_return_data());
             }
-
+            transact_0(transact_0Call { txHash }) => {
+                tracing::info!("👷 Transacting current fork with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: None,
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
+            transact_1(transact_1Call { forkId, txHash }) => {
+                tracing::info!("👷 Transacting fork {forkId} with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: Some(forkId.to_u256()),
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
             tryFfi(tryFfiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running try ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
