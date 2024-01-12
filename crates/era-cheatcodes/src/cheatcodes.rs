@@ -783,7 +783,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                                 .collect(),
                         );
 
-                        let mut db: std::sync::MutexGuard<'_, Box<S>> = era_db.db.lock().unwrap();
+                        let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
                         let mut env = into_revm_env(era_env);
                         db.select_fork(

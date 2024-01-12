@@ -454,13 +454,7 @@ mod tests {
     }
 
     impl<S, H> StorageModificationRecorder for Noop<S, H> {
-        fn record_storage_modifications(
-            &mut self,
-            _modified_keys: &HashMap<StorageKey, StorageValue>,
-        ) {
-        }
-
-        fn record_modified_contracts(&mut self, modified_keys: &HashMap<H256, Vec<u8>>) {}
+        fn record_storage_modifications(&mut self, storage_modifications: StorageModifications) {}
 
         fn get(&self) -> &HashMap<StorageKey, StorageValue> {
             &self.modified_storage_keys
