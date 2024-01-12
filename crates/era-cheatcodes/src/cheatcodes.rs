@@ -656,8 +656,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     ));
                 }
                 FinishCycleOneTimeActions::MakePersistentAccounts { accounts } => {
-                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                        &storage.borrow_mut().storage_handle;
+                    let handle = &storage.borrow_mut().storage_handle;
                     let fork_storage = handle.inner.write().unwrap();
                     let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
 
@@ -670,8 +669,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     );
                 }
                 FinishCycleOneTimeActions::RevokePersistentAccount { account } => {
-                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                        &storage.borrow_mut().storage_handle;
+                    let handle = &storage.borrow_mut().storage_handle;
                     let fork_storage = handle.inner.write().unwrap();
                     let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
                     let mut db = era_db.db.lock().unwrap();
@@ -680,8 +678,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     ));
                 }
                 FinishCycleOneTimeActions::RevokePersistentAccounts { accounts } => {
-                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                        &storage.borrow_mut().storage_handle;
+                    let handle = &storage.borrow_mut().storage_handle;
                     let fork_storage = handle.inner.write().unwrap();
                     let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
                     let mut db = era_db.db.lock().unwrap();
@@ -701,8 +698,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     storage.borrow_mut().clean_cache();
                     let fork_id = {
-                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                            &storage.borrow_mut().storage_handle;
+                        let handle = &storage.borrow_mut().storage_handle;
                         let mut fork_storage = handle.inner.write().unwrap();
                         fork_storage.value_read_cache.clear();
                         let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
@@ -735,8 +731,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(fork_id.unwrap().to_return_data());
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
-                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                        &storage.borrow_mut().storage_handle;
+                    let handle = &storage.borrow_mut().storage_handle;
                     let era_db =
                         handle.inner.write().unwrap().fork.as_ref().unwrap().fork_source.clone();
 
@@ -755,8 +750,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
                     {
                         storage.borrow_mut().clean_cache();
-                        let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                            &storage.borrow_mut().storage_handle;
+                        let handle = &storage.borrow_mut().storage_handle;
                         let mut fork_storage = handle.inner.write().unwrap();
                         fork_storage.value_read_cache.clear();
                         let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
@@ -791,7 +785,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.clean_cache();
 
                     {
-                        let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
+                        let handle = &storage.storage_handle;
                         let mut fork_storage = handle.inner.write().unwrap();
                         fork_storage.value_read_cache.clear();
                         let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
@@ -822,7 +816,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.clean_cache();
 
                     let snapshot_id = {
-                        let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
+                        let handle = &storage.storage_handle;
                         let mut fork_storage = handle.inner.write().unwrap();
                         fork_storage.value_read_cache.clear();
                         let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
@@ -994,8 +988,7 @@ impl CheatcodeTracer {
         match call {
             activeFork(activeForkCall {}) => {
                 tracing::info!("👷 Getting active fork");
-                let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                    &storage.borrow_mut().storage_handle;
+                let handle = &storage.borrow_mut().storage_handle;
                 let fork_storage = handle.inner.read().unwrap();
                 let fork_id = fork_storage
                     .fork
@@ -1197,8 +1190,7 @@ impl CheatcodeTracer {
             }
             isPersistent(isPersistentCall { account }) => {
                 tracing::info!("👷 Checking if account {:?} is persistent", account);
-                let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                    &storage.borrow_mut().storage_handle;
+                let handle = &storage.borrow_mut().storage_handle;
                 let fork_storage = handle.inner.read().unwrap();
                 let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
                 let db = era_db.db.lock().unwrap();
