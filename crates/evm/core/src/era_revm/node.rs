@@ -2,6 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use era_test_node::{
     console_log::ConsoleLogHandler,
+    formatter,
+    node::ShowCalls,
     system_contracts::{Options, SystemContracts},
     utils::bytecode_to_factory_dep,
 };
@@ -47,6 +49,11 @@ pub fn run_l2_tx_raw<S: ReadStorage>(
     let console_log_handler = ConsoleLogHandler::default();
     for call in &call_traces {
         console_log_handler.handle_call_recursive(call);
+    }
+
+    tracing::info!("=== Calls: ");
+    for call in call_traces.iter() {
+        formatter::print_call(call, 0, &ShowCalls::All, false);
     }
 
     let bytecodes: HashMap<U256, Vec<U256>> = vm
