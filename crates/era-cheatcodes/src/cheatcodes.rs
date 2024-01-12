@@ -2094,8 +2094,7 @@ impl CheatcodeTracer {
                     let key = u256_to_h256(bytecode_key);
                     let value = bytecode_value
                         .into_iter()
-                        .map(|v| u256_to_h256(v).as_bytes().to_owned())
-                        .flatten()
+                        .flat_map(|v| u256_to_h256(v).as_bytes().to_owned())
                         .collect_vec();
                     (key, value)
                 })
