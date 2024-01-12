@@ -12,7 +12,7 @@ use ethers_core::utils::GenesisAccount;
 use foundry_common::{AsTracerPointer, StorageModificationRecorder};
 use revm::{
     db::DatabaseRef,
-    primitives::{AccountInfo, Bytecode, EVMError, EVMResult, Env, ResultAndState},
+    primitives::{AccountInfo, Bytecode, EVMResult, Env, ResultAndState},
     Database, Inspector, JournaledState,
 };
 use std::{borrow::Cow, collections::HashMap};

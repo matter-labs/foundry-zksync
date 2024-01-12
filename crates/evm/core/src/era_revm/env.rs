@@ -39,10 +39,9 @@ pub fn create_l1_batch_env<ST: ReadStorage>(
 
     batch_number += 1;
 
-    // let mut block_ctx = block_ctx.new_batch();
     first_l2_block.timestamp = std::cmp::max(batch_timestamp + 1, first_l2_block.timestamp);
     batch_timestamp = first_l2_block.timestamp;
-    let batch_env = L1BatchEnv {
+    L1BatchEnv {
         // TODO: set the previous batch hash properly (take from fork, when forking, and from local
         // storage, when this is not the first block).
         previous_batch_hash: None,
@@ -53,8 +52,7 @@ pub fn create_l1_batch_env<ST: ReadStorage>(
         enforced_base_fee: None,
         first_l2_block,
         l1_gas_price,
-    };
-    batch_env
+    }
 }
 
 pub fn create_system_env(

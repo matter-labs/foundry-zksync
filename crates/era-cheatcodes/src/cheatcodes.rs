@@ -644,7 +644,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
-                            storage_to_state(&era_db, &modified_storage, bytecodes);
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -691,7 +691,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
-                            storage_to_state(&era_db, &modified_storage, bytecodes);
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -723,7 +723,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
-                            storage_to_state(&era_db, &modified_storage, bytecodes);
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -751,7 +751,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
-                            storage_to_state(&era_db, &modified_storage, bytecodes);
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();

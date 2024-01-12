@@ -23,8 +23,8 @@ use revm::{
     inspectors::NoOpInspector,
     precompile::{Precompiles, SpecId},
     primitives::{
-        Account, AccountInfo, Bytecode, CreateScheme, EVMError, EVMResult, Env, HashMap as Map,
-        Log, ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
+        Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, HashMap as Map, Log,
+        ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, Inspector, JournaledState, EVM,
 };
