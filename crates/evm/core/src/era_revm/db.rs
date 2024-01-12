@@ -50,7 +50,7 @@ impl<DB> Debug for RevmDatabaseForEra<DB> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RevmDatabaseForEra")
             .field("db", &"db")
-            // .field("env", &self.env.lock().unwrap())
+            .field("current_block", &self.current_block)
             .finish()
     }
 }
@@ -74,13 +74,12 @@ where
         Self { db, current_block: current_block as u64, factory_deps: HashMap::new() }
     }
 
-    pub fn into_storage_view_with_system_contracts(mut self) -> StorageView<Self> {
+    pub fn into_storage_view_with_system_contracts(mut self, chain_id: u32) -> StorageView<Self> {
         let mut modified_keys = HashMap::new();
         let contracts = era_test_node::system_contracts::get_deployed_contracts(
             &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
         );
-        // TODO fix chain id
-        let chain_id = { L2ChainId::try_from(9u32).unwrap() };
+        let chain_id = { L2ChainId::try_from(chain_id).unwrap() };
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         contracts

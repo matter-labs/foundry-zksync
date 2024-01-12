@@ -23,8 +23,8 @@ use revm::{
     inspectors::NoOpInspector,
     precompile::{Precompiles, SpecId},
     primitives::{
-        Account, AccountInfo, Bytecode, CreateScheme, EVMError, Env, HashMap as Map, Log,
-        ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
+        Account, AccountInfo, Bytecode, CreateScheme, EVMError, EVMResult, Env, HashMap as Map,
+        Log, ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, Inspector, JournaledState, EVM,
 };
@@ -774,7 +774,7 @@ impl Backend {
     {
         self.initialize(env);
 
-        let result: Result<ResultAndState, EVMError<DatabaseError>> =
+        let result: EVMResult<DatabaseError> =
             crate::era_revm::transactions::run_era_transaction(env, self, inspector);
 
         Ok(result.unwrap())

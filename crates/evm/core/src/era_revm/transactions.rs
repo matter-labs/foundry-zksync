@@ -119,11 +119,15 @@ where
     INSP: AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
         + StorageModificationRecorder,
 {
-    let (num, ts) = (env.block.number.to::<u64>(), env.block.timestamp.to::<u64>());
     let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
-
+    let (num, ts) = era_db.get_l2_block_number_and_timestamp();
+    let l1_num = num;
     let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
-    debug!("Starting ERA transaction: block={:?} timestamp={:?} nonce={:?}", num, ts, nonce);
+
+    info!(
+        "Starting ERA transaction: block={:?} timestamp={:?} nonce={:?} | l1_block={}",
+        num, ts, nonce, l1_num
+    );
 
     // Update the environment timestamp and block number.
     // Check if this should be done at the end?
@@ -146,7 +150,7 @@ where
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
     let tracer = inspector.as_tracer_pointer();
-    let storage = era_db.clone().into_storage_view_with_system_contracts();
+    let storage = era_db.clone().into_storage_view_with_system_contracts(chain_id_u32);
 
     let storage_ptr = storage.into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) = run_l2_tx_raw(

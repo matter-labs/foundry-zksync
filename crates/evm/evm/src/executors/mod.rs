@@ -329,7 +329,7 @@ impl Executor {
         let mut env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
 
         let mut db = FuzzBackendWrapper::new(&self.backend);
-        let result: ResultAndState = db.inspect_ref(&mut env, &mut inspector)?;
+        let result = db.inspect_ref(&mut env, &mut inspector)?;
 
         // Persist the snapshot failure recorded on the fuzz backend wrapper.
         let has_snapshot_failure = db.has_snapshot_failure();
