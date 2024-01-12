@@ -1,14 +1,6 @@
-use era_test_node::{
-    deps::storage_view::StorageView,
-    fork::{ForkDetails, ForkStorage},
-    node::{
-        InMemoryNode, InMemoryNodeConfig, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails,
-    },
-    system_contracts,
-};
 use ethers_core::abi::ethabi::{self, ParamType};
 use itertools::Itertools;
-use multivm::{interface::VmExecutionResultAndLogs, vm_latest::HistoryDisabled};
+use multivm::vm_latest::HistoryDisabled;
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
     OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
@@ -19,10 +11,10 @@ use std::{
     fmt::Debug,
     sync::{Arc, Mutex},
 };
-use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
+use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
 use zksync_types::{
-    api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
-    StorageKey, StorageLogQueryType, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
+    fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
+    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
@@ -35,18 +27,10 @@ use foundry_common::{
 };
 
 use super::db::RevmDatabaseForEra;
-use crate::backend::DatabaseExt;
-
-fn contract_address_from_tx_result(execution_result: &VmExecutionResultAndLogs) -> Option<H160> {
-    for query in execution_result.logs.storage_logs.iter().rev() {
-        if query.log_type == StorageLogQueryType::InitialWrite &&
-            query.log_query.address == ACCOUNT_CODE_STORAGE_ADDRESS
-        {
-            return Some(h256_to_account_address(&u256_to_h256(query.log_query.key)))
-        }
-    }
-    None
-}
+use crate::{
+    backend::DatabaseExt,
+    era_revm::{node::run_l2_tx_raw, storage_view::StorageView},
+};
 
 /// Prepares calldata to invoke deployer contract.
 /// This method encodes parameters for the `create` method.
@@ -132,7 +116,7 @@ pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, mut inspector: IN
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
-    INSP: AsTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>
+    INSP: AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
         + StorageModificationRecorder,
 {
     let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
@@ -158,28 +142,6 @@ where
         31337
     };
 
-    let fork_details = ForkDetails {
-        fork_source: era_db.clone(),
-        l1_block: L1BatchNumber(l1_num as u32),
-        l2_block: Block::default(),
-        l2_miniblock: num,
-        l2_miniblock_hash: Default::default(),
-        block_timestamp: ts,
-        overwrite_chain_id: Some(L2ChainId::from(chain_id_u32)),
-        // Make sure that l1 gas price is set to reasonable values.
-        l1_gas_price: u64::max(env.block.basefee.to::<u64>(), 1000),
-    };
-
-    let config = InMemoryNodeConfig {
-        show_calls: ShowCalls::None,
-        show_storage_logs: ShowStorageLogs::None,
-        show_vm_details: ShowVMDetails::None,
-        show_gas_details: ShowGasDetails::None,
-        resolve_hashes: false,
-        system_contracts_options: system_contracts::Options::BuiltInWithoutSecurity,
-    };
-    let node = InMemoryNode::new(Some(fork_details), None, config);
-
     let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
 
     if l2_tx.common_data.signature.is_empty() {
@@ -188,21 +150,19 @@ where
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
     let tracer = inspector.as_tracer_pointer();
-    let era_execution_result = node
-        .run_l2_tx_raw(
-            l2_tx,
-            multivm::interface::TxExecutionMode::VerifyExecute,
-            vec![tracer],
-            false,
-        )
-        .unwrap();
+    let storage = era_db.clone().into_storage_view_with_system_contracts(chain_id_u32);
 
-    let (modified_keys, tx_result, _call_traces, _block, bytecodes, _block_ctx) =
-        era_execution_result;
-    let maybe_contract_address = contract_address_from_tx_result(&tx_result);
+    let storage_ptr = storage.into_rc_ptr();
+    let (tx_result, bytecodes, modified_storage) = run_l2_tx_raw(
+        l2_tx,
+        storage_ptr.clone(),
+        L2ChainId::from(chain_id_u32),
+        u64::max(env.block.basefee.to::<u64>(), 1000),
+        vec![tracer],
+    );
 
     // record storage modifications in the inspector
-    inspector.record_modified_keys(&modified_keys);
+    inspector.record_modified_keys(&modified_storage);
 
     let execution_result = match tx_result.result {
         multivm::interface::ExecutionResult::Success { output, .. } => {
@@ -217,14 +177,20 @@ where
                     data: event.value.into(),
                 })
                 .collect_vec();
+            let result = decode_l2_tx_result(output);
+            let address = if result.len() == 32 {
+                Some(h256_to_account_address(&H256::from_slice(&result)))
+            } else {
+                None
+            };
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
                 gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
                 logs,
                 output: revm::primitives::Output::Create(
-                    Bytes::from(decode_l2_tx_result(output)),
-                    maybe_contract_address.map(h160_to_address),
+                    Bytes::from(result),
+                    address.map(h160_to_address),
                 ),
             }
         }
@@ -258,7 +224,7 @@ where
 
     Ok(ResultAndState {
         result: execution_result,
-        state: storage_to_state(&era_db, &modified_keys, bytecodes),
+        state: storage_to_state(&era_db, &modified_storage, bytecodes),
     })
 }
 
