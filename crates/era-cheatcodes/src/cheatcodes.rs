@@ -656,7 +656,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             &storage.borrow_mut().storage_handle;
                         let mut fork_storage = handle.inner.write().unwrap();
                         fork_storage.value_read_cache.clear();
-                        fork_storage.value_read_cache.clear();
                         fork_storage.factory_dep_cache.clear();
                         for (key, value) in modified_bytecodes.clone().into_iter() {
                             fork_storage.factory_dep_cache.insert(key, Some(value));
@@ -712,16 +711,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(fork_id.unwrap().to_return_data());
                 }
                 FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
-                    let mut modified_storage = self
-                        .modified_storage_keys
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect::<HashMap<_, _>>();
-                    modified_storage.extend(
-                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
-                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
-                        }),
+                    let modified_storage =
+                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
                     );
 
                     storage.borrow_mut().clean_cache();
@@ -730,15 +723,26 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             &storage.borrow_mut().storage_handle;
                         let mut fork_storage = handle.inner.write().unwrap();
                         fork_storage.value_read_cache.clear();
+                        fork_storage.factory_dep_cache.clear();
+                        for (key, value) in modified_bytecodes.clone().into_iter() {
+                            fork_storage.factory_dep_cache.insert(key, Some(value));
+                        }
                         let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
-                        let bytecodes = bootloader_state
-                            .get_last_tx_compressed_bytecodes()
-                            .iter()
-                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
-                            .collect();
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state = storage_to_state(&era_db, &modified_storage, bytecodes);
+                        let state = storage_to_state(
+                            &era_db,
+                            &modified_storage,
+                            modified_bytecodes
+                                .clone()
+                                .into_iter()
+                                .map(|(key, value)| {
+                                    let key = h256_to_u256(key);
+                                    let value = value.chunks(32).map(U256::from).collect_vec();
+                                    (key, value)
+                                })
+                                .collect(),
+                        );
                         *journaled_state.state() = state;
 
                         let mut db = era_db.db.lock().unwrap();
@@ -854,7 +858,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let snapshot_id = {
                         let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
                         let mut fork_storage = handle.inner.write().unwrap();
-                        fork_storage.value_read_cache.clear();
                         fork_storage.value_read_cache.clear();
                         fork_storage.factory_dep_cache.clear();
                         for (key, value) in modified_bytecodes.clone().into_iter() {
