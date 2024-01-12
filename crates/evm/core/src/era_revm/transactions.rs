@@ -31,7 +31,7 @@ use foundry_common::{
         conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
         factory_deps::PackedEraBytecode,
     },
-    AsTracerPointer, StorageModificationRecorder,
+    AsTracerPointer, StorageModificationRecorder, StorageModifications,
 };
 
 use super::db::RevmDatabaseForEra;
@@ -202,7 +202,22 @@ where
     let maybe_contract_address = contract_address_from_tx_result(&tx_result);
 
     // record storage modifications in the inspector
-    inspector.record_modified_keys(&modified_keys);
+    inspector.record_storage_modifications(StorageModifications {
+        keys: modified_keys.clone(),
+        bytecodes: bytecodes
+            .clone()
+            .into_iter()
+            .map(|(key, value)| {
+                let key = u256_to_h256(key);
+                let value = value
+                    .into_iter()
+                    .map(|word| u256_to_h256(word).as_bytes().to_owned())
+                    .flatten()
+                    .collect_vec();
+                (key, value)
+            })
+            .collect(),
+    });
 
     let execution_result = match tx_result.result {
         multivm::interface::ExecutionResult::Success { output, .. } => {
@@ -439,7 +454,13 @@ mod tests {
     }
 
     impl<S, H> StorageModificationRecorder for Noop<S, H> {
-        fn record_modified_keys(&mut self, _modified_keys: &HashMap<StorageKey, StorageValue>) {}
+        fn record_storage_modifications(
+            &mut self,
+            _modified_keys: &HashMap<StorageKey, StorageValue>,
+        ) {
+        }
+
+        fn record_modified_contracts(&mut self, modified_keys: &HashMap<H256, Vec<u8>>) {}
 
         fn get(&self) -> &HashMap<StorageKey, StorageValue> {
             &self.modified_storage_keys

@@ -67,6 +67,7 @@ contract ForkTest is Test {
             "ENV for blocks is not set correctly"
         );
     }
+    
 
     function testActiveFork() public {
         uint256 data = vm.createFork("mainnet", FORK_BLOCK + 100);
