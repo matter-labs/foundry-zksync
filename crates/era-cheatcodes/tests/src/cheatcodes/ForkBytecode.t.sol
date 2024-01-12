@@ -10,7 +10,7 @@ contract Target {
     }
 }
 
-contract ForkStorageTest is Test {
+contract ForkBytecodeTest is Test {
     uint256 constant FORK_BLOCK = 19579636;
 
     function testCreateSelectForkHasNonDeployedBytecodes() public {
