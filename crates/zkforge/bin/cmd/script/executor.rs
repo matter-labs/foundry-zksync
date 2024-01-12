@@ -256,7 +256,7 @@ impl ScriptArgs {
         if !shell::verbosity().is_silent() {
             let n = script_config.total_rpcs.len();
             let s = if n != 1 { "s" } else { "" };
-            println!("\n## Setting up {n} EVM{s}.");
+            println!("\n## Setting up {n} zkEVM{s}.");
         }
 
         let futs = script_config
