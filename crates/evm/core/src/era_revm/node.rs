@@ -48,7 +48,6 @@ pub fn run_l2_tx_raw<S: ReadStorage>(
     let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity);
     let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);
 
-    dbg!(&batch_env, &system_env);
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env.clone(), system_env, storage.clone());
 
     let tx: Transaction = l2_tx.clone().into();

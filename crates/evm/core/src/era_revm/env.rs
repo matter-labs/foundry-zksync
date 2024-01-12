@@ -5,7 +5,6 @@ use multivm::{
         constants::BLOCK_GAS_LIMIT, utils::l2_blocks::load_last_l2_block, TxExecutionMode,
     },
 };
-use revm::db;
 use zksync_basic_types::{AccountTreeId, L1BatchNumber, L2ChainId, MiniblockNumber, H160};
 use zksync_contracts::BaseSystemContracts;
 use zksync_state::{ReadStorage, StoragePtr};

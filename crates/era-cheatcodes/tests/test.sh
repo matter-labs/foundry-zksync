@@ -58,6 +58,6 @@ command -v git &>/dev/null || {
 build_zkforge "${REPO_ROOT}"
 
 echo "Running tests..."
-RUST_LOG=sharedbackend=trace,era_test_node=debug,multivm=debug,foundry_evm=trace,evm=trace,foundry_common=trace,foundry_evm_core=trace,zkforge=trace "${BINARY_PATH}" test --use "./${SOLC}"
+RUST_LOG=info "${BINARY_PATH}" test --use "./${SOLC}"
 # RUST_LOG=era_test_node=debug,zkforge=trace "${BINARY_PATH}" test --use "./${SOLC}"
 # RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}"

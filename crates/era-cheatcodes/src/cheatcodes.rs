@@ -454,11 +454,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         });
 
                         let new_origin = broadcast.new_origin;
-                        let revm_db_for_era = &storage.borrow_mut().storage_handle;
+                        let handle = &mut storage.borrow_mut();
+                        let (nonce, _) = Self::get_nonce(new_origin, handle);
+                        let revm_db_for_era = &handle.storage_handle;
                         let rpc = revm_db_for_era.db.lock().unwrap().active_fork_url();
 
                         let gas_limit = current.ergs_remaining;
-                        let (nonce, _) = Self::get_nonce(new_origin, &mut storage.borrow_mut());
 
                         let (value, to) = if current.code_address == MSG_VALUE_SIMULATOR_ADDRESS {
                             //when some eth is sent to an address in zkevm the call is replaced
@@ -505,11 +506,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         self.broadcastable_transactions.push(tx);
                         //FIXME: detect if this is a deployment and increase the other nonce too
-                        self.set_nonce(
-                            new_origin,
-                            (Some(nonce + 1), None),
-                            &mut storage.borrow_mut(),
-                        );
+                        self.set_nonce(new_origin, (Some(nonce + 1), None), handle);
                     }
                 }
                 return
@@ -632,12 +629,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
+                    let mut storage = storage.borrow_mut();
                     let modified_storage =
-                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
+                        self.get_modified_storage(storage.modified_storage_keys());
 
-                    storage.borrow_mut().clean_cache();
+                    storage.clean_cache();
                     let fork_id = {
-                        let era_db = &storage.borrow_mut().storage_handle;
+                        let era_db = &storage.storage_handle;
                         let bytecodes = bootloader_state
                             .get_last_tx_compressed_bytecodes()
                             .iter()
@@ -662,7 +660,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             &mut journaled_state,
                         )
                     };
-                    storage.borrow_mut().modified_storage_keys = modified_storage;
+                    storage.modified_storage_keys = modified_storage;
 
                     self.return_data = Some(fork_id.unwrap().to_return_data());
                 }
@@ -679,11 +677,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(fork_id.unwrap().to_return_data());
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
+                    let mut storage = storage.borrow_mut();
                     let modified_storage =
-                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
+                        self.get_modified_storage(storage.modified_storage_keys());
                     {
-                        storage.borrow_mut().clean_cache();
-                        let era_db = &storage.borrow_mut().storage_handle;
+                        storage.clean_cache();
+                        let era_db = &storage.storage_handle;
                         let bytecodes = bootloader_state
                             .get_last_tx_compressed_bytecodes()
                             .iter()
@@ -704,7 +703,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         )
                         .unwrap();
                     }
-                    storage.borrow_mut().modified_storage_keys = modified_storage;
+                    storage.modified_storage_keys = modified_storage;
 
                     self.return_data = Some(vec![fork_id]);
                 }
