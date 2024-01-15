@@ -5,26 +5,31 @@ import {Test, console2 as console} from "../../lib/forge-std/src/Test.sol";
 import {Constants} from "./Constants.sol";
 
 contract CheatcodeTransactTest is Test {
-    /// USDT Token
-    bytes32 constant TOKEN_CREATION_TX = 0x058a0e64a30be0aaa9631427ce9fc15b2908847f42f27f2df723b57ca1ae1368;
-    uint constant TOKEN_CREATION_BLOCK = 2719164;
-    address constant TOKEN_ADDRESS = 0x493257fD37EDB34451f62EDf8D2a0C418852bA4C;
-
-    address constant L1_ADDRESS = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    /// Random recent block & tx
+    uint constant SAMPLE_BLOCK = 23942350;
+    bytes32 constant SAMPLE_TX = 0x272c2251368cae9eceaea67f52855c9858fd6b00dd68d6dfadab3ab1d66f9e4b;
+    address constant SAMPLE_TX_RECEIVER = 0xC16e4F1237C7d7414a4DED7A4bADB2899AF6e91A;
+    uint constant START_BALANCE = 195359993982204;
+    uint constant SENT_VALUE = 1990000000000063;
 
     function setUp() public {
-        vm.createSelectFork("mainnet", TOKEN_CREATION_BLOCK - 10);
+        vm.createSelectFork("mainnet", SAMPLE_BLOCK);
 
-        (bool success, bytes memory data) = TOKEN_ADDRESS.call(abi.encodeWithSignature("l1Address()"));
-        require(data.length == 0, "contract shouldn't exist yet");
+        console.log(SAMPLE_TX_RECEIVER.balance);
+        require(SAMPLE_TX_RECEIVER.balance == START_BALANCE, "balance not as expected");
     }
 
     function testTransact() public {
-        vm.transact(TOKEN_CREATION_TX);
+        vm.transact(SAMPLE_TX);
 
-        (bool success, bytes memory data) = TOKEN_ADDRESS.call(abi.encodeWithSignature("l1Address()"));
-        (address l1_address) = abi.decode(data, (address));
+        console.log(SAMPLE_TX_RECEIVER.balance);
+        require(SAMPLE_TX_RECEIVER.balance == (START_BALANCE + SENT_VALUE), "tx didn't execute");
+    }
 
-        require(l1_address == L1_ADDRESS, "contract exists now");
+    function testRollInsteadOfTransact() public {
+        vm.roll(SAMPLE_BLOCK + 1);
+
+        console.log(SAMPLE_TX_RECEIVER.balance);
+        require(SAMPLE_TX_RECEIVER.balance == (START_BALANCE + SENT_VALUE), "tx didn't execute");
     }
 }
