@@ -1,16 +1,6 @@
-use era_test_node::{
-    fork::{ForkDetails, ForkStorage},
-    node::{
-        InMemoryNode, InMemoryNodeConfig, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails,
-    },
-    system_contracts,
-};
 use ethers_core::abi::ethabi::{self, ParamType};
 use itertools::Itertools;
-use multivm::{
-    interface::VmExecutionResultAndLogs,
-    vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer},
-};
+use multivm::vm_latest::HistoryDisabled;
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
     OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
@@ -21,34 +11,26 @@ use std::{
     fmt::Debug,
     sync::{Arc, Mutex},
 };
-use zksync_basic_types::{web3::signing::keccak256, L1BatchNumber, L2ChainId, H160, H256, U256};
-use zksync_state::StorageView;
+use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
 use zksync_types::{
-    api::Block, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
-    StorageKey, StorageLogQueryType, ACCOUNT_CODE_STORAGE_ADDRESS,
+    fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
+    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
-use foundry_common::zk_utils::{
-    conversion_utils::{
-        address_to_h160, h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
+use foundry_common::{
+    zk_utils::{
+        conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
+        factory_deps::PackedEraBytecode,
     },
-    factory_deps::PackedEraBytecode,
+    AsTracerPointer, StorageModificationRecorder,
 };
 
 use super::db::RevmDatabaseForEra;
-use crate::backend::DatabaseExt;
-
-fn contract_address_from_tx_result(execution_result: &VmExecutionResultAndLogs) -> Option<H160> {
-    for query in execution_result.logs.storage_logs.iter().rev() {
-        if query.log_type == StorageLogQueryType::InitialWrite &&
-            query.log_query.address == ACCOUNT_CODE_STORAGE_ADDRESS
-        {
-            return Some(h256_to_account_address(&u256_to_h256(query.log_query.key)))
-        }
-    }
-    None
-}
+use crate::{
+    backend::DatabaseExt,
+    era_revm::{node::run_l2_tx_raw, storage_view::StorageView},
+};
 
 /// Prepares calldata to invoke deployer contract.
 /// This method encodes parameters for the `create` method.
@@ -130,20 +112,26 @@ pub enum DatabaseError {
     MissingCode(bool),
 }
 
-pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, inspector: INSP) -> EVMResult<E>
+pub fn run_era_transaction<DB, E, INSP>(env: &mut Env, db: DB, mut inspector: INSP) -> EVMResult<E>
 where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
-    INSP: ToTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>,
+    INSP: AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
+        + StorageModificationRecorder,
 {
     let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
-    let nonce = era_db.get_nonce_for_address(address_to_h160(env.tx.caller));
     let (num, ts) = era_db.get_l2_block_number_and_timestamp();
+    let l1_num = num;
+    let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
 
-    debug!("Starting ERA transaction: block={:?} timestamp={:?} nonce={:?}", num, ts, nonce);
+    info!(
+        "Starting ERA transaction: block={:?} timestamp={:?} nonce={:?} | l1_block={}",
+        num, ts, nonce, l1_num
+    );
 
     // Update the environment timestamp and block number.
     // Check if this should be done at the end?
+    // In general, we do not rely on env as it's consistently maintained in foundry
     env.block.number = env.block.number.saturating_add(rU256::from(1));
     env.block.timestamp = env.block.timestamp.saturating_add(rU256::from(1));
 
@@ -154,29 +142,6 @@ where
         31337
     };
 
-    let l1_num = num / 2;
-    let fork_details = ForkDetails {
-        fork_source: era_db.clone(),
-        l1_block: L1BatchNumber(l1_num as u32),
-        l2_block: Block::default(),
-        l2_miniblock: num,
-        l2_miniblock_hash: Default::default(),
-        block_timestamp: ts,
-        overwrite_chain_id: Some(L2ChainId::from(chain_id_u32)),
-        // Make sure that l1 gas price is set to reasonable values.
-        l1_gas_price: u64::max(env.block.basefee.to::<u64>(), 1000),
-    };
-
-    let config = InMemoryNodeConfig {
-        show_calls: ShowCalls::None,
-        show_storage_logs: ShowStorageLogs::None,
-        show_vm_details: ShowVMDetails::None,
-        show_gas_details: ShowGasDetails::None,
-        resolve_hashes: false,
-        system_contracts_options: system_contracts::Options::BuiltInWithoutSecurity,
-    };
-    let node = InMemoryNode::new(Some(fork_details), None, config);
-
     let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
 
     if l2_tx.common_data.signature.is_empty() {
@@ -184,14 +149,20 @@ where
         // Fails without a signature here: https://github.com/matter-labs/zksync-era/blob/73a1e8ff564025d06e02c2689da238ae47bb10c3/core/lib/types/src/transaction_request.rs#L381
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
-    let tracer = inspector.into_tracer_pointer();
-    let era_execution_result = node
-        .run_l2_tx_raw(l2_tx, multivm::interface::TxExecutionMode::VerifyExecute, vec![tracer])
-        .unwrap();
+    let tracer = inspector.as_tracer_pointer();
+    let storage = era_db.clone().into_storage_view_with_system_contracts(chain_id_u32);
 
-    let (modified_keys, tx_result, _call_traces, _block, bytecodes, _block_ctx) =
-        era_execution_result;
-    let maybe_contract_address = contract_address_from_tx_result(&tx_result);
+    let storage_ptr = storage.into_rc_ptr();
+    let (tx_result, bytecodes, modified_storage) = run_l2_tx_raw(
+        l2_tx,
+        storage_ptr.clone(),
+        L2ChainId::from(chain_id_u32),
+        u64::max(env.block.basefee.to::<u64>(), 1000),
+        vec![tracer],
+    );
+
+    // record storage modifications in the inspector
+    inspector.record_modified_keys(&modified_storage);
 
     let execution_result = match tx_result.result {
         multivm::interface::ExecutionResult::Success { output, .. } => {
@@ -206,14 +177,20 @@ where
                     data: event.value.into(),
                 })
                 .collect_vec();
+            let result = decode_l2_tx_result(output);
+            let address = if result.len() == 32 {
+                Some(h256_to_account_address(&H256::from_slice(&result)))
+            } else {
+                None
+            };
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
                 gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
                 logs,
                 output: revm::primitives::Output::Create(
-                    Bytes::from(decode_l2_tx_result(output)),
-                    maybe_contract_address.map(h160_to_address),
+                    Bytes::from(result),
+                    address.map(h160_to_address),
                 ),
             }
         }
@@ -245,6 +222,30 @@ where
         }
     };
 
+    Ok(ResultAndState {
+        result: execution_result,
+        state: storage_to_state(&era_db, &modified_storage, bytecodes),
+    })
+}
+
+fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
+    ethabi::decode(&[ParamType::Bytes], &output)
+        .ok()
+        .and_then(|result| result.first().cloned())
+        .and_then(|result| result.into_bytes())
+        .unwrap_or_default()
+}
+
+/// Converts the zksync era's modified keys to the revm state.
+pub fn storage_to_state<DB>(
+    era_db: &RevmDatabaseForEra<DB>,
+    modified_keys: &HashMap<StorageKey, StorageValue>,
+    bytecodes: HashMap<U256, Vec<U256>>,
+) -> rHashMap<Address, Account>
+where
+    DB: DatabaseExt + Send,
+    <DB as revm::Database>::Error: Debug,
+{
     let account_to_keys: HashMap<H160, HashMap<StorageKey, H256>> =
         modified_keys.iter().fold(HashMap::new(), |mut acc, (storage_key, value)| {
             acc.entry(*storage_key.address()).or_default().insert(*storage_key, *value);
@@ -293,7 +294,7 @@ where
                         .collect()
                 });
 
-            let account_code = era_db.fetch_account_code(*account, &modified_keys, &bytecodes);
+            let account_code = era_db.fetch_account_code(*account, modified_keys, &bytecodes);
 
             let (code_hash, code) = account_code
                 .map(|(hash, bytecode)| (B256::from(&hash.0), Some(bytecode)))
@@ -317,24 +318,15 @@ where
             )
         })
         .collect();
-
-    Ok(ResultAndState { result: execution_result, state })
-}
-
-fn decode_l2_tx_result(output: Vec<u8>) -> Vec<u8> {
-    ethabi::decode(&[ParamType::Bytes], &output)
-        .ok()
-        .and_then(|result| result.first().cloned())
-        .and_then(|result| result.into_bytes())
-        .unwrap_or_default()
+    state
 }
 
 #[cfg(test)]
 mod tests {
     use core::marker::PhantomData;
     use multivm::{
-        interface::dyn_tracers::vm_1_3_3::DynTracer,
-        vm_refunds_enhancement::{HistoryMode, SimpleMemory, VmTracer},
+        interface::dyn_tracers::vm_1_4_0::DynTracer,
+        vm_latest::{HistoryMode, SimpleMemory, VmTracer},
     };
     use zksync_state::WriteStorage;
 
@@ -386,14 +378,37 @@ mod tests {
 
     struct Noop<S, H> {
         _phantom: PhantomData<(S, H)>,
+        modified_storage_keys: HashMap<StorageKey, StorageValue>,
     }
 
     impl<S, H> Default for Noop<S, H> {
         fn default() -> Self {
-            Self { _phantom: Default::default() }
+            Self { _phantom: Default::default(), modified_storage_keys: Default::default() }
+        }
+    }
+
+    impl<S, H> Clone for Noop<S, H> {
+        fn clone(&self) -> Self {
+            Self {
+                _phantom: self._phantom,
+                modified_storage_keys: self.modified_storage_keys.clone(),
+            }
         }
     }
 
     impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Noop<S, H> {}
     impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for Noop<S, H> {}
+    impl<S: WriteStorage + 'static, H: HistoryMode + 'static> AsTracerPointer<S, H> for Noop<S, H> {
+        fn as_tracer_pointer(&self) -> multivm::vm_latest::TracerPointer<S, H> {
+            Box::new(self.clone())
+        }
+    }
+
+    impl<S, H> StorageModificationRecorder for Noop<S, H> {
+        fn record_modified_keys(&mut self, _modified_keys: &HashMap<StorageKey, StorageValue>) {}
+
+        fn get(&self) -> &HashMap<StorageKey, StorageValue> {
+            &self.modified_storage_keys
+        }
+    }
 }

@@ -30,7 +30,6 @@
 ///
 /// - Artifact Path Generation: The `build_artifacts_path` and `build_artifacts_file` methods
 ///   construct the path and file for saving the compiler output artifacts.
-use crate::zksolc_manager::ZkSolcManager;
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::Bytes;
 use ansi_term::Colour::{Red, Yellow};
@@ -43,6 +42,7 @@ use foundry_compilers::{
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
 };
+use foundry_config::zksolc_config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput};
 use semver::Version;
 use serde::Deserialize;
 use serde_json::Value;
@@ -54,7 +54,6 @@ use std::{
     path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
-
 /// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
 
@@ -154,11 +153,9 @@ type SolidityVersionSources = (Version, BTreeMap<PathBuf, Source>);
 /// resulting errors are handled accordingly.
 #[derive(Debug)]
 pub struct ZkSolc {
+    config: ZkSolcConfig,
     project: Project,
-    compiler_path: PathBuf,
-    is_system: bool,
-    force_evmla: bool,
-    standard_json: Option<StandardJsonCompilerInput>,
+    standard_json: Option<ZkStandardJsonCompilerInput>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -169,7 +166,7 @@ impl fmt::Display for ZkSolc {
                 compiler_path: {},
                 output_path: {},
             )",
-            self.compiler_path.display(),
+            self.config.compiler_path.display(),
             self.project.paths.artifacts.display(),
         )
     }
@@ -184,19 +181,8 @@ impl fmt::Display for ZkSolc {
 ///
 /// The function returns `Ok(())` if the compilation process completes successfully, or an error
 /// if it fails.
-pub fn compile_smart_contracts(
-    is_system: bool,
-    is_legacy: bool,
-    zksolc_manager: ZkSolcManager,
-    project: Project,
-) -> eyre::Result<()> {
-    let zksolc_opts = ZkSolcOpts {
-        compiler_path: zksolc_manager.get_full_compiler_path(),
-        is_system,
-        force_evmla: is_legacy,
-    };
-
-    let mut zksolc = ZkSolc::new(zksolc_opts, project);
+pub fn compile_smart_contracts(zksolc_cfg: ZkSolcConfig, project: Project) -> eyre::Result<()> {
+    let mut zksolc = ZkSolc::new(zksolc_cfg, project);
 
     match zksolc.compile() {
         Ok(_) => {
@@ -210,14 +196,8 @@ pub fn compile_smart_contracts(
 }
 
 impl ZkSolc {
-    pub fn new(opts: ZkSolcOpts, project: Project) -> Self {
-        Self {
-            project,
-            compiler_path: opts.compiler_path,
-            is_system: opts.is_system,
-            force_evmla: opts.force_evmla,
-            standard_json: None,
-        }
+    pub fn new(config: ZkSolcConfig, project: Project) -> Self {
+        Self { config, project, standard_json: None }
     }
 
     /// Compiles the Solidity contracts in the project's 'sources' directory and its subdirectories
@@ -339,7 +319,7 @@ impl ZkSolc {
                         (output, None)
                     }
                     None => {
-                        let mut cmd = Command::new(&self.compiler_path);
+                        let mut cmd = Command::new(&self.config.compiler_path);
                         let mut child = cmd
                             .args(&comp_args)
                             .stdin(Stdio::piped())
@@ -350,7 +330,10 @@ impl ZkSolc {
 
                         let stdin = child.stdin.take().expect("Stdin exists.");
 
-                        serde_json::to_writer(stdin, &self.standard_json.clone().unwrap())
+                        let stdjson = serde_json::to_value(&self.standard_json.clone().unwrap())
+                            .wrap_err("Could not serialize JSON input")?;
+
+                        serde_json::to_writer(stdin, &stdjson)
                             .wrap_err("Could not assign standard_json to writer")?;
 
                         let output =
@@ -367,7 +350,7 @@ impl ZkSolc {
                             eyre::bail!(
                                     "Compilation failed with {:?}. Using compiler: {:?}, with args {:?} {:?}",
                                     String::from_utf8(output.stderr).unwrap_or_default(),
-                                    self.compiler_path,
+                                    self.config.compiler_path,
                                     contract_path,
                                     &comp_args
                                 );
@@ -448,12 +431,12 @@ impl ZkSolc {
         let mut comp_args = vec!["--standard-json".to_string(), "--solc".to_string(), solc_path];
 
         // Check if system mode is enabled or if the source path contains "is-system"
-        if self.is_system || contract_path.to_str().unwrap().contains("is-system") {
+        if self.config.settings.is_system || contract_path.to_str().unwrap().contains("is-system") {
             comp_args.push("--system-mode".to_string());
         }
 
         // Check if force-evmla is enabled
-        if self.force_evmla {
+        if self.config.settings.force_evmla {
             comp_args.push("--force-evmla".to_string());
         }
         comp_args
@@ -793,25 +776,9 @@ impl ZkSolc {
     fn prepare_compiler_input(&mut self, contract_path: &PathBuf) -> Result<()> {
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
-        file_output_selection.insert(
-            "*".to_string(),
-            vec![
-                "abi".to_string(),
-                "evm.methodIdentifiers".to_string(),
-                // "evm.legacyAssembly".to_string(),
-            ],
-        );
-        file_output_selection.insert(
-            "".to_string(),
-            vec![
-                "metadata".to_string(),
-                // "ast".to_string(),
-                // "userdoc".to_string(),
-                // "devdoc".to_string(),
-                // "storageLayout".to_string(),
-                // "irOptimized".to_string(),
-            ],
-        );
+        file_output_selection
+            .insert("*".to_string(), vec!["abi".to_string(), "evm.methodIdentifiers".to_string()]);
+        file_output_selection.insert("".to_string(), vec!["metadata".to_string()]);
 
         // Step 2: Configure Solidity Compiler
         // zksolc requires metadata to be 'None'
@@ -829,11 +796,13 @@ impl ZkSolc {
         let standard_json = self
             .project
             .standard_json_input(contract_path)
-            .wrap_err("Could not get standard json input")
-            .unwrap();
+            .wrap_err("Could not get standard json input")?;
+        // Convert the standard JSON input to the zk-specific standard JSON format for further
+        // processing
+        let std_zk_json = self.convert_to_zk_standard_json(standard_json);
 
         // Store the generated standard JSON input in the ZkSolc instance
-        self.standard_json = Some(standard_json.to_owned());
+        self.standard_json = Some(std_zk_json.to_owned());
 
         // Step 5: Build Artifacts Path
         let artifact_path = &self.build_artifacts_path(contract_path)?;
@@ -841,12 +810,34 @@ impl ZkSolc {
         // Step 6: Save JSON Input
         let json_input_path = artifact_path.join("json_input.json");
         let stdjson =
-            serde_json::to_value(&standard_json).wrap_err("Could not serialize JSON input")?;
+            serde_json::to_value(&std_zk_json).wrap_err("Could not serialize JSON input")?;
 
-        std::fs::write(json_input_path, serde_json::to_string_pretty(&stdjson).unwrap())
+        std::fs::write(json_input_path, serde_json::to_string_pretty(&stdjson)?)
             .wrap_err("Could not write JSON input file")?;
 
         Ok(())
+    }
+
+    fn convert_to_zk_standard_json(
+        &self,
+        input: StandardJsonCompilerInput,
+    ) -> ZkStandardJsonCompilerInput {
+        ZkStandardJsonCompilerInput {
+            language: input.language,
+            sources: input.sources,
+            settings: Settings {
+                remappings: input.settings.remappings,
+                optimizer: self.config.settings.optimizer.clone(),
+                metadata: input.settings.metadata,
+                output_selection: input.settings.output_selection,
+                libraries: input.settings.libraries,
+                is_system: self.config.settings.is_system,
+                force_evmla: self.config.settings.force_evmla,
+                missing_libraries_path: self.config.settings.missing_libraries_path.clone(),
+                are_libraries_missing: self.config.settings.are_libraries_missing,
+                contracts_to_compile: self.config.settings.contracts_to_compile.clone(),
+            },
+        }
     }
 
     /// Retrieves the versioned sources for the Solidity contracts in the project. The versioned

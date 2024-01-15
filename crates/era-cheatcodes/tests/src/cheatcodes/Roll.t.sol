@@ -17,10 +17,7 @@ contract CheatcodeRollTest is Test {
             "block number must be different than current block number"
         );
 
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("roll(uint256)", NEW_BLOCK_NUMBER)
-        );
-        require(success, "roll failed");
+        vm.roll(NEW_BLOCK_NUMBER);
         uint256 finalBlockNumber = block.number;
         console.log("blockNumber after :", finalBlockNumber);
 
@@ -28,6 +25,5 @@ contract CheatcodeRollTest is Test {
             finalBlockNumber == NEW_BLOCK_NUMBER,
             "block number was not changed"
         );
-        console.log("failed?", failed());
     }
 }

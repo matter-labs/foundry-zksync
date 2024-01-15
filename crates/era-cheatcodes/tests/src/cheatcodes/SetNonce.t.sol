@@ -6,17 +6,9 @@ import {Constants} from "./Constants.sol";
 
 contract CheatcodeSetNonceTest is Test {
     address constant TEST_ADDRESS = 0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a;
-    uint256 constant NEW_NONCE = uint256(123456);
+    uint8 constant NEW_NONCE = 123;
 
     function testSetNonce() public {
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "setNonce(address,uint64)",
-                TEST_ADDRESS,
-                NEW_NONCE
-            )
-        );
-        require(success, "setNonce failed");
-        console.log("failed?", failed());
+        vm.setNonce(TEST_ADDRESS, NEW_NONCE);
     }
 }

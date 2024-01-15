@@ -96,7 +96,11 @@ use providers::remappings::RemappingsProvider;
 
 mod inline;
 pub use inline::{validate_profiles, InlineConfig, InlineConfigError, InlineConfigParser, NatSpec};
-
+// @zkSync - zksolc configuration and settings
+pub mod zksolc_config;
+use zksolc_config::{
+    Optimizer as OptimizerSettings, Settings as ZkSettings, ZkSolcConfig, ZkSolcConfigBuilder,
+};
 /// Foundry configuration
 ///
 /// # Defaults
@@ -390,6 +394,25 @@ pub struct Config {
     /// Warnings gathered when loading the Config. See [`WarningsProvider`] for more information
     #[serde(default, skip_serializing)]
     pub __warnings: Vec<Warning>,
+
+    /// @zkSync zkSolc configuration and settings
+    ///
+    /// Path to zksolc binary. Can be a URL.
+    pub compiler_path: PathBuf,
+    /// Optimizer settings for zkSync
+    pub zk_optimizer: bool,
+    /// The optimization mode string.
+    pub mode: String,
+    /// solc optimizer details remain the same
+    pub zk_optimizer_details: Option<OptimizerDetails>,
+    /// Whether to try to recompile with -Oz if the bytecode is too large.
+    pub fallback_oz: bool,
+    /// Whether to support compilation of zkSync-specific simulations
+    pub is_system: bool,
+    /// Force evmla for zkSync
+    pub force_evmla: bool,
+    /// Path to cache missing library dependencies, used for compiling and deploying libraries.
+    pub detect_missing_libraries: bool,
 }
 
 /// Mapping of fallback standalone sections. See [`FallbackProfileProvider`]
@@ -613,6 +636,21 @@ impl Config {
         self.create_project(true, false)
     }
 
+    /// Serves as the entrypoint for using zksolc for compilation on zkSync projects.
+    ///
+    /// Returns the `ZkSolc` configured with all `zksolc` and path related values.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use foundry_config::Config;
+    /// let config = Config::load_with_root(".").sanitized();
+    /// let zksolc = config.zk_solc_config();
+    /// ```
+    pub fn zk_solc_config(&self) -> Result<ZkSolcConfig, String> {
+        self.create_zksolc_config()
+    }
+
     /// Same as [`Self::project()`] but sets configures the project to not emit artifacts and ignore
     /// cache, caching causes no output until https://github.com/gakonst/ethers-rs/issues/727
     pub fn ephemeral_no_artifacts_project(&self) -> Result<Project, SolcError> {
@@ -650,6 +688,15 @@ impl Config {
         }
 
         Ok(project)
+    }
+
+    fn create_zksolc_config(&self) -> Result<ZkSolcConfig, String> {
+        let zksolc_config = ZkSolcConfigBuilder::new()
+            .compiler_path(self.compiler_path.clone())
+            .settings(self.zksolc_settings()?)
+            .build()?;
+
+        Ok(zksolc_config)
     }
 
     /// Ensures that the configured version is installed if explicitly set
@@ -991,6 +1038,20 @@ impl Config {
         Optimizer { enabled: Some(self.optimizer), runs: Some(self.optimizer_runs), details }
     }
 
+    /// Returns the zksolc `OptimizerSettings` based on the configured settings
+    pub fn zk_optimizer(&self) -> OptimizerSettings {
+        let mode = self.mode.clone();
+        // only configure optimizer settings if optimizer is enabled
+        let details = if self.zk_optimizer { self.optimizer_details.clone() } else { None };
+
+        OptimizerSettings {
+            enabled: Some(self.zk_optimizer),
+            mode: Some(mode),
+            details,
+            fallback_to_optimizing_for_size: Some(self.fallback_oz),
+        }
+    }
+
     /// returns the [`ethers_solc::ConfigurableArtifacts`] for this config, that includes the
     /// `extra_output` fields
     pub fn configured_artifacts_handler(&self) -> ConfigurableArtifacts {
@@ -1053,6 +1114,29 @@ impl Config {
         if self.via_ir {
             settings = settings.with_via_ir();
         }
+
+        Ok(settings)
+    }
+
+    /// Returns the configured `zksolc` `Settings` that includes:
+    ///   - all libraries
+    ///   - the optimizer (including details, if configured)
+    ///   - is_system
+    ///   - force_evmla
+    pub fn zksolc_settings(&self) -> Result<ZkSettings, String> {
+        let libraries = match self.parsed_libraries() {
+            Ok(libs) => libs.with_applied_remappings(&self.project_paths()),
+            Err(e) => return Err(format!("Failed to parse libraries: {}", e)),
+        };
+        let optimizer = self.zk_optimizer();
+
+        let settings = ZkSettings {
+            optimizer,
+            libraries,
+            is_system: self.is_system,
+            force_evmla: self.force_evmla,
+            ..Default::default()
+        };
 
         Ok(settings)
     }
@@ -1834,6 +1918,14 @@ impl Default for Config {
             doc: Default::default(),
             __non_exhaustive: (),
             __warnings: vec![],
+            compiler_path: Default::default(),
+            zk_optimizer: true,
+            mode: "3".to_string(),
+            zk_optimizer_details: None,
+            fallback_oz: false,
+            force_evmla: false,
+            is_system: false,
+            detect_missing_libraries: false,
         }
     }
 }

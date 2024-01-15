@@ -114,6 +114,18 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         cancun: true,
         __non_exhaustive: (),
         __warnings: vec![],
+        compiler_path: Default::default(),
+        zk_optimizer: true,
+        mode: "3".to_string(),
+        zk_optimizer_details: Some(OptimizerDetails {
+            yul: Some(false),
+            yul_details: Some(YulDetails { stack_allocation: Some(true), ..Default::default() }),
+            ..Default::default()
+        }),
+        fallback_oz: false,
+        force_evmla: false,
+        is_system: false,
+        detect_missing_libraries: false,
     };
     prj.write_config(input.clone());
     let config = cmd.config();

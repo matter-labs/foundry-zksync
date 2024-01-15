@@ -4,8 +4,9 @@
 //! concurrently active pairs at once.
 
 use crate::fork::{BackendHandler, BlockchainDb, BlockchainDbMeta, CreateFork, SharedBackend};
+use alloy_primitives::Bytes;
 use ethers_core::types::{BlockId, BlockNumber};
-use ethers_providers::Provider;
+use ethers_providers::{JsonRpcClient, Provider};
 use foundry_common::{runtime_client::RuntimeClient, types::ToEthers, ProviderBuilder};
 use foundry_config::Config;
 use futures::{
@@ -25,6 +26,8 @@ use std::{
     },
     time::Duration,
 };
+
+use super::zksync_provider::ZkSyncMiddleware;
 
 /// The identifier for a specific fork, this could be the name of the network a custom descriptive
 /// name.
@@ -478,4 +481,25 @@ async fn create_fork(mut fork: CreateFork) -> eyre::Result<(CreatedFork, Handler
         SharedBackend::new(provider, db, Some(BlockId::Number(BlockNumber::Number(number.into()))));
     let fork = CreatedFork::new(fork, backend);
     Ok((fork, handler))
+}
+
+#[async_trait::async_trait]
+impl<P: JsonRpcClient> ZkSyncMiddleware for Provider<P> {
+    async fn get_bytecode_by_hash(
+        &self,
+        hash: alloy_primitives::B256,
+    ) -> Result<Option<revm::primitives::Bytecode>, Self::Error> {
+        let bytecode: Option<Bytes> = self.request("zks_getBytecodeByHash", vec![hash]).await?;
+        Ok(bytecode.map(revm::primitives::Bytecode::new_raw))
+    }
+}
+
+#[async_trait::async_trait]
+impl<P: JsonRpcClient> ZkSyncMiddleware for Arc<Provider<P>> {
+    async fn get_bytecode_by_hash(
+        &self,
+        hash: alloy_primitives::B256,
+    ) -> Result<Option<revm::primitives::Bytecode>, Self::Error> {
+        self.as_ref().get_bytecode_by_hash(hash).await
+    }
 }

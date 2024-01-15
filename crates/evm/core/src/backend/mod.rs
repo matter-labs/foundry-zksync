@@ -2,6 +2,7 @@
 
 use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
+    era_revm::storage_view::StorageView,
     fork::{CreateFork, ForkId, MultiFork, SharedBackend},
     snapshot::Snapshots,
     utils::configure_tx_env,
@@ -12,9 +13,10 @@ use ethers_core::{
     utils::GenesisAccount,
 };
 use foundry_common::{
+    conversion_utils::h160_to_address,
     is_known_system_sender,
     types::{ToAlloy, ToEthers},
-    SYSTEM_TRANSACTION_TYPE,
+    AsTracerPointer, StorageModificationRecorder, SYSTEM_TRANSACTION_TYPE,
 };
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -29,9 +31,7 @@ use revm::{
 use std::collections::{HashMap, HashSet};
 
 use crate::era_revm::db::RevmDatabaseForEra;
-use era_test_node::fork::ForkStorage;
-use multivm::vm_refunds_enhancement::{HistoryDisabled, ToTracerPointer};
-use zksync_state::StorageView;
+use multivm::vm_latest::HistoryDisabled;
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -769,10 +769,8 @@ impl Backend {
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + ToTracerPointer<
-                StorageView<ForkStorage<RevmDatabaseForEra<&'a mut Self>>>,
-                HistoryDisabled,
-            >,
+            + AsTracerPointer<StorageView<RevmDatabaseForEra<&'a mut Self>>, HistoryDisabled>
+            + StorageModificationRecorder,
     {
         self.initialize(env);
 
@@ -1799,6 +1797,8 @@ pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
     }
 
     *active_journaled_state = target_fork.journaled_state.clone();
+
+    target_fork.db.accounts.remove(&h160_to_address(zksync_types::SYSTEM_CONTEXT_ADDRESS));
 }
 
 /// Clones the account data from the `active_journaled_state`  into the `fork_journaled_state`

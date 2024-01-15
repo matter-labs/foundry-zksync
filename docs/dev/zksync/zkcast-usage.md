@@ -139,5 +139,3 @@ Welcome to the zkcast usage guide! This document will provide you with detailed 
   zkcast call 0x97b985951fd3e0c1d996421cc783d46c12d00082 "greet()(string)" --rpc-url http://localhost:3050
   ```
   **Output:** `Killer combo!`
-
-This guide provides a comprehensive overview of the commands available in zkcast for various blockchain interactions, bridging assets

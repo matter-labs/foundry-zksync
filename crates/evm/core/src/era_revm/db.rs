@@ -10,8 +10,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use era_test_node::fork::ForkSource;
-use eyre::ErrReport;
 use foundry_common::zk_utils::conversion_utils::{
     h160_to_address, h256_to_b256, h256_to_h160, revm_u256_to_h256, u256_to_revm_u256,
 };
@@ -19,26 +17,32 @@ use revm::{
     primitives::{Bytecode, Bytes},
     Database,
 };
-use zksync_basic_types::{
-    web3::signing::keccak256, AccountTreeId, MiniblockNumber, H160, H256, U256,
-};
+use zksync_basic_types::{web3::signing::keccak256, AccountTreeId, L2ChainId, H160, H256, U256};
+use zksync_state::ReadStorage;
 use zksync_types::{
-    api::{BlockIdVariant, Transaction, TransactionDetails},
-    StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-    SYSTEM_CONTEXT_ADDRESS,
+    block::unpack_block_info, get_code_key, get_system_context_init_logs, StorageKey, StorageLog,
+    StorageLogKind, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
+    SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION,
 };
 
-use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
+use super::storage_view::StorageView;
+use zksync_utils::{address_to_h256, bytecode::hash_bytecode, h256_to_u256, u256_to_h256};
 
 #[derive(Default)]
 pub struct RevmDatabaseForEra<DB> {
     pub db: Arc<Mutex<Box<DB>>>,
-    current_block: u64,
+    pub current_block: u64,
+    pub factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 impl<Db> Clone for RevmDatabaseForEra<Db> {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone(), current_block: self.current_block }
+        Self {
+            db: self.db.clone(),
+            current_block: self.current_block,
+            factory_deps: self.factory_deps.clone(),
+        }
     }
 }
 
@@ -55,7 +59,7 @@ impl<DB: Database + Send> RevmDatabaseForEra<DB>
 where
     <DB as revm::Database>::Error: Debug,
 {
-    /// Create a new instance of [RevmDatabaseForEra] caching the current l2 block.
+    /// Create a new instance of [RevmDatabaseForEra].
     pub fn new(db: Arc<Mutex<Box<DB>>>) -> Self {
         let db_inner = db.clone();
         let current_block = {
@@ -64,34 +68,63 @@ where
                 .storage(h160_to_address(SYSTEM_CONTEXT_ADDRESS), u256_to_revm_u256(U256::from(9)))
                 .unwrap();
             let num_and_ts = revm_u256_to_h256(result);
-            let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-            let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-            u64::from_be_bytes(num)
+            let (num, _) = unpack_block_info(h256_to_u256(num_and_ts));
+            num
         };
+        Self { db, current_block: current_block as u64, factory_deps: HashMap::new() }
+    }
 
-        Self { db, current_block }
+    pub fn into_storage_view_with_system_contracts(mut self, chain_id: u32) -> StorageView<Self> {
+        let mut modified_keys = HashMap::new();
+        let contracts = era_test_node::system_contracts::get_deployed_contracts(
+            &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
+        );
+        let chain_id = { L2ChainId::try_from(chain_id).unwrap() };
+        let system_context_init_log = get_system_context_init_logs(chain_id);
+
+        contracts
+            .iter()
+            .map(|contract| {
+                let deployer_code_key = get_code_key(contract.account_id.address());
+                StorageLog::new_write_log(deployer_code_key, hash_bytecode(&contract.bytecode))
+            })
+            .chain(system_context_init_log)
+            .for_each(|log| {
+                (log.kind == StorageLogKind::Write)
+                    .then_some(modified_keys.insert(log.key, log.value));
+            });
+
+        let factory_deps = contracts
+            .into_iter()
+            .map(|contract| (hash_bytecode(&contract.bytecode), contract.bytecode))
+            .collect();
+
+        self.factory_deps = factory_deps;
+        let mut storage_view = StorageView::new(self);
+        storage_view.modified_storage_keys = modified_keys;
+        storage_view
     }
 
     /// Returns the current L1 block number and timestamp from the database.
     /// Reads it directly from the SYSTEM_CONTEXT storage.
     pub fn get_l1_block_number_and_timestamp(&self) -> (u64, u64) {
-        let num_and_ts = self.read_storage_internal(SYSTEM_CONTEXT_ADDRESS, U256::from(7));
-        let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-        let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-        let ts: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
-
-        (u64::from_be_bytes(num), u64::from_be_bytes(ts))
+        let num_and_ts = self.read_storage_internal(
+            SYSTEM_CONTEXT_ADDRESS,
+            h256_to_u256(SYSTEM_CONTEXT_BLOCK_INFO_POSITION),
+        );
+        let (num, ts) = unpack_block_info(h256_to_u256(num_and_ts));
+        (num, ts)
     }
 
     /// Returns the current L2 block number and timestamp from the database.
     /// Reads it directly from the SYSTEM_CONTEXT storage.
     pub fn get_l2_block_number_and_timestamp(&self) -> (u64, u64) {
-        let num_and_ts = self.read_storage_internal(SYSTEM_CONTEXT_ADDRESS, U256::from(9));
-        let num_and_ts_bytes = num_and_ts.as_fixed_bytes();
-        let num: [u8; 8] = num_and_ts_bytes[24..32].try_into().unwrap();
-        let ts: [u8; 8] = num_and_ts_bytes[8..16].try_into().unwrap();
-
-        (u64::from_be_bytes(num), u64::from_be_bytes(ts))
+        let num_and_ts = self.read_storage_internal(
+            SYSTEM_CONTEXT_ADDRESS,
+            h256_to_u256(SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION),
+        );
+        let (num, ts) = unpack_block_info(h256_to_u256(num_and_ts));
+        (num, ts)
     }
 
     /// Returns the nonce for a given account from NonceHolder storage.
@@ -171,32 +204,20 @@ where
             })
             .flatten()
     }
+
+    pub fn store_factory_dep(&mut self, hash: H256, bytecode: Vec<u8>) {
+        self.factory_deps.insert(hash, bytecode);
+    }
 }
 
-impl<DB: Database + Send> ForkSource for RevmDatabaseForEra<DB>
+impl<DB> ReadStorage for RevmDatabaseForEra<DB>
 where
+    DB: Database + Send,
     <DB as revm::Database>::Error: Debug,
 {
-    fn get_storage_at(
-        &self,
-        address: H160,
-        idx: U256,
-        block: Option<BlockIdVariant>,
-    ) -> eyre::Result<H256> {
-        // We cannot support historical lookups. Only the most recent L2 block is supported.
-        if let Some(block) = &block {
-            match block {
-                BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(num)) => {
-                    if num.as_u64() != self.current_block {
-                        eyre::bail!("Only fetching of the most recent L2 block {} is supported - but queried for {}", self.current_block, num)
-                    }
-                }
-                _ => eyre::bail!("Only fetching most recent block is implemented"),
-            }
-        }
-        let mut result = self.read_storage_internal(address, idx);
-
-        if L2_ETH_TOKEN_ADDRESS == address && result.is_zero() {
+    fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
+        let mut result = self.read_storage_internal(*key.address(), h256_to_u256(*key.key()));
+        if L2_ETH_TOKEN_ADDRESS == *key.address() && result.is_zero() {
             // TODO: here we should read the account information from the Database trait
             // and lookup how many token it holds.
             // Unfortunately the 'idx' here is a hash of the account and Database doesn't
@@ -204,93 +225,30 @@ where
             // So for now - simply assume that every user has infinite money.
             result = u256_to_h256(U256::from(9_223_372_036_854_775_808_u64));
         }
-        Ok(result)
+        result
     }
 
-    fn get_raw_block_transactions(
-        &self,
-        _block_number: MiniblockNumber,
-    ) -> eyre::Result<Vec<zksync_types::Transaction>> {
-        todo!()
+    fn is_write_initial(&mut self, _key: &StorageKey) -> bool {
+        false
     }
 
-    fn get_bytecode_by_hash(&self, hash: H256) -> eyre::Result<Option<Vec<u8>>> {
+    fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
         let mut db = self.db.lock().unwrap();
-        let result = db.code_by_hash(h256_to_b256(hash)).unwrap();
-        Ok(Some(result.bytecode.to_vec()))
+        let result = db.code_by_hash(h256_to_b256(hash));
+        let res = match result {
+            Ok(bytecode) => {
+                if bytecode.is_empty() {
+                    return self.factory_deps.get(&hash).cloned()
+                }
+                Some(bytecode.bytecode.to_vec())
+            }
+            Err(_) => self.factory_deps.get(&hash).cloned(),
+        };
+        res
     }
 
-    fn get_transaction_by_hash(&self, _hash: H256) -> eyre::Result<Option<Transaction>> {
-        todo!()
-    }
-
-    fn get_transaction_details(
-        &self,
-        _hash: H256,
-    ) -> Result<std::option::Option<TransactionDetails>, ErrReport> {
-        todo!()
-    }
-
-    fn get_block_by_hash(
-        &self,
-        _hash: H256,
-        _full_transactions: bool,
-    ) -> eyre::Result<Option<zksync_types::api::Block<zksync_types::api::TransactionVariant>>> {
-        todo!()
-    }
-
-    fn get_block_by_number(
-        &self,
-        _block_number: zksync_types::api::BlockNumber,
-        _full_transactions: bool,
-    ) -> eyre::Result<Option<zksync_types::api::Block<zksync_types::api::TransactionVariant>>> {
-        todo!()
-    }
-
-    fn get_block_details(
-        &self,
-        _miniblock: MiniblockNumber,
-    ) -> eyre::Result<Option<zksync_types::api::BlockDetails>> {
-        todo!()
-    }
-
-    fn get_block_transaction_count_by_hash(&self, _block_hash: H256) -> eyre::Result<Option<U256>> {
-        todo!()
-    }
-
-    fn get_block_transaction_count_by_number(
-        &self,
-        _block_number: zksync_types::api::BlockNumber,
-    ) -> eyre::Result<Option<U256>> {
-        todo!()
-    }
-
-    fn get_transaction_by_block_hash_and_index(
-        &self,
-        _block_hash: H256,
-        _index: zksync_basic_types::web3::types::Index,
-    ) -> eyre::Result<Option<Transaction>> {
-        todo!()
-    }
-
-    fn get_transaction_by_block_number_and_index(
-        &self,
-        _block_number: zksync_types::api::BlockNumber,
-        _index: zksync_basic_types::web3::types::Index,
-    ) -> eyre::Result<Option<Transaction>> {
-        todo!()
-    }
-
-    fn get_bridge_contracts(&self) -> eyre::Result<zksync_types::api::BridgeAddresses> {
-        todo!()
-    }
-
-    fn get_confirmed_tokens(
-        &self,
-        _from: u32,
-        _limit: u8,
-    ) -> eyre::Result<Vec<zksync_web3_decl::types::Token>> {
-        todo!()
+    fn get_enumeration_index(&mut self, _key: &StorageKey) -> Option<u64> {
+        Some(0_u64)
     }
 }
 
@@ -320,6 +278,7 @@ mod tests {
         let db = RevmDatabaseForEra {
             current_block: 0,
             db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
+            factory_deps: Default::default(),
         };
 
         let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
@@ -349,6 +308,7 @@ mod tests {
         let db = RevmDatabaseForEra {
             current_block: 0,
             db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
+            factory_deps: Default::default(),
         };
 
         let actual = db.fetch_account_code(account, &modified_keys, &bytecodes);
@@ -376,6 +336,7 @@ mod tests {
         let bytecodes = Default::default();
         let db = RevmDatabaseForEra {
             current_block: 0,
+            factory_deps: Default::default(),
             db: Arc::new(Mutex::new(Box::new(MockDatabase {
                 basic: hashmap! {
                     h160_to_address(account) => AccountInfo {
@@ -423,6 +384,7 @@ mod tests {
         let bytecodes = Default::default(); // nothing in bytecodes
         let db = RevmDatabaseForEra {
             current_block: 0,
+            factory_deps: Default::default(),
             db: Arc::new(Mutex::new(Box::new(MockDatabase {
                 basic: hashmap! {
                     h160_to_address(account) => AccountInfo {
@@ -453,51 +415,5 @@ mod tests {
             ),
         ));
         assert_eq!(expected, actual)
-    }
-
-    #[test]
-    fn test_get_storage_at_does_not_panic_when_even_numbered_blocks_are_requested() {
-        // This test exists because era-test-node creates two L2 (virtual) blocks per transaction.
-        // See https://github.com/matter-labs/era-test-node/pull/111/files#diff-af08c3181737aa5783b96dfd920cd5ef70829f46cd1b697bdb42414c97310e13R1333
-
-        let db = &RevmDatabaseForEra {
-            current_block: 1,
-            db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
-        };
-
-        let actual = db
-            .get_storage_at(
-                H160::zero(),
-                U256::zero(),
-                Some(BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(
-                    zksync_basic_types::U64::from(2),
-                ))),
-            )
-            .expect("failed getting storage");
-
-        assert_eq!(H256::zero(), actual)
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "Only fetching of the most recent L2 block 2 is supported - but queried for 1"
-    )]
-    fn test_get_storage_at_panics_when_odd_numbered_blocks_are_requested() {
-        // This test exists because era-test-node creates two L2 (virtual) blocks per transaction.
-        // See https://github.com/matter-labs/era-test-node/pull/111/files#diff-af08c3181737aa5783b96dfd920cd5ef70829f46cd1b697bdb42414c97310e13R1333
-
-        let db = &RevmDatabaseForEra {
-            current_block: 1,
-            db: Arc::new(Mutex::new(Box::new(MockDatabase::default()))),
-        };
-
-        db.get_storage_at(
-            H160::zero(),
-            U256::zero(),
-            Some(BlockIdVariant::BlockNumber(zksync_types::api::BlockNumber::Number(
-                zksync_basic_types::U64::from(1),
-            ))),
-        )
-        .unwrap();
     }
 }

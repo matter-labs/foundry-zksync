@@ -12,20 +12,12 @@ contract FsTest is Test {
         string memory path = "src/fixtures/Json/write_test.json";
 
         // Write json to file
-        (bool success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("writeJson(string,string)", json, path)
-        );
-        require(success, "writeJson failed");
+        vm.writeJson(json, path);
 
-        bytes memory readRawData;
-        (success, readRawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("readFile(string)", path)
-        );
-        require(success, "readFile failed");
-        bytes memory readData = Utils.trimReturnBytes(readRawData);
+        string memory readData = vm.readFile(path);
 
         require(
-            keccak256(readData) ==
+            keccak256(bytes(readData)) ==
                 keccak256(
                     bytes(
                         '{\n  "boolean": true,\n  "number": 342,\n  "object": {\n    "title": "finally json serialization"\n  }\n}'
@@ -35,24 +27,12 @@ contract FsTest is Test {
         );
 
         // Write json to key b
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "writeJson(string,string,string)",
-                json,
-                path,
-                "b"
-            )
-        );
-        require(success, "writeJson to key failed");
+        vm.writeJson(json, path, "b");
 
-        (success, readRawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("readFile(string)", path)
-        );
-        require(success, "readFile failed");
-        readData = Utils.trimReturnBytes(readRawData);
+        string memory readData2 = vm.readFile(path);
 
         require(
-            keccak256(readData) ==
+            keccak256(bytes(readData2)) ==
                 keccak256(
                     bytes(
                         '{\n  "boolean": true,\n  "number": 342,\n  "object": {\n    "title": "finally json serialization"\n  },\n  "b": {\n    "boolean": true,\n    "number": 342,\n    "object": {\n      "title": "finally json serialization"\n    }\n  }\n}'
@@ -62,24 +42,12 @@ contract FsTest is Test {
         );
 
         // Replace the key b with single value
-        (success, ) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature(
-                "writeJson(string,string,string)",
-                '"test"',
-                path,
-                "b"
-            )
-        );
-        require(success, "writeJson to key failed");
+        vm.writeJson('"test"', path, "b");
 
-        (success, readRawData) = Constants.CHEATCODE_ADDRESS.call(
-            abi.encodeWithSignature("readFile(string)", path)
-        );
-        require(success, "readFile failed");
-        readData = Utils.trimReturnBytes(readRawData);
+        string memory readData3 = vm.readFile(path);
 
         require(
-            keccak256(readData) ==
+            keccak256(bytes(readData3)) ==
                 keccak256(
                     bytes(
                         '{\n  "boolean": true,\n  "number": 342,\n  "object": {\n    "title": "finally json serialization"\n  },\n  "b": "test"\n}'

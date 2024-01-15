@@ -33,6 +33,8 @@ pub enum DatabaseError {
     GetBlockHash(u64, Arc<eyre::Error>),
     #[error("failed to get full block for {0:?}: {1}")]
     GetFullBlock(BlockId, Arc<eyre::Error>),
+    #[error("failed to get bytecode for {0:?}: {1}")]
+    GetBytecode(B256, Arc<eyre::Error>),
     #[error("block {0:?} does not exist")]
     BlockNotFound(BlockId),
     #[error("failed to get transaction {0}: {1}")]
@@ -66,6 +68,7 @@ impl DatabaseError {
             Self::GetBlockHash(_, err) => Some(err),
             Self::GetFullBlock(_, err) => Some(err),
             Self::GetTransaction(_, err) => Some(err),
+            Self::GetBytecode(_, err) => Some(err),
             // Enumerate explicitly to make sure errors are updated if a new one is added.
             Self::NoCheats(_) |
             Self::MissingAccount(_) |
