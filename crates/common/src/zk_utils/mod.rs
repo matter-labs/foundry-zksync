@@ -148,14 +148,31 @@ pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
 }
 
+/// Recorded storage modifications.
+#[derive(Default, Debug, Clone)]
+pub struct StorageModifications {
+    /// Storage key modifications.
+    pub keys: HashMap<StorageKey, StorageValue>,
+    /// Bytecode modifications.
+    pub bytecodes: HashMap<H256, Vec<u8>>,
+}
+
+impl StorageModifications {
+    /// Updates current modifications with the provided modifications.
+    pub fn extend(&mut self, other: StorageModifications) {
+        self.keys.extend(other.keys);
+        self.bytecodes.extend(other.bytecodes);
+    }
+}
+
 /// Keeps track of storage modifications performed during test executions.
 /// This is especially important when forking to re-apply changes.
 pub trait StorageModificationRecorder {
-    /// Merge modified keys into the existing modifications
-    fn record_modified_keys(&mut self, modified_keys: &HashMap<StorageKey, StorageValue>);
+    /// Merge modified keys and bytecodes into the existing modifications
+    fn record_storage_modifications(&mut self, storage_modifications: StorageModifications);
 
     /// Return all modified keys
-    fn get(&self) -> &HashMap<StorageKey, StorageValue>;
+    fn get(&self) -> &StorageModifications;
 }
 
 /// Converts a reference to self into a tracer pointer.
