@@ -649,7 +649,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                                         .decommittment_processor
                                         .known_bytecodes
                                         .inner()
-                                        .contains_key(&key)
+                                        .contains_key(key)
                                 })
                                 .collect(),
                             Timestamp(state.local_state.timestamp),
@@ -711,7 +711,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                                         .decommittment_processor
                                         .known_bytecodes
                                         .inner()
-                                        .contains_key(&key)
+                                        .contains_key(key)
                                 })
                                 .collect(),
                             Timestamp(state.local_state.timestamp),
@@ -745,11 +745,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                                 .clone()
                                 .into_iter()
                                 .filter(|(key, _)| {
+                                    println!("STOR {}", hex::encode(u256_to_h256(*key)));
                                     !state
                                         .decommittment_processor
                                         .known_bytecodes
                                         .inner()
-                                        .contains_key(&key)
+                                        .contains_key(key)
                                 })
                                 .collect(),
                             Timestamp(state.local_state.timestamp),

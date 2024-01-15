@@ -45,24 +45,22 @@ pub fn run_l2_tx_raw<S: ReadStorage>(
     let tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
     let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
 
-    if get_env_var::<bool>("ZK_DEBUG_INFO") {
-        let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
+    let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
 
-        tracing::info!("=== Console Logs: ");
-        let console_log_handler = ConsoleLogHandler::default();
-        for call in &call_traces {
-            console_log_handler.handle_call_recursive(call);
-        }
+    tracing::info!("=== Console Logs: ");
+    let console_log_handler = ConsoleLogHandler::default();
+    for call in &call_traces {
+        console_log_handler.handle_call_recursive(call);
+    }
 
-        tracing::info!("=== Calls: ");
-        for call in call_traces.iter() {
-            formatter::print_call(call, 0, &ShowCalls::All, resolve_hashes);
-        }
+    tracing::info!("=== Calls: ");
+    for call in call_traces.iter() {
+        formatter::print_call(call, 0, &ShowCalls::All, resolve_hashes);
+    }
 
-        tracing::info!("==== {}", format!("{} events", tx_result.logs.events.len()));
-        for event in &tx_result.logs.events {
-            formatter::print_event(event, resolve_hashes);
-        }
+    tracing::info!("==== {}", format!("{} events", tx_result.logs.events.len()));
+    for event in &tx_result.logs.events {
+        formatter::print_event(event, resolve_hashes);
     }
 
     let bytecodes = vm
