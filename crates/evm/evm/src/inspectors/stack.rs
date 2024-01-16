@@ -5,8 +5,10 @@ use super::{
 use alloy_primitives::{Address, Bytes, B256, U256};
 use ethers_core::types::Log;
 use ethers_signers::LocalWallet;
-use foundry_common::{AsTracerPointer, StorageModificationRecorder};
-use foundry_evm_core::{backend::DatabaseExt, debug::DebugArena};
+use foundry_common::{AsTracerPointer, StorageModificationRecorder, StorageModifications};
+use foundry_evm_core::{
+    backend::DatabaseExt, debug::DebugArena, era_revm::storage_view::StorageView,
+};
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::CallTraceArena;
 use revm::{
@@ -16,11 +18,7 @@ use revm::{
     primitives::{BlockEnv, Env},
     EVMData, Inspector,
 };
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
-use zksync_types::{StorageKey, StorageValue};
+use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Clone, Debug, Default)]
 #[must_use = "builders do nothing unless you call `build` on them"]
@@ -212,7 +210,7 @@ pub struct InspectorStack {
     pub log_collector: Option<LogCollector>,
     pub printer: Option<TracePrinter>,
     pub tracer: Option<Tracer>,
-    pub modified_storage_keys: HashMap<StorageKey, StorageValue>,
+    pub storage_modifications: StorageModifications,
 }
 
 impl InspectorStack {
@@ -576,37 +574,31 @@ impl<DB: DatabaseExt> Inspector<DB> for InspectorStack {
     }
 }
 
-use era_test_node::fork::ForkStorage;
-use foundry_evm_core::era_revm::db::RevmDatabaseForEra;
-
 use era_cheatcodes::cheatcodes::CheatcodeTracer;
-use era_test_node::deps::storage_view::StorageView;
+use foundry_evm_core::era_revm::db::RevmDatabaseForEra;
 use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
 
-impl<DB: DatabaseExt + Send>
-    AsTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>
+impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
     for &mut InspectorStack
 {
     fn as_tracer_pointer(
         &self,
-    ) -> multivm::vm_latest::TracerPointer<
-        StorageView<ForkStorage<RevmDatabaseForEra<DB>>>,
-        HistoryDisabled,
-    > {
+    ) -> multivm::vm_latest::TracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
+    {
         CheatcodeTracer::new(
             self.cheatcodes.as_ref().map(|c| c.config.clone()).unwrap_or_default(),
-            self.modified_storage_keys.clone(),
+            self.storage_modifications.clone(),
         )
         .into_tracer_pointer()
     }
 }
 
 impl StorageModificationRecorder for &mut InspectorStack {
-    fn record_modified_keys(&mut self, modified_keys: &HashMap<StorageKey, StorageValue>) {
-        self.modified_storage_keys.extend(modified_keys);
+    fn record_storage_modifications(&mut self, storage_modifications: StorageModifications) {
+        self.storage_modifications.extend(storage_modifications);
     }
 
-    fn get(&self) -> &HashMap<StorageKey, StorageValue> {
-        &self.modified_storage_keys
+    fn get_storage_modifications(&self) -> &StorageModifications {
+        &self.storage_modifications
     }
 }

@@ -2,6 +2,7 @@
 
 use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
+    era_revm::storage_view::StorageView,
     fork::{CreateFork, ForkId, MultiFork, SharedBackend},
     snapshot::Snapshots,
     utils::configure_tx_env,
@@ -30,7 +31,6 @@ use revm::{
 use std::collections::{HashMap, HashSet};
 
 use crate::era_revm::db::RevmDatabaseForEra;
-use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
 use multivm::vm_latest::HistoryDisabled;
 
 mod diagnostic;
@@ -769,10 +769,8 @@ impl Backend {
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + AsTracerPointer<
-                StorageView<ForkStorage<RevmDatabaseForEra<&'a mut Self>>>,
-                HistoryDisabled,
-            > + StorageModificationRecorder,
+            + AsTracerPointer<StorageView<RevmDatabaseForEra<&'a mut Self>>, HistoryDisabled>
+            + StorageModificationRecorder,
     {
         self.initialize(env);
 

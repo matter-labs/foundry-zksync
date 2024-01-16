@@ -193,7 +193,6 @@ where
     fn request_account_storage(&mut self, address: Address, idx: U256, listener: StorageSender) {
         match self.storage_requests.entry((address, idx)) {
             Entry::Occupied(mut entry) => {
-                println!("occupied {:?}, {:?}, {:?}", &address, &idx, &self.block_id);
                 entry.get_mut().push(listener);
             }
             Entry::Vacant(entry) => {
