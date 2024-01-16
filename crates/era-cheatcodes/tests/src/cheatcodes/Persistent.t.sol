@@ -4,12 +4,6 @@ pragma solidity ^0.8.13;
 import {Test, console2 as console} from "forge-std/Test.sol";
 import {Constants} from "./Constants.sol";
 
-contract Target {
-    function output() public pure returns (uint256) {
-        return 255;
-    }
-}
-
 contract DummyContract {
     uint256 public val;
 
