@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use era_test_node::{
     console_log::ConsoleLogHandler,
@@ -45,6 +45,8 @@ pub fn run_l2_tx_raw<S: ReadStorage>(
     let tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
     let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
 
+    let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
+
     tracing::info!("=== Console Logs: ");
     let console_log_handler = ConsoleLogHandler::default();
     for call in &call_traces {
@@ -53,14 +55,33 @@ pub fn run_l2_tx_raw<S: ReadStorage>(
 
     tracing::info!("=== Calls: ");
     for call in call_traces.iter() {
-        formatter::print_call(call, 0, &ShowCalls::All, false);
+        formatter::print_call(call, 0, &ShowCalls::All, resolve_hashes);
     }
 
-    let bytecodes: HashMap<U256, Vec<U256>> = vm
+    tracing::info!("==== {}", format!("{} events", tx_result.logs.events.len()));
+    for event in &tx_result.logs.events {
+        formatter::print_event(event, resolve_hashes);
+    }
+
+    let bytecodes = vm
         .get_last_tx_compressed_bytecodes()
         .iter()
         .map(|b| bytecode_to_factory_dep(b.original.clone()))
         .collect();
     let modified_keys = storage.borrow().modified_storage_keys().clone();
     (tx_result, bytecodes, modified_keys)
+}
+
+fn get_env_var<T>(name: &str) -> T
+where
+    T: FromStr + Default,
+    T::Err: Debug,
+{
+    std::env::var(name)
+        .map(|value| {
+            value.parse::<T>().unwrap_or_else(|err| {
+                panic!("failed parsing env variable {}={}, {:?}", name, value, err)
+            })
+        })
+        .unwrap_or_default()
 }

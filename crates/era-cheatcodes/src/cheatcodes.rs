@@ -7,7 +7,7 @@ use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
 use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
-use foundry_common::conversion_utils::h160_to_address;
+use foundry_common::{conversion_utils::h160_to_address, StorageModifications};
 use foundry_evm_core::{
     backend::DatabaseExt,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
@@ -53,10 +53,9 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
-    MSG_VALUE_SIMULATOR_ADDRESS,
+    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS, MSG_VALUE_SIMULATOR_ADDRESS,
 };
-use zksync_utils::{h256_to_u256, u256_to_h256};
+use zksync_utils::{bytecode::CompressedBytecodeInfo, h256_to_u256, u256_to_h256};
 
 type EraDb<DB> = StorageView<RevmDatabaseForEra<DB>>;
 type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
@@ -115,7 +114,7 @@ enum FoundryTestState {
 
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
-    modified_storage_keys: HashMap<StorageKey, StorageValue>,
+    storage_modifications: StorageModifications,
     one_time_actions: Vec<FinishCycleOneTimeActions>,
     next_return_action: Option<NextReturnAction>,
     permanent_actions: FinishCyclePermanentActions,
@@ -633,15 +632,28 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let mut storage = storage.borrow_mut();
                     let modified_storage =
                         self.get_modified_storage(storage.modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
+                    );
 
                     storage.clean_cache();
                     let fork_id = {
-                        let era_db = &storage.storage_handle;
-                        let bytecodes = bootloader_state
-                            .get_last_tx_compressed_bytecodes()
-                            .iter()
-                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
-                            .collect();
+                        let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
+                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                        state.decommittment_processor.populate(
+                            bytecodes
+                                .clone()
+                                .into_iter()
+                                .filter(|(key, _)| {
+                                    !state
+                                        .decommittment_processor
+                                        .known_bytecodes
+                                        .inner()
+                                        .contains_key(key)
+                                })
+                                .collect(),
+                            Timestamp(state.local_state.timestamp),
+                        );
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
@@ -669,40 +681,47 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let era_db = &storage.borrow_mut().storage_handle;
                     let mut db = era_db.db.lock().unwrap();
                     let era_env = self.env.get().unwrap();
-                    let fork_id = db.create_fork(create_fork_request(
-                        era_env,
-                        self.config.clone(),
-                        block_number,
-                        &url_or_alias,
-                    ));
-                    self.return_data = Some(fork_id.unwrap().to_return_data());
+                    let fork_id = db
+                        .create_fork(create_fork_request(
+                            era_env,
+                            self.config.clone(),
+                            block_number,
+                            &url_or_alias,
+                        ))
+                        .unwrap();
+                    self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
-                    let mut modified_storage = self
-                        .modified_storage_keys
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect::<HashMap<_, _>>();
-                    modified_storage.extend(
-                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
-                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
-                        }),
+                    let modified_storage =
+                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
                     );
+
                     let mut storage = storage.borrow_mut();
 
                     storage.clean_cache();
                     {
                         let era_db = &storage.storage_handle;
-                        let bytecodes = bootloader_state
-                            .get_last_tx_compressed_bytecodes()
-                            .iter()
-                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
-                            .collect();
+                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                        state.decommittment_processor.populate(
+                            bytecodes
+                                .clone()
+                                .into_iter()
+                                .filter(|(key, _)| {
+                                    !state
+                                        .decommittment_processor
+                                        .known_bytecodes
+                                        .inner()
+                                        .contains_key(key)
+                                })
+                                .collect(),
+                            Timestamp(state.local_state.timestamp),
+                        );
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state = storage_to_state(era_db, &modified_storage, bytecodes);
-                        *journaled_state.state() = state;
+                        journaled_state.state =
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -716,14 +735,27 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let mut storage = storage.borrow_mut();
                     let modified_storage =
                         self.get_modified_storage(storage.modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
+                    );
                     {
                         storage.clean_cache();
                         let era_db = &storage.storage_handle;
-                        let bytecodes = bootloader_state
-                            .get_last_tx_compressed_bytecodes()
-                            .iter()
-                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
-                            .collect();
+                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                        state.decommittment_processor.populate(
+                            bytecodes
+                                .clone()
+                                .into_iter()
+                                .filter(|(key, _)| {
+                                    !state
+                                        .decommittment_processor
+                                        .known_bytecodes
+                                        .inner()
+                                        .contains_key(key)
+                                })
+                                .collect(),
+                            Timestamp(state.local_state.timestamp),
+                        );
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
@@ -881,13 +913,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 impl CheatcodeTracer {
     pub fn new(
         cheatcodes_config: Arc<CheatsConfig>,
-        modified_keys: HashMap<StorageKey, StorageValue>,
+        storage_modifications: StorageModifications,
     ) -> Self {
-        Self {
-            config: cheatcodes_config,
-            modified_storage_keys: modified_keys,
-            ..Default::default()
-        }
+        Self { config: cheatcodes_config, storage_modifications, ..Default::default() }
     }
 
     /// Resets the test state to [TestStatus::NotStarted]
@@ -1585,8 +1613,8 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to write file");
                 }
             }
-            _ => {
-                tracing::error!("👷 Unrecognized cheatcode");
+            code => {
+                tracing::error!("👷 Unrecognized cheatcode {:?}", code);
             }
         };
     }
@@ -1967,7 +1995,8 @@ impl CheatcodeTracer {
         storage: &HashMap<StorageKey, H256>,
     ) -> HashMap<StorageKey, H256> {
         let mut modified_storage = self
-            .modified_storage_keys
+            .storage_modifications
+            .keys
             .clone()
             .into_iter()
             .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
@@ -1978,6 +2007,31 @@ impl CheatcodeTracer {
                 .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS),
         );
         modified_storage
+    }
+
+    /// Merge current modified bytecodes with the entire storage modifications made so far in the
+    /// test
+    fn get_modified_bytecodes(
+        &self,
+        bootloader_bytecodes: Vec<CompressedBytecodeInfo>,
+    ) -> HashMap<H256, Vec<u8>> {
+        let mut modified_bytecodes = self.storage_modifications.bytecodes.clone();
+        modified_bytecodes.extend(
+            bootloader_bytecodes
+                .iter()
+                .map(|b| {
+                    let (bytecode_key, bytecode_value) =
+                        bytecode_to_factory_dep(b.original.clone());
+                    let key = u256_to_h256(bytecode_key);
+                    let value = bytecode_value
+                        .into_iter()
+                        .flat_map(|v| u256_to_h256(v).as_bytes().to_owned())
+                        .collect_vec();
+                    (key, value)
+                })
+                .collect::<HashMap<_, _>>(),
+        );
+        modified_bytecodes
     }
 }
 
@@ -1996,6 +2050,17 @@ where
 
         abi_encoded_data.chunks(32).map(U256::from_big_endian).collect_vec()
     }
+}
+
+fn into_revm_bytecodes(zk_bytecodes: HashMap<H256, Vec<u8>>) -> HashMap<U256, Vec<U256>> {
+    zk_bytecodes
+        .into_iter()
+        .map(|(key, value)| {
+            let key = h256_to_u256(key);
+            let value = value.chunks(32).map(U256::from).collect_vec();
+            (key, value)
+        })
+        .collect()
 }
 
 fn into_revm_env(env: &EraEnv) -> Env {
