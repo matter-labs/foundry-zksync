@@ -53,7 +53,7 @@ pub fn run_l2_tx_raw<S: ReadStorage>(
 
     tracing::info!("=== Calls: ");
     for call in call_traces.iter() {
-        formatter::print_call(call, 0, &ShowCalls::All, false);
+        formatter::print_call(call, 0, &ShowCalls::None, false);
     }
 
     let bytecodes: HashMap<U256, Vec<U256>> = vm

@@ -1351,6 +1351,27 @@ impl CheatcodeTracer {
                     tracing::error!("👷 Setting nonces failed")
                 }
             }
+            sign_0(sign_0Call { privateKey: private_key, digest }) => {
+                println!("Digest: {:?}", digest);
+                tracing::info!("👷 Signing digest with private key");
+                let Ok(signature) = zksync_types::PackedEthSignature::sign(
+                    &private_key.to_h256(),
+                    &digest[..],
+                ) else {
+                    tracing::error!("Failed to sign digest with private key");
+                    return
+                };
+
+                println!("Signature: {:?}", signature);
+                let r = signature.r();
+                println!("R: {:?}", r);
+                let s = signature.s();
+                println!("S: {:?}", s);
+                let v = signature.v();
+                println!("V: {:?}", v);
+
+                self.return_data = Some(vec!(v.into(), r.into(), s.into()))
+            }
             snapshot(snapshotCall {}) => {
                 tracing::info!("👷 Creating snapshot");
                 self.one_time_actions.push(FinishCycleOneTimeActions::Snapshot);
