@@ -819,9 +819,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let mut storage = storage.borrow_mut();
                     let modified_storage =
                         self.get_modified_storage(storage.modified_storage_keys());
-                    let modified_bytecodes = self.get_modified_bytecodes(
-                        bootloader_state.get_last_tx_compressed_bytecodes(),
-                    );
                     storage.clean_cache();
 
                     {
@@ -849,10 +846,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let mut storage = storage.borrow_mut();
                     let modified_storage =
                         self.get_modified_storage(storage.modified_storage_keys());
-                    let modified_bytecodes = self.get_modified_bytecodes(
-                        bootloader_state.get_last_tx_compressed_bytecodes(),
-                    );
-
                     storage.clean_cache();
 
                     let snapshot_id = {
