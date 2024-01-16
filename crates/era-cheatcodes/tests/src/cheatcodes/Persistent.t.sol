@@ -28,8 +28,8 @@ contract ForkPersistentTest is Test {
 
     /// checks that marking as persistent works
     function testMakePersistent() public {
-        uint256 mainnetFork = vm.createFork("mainnet", FORK_BLOCK + 100);
-        uint256 optimismFork = vm.createFork("mainnet", FORK_BLOCK + 100);
+        uint256 fork1 = vm.createFork("mainnet", FORK_BLOCK + 100);
+        uint256 fork2 = vm.createFork("mainnet", FORK_BLOCK + 100);
 
         DummyContract dummy = new DummyContract();
 
@@ -38,14 +38,14 @@ contract ForkPersistentTest is Test {
             "should not be persistent"
         );
 
-        vm.selectFork(mainnetFork);
+        vm.selectFork(fork1);
 
         uint256 expectedValue = 99;
         dummy.set(expectedValue);
 
-        vm.selectFork(optimismFork);
+        vm.selectFork(fork2);
 
-        vm.selectFork(mainnetFork);
+        vm.selectFork(fork1);
 
         require(dummy.val() == expectedValue, "should be expected value");
 
@@ -55,7 +55,7 @@ contract ForkPersistentTest is Test {
             "should be persistent"
         );
 
-        vm.selectFork(optimismFork);
+        vm.selectFork(fork2);
         // the account is now marked as persistent and the contract is persistent across swaps
         dummy.hello();
         require(dummy.val() == expectedValue, "should be expected value");
