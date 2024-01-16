@@ -630,10 +630,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     });
                 }
                 FinishCycleOneTimeActions::MakePersistentAccount { account } => {
-                    let handle: &ForkStorage<RevmDatabaseForEra<S>> =
-                        &storage.borrow_mut().storage_handle;
-                    let fork_storage = handle.inner.write().unwrap();
-                    let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
 
                     let mut db = era_db.db.lock().unwrap();
                     db.add_persistent_account(revm::primitives::Address::from(
@@ -641,9 +638,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     ));
                 }
                 FinishCycleOneTimeActions::MakePersistentAccounts { accounts } => {
-                    let handle = &storage.borrow_mut().storage_handle;
-                    let fork_storage = handle.inner.write().unwrap();
-                    let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
 
                     let mut db = era_db.db.lock().unwrap();
                     db.extend_persistent_accounts(
@@ -654,18 +649,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     );
                 }
                 FinishCycleOneTimeActions::RevokePersistentAccount { account } => {
-                    let handle = &storage.borrow_mut().storage_handle;
-                    let fork_storage = handle.inner.write().unwrap();
-                    let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
                     let mut db = era_db.db.lock().unwrap();
                     db.remove_persistent_account(&revm::primitives::Address::from(
                         account.to_fixed_bytes(),
                     ));
                 }
                 FinishCycleOneTimeActions::RevokePersistentAccounts { accounts } => {
-                    let handle = &storage.borrow_mut().storage_handle;
-                    let fork_storage = handle.inner.write().unwrap();
-                    let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
                     let mut db = era_db.db.lock().unwrap();
                     db.remove_persistent_accounts(
                         accounts
@@ -872,7 +863,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             .map(|b| bytecode_to_factory_dep(b.original.clone()))
                             .collect();
 
-                        let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
                             storage_to_state(era_db, &modified_storage, bytecodes);
@@ -1224,9 +1214,7 @@ impl CheatcodeTracer {
             }
             isPersistent(isPersistentCall { account }) => {
                 tracing::info!("👷 Checking if account {:?} is persistent", account);
-                let handle = &storage.borrow_mut().storage_handle;
-                let fork_storage = handle.inner.read().unwrap();
-                let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
+                let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
                 let db = era_db.db.lock().unwrap();
                 let is_persistent = db.is_persistent(&revm::primitives::Address::from(
                     account.to_h160().to_fixed_bytes(),
