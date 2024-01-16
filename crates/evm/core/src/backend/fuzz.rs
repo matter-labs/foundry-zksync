@@ -4,6 +4,7 @@ use crate::{
     backend::{
         diagnostic::RevertDiagnostic, error::DatabaseError, Backend, DatabaseExt, LocalForkId,
     },
+    era_revm::storage_view::StorageView,
     fork::{CreateFork, ForkId},
 };
 use alloy_primitives::{Address, B256, U256};
@@ -17,7 +18,6 @@ use revm::{
 use std::{borrow::Cow, collections::HashMap};
 
 use crate::era_revm::db::RevmDatabaseForEra;
-use era_test_node::{deps::storage_view::StorageView, fork::ForkStorage};
 use multivm::vm_latest::HistoryDisabled;
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
@@ -59,10 +59,8 @@ impl<'a> FuzzBackendWrapper<'a> {
     ) -> eyre::Result<ResultAndState>
     where
         INSP: Inspector<Self>
-            + AsTracerPointer<
-                StorageView<ForkStorage<RevmDatabaseForEra<&'b mut Self>>>,
-                HistoryDisabled,
-            > + StorageModificationRecorder,
+            + AsTracerPointer<StorageView<RevmDatabaseForEra<&'b mut Self>>, HistoryDisabled>
+            + StorageModificationRecorder,
     {
         self.is_initialized = false;
 

@@ -10,23 +10,14 @@ contract Target {
     }
 }
 
-contract ForkBytecodeTest is Test {
+contract ForkBytecodeSetup2Test is Test {
     uint256 constant FORK_BLOCK = 19579636;
 
-    function testCreateSelectForkHasNonDeployedBytecodes() public {
-        console.log("run");
+    function setUp() public {
         vm.createSelectFork("mainnet", FORK_BLOCK);
-
-        // target should be able to deploy
-        Target target = new Target();
-        require(255 == target.output(), "incorrect output after fork");
     }
 
-    function testSelectForkForkHasNonDeployedBytecodes() public {
-        uint256 forkId = vm.createFork("mainnet", FORK_BLOCK);
-        vm.selectFork(forkId);
-
-        // target should be able to deploy
+    function testForkBytecodeSetup2Success() public {
         Target target = new Target();
         require(255 == target.output(), "incorrect output after fork");
     }

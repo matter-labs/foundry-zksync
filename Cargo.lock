@@ -4388,7 +4388,6 @@ dependencies = [
  "alloy-sol-types",
  "const-hex",
  "era_cheatcodes",
- "era_test_node",
  "ethers-core",
  "ethers-signers",
  "eyre",
@@ -4446,10 +4445,10 @@ dependencies = [
  "tracing",
  "url",
  "zksync_basic_types",
+ "zksync_contracts",
  "zksync_state",
  "zksync_types",
  "zksync_utils",
- "zksync_web3_decl",
 ]
 
 [[package]]
