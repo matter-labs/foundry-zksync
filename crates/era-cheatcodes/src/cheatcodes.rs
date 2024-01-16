@@ -180,6 +180,10 @@ enum FinishCycleOneTimeActions {
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
     SetOrigin { origin: H160 },
+    MakePersistentAccount { account: H160 },
+    MakePersistentAccounts { accounts: Vec<H160> },
+    RevokePersistentAccount { account: H160 },
+    RevokePersistentAccounts { accounts: Vec<H160> },
 }
 
 #[derive(Debug, Clone)]
@@ -624,6 +628,42 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         rollback: false,
                         is_service: false,
                     });
+                }
+                FinishCycleOneTimeActions::MakePersistentAccount { account } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+
+                    let mut db = era_db.db.lock().unwrap();
+                    db.add_persistent_account(revm::primitives::Address::from(
+                        account.to_fixed_bytes(),
+                    ));
+                }
+                FinishCycleOneTimeActions::MakePersistentAccounts { accounts } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+
+                    let mut db = era_db.db.lock().unwrap();
+                    db.extend_persistent_accounts(
+                        accounts
+                            .into_iter()
+                            .map(|a: H160| revm::primitives::Address::from(a.to_fixed_bytes()))
+                            .collect::<Vec<revm::primitives::Address>>(),
+                    );
+                }
+                FinishCycleOneTimeActions::RevokePersistentAccount { account } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    db.remove_persistent_account(&revm::primitives::Address::from(
+                        account.to_fixed_bytes(),
+                    ));
+                }
+                FinishCycleOneTimeActions::RevokePersistentAccounts { accounts } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    db.remove_persistent_accounts(
+                        accounts
+                            .into_iter()
+                            .map(|a: H160| revm::primitives::Address::from(a.to_fixed_bytes()))
+                            .collect::<Vec<revm::primitives::Address>>(),
+                    );
                 }
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
@@ -1166,6 +1206,15 @@ impl CheatcodeTracer {
                 //disable flag of recording logs
                 self.recording_logs = false;
             }
+            isPersistent(isPersistentCall { account }) => {
+                tracing::info!("👷 Checking if account {:?} is persistent", account);
+                let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                let db = era_db.db.lock().unwrap();
+                let is_persistent = db.is_persistent(&revm::primitives::Address::from(
+                    account.to_h160().to_fixed_bytes(),
+                ));
+                self.return_data = Some(is_persistent.to_return_data());
+            }
             load(loadCall { target, slot }) => {
                 if H160(target.0 .0) != CHEATCODE_ADDRESS {
                     tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
@@ -1176,6 +1225,35 @@ impl CheatcodeTracer {
                 } else {
                     self.return_data = Some(vec![U256::zero()]);
                 }
+            }
+            makePersistent_0(makePersistent_0Call { account }) => {
+                tracing::info!("👷 Making account {:?} persistent", account);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccount {
+                    account: account.to_h160(),
+                });
+            }
+            makePersistent_1(makePersistent_1Call { account0, account1 }) => {
+                tracing::info!("👷 Making accounts {:?} and {:?} persistent", account0, account1);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: vec![account0.to_h160(), account1.to_h160()],
+                });
+            }
+            makePersistent_2(makePersistent_2Call { account0, account1, account2 }) => {
+                tracing::info!(
+                    "👷 Making accounts {:?}, {:?} and {:?} persistent",
+                    account0,
+                    account1,
+                    account2
+                );
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: vec![account0.to_h160(), account1.to_h160(), account2.to_h160()],
+                });
+            }
+            makePersistent_3(makePersistent_3Call { accounts }) => {
+                tracing::info!("👷 Making accounts {:?} persistent", accounts);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: accounts.into_iter().map(|a| a.to_h160()).collect(),
+                });
             }
             recordLogs(recordLogsCall {}) => {
                 tracing::info!("👷 Recording logs");
@@ -1238,6 +1316,18 @@ impl CheatcodeTracer {
                     snapshot_id: snapshotId.to_u256(),
                 });
                 self.return_data = Some(true.to_return_data());
+            }
+            revokePersistent_0(revokePersistent_0Call { account }) => {
+                tracing::info!("👷 Revoking persistence for account {:?}", account);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RevokePersistentAccount {
+                    account: account.to_h160(),
+                });
+            }
+            revokePersistent_1(revokePersistent_1Call { accounts }) => {
+                tracing::info!("👷 Revoking persistence for accounts {:?}", accounts);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RevokePersistentAccounts {
+                    accounts: accounts.into_iter().map(|a| a.to_h160()).collect(),
+                });
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
