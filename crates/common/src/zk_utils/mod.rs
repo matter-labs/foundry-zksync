@@ -172,7 +172,7 @@ pub trait StorageModificationRecorder {
     fn record_storage_modifications(&mut self, storage_modifications: StorageModifications);
 
     /// Return all modified keys
-    fn get(&self) -> &StorageModifications;
+    fn get_storage_modifications(&self) -> &StorageModifications;
 }
 
 /// Converts a reference to self into a tracer pointer.

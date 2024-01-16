@@ -681,13 +681,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let era_db = &storage.borrow_mut().storage_handle;
                     let mut db = era_db.db.lock().unwrap();
                     let era_env = self.env.get().unwrap();
-                    let fork_id = db.create_fork(create_fork_request(
-                        era_env,
-                        self.config.clone(),
-                        block_number,
-                        &url_or_alias,
-                    ));
-                    self.return_data = Some(fork_id.unwrap().to_return_data());
+                    let fork_id = db
+                        .create_fork(create_fork_request(
+                            era_env,
+                            self.config.clone(),
+                            block_number,
+                            &url_or_alias,
+                        ))
+                        .unwrap();
+                    self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
                     let modified_storage =
@@ -745,7 +747,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                                 .clone()
                                 .into_iter()
                                 .filter(|(key, _)| {
-                                    println!("STOR {}", hex::encode(u256_to_h256(*key)));
                                     !state
                                         .decommittment_processor
                                         .known_bytecodes
@@ -1612,8 +1613,8 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to write file");
                 }
             }
-            _ => {
-                tracing::error!("👷 Unrecognized cheatcode");
+            code => {
+                tracing::error!("👷 Unrecognized cheatcode {:?}", code);
             }
         };
     }

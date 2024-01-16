@@ -72,7 +72,12 @@ pub fn tx_env_to_fee(tx_env: &TxEnv) -> Fee {
 }
 
 /// Translates Revm transaction into era's L2Tx.
-pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64) -> L2Tx {
+pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64, factory_deps: &HashMap<H256, Vec<u8>>) -> L2Tx {
+    let factory_deps = if factory_deps.is_empty() {
+        None
+    } else {
+        Some(factory_deps.values().cloned().collect_vec())
+    };
     let mut l2tx = match tx_env.transact_to {
         revm::primitives::TransactTo::Call(contract_address) => L2Tx::new(
             H160::from(contract_address.0 .0),
@@ -81,7 +86,7 @@ pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64) -> L2Tx {
             tx_env_to_fee(&tx_env),
             H160::from(tx_env.caller.0 .0),
             revm_u256_to_u256(tx_env.value),
-            None, // factory_deps
+            factory_deps, // factory_deps
             PaymasterParams::default(),
         ),
         revm::primitives::TransactTo::Create(_scheme) => {
@@ -142,7 +147,8 @@ where
         31337
     };
 
-    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
+    let mut l2_tx =
+        tx_env_to_era_tx(env.tx.clone(), nonce, &inspector.get_storage_modifications().bytecodes);
 
     if l2_tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -421,7 +427,7 @@ mod tests {
     impl<S, H> StorageModificationRecorder for Noop<S, H> {
         fn record_storage_modifications(&mut self, _storage_modifications: StorageModifications) {}
 
-        fn get(&self) -> &StorageModifications {
+        fn get_storage_modifications(&self) -> &StorageModifications {
             &self.storage_modifications
         }
     }

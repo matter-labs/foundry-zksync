@@ -279,6 +279,7 @@ impl ZkCreateArgs {
         project: &Project,
         contract_info: &ContractInfo,
     ) -> eyre::Result<Bytes> {
+        println!("FETCH");
         let output_path = Self::get_path_for_contract_output(project, contract_info);
         let contract_output = Self::get_contract_output(output_path)?;
         let contract_file_codes = &contract_output[contract_info.path.as_ref().unwrap()];

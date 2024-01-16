@@ -598,7 +598,7 @@ impl StorageModificationRecorder for &mut InspectorStack {
         self.storage_modifications.extend(storage_modifications);
     }
 
-    fn get(&self) -> &StorageModifications {
+    fn get_storage_modifications(&self) -> &StorageModifications {
         &self.storage_modifications
     }
 }
