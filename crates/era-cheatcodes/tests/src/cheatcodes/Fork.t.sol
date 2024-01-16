@@ -9,7 +9,6 @@ contract ForkTest is Test {
     address constant TOKEN_ADDRESS = 0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4;
     uint256 constant TOKEN_DECIMALS = 6;
     uint256 constant FORK_BLOCK = 19579636;
-    address constant DUMMY_ADDRESS = 0x1345df6d4C9c3035724fd0e3914dE96a5a83AAF4;
 
     function setUp() public {
         /// USDC TOKEN doesn't exists locally

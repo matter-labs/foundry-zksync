@@ -846,6 +846,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let mut storage = storage.borrow_mut();
                     let modified_storage =
                         self.get_modified_storage(storage.modified_storage_keys());
+
                     storage.clean_cache();
 
                     let snapshot_id = {
@@ -1370,6 +1371,7 @@ impl CheatcodeTracer {
                         )
                     }
                 };
+
                 self.return_data = Some(rpc_url.to_return_data());
             }
             rpcUrls(rpcUrlsCall {}) => {
