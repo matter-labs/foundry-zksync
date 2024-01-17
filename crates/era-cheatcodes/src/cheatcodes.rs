@@ -1478,7 +1478,7 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to sign digest with private key");
                     return
                 };
-                
+
                 let r = signature.r();
                 let s = signature.s();
                 let v = signature.v() + 27;
