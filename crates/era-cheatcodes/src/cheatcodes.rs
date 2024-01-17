@@ -1352,25 +1352,20 @@ impl CheatcodeTracer {
                 }
             }
             sign_0(sign_0Call { privateKey: private_key, digest }) => {
-                println!("Digest: {:?}", digest);
                 tracing::info!("👷 Signing digest with private key");
                 let Ok(signature) = zksync_types::PackedEthSignature::sign(
                     &private_key.to_h256(),
-                    &digest[..],
+                    digest.as_slice(),
                 ) else {
                     tracing::error!("Failed to sign digest with private key");
                     return
                 };
-
-                println!("Signature: {:?}", signature);
+                
                 let r = signature.r();
-                println!("R: {:?}", r);
                 let s = signature.s();
-                println!("S: {:?}", s);
-                let v = signature.v();
-                println!("V: {:?}", v);
+                let v = signature.v() + 27;
 
-                self.return_data = Some(vec!(v.into(), r.into(), s.into()))
+                self.return_data = Some(vec![v.into(), r.into(), s.into()])
             }
             snapshot(snapshotCall {}) => {
                 tracing::info!("👷 Creating snapshot");
