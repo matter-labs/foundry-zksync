@@ -245,8 +245,6 @@ impl ScriptArgs {
         // if let Ok(_) = dunce::canonicalize(&self.path) {
         let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         zksolc_cfg.compiler_path = compiler_path;
-        zksolc_cfg.settings.is_system = false;
-        zksolc_cfg.settings.force_evmla = false;
 
         let mut zksolc = ZkSolc::new(zksolc_cfg, project);
         match zksolc.compile() {
