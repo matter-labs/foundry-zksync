@@ -113,7 +113,7 @@ impl Executor {
             .expect("failed writing account storage for known codes storage address");
 
         // setup modified keys in inspector to persist cheatcode address setup across forks
-        inspector.modified_storage_keys.insert(
+        inspector.storage_modifications.keys.insert(
             StorageKey::new(
                 AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS),
                 H256::from_slice(
@@ -122,7 +122,7 @@ impl Executor {
             ),
             H256::from_slice(&empty_contract_code_hash.0),
         );
-        inspector.modified_storage_keys.insert(
+        inspector.storage_modifications.keys.insert(
             StorageKey::new(
                 AccountTreeId::new(zksync_types::H160(CHEATCODE_ADDRESS.0 .0)),
                 H256::from_slice(&empty_contract_code_hash.0),
@@ -350,7 +350,7 @@ impl Executor {
         let result = self.backend.inspect_ref(&mut env, &mut inspector)?;
         // record storage modifications
         if result.result.is_success() {
-            self.inspector.modified_storage_keys = inspector.modified_storage_keys.clone();
+            self.inspector.storage_modifications = inspector.storage_modifications.clone();
         }
         convert_executed_result(env, inspector, result, self.backend.has_snapshot_failure())
     }
