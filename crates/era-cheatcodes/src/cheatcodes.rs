@@ -1481,6 +1481,11 @@ impl CheatcodeTracer {
 
                 let r = signature.r();
                 let s = signature.s();
+                // Ethereum signed message produced by most clients contains v where v = 27 +
+                // recovery_id(0,1,2,3), but for some clients v = recovery_id(0,1,2,3). The library
+                // that we use for signature verification (written for bitcoin)
+                // expects v = recovery_id and to able to recover the address from Solidity it
+                // expects v = 27 + recovery_id.
                 let v = signature.v() + 27;
 
                 self.return_data = Some(vec![v.into(), r.into(), s.into()])
