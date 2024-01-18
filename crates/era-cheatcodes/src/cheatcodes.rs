@@ -5,7 +5,7 @@ use crate::{
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
-use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
+use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_common::{conversion_utils::h160_to_address, StorageModifications};
 use foundry_evm_core::{
@@ -45,7 +45,7 @@ use std::{
     ops::BitAnd,
     process::Command,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -131,7 +131,7 @@ pub struct CheatcodeTracer {
     test_status: FoundryTestState,
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
-    broadcastable_transactions: Vec<BroadcastableTransaction>,
+    broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
 }
 
 #[derive(Debug, Clone)]
@@ -508,7 +508,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         };
                         tracing::debug!(?tx, "storing for broadcast");
 
-                        self.broadcastable_transactions.push(tx);
+                        self.broadcastable_transactions.write().unwrap().push_back(tx);
                         //FIXME: detect if this is a deployment and increase the other nonce too
                         self.set_nonce(new_origin, (Some(nonce + 1), None), handle);
                     }
@@ -954,8 +954,14 @@ impl CheatcodeTracer {
     pub fn new(
         cheatcodes_config: Arc<CheatsConfig>,
         storage_modifications: StorageModifications,
+        broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
     ) -> Self {
-        Self { config: cheatcodes_config, storage_modifications, ..Default::default() }
+        Self {
+            config: cheatcodes_config,
+            storage_modifications,
+            broadcastable_transactions,
+            ..Default::default()
+        }
     }
 
     /// Resets the test state to [TestStatus::NotStarted]
