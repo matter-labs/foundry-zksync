@@ -20,9 +20,10 @@ contract CheatcodeTransactTest is Test {
     }
 
     function testTransact() public {
+        console.log("receiver before: ", SAMPLE_TX_RECEIVER.balance);
         vm.transact(SAMPLE_TX);
 
-        console.log(SAMPLE_TX_RECEIVER.balance);
+        console.log("receiver after: ", SAMPLE_TX_RECEIVER.balance);
         require(SAMPLE_TX_RECEIVER.balance == (START_BALANCE + SENT_VALUE), "tx didn't execute");
     }
 

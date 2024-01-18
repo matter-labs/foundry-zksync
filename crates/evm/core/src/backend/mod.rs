@@ -1233,6 +1233,8 @@ impl DatabaseExt for Backend {
         let fork = self.inner.get_fork_by_id_mut(id)?;
         let tx = fork.db.db.get_transaction(transaction)?;
 
+        dbg!(&tx);
+
         commit_transaction(tx, env, journaled_state, fork, &fork_id, inspector)
     }
 
@@ -1436,9 +1438,12 @@ impl DatabaseCommit for Backend {
 impl Database for Backend {
     type Error = DatabaseError;
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
+        println!("//basic");
         if let Some(db) = self.active_fork_db_mut() {
+            println!("//basic_active_fork_db_mut");
             db.basic(address)
         } else {
+            println!("//basic_mem_db");
             Ok(self.mem_db.basic(address)?)
         }
     }
@@ -1897,17 +1902,30 @@ fn apply_state_changeset(
     fork: &mut Fork,
 ) {
     let changed_accounts = state.keys().copied().collect::<Vec<_>>();
+
+    dbg!(&state);
+
     // commit the state and update the loaded accounts
     fork.db.commit(state);
 
     for addr in changed_accounts {
+        dbg!(&addr);
+
+        let journaled_state_account = journaled_state.state.remove(&addr);
+        let fork_journaled_state_account = fork.journaled_state.state.remove(&addr);
+
+        dbg!(&journaled_state_account);
+        dbg!(&fork_journaled_state_account);
+
         // reload all changed accounts by removing them from the journaled state and reloading them
         // from the now updated database
-        if journaled_state.state.remove(&addr).is_some() {
+        if journaled_state_account.is_some() {
             let _ = journaled_state.load_account(addr, &mut fork.db);
         }
-        if fork.journaled_state.state.remove(&addr).is_some() {
+        if fork_journaled_state_account.is_some() {
             let _ = fork.journaled_state.load_account(addr, &mut fork.db);
         }
+
+
     }
 }
