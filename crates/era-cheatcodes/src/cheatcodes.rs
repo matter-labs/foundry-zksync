@@ -12,7 +12,11 @@ use foundry_common::{
 };
 use foundry_evm_core::{
     backend::DatabaseExt,
-    era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
+    era_revm::{
+        db::RevmDatabaseForEra,
+        storage_view::StorageView,
+        transactions::{storage_to_state, tx_env_to_era_tx},
+    },
     fork::CreateFork,
     opts::EvmOpts,
 };
@@ -21,7 +25,7 @@ use multivm::{
     interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus, VmRevertReason},
     vm_latest::{
         BootloaderState, HistoryDisabled, HistoryMode, L1BatchEnv, SimpleMemory, SystemEnv,
-        ToTracerPointer, TracerPointer, VmTracer, ZkSyncVmState,
+        ToTracerPointer, VmTracer, ZkSyncVmState,
     },
     zk_evm_1_3_3::zkevm_opcode_defs::CALL_SYSTEM_ABI_REGISTERS,
     zk_evm_1_4_0::{
@@ -50,14 +54,14 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use zksync_basic_types::{AccountTreeId, H160, H256, U256};
+use zksync_basic_types::{AccountTreeId, L2ChainId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
-    MSG_VALUE_SIMULATOR_ADDRESS,
+    LogQuery, PackedEthSignature, StorageKey, StorageValue, Timestamp,
+    ACCOUNT_CODE_STORAGE_ADDRESS, MSG_VALUE_SIMULATOR_ADDRESS,
 };
 use zksync_utils::{h256_to_u256, u256_to_h256};
 
@@ -127,6 +131,7 @@ pub struct CheatcodeTracer {
     near_calls: usize,
     serialized_objects: HashMap<String, String>,
     env: OnceCell<EraEnv>,
+    revm_env: Env,
     config: Arc<CheatsConfig>,
     recorded_logs: HashSet<LogEntry>,
     recording_logs: bool,
@@ -862,24 +867,27 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.borrow_mut().set_value(key, origin.into());
                 }
                 FinishCycleOneTimeActions::SwitchToZkSync => {
-                    let storage = storage.clone();
-                    // let mut storage: RefMut<'_, StorageView<ForkStorage<RevmDatabaseForEra<S>>>>
-                    // = storage.borrow_mut();
+                    let era_db = &storage.borrow().storage_handle;
+                    let era_env = self.env.get().unwrap();
+                    let mut env = into_revm_env(era_env);
+                    let nonce =
+                        era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
 
-                    // let handle: &ForkStorage<RevmDatabaseForEra<S>> = &storage.storage_handle;
-                    // let mut fork_storage = handle.inner.write().unwrap();
-                    // fork_storage.value_read_cache.clear();
-                    // let era_db = fork_storage.fork.as_ref().unwrap().fork_source.clone();
-                    // let mut db = era_db.db.lock().unwrap();
-                    // let era_env = self.env.get().unwrap();
-                    // let mut env = into_revm_env(era_env);
-                    // let cheatcode_tracer = self.clone();
-
-                    // let result = foundry_evm_core::era_revm::transactions::run_era_transaction(
-                    //     &mut env,
-                    //     db,
-                    //     cheatcode_tracer,
-                    // );
+                    let mut l2_tx = tx_env_to_era_tx(self.revm_env.tx.clone(), nonce);
+                    if l2_tx.common_data.signature.is_empty() {
+                        // FIXME: This is a hack to make sure that the signature is not empty.
+                        // Fails without a signature here: https://github.com/matter-labs/zksync-era/blob/73a1e8ff564025d06e02c2689da238ae47bb10c3/core/lib/types/src/transaction_request.rs#L381
+                        l2_tx.common_data.signature =
+                            PackedEthSignature::default().serialize_packed().into();
+                    }
+                    let cheatcode_tracer = self.clone();
+                    let result = foundry_evm_core::era_revm::node::run_l2_tx_raw(
+                        l2_tx,
+                        storage.clone(),
+                        self.revm_env.cfg.chain_id.try_into().unwrap(),
+                        self.revm_env.block.basefee.try_into().unwrap(),
+                        vec![cheatcode_tracer.into_tracer_pointer()],
+                    );
                 }
                 FinishCycleOneTimeActions::SwitchToREVM => todo!(),
             }
@@ -908,10 +916,12 @@ impl CheatcodeTracer {
     pub fn new(
         cheatcodes_config: Arc<CheatsConfig>,
         modified_keys: HashMap<StorageKey, StorageValue>,
+        env: Env,
     ) -> Self {
         Self {
             config: cheatcodes_config,
             modified_storage_keys: modified_keys,
+            revm_env: env,
             ..Default::default()
         }
     }
@@ -2129,26 +2139,4 @@ fn are_logs_equal(a: &LogEntry, b: &LogEntry, emit_checks: &EmitChecks) -> bool 
     let data_match = if emit_checks.data { a.data == b.data } else { true };
 
     address_match && topics_match && data_match
-}
-
-impl<DB: DatabaseExt + Send>
-    AsTracerPointer<StorageView<ForkStorage<RevmDatabaseForEra<DB>>>, HistoryDisabled>
-    for CheatcodeTracer
-{
-    fn as_tracer_pointer(
-        &self,
-    ) -> multivm::vm_latest::TracerPointer<
-        StorageView<ForkStorage<RevmDatabaseForEra<DB>>>,
-        HistoryDisabled,
-    > {
-        todo!()
-    }
-}
-
-impl StorageModificationRecorder for CheatcodeTracer {
-    fn record_modified_keys(&mut self, modified_keys: &HashMap<StorageKey, StorageValue>) {}
-
-    fn get(&self) -> &HashMap<StorageKey, StorageValue> {
-        todo!()
-    }
 }

@@ -215,6 +215,7 @@ pub struct InspectorStack {
     pub printer: Option<TracePrinter>,
     pub tracer: Option<Tracer>,
     pub modified_storage_keys: HashMap<StorageKey, StorageValue>,
+    pub env: Option<Env>,
 }
 
 impl InspectorStack {
@@ -233,6 +234,7 @@ impl InspectorStack {
     pub fn set_env(&mut self, env: &Env) {
         self.set_block(&env.block);
         self.set_gas_price(env.tx.gas_price);
+        self.env = Some(env.clone());
     }
 
     /// Sets the block for the relevant inspectors.
@@ -592,6 +594,7 @@ impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>
         CheatcodeTracer::new(
             self.cheatcodes.as_ref().map(|c| c.config.clone()).unwrap_or_default(),
             self.modified_storage_keys.clone(),
+            self.env.clone().unwrap(),
         )
         .into_tracer_pointer()
     }

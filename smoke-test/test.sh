@@ -5,7 +5,7 @@ set -o pipefail -e
 
 SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
-BINARY_PATH="../target/release/zkforge"
+BINARY_PATH="../target/debug/zkforge"
 
 function cleanup() {
   echo "Cleaning up..."
@@ -55,7 +55,7 @@ function wait_for_build() {
 # See https://unix.stackexchange.com/questions/312631/bash-script-with-set-e-doesnt-stop-on-command
 function build_zkforge() {
   echo "Building..."
-  cargo build --manifest-path="../Cargo.toml" --release
+  cargo build --manifest-path="../Cargo.toml" 
   wait_for_build 30
 }
 
