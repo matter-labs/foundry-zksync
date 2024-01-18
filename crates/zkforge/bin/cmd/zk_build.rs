@@ -120,7 +120,7 @@ impl ZkBuildArgs {
     /// step in the process fails. The purpose of this function is to consolidate all steps
     /// involved in the zkSync contract compilation process in a single method, allowing for
     /// easy invocation of the process with a single function call.
-    pub fn run(self) -> eyre::Result<()> {
+    pub async fn run(self) -> eyre::Result<()> {
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
@@ -137,12 +137,15 @@ impl ZkBuildArgs {
             project = config.project()?;
             zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         }
+
         // TODO: revisit to remove zksolc_manager and move binary installation to zksolc_config
-        let compiler_path = setup_zksolc_manager(self.args.use_zksolc.clone())?;
+        let compiler_path = setup_zksolc_manager(self.args.use_zksolc.clone()).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
         // TODO: add filter support
-        foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project)
+        // TODO: add remappings?
+        let _ = foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project);
+        Ok(())
     }
     /// Returns the `Project` for the current workspace
     ///

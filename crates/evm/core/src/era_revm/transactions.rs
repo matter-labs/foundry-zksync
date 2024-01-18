@@ -23,7 +23,7 @@ use foundry_common::{
         conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
         factory_deps::PackedEraBytecode,
     },
-    AsTracerPointer, StorageModificationRecorder,
+    AsTracerPointer, StorageModificationRecorder, StorageModifications,
 };
 
 use super::db::RevmDatabaseForEra;
@@ -72,7 +72,12 @@ pub fn tx_env_to_fee(tx_env: &TxEnv) -> Fee {
 }
 
 /// Translates Revm transaction into era's L2Tx.
-pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64) -> L2Tx {
+pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64, factory_deps: &HashMap<H256, Vec<u8>>) -> L2Tx {
+    let factory_deps = if factory_deps.is_empty() {
+        None
+    } else {
+        Some(factory_deps.values().cloned().collect_vec())
+    };
     let mut l2tx = match tx_env.transact_to {
         revm::primitives::TransactTo::Call(contract_address) => L2Tx::new(
             H160::from(contract_address.0 .0),
@@ -81,7 +86,7 @@ pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64) -> L2Tx {
             tx_env_to_fee(&tx_env),
             H160::from(tx_env.caller.0 .0),
             revm_u256_to_u256(tx_env.value),
-            None, // factory_deps
+            factory_deps, // factory_deps
             PaymasterParams::default(),
         ),
         revm::primitives::TransactTo::Create(_scheme) => {
@@ -142,7 +147,8 @@ where
         31337
     };
 
-    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
+    let mut l2_tx =
+        tx_env_to_era_tx(env.tx.clone(), nonce, &inspector.get_storage_modifications().bytecodes);
 
     if l2_tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -162,7 +168,21 @@ where
     );
 
     // record storage modifications in the inspector
-    inspector.record_modified_keys(&modified_storage);
+    inspector.record_storage_modifications(StorageModifications {
+        keys: modified_storage.clone(),
+        bytecodes: bytecodes
+            .clone()
+            .into_iter()
+            .map(|(key, value)| {
+                let key = u256_to_h256(key);
+                let value = value
+                    .into_iter()
+                    .flat_map(|word| u256_to_h256(word).as_bytes().to_owned())
+                    .collect_vec();
+                (key, value)
+            })
+            .collect(),
+    });
 
     let execution_result = match tx_result.result {
         multivm::interface::ExecutionResult::Success { output, .. } => {
@@ -185,7 +205,7 @@ where
             };
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
-                gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                gas_used: tx_result.statistics.gas_used as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
                 logs,
                 output: revm::primitives::Output::Create(
@@ -378,12 +398,12 @@ mod tests {
 
     struct Noop<S, H> {
         _phantom: PhantomData<(S, H)>,
-        modified_storage_keys: HashMap<StorageKey, StorageValue>,
+        storage_modifications: StorageModifications,
     }
 
     impl<S, H> Default for Noop<S, H> {
         fn default() -> Self {
-            Self { _phantom: Default::default(), modified_storage_keys: Default::default() }
+            Self { _phantom: Default::default(), storage_modifications: Default::default() }
         }
     }
 
@@ -391,7 +411,7 @@ mod tests {
         fn clone(&self) -> Self {
             Self {
                 _phantom: self._phantom,
-                modified_storage_keys: self.modified_storage_keys.clone(),
+                storage_modifications: self.storage_modifications.clone(),
             }
         }
     }
@@ -405,10 +425,10 @@ mod tests {
     }
 
     impl<S, H> StorageModificationRecorder for Noop<S, H> {
-        fn record_modified_keys(&mut self, _modified_keys: &HashMap<StorageKey, StorageValue>) {}
+        fn record_storage_modifications(&mut self, _storage_modifications: StorageModifications) {}
 
-        fn get(&self) -> &HashMap<StorageKey, StorageValue> {
-            &self.modified_storage_keys
+        fn get_storage_modifications(&self) -> &StorageModifications {
+            &self.storage_modifications
         }
     }
 }
