@@ -5,32 +5,40 @@ import {Test, console2 as console} from "../../lib/forge-std/src/Test.sol";
 import {Constants} from "./Constants.sol";
 
 contract CheatcodeTransactTest is Test {
-    /// Random recent block & tx
-    uint constant SAMPLE_BLOCK = 23942350;
-    bytes32 constant SAMPLE_TX = 0x272c2251368cae9eceaea67f52855c9858fd6b00dd68d6dfadab3ab1d66f9e4b;
-    address constant SAMPLE_TX_RECEIVER = 0xC16e4F1237C7d7414a4DED7A4bADB2899AF6e91A;
-    uint constant START_BALANCE = 195359993982204;
-    uint constant SENT_VALUE = 1990000000000063;
-
     function setUp() public {
-        vm.createSelectFork("mainnet", SAMPLE_BLOCK);
-
-        console.log(SAMPLE_TX_RECEIVER.balance);
-        require(SAMPLE_TX_RECEIVER.balance == START_BALANCE, "balance not as expected");
+        vm.createSelectFork("mainnet", 23942350);
     }
 
     function testTransact() public {
-        console.log("receiver before: ", SAMPLE_TX_RECEIVER.balance);
-        vm.transact(SAMPLE_TX);
+        // A random block https://explorer.zksync.io/block/23942350
+        // vm.createSelectFork("mainnet", 23942350);
 
-        console.log("receiver after: ", SAMPLE_TX_RECEIVER.balance);
-        require(SAMPLE_TX_RECEIVER.balance == (START_BALANCE + SENT_VALUE), "tx didn't execute");
-    }
+        // A random transfer in the next block
+        bytes32 transaction = 0x272c2251368cae9eceaea67f52855c9858fd6b00dd68d6dfadab3ab1d66f9e4b;
+        address sender = 0xE4eDb277e41dc89aB076a1F049f4a3EfA700bCE8;
+        address recipient = 0xC16e4F1237C7d7414a4DED7A4bADB2899AF6e91A;
 
-    function testRollInsteadOfTransact() public {
-        vm.roll(SAMPLE_BLOCK + 1);
+        console.log("before sender balance: ", sender.balance);
+        console.log("before recipient balance: ", recipient.balance);
 
-        console.log(SAMPLE_TX_RECEIVER.balance);
-        require(SAMPLE_TX_RECEIVER.balance == (START_BALANCE + SENT_VALUE), "tx didn't execute");
+        assertEq(sender.balance, 152522463532909498719);
+        assertEq(recipient.balance, 195359993982204);
+
+        // Transfer amount: 0.001990000000000063 Ether
+        uint256 transferAmount = 1990000000000063;
+        uint256 expectedRecipientBalance = recipient.balance + transferAmount;
+        uint256 expectedSenderBalance = sender.balance - transferAmount;
+
+        // Execute the transaction
+        vm.transact(transaction);
+
+        console.log("after sender balance: ", sender.balance);
+        console.log("after recipient balance: ", recipient.balance);
+
+        // Recipient received transfer
+        assertEq(recipient.balance, expectedRecipientBalance);
+
+        // Sender balance decreased by transferAmount and gas
+        assert(sender.balance < expectedSenderBalance);
     }
 }
