@@ -33,7 +33,7 @@ use multivm::{
     },
 };
 use revm::{
-    primitives::{ruint::Uint, Address, BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
+    primitives::{ruint::Uint, BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
     JournaledState,
 };
 use serde::Serialize;
@@ -53,8 +53,7 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
-    L2_ETH_TOKEN_ADDRESS, MSG_VALUE_SIMULATOR_ADDRESS,
+    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS, MSG_VALUE_SIMULATOR_ADDRESS,
 };
 use zksync_utils::{bytecode::CompressedBytecodeInfo, h256_to_u256, u256_to_h256};
 
@@ -931,93 +930,42 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.borrow_mut().set_value(key, origin.into());
                 }
                 FinishCycleOneTimeActions::Transact { fork_id, tx_hash } => {
-                    let address =
-                    hex::decode("C16e4F1237C7d7414a4DED7A4bADB2899AF6e91A").unwrap();
-                    // let key = StorageKey::new(
-                    //     AccountTreeId::new(L2_ETH_TOKEN_ADDRESS),
-                    //     H256::from_slice(&address),
-                    // );
-                    // let result1 = storage.borrow_mut().read_value(&key);
-                    // dbg!(result1);
-
-                    let account_info = {
-                        let storage = storage.borrow_mut();
-                        let modified_storage =
-                            self.get_modified_storage(storage.modified_storage_keys());
-
-                        let era_db = &storage.storage_handle;
-
+                    {
                         let bytecodes = bootloader_state
                             .get_last_tx_compressed_bytecodes()
                             .iter()
                             .map(|b| bytecode_to_factory_dep(b.original.clone()))
                             .collect();
 
+                        let storage = storage.borrow_mut();
+                        let modified_storage =
+                            self.get_modified_storage(storage.modified_storage_keys());
+
+                        let era_db = &storage.storage_handle;
+
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
                             storage_to_state(&era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
-
-                        let account_info = db.basic(Address::from_slice(
-                            &hex::decode("C16e4F1237C7d7414a4DED7A4bADB2899AF6e91A").unwrap(),
-                        ));
-                        dbg!(&account_info);
-
                         let era_env = self.env.get().unwrap();
-
                         let mut env = into_revm_env(era_env);
 
-                        //FIXME: retrieving a tx fails
                         db.transact(
-                            None,
-                            // fork_id.map(|i d| {
-                            //     let mut arr = [0; 32];
-                            //     id.to_big_endian(&mut arr);
-                            //     Uint::from_be_bytes(arr)
-                            //}),
+                            fork_id.map(|id| {
+                                let mut arr = [0; 32];
+                                id.to_big_endian(&mut arr);
+                                Uint::from_be_bytes(arr)
+                            }),
                             tx_hash.to_fixed_bytes().into(),
                             &mut env,
                             &mut journaled_state,
                             &mut revm::inspectors::NoOpInspector,
                         )
                         .unwrap();
-
-                        let account_info =
-                            db.basic(Address::from_slice(&address)).unwrap().unwrap();
-                        dbg!(&account_info);
-
-                        account_info
-
-                        // storage.storage_handle.inner.write().unwrap().
                     };
 
-                    // let result2 = storage.borrow_mut().read_value(&key);
-                    // dbg!(result2);
-
-                    // let address =
-                    // hex::decode("C16e4F1237C7d7414a4DED7A4bADB2899AF6e91A").unwrap();
-                    let mut storage = storage.borrow_mut();
-
-                    self.write_storage(
-                        StorageKey::new(
-                            AccountTreeId::new(L2_ETH_TOKEN_ADDRESS),
-                            H256::from_slice(&address),
-                        ),
-                        account_info.balance.to_h256(),
-                        &mut storage,
-                    );
-                    // storage.set_value(
-                    //     StorageKey::new(
-                    //         AccountTreeId::new(L2_ETH_TOKEN_ADDRESS),
-                    //         H256::from_slice(&address),
-                    //     ),
-                    //     account_info.balance.to_h256(),
-                    // );
-
-                    // let read_cache =
-                    // &storage.storage_handle.inner.write().unwrap().value_read_cache;
-                    // dbg!(read_cache);
+                    storage.borrow_mut().clean_cache();
                 }
             }
         }

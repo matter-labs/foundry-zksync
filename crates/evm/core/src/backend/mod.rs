@@ -2,7 +2,7 @@
 
 use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
-    era_revm::storage_view::StorageView,
+    era_revm::{storage_view::StorageView, transactions::NoopEraInspector},
     fork::{CreateFork, ForkId, MultiFork, SharedBackend},
     snapshot::Snapshots,
     utils::configure_tx_env,
@@ -26,7 +26,7 @@ use revm::{
         Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, HashMap as Map, Log,
         ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
-    Database, DatabaseCommit, Inspector, JournaledState, EVM,
+    Database, DatabaseCommit, Inspector, JournaledState,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -1233,8 +1233,6 @@ impl DatabaseExt for Backend {
         let fork = self.inner.get_fork_by_id_mut(id)?;
         let tx = fork.db.db.get_transaction(transaction)?;
 
-        dbg!(&tx);
-
         commit_transaction(tx, env, journaled_state, fork, &fork_id, inspector)
     }
 
@@ -1438,12 +1436,9 @@ impl DatabaseCommit for Backend {
 impl Database for Backend {
     type Error = DatabaseError;
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        println!("//basic");
         if let Some(db) = self.active_fork_db_mut() {
-            println!("//basic_active_fork_db_mut");
             db.basic(address)
         } else {
-            println!("//basic_mem_db");
             Ok(self.mem_db.basic(address)?)
         }
     }
@@ -1863,28 +1858,31 @@ fn is_contract_in_state(journaled_state: &JournaledState, acc: Address) -> bool 
 }
 
 /// Executes the given transaction and commits state changes to the database _and_ the journaled
-/// state, with an optional inspector
+/// state
+/// Note: Ispector is fixed to `NoopEraInspector` in order to prevent modifying the traits
+/// signature
 fn commit_transaction<I: Inspector<Backend>>(
     tx: Transaction,
     mut env: Env,
     journaled_state: &mut JournaledState,
     fork: &mut Fork,
     fork_id: &ForkId,
-    inspector: I,
+    _: I,
 ) -> eyre::Result<()> {
     configure_tx_env(&mut env, &tx);
 
     let state = {
-        let mut evm = EVM::new();
-        evm.env = env;
-
         let fork = fork.clone();
         let journaled_state = journaled_state.clone();
         let db = crate::utils::RuntimeOrHandle::new()
             .block_on(async move { Backend::new_with_fork(fork_id, fork, journaled_state).await });
-        evm.database(db);
 
-        match evm.inspect(inspector) {
+        let inspector = NoopEraInspector::default();
+
+        let result: EVMResult<DatabaseError> =
+            crate::era_revm::transactions::run_era_transaction(&mut env, db, inspector.clone());
+
+        match result {
             Ok(res) => res.state,
             Err(e) => eyre::bail!("backend: failed committing transaction: {e}"),
         }
@@ -1902,30 +1900,17 @@ fn apply_state_changeset(
     fork: &mut Fork,
 ) {
     let changed_accounts = state.keys().copied().collect::<Vec<_>>();
-
-    dbg!(&state);
-
     // commit the state and update the loaded accounts
     fork.db.commit(state);
 
     for addr in changed_accounts {
-        dbg!(&addr);
-
-        let journaled_state_account = journaled_state.state.remove(&addr);
-        let fork_journaled_state_account = fork.journaled_state.state.remove(&addr);
-
-        dbg!(&journaled_state_account);
-        dbg!(&fork_journaled_state_account);
-
         // reload all changed accounts by removing them from the journaled state and reloading them
         // from the now updated database
-        if journaled_state_account.is_some() {
+        if journaled_state.state.remove(&addr).is_some() {
             let _ = journaled_state.load_account(addr, &mut fork.db);
         }
-        if fork_journaled_state_account.is_some() {
+        if fork.journaled_state.state.remove(&addr).is_some() {
             let _ = fork.journaled_state.load_account(addr, &mut fork.db);
         }
-
-
     }
 }
