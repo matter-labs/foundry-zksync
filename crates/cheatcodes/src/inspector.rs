@@ -81,6 +81,9 @@ pub struct BroadcastableTransaction {
     pub rpc: Option<RpcUrl>,
     /// The transaction to broadcast.
     pub transaction: TypedTransaction,
+
+    /// Additional factory deps of the tx
+    pub factory_deps: Vec<Vec<u8>>,
 }
 
 /// List of transactions that can be broadcasted.
@@ -783,6 +786,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
                     let tx = BroadcastableTransaction {
                         rpc: data.db.active_fork_url(),
+                        factory_deps: vec![],
                         transaction: TypedTransaction::Legacy(TransactionRequest {
                             from: Some(broadcast.new_origin.to_ethers()),
                             to: Some(NameOrAddress::Address(call.contract.to_ethers())),
@@ -1147,6 +1151,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
                     let tx = BroadcastableTransaction {
                         rpc: data.db.active_fork_url(),
+                        factory_deps: vec![],
                         transaction: TypedTransaction::Legacy(TransactionRequest {
                             from: Some(broadcast.new_origin.to_ethers()),
                             to: to.map(|a| NameOrAddress::Address(a.to_ethers())),

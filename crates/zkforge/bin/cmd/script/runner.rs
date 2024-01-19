@@ -211,7 +211,15 @@ impl ScriptRunner {
         to: Option<NameOrAddress>,
         calldata: Option<Bytes>,
         value: Option<U256>,
+        factory_deps: &[Vec<u8>],
     ) -> Result<ScriptResult> {
+        for dep in factory_deps {
+            let hash = zksync_utils::bytecode::hash_bytecode(dep);
+            info!(?hash, "adding factory dep to storage modifications");
+
+            self.executor.inspector.storage_modifications.bytecodes.insert(hash, dep.clone());
+        }
+
         if let Some(NameOrAddress::Address(to)) = to {
             self.call(
                 from,

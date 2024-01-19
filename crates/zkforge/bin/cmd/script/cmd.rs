@@ -173,14 +173,9 @@ impl ScriptArgs {
             &script_config.evm_opts.fork_url,
         );
 
-        if let Some(txs) = &mut result.transactions {
-            for tx in txs.iter() {
-                lib_deploy.push_back(BroadcastableTransaction {
-                    rpc: tx.rpc.clone(),
-                    transaction: TypedTransaction::Legacy(tx.transaction.clone().into()),
-                });
-            }
-            *txs = lib_deploy;
+        if let Some(mut txs) = result.transactions.take() {
+            lib_deploy.append(&mut txs);
+            result.transactions.replace(lib_deploy);
         }
 
         Ok(None)
@@ -341,6 +336,7 @@ impl ScriptArgs {
         if let Some(new_txs) = &result.transactions {
             for new_tx in new_txs.iter() {
                 txs.push_back(BroadcastableTransaction {
+                    factory_deps: vec![],
                     rpc: new_tx.rpc.clone(),
                     transaction: TypedTransaction::Legacy(new_tx.transaction.clone().into()),
                 });

@@ -53,7 +53,7 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS, MSG_VALUE_SIMULATOR_ADDRESS,
+    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{bytecode::CompressedBytecodeInfo, h256_to_u256, u256_to_h256};
 
@@ -459,9 +459,29 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         let revm_db_for_era = &handle.storage_handle;
                         let rpc = revm_db_for_era.db.lock().unwrap().active_fork_url();
 
+                        let calldata = get_calldata(&state, memory);
+
+                        let factory_deps =
+                            if current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS {
+                                let test_contract_hash = handle.read_value(&StorageKey::new(
+                                    AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
+                                    TEST_ADDRESS.into(),
+                                ));
+
+                                self.get_modified_bytecodes(vec![])
+                                    .into_iter()
+                                    .filter(|(k, _)| k != &test_contract_hash)
+                                    .map(|(_, v)| v)
+                                    .collect::<Vec<_>>()
+                            } else {
+                                vec![]
+                            };
+
                         let gas_limit = current.ergs_remaining;
 
-                        let (value, to) = if current.code_address == MSG_VALUE_SIMULATOR_ADDRESS {
+                        let (value, to) = if current.code_address ==
+                            zksync_types::MSG_VALUE_SIMULATOR_ADDRESS
+                        {
                             //when some eth is sent to an address in zkevm the call is replaced
                             // with a call to MsgValueSimulator, which does a mimic_call later
                             // to the original destination
@@ -488,6 +508,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         let tx = BroadcastableTransaction {
                             rpc,
+                            factory_deps,
                             transaction:
                                 ethers::types::transaction::eip2718::TypedTransaction::Legacy(
                                     TransactionRequest {
@@ -496,7 +517,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                         //FIXME: set only if set manually by user
                                         gas: Some(gas_limit.into()),
                                         value,
-                                        data: Some(get_calldata(&state, memory).into()),
+                                        data: Some(calldata.into()),
                                         nonce: Some(nonce),
                                         ..Default::default()
                                     },

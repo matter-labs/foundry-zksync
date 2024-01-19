@@ -146,6 +146,7 @@ impl ScriptArgs {
                         .expect("to have been built.")
                         .write();
 
+                    let deps = transaction.factory_deps;
                     if let TypedTransaction::Legacy(mut tx) = transaction.transaction {
                         let result = runner
                         .simulate(
@@ -155,6 +156,7 @@ impl ScriptArgs {
                             tx.to.clone(),
                             tx.data.clone().map(|b| b.to_alloy()),
                             tx.value.map(|v| v.to_alloy()),
+                            &deps,
                         )
                         .wrap_err("Internal EVM error during simulation")?;
 

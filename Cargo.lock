@@ -12745,6 +12745,7 @@ dependencies = [
  "zkcast",
  "zksync-web3-rs",
  "zksync_types",
+ "zksync_utils",
 ]
 
 [[package]]
