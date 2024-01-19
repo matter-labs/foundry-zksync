@@ -965,7 +965,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         .unwrap();
                     };
 
-                    storage.borrow_mut().clean_cache();
+                storage.borrow_mut().read_storage_keys = Default::default();
                 }
             }
         }
