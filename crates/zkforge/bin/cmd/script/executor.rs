@@ -206,6 +206,7 @@ impl ScriptArgs {
                             decoder,
                             created_contracts,
                             is_fixed_gas_limit,
+                            deps,
                         )?;
 
                         Ok((Some(tx), result.traces))
