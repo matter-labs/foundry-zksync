@@ -77,6 +77,7 @@ contract Emitter {
         uint256 topic3,
         bytes memory data
     ) public {
+        emit LogTopic1(1, topic2, topic3, data); // Event not expected
         emit LogTopic1(topic1, topic2, topic3, data);
     }
 }
