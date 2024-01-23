@@ -2249,7 +2249,7 @@ fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry], checks: Em
     while let Some(expected_log) = expected_iter.peek() {
         let mut found = false;
 
-        while let Some(actual_log) = actual_iter.next() {
+        for actual_log in actual_iter.by_ref() {
             if are_logs_equal(expected_log, actual_log, &checks) {
                 found = true;
                 break
