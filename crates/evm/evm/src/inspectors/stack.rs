@@ -588,6 +588,10 @@ impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>
         CheatcodeTracer::new(
             self.cheatcodes.as_ref().map(|c| c.config.clone()).unwrap_or_default(),
             self.storage_modifications.clone(),
+            self.cheatcodes
+                .as_ref()
+                .map(|c| c.broadcastable_transactions.clone())
+                .unwrap_or_default(),
         )
         .into_tracer_pointer()
     }

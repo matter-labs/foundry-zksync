@@ -17,7 +17,15 @@ impl ScriptArgs {
     pub async fn run_script(mut self) -> Result<()> {
         trace!(target: "script", "executing script command");
 
-        let (config, evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
+        let (mut config, evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
+        {
+            //put all artifacts in `zkout` instead of whatever was configured
+            let mut outpath = config.out.clone();
+            outpath.pop();
+            outpath.push("zkout");
+            config.out = outpath;
+        }
+
         let mut script_config = ScriptConfig {
             // dapptools compatibility
             sender_nonce: 1,
@@ -38,7 +46,7 @@ impl ScriptArgs {
             script_config.config.libraries = Default::default();
         }
 
-        let build_output = self.compile(&mut script_config)?;
+        let build_output = self.compile(&mut script_config).await?;
 
         let mut verify = VerifyBundle::new(
             &build_output.project,

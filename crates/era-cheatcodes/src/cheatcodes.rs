@@ -5,7 +5,7 @@ use crate::{
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
-use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
+use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_common::{conversion_utils::h160_to_address, StorageModifications};
 use foundry_evm_core::{
@@ -45,7 +45,7 @@ use std::{
     ops::BitAnd,
     process::Command,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -131,7 +131,7 @@ pub struct CheatcodeTracer {
     test_status: FoundryTestState,
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
-    broadcastable_transactions: Vec<BroadcastableTransaction>,
+    broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
 }
 
 #[derive(Debug, Clone)]
@@ -509,7 +509,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         };
                         tracing::debug!(?tx, "storing for broadcast");
 
-                        self.broadcastable_transactions.push(tx);
+                        self.broadcastable_transactions.write().unwrap().push_back(tx);
                         //FIXME: detect if this is a deployment and increase the other nonce too
                         self.set_nonce(new_origin, (Some(nonce + 1), None), handle);
                     }
@@ -993,8 +993,14 @@ impl CheatcodeTracer {
     pub fn new(
         cheatcodes_config: Arc<CheatsConfig>,
         storage_modifications: StorageModifications,
+        broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
     ) -> Self {
-        Self { config: cheatcodes_config, storage_modifications, ..Default::default() }
+        Self {
+            config: cheatcodes_config,
+            storage_modifications,
+            broadcastable_transactions,
+            ..Default::default()
+        }
     }
 
     /// Resets the test state to [TestStatus::NotStarted]
@@ -1507,6 +1513,27 @@ impl CheatcodeTracer {
                 } else {
                     tracing::error!("👷 Setting nonces failed")
                 }
+            }
+            sign_0(sign_0Call { privateKey: private_key, digest }) => {
+                tracing::info!("👷 Signing digest with private key");
+                let Ok(signature) = zksync_types::PackedEthSignature::sign(
+                    &private_key.to_h256(),
+                    digest.as_slice(),
+                ) else {
+                    tracing::error!("Failed to sign digest with private key");
+                    return
+                };
+
+                let r = signature.r();
+                let s = signature.s();
+                // Ethereum signed message produced by most clients contains v where v = 27 +
+                // recovery_id(0,1,2,3), but for some clients v = recovery_id(0,1,2,3). The library
+                // that we use for signature verification (written for bitcoin)
+                // expects v = recovery_id and to able to recover the address from Solidity it
+                // expects v = 27 + recovery_id.
+                let v = signature.v() + 27;
+
+                self.return_data = Some(vec![v.into(), r.into(), s.into()])
             }
             snapshot(snapshotCall {}) => {
                 tracing::info!("👷 Creating snapshot");
@@ -2272,14 +2299,19 @@ fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry], checks: Em
     let mut actual_iter = actual_logs.iter();
 
     while let Some(expected_log) = expected_iter.peek() {
-        if let Some(actual_log) = actual_iter.next() {
+        let mut found = false;
+
+        while let Some(actual_log) = actual_iter.next() {
             if are_logs_equal(expected_log, actual_log, &checks) {
-                expected_iter.next(); // Move to the next expected log
-            } else {
-                return false
+                found = true;
+                break
             }
+        }
+
+        if found {
+            expected_iter.next(); // Move to the next expected log
         } else {
-            // No more actual logs to compare
+            // Expected log not found in the remaining actual logs
             return false
         }
     }

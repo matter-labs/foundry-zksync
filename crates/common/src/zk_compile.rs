@@ -181,13 +181,16 @@ impl fmt::Display for ZkSolc {
 ///
 /// The function returns `Ok(())` if the compilation process completes successfully, or an error
 /// if it fails.
-pub fn compile_smart_contracts(zksolc_cfg: ZkSolcConfig, project: Project) -> eyre::Result<()> {
+pub fn compile_smart_contracts(
+    zksolc_cfg: ZkSolcConfig,
+    project: Project,
+) -> eyre::Result<(ProjectCompileOutput, ContractBytecodes)> {
+    //TODO: use remappings
     let mut zksolc = ZkSolc::new(zksolc_cfg, project);
-
     match zksolc.compile() {
-        Ok(_) => {
+        Ok(output) => {
             info!("Compiled Successfully");
-            Ok(())
+            Ok(output)
         }
         Err(err) => {
             eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
