@@ -2,7 +2,7 @@
 
 use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
-    era_revm::storage_view::StorageView,
+    era_revm::{storage_view::StorageView, transactions::NoopEraInspector},
     fork::{CreateFork, ForkId, MultiFork, SharedBackend},
     snapshot::Snapshots,
     utils::configure_tx_env,
@@ -23,10 +23,10 @@ use revm::{
     inspectors::NoOpInspector,
     precompile::{Precompiles, SpecId},
     primitives::{
-        Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, HashMap as Map, Log,
-        ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
+        Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, ExecutionResult,
+        HashMap as Map, Log, ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
-    Database, DatabaseCommit, Inspector, JournaledState, EVM,
+    Database, DatabaseCommit, Inspector, JournaledState,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -1858,34 +1858,40 @@ fn is_contract_in_state(journaled_state: &JournaledState, acc: Address) -> bool 
 }
 
 /// Executes the given transaction and commits state changes to the database _and_ the journaled
-/// state, with an optional inspector
+/// state
+/// Note: Ispector is fixed to `NoopEraInspector` in order to prevent modifying the traits
+/// signature
 fn commit_transaction<I: Inspector<Backend>>(
     tx: Transaction,
     mut env: Env,
     journaled_state: &mut JournaledState,
     fork: &mut Fork,
     fork_id: &ForkId,
-    inspector: I,
+    _: I,
 ) -> eyre::Result<()> {
     configure_tx_env(&mut env, &tx);
 
-    let state = {
-        let mut evm = EVM::new();
-        evm.env = env;
-
+    let (state, logs) = {
         let fork = fork.clone();
         let journaled_state = journaled_state.clone();
         let db = crate::utils::RuntimeOrHandle::new()
             .block_on(async move { Backend::new_with_fork(fork_id, fork, journaled_state).await });
-        evm.database(db);
 
-        match evm.inspect(inspector) {
-            Ok(res) => res.state,
+        let inspector = NoopEraInspector::default();
+
+        let result: EVMResult<DatabaseError> =
+            crate::era_revm::transactions::run_era_transaction(&mut env, db, inspector.clone());
+
+        match result {
+            Ok(res) => match res.result {
+                ExecutionResult::Success { logs, .. } => (res.state, logs),
+                _ => (res.state, vec![]),
+            },
             Err(e) => eyre::bail!("backend: failed committing transaction: {e}"),
         }
     };
 
-    apply_state_changeset(state, journaled_state, fork);
+    apply_state_changeset(state, journaled_state, fork, logs);
     Ok(())
 }
 
@@ -1895,6 +1901,7 @@ fn apply_state_changeset(
     state: Map<revm::primitives::Address, Account>,
     journaled_state: &mut JournaledState,
     fork: &mut Fork,
+    logs: Vec<Log>,
 ) {
     let changed_accounts = state.keys().copied().collect::<Vec<_>>();
     // commit the state and update the loaded accounts
@@ -1910,4 +1917,7 @@ fn apply_state_changeset(
             let _ = fork.journaled_state.load_account(addr, &mut fork.db);
         }
     }
+
+    // update the journaled state with the new logs
+    journaled_state.logs.extend(logs.clone());
 }

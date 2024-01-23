@@ -20,7 +20,7 @@ pub struct StorageView<S> {
     // Used for caching and to get the list/count of modified keys
     pub modified_storage_keys: HashMap<StorageKey, StorageValue>,
     // Used purely for caching
-    read_storage_keys: HashMap<StorageKey, StorageValue>,
+    pub read_storage_keys: HashMap<StorageKey, StorageValue>,
     // Cache for `contains_key()` checks. The cache is only valid within one L1 batch execution.
     initial_writes_cache: HashMap<StorageKey, bool>,
 }
