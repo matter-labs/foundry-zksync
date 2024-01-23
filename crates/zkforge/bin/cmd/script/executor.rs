@@ -20,6 +20,7 @@ use zkforge::{
     traces::{CallTraceDecoder, Traces},
     utils::CallKind,
 };
+use zksync_types::H160;
 
 /// Helper alias type for the processed result of a runner onchain simulation.
 type RunnerResult = (Option<TransactionWithMetadata>, Traces);
@@ -84,6 +85,17 @@ impl ScriptArgs {
                     result.transactions = Some(new_txs);
                 }
                 _ => {}
+            }
+        }
+
+        for tx in result.transactions.iter_mut().map(|txs| txs.iter_mut()).flatten() {
+            //fix nonces in the recorded transactions
+            // for default sender
+            let default_sender = H160::from_slice(Config::DEFAULT_SENDER.as_slice());
+            if tx.transaction.from().map(|addr| addr == &default_sender).unwrap_or_default() {
+                let nonce =
+                    tx.transaction.nonce().map(|n| n.saturating_sub(1.into())).unwrap_or_default();
+                tx.transaction.set_nonce(nonce);
             }
         }
 

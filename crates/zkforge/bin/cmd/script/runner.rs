@@ -70,8 +70,8 @@ impl ScriptRunner {
             .map(|traces| (TraceKind::Deployment, traces))
             .collect();
 
-        let sender_nonce = self.executor.get_nonce(CALLER)?;
-        let address = CALLER.create(sender_nonce);
+        let deployer_nonce = self.executor.get_nonce(CALLER)?;
+        let address = CALLER.create(deployer_nonce);
 
         // Set the contracts initial balance before deployment, so it is available during the
         // construction
@@ -119,7 +119,7 @@ impl ScriptRunner {
                     traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
                     logs.extend_from_slice(&setup_logs);
 
-                    self.maybe_correct_nonce(sender_nonce, libraries.len())?;
+                    self.correct_nonce(sender_nonce, libraries.len())?;
 
                     (
                         !reverted,
@@ -145,7 +145,7 @@ impl ScriptRunner {
                     traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
                     logs.extend_from_slice(&setup_logs);
 
-                    self.maybe_correct_nonce(sender_nonce, libraries.len())?;
+                    self.correct_nonce(sender_nonce, libraries.len())?;
 
                     (
                         !reverted,
@@ -181,20 +181,11 @@ impl ScriptRunner {
         ))
     }
 
-    /// We call the `setUp()` function with self.sender, and if there haven't been
-    /// any broadcasts, then the EVM cheatcode module hasn't corrected the nonce.
-    /// So we have to.
-    fn maybe_correct_nonce(
-        &mut self,
-        sender_initial_nonce: u64,
-        libraries_len: usize,
-    ) -> Result<()> {
-        if let Some(cheatcodes) = &self.executor.inspector.cheatcodes {
-            if !cheatcodes.corrected_nonce {
-                self.executor
-                    .set_nonce(self.sender, sender_initial_nonce + libraries_len as u64)?;
-            }
-            self.executor.inspector.cheatcodes.as_mut().unwrap().corrected_nonce = false;
+    /// We call the `setUp()` function with self.sender, this leaves the
+    /// sender account in an undesirable state for broadcasting (nonce +1)
+    fn correct_nonce(&mut self, sender_initial_nonce: u64, libraries_len: usize) -> Result<()> {
+        if self.sender == Config::DEFAULT_SENDER {
+            self.executor.set_nonce(self.sender, sender_initial_nonce + libraries_len as u64)?;
         }
         Ok(())
     }
