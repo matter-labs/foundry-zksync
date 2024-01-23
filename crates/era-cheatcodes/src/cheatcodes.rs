@@ -132,6 +132,7 @@ pub struct CheatcodeTracer {
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
     broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
+    transact_logs: Vec<LogEntry>,
 }
 
 #[derive(Debug, Clone)]
@@ -180,6 +181,11 @@ enum FinishCycleOneTimeActions {
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
     SetOrigin { origin: H160 },
+    Transact { fork_id: Option<U256>, tx_hash: H256 },
+    MakePersistentAccount { account: H160 },
+    MakePersistentAccounts { accounts: Vec<H160> },
+    RevokePersistentAccount { account: H160 },
+    RevokePersistentAccounts { accounts: Vec<H160> },
 }
 
 #[derive(Debug, Clone)]
@@ -579,6 +585,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             for log in logs {
                 self.recorded_logs.insert(log);
             }
+            //insert transact logs
+            for log in &self.transact_logs {
+                self.recorded_logs.insert(log.to_owned());
+            }
         }
 
         // This assert is triggered only once after the test execution finishes
@@ -624,7 +634,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 .into_iter()
                 .take(actual_events_initial_dimension.len() - actual_events_surplus)
                 .collect::<Vec<_>>();
-            let actual_logs = crate::events::parse_events(actual_events);
+            let mut actual_logs = crate::events::parse_events(actual_events);
+            actual_logs.extend(self.transact_logs.clone());
 
             assert!(compare_logs(&expected_logs, &actual_logs, self.emit_config.checks.clone()));
         }
@@ -645,6 +656,42 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         rollback: false,
                         is_service: false,
                     });
+                }
+                FinishCycleOneTimeActions::MakePersistentAccount { account } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+
+                    let mut db = era_db.db.lock().unwrap();
+                    db.add_persistent_account(revm::primitives::Address::from(
+                        account.to_fixed_bytes(),
+                    ));
+                }
+                FinishCycleOneTimeActions::MakePersistentAccounts { accounts } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+
+                    let mut db = era_db.db.lock().unwrap();
+                    db.extend_persistent_accounts(
+                        accounts
+                            .into_iter()
+                            .map(|a: H160| revm::primitives::Address::from(a.to_fixed_bytes()))
+                            .collect::<Vec<revm::primitives::Address>>(),
+                    );
+                }
+                FinishCycleOneTimeActions::RevokePersistentAccount { account } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    db.remove_persistent_account(&revm::primitives::Address::from(
+                        account.to_fixed_bytes(),
+                    ));
+                }
+                FinishCycleOneTimeActions::RevokePersistentAccounts { accounts } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    db.remove_persistent_accounts(
+                        accounts
+                            .into_iter()
+                            .map(|a: H160| revm::primitives::Address::from(a.to_fixed_bytes()))
+                            .collect::<Vec<revm::primitives::Address>>(),
+                    );
                 }
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
@@ -908,6 +955,58 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     );
 
                     storage.borrow_mut().set_value(key, origin.into());
+                }
+                FinishCycleOneTimeActions::Transact { fork_id, tx_hash } => {
+                    let journaled_state = {
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let storage = storage.borrow_mut();
+                        let modified_storage =
+                            self.get_modified_storage(storage.modified_storage_keys());
+
+                        let era_db = &storage.storage_handle;
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        journaled_state.state =
+                            storage_to_state(era_db, &modified_storage, bytecodes);
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+
+                        db.transact(
+                            fork_id.map(|id| {
+                                let mut arr = [0; 32];
+                                id.to_big_endian(&mut arr);
+                                Uint::from_be_bytes(arr)
+                            }),
+                            tx_hash.to_fixed_bytes().into(),
+                            &mut env,
+                            &mut journaled_state,
+                            &mut revm::inspectors::NoOpInspector,
+                        )
+                        .unwrap();
+
+                        journaled_state
+                    };
+
+                    storage.borrow_mut().read_storage_keys = Default::default();
+
+                    for log in journaled_state.logs {
+                        self.transact_logs.push(LogEntry {
+                            address: log.address.to_h160(),
+                            data: log.data.to_vec(),
+                            topics: log
+                                .topics
+                                .iter()
+                                .map(|b| H256::from_slice(b.as_slice()))
+                                .collect(),
+                        })
+                    }
                 }
             }
         }
@@ -1175,6 +1274,7 @@ impl CheatcodeTracer {
                     .recorded_logs
                     .iter()
                     .filter(|log| !log.data.is_empty())
+                    .filter(|log| !INTERNAL_CONTRACT_ADDRESSES.contains(&log.address))
                     .map(|log| Log {
                         topics: log
                             .topics
@@ -1193,6 +1293,15 @@ impl CheatcodeTracer {
                 //disable flag of recording logs
                 self.recording_logs = false;
             }
+            isPersistent(isPersistentCall { account }) => {
+                tracing::info!("👷 Checking if account {:?} is persistent", account);
+                let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                let db = era_db.db.lock().unwrap();
+                let is_persistent = db.is_persistent(&revm::primitives::Address::from(
+                    account.to_h160().to_fixed_bytes(),
+                ));
+                self.return_data = Some(is_persistent.to_return_data());
+            }
             load(loadCall { target, slot }) => {
                 if H160(target.0 .0) != CHEATCODE_ADDRESS {
                     tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
@@ -1203,6 +1312,35 @@ impl CheatcodeTracer {
                 } else {
                     self.return_data = Some(vec![U256::zero()]);
                 }
+            }
+            makePersistent_0(makePersistent_0Call { account }) => {
+                tracing::info!("👷 Making account {:?} persistent", account);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccount {
+                    account: account.to_h160(),
+                });
+            }
+            makePersistent_1(makePersistent_1Call { account0, account1 }) => {
+                tracing::info!("👷 Making accounts {:?} and {:?} persistent", account0, account1);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: vec![account0.to_h160(), account1.to_h160()],
+                });
+            }
+            makePersistent_2(makePersistent_2Call { account0, account1, account2 }) => {
+                tracing::info!(
+                    "👷 Making accounts {:?}, {:?} and {:?} persistent",
+                    account0,
+                    account1,
+                    account2
+                );
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: vec![account0.to_h160(), account1.to_h160(), account2.to_h160()],
+                });
+            }
+            makePersistent_3(makePersistent_3Call { accounts }) => {
+                tracing::info!("👷 Making accounts {:?} persistent", accounts);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: accounts.into_iter().map(|a| a.to_h160()).collect(),
+                });
             }
             recordLogs(recordLogsCall {}) => {
                 tracing::info!("👷 Recording logs");
@@ -1265,6 +1403,18 @@ impl CheatcodeTracer {
                     snapshot_id: snapshotId.to_u256(),
                 });
                 self.return_data = Some(true.to_return_data());
+            }
+            revokePersistent_0(revokePersistent_0Call { account }) => {
+                tracing::info!("👷 Revoking persistence for account {:?}", account);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RevokePersistentAccount {
+                    account: account.to_h160(),
+                });
+            }
+            revokePersistent_1(revokePersistent_1Call { accounts }) => {
+                tracing::info!("👷 Revoking persistence for accounts {:?}", accounts);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RevokePersistentAccounts {
+                    accounts: accounts.into_iter().map(|a| a.to_h160()).collect(),
+                });
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
@@ -1406,6 +1556,27 @@ impl CheatcodeTracer {
                     tracing::error!("👷 Setting nonces failed")
                 }
             }
+            sign_0(sign_0Call { privateKey: private_key, digest }) => {
+                tracing::info!("👷 Signing digest with private key");
+                let Ok(signature) = zksync_types::PackedEthSignature::sign(
+                    &private_key.to_h256(),
+                    digest.as_slice(),
+                ) else {
+                    tracing::error!("Failed to sign digest with private key");
+                    return
+                };
+
+                let r = signature.r();
+                let s = signature.s();
+                // Ethereum signed message produced by most clients contains v where v = 27 +
+                // recovery_id(0,1,2,3), but for some clients v = recovery_id(0,1,2,3). The library
+                // that we use for signature verification (written for bitcoin)
+                // expects v = recovery_id and to able to recover the address from Solidity it
+                // expects v = 27 + recovery_id.
+                let v = signature.v() + 27;
+
+                self.return_data = Some(vec![v.into(), r.into(), s.into()])
+            }
             snapshot(snapshotCall {}) => {
                 tracing::info!("👷 Creating snapshot");
                 self.one_time_actions.push(FinishCycleOneTimeActions::Snapshot);
@@ -1490,7 +1661,20 @@ impl CheatcodeTracer {
                 let int_value = value.to_string();
                 self.return_data = Some(int_value.to_return_data());
             }
-
+            transact_0(transact_0Call { txHash }) => {
+                tracing::info!("👷 Transacting current fork with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: None,
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
+            transact_1(transact_1Call { forkId, txHash }) => {
+                tracing::info!("👷 Transacting fork {forkId} with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: Some(forkId.to_u256()),
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
             tryFfi(tryFfiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running try ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
@@ -2157,14 +2341,19 @@ fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry], checks: Em
     let mut actual_iter = actual_logs.iter();
 
     while let Some(expected_log) = expected_iter.peek() {
-        if let Some(actual_log) = actual_iter.next() {
+        let mut found = false;
+
+        for actual_log in actual_iter.by_ref() {
             if are_logs_equal(expected_log, actual_log, &checks) {
-                expected_iter.next(); // Move to the next expected log
-            } else {
-                return false
+                found = true;
+                break
             }
+        }
+
+        if found {
+            expected_iter.next(); // Move to the next expected log
         } else {
-            // No more actual logs to compare
+            // Expected log not found in the remaining actual logs
             return false
         }
     }

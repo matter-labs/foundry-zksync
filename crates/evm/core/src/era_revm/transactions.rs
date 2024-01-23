@@ -1,6 +1,10 @@
+use core::marker::PhantomData;
 use ethers_core::abi::ethabi::{self, ParamType};
 use itertools::Itertools;
-use multivm::vm_latest::HistoryDisabled;
+use multivm::{
+    interface::dyn_tracers::vm_1_4_0::DynTracer,
+    vm_latest::{HistoryDisabled, HistoryMode, SimpleMemory, VmTracer},
+};
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
     OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
@@ -12,6 +16,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
+use zksync_state::WriteStorage;
 use zksync_types::{
     fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
     StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
@@ -341,14 +346,43 @@ where
     state
 }
 
+pub struct NoopEraInspector<S, H> {
+    _phantom: PhantomData<(S, H)>,
+    storage_modifications: StorageModifications,
+}
+
+impl<S, H> Default for NoopEraInspector<S, H> {
+    fn default() -> Self {
+        Self { _phantom: Default::default(), storage_modifications: Default::default() }
+    }
+}
+
+impl<S, H> Clone for NoopEraInspector<S, H> {
+    fn clone(&self) -> Self {
+        Self { _phantom: self._phantom, storage_modifications: self.storage_modifications.clone() }
+    }
+}
+
+impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for NoopEraInspector<S, H> {}
+impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for NoopEraInspector<S, H> {}
+impl<S: WriteStorage + 'static, H: HistoryMode + 'static> AsTracerPointer<S, H>
+    for NoopEraInspector<S, H>
+{
+    fn as_tracer_pointer(&self) -> multivm::vm_latest::TracerPointer<S, H> {
+        Box::new(self.clone())
+    }
+}
+
+impl<S, H> StorageModificationRecorder for NoopEraInspector<S, H> {
+    fn record_storage_modifications(&mut self, _storage_modifications: StorageModifications) {}
+
+    fn get_storage_modifications(&self) -> &StorageModifications {
+        &self.storage_modifications
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use core::marker::PhantomData;
-    use multivm::{
-        interface::dyn_tracers::vm_1_4_0::DynTracer,
-        vm_latest::{HistoryMode, SimpleMemory, VmTracer},
-    };
-    use zksync_state::WriteStorage;
 
     use super::*;
     use crate::era_revm::testing::MockDatabase;
@@ -380,8 +414,12 @@ mod tests {
         };
         let mock_db = MockDatabase::default();
 
-        let res = run_era_transaction::<_, ResultAndState, _>(&mut env, mock_db, Noop::default())
-            .expect("failed executing");
+        let res = run_era_transaction::<_, ResultAndState, _>(
+            &mut env,
+            mock_db,
+            NoopEraInspector::default(),
+        )
+        .expect("failed executing");
 
         assert!(!res.state.is_empty(), "unexpected failure: no states were touched");
         for (address, account) in res.state {
@@ -394,41 +432,5 @@ mod tests {
 
         assert_eq!(1, env.block.number.to::<u64>());
         assert_eq!(1, env.block.timestamp.to::<u64>());
-    }
-
-    struct Noop<S, H> {
-        _phantom: PhantomData<(S, H)>,
-        storage_modifications: StorageModifications,
-    }
-
-    impl<S, H> Default for Noop<S, H> {
-        fn default() -> Self {
-            Self { _phantom: Default::default(), storage_modifications: Default::default() }
-        }
-    }
-
-    impl<S, H> Clone for Noop<S, H> {
-        fn clone(&self) -> Self {
-            Self {
-                _phantom: self._phantom,
-                storage_modifications: self.storage_modifications.clone(),
-            }
-        }
-    }
-
-    impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Noop<S, H> {}
-    impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for Noop<S, H> {}
-    impl<S: WriteStorage + 'static, H: HistoryMode + 'static> AsTracerPointer<S, H> for Noop<S, H> {
-        fn as_tracer_pointer(&self) -> multivm::vm_latest::TracerPointer<S, H> {
-            Box::new(self.clone())
-        }
-    }
-
-    impl<S, H> StorageModificationRecorder for Noop<S, H> {
-        fn record_storage_modifications(&mut self, _storage_modifications: StorageModifications) {}
-
-        fn get_storage_modifications(&self) -> &StorageModifications {
-            &self.storage_modifications
-        }
     }
 }
