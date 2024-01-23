@@ -1051,6 +1051,34 @@ impl CheatcodeTracer {
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
             }
+            envUint_0(envUint_0Call { name }) => {
+                tracing::info!("👷 Getting env variable {name}");
+                let env_var = std::env::var(&name).expect("Env var not found");
+                let env_var = if let Some(var) = env_var.strip_prefix("0x") {
+                    let hex = hex::decode(var).expect("Env var not hex");
+                    rU256::from_be_slice(&hex)
+                } else {
+                    rU256::from_str(&env_var).expect("Env var not uint")
+                };
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envUint_1(envUint_1Call { name, delim }) => {
+                tracing::info!("👷 Getting env variable {name} with delimiter {delim}");
+                let env_var = std::env::var(&name).expect("Env var not found");
+                let env_vars: Vec<rU256> = env_var
+                    .split(&delim)
+                    .filter(|var| !var.is_empty())
+                    .map(|var| {
+                        if let Some(var) = var.strip_prefix("0x") {
+                            let hex = hex::decode(var).expect("Env var not hex");
+                            rU256::from_be_slice(&hex)
+                        } else {
+                            rU256::from_str(var).expect("Env var not uint")
+                        }
+                    })
+                    .collect();
+                self.return_data = Some(env_vars.to_return_data());
+            }
             expectRevert_0(expectRevert_0Call {}) => {
                 let depth = state.vm_local_state.callstack.depth();
                 tracing::info!(%depth, "👷 Setting up expectRevert for any reason");
@@ -1456,6 +1484,10 @@ impl CheatcodeTracer {
 
                 let uint_value = value.to_string();
                 self.return_data = Some(uint_value.to_return_data());
+            }
+            setEnv(setEnvCall { name, value }) => {
+                tracing::info!("👷 Setting env variable {name:?} to {value:?}");
+                std::env::set_var(name, value);
             }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
