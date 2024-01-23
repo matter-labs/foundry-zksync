@@ -132,6 +132,7 @@ pub struct CheatcodeTracer {
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
     broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
+    transact_logs: Vec<LogEntry>,
 }
 
 #[derive(Debug, Clone)]
@@ -563,6 +564,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             for log in logs {
                 self.recorded_logs.insert(log);
             }
+            //insert transact logs
+            for log in &self.transact_logs {
+                self.recorded_logs.insert(log.to_owned());
+            }
         }
 
         // This assert is triggered only once after the test execution finishes
@@ -608,7 +613,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 .into_iter()
                 .take(actual_events_initial_dimension.len() - actual_events_surplus)
                 .collect::<Vec<_>>();
-            let actual_logs = crate::events::parse_events(actual_events);
+            let mut actual_logs = crate::events::parse_events(actual_events);
+            actual_logs.extend(self.transact_logs.clone());
 
             assert!(compare_logs(&expected_logs, &actual_logs, self.emit_config.checks.clone()));
         }
@@ -930,7 +936,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.borrow_mut().set_value(key, origin.into());
                 }
                 FinishCycleOneTimeActions::Transact { fork_id, tx_hash } => {
-                    {
+                    let journaled_state = {
                         let bytecodes = bootloader_state
                             .get_last_tx_compressed_bytecodes()
                             .iter()
@@ -945,7 +951,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
-                            storage_to_state(&era_db, &modified_storage, bytecodes);
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -963,9 +969,23 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             &mut revm::inspectors::NoOpInspector,
                         )
                         .unwrap();
+
+                        journaled_state
                     };
 
-                storage.borrow_mut().read_storage_keys = Default::default();
+                    storage.borrow_mut().read_storage_keys = Default::default();
+
+                    for log in journaled_state.logs {
+                        self.transact_logs.push(LogEntry {
+                            address: log.address.to_h160(),
+                            data: log.data.to_vec(),
+                            topics: log
+                                .topics
+                                .iter()
+                                .map(|b| H256::from_slice(b.as_slice()))
+                                .collect(),
+                        })
+                    }
                 }
             }
         }
@@ -1233,6 +1253,7 @@ impl CheatcodeTracer {
                     .recorded_logs
                     .iter()
                     .filter(|log| !log.data.is_empty())
+                    .filter(|log| !INTERNAL_CONTRACT_ADDRESSES.contains(&log.address))
                     .map(|log| Log {
                         topics: log
                             .topics

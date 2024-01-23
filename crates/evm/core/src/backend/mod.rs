@@ -23,8 +23,8 @@ use revm::{
     inspectors::NoOpInspector,
     precompile::{Precompiles, SpecId},
     primitives::{
-        Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, HashMap as Map, Log,
-        ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
+        Account, AccountInfo, Bytecode, CreateScheme, EVMResult, Env, ExecutionResult,
+        HashMap as Map, Log, ResultAndState, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, Inspector, JournaledState,
 };
@@ -1871,7 +1871,7 @@ fn commit_transaction<I: Inspector<Backend>>(
 ) -> eyre::Result<()> {
     configure_tx_env(&mut env, &tx);
 
-    let state = {
+    let (state, logs) = {
         let fork = fork.clone();
         let journaled_state = journaled_state.clone();
         let db = crate::utils::RuntimeOrHandle::new()
@@ -1883,12 +1883,15 @@ fn commit_transaction<I: Inspector<Backend>>(
             crate::era_revm::transactions::run_era_transaction(&mut env, db, inspector.clone());
 
         match result {
-            Ok(res) => res.state,
+            Ok(res) => match res.result {
+                ExecutionResult::Success { logs, .. } => (res.state, logs),
+                _ => (res.state, vec![]),
+            },
             Err(e) => eyre::bail!("backend: failed committing transaction: {e}"),
         }
     };
 
-    apply_state_changeset(state, journaled_state, fork);
+    apply_state_changeset(state, journaled_state, fork, logs);
     Ok(())
 }
 
@@ -1898,6 +1901,7 @@ fn apply_state_changeset(
     state: Map<revm::primitives::Address, Account>,
     journaled_state: &mut JournaledState,
     fork: &mut Fork,
+    logs: Vec<Log>,
 ) {
     let changed_accounts = state.keys().copied().collect::<Vec<_>>();
     // commit the state and update the loaded accounts
@@ -1913,4 +1917,7 @@ fn apply_state_changeset(
             let _ = fork.journaled_state.load_account(addr, &mut fork.db);
         }
     }
+
+    // update the journaled state with the new logs
+    journaled_state.logs.extend(logs.clone());
 }

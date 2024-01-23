@@ -49,13 +49,13 @@ contract CheatcodeTransactTest is Test {
     }
 
     function testTransactCooperatesWithCheatcodes() public {
-        // A random block https://explorer.zksync.io/block/21048437
-        vm.createSelectFork("mainnet", 21048437);
+        // A random block https://explorer.zksync.io/block/20570164
+        vm.createSelectFork("mainnet", 20570164);
 
-        // a random ERC20 USDT transfer transaction in the next block: https://explorer.zksync.io/tx/0x2c8a84ec365b39e548e65d82aaf6989a17af2799e29ec537eea6ac7c4fb503b4
-        bytes32 transaction = 0x2c8a84ec365b39e548e65d82aaf6989a17af2799e29ec537eea6ac7c4fb503b4;
+        // a random ERC20 USDT transfer transaction in the next block: https://explorer.zksync.io/tx/0xa4124eed3fcb2eea3883915839004107a76597107a74c5eaf00a7d6c43638152
+        bytes32 transaction = 0xa4124eed3fcb2eea3883915839004107a76597107a74c5eaf00a7d6c43638152;
 
-        address sender = 0x4F170ae33F4e8950a969Ca495544f91254eEA64A;
+        address sender = 0x4e8DB76952BFDA859545d399f54c15E6b14607D5;
         address recipient = 0x493257fD37EDB34451f62EDf8D2a0C418852bA4C;
 
         uint256 senderBalance = USDT.balanceOf(sender);
@@ -64,11 +64,11 @@ contract CheatcodeTransactTest is Test {
         console.log("before sender balance: ", senderBalance);
         console.log("before recipient balance: ", recipientBalance);
 
-        assertEq(senderBalance, 17685345938);
-        assertEq(recipientBalance, 142926761);
+        assertEq(senderBalance, 3670808);
+        assertEq(recipientBalance, 142916761);
 
-        // transfer amount: 17685.345938 USDT
-        uint256 transferAmount = 17685345938;
+        // transfer amount: 0.01 USDT
+        uint256 transferAmount = 10000;
         uint256 expectedRecipientBalance = recipientBalance + transferAmount;
         uint256 expectedSenderBalance = senderBalance - transferAmount;
 
