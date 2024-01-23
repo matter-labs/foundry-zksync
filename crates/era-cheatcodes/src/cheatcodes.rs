@@ -2247,14 +2247,19 @@ fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry], checks: Em
     let mut actual_iter = actual_logs.iter();
 
     while let Some(expected_log) = expected_iter.peek() {
-        if let Some(actual_log) = actual_iter.next() {
+        let mut found = false;
+
+        for actual_log in actual_iter.by_ref() {
             if are_logs_equal(expected_log, actual_log, &checks) {
-                expected_iter.next(); // Move to the next expected log
-            } else {
-                return false
+                found = true;
+                break
             }
+        }
+
+        if found {
+            expected_iter.next(); // Move to the next expected log
         } else {
-            // No more actual logs to compare
+            // Expected log not found in the remaining actual logs
             return false
         }
     }
