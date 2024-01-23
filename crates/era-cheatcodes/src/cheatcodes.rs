@@ -93,6 +93,33 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     H160::zero(),
 ];
 
+//same as above, except without
+// CONTRACT_DEPLOYER_ADDRESS
+// MSG_VALUE_SIMULATOR_ADDRESS
+// and with
+// CHEATCODE_ADDRESS
+const BROADCAST_IGNORED_CONTRACTS: [H160; 19] = [
+    zksync_types::BOOTLOADER_ADDRESS,
+    zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS,
+    zksync_types::NONCE_HOLDER_ADDRESS,
+    zksync_types::KNOWN_CODES_STORAGE_ADDRESS,
+    zksync_types::IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    zksync_types::CONTRACT_FORCE_DEPLOYER_ADDRESS,
+    zksync_types::L1_MESSENGER_ADDRESS,
+    zksync_types::KECCAK256_PRECOMPILE_ADDRESS,
+    zksync_types::L2_ETH_TOKEN_ADDRESS,
+    zksync_types::SYSTEM_CONTEXT_ADDRESS,
+    zksync_types::BOOTLOADER_UTILITIES_ADDRESS,
+    zksync_types::EVENT_WRITER_ADDRESS,
+    zksync_types::COMPRESSOR_ADDRESS,
+    zksync_types::COMPLEX_UPGRADER_ADDRESS,
+    zksync_types::ECRECOVER_PRECOMPILE_ADDRESS,
+    zksync_types::SHA256_PRECOMPILE_ADDRESS,
+    zksync_types::MINT_AND_BURN_ADDRESS,
+    CHEATCODE_ADDRESS,
+    H160::zero(),
+];
+
 #[derive(Debug, Clone)]
 struct EraEnv {
     l1_batch_env: L1BatchEnv,
@@ -453,7 +480,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         .expect("callstack before the current");
 
                     if state.vm_local_state.callstack.depth() == broadcast.depth &&
-                        prev_cs.this_address == broadcast.original_caller
+                        prev_cs.this_address == broadcast.original_caller &&
+                        !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address)
                     {
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
                             origin: broadcast.new_origin,
@@ -461,27 +489,30 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         let new_origin = broadcast.new_origin;
                         let handle = &mut storage.borrow_mut();
-                        let (nonce, _) = Self::get_nonce(new_origin, handle);
                         let revm_db_for_era = &handle.storage_handle;
                         let rpc = revm_db_for_era.db.lock().unwrap().active_fork_url();
 
                         let calldata = get_calldata(&state, memory);
 
-                        let factory_deps =
-                            if current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS {
-                                let test_contract_hash = handle.read_value(&StorageKey::new(
-                                    AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
-                                    TEST_ADDRESS.into(),
-                                ));
+                        let is_deployment =
+                            current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
+                        let factory_deps = if is_deployment {
+                            let test_contract_hash = handle.read_value(&StorageKey::new(
+                                AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
+                                TEST_ADDRESS.into(),
+                            ));
 
-                                self.get_modified_bytecodes(vec![])
-                                    .into_iter()
-                                    .filter(|(k, _)| k != &test_contract_hash)
-                                    .map(|(_, v)| v)
-                                    .collect::<Vec<_>>()
-                            } else {
-                                vec![]
-                            };
+                            self.get_modified_bytecodes(vec![])
+                                .into_iter()
+                                .filter(|(k, _)| k != &test_contract_hash)
+                                .map(|(_, v)| v)
+                                .collect::<Vec<_>>()
+                        } else {
+                            vec![]
+                        };
+
+                        let (account_nonce, deployment_nonce) = Self::get_nonce(new_origin, handle);
+                        let nonce = if is_deployment { deployment_nonce } else { account_nonce };
 
                         let gas_limit = current.ergs_remaining;
 
@@ -532,12 +563,18 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         tracing::debug!(?tx, "storing for broadcast");
 
                         self.broadcastable_transactions.write().unwrap().push_back(tx);
-                        //FIXME: detect if this is a deployment and increase the other nonce too
-                        self.set_nonce(new_origin, (Some(nonce + 1), None), handle);
+
+                        let set_nonce = if is_deployment {
+                            (None, Some(nonce + 1))
+                        } else {
+                            (Some(nonce + 1), None)
+                        };
+                        self.set_nonce(new_origin, set_nonce, handle);
                     }
                 }
                 return
             }
+
             if current.code_page.0 == 0 || current.ergs_remaining == 0 {
                 tracing::error!("cheatcode triggered, but no calldata or ergs available");
                 return

@@ -192,7 +192,11 @@ impl ScriptRunner {
 
     /// Executes the method that will collect all broadcastable transactions.
     pub fn script(&mut self, address: Address, calldata: Bytes) -> Result<ScriptResult> {
-        self.call(self.sender, address, calldata, U256::ZERO, false)
+        let result = self.call(self.sender, address, calldata, U256::ZERO, false);
+
+        self.correct_nonce(self.executor.get_nonce(self.sender)?.saturating_sub(1), 0)?;
+
+        result
     }
 
     /// Runs a broadcastable transaction locally and persists its state.

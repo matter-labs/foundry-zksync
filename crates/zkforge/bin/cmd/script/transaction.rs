@@ -62,6 +62,7 @@ impl TransactionWithMetadata {
         Self { transaction, ..Default::default() }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         transaction: TypedTransaction,
         rpc: Option<RpcUrl>,

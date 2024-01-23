@@ -88,8 +88,14 @@ impl ScriptArgs {
             }
         }
 
-        for tx in result.transactions.iter_mut().map(|txs| txs.iter_mut()).flatten() {
-            //fix nonces in the recorded transactions
+        for tx in result
+            .transactions
+            .iter_mut()
+            .flat_map(|txs| txs.iter_mut())
+            //ignore deployments as the nonce doesn't need to be fixed
+            .filter(|tx| !tx.factory_deps.is_empty())
+        {
+            //fix nonces in the recorded non-deploy transactions
             // for default sender
             let default_sender = H160::from_slice(Config::DEFAULT_SENDER.as_slice());
             if tx.transaction.from().map(|addr| addr == &default_sender).unwrap_or_default() {
