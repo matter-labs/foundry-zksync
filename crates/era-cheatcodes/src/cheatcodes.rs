@@ -517,14 +517,11 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         // that resembles the one to be used on-chain
                         let is_sender_also_caller =
                             new_origin == self.config.evm_opts.sender.to_h160();
-                        let account_nonce_offset = if is_sender_also_caller { 1 } else { 0 };
+                        let nonce_offset = if is_sender_also_caller { 1 } else { 0 };
 
-                        let (account_nonce, deployment_nonce) = Self::get_nonce(new_origin, handle);
-                        let nonce = if is_deployment {
-                            deployment_nonce
-                        } else {
-                            account_nonce.saturating_sub(account_nonce_offset.into())
-                        };
+                        let nonce = Self::get_nonce(new_origin, handle)
+                            .0
+                            .saturating_sub(nonce_offset.into());
 
                         let _gas_limit = current.ergs_remaining;
 
@@ -578,12 +575,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         // we increase the nonce so that future calls will have the nonce
                         // increased, simulating the previous tx being executed
-                        let set_nonce = if is_deployment {
-                            (None, Some(nonce + 1))
-                        } else {
-                            (Some(nonce + 1 + account_nonce_offset), None)
-                        };
-                        self.set_nonce(new_origin, set_nonce, handle);
+                        self.set_nonce(new_origin, (Some(nonce + 1 + nonce_offset), None), handle);
                     }
                 }
                 return
