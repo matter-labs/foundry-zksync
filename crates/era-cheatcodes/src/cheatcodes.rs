@@ -511,14 +511,19 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             vec![]
                         };
 
+                        // used to determine whether the nonce should be decreased, since
+                        // zkevm updates the nonce for the _sender_ already when we run the
+                        // script/test function therefore, we should fix it and obtain the nonce
+                        // that resembles the one to be used on-chain
+                        let is_sender_also_caller =
+                            new_origin == self.config.evm_opts.sender.to_h160();
+                        let account_nonce_offset = if is_sender_also_caller { 1 } else { 0 };
+
                         let (account_nonce, deployment_nonce) = Self::get_nonce(new_origin, handle);
                         let nonce = if is_deployment {
                             deployment_nonce
                         } else {
-                            // zkevm updates the nonce already when we run the script/test function
-                            // therefore, we should decrease the nonce by 1 to obtain the nonce
-                            // that will be used on-chain
-                            account_nonce.saturating_sub(1.into())
+                            account_nonce.saturating_sub(account_nonce_offset.into())
                         };
 
                         let _gas_limit = current.ergs_remaining;
@@ -576,8 +581,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         let set_nonce = if is_deployment {
                             (None, Some(nonce + 1))
                         } else {
-                            // we +2 here to offset for the -1 earlier
-                            (Some(nonce + 2), None)
+                            (Some(nonce + 1 + account_nonce_offset), None)
                         };
                         self.set_nonce(new_origin, set_nonce, handle);
                     }
