@@ -543,9 +543,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             (None, current.code_address)
                         };
 
-                        // zkevm updates the nonce already when the tx starts, so the current nonce
-                        // is 1 less.
-                        let new_nonce = nonce.saturating_sub(1.into());
+                        // zkevm updates the nonce already when the tx starts, so the original nonce
+                        // is 1 less than current.
+                        let orig_nonce = nonce.saturating_sub(1.into());
                         let tx = BroadcastableTransaction {
                             rpc,
                             factory_deps,
@@ -558,7 +558,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                         gas: Some(gas_limit.into()),
                                         value,
                                         data: Some(calldata.into()),
-                                        nonce: Some(new_nonce),
+                                        nonce: Some(orig_nonce),
                                         ..Default::default()
                                     },
                                 ),
