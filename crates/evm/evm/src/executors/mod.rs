@@ -14,7 +14,13 @@ use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, FixedBytes, B256, U256};
 use ethers_core::types::{Log, H256};
 use ethers_signers::LocalWallet;
-use foundry_common::{abi::IntoFunction, conversion_utils::address_to_h160, evm::Breakpoints};
+use foundry_common::{
+    abi::IntoFunction,
+    conversion_utils::{
+        address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_u256, u256_to_revm_u256,
+    },
+    evm::Breakpoints,
+};
 use foundry_evm_core::{
     backend::{Backend, DatabaseError, DatabaseExt, DatabaseResult, FuzzBackendWrapper},
     constants::{CALLER, CHEATCODE_ADDRESS},
@@ -33,7 +39,10 @@ use revm::{
 };
 use std::collections::BTreeMap;
 use zksync_types::{
+    get_nonce_key,
+    utils::{decompose_full_nonce, nonces_to_full_nonce},
     AccountTreeId, StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
+    NONCE_HOLDER_ADDRESS,
 };
 use zksync_utils::bytecode::hash_bytecode;
 
@@ -155,11 +164,22 @@ impl Executor {
         Ok(self.backend.basic_ref(address)?.map(|acc| acc.balance).unwrap_or_default())
     }
 
-    /// Set the nonce of an account.
+    /// Set the nonce of an account. We additionally update the nonce in the NONCE_HOLDER storage.
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> DatabaseResult<&mut Self> {
         let mut account = self.backend.basic_ref(address)?.unwrap_or_default();
         account.nonce = nonce;
 
+        let nonce_storage_slot = h256_to_revm_u256(*get_nonce_key(&address_to_h160(address)).key());
+        let nonce_holder_address = h160_to_address(NONCE_HOLDER_ADDRESS);
+        let full_nonce = self.backend.storage_ref(nonce_holder_address, nonce_storage_slot)?;
+        let (_, deploy_nonce) = decompose_full_nonce(revm_u256_to_u256(full_nonce));
+        let new_full_nonce = nonces_to_full_nonce(nonce.into(), deploy_nonce);
+
+        self.backend.insert_account_storage(
+            nonce_holder_address,
+            nonce_storage_slot,
+            u256_to_revm_u256(new_full_nonce),
+        )?;
         self.backend.insert_account_info(address, account);
         Ok(self)
     }

@@ -10,6 +10,13 @@ pub fn address_to_h160(i: Address) -> H160 {
     H160::from(i.0 .0)
 }
 
+/// Convert address to h256
+pub fn address_to_h256(i: &Address) -> H256 {
+    let mut buffer = [0u8; 32];
+    buffer[12..].copy_from_slice(i.as_slice());
+    H256(buffer)
+}
+
 /// Convert h160 to address
 pub fn h160_to_address(i: H160) -> Address {
     i.as_fixed_bytes().into()

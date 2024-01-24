@@ -184,9 +184,7 @@ impl ScriptRunner {
     /// We call the `setUp()` function with self.sender, this leaves the
     /// sender account in an undesirable state for broadcasting (nonce +1)
     fn correct_nonce(&mut self, sender_initial_nonce: u64, libraries_len: usize) -> Result<()> {
-        if self.sender == Config::DEFAULT_SENDER {
-            self.executor.set_nonce(self.sender, sender_initial_nonce + libraries_len as u64)?;
-        }
+        self.executor.set_nonce(self.sender, sender_initial_nonce + libraries_len as u64)?;
         Ok(())
     }
 
