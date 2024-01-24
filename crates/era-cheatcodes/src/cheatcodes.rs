@@ -132,6 +132,7 @@ pub struct CheatcodeTracer {
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
     broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
+    transact_logs: Vec<LogEntry>,
 }
 
 #[derive(Debug, Clone)]
@@ -180,6 +181,7 @@ enum FinishCycleOneTimeActions {
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
     SetOrigin { origin: H160 },
+    Transact { fork_id: Option<U256>, tx_hash: H256 },
     MakePersistentAccount { account: H160 },
     MakePersistentAccounts { accounts: Vec<H160> },
     RevokePersistentAccount { account: H160 },
@@ -562,6 +564,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             for log in logs {
                 self.recorded_logs.insert(log);
             }
+            //insert transact logs
+            for log in &self.transact_logs {
+                self.recorded_logs.insert(log.to_owned());
+            }
         }
 
         // This assert is triggered only once after the test execution finishes
@@ -607,7 +613,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 .into_iter()
                 .take(actual_events_initial_dimension.len() - actual_events_surplus)
                 .collect::<Vec<_>>();
-            let actual_logs = crate::events::parse_events(actual_events);
+            let mut actual_logs = crate::events::parse_events(actual_events);
+            actual_logs.extend(self.transact_logs.clone());
 
             assert!(compare_logs(&expected_logs, &actual_logs, self.emit_config.checks.clone()));
         }
@@ -928,6 +935,58 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     storage.borrow_mut().set_value(key, origin.into());
                 }
+                FinishCycleOneTimeActions::Transact { fork_id, tx_hash } => {
+                    let journaled_state = {
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let storage = storage.borrow_mut();
+                        let modified_storage =
+                            self.get_modified_storage(storage.modified_storage_keys());
+
+                        let era_db = &storage.storage_handle;
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        journaled_state.state =
+                            storage_to_state(era_db, &modified_storage, bytecodes);
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+
+                        db.transact(
+                            fork_id.map(|id| {
+                                let mut arr = [0; 32];
+                                id.to_big_endian(&mut arr);
+                                Uint::from_be_bytes(arr)
+                            }),
+                            tx_hash.to_fixed_bytes().into(),
+                            &mut env,
+                            &mut journaled_state,
+                            &mut revm::inspectors::NoOpInspector,
+                        )
+                        .unwrap();
+
+                        journaled_state
+                    };
+
+                    storage.borrow_mut().read_storage_keys = Default::default();
+
+                    for log in journaled_state.logs {
+                        self.transact_logs.push(LogEntry {
+                            address: log.address.to_h160(),
+                            data: log.data.to_vec(),
+                            topics: log
+                                .topics
+                                .iter()
+                                .map(|b| H256::from_slice(b.as_slice()))
+                                .collect(),
+                        })
+                    }
+                }
             }
         }
 
@@ -1222,6 +1281,7 @@ impl CheatcodeTracer {
                     .recorded_logs
                     .iter()
                     .filter(|log| !log.data.is_empty())
+                    .filter(|log| !INTERNAL_CONTRACT_ADDRESSES.contains(&log.address))
                     .map(|log| Log {
                         topics: log
                             .topics
@@ -1612,7 +1672,20 @@ impl CheatcodeTracer {
                 let int_value = value.to_string();
                 self.return_data = Some(int_value.to_return_data());
             }
-
+            transact_0(transact_0Call { txHash }) => {
+                tracing::info!("👷 Transacting current fork with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: None,
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
+            transact_1(transact_1Call { forkId, txHash }) => {
+                tracing::info!("👷 Transacting fork {forkId} with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: Some(forkId.to_u256()),
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
             tryFfi(tryFfiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running try ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
