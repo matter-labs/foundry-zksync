@@ -514,7 +514,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         let (account_nonce, deployment_nonce) = Self::get_nonce(new_origin, handle);
                         let nonce = if is_deployment { deployment_nonce } else { account_nonce };
 
-                        let gas_limit = current.ergs_remaining;
+                        let _gas_limit = current.ergs_remaining;
 
                         let (value, to) = if current.code_address ==
                             zksync_types::MSG_VALUE_SIMULATOR_ADDRESS
@@ -554,8 +554,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                     TransactionRequest {
                                         from: Some(new_origin),
                                         to: Some(ethers::types::NameOrAddress::Address(to)),
-                                        //FIXME: set only if set manually by user
-                                        gas: Some(gas_limit.into()),
+                                        //TODO: set only if set manually by user in script
+                                        gas: None,
                                         value,
                                         data: Some(calldata.into()),
                                         nonce: Some(orig_nonce),
