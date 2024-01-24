@@ -20,7 +20,6 @@ use zkforge::{
     traces::{CallTraceDecoder, Traces},
     utils::CallKind,
 };
-use zksync_types::H160;
 
 /// Helper alias type for the processed result of a runner onchain simulation.
 type RunnerResult = (Option<TransactionWithMetadata>, Traces);
