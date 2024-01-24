@@ -93,14 +93,14 @@ impl ScriptArgs {
             .iter_mut()
             .flat_map(|txs| txs.iter_mut())
             //ignore deployments as the nonce doesn't need to be fixed
-            .filter(|tx| !tx.factory_deps.is_empty())
+            .filter(|tx| tx.factory_deps.is_empty())
         {
             //fix nonces in the recorded non-deploy transactions
-            // for default sender
-            let default_sender = H160::from_slice(Config::DEFAULT_SENDER.as_slice());
-            if tx.transaction.from().map(|addr| addr == &default_sender).unwrap_or_default() {
+            // for non default sender
+            let script_caller = H160::from_slice(sender.as_slice());
+            if tx.transaction.from().map(|addr| addr == &script_caller).unwrap_or_default() {
                 let nonce =
-                    tx.transaction.nonce().map(|n| n.saturating_sub(1.into())).unwrap_or_default();
+                    tx.transaction.nonce().map(|n| n.saturating_sub(2.into())).unwrap_or_default();
                 tx.transaction.set_nonce(nonce);
             }
         }

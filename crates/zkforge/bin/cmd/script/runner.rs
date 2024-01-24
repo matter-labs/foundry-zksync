@@ -119,8 +119,6 @@ impl ScriptRunner {
                     traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
                     logs.extend_from_slice(&setup_logs);
 
-                    self.correct_nonce(sender_nonce, libraries.len())?;
-
                     (
                         !reverted,
                         gas_used,
@@ -144,8 +142,6 @@ impl ScriptRunner {
                     } = *err;
                     traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
                     logs.extend_from_slice(&setup_logs);
-
-                    self.correct_nonce(sender_nonce, libraries.len())?;
 
                     (
                         !reverted,
