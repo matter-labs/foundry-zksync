@@ -104,7 +104,7 @@ impl ScriptRunner {
                 vec![],
             )
         } else {
-            match self.executor.setup(Some(self.sender), address) {
+            let res = match self.executor.setup(Some(self.sender), address) {
                 Ok(CallResult {
                     reverted,
                     traces: setup_traces,
@@ -153,10 +153,11 @@ impl ScriptRunner {
                     )
                 }
                 Err(e) => return Err(e.into()),
-            }
-        };
+            };
 
-        self.correct_nonce(sender_nonce, libraries.len())?;
+            self.correct_nonce(sender_nonce, libraries.len())?;
+            res
+        };
 
         Ok((
             address,
