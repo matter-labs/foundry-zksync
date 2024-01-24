@@ -512,7 +512,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         };
 
                         let (account_nonce, deployment_nonce) = Self::get_nonce(new_origin, handle);
-                        let nonce = if is_deployment { deployment_nonce } else { account_nonce };
+                        let nonce = if is_deployment {
+                            deployment_nonce
+                        } else {
+                            // zkevm updates the nonce already when we run the script/test function
+                            // therefore, we should decrease the nonce by 1 to obtain the nonce
+                            // that will be used on-chain
+                            account_nonce.saturating_sub(1.into())
+                        };
 
                         let _gas_limit = current.ergs_remaining;
 
@@ -543,9 +550,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             (None, current.code_address)
                         };
 
-                        // zkevm updates the nonce already when the tx starts, so the original nonce
-                        // is 1 less than current.
-                        let orig_nonce = nonce.saturating_sub(1.into());
                         let tx = BroadcastableTransaction {
                             rpc,
                             factory_deps,
@@ -558,7 +562,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                         gas: None,
                                         value,
                                         data: Some(calldata.into()),
-                                        nonce: Some(orig_nonce),
+                                        nonce: Some(nonce),
                                         ..Default::default()
                                     },
                                 ),
@@ -567,10 +571,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         self.broadcastable_transactions.write().unwrap().push_back(tx);
 
+                        // we increase the nonce so that future calls will have the nonce
+                        // increased, simulating the previous tx being executed
                         let set_nonce = if is_deployment {
                             (None, Some(nonce + 1))
                         } else {
-                            (Some(nonce + 1), None)
+                            // we +2 here to offset for the -1 earlier
+                            (Some(nonce + 2), None)
                         };
                         self.set_nonce(new_origin, set_nonce, handle);
                     }

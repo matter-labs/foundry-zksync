@@ -156,6 +156,8 @@ impl ScriptRunner {
             }
         };
 
+        self.correct_nonce(sender_nonce, libraries.len())?;
+
         Ok((
             address,
             ScriptResult {
@@ -177,7 +179,7 @@ impl ScriptRunner {
         ))
     }
 
-    /// We call the `setUp()` function with self.sender, this leaves the
+    /// We call the script/test functions with self.sender, this leaves the
     /// sender account in an undesirable state for broadcasting (nonce +1)
     fn correct_nonce(&mut self, sender_initial_nonce: u64, libraries_len: usize) -> Result<()> {
         self.executor.set_nonce(self.sender, sender_initial_nonce + libraries_len as u64)?;
@@ -188,6 +190,8 @@ impl ScriptRunner {
     pub fn script(&mut self, address: Address, calldata: Bytes) -> Result<ScriptResult> {
         let result = self.call(self.sender, address, calldata, U256::ZERO, false);
 
+        //technically unneded as nothing executes afterwards
+        // so this is here just for consistency
         self.correct_nonce(self.executor.get_nonce(self.sender)?.saturating_sub(1), 0)?;
 
         result
