@@ -132,14 +132,21 @@ pub struct CheatcodeTracer {
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
     broadcastable_transactions: Vec<BroadcastableTransaction>,
-    mock_calls: Vec<MockCall>,
+    pub mock_calls: Vec<MockCall>,
+    last_pc: Option<PcOrImm>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MockCall {
-    pub address: H160,
-    pub calldata: Vec<u8>,
-    pub return_data: Vec<u8>,
+    filter: FilterOps,
+    mock_next: Option<Vec<zksync_types::U256>>,
+}
+
+#[derive(Debug, Clone)]
+struct FilterOps {
+    address: H160,
+    calldata: Vec<u8>,
+    return_data: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -217,7 +224,6 @@ enum ActionOnReturn {
 struct FinishCyclePermanentActions {
     start_prank: Option<StartPrankOpts>,
     broadcast: Option<BroadcastOpts>,
-    mock_call: Vec<MockCall>,
 }
 
 #[derive(Debug, Clone)]
@@ -315,19 +321,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) {
-        //detect far or near calls and compare to mock calls to return the data appropriately
-        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let current = state.vm_local_state.callstack.current;
-            let calldata = get_calldata(&state, memory);
-            for mock_call in &self.mock_calls {
-                println!("mock call: {:?}", mock_call);
-                println!("mock call address: {:?}", mock_call.address);
-                println!("mock call calldata: {:?}", mock_call.calldata);
-                if mock_call.address == current.code_address && mock_call.calldata == calldata {
-                    self.permanent_actions.mock_call.push(mock_call.clone());
-                }
-            }
-        }
         let current = state.vm_local_state.callstack.get_current_stack();
         let is_reserved_addr = current
             .code_address
@@ -414,7 +407,25 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
         }
 
-        let current = state.vm_local_state.callstack.get_current_stack();
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            println!("mock call found");
+            let current = state.vm_local_state.callstack.current;
+            let calldata = get_calldata(&state, memory);
+            for mock_call in &mut self.mock_calls {
+                if mock_call.filter.address == current.code_address &&
+                    mock_call.filter.calldata == calldata
+                {
+                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
+                        data: mock_call.filter.return_data.clone(),
+                        continue_pc: self.last_pc.unwrap(),
+                    })
+                    // println!("return data: {:?}", self.return_data);
+                    // println!("depth {}", state.vm_local_state.callstack.depth());
+                    // println!("mock call found");
+                    // mock_call.mock_next = Some(mock_call.filter.return_data.clone());
+                }
+            }
+        }
 
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -434,9 +445,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             if current.code_address != CHEATCODE_ADDRESS {
                 if let Some(broadcast) = &self.permanent_actions.broadcast {
                     if state.vm_local_state.callstack.depth() == broadcast.depth {
-                        //when the test ends, just make sure the tx origin is set to the original
-                        // one (should never get here unless .stopBroadcast
-                        // wasn't called)
+                        //when the test ends, just make sure the tx origin is set to the
+                        // original one (should never get here
+                        // unless .stopBroadcast wasn't called)
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
                             origin: broadcast.original_origin,
                         });
@@ -899,6 +910,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(snapshot_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
+                    println!("HERE");
                     tracing::debug!("!!!! FORCING RETURN");
 
                     self.return_data = Some(data.to_return_data());
@@ -953,29 +965,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             }
         }
 
-        //iterate through mock calls and if address and calldata matches return the mocked data
-        for mock_call in &self.permanent_actions.mock_call {
-            let current = state.local_state.callstack.current;
+        // for mock_call in &mut self.mock_calls {
+        //     if mock_call.mock_next.is_some() {
+        //         println!("depth {}", state.local_state.callstack.depth());
+        //         println!("FINISHHHH: {:?}", mock_call);
+        //         self.return_data = mock_call.mock_next.take();
+        //     }
+        // }
 
-            if current.code_address == mock_call.address  {
-                let vmlocalstate = VmLocalStateData{vm_local_state: &state.local_state};
-                let calldata = get_calldata(&vmlocalstate, &state.memory);
-                println!("calldata: {:?}", calldata);
-                if mock_call.calldata == calldata {
-                    self.return_data = Some(mock_call.return_data.clone().to_return_data());
-                }
-            }
-           
-            
-            
-            // if mock_call.address == current.code_address &&
-            //     mock_call.calldata == return_data
-            // {
-            //     self.return_data = Some(mock_call.return_data.clone().to_return_data());
-            // }
-        }
-
-        // Set return data, if any
+        //Set return data, if any
         if let Some(fat_pointer) = self.return_ptr.take() {
             let elements = self.return_data.take().unwrap();
             Self::set_return(fat_pointer, elements, &mut state.local_state, &mut state.memory);
@@ -1301,9 +1299,12 @@ impl CheatcodeTracer {
                 tracing::info!("👷 Mocking call to {callee:?}");
                 //store the mock call to compare later
                 self.mock_calls.push(MockCall {
-                    address: callee.to_h160(),
-                    calldata: data,
-                    return_data: returnData,
+                    filter: FilterOps {
+                        address: callee.to_h160(),
+                        calldata: data,
+                        return_data: returnData,
+                    },
+                    mock_next: None,
                 })
             }
             recordLogs(recordLogsCall {}) => {
@@ -2259,7 +2260,7 @@ fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMem
     let ptr = state.vm_local_state.registers[CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
     assert!(ptr.is_pointer);
     let fat_data_pointer = FatPointer::from_u256(ptr.value);
-    memory.read_unaligned_bytes(    
+    memory.read_unaligned_bytes(
         fat_data_pointer.memory_page as usize,
         fat_data_pointer.start as usize,
         fat_data_pointer.length as usize,
