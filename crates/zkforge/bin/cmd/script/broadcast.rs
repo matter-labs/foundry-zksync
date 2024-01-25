@@ -585,7 +585,6 @@ impl ScriptArgs {
         signer: &WalletSigner,
         (mut legacy_or_1559, factory_deps): (TypedTransaction, Vec<Vec<u8>>),
     ) -> Result<TxHash> {
-        debug!("sending transaction: {:?}", legacy_or_1559);
 
         // Chains which use `eth_estimateGas` are being sent sequentially and require their gas
         // to be re-estimated right before broadcasting.
@@ -605,6 +604,7 @@ impl ScriptArgs {
                 .sign_transaction(&legacy_or_1559)
                 .await
                 .wrap_err("Failed to sign transaction")?;
+            debug!("sending transaction: {:?}", legacy_or_1559);
 
             legacy_or_1559.rlp_signed(&signature)
         } else {
@@ -621,14 +621,18 @@ impl ScriptArgs {
                 .data(legacy_or_1559.data().cloned().unwrap())
                 .custom_data(custom_data);
 
-            //TODO: estimate fee?
-            deploy_request = deploy_request.gas_limit(legacy_or_1559.gas().unwrap())
-                //.max_fee_per_gas()
-                //.max_priority_fee_per_gas()
-                ;
+            let gas_price = provider.get_gas_price().await?;
+            let fee: zksync_web3_rs::zks_provider::types::Fee = provider.request("zks_estimateFee", [deploy_request.clone()]).await.unwrap();
+
+            deploy_request = deploy_request.gas_limit(fee.gas_limit)
+                .max_fee_per_gas(fee.max_fee_per_gas)
+                .max_priority_fee_per_gas(fee.max_priority_fee_per_gas)
+                .gas_price(gas_price);
 
             let signable: Eip712Transaction =
                 deploy_request.clone().try_into().expect("converting deploy request");
+            debug!("sending transaction: {:?}", signable);
+
             let signature =
                 signer.sign_typed_data(&signable).await.wrap_err("Failed to sign typed data")?;
 
