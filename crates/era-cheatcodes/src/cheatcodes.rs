@@ -205,6 +205,10 @@ enum ActionOnReturn {
         prev_continue_pc: Option<PcOrImm>,
         prev_exception_handler_pc: Option<PcOrImm>,
     },
+    SkipTest {
+        depth: usize,
+        prev_continue_pc: Option<PcOrImm>,
+    },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -276,7 +280,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             prev_exception_handler_pc,
             prev_continue_pc,
             ..
-        }) = self.current_expect_revert()
+        }) = self.current_return_action()
         {
             if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
                 // Callstack on the desired depth, it has the correct pc for continue
@@ -297,6 +301,32 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 }
 
                 prev_exception_handler_pc.replace(current.exception_handler_location);
+            }
+        }
+        //store the current exception handler in expect revert
+        // to be used to force a revert
+        if let Some(ActionOnReturn::SkipTest { prev_continue_pc, .. }) =
+            self.current_return_action()
+        {
+            if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
+                // Callstack on the desired depth, it has the correct pc for continue
+                let last = state.vm_local_state.callstack.inner.last().unwrap();
+                // Callstack on the current depth, it has the correct pc for exception handler and
+                // is_local_frame
+                // let current = &state.vm_local_state.callstack.current;
+                // let is_to_label: bool = data.opcode.variant.flags
+                //     [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
+                //     state.vm_local_state.callstack.current.is_local_frame;
+                // tracing::debug!(%is_to_label, ?last, "storing continuations");
+
+                // The source https://github.com/matter-labs/era-zk_evm/blob/763ef5dfd52fecde36bfdd01d47589b61eabf118/src/opcodes/execution/ret.rs#L242
+                // if is_to_label {
+                //     prev_continue_pc.replace(data.opcode.imm_0);
+                // } else {
+                prev_continue_pc.replace(last.pc);
+                // }
+
+                // prev_exception_handler_pc.replace(current.exception_handler_location);
             }
         }
     }
@@ -365,7 +395,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             self.reset_test_status();
         }
 
-        // Checks returns from caontracts for expectRevert cheatcode
+        // Checks returns from contracts for expectRevert cheatcode
         self.handle_return(&state, &data, memory);
 
         // Checks contract calls for expectCall cheatcode
@@ -1094,6 +1124,14 @@ impl CheatcodeTracer {
                     return
                 };
                 self.return_data = Some(h160_to_address(address).to_return_data());
+            }
+            assume(assumeCall { condition }) => {
+                tracing::info!("👷 Assuming condition {condition}");
+                if !condition {
+                    return
+                }
+                let depth = state.vm_local_state.callstack.depth();
+                self.add_skip_test(depth);
             }
             deal(dealCall { account, newBalance: new_balance }) => {
                 tracing::info!("👷 Setting balance for {account:?} to {new_balance}");
@@ -1922,12 +1960,12 @@ impl CheatcodeTracer {
         );
     }
 
-    fn current_expect_revert(&mut self) -> Option<&mut ActionOnReturn> {
+    fn current_return_action(&mut self) -> Option<&mut ActionOnReturn> {
         self.next_return_action.as_mut().map(|action| &mut action.action)
     }
 
     fn add_expect_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
-        if self.current_expect_revert().is_some() {
+        if self.current_return_action().is_some() {
             panic!("expectRevert already set")
         }
 
@@ -1944,7 +1982,16 @@ impl CheatcodeTracer {
             Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 1 });
     }
 
-    fn handle_except_revert<H: HistoryMode>(
+    fn add_skip_test(&mut self, depth: usize) {
+        //-1: Because we are working with return opcode and it pops the stack after execution
+        let action = ActionOnReturn::SkipTest { depth, prev_continue_pc: None };
+
+        // We have to skip at least one return from CHEATCODES contract
+        self.next_return_action =
+            Some(NextReturnAction { target_depth: depth, action, returns_to_skip: 0 });
+    }
+
+    fn handle_expect_revert<H: HistoryMode>(
         reason: Option<&Vec<u8>>,
         op: zkevm_opcode_defs::RetOpcode,
         state: &VmLocalStateData<'_>,
@@ -2082,51 +2129,71 @@ impl CheatcodeTracer {
         }
 
         // The desired return opcode was found
-        let ActionOnReturn::ExpectRevert {
-            reason,
-            depth,
-            prev_exception_handler_pc: exception_handler,
-            prev_continue_pc: continue_pc,
-        } = &action.action;
-        match op {
-            RetOpcode::Revert => {
+        match &action.action {
+            ActionOnReturn::ExpectRevert {
+                reason,
+                depth,
+                prev_continue_pc: exception_handler,
+                prev_exception_handler_pc: continue_pc,
+            } => {
+                match op {
+                    RetOpcode::Revert => {
+                        tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
+                        let (Some(exception_handler), Some(continue_pc)) =
+                            (*exception_handler, *continue_pc)
+                        else {
+                            tracing::error!("exceptRevert missing stored continuations");
+                            return
+                        };
+
+                        self.one_time_actions.push(
+                            Self::handle_expect_revert(reason.as_ref(), op, state, memory)
+                                .map(|_| FinishCycleOneTimeActions::ForceReturn {
+                                        //dummy data
+                                        data: // vec![0u8; 8192]
+                                            [0xde, 0xad, 0xbe, 0xef].to_vec(),
+                                        continue_pc,
+                                    })
+                                .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
+                                    error,
+                                    exception_handler,
+                                }),
+                        );
+                        self.next_return_action = None;
+                    }
+                    RetOpcode::Ok => {
+                        let Some(exception_handler) = *exception_handler else {
+                            tracing::error!("exceptRevert missing stored continuations");
+                            return
+                        };
+                        if let Err(err) =
+                            Self::handle_expect_revert(reason.as_ref(), op, state, memory)
+                        {
+                            self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                                error: err,
+                                exception_handler,
+                            });
+                        }
+                        self.next_return_action = None;
+                    }
+                    RetOpcode::Panic => (),
+                }
+            }
+            ActionOnReturn::SkipTest { depth, prev_continue_pc: continue_pc } => {
                 tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
-                let (Some(exception_handler), Some(continue_pc)) =
-                    (*exception_handler, *continue_pc)
-                else {
-                    tracing::error!("exceptRevert missing stored continuations");
+                let Some(continue_pc) = *continue_pc else {
+                    tracing::error!("skipTest missing stored continuations");
                     return
                 };
 
-                self.one_time_actions.push(
-                    Self::handle_except_revert(reason.as_ref(), op, state, memory)
-                        .map(|_| FinishCycleOneTimeActions::ForceReturn {
-                                //dummy data
-                                data: // vec![0u8; 8192]
-                                    [0xde, 0xad, 0xbe, 0xef].to_vec(),
-                                continue_pc,
-                            })
-                        .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
-                            error,
-                            exception_handler,
-                        }),
-                );
+                self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
+                    //dummy data
+                    data: // vec![0u8; 8192]
+                        [0xde, 0xad, 0xbe, 0xef].to_vec(),
+                    continue_pc,
+                });
                 self.next_return_action = None;
             }
-            RetOpcode::Ok => {
-                let Some(exception_handler) = *exception_handler else {
-                    tracing::error!("exceptRevert missing stored continuations");
-                    return
-                };
-                if let Err(err) = Self::handle_except_revert(reason.as_ref(), op, state, memory) {
-                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
-                        error: err,
-                        exception_handler,
-                    });
-                }
-                self.next_return_action = None;
-            }
-            RetOpcode::Panic => (),
         }
     }
 
