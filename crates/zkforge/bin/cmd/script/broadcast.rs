@@ -585,7 +585,6 @@ impl ScriptArgs {
         signer: &WalletSigner,
         (mut legacy_or_1559, factory_deps): (TypedTransaction, Vec<Vec<u8>>),
     ) -> Result<TxHash> {
-
         // Chains which use `eth_estimateGas` are being sent sequentially and require their gas
         // to be re-estimated right before broadcasting.
         if has_different_gas_calc(signer.chain_id()) || self.skip_simulation {
@@ -622,9 +621,11 @@ impl ScriptArgs {
                 .custom_data(custom_data);
 
             let gas_price = provider.get_gas_price().await?;
-            let fee: zksync_web3_rs::zks_provider::types::Fee = provider.request("zks_estimateFee", [deploy_request.clone()]).await.unwrap();
+            let fee: zksync_web3_rs::zks_provider::types::Fee =
+                provider.request("zks_estimateFee", [deploy_request.clone()]).await.unwrap();
 
-            deploy_request = deploy_request.gas_limit(fee.gas_limit)
+            deploy_request = deploy_request
+                .gas_limit(fee.gas_limit)
                 .max_fee_per_gas(fee.max_fee_per_gas)
                 .max_priority_fee_per_gas(fee.max_priority_fee_per_gas)
                 .gas_price(gas_price);
