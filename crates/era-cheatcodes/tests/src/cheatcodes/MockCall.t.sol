@@ -53,11 +53,11 @@ contract MockCallTest is Test {
         vm.mockCall(
             address(target),
             abi.encodeWithSelector(target.numberB.selector),
-            abi.encode(10)
+            abi.encode(30)
         );
 
         // post-mock
-        console.log("numberB: ", target.numberB());
-        assertEq(target.numberB(), 10);
+        console.log("numberB", target.numberB());
+        require(target.numberB() == 30, "numberB failed mock");
     }
 }
