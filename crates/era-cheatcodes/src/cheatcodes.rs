@@ -191,8 +191,17 @@ enum FinishCycleOneTimeActions {
 
 #[derive(Debug, Clone)]
 struct ForceRevertError {
-    abi_encode: bool,
-    inner: Vec<u8>,
+    reason: Vec<U256>,
+}
+
+impl ForceRevertError {
+    fn abi_encode(reason: Vec<u8>) -> Self {
+        Self { reason: reason.to_return_data() }
+    }
+
+    fn raw(reason: Vec<u8>) -> Self {
+        Self { reason: reason.chunks(32).map(U256::from_big_endian).collect_vec() }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -924,11 +933,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
                     tracing::debug!(?error, pc, "Forcing revert");
 
-                    self.return_data = if error.abi_encode {
-                        Some(error.inner.to_return_data())
-                    } else {
-                        Some(error.inner.chunks(32).map(U256::from_big_endian).collect_vec())
-                    };
+                    self.return_data = Some(error.reason);
 
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
@@ -2152,7 +2157,7 @@ impl CheatcodeTracer {
                                 continue_pc,
                             })
                                 .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
-                                    error: ForceRevertError { abi_encode: true, inner: error },
+                                    error: ForceRevertError::abi_encode(error),
                                     exception_handler,
                                 }),
                         );
@@ -2167,7 +2172,7 @@ impl CheatcodeTracer {
                             Self::handle_expect_revert(reason.as_ref(), op, state, memory)
                         {
                             self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
-                                error: ForceRevertError { abi_encode: true, inner: err },
+                                error: ForceRevertError::abi_encode(err),
                                 exception_handler,
                             });
                         }
@@ -2183,7 +2188,7 @@ impl CheatcodeTracer {
                     return
                 };
                 self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
-                    error: ForceRevertError { abi_encode: false, inner: reason.clone() },
+                    error: ForceRevertError::raw(reason.clone()),
                     exception_handler: continue_pc,
                 });
                 self.next_return_action = None;
