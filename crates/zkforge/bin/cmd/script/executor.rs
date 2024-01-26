@@ -293,7 +293,7 @@ impl ScriptArgs {
             script_config.evm_opts.evm_env().await.expect("Could not instantiate fork environment");
 
         // The db backend that serves all the data.
-        let db: Backend = match &script_config.evm_opts.fork_url {
+        let db = match &script_config.evm_opts.fork_url {
             Some(url) => match script_config.backends.get(url) {
                 Some(db) => db.clone(),
                 None => {
