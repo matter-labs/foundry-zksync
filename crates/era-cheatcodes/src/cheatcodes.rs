@@ -920,7 +920,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     //change current stack pc to label
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
-                    break
                 }
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
                     tracing::debug!(?error, pc, "Forcing revert");
@@ -944,7 +943,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     //change current stack pc to exception handler
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
-                    break
                 }
                 FinishCycleOneTimeActions::SetOrigin { origin } => {
                     let prev = state
