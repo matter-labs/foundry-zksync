@@ -10,6 +10,7 @@ use foundry_cheatcodes_spec::Vm;
 use foundry_common::{conversion_utils::h160_to_address, StorageModifications};
 use foundry_evm_core::{
     backend::DatabaseExt,
+    constants::MAGIC_ASSUME,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
     opts::EvmOpts,
@@ -172,7 +173,7 @@ enum ExpectedEmitState {
 enum FinishCycleOneTimeActions {
     StorageWrite { key: StorageKey, read_value: H256, write_value: H256 },
     StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
-    ForceRevert { error: Vec<u8>, exception_handler: PcOrImm },
+    ForceRevert { error: ForceRevertError, exception_handler: PcOrImm },
     ForceReturn { data: Vec<u8>, continue_pc: PcOrImm },
     CreateSelectFork { url_or_alias: String, block_number: Option<u64> },
     CreateFork { url_or_alias: String, block_number: Option<u64> },
@@ -186,6 +187,12 @@ enum FinishCycleOneTimeActions {
     MakePersistentAccounts { accounts: Vec<H160> },
     RevokePersistentAccount { account: H160 },
     RevokePersistentAccounts { accounts: Vec<H160> },
+}
+
+#[derive(Debug, Clone)]
+struct ForceRevertError {
+    abi_encode: bool,
+    inner: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -205,10 +212,10 @@ enum ActionOnReturn {
         prev_continue_pc: Option<PcOrImm>,
         prev_exception_handler_pc: Option<PcOrImm>,
     },
-    SkipTest {
+    Revert {
         depth: usize,
-        prev_continue_pc: Option<PcOrImm>,
-        test_depth: usize,
+        prev_exception_handler_pc: Option<PcOrImm>,
+        reason: Vec<u8>,
     },
 }
 
@@ -304,32 +311,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 prev_exception_handler_pc.replace(current.exception_handler_location);
             }
         }
-        //store the current exception handler in expect revert
-        // to be used to force a revert
-        if let Some(ActionOnReturn::SkipTest { prev_continue_pc, .. }) =
+        if let Some(ActionOnReturn::Revert { prev_exception_handler_pc, .. }) =
             self.current_return_action()
         {
-            // if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
-            // Callstack on the desired depth, it has the correct pc for continue
-            let second_to_last = state.vm_local_state.callstack.inner.iter().rev().nth(0).unwrap();
-            // Callstack on the current depth, it has the correct pc for exception handler and
-            // is_local_frame
-            let current = &state.vm_local_state.callstack.current;
-            // let is_to_label: bool = data.opcode.variant.flags
-            //     [zkevm_opcode_defs::RET_TO_LABEL_BIT_IDX] &
-            //     state.vm_local_state.callstack.current.is_local_frame;
-            // tracing::debug!(%is_to_label, ?second_to_last, "storing continuations");
-
-            // The source https://github.com/matter-labs/era-zk_evm/blob/763ef5dfd52fecde36bfdd01d47589b61eabf118/src/opcodes/execution/ret.rs#L242
-            // if is_to_label {
-            // prev_continue_pc.replace(data.opcode.imm_0);
-            // } else {
-            // tracing::debug!(pc = ?second_to_last.pc, "skipTest actionOnReturn before_execution");
-            prev_continue_pc.replace(second_to_last.pc);
-            // }
-
-            // prev_exception_handler_pc.replace(current.exception_handler_location);
-            // }
+            if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
+                let current = &state.vm_local_state.callstack.current;
+                tracing::debug!(?current, "storing continuations");
+                prev_exception_handler_pc.replace(current.exception_handler_location);
+            }
         }
     }
 
@@ -916,8 +905,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(snapshot_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
-                    tracing::debug!("!!!! FORCING RETURN");
-
+                    tracing::debug!(?data, pc, "Forcing return");
                     self.return_data = Some(data.to_return_data());
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
@@ -935,9 +923,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     break
                 }
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
-                    tracing::debug!("!!! FORCING REVERT");
+                    tracing::debug!(?error, pc, "Forcing revert");
 
-                    self.return_data = Some(error.to_return_data());
+                    self.return_data = if error.abi_encode {
+                        Some(error.inner.to_return_data())
+                    } else {
+                        Some(error.inner.chunks(32).map(U256::from_big_endian).collect_vec())
+                    };
+
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
                     let fat_data_pointer = FatPointer::from_u256(ptr.value);
@@ -1081,7 +1074,8 @@ impl CheatcodeTracer {
                     self.test_status = FoundryTestState::Running {
                         call_depth: state.vm_local_state.callstack.depth(),
                     };
-                    tracing::info!("Test started depth {}", state.vm_local_state.callstack.depth());
+                    let depth = state.vm_local_state.callstack.depth();
+                    tracing::info!("Test started depth {}", depth);
                 }
             }
             Opcode::Ret(_) => {
@@ -1091,8 +1085,6 @@ impl CheatcodeTracer {
                     if call_depth == state.vm_local_state.callstack.depth() + 1 {
                         self.test_status = FoundryTestState::Finished;
                         tracing::info!("Test finished {}", state.vm_local_state.callstack.depth());
-                        //TODO: get returndata to check
-                        // panic!("Test finished")
                     }
                 }
             }
@@ -1131,12 +1123,11 @@ impl CheatcodeTracer {
                 self.return_data = Some(h160_to_address(address).to_return_data());
             }
             assume(assumeCall { condition }) => {
-                tracing::info!("👷 Assuming condition {condition}");
-                if !condition {
+                tracing::info!(condition, "👷 Skipping fuzz test run if condition is not met");
+                if condition {
                     return
                 }
-                let depth = state.vm_local_state.callstack.depth();
-                self.add_skip_test(depth);
+                self.add_revert_test(MAGIC_ASSUME.to_vec(), state.vm_local_state.callstack.depth());
             }
             deal(dealCall { account, newBalance: new_balance }) => {
                 tracing::info!("👷 Setting balance for {account:?} to {new_balance}");
@@ -1987,15 +1978,12 @@ impl CheatcodeTracer {
             Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 1 });
     }
 
-    fn add_skip_test(&mut self, depth: usize) {
+    fn add_revert_test(&mut self, reason: Vec<u8>, depth: usize) {
         //-1: Because we are working with return opcode and it pops the stack after execution
-        let action = ActionOnReturn::SkipTest {
-            depth: depth - 1,
-            prev_continue_pc: None,
-            test_depth: depth - 2,
-        };
+        let action =
+            ActionOnReturn::Revert { depth: depth - 1, prev_exception_handler_pc: None, reason };
 
-        tracing::debug!(?depth, "add_skip_test");
+        tracing::debug!(?depth, "add_revert_test");
         // We have to skip at least one return from CHEATCODES contract
         self.next_return_action =
             Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 0 });
@@ -2136,8 +2124,8 @@ impl CheatcodeTracer {
             ActionOnReturn::ExpectRevert {
                 reason,
                 depth,
-                prev_continue_pc: exception_handler,
-                prev_exception_handler_pc: continue_pc,
+                prev_exception_handler_pc: exception_handler,
+                prev_continue_pc: continue_pc,
             } => {
                 // Skip check if opcode is not Ret
                 let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
@@ -2160,13 +2148,13 @@ impl CheatcodeTracer {
                         self.one_time_actions.push(
                             Self::handle_expect_revert(reason.as_ref(), op, state, memory)
                                 .map(|_| FinishCycleOneTimeActions::ForceReturn {
-                                        //dummy data
-                                        data: // vec![0u8; 8192]
-                                            [0xde, 0xad, 0xbe, 0xef].to_vec(),
-                                        continue_pc,
-                                    })
+                                    //dummy data
+                                    data: // vec![0u8; 8192]
+                                    [0xde, 0xad, 0xbe, 0xef].to_vec(),
+                                continue_pc,
+                            })
                                 .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
-                                    error,
+                                    error: ForceRevertError { abi_encode: true, inner: error },
                                     exception_handler,
                                 }),
                         );
@@ -2181,7 +2169,7 @@ impl CheatcodeTracer {
                             Self::handle_expect_revert(reason.as_ref(), op, state, memory)
                         {
                             self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
-                                error: err,
+                                error: ForceRevertError { abi_encode: true, inner: err },
                                 exception_handler,
                             });
                         }
@@ -2190,51 +2178,17 @@ impl CheatcodeTracer {
                     RetOpcode::Panic => (),
                 }
             }
-            ActionOnReturn::SkipTest { depth, test_depth, prev_continue_pc: continue_pc } => {
-                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, %test_depth, ?continue_pc, "skipTest");
+            ActionOnReturn::Revert { depth, reason, prev_exception_handler_pc: continue_pc } => {
+                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, ?continue_pc, "revert");
                 let Some(continue_pc) = *continue_pc else {
-                    tracing::error!("skipTest missing stored continuations");
+                    tracing::error!("revert missing stored continuations");
                     return
                 };
-
-                if depth == test_depth {
-                    //done, we'll be exiting the test here
-                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
-                    //dummy data
-                    data: // vec![0u8; 8192]
-                        [0xde, 0xad, 0xbe, 0xef].to_vec(),
-                    continue_pc,
-                    });
-                    self.next_return_action = None;
-                } else {
-                    // Skip check if opcode is not Ret
-                    let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
-                    // Check how many retunrs we need to skip before finding the actual one
-                    if action.returns_to_skip != 0 {
-                        action.returns_to_skip -= 1;
-                        return
-                    }
-
-                    //we'll be exiting the cheatcode
-                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
-                    //dummy data
-                    data: // vec![0u8; 8192]
-                        [0xde, 0xad, 0xbe, 0xef].to_vec(),
-                    continue_pc,
-                        //TODO: try putting same PC as current RET to execute
-                        // RET twice
-                    });
-
-                    self.next_return_action = Some(NextReturnAction {
-                        target_depth: *depth,
-                        action: ActionOnReturn::SkipTest {
-                            depth: depth - 1,
-                            prev_continue_pc: None,
-                            test_depth: *test_depth,
-                        },
-                        returns_to_skip: 0,
-                    });
-                }
+                self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                    error: ForceRevertError { abi_encode: false, inner: reason.clone() },
+                    exception_handler: continue_pc,
+                });
+                self.next_return_action = None;
             }
         }
     }
