@@ -1976,12 +1976,14 @@ impl CheatcodeTracer {
     }
 
     fn add_revert_test(&mut self, reason: Vec<u8>, depth: usize) {
+        if self.current_return_action().is_some() {
+            panic!("revert test already set")
+        }
+
         //-1: Because we are working with return opcode and it pops the stack after execution
         let action =
             ActionOnReturn::Revert { depth: depth - 1, prev_exception_handler_pc: None, reason };
 
-        tracing::debug!(?depth, "add_revert_test");
-        // We have to skip at least one return from CHEATCODES contract
         self.next_return_action =
             Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 0 });
     }
@@ -2111,7 +2113,6 @@ impl CheatcodeTracer {
         let Some(action) = self.next_return_action.as_mut() else { return };
         // We only care about the certain depth
         let callstack_depth = state.vm_local_state.callstack.depth();
-        tracing::debug!(?callstack_depth, ?action, "handle_return");
         if callstack_depth != action.target_depth {
             return
         }
