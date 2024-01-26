@@ -214,6 +214,7 @@ impl FuzzedExecutor {
         );
 
         // When the `assume` cheatcode is called it returns a special string
+        // NOTE: `ends_with` is used to prevent padded results issues
         if call.result.ends_with(MAGIC_ASSUME) {
             return Err(TestCaseError::reject(FuzzError::AssumeReject))
         }
