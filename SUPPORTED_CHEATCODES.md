@@ -47,3 +47,12 @@ The `status` options are:
 | `vm.tryFfi` | SUPPORTED | [Link](https://book.getfoundry.sh/cheatcodes/try-ffi) |
 | `vm.startBroadcast` | SUPPORTED | [Link](https://book.getfoundry.sh/cheatcodes/start-broadcast) |
 | `vm.stopBroadcast` | SUPPORTED | [Link](https://book.getfoundry.sh/cheatcodes/stop-broadcast) |
+| `vm.sign`              | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/sign)          |
+| `vm.envUint`           | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-uint)      |
+| `vm.setEnv`            | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/set-env.html)  |
+| `vm.transact`          | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/transact.html) |
+| `vm.makePersistance`   | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/make-persistent.html) |
+| `vm.revokePersistance` | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/revoke-persistent.html) |
+| `vm.isPersistent`      | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/is-persistent.html) |
+| `vm.rollFork`          | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/roll-fork.html) |
+| `vm.assume`            | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/assume)        |

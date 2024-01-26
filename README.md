@@ -49,13 +49,13 @@ While `foundry-zksync` is **in-development**, there are some limitations to be a
 
 - **Cheat Codes Support**: Not all cheat codes are fully supported. [View the list of supported cheat codes](./SUPPORTED_CHEATCODES.md).
 - **Compile Time**: Some users may experience slower compile times.
-- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration like so:
+- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration. For more information please refer to [official docs](https://era.zksync.io/docs/tools/hardhat/compiling-libraries.html).
+
     ```
     libraries = [
         "src/MyLibrary.sol:MyLibrary:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4"
     ]
     ```
-[Learn more](https://era.zksync.io/docs/tools/hardhat/compiling-libraries.html).
 - **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://era.zksync.io/docs/reference/architecture/differences-with-ethereum.html#create-create2).
 
 For the most effective use of our library, we recommend familiarizing yourself with these features and limitations. 
@@ -207,8 +207,8 @@ If you get errors like `(code: -32601, message: Method not found, data: None)` -
 -   [Brock Elmore](https://twitter.com/brockjelmore): For extending the VM's cheatcodes and implementing [structured call tracing](https://github.com/foundry-rs/foundry/pull/192), a critical feature for debugging smart contract calls.
 -   All the other [contributors](https://github.com/foundry-rs/foundry/graphs/contributors) to the [ethers-rs](https://github.com/gakonst/ethers-rs) & [foundry](https://github.com/foundry-rs/foundry) repositories and chatrooms.
 
-### foundry-zksync Acknowledgments
-- [Moonsong Labs](https://moonsonglabs.com/): Implemented [era-cheatcodes], and resolved a number of different challenges to enable zkSync support. 
+### Acknowledgments - foundry-zksync
+- [Moonsong Labs](https://moonsonglabs.com/): Implemented [era-cheatcodes](./crates/era-cheatcodes/), and resolved a number of different challenges to enable zkSync support. 
 
 [foundry-book]: https://book.getfoundry.sh
 [foundry-gha]: https://github.com/foundry-rs/foundry-toolchain
