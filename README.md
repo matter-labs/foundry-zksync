@@ -1,4 +1,4 @@
-# Foundry with zkSync Era v0.1
+# Foundry with zkSync Era v0.1-alpha
 
 This repository provides [Foundry](https://github.com/foundry-rs/foundry) functionality in Solidity for compiling, deploying, testing, and interacting with smart contracts on **zkSync Era**. 
 
@@ -45,7 +45,7 @@ Please note that `foundry-zksync` is still in its **alpha** stage. Some features
 
 # Limitations
 
-While `foundry-zksync` is **in-development**, there are some limitations to be aware of:
+While `foundry-zksync` is **alpha stage**, there are some limitations to be aware of:
 
 - **Cheat Codes Support**: Not all cheat codes are fully supported. [View the list of supported cheat codes](./SUPPORTED_CHEATCODES.md).
 - **Compile Time**: Some users may experience slower compile times.
@@ -57,6 +57,7 @@ While `foundry-zksync` is **in-development**, there are some limitations to be a
     ]
     ```
 - **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://era.zksync.io/docs/reference/architecture/differences-with-ethereum.html#create-create2).
+- **Specific Foundry Features**: Currently features such as `--gas-report` may not work as intended. We are actively working on providing support for these feature types.
 
 For the most effective use of our library, we recommend familiarizing yourself with these features and limitations. 
 
