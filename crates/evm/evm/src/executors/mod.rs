@@ -20,6 +20,7 @@ use foundry_common::{
         address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_u256, u256_to_revm_u256,
     },
     evm::Breakpoints,
+    fix_l2_gas_limit, fix_l2_gas_price,
 };
 use foundry_evm_core::{
     backend::{Backend, DatabaseError, DatabaseExt, DatabaseResult, FuzzBackendWrapper},
@@ -629,6 +630,29 @@ impl Executor {
                 ..self.env.tx.clone()
             },
         }
+    }
+
+    /// Adjust the gas parameters of an executor for ZKSync.
+    /// zksync vm allows max gas limit to be u32, and additionally the account balance must be able
+    /// to pay for the gas + value. Hence we cap the gas limit what the caller can actually pay.
+    pub fn adjust_zksync_gas_parameters(&mut self) {
+        let tx_env = &self.env.tx;
+        let caller_balance = self.get_balance(tx_env.caller).unwrap_or_default();
+        let min_gas_price =
+            u256_to_revm_u256(fix_l2_gas_price(revm_u256_to_u256(tx_env.gas_price)));
+        let max_allowed_gas_limit = caller_balance
+            .saturating_sub(tx_env.value)
+            .saturating_sub(U256::from(1))
+            .wrapping_div(min_gas_price);
+        let adjusted_gas_limit =
+            u256_to_revm_u256(fix_l2_gas_limit(revm_u256_to_u256(max_allowed_gas_limit)));
+        let gas_limit = U256::from(tx_env.gas_limit).min(adjusted_gas_limit);
+
+        debug!(
+            "calculated new gas parameters for caller {:?}, gas_limit={} gas_price={}",
+            tx_env.caller, gas_limit, min_gas_price
+        );
+        self.set_gas_limit(U256::from(gas_limit));
     }
 }
 

@@ -183,19 +183,17 @@ impl ScriptRunner {
     /// We call the script/test functions with self.sender, this leaves the
     /// sender account in an undesirable state for broadcasting (nonce +1)
     fn correct_nonce(&mut self, sender_initial_nonce: u64, libraries_len: usize) -> Result<()> {
-        self.executor.set_nonce(self.sender, sender_initial_nonce + libraries_len as u64)?;
+        let new_nonce = sender_initial_nonce + libraries_len as u64;
+        trace!("correcting sender {:?} nonce to {}", self.sender, new_nonce);
+
+        self.executor.set_nonce(self.sender, new_nonce)?;
         Ok(())
     }
 
     /// Executes the method that will collect all broadcastable transactions.
     pub fn script(&mut self, address: Address, calldata: Bytes) -> Result<ScriptResult> {
-        let result = self.call(self.sender, address, calldata, U256::ZERO, false);
-
-        //technically unneded as nothing executes afterwards
-        // so this is here just for consistency
-        self.correct_nonce(self.executor.get_nonce(self.sender)?.saturating_sub(1), 0)?;
-
-        result
+        self.executor.adjust_zksync_gas_parameters();
+        self.call(self.sender, address, calldata, U256::ZERO, false)
     }
 
     /// Runs a broadcastable transaction locally and persists its state.

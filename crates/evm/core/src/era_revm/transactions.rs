@@ -24,6 +24,7 @@ use zksync_types::{
 use zksync_utils::{h256_to_account_address, u256_to_h256};
 
 use foundry_common::{
+    fix_l2_gas_limit, fix_l2_gas_price,
     zk_utils::{
         conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
         factory_deps::PackedEraBytecode,
@@ -66,11 +67,8 @@ pub fn encode_deploy_params_create(
 /// Extract the zkSync Fee based off the Revm transaction.
 pub fn tx_env_to_fee(tx_env: &TxEnv) -> Fee {
     Fee {
-        // Currently zkSync doesn't allow gas limits larger than u32.
-        gas_limit: U256::min(tx_env.gas_limit.into(), U256::from(2147483640)),
-        // Block base fee on L2 is 0.25 GWei - make sure that the max_fee_per_gas is set to higher
-        // value.
-        max_fee_per_gas: U256::max(revm_u256_to_u256(tx_env.gas_price), U256::from(260_000_000)),
+        gas_limit: fix_l2_gas_limit(tx_env.gas_limit.into()),
+        max_fee_per_gas: fix_l2_gas_price(revm_u256_to_u256(tx_env.gas_price)),
         max_priority_fee_per_gas: revm_u256_to_u256(tx_env.gas_priority_fee.unwrap_or_default()),
         gas_per_pubdata_limit: U256::from(800),
     }
