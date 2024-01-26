@@ -2127,7 +2127,7 @@ impl CheatcodeTracer {
             } => {
                 // Skip check if opcode is not Ret
                 let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
-                // Check how many retunrs we need to skip before finding the actual one
+                // Check how many returns we need to skip before finding the actual one
                 if action.returns_to_skip != 0 {
                     action.returns_to_skip -= 1;
                     return
