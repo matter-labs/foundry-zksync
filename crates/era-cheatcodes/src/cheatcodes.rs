@@ -1072,8 +1072,7 @@ impl CheatcodeTracer {
                     self.test_status = FoundryTestState::Running {
                         call_depth: state.vm_local_state.callstack.depth(),
                     };
-                    let depth = state.vm_local_state.callstack.depth();
-                    tracing::info!("Test started depth {}", depth);
+                    tracing::info!("Test started depth {}", state.vm_local_state.callstack.depth());
                 }
             }
             Opcode::Ret(_) => {
