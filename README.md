@@ -43,7 +43,7 @@ Please note that `foundry-zksync` is still in its **alpha** stage. Some features
   - Hardhat-style: Leverage the popular console.sol contract.
 - **Configurable Compiler Options**: Tailor compiler settings to your needs, including LLVM optimization modes.
 
-# Limitations
+### Limitations
 
 While `foundry-zksync` is **alpha stage**, there are some limitations to be aware of:
 
