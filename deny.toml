@@ -10,9 +10,7 @@ vulnerability = "deny"
 unmaintained = "warn"
 yanked = "warn"
 notice = "warn"
-ignore = [
-    "RUSTSEC-2020-0071", # https://rustsec.org/advisories/RUSTSEC-2020-0071
-]
+ignore = []
 
 # This section is considered when running `cargo deny check bans`.
 # More documentation about the 'bans' section can be found here:
@@ -51,7 +49,8 @@ allow = [
     "WTFPL",
     "BSL-1.0",
     "0BSD",
-    "Zlib"
+    "Zlib",
+    "MPL-2.0",
 ]
 
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses

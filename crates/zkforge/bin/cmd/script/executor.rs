@@ -137,81 +137,86 @@ impl ScriptArgs {
         let mut final_txs = VecDeque::new();
 
         // Executes all transactions from the different forks concurrently.
-        let futs =
-            transactions
-                .into_iter()
-                .map(|transaction| async {
-                    let mut runner = runners
-                        .get(transaction.rpc.as_ref().expect("to have been filled already."))
-                        .expect("to have been built.")
-                        .write();
+        let futs = transactions
+            .into_iter()
+            .map(|transaction| async {
+                let mut runner = runners
+                    .get(transaction.rpc.as_ref().expect("to have been filled already."))
+                    .expect("to have been built.")
+                    .write();
+                runner.executor.adjust_zksync_gas_parameters();
 
-                    if let TypedTransaction::Legacy(mut tx) = transaction.transaction {
-                        let result = runner
+                let deps = transaction.factory_deps;
+                if let TypedTransaction::Legacy(mut tx) = transaction.transaction {
+                    let result = runner
                         .simulate(
-                            tx.from.expect(
-                                "Transaction doesn't have a `from` address at execution time",
-                            ).to_alloy(),
+                            tx.from
+                                .expect(
+                                    "Transaction doesn't have a `from` address at execution time",
+                                )
+                                .to_alloy(),
                             tx.to.clone(),
                             tx.data.clone().map(|b| b.to_alloy()),
                             tx.value.map(|v| v.to_alloy()),
+                            &deps,
                         )
                         .wrap_err("Internal EVM error during simulation")?;
 
-                        if !result.success || result.traces.is_empty() {
-                            return Ok((None, result.traces))
-                        }
-
-                        let created_contracts = result
-                            .traces
-                            .iter()
-                            .flat_map(|(_, traces)| {
-                                traces.arena.iter().filter_map(|node| {
-                                    if matches!(node.kind(), CallKind::Create | CallKind::Create2) {
-                                        return Some(AdditionalContract {
-                                            opcode: node.kind(),
-                                            address: node.trace.address,
-                                            init_code: node.trace.data.as_bytes().to_vec().into(),
-                                        })
-                                    }
-                                    None
-                                })
-                            })
-                            .collect();
-
-                        // Simulate mining the transaction if the user passes `--slow`.
-                        if self.slow {
-                            runner.executor.env.block.number += U256::from(1);
-                        }
-
-                        let is_fixed_gas_limit = tx.gas.is_some();
-                        // If tx.gas is already set that means it was specified in script
-                        if !is_fixed_gas_limit {
-                            // We inflate the gas used by the user specified percentage
-                            tx.gas = Some(
-                                U256::from(result.gas_used * self.gas_estimate_multiplier / 100)
-                                    .to_ethers(),
-                            );
-                        } else {
-                            println!("Gas limit was set in script to {:}", tx.gas.unwrap());
-                        }
-
-                        let tx = TransactionWithMetadata::new(
-                            tx.into(),
-                            transaction.rpc,
-                            &result,
-                            &address_to_abi,
-                            decoder,
-                            created_contracts,
-                            is_fixed_gas_limit,
-                        )?;
-
-                        Ok((Some(tx), result.traces))
-                    } else {
-                        unreachable!()
+                    if !result.success || result.traces.is_empty() {
+                        return Ok((None, result.traces))
                     }
-                })
-                .collect::<Vec<_>>();
+
+                    let created_contracts = result
+                        .traces
+                        .iter()
+                        .flat_map(|(_, traces)| {
+                            traces.arena.iter().filter_map(|node| {
+                                if matches!(node.kind(), CallKind::Create | CallKind::Create2) {
+                                    return Some(AdditionalContract {
+                                        opcode: node.kind(),
+                                        address: node.trace.address,
+                                        init_code: node.trace.data.as_bytes().to_vec().into(),
+                                    })
+                                }
+                                None
+                            })
+                        })
+                        .collect();
+
+                    // Simulate mining the transaction if the user passes `--slow`.
+                    if self.slow {
+                        runner.executor.env.block.number += U256::from(1);
+                    }
+
+                    let is_fixed_gas_limit = tx.gas.is_some();
+                    // If tx.gas is already set that means it was specified in script
+                    if !is_fixed_gas_limit {
+                        // We inflate the gas used by the user specified percentage
+                        tx.gas = Some(
+                            U256::from(result.gas_used * self.gas_estimate_multiplier / 100)
+                                .to_ethers(),
+                        );
+                    } else {
+                        println!("Gas limit was set in script to {:}", tx.gas.unwrap());
+                    }
+
+                    let tx = TransactionWithMetadata::new(
+                        tx.into(),
+                        transaction.rpc,
+                        &result,
+                        &address_to_abi,
+                        decoder,
+                        created_contracts,
+                        is_fixed_gas_limit,
+                        deps,
+                    )?;
+
+                    Ok((Some(tx), result.traces))
+                } else {
+                    unreachable!()
+                }
+            })
+            .collect::<Vec<_>>();
 
         let mut abort = false;
         for res in join_all(futs).await {
