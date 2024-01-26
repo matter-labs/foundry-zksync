@@ -2122,6 +2122,9 @@ impl CheatcodeTracer {
             return
         }
 
+        // Skip check if opcode is not Ret
+        let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
+
         // The desired return opcode was found
         match &action.action {
             ActionOnReturn::ExpectRevert {
@@ -2130,8 +2133,6 @@ impl CheatcodeTracer {
                 prev_exception_handler_pc: exception_handler,
                 prev_continue_pc: continue_pc,
             } => {
-                // Skip check if opcode is not Ret
-                let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
                 // Check how many returns we need to skip before finding the actual one
                 if action.returns_to_skip != 0 {
                     action.returns_to_skip -= 1;
