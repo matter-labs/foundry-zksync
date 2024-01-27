@@ -3,14 +3,25 @@ pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
 import {Script} from "forge-std/Script.sol";
-import {Counter} from "../src/Counter.sol";
+
+contract CounterExample {
+    uint256 public number = 0;
+
+    function increment() public {
+        number += 1;
+    }
+
+    function setNumber(uint256 value) public {
+        number = value;
+    }
+}
 
 contract CounterScript is Script, Test {
-    Counter counter;
+    CounterExample counter;
 
     function setUp() public {
-        // Deploy the Counter contract
-        counter = new Counter();
+        // Deploy the CounterExample contract
+        counter = new CounterExample();
     }
 
     function run() public {
