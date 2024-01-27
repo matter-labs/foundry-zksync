@@ -15,6 +15,11 @@ contract Counter {
         console.log("incrementBy", amount);
         number += uint256(amount);
     }
+
+    function setNumber(uint256 value) public {
+        console.log("setNumber", value);
+        number = value;
+    }
 }
 
 contract CounterTest is Test {
