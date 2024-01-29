@@ -176,6 +176,8 @@ pub struct StorageModifications {
     pub keys: HashMap<StorageKey, StorageValue>,
     /// Bytecode modifications.
     pub bytecodes: HashMap<H256, Vec<u8>>,
+    /// Recorded known codes.
+    pub known_codes: HashMap<H256, Vec<u8>>,
 }
 
 impl StorageModifications {
@@ -183,6 +185,7 @@ impl StorageModifications {
     pub fn extend(&mut self, other: StorageModifications) {
         self.keys.extend(other.keys);
         self.bytecodes.extend(other.bytecodes);
+        self.known_codes.extend(other.known_codes);
     }
 }
 

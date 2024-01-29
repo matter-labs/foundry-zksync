@@ -496,20 +496,28 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         let is_deployment =
                             current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
-                        let factory_deps = if is_deployment {
-                            let test_contract_hash = handle.read_value(&StorageKey::new(
-                                AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
-                                TEST_ADDRESS.into(),
-                            ));
+                        let factory_deps =
+                            if is_deployment {
+                                let test_contract_hash = handle.read_value(&StorageKey::new(
+                                    AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
+                                    TEST_ADDRESS.into(),
+                                ));
 
-                            self.get_modified_bytecodes(vec![])
-                                .into_iter()
-                                .filter(|(k, _)| k != &test_contract_hash)
-                                .map(|(_, v)| v)
-                                .collect::<Vec<_>>()
-                        } else {
-                            vec![]
-                        };
+                                self.get_modified_bytecodes(vec![])
+                                    .iter()
+                                    .chain(self.storage_modifications.known_codes.iter())
+                                    .filter_map(|(k, v)| {
+                                        if k != &test_contract_hash {
+                                            Some(v)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .cloned()
+                                    .collect_vec()
+                            } else {
+                                vec![]
+                            };
 
                         // used to determine whether the nonce should be decreased, since
                         // zkevm updates the nonce for the _sender_ already when we run the
