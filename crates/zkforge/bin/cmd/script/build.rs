@@ -180,7 +180,8 @@ impl ScriptArgs {
                             .expect("The target specifier is malformed.");
                     let path = std::path::Path::new(&path);
 
-                    // Make sure the path to script is absolute
+                    // Make sure the path to script is absolute, since
+                    // `script_path` is an absolute path
                     let path = path
                         .is_relative()
                         .then(|| project.root().join(path))
