@@ -6,10 +6,7 @@ use eyre::{Context, ContextCompat, Result};
 
 use foundry_cli::utils::LoadConfig;
 use foundry_common::{
-    compact_to_contract,
-    compile::ContractSources,
-    fs,
-    zksolc_manager::{setup_zksolc_manager},
+    compact_to_contract, compile::ContractSources, fs, zksolc_manager::setup_zksolc_manager,
 };
 use foundry_compilers::{
     artifacts::{CompactContractBytecode, ContractBytecode, ContractBytecodeSome, Libraries},
@@ -249,9 +246,9 @@ impl ScriptArgs {
         // if let Ok(_) = dunce::canonicalize(&self.path) {
         let compiler_path = setup_zksolc_manager(self.opts.args.use_zksolc.clone()).await?;
         zksolc_cfg.compiler_path = compiler_path;
-        
+
         if install::install_missing_dependencies(&mut config, self.opts.args.silent) &&
-        script_config.config.auto_detect_remappings
+            script_config.config.auto_detect_remappings
         {
             // need to re-configure here to also catch additional remappings
             config = self.opts.load_config();
@@ -262,7 +259,7 @@ impl ScriptArgs {
         match foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project) {
             Ok((project_compile_output, _contract_bytecodes)) => {
                 Ok((config.project()?, project_compile_output))
-            },
+            }
             Err(e) => eyre::bail!("Failed to compile with zksolc: {e}"),
         }
         //FIXME: add support for specifying contract name only in `script` invocations
