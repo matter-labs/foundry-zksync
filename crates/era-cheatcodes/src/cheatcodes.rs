@@ -173,7 +173,7 @@ enum ExpectedEmitState {
 enum FinishCycleOneTimeActions {
     StorageWrite { key: StorageKey, read_value: H256, write_value: H256 },
     StoreFactoryDep { hash: U256, bytecode: Vec<U256> },
-    ForceRevert { error: ForceRevertError, exception_handler: PcOrImm },
+    ForceRevert { error: Vec<u8>, exception_handler: PcOrImm },
     ForceReturn { data: Vec<u8>, continue_pc: PcOrImm },
     CreateSelectFork { url_or_alias: String, block_number: Option<u64> },
     CreateFork { url_or_alias: String, block_number: Option<u64> },
@@ -187,21 +187,6 @@ enum FinishCycleOneTimeActions {
     MakePersistentAccounts { accounts: Vec<H160> },
     RevokePersistentAccount { account: H160 },
     RevokePersistentAccounts { accounts: Vec<H160> },
-}
-
-#[derive(Debug, Clone)]
-struct ForceRevertError {
-    reason: Vec<U256>,
-}
-
-impl ForceRevertError {
-    fn abi_encode(reason: Vec<u8>) -> Self {
-        Self { reason: reason.to_return_data() }
-    }
-
-    fn raw(reason: Vec<u8>) -> Self {
-        Self { reason: reason.chunks(32).map(U256::from_big_endian).collect_vec() }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -933,7 +918,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
                     tracing::debug!(?error, pc, "Forcing revert");
 
-                    self.return_data = Some(error.reason);
+                    self.return_data = Some(error.to_return_data());
 
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
@@ -2158,7 +2143,7 @@ impl CheatcodeTracer {
                                 continue_pc,
                             })
                                 .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
-                                    error: ForceRevertError::abi_encode(error),
+                                    error,
                                     exception_handler,
                                 }),
                         );
@@ -2169,11 +2154,11 @@ impl CheatcodeTracer {
                             tracing::error!("exceptRevert missing stored continuations");
                             return
                         };
-                        if let Err(err) =
+                        if let Err(error) =
                             Self::handle_expect_revert(reason.as_ref(), op, state, memory)
                         {
                             self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
-                                error: ForceRevertError::abi_encode(err),
+                                error,
                                 exception_handler,
                             });
                         }
@@ -2189,7 +2174,7 @@ impl CheatcodeTracer {
                     return
                 };
                 self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
-                    error: ForceRevertError::raw(reason.clone()),
+                    error: reason.to_owned(),
                     exception_handler: continue_pc,
                 });
                 self.next_return_action = None;

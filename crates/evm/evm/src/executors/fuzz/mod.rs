@@ -2,6 +2,7 @@ use crate::executors::{Executor, RawCallResult};
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, U256};
+use alloy_sol_types::{sol_data::String, SolType};
 use eyre::Result;
 use foundry_config::FuzzConfig;
 use foundry_evm_core::{
@@ -214,9 +215,11 @@ impl FuzzedExecutor {
         );
 
         // When the `assume` cheatcode is called it returns a special string
-        // NOTE: `ends_with` is used to prevent padded results issues
-        if call.result.ends_with(MAGIC_ASSUME) {
-            return Err(TestCaseError::reject(FuzzError::AssumeReject))
+        if let Ok(call_result) = String::abi_decode(&call.result, false) {
+            let call_result: Vec<u8> = call_result.into();
+            if call_result == MAGIC_ASSUME {
+                return Err(TestCaseError::reject(FuzzError::AssumeReject))
+            }
         }
 
         let breakpoints = call
