@@ -88,15 +88,11 @@ impl ScriptArgs {
         let mut contract = CompactContractBytecode::default();
         let mut highlevel_known_contracts = BTreeMap::new();
 
-        dbg!(&self);
-
         //FIXME: remove - we temporarily parse this path:name (possibility)
         // since we don't handle name-only contract for now
         // otherwise self.path would be clean without the :name and we could
         // use that directly
         let contract_info = ContractInfo::from_str(&self.path)?;
-
-        dbg!(&contract_info);
 
         let mut target_fname =
             dunce::canonicalize(contract_info.path.wrap_err("unknown path for contract")?)
@@ -122,8 +118,6 @@ impl ScriptArgs {
             matched: false,
             target_id: None,
         };
-
-        dbg!(&extra_info);
 
         // link_with_nonce_or_address expects absolute paths
         let mut libs = libraries_addresses.clone();
@@ -167,12 +161,9 @@ impl ScriptArgs {
                 // if it's the target contract, grab the info
                 if extra.no_target_name {
                     // Match artifact source, and ignore interfaces
-                    println!("Comparing {} to {}", id.source.display(), extra.target_fname);
                     if id.source == std::path::Path::new(&extra.target_fname) &&
                         contract.bytecode.as_ref().map_or(false, |b| b.object.bytes_len() > 0)
                     {
-                        println!("TARGET CONTRACT");
-                        dbg!(&extra);
                         if extra.matched {
                             eyre::bail!("Multiple contracts in the target path. Please specify the contract name with `--tc ContractName`")
                         }
