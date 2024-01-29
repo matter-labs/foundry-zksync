@@ -273,7 +273,6 @@ impl ScriptArgs {
     }
 }
 
-#[derive(Debug)]
 struct ExtraLinkingInfo<'a> {
     no_target_name: bool,
     target_fname: String,
