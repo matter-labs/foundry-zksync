@@ -227,7 +227,7 @@ impl ScriptArgs {
         )
         .await
         .map_err(|err| {
-            eyre::eyre!("{err}\n\nIf you were trying to resume or verify a multi chain deployment, add `--multi` to your command invocation.") 
+            eyre::eyre!("{err}\n\nIf you were trying to resume or verify a multi chain deployment, add `--multi` to your command invocation.")
         })
     }
 
@@ -294,6 +294,7 @@ impl ScriptArgs {
                 Libraries::parse(&deployment_sequence.libraries)?,
                 script_config.config.sender, // irrelevant, since we're not creating any
                 0,                           // irrelevant, since we're not creating any
+                &script_config.config.script,
             )?;
 
             verify.known_contracts = flatten_contracts(&highlevel_known_contracts, false);
@@ -333,6 +334,7 @@ impl ScriptArgs {
             script_config.config.parsed_libraries()?,
             new_sender,
             nonce,
+            &script_config.config.script,
         )?;
 
         let mut txs = self.create_deploy_transactions(

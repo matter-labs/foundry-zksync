@@ -16,7 +16,7 @@ use foundry_compilers::{
     ArtifactId, Project, ProjectCompileOutput,
 };
 
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
+use std::{collections::BTreeMap, path::Path, str::FromStr};
 use zkforge::link::{link_with_nonce_or_address, PostLinkInput, ResolvedDependency};
 
 impl ScriptArgs {
@@ -68,6 +68,7 @@ impl ScriptArgs {
             script_config.config.parsed_libraries()?,
             script_config.evm_opts.sender,
             script_config.sender_nonce,
+            &script_config.config.script,
         )?;
 
         output.sources = sources;
@@ -76,13 +77,14 @@ impl ScriptArgs {
         Ok(output)
     }
 
-    pub fn link(
+    pub fn link<P: AsRef<Path>>(
         &self,
         project: Project,
         contracts: ArtifactContracts,
         libraries_addresses: Libraries,
         sender: Address,
         nonce: u64,
+        script_path: P,
     ) -> Result<BuildOutput> {
         let mut run_dependencies = vec![];
         let mut contract = CompactContractBytecode::default();
@@ -178,15 +180,15 @@ impl ScriptArgs {
                             .expect("The target specifier is malformed.");
                     let path = std::path::Path::new(&path);
 
-                    // Remove dir prefix for files in script/ dir
-                    let mut new_path = PathBuf::from("");
-                    if path.starts_with("script/") {
-                        for component in path.strip_prefix("script/").unwrap().iter() {
-                            new_path.push(component);
-                        }
-                    } else {
-                        new_path = path.to_path_buf();
-                    }
+                    // Make sure the path to script is absolute, since
+                    // `script_path` is an absolute path
+                    let path = path
+                        .is_relative()
+                        .then(|| project.root().join(path))
+                        .unwrap_or_else(|| path.to_path_buf());
+
+                    // Remove dir prefix for files in script dir
+                    let new_path = path.strip_prefix(&script_path).unwrap_or(&path);
 
                     if new_path == id.source && name == id.name {
                         *extra.dependencies = unique_deps(dependencies);
