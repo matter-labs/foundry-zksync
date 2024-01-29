@@ -16,7 +16,7 @@ use foundry_compilers::{
     ArtifactId, Project, ProjectCompileOutput,
 };
 
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr};
 use zkforge::link::{link_with_nonce_or_address, PostLinkInput, ResolvedDependency};
 
 impl ScriptArgs {
@@ -88,11 +88,15 @@ impl ScriptArgs {
         let mut contract = CompactContractBytecode::default();
         let mut highlevel_known_contracts = BTreeMap::new();
 
+        dbg!(&self);
+
         //FIXME: remove - we temporarily parse this path:name (possibility)
         // since we don't handle name-only contract for now
         // otherwise self.path would be clean without the :name and we could
         // use that directly
         let contract_info = ContractInfo::from_str(&self.path)?;
+
+        dbg!(&contract_info);
 
         let mut target_fname =
             dunce::canonicalize(contract_info.path.wrap_err("unknown path for contract")?)
@@ -118,6 +122,8 @@ impl ScriptArgs {
             matched: false,
             target_id: None,
         };
+
+        dbg!(&extra_info);
 
         // link_with_nonce_or_address expects absolute paths
         let mut libs = libraries_addresses.clone();
@@ -161,9 +167,12 @@ impl ScriptArgs {
                 // if it's the target contract, grab the info
                 if extra.no_target_name {
                     // Match artifact source, and ignore interfaces
+                    println!("Comparing {} to {}", id.source.display(), extra.target_fname);
                     if id.source == std::path::Path::new(&extra.target_fname) &&
                         contract.bytecode.as_ref().map_or(false, |b| b.object.bytes_len() > 0)
                     {
+                        println!("TARGET CONTRACT");
+                        dbg!(&extra);
                         if extra.matched {
                             eyre::bail!("Multiple contracts in the target path. Please specify the contract name with `--tc ContractName`")
                         }
@@ -178,15 +187,11 @@ impl ScriptArgs {
                             .expect("The target specifier is malformed.");
                     let path = std::path::Path::new(&path);
 
-                    // Remove dir prefix for files in script/ dir
-                    let mut new_path = PathBuf::from("");
-                    if path.starts_with("script/") {
-                        for component in path.strip_prefix("script/").unwrap().iter() {
-                            new_path.push(component);
-                        }
-                    } else {
-                        new_path = path.to_path_buf();
-                    }
+                    // Remove dir prefix for files in script/ or scripts/ dir
+                    let new_path = path
+                        .strip_prefix("script/")
+                        .or_else(|_| path.strip_prefix("scripts/"))
+                        .unwrap_or(path);
 
                     if new_path == id.source && name == id.name {
                         *extra.dependencies = unique_deps(dependencies);
@@ -277,6 +282,7 @@ impl ScriptArgs {
     }
 }
 
+#[derive(Debug)]
 struct ExtraLinkingInfo<'a> {
     no_target_name: bool,
     target_fname: String,
