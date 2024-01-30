@@ -459,24 +459,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 );
                 self.farcall_handler.set_immediate_return(return_data);
             }
-            // for mock_call in &mut self.mocked_calls {
-            //     println!(
-            //         "want={} got={}",
-            //         hex::encode(&mock_call.filter.calldata),
-            //         hex::encode(&calldata)
-            //     );
-
-            //     if mock_call.filter.address == current.code_address &&
-            //         mock_call.filter.calldata == calldata
-            //     {
-            //         tracing::info!(
-            //             calldata = hex::encode(&calldata),
-            //             return_data = hex::encode(&mock_call.filter.return_data),
-            //             "mock call matched"
-            //         );
-            //         self.farcall_handler.set_immediate_return(mock_call.filter.return_data.
-            // clone());     }
-            // }
         }
 
         if self.return_data.is_some() {
@@ -497,9 +479,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             if current.code_address != CHEATCODE_ADDRESS {
                 if let Some(broadcast) = &self.permanent_actions.broadcast {
                     if state.vm_local_state.callstack.depth() == broadcast.depth {
-                        //when the test ends, just make sure the tx origin is set to the
-                        // original one (should never get here
-                        // unless .stopBroadcast wasn't called)
+                        // when the test ends, just make sure the tx origin is set to the
+                        // original one (should never get here unless .stopBroadcast wasn't called)
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
                             origin: broadcast.original_origin,
                         });
@@ -1120,7 +1101,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
         self.farcall_handler.maybe_return_early(state, bootloader_state, storage);
 
-        //Set return data, if any
         if let Some(fat_pointer) = self.return_ptr.take() {
             let elements = self.return_data.take().unwrap();
             Self::set_return(fat_pointer, elements, &mut state.local_state, &mut state.memory);
