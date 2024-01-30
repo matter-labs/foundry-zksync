@@ -1,6 +1,6 @@
 use crate::{
     events::LogEntry,
-    farcall::FarCallHandler,
+    farcall::{FarCallHandler, MockCall, MockedCalls},
     utils::{ToH160, ToH256, ToU256},
 };
 use alloy_sol_types::{SolInterface, SolValue};
@@ -8,7 +8,10 @@ use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
 use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
-use foundry_common::{conversion_utils::h160_to_address, StorageModifications};
+use foundry_common::{
+    conversion_utils::{h160_to_address, revm_u256_to_u256},
+    StorageModifications,
+};
 use foundry_evm_core::{
     backend::DatabaseExt,
     constants::MAGIC_ASSUME,
@@ -162,20 +165,9 @@ pub struct CheatcodeTracer {
     saved_snapshots: HashMap<U256, SavedSnapshot>,
     broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
     transact_logs: Vec<LogEntry>,
-    pub mock_calls: Vec<MockCall>,
+    mocked_calls: MockedCalls,
     farcall_handler: FarCallHandler,
 }
-
-#[derive(Debug, Clone)]
-pub struct MockCall {
-    filter: FilterOps,
-}
-
-#[derive(Debug, Clone)]
-struct FilterOps {
-    address: H160,
-    calldata: Vec<u8>,
-    return_data: Vec<u8>,
 
 #[derive(Debug, Clone)]
 pub struct SavedSnapshot {
@@ -455,18 +447,36 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
             let calldata = get_calldata(&state, memory);
-            for mock_call in &mut self.mock_calls {
-                if mock_call.filter.address == current.code_address &&
-                    mock_call.filter.calldata == calldata
-                {
-                    tracing::info!(
-                        calldata = hex::encode(&calldata),
-                        return_data = hex::encode(&mock_call.filter.return_data),
-                        "mock call matched"
-                    );
-                    self.farcall_handler.set_immediate_return(mock_call.filter.return_data.clone());
-                }
+            if let Some(return_data) = self.mocked_calls.get_matching_return_data(
+                current.code_address,
+                &calldata,
+                U256::from(current.context_u128_value),
+            ) {
+                tracing::info!(
+                    calldata = hex::encode(&calldata),
+                    return_data = hex::encode(&return_data),
+                    "mock call matched"
+                );
+                self.farcall_handler.set_immediate_return(return_data);
             }
+            // for mock_call in &mut self.mocked_calls {
+            //     println!(
+            //         "want={} got={}",
+            //         hex::encode(&mock_call.filter.calldata),
+            //         hex::encode(&calldata)
+            //     );
+
+            //     if mock_call.filter.address == current.code_address &&
+            //         mock_call.filter.calldata == calldata
+            //     {
+            //         tracing::info!(
+            //             calldata = hex::encode(&calldata),
+            //             return_data = hex::encode(&mock_call.filter.return_data),
+            //             "mock call matched"
+            //         );
+            //         self.farcall_handler.set_immediate_return(mock_call.filter.return_data.
+            // clone());     }
+            // }
         }
 
         if self.return_data.is_some() {
@@ -1475,14 +1485,25 @@ impl CheatcodeTracer {
             }
             mockCall_0(mockCall_0Call { callee, data, returnData }) => {
                 tracing::info!("👷 Mocking call to {callee:?}");
-                //store the mock call to compare later
-                self.mock_calls.push(MockCall {
-                    filter: FilterOps {
+                self.mocked_calls.insert(
+                    MockCall { address: callee.to_h160(), value: None, calldata: data },
+                    returnData,
+                )
+            }
+            mockCall_1(mockCall_1Call { callee, msgValue, data, returnData }) => {
+                tracing::info!("👷 Mocking call to {callee:?}");
+                self.mocked_calls.insert(
+                    MockCall {
                         address: callee.to_h160(),
+                        value: Some(revm_u256_to_u256(msgValue)),
                         calldata: data,
-                        return_data: returnData,
                     },
-                })
+                    returnData,
+                )
+            }
+            clearMockedCalls(clearMockedCallsCall {}) => {
+                tracing::info!("👷 Clearing all mocked calls");
+                self.mocked_calls.clear();
             }
             recordLogs(recordLogsCall {}) => {
                 tracing::info!("👷 Recording logs");

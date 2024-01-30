@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use foundry_evm_core::{
     backend::DatabaseExt,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView},
@@ -15,7 +17,7 @@ use multivm::{
         },
     },
 };
-use zksync_basic_types::U256;
+use zksync_basic_types::{H160, U256};
 use zksync_state::StoragePtr;
 use zksync_types::Timestamp;
 
@@ -110,5 +112,88 @@ impl FarCallHandler {
             current.base_memory_page = MemoryPage(immediate_return.base_memory_page);
             current.code_page = MemoryPage(immediate_return.code_page);
         }
+    }
+}
+
+/// Defines the [MockCall]s return type.
+type MockCallReturn = Vec<u8>;
+
+/// Defines the match criteria of a mocked call.
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MockCall {
+    pub address: H160,
+    pub value: Option<U256>,
+    pub calldata: Vec<u8>,
+}
+
+/// Contains the list of mocked calls.
+/// Note that mocked calls with value take precedence of the ones without.
+#[derive(Default, Debug, Clone)]
+pub struct MockedCalls {
+    /// List of mocked calls with the value parameter.
+    with_value: HashMap<MockCall, MockCallReturn>,
+
+    /// List of mocked calls without the value parameter.
+    without_value: HashMap<MockCall, MockCallReturn>,
+}
+
+impl MockedCalls {
+    /// Insert a mocked call with its return data.
+    pub(crate) fn insert(&mut self, call: MockCall, return_data: MockCallReturn) {
+        if call.value.is_some() {
+            self.with_value.insert(call, return_data);
+        } else {
+            self.without_value.insert(call, return_data);
+        }
+    }
+
+    /// Clear all mocked calls.
+    pub(crate) fn clear(&mut self) {
+        self.with_value.clear();
+        self.without_value.clear();
+    }
+
+    /// Matches the mocked calls based on foundry rules. The matching is in the precedence order of:
+    /// * Calls with value parameter and exact calldata match
+    /// * Exact calldata matches
+    /// * Partial calldata matches
+    pub(crate) fn get_matching_return_data(
+        &self,
+        code_address: H160,
+        actual_calldata: &[u8],
+        actual_value: U256,
+    ) -> Option<Vec<u8>> {
+        let mut best_match = None;
+
+        for (call, call_return_data) in self.with_value.iter().chain(self.without_value.iter()) {
+            if call.address == code_address {
+                let value_matches = call.value.map_or(true, |value| value == actual_value);
+                if !value_matches {
+                    continue
+                }
+
+                if actual_calldata.starts_with(&call.calldata) {
+                    // return early if exact match
+                    if call.calldata.len() == actual_calldata.len() {
+                        return Some(call_return_data.clone())
+                    }
+
+                    // else check for partial matches and pick the best
+                    let matched_len = call.calldata.len();
+                    best_match = best_match.map_or(
+                        Some((matched_len, call_return_data)),
+                        |(best_match, best_match_return_data)| {
+                            if matched_len > best_match {
+                                Some((matched_len, call_return_data))
+                            } else {
+                                Some((best_match, best_match_return_data))
+                            }
+                        },
+                    );
+                }
+            }
+        }
+
+        best_match.map(|(_, return_data)| return_data.clone())
     }
 }

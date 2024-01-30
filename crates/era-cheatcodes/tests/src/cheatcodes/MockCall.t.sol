@@ -49,15 +49,108 @@ contract MockCallTest is Test {
         assertEq(target.numberA(), 1);
         assertEq(target.numberB(), 2);
 
-        vm.mockCall(
-            address(target),
-            abi.encodeWithSelector(target.numberB.selector),
-            abi.encode(30)
-        );
+        vm.mockCall(address(target), abi.encodeWithSelector(target.numberB.selector), abi.encode(10));
 
         // post-mock
-        console.log("numberB", target.numberB());
         assertEq(target.numberA(), 1);
-        require(target.numberB() == 30, "numberB failed mock");
+        assertEq(target.numberB(), 10);
     }
+
+    function testMockNested() public {
+        Mock inner = new Mock();
+        NestedMock target = new NestedMock(inner);
+
+        // pre-mock
+        assertEq(target.sum(), 3);
+
+        vm.mockCall(address(inner), abi.encodeWithSelector(inner.numberB.selector), abi.encode(9));
+
+        // post-mock
+        assertEq(target.sum(), 10);
+    }
+
+    function testMockSelector() public {
+        Mock target = new Mock();
+        assertEq(target.add(5, 5), 10);
+
+        vm.mockCall(address(target), abi.encodeWithSelector(target.add.selector), abi.encode(11));
+
+        assertEq(target.add(5, 5), 11);
+    }
+
+    function testMockCalldata() public {
+        Mock target = new Mock();
+        assertEq(target.add(5, 5), 10);
+        assertEq(target.add(6, 4), 10);
+
+        vm.mockCall(address(target), abi.encodeWithSelector(target.add.selector, 5, 5), abi.encode(11));
+
+        assertEq(target.add(5, 5), 11);
+        assertEq(target.add(6, 4), 10);
+    }
+
+    function testClearMockedCalls() public {
+        Mock target = new Mock();
+
+        vm.mockCall(address(target), abi.encodeWithSelector(target.numberB.selector), abi.encode(10));
+
+        assertEq(target.numberA(), 1);
+        assertEq(target.numberB(), 10);
+
+        vm.clearMockedCalls();
+
+        assertEq(target.numberA(), 1);
+        assertEq(target.numberB(), 2);
+    }
+
+    function testMockCallMultiplePartialMatch() public {
+        Mock mock = new Mock();
+
+        vm.mockCall(address(mock), abi.encodeWithSelector(mock.add.selector), abi.encode(10));
+        vm.mockCall(address(mock), abi.encodeWithSelector(mock.add.selector, 2), abi.encode(20));
+        vm.mockCall(address(mock), abi.encodeWithSelector(mock.add.selector, 2, 3), abi.encode(30));
+
+        assertEq(mock.add(1, 2), 10);
+        assertEq(mock.add(2, 2), 20);
+        assertEq(mock.add(2, 3), 30);
+    }
+
+    function testMockCallWithValue() public {
+        Mock mock = new Mock();
+        
+        vm.mockCall(address(mock), 10, abi.encodeWithSelector(mock.pay.selector), abi.encode(10));
+
+        assertEq(mock.pay{value: 10}(1), 10);
+        assertEq(mock.pay(1), 1);
+
+        for (uint256 i = 0; i < 100; i++) {
+            vm.mockCall(address(mock), i, abi.encodeWithSelector(mock.pay.selector), abi.encode(i * 2));
+        }
+
+        assertEq(mock.pay(1), 0);
+        assertEq(mock.pay{value: 10}(1), 20);
+        assertEq(mock.pay{value: 50}(1), 100);
+    }
+
+    function testMockCallWithValueCalldataPrecedence() public {
+        Mock mock = new Mock();
+
+        vm.mockCall(address(mock), 10, abi.encodeWithSelector(mock.pay.selector), abi.encode(10));
+        vm.mockCall(address(mock), abi.encodeWithSelector(mock.pay.selector, 2), abi.encode(2));
+
+        assertEq(mock.pay{value: 10}(1), 10);
+        assertEq(mock.pay{value: 10}(2), 2);
+        assertEq(mock.pay(2), 2);
+    }
+
+    // This fails as calls to empty account cause panic in the VM
+    // function testMockCallEmptyAccount() public {
+    //     Mock mock = Mock(address(100));
+
+    //     vm.mockCall(address(mock), abi.encodeWithSelector(mock.add.selector), abi.encode(10));
+    //     vm.mockCall(address(mock), abi.encodeWithSelector(mock.noReturnValue.selector), abi.encode());
+
+    //     assertEq(mock.add(1, 2), 10);
+    //     mock.noReturnValue();
+    // }
 }
