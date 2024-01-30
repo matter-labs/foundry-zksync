@@ -1,5 +1,6 @@
 use crate::{
     events::LogEntry,
+    farcall::{FarCallHandler, MockCall, MockedCalls},
     utils::{ToH160, ToH256, ToU256},
 };
 use alloy_sol_types::{SolInterface, SolValue};
@@ -7,7 +8,10 @@ use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
 use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
-use foundry_common::{conversion_utils::h160_to_address, StorageModifications};
+use foundry_common::{
+    conversion_utils::{h160_to_address, revm_u256_to_u256},
+    StorageModifications,
+};
 use foundry_evm_core::{
     backend::DatabaseExt,
     constants::MAGIC_ASSUME,
@@ -161,6 +165,8 @@ pub struct CheatcodeTracer {
     saved_snapshots: HashMap<U256, SavedSnapshot>,
     broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
     transact_logs: Vec<LogEntry>,
+    mocked_calls: MockedCalls,
+    farcall_handler: FarCallHandler,
 }
 
 #[derive(Debug, Clone)]
@@ -300,9 +306,11 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         &mut self,
         state: VmLocalStateData<'_>,
         data: multivm::zk_evm_1_4_0::tracing::BeforeExecutionData,
-        _memory: &SimpleMemory<H>,
-        _storage: StoragePtr<EraDb<S>>,
+        memory: &SimpleMemory<H>,
+        storage: StoragePtr<EraDb<S>>,
     ) {
+        self.farcall_handler.track_active_far_calls(state, data, memory, storage);
+
         //store the current exception handler in expect revert
         // to be used to force a revert
         if let Some(ActionOnReturn::ExpectRevert {
@@ -436,7 +444,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
         }
 
-        let current = state.vm_local_state.callstack.get_current_stack();
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.current;
+            let calldata = get_calldata(&state, memory);
+            if let Some(return_data) = self.mocked_calls.get_matching_return_data(
+                current.code_address,
+                &calldata,
+                U256::from(current.context_u128_value),
+            ) {
+                tracing::info!(
+                    calldata = hex::encode(&calldata),
+                    return_data = hex::encode(&return_data),
+                    "mock call matched"
+                );
+                self.farcall_handler.set_immediate_return(return_data);
+            }
+        }
 
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -456,9 +479,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             if current.code_address != CHEATCODE_ADDRESS {
                 if let Some(broadcast) = &self.permanent_actions.broadcast {
                     if state.vm_local_state.callstack.depth() == broadcast.depth {
-                        //when the test ends, just make sure the tx origin is set to the original
-                        // one (should never get here unless .stopBroadcast
-                        // wasn't called)
+                        // when the test ends, just make sure the tx origin is set to the
+                        // original one (should never get here unless .stopBroadcast wasn't called)
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
                             origin: broadcast.original_origin,
                         });
@@ -1077,10 +1099,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             }
         }
 
-        // Set return data, if any
+        self.farcall_handler.maybe_return_early(state, bootloader_state, storage);
+
         if let Some(fat_pointer) = self.return_ptr.take() {
             let elements = self.return_data.take().unwrap();
-
             Self::set_return(fat_pointer, elements, &mut state.local_state, &mut state.memory);
         }
 
@@ -1091,7 +1113,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 state.local_state.callstack.current.msg_sender = start_prank_call.sender;
             }
         }
-
         TracerExecutionStatus::Continue
     }
 }
@@ -1441,6 +1462,28 @@ impl CheatcodeTracer {
                 self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
                     accounts: accounts.into_iter().map(|a| a.to_h160()).collect(),
                 });
+            }
+            mockCall_0(mockCall_0Call { callee, data, returnData }) => {
+                tracing::info!("👷 Mocking call to {callee:?}");
+                self.mocked_calls.insert(
+                    MockCall { address: callee.to_h160(), value: None, calldata: data },
+                    returnData,
+                )
+            }
+            mockCall_1(mockCall_1Call { callee, msgValue, data, returnData }) => {
+                tracing::info!("👷 Mocking call to {callee:?}");
+                self.mocked_calls.insert(
+                    MockCall {
+                        address: callee.to_h160(),
+                        value: Some(revm_u256_to_u256(msgValue)),
+                        calldata: data,
+                    },
+                    returnData,
+                )
+            }
+            clearMockedCalls(clearMockedCallsCall {}) => {
+                tracing::info!("👷 Clearing all mocked calls");
+                self.mocked_calls.clear();
             }
             recordLogs(recordLogsCall {}) => {
                 tracing::info!("👷 Recording logs");
