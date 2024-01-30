@@ -426,6 +426,7 @@ impl ScriptArgs {
         data.iter()
             .enumerate()
             .map(|(i, bytes)| BroadcastableTransaction {
+                factory_deps: vec![],
                 rpc: fork_url.clone(),
                 transaction: TypedTransaction::Legacy(TransactionRequest {
                     from: Some(from.to_ethers()),

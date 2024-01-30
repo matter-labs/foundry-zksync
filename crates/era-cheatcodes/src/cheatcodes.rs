@@ -6,11 +6,12 @@ use crate::{
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
-use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
+use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_common::{conversion_utils::h160_to_address, StorageModifications};
 use foundry_evm_core::{
     backend::DatabaseExt,
+    constants::MAGIC_ASSUME,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
     opts::EvmOpts,
@@ -46,7 +47,7 @@ use std::{
     ops::BitAnd,
     process::Command,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -54,7 +55,7 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS, MSG_VALUE_SIMULATOR_ADDRESS,
+    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{bytecode::CompressedBytecodeInfo, h256_to_u256, u256_to_h256};
 
@@ -91,6 +92,33 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     zksync_types::ECRECOVER_PRECOMPILE_ADDRESS,
     zksync_types::SHA256_PRECOMPILE_ADDRESS,
     zksync_types::MINT_AND_BURN_ADDRESS,
+    H160::zero(),
+];
+
+//same as above, except without
+// CONTRACT_DEPLOYER_ADDRESS
+// MSG_VALUE_SIMULATOR_ADDRESS
+// and with
+// CHEATCODE_ADDRESS
+const BROADCAST_IGNORED_CONTRACTS: [H160; 19] = [
+    zksync_types::BOOTLOADER_ADDRESS,
+    zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS,
+    zksync_types::NONCE_HOLDER_ADDRESS,
+    zksync_types::KNOWN_CODES_STORAGE_ADDRESS,
+    zksync_types::IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    zksync_types::CONTRACT_FORCE_DEPLOYER_ADDRESS,
+    zksync_types::L1_MESSENGER_ADDRESS,
+    zksync_types::KECCAK256_PRECOMPILE_ADDRESS,
+    zksync_types::L2_ETH_TOKEN_ADDRESS,
+    zksync_types::SYSTEM_CONTEXT_ADDRESS,
+    zksync_types::BOOTLOADER_UTILITIES_ADDRESS,
+    zksync_types::EVENT_WRITER_ADDRESS,
+    zksync_types::COMPRESSOR_ADDRESS,
+    zksync_types::COMPLEX_UPGRADER_ADDRESS,
+    zksync_types::ECRECOVER_PRECOMPILE_ADDRESS,
+    zksync_types::SHA256_PRECOMPILE_ADDRESS,
+    zksync_types::MINT_AND_BURN_ADDRESS,
+    CHEATCODE_ADDRESS,
     H160::zero(),
 ];
 
@@ -132,12 +160,10 @@ pub struct CheatcodeTracer {
     test_status: FoundryTestState,
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
-    broadcastable_transactions: Vec<BroadcastableTransaction>,
+    broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
+    transact_logs: Vec<LogEntry>,
     pub mock_calls: Vec<MockCall>,
-    // active_farcall_stack: Option<CallStackEntry>,
     farcall_handler: FarCallHandler,
-    // current_opcode: CurrentOpcode,
-    // current_opcode_track: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -150,7 +176,6 @@ struct FilterOps {
     address: H160,
     calldata: Vec<u8>,
     return_data: Vec<u8>,
-}
 
 #[derive(Debug, Clone)]
 pub struct SavedSnapshot {
@@ -198,6 +223,7 @@ enum FinishCycleOneTimeActions {
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
     SetOrigin { origin: H160 },
+    Transact { fork_id: Option<U256>, tx_hash: H256 },
     MakePersistentAccount { account: H160 },
     MakePersistentAccounts { accounts: Vec<H160> },
     RevokePersistentAccount { account: H160 },
@@ -220,6 +246,11 @@ enum ActionOnReturn {
         depth: usize,
         prev_continue_pc: Option<PcOrImm>,
         prev_exception_handler_pc: Option<PcOrImm>,
+    },
+    Revert {
+        depth: usize,
+        prev_exception_handler_pc: Option<PcOrImm>,
+        reason: Vec<u8>,
     },
 }
 
@@ -294,7 +325,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             prev_exception_handler_pc,
             prev_continue_pc,
             ..
-        }) = self.current_expect_revert()
+        }) = self.current_return_action()
         {
             if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
                 // Callstack on the desired depth, it has the correct pc for continue
@@ -314,6 +345,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                     prev_continue_pc.replace(last.pc);
                 }
 
+                prev_exception_handler_pc.replace(current.exception_handler_location);
+            }
+        }
+        if let Some(ActionOnReturn::Revert { prev_exception_handler_pc, .. }) =
+            self.current_return_action()
+        {
+            if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
+                let current = &state.vm_local_state.callstack.current;
+                tracing::debug!(?current, "storing continuations");
                 prev_exception_handler_pc.replace(current.exception_handler_location);
             }
         }
@@ -486,7 +526,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         .expect("callstack before the current");
 
                     if state.vm_local_state.callstack.depth() == broadcast.depth &&
-                        prev_cs.this_address == broadcast.original_caller
+                        prev_cs.this_address == broadcast.original_caller &&
+                        !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address)
                     {
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
                             origin: broadcast.new_origin,
@@ -494,13 +535,53 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         let new_origin = broadcast.new_origin;
                         let handle = &mut storage.borrow_mut();
-                        let (nonce, _) = Self::get_nonce(new_origin, handle);
                         let revm_db_for_era = &handle.storage_handle;
                         let rpc = revm_db_for_era.db.lock().unwrap().active_fork_url();
 
-                        let gas_limit = current.ergs_remaining;
+                        let calldata = get_calldata(&state, memory);
 
-                        let (value, to) = if current.code_address == MSG_VALUE_SIMULATOR_ADDRESS {
+                        let is_deployment =
+                            current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
+                        let factory_deps =
+                            if is_deployment {
+                                let test_contract_hash = handle.read_value(&StorageKey::new(
+                                    AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
+                                    TEST_ADDRESS.into(),
+                                ));
+
+                                self.get_modified_bytecodes(vec![])
+                                    .iter()
+                                    .chain(self.storage_modifications.known_codes.iter())
+                                    .filter_map(|(k, v)| {
+                                        if k != &test_contract_hash {
+                                            Some(v)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .cloned()
+                                    .collect_vec()
+                            } else {
+                                vec![]
+                            };
+
+                        // used to determine whether the nonce should be decreased, since
+                        // zkevm updates the nonce for the _sender_ already when we run the
+                        // script/test function therefore, we should fix it and obtain the nonce
+                        // that resembles the one to be used on-chain
+                        let is_sender_also_caller =
+                            new_origin == self.config.evm_opts.sender.to_h160();
+                        let nonce_offset = if is_sender_also_caller { 1 } else { 0 };
+
+                        let nonce = Self::get_nonce(new_origin, handle)
+                            .0
+                            .saturating_sub(nonce_offset.into());
+
+                        let _gas_limit = current.ergs_remaining;
+
+                        let (value, to) = if current.code_address ==
+                            zksync_types::MSG_VALUE_SIMULATOR_ADDRESS
+                        {
                             //when some eth is sent to an address in zkevm the call is replaced
                             // with a call to MsgValueSimulator, which does a mimic_call later
                             // to the original destination
@@ -527,15 +608,16 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         let tx = BroadcastableTransaction {
                             rpc,
+                            factory_deps,
                             transaction:
                                 ethers::types::transaction::eip2718::TypedTransaction::Legacy(
                                     TransactionRequest {
                                         from: Some(new_origin),
                                         to: Some(ethers::types::NameOrAddress::Address(to)),
-                                        //FIXME: set only if set manually by user
-                                        gas: Some(gas_limit.into()),
+                                        //TODO: set only if set manually by user in script
+                                        gas: None,
                                         value,
-                                        data: Some(get_calldata(&state, memory).into()),
+                                        data: Some(calldata.into()),
                                         nonce: Some(nonce),
                                         ..Default::default()
                                     },
@@ -543,13 +625,16 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         };
                         tracing::debug!(?tx, "storing for broadcast");
 
-                        self.broadcastable_transactions.push(tx);
-                        //FIXME: detect if this is a deployment and increase the other nonce too
-                        self.set_nonce(new_origin, (Some(nonce + 1), None), handle);
+                        self.broadcastable_transactions.write().unwrap().push_back(tx);
+
+                        // we increase the nonce so that future calls will have the nonce
+                        // increased, simulating the previous tx being executed
+                        self.set_nonce(new_origin, (Some(nonce + 1 + nonce_offset), None), handle);
                     }
                 }
                 return
             }
+
             if current.code_page.0 == 0 || current.ergs_remaining == 0 {
                 tracing::error!("cheatcode triggered, but no calldata or ergs available");
                 return
@@ -597,6 +682,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             for log in logs {
                 self.recorded_logs.insert(log);
             }
+            //insert transact logs
+            for log in &self.transact_logs {
+                self.recorded_logs.insert(log.to_owned());
+            }
         }
 
         // This assert is triggered only once after the test execution finishes
@@ -642,7 +731,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 .into_iter()
                 .take(actual_events_initial_dimension.len() - actual_events_surplus)
                 .collect::<Vec<_>>();
-            let actual_logs = crate::events::parse_events(actual_events);
+            let mut actual_logs = crate::events::parse_events(actual_events);
+            actual_logs.extend(self.transact_logs.clone());
 
             assert!(compare_logs(&expected_logs, &actual_logs, self.emit_config.checks.clone()));
         }
@@ -912,8 +1002,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(snapshot_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
-                    tracing::debug!("!!!! FORCING RETURN");
-
+                    tracing::debug!(?data, pc, "Forcing return");
                     self.return_data = Some(data.to_return_data());
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
@@ -930,9 +1019,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
                 }
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
-                    tracing::debug!("!!! FORCING REVERT");
+                    tracing::debug!(?error, pc, "Forcing revert");
 
                     self.return_data = Some(error.to_return_data());
+
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
                     let fat_data_pointer = FatPointer::from_u256(ptr.value);
@@ -963,6 +1053,58 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     storage.borrow_mut().set_value(key, origin.into());
                 }
+                FinishCycleOneTimeActions::Transact { fork_id, tx_hash } => {
+                    let journaled_state = {
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let storage = storage.borrow_mut();
+                        let modified_storage =
+                            self.get_modified_storage(storage.modified_storage_keys());
+
+                        let era_db = &storage.storage_handle;
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        journaled_state.state =
+                            storage_to_state(era_db, &modified_storage, bytecodes);
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+
+                        db.transact(
+                            fork_id.map(|id| {
+                                let mut arr = [0; 32];
+                                id.to_big_endian(&mut arr);
+                                Uint::from_be_bytes(arr)
+                            }),
+                            tx_hash.to_fixed_bytes().into(),
+                            &mut env,
+                            &mut journaled_state,
+                            &mut revm::inspectors::NoOpInspector,
+                        )
+                        .unwrap();
+
+                        journaled_state
+                    };
+
+                    storage.borrow_mut().read_storage_keys = Default::default();
+
+                    for log in journaled_state.logs {
+                        self.transact_logs.push(LogEntry {
+                            address: log.address.to_h160(),
+                            data: log.data.to_vec(),
+                            topics: log
+                                .topics
+                                .iter()
+                                .map(|b| H256::from_slice(b.as_slice()))
+                                .collect(),
+                        })
+                    }
+                }
             }
         }
 
@@ -989,8 +1131,14 @@ impl CheatcodeTracer {
     pub fn new(
         cheatcodes_config: Arc<CheatsConfig>,
         storage_modifications: StorageModifications,
+        broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
     ) -> Self {
-        Self { config: cheatcodes_config, storage_modifications, ..Default::default() }
+        Self {
+            config: cheatcodes_config,
+            storage_modifications,
+            broadcastable_transactions,
+            ..Default::default()
+        }
     }
 
     /// Resets the test state to [TestStatus::NotStarted]
@@ -1064,6 +1212,13 @@ impl CheatcodeTracer {
                 };
                 self.return_data = Some(h160_to_address(address).to_return_data());
             }
+            assume(assumeCall { condition }) => {
+                tracing::info!(condition, "👷 Skipping fuzz test run if condition is not met");
+                if condition {
+                    return
+                }
+                self.add_revert_test(MAGIC_ASSUME.to_vec(), state.vm_local_state.callstack.depth());
+            }
             deal(dealCall { account, newBalance: new_balance }) => {
                 tracing::info!("👷 Setting balance for {account:?} to {new_balance}");
                 self.write_storage(
@@ -1078,6 +1233,34 @@ impl CheatcodeTracer {
                 let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+            }
+            envUint_0(envUint_0Call { name }) => {
+                tracing::info!("👷 Getting env variable {name}");
+                let env_var = std::env::var(&name).expect("Env var not found");
+                let env_var = if let Some(var) = env_var.strip_prefix("0x") {
+                    let hex = hex::decode(var).expect("Env var not hex");
+                    rU256::from_be_slice(&hex)
+                } else {
+                    rU256::from_str(&env_var).expect("Env var not uint")
+                };
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envUint_1(envUint_1Call { name, delim }) => {
+                tracing::info!("👷 Getting env variable {name} with delimiter {delim}");
+                let env_var = std::env::var(&name).expect("Env var not found");
+                let env_vars: Vec<rU256> = env_var
+                    .split(&delim)
+                    .filter(|var| !var.is_empty())
+                    .map(|var| {
+                        if let Some(var) = var.strip_prefix("0x") {
+                            let hex = hex::decode(var).expect("Env var not hex");
+                            rU256::from_be_slice(&hex)
+                        } else {
+                            rU256::from_str(var).expect("Env var not uint")
+                        }
+                    })
+                    .collect();
+                self.return_data = Some(env_vars.to_return_data());
             }
             expectRevert_0(expectRevert_0Call {}) => {
                 let depth = state.vm_local_state.callstack.depth();
@@ -1222,6 +1405,7 @@ impl CheatcodeTracer {
                     .recorded_logs
                     .iter()
                     .filter(|log| !log.data.is_empty())
+                    .filter(|log| !INTERNAL_CONTRACT_ADDRESSES.contains(&log.address))
                     .map(|log| Log {
                         topics: log
                             .topics
@@ -1496,6 +1680,10 @@ impl CheatcodeTracer {
                 let uint_value = value.to_string();
                 self.return_data = Some(uint_value.to_return_data());
             }
+            setEnv(setEnvCall { name, value }) => {
+                tracing::info!("👷 Setting env variable {name:?} to {value:?}");
+                std::env::set_var(name, value);
+            }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
                 let new_full_nonce = self.set_nonce(
@@ -1513,6 +1701,27 @@ impl CheatcodeTracer {
                 } else {
                     tracing::error!("👷 Setting nonces failed")
                 }
+            }
+            sign_0(sign_0Call { privateKey: private_key, digest }) => {
+                tracing::info!("👷 Signing digest with private key");
+                let Ok(signature) = zksync_types::PackedEthSignature::sign(
+                    &private_key.to_h256(),
+                    digest.as_slice(),
+                ) else {
+                    tracing::error!("Failed to sign digest with private key");
+                    return
+                };
+
+                let r = signature.r();
+                let s = signature.s();
+                // Ethereum signed message produced by most clients contains v where v = 27 +
+                // recovery_id(0,1,2,3), but for some clients v = recovery_id(0,1,2,3). The library
+                // that we use for signature verification (written for bitcoin)
+                // expects v = recovery_id and to able to recover the address from Solidity it
+                // expects v = 27 + recovery_id.
+                let v = signature.v() + 27;
+
+                self.return_data = Some(vec![v.into(), r.into(), s.into()])
             }
             snapshot(snapshotCall {}) => {
                 tracing::info!("👷 Creating snapshot");
@@ -1598,7 +1807,20 @@ impl CheatcodeTracer {
                 let int_value = value.to_string();
                 self.return_data = Some(int_value.to_return_data());
             }
-
+            transact_0(transact_0Call { txHash }) => {
+                tracing::info!("👷 Transacting current fork with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: None,
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
+            transact_1(transact_1Call { forkId, txHash }) => {
+                tracing::info!("👷 Transacting fork {forkId} with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: Some(forkId.to_u256()),
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
             tryFfi(tryFfiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running try ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
@@ -1835,12 +2057,12 @@ impl CheatcodeTracer {
         );
     }
 
-    fn current_expect_revert(&mut self) -> Option<&mut ActionOnReturn> {
+    fn current_return_action(&mut self) -> Option<&mut ActionOnReturn> {
         self.next_return_action.as_mut().map(|action| &mut action.action)
     }
 
     fn add_expect_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
-        if self.current_expect_revert().is_some() {
+        if self.current_return_action().is_some() {
             panic!("expectRevert already set")
         }
 
@@ -1857,7 +2079,20 @@ impl CheatcodeTracer {
             Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 1 });
     }
 
-    fn handle_except_revert<H: HistoryMode>(
+    fn add_revert_test(&mut self, reason: Vec<u8>, depth: usize) {
+        if self.current_return_action().is_some() {
+            panic!("revert test already set")
+        }
+
+        //-1: Because we are working with return opcode and it pops the stack after execution
+        let action =
+            ActionOnReturn::Revert { depth: depth - 1, prev_exception_handler_pc: None, reason };
+
+        self.next_return_action =
+            Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 0 });
+    }
+
+    fn handle_expect_revert<H: HistoryMode>(
         reason: Option<&Vec<u8>>,
         op: zkevm_opcode_defs::RetOpcode,
         state: &VmLocalStateData<'_>,
@@ -1988,58 +2223,76 @@ impl CheatcodeTracer {
 
         // Skip check if opcode is not Ret
         let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
-        // Check how many retunrs we need to skip before finding the actual one
-        if action.returns_to_skip != 0 {
-            action.returns_to_skip -= 1;
-            return
-        }
 
         // The desired return opcode was found
-        let ActionOnReturn::ExpectRevert {
-            reason,
-            depth,
-            prev_exception_handler_pc: exception_handler,
-            prev_continue_pc: continue_pc,
-        } = &action.action;
-        match op {
-            RetOpcode::Revert => {
-                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
-                let (Some(exception_handler), Some(continue_pc)) =
-                    (*exception_handler, *continue_pc)
-                else {
-                    tracing::error!("exceptRevert missing stored continuations");
+        match &action.action {
+            ActionOnReturn::ExpectRevert {
+                reason,
+                depth,
+                prev_exception_handler_pc: exception_handler,
+                prev_continue_pc: continue_pc,
+            } => {
+                // Check how many returns we need to skip before finding the actual one
+                if action.returns_to_skip != 0 {
+                    action.returns_to_skip -= 1;
                     return
-                };
+                }
 
-                self.one_time_actions.push(
-                    Self::handle_except_revert(reason.as_ref(), op, state, memory)
-                        .map(|_| FinishCycleOneTimeActions::ForceReturn {
-                                //dummy data
-                                data: // vec![0u8; 8192]
+                match op {
+                    RetOpcode::Revert => {
+                        tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
+                        let (Some(exception_handler), Some(continue_pc)) =
+                            (*exception_handler, *continue_pc)
+                        else {
+                            tracing::error!("exceptRevert missing stored continuations");
+                            return
+                        };
+
+                        self.one_time_actions.push(
+                            Self::handle_expect_revert(reason.as_ref(), op, state, memory)
+                                .map(|_| FinishCycleOneTimeActions::ForceReturn {
+                                    //dummy data
+                                    data: // vec![0u8; 8192]
                                     [0xde, 0xad, 0xbe, 0xef].to_vec(),
                                 continue_pc,
                             })
-                        .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
-                            error,
-                            exception_handler,
-                        }),
-                );
-                self.next_return_action = None;
+                                .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
+                                    error,
+                                    exception_handler,
+                                }),
+                        );
+                        self.next_return_action = None;
+                    }
+                    RetOpcode::Ok => {
+                        let Some(exception_handler) = *exception_handler else {
+                            tracing::error!("exceptRevert missing stored continuations");
+                            return
+                        };
+                        if let Err(error) =
+                            Self::handle_expect_revert(reason.as_ref(), op, state, memory)
+                        {
+                            self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                                error,
+                                exception_handler,
+                            });
+                        }
+                        self.next_return_action = None;
+                    }
+                    RetOpcode::Panic => (),
+                }
             }
-            RetOpcode::Ok => {
-                let Some(exception_handler) = *exception_handler else {
-                    tracing::error!("exceptRevert missing stored continuations");
+            ActionOnReturn::Revert { depth, reason, prev_exception_handler_pc: continue_pc } => {
+                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, ?continue_pc, "revert");
+                let Some(continue_pc) = *continue_pc else {
+                    tracing::error!("revert missing stored continuations");
                     return
                 };
-                if let Err(err) = Self::handle_except_revert(reason.as_ref(), op, state, memory) {
-                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
-                        error: err,
-                        exception_handler,
-                    });
-                }
+                self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                    error: reason.to_owned(),
+                    exception_handler: continue_pc,
+                });
                 self.next_return_action = None;
             }
-            RetOpcode::Panic => (),
         }
     }
 
@@ -2265,14 +2518,19 @@ fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry], checks: Em
     let mut actual_iter = actual_logs.iter();
 
     while let Some(expected_log) = expected_iter.peek() {
-        if let Some(actual_log) = actual_iter.next() {
+        let mut found = false;
+
+        for actual_log in actual_iter.by_ref() {
             if are_logs_equal(expected_log, actual_log, &checks) {
-                expected_iter.next(); // Move to the next expected log
-            } else {
-                return false
+                found = true;
+                break
             }
+        }
+
+        if found {
+            expected_iter.next(); // Move to the next expected log
         } else {
-            // No more actual logs to compare
+            // Expected log not found in the remaining actual logs
             return false
         }
     }

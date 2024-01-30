@@ -30,9 +30,10 @@
 /// for managing and interacting with zkSync contracts.
 use anyhow::{anyhow, Context, Error, Result};
 use dirs;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::Serialize;
-use std::{fmt, fs, fs::File, io::copy, os::unix::prelude::PermissionsExt, path::PathBuf};
+use std::{fmt, fs, os::unix::prelude::PermissionsExt, path::PathBuf};
+use tokio::{fs::File, io::copy};
 use url::Url;
 
 const ZKSOLC_DOWNLOAD_BASE_URL: &str =
@@ -434,7 +435,7 @@ impl fmt::Display for ZkSolcManager {
 ///
 /// The function returns the `ZkSolcManager` if all steps are successful, or an error if any
 /// step fails.
-pub fn setup_zksolc_manager(zksolc_version: String) -> eyre::Result<PathBuf> {
+pub async fn setup_zksolc_manager(zksolc_version: String) -> eyre::Result<PathBuf> {
     let zksolc_manager_opts = ZkSolcManagerOpts::new(zksolc_version.clone());
     let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
     let zksolc_manager = zksolc_manager_builder.build().map_err(|e| {
@@ -455,7 +456,7 @@ pub fn setup_zksolc_manager(zksolc_version: String) -> eyre::Result<PathBuf> {
             "zksolc not found in `.zksync` directory. Downloading zksolc compiler from {}",
             download_url
         );
-        zksolc_manager.download().map_err(|err| {
+        zksolc_manager.download().await.map_err(|err| {
             eyre::eyre!(
                 "Failed to download zksolc version '{}' from {}: {}",
                 zksolc_version,
@@ -620,7 +621,7 @@ impl ZkSolcManager {
     /// * If the HTTP GET request to the download URL fails.
     /// * If the output file cannot be created or written to.
     /// * If the permissions for the downloaded compiler binary cannot be set.
-    pub fn download(&self) -> Result<()> {
+    pub async fn download(&self) -> Result<()> {
         if self.exists() {
             // TODO: figure out better don't download if compiler is downloaded
             return Ok(())
@@ -631,16 +632,24 @@ impl ZkSolcManager {
             .map_err(|e| Error::msg(format!("Could not get full download url: {}", e)))?;
 
         let client = Client::new();
-        let mut response = client
+        let response = client
             .get(url)
             .send()
+            .await
             .map_err(|e| Error::msg(format!("Failed to download file: {}", e)))?;
 
         if response.status().is_success() {
             let mut output_file = File::create(self.get_full_compiler_path())
+                .await
                 .map_err(|e| Error::msg(format!("Failed to create output file: {}", e)))?;
 
-            copy(&mut response, &mut output_file)
+            let content = response
+                .bytes()
+                .await
+                .map_err(|e| Error::msg(format!("failed to download file: {}", e)))?;
+
+            copy(&mut content.as_ref(), &mut output_file)
+                .await
                 .map_err(|e| Error::msg(format!("Failed to write the downloaded file: {}", e)))?;
 
             let compiler_path = self.compilers_path.join(self.get_full_compiler());

@@ -40,7 +40,7 @@ use std::{
     io::BufReader,
     ops::Range,
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 macro_rules! try_or_continue {
@@ -81,6 +81,9 @@ pub struct BroadcastableTransaction {
     pub rpc: Option<RpcUrl>,
     /// The transaction to broadcast.
     pub transaction: TypedTransaction,
+
+    /// Additional factory deps of the tx
+    pub factory_deps: Vec<Vec<u8>>,
 }
 
 /// List of transactions that can be broadcasted.
@@ -176,7 +179,7 @@ pub struct Cheatcodes {
     pub corrected_nonce: bool,
 
     /// Scripting based transactions
-    pub broadcastable_transactions: BroadcastableTransactions,
+    pub broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
 
     /// Additional, user configurable context this Inspector has access to when inspecting a call
     pub config: Arc<CheatsConfig>,
@@ -781,8 +784,9 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                     let account =
                         data.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
-                    self.broadcastable_transactions.push_back(BroadcastableTransaction {
+                    let tx = BroadcastableTransaction {
                         rpc: data.db.active_fork_url(),
+                        factory_deps: vec![],
                         transaction: TypedTransaction::Legacy(TransactionRequest {
                             from: Some(broadcast.new_origin.to_ethers()),
                             to: Some(NameOrAddress::Address(call.contract.to_ethers())),
@@ -796,8 +800,9 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         }),
-                    });
-                    debug!(target: "cheatcodes", tx=?self.broadcastable_transactions.back().unwrap(), "broadcastable call");
+                    };
+                    debug!(target: "cheatcodes", ?tx, "broadcastable call");
+                    self.broadcastable_transactions.write().unwrap().push_back(tx);
 
                     let prev = account.info.nonce;
                     account.info.nonce += 1;
@@ -1144,8 +1149,9 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(data, call.gas_limit);
 
-                    self.broadcastable_transactions.push_back(BroadcastableTransaction {
+                    let tx = BroadcastableTransaction {
                         rpc: data.db.active_fork_url(),
+                        factory_deps: vec![],
                         transaction: TypedTransaction::Legacy(TransactionRequest {
                             from: Some(broadcast.new_origin.to_ethers()),
                             to: to.map(|a| NameOrAddress::Address(a.to_ethers())),
@@ -1159,12 +1165,13 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         }),
-                    });
+                    };
                     let kind = match call.scheme {
                         CreateScheme::Create => "create",
                         CreateScheme::Create2 { .. } => "create2",
                     };
-                    debug!(target: "cheatcodes", tx=?self.broadcastable_transactions.back().unwrap(), "broadcastable {kind}");
+                    debug!(target: "cheatcodes", ?tx, "broadcastable {kind}");
+                    self.broadcastable_transactions.write().unwrap().push_back(tx);
                 }
             }
         }

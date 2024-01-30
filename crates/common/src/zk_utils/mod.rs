@@ -32,6 +32,7 @@ use foundry_config::Chain;
 use multivm::vm_latest::TracerPointer;
 use std::{collections::HashMap, num::ParseIntError};
 use url::Url;
+use zksync_basic_types::U256;
 use zksync_types::{StorageKey, StorageValue};
 use zksync_web3_rs::types::H256;
 /// Utils for conversion between zksync types and revm types
@@ -148,6 +149,26 @@ pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
 }
 
+/// Fixes the gas price to be minimum of 0.26GWei which is above the block base fee on L2.
+/// This is required so the bootloader does not throw an error if baseFee < gasPrice.
+///
+/// TODO: Remove this later to allow for dynamic gas prices that work in both tests and scripts.
+/// This is extremely unstable right now - when the gas price changes either of the following can
+/// happen:
+///   * The scripts can fail if the balance is not enough for gas * MAGIC_VALUE
+///   * The tests/deploy can fail if MAGIC_VALUE is too low
+pub fn fix_l2_gas_price(gas_price: U256) -> U256 {
+    U256::max(gas_price, U256::from(260_000_000))
+}
+
+/// Fixes the gas limit to be maxmium of 2^31, which is below the VM gas limit of 2^32.
+/// This is required so the bootloader does not throw an error for not having enough gas.
+///
+/// TODO: Remove this later to allow for dynamic gas prices that work in both tests and scripts.
+pub fn fix_l2_gas_limit(gas_limit: U256) -> U256 {
+    U256::min(gas_limit, U256::from(u32::MAX >> 1))
+}
+
 /// Recorded storage modifications.
 #[derive(Default, Debug, Clone)]
 pub struct StorageModifications {
@@ -155,6 +176,8 @@ pub struct StorageModifications {
     pub keys: HashMap<StorageKey, StorageValue>,
     /// Bytecode modifications.
     pub bytecodes: HashMap<H256, Vec<u8>>,
+    /// Recorded known codes.
+    pub known_codes: HashMap<H256, Vec<u8>>,
 }
 
 impl StorageModifications {
@@ -162,6 +185,7 @@ impl StorageModifications {
     pub fn extend(&mut self, other: StorageModifications) {
         self.keys.extend(other.keys);
         self.bytecodes.extend(other.bytecodes);
+        self.known_codes.extend(other.known_codes);
     }
 }
 

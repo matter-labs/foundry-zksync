@@ -42,7 +42,7 @@ fn main() -> Result<()> {
             if cmd.is_watch() {
                 utils::block_on(watch::watch_build(cmd))
             } else {
-                cmd.run().map(|_| ())
+                utils::block_on(cmd.run()).map(|_| ())
             }
         }
         Subcommands::ZkCreate(cmd) => utils::block_on(cmd.run()),

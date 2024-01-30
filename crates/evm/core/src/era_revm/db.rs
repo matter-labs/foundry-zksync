@@ -20,8 +20,9 @@ use revm::{
 use zksync_basic_types::{web3::signing::keccak256, AccountTreeId, L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
-    block::unpack_block_info, get_code_key, get_system_context_init_logs, StorageKey, StorageLog,
-    StorageLogKind, ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    block::unpack_block_info, get_code_key, get_system_context_init_logs,
+    utils::decompose_full_nonce, StorageKey, StorageLog, StorageLogKind,
+    ACCOUNT_CODE_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
     SYSTEM_CONTEXT_CURRENT_L2_BLOCK_INFO_POSITION,
 };
@@ -135,8 +136,8 @@ where
 
         let nonce_storage =
             self.read_storage_internal(NONCE_HOLDER_ADDRESS, h256_to_u256(storage_idx));
-        let nonces: [u8; 8] = nonce_storage.as_fixed_bytes()[24..32].try_into().unwrap();
-        u64::from_be_bytes(nonces)
+        let (tx_nonce, _deploy_nonce) = decompose_full_nonce(h256_to_u256(nonce_storage));
+        tx_nonce.as_u64()
     }
 
     fn read_storage_internal(&self, address: H160, idx: U256) -> H256 {

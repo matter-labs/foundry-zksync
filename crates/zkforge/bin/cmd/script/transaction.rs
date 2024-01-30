@@ -42,6 +42,7 @@ pub struct TransactionWithMetadata {
     pub transaction: TypedTransaction,
     pub additional_contracts: Vec<AdditionalContract>,
     pub is_fixed_gas_limit: bool,
+    pub factory_deps: Vec<Vec<u8>>,
 }
 
 fn default_string() -> Option<String> {
@@ -61,6 +62,7 @@ impl TransactionWithMetadata {
         Self { transaction, ..Default::default() }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         transaction: TypedTransaction,
         rpc: Option<RpcUrl>,
@@ -69,8 +71,10 @@ impl TransactionWithMetadata {
         decoder: &CallTraceDecoder,
         additional_contracts: Vec<AdditionalContract>,
         is_fixed_gas_limit: bool,
+        factory_deps: Vec<Vec<u8>>,
     ) -> Result<Self> {
-        let mut metadata = Self { transaction, rpc, is_fixed_gas_limit, ..Default::default() };
+        let mut metadata =
+            Self { transaction, rpc, is_fixed_gas_limit, factory_deps, ..Default::default() };
 
         // Specify if any contract was directly created with this transaction
         if let Some(NameOrAddress::Address(to)) = metadata.transaction.to().cloned() {

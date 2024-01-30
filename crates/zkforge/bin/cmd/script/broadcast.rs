@@ -15,6 +15,10 @@ use foundry_cli::{
 use foundry_common::{estimate_eip1559_fees, shell, try_get_http_provider, RetryProvider};
 use futures::StreamExt;
 use std::{cmp::min, collections::HashSet, ops::Mul, sync::Arc};
+use zksync_web3_rs::{
+    eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest},
+    zks_utils::EIP712_TX_TYPE,
+};
 
 impl ScriptArgs {
     /// Sends the transactions which haven't been broadcasted yet.
@@ -86,6 +90,7 @@ impl ScriptArgs {
                 .skip(already_broadcasted)
                 .map(|tx_with_metadata| {
                     let tx = tx_with_metadata.typed_tx();
+                    let factory_deps = tx_with_metadata.factory_deps.clone();
                     let from = (*tx.from().expect("No sender for onchain transaction!")).to_alloy();
 
                     let kind = send_kind.for_sender(&from)?;
@@ -117,7 +122,7 @@ impl ScriptArgs {
                         }
                     }
 
-                    Ok((tx, kind, is_fixed_gas_limit))
+                    Ok(((tx, factory_deps), kind, is_fixed_gas_limit))
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -218,7 +223,7 @@ impl ScriptArgs {
     async fn send_transaction(
         &self,
         provider: Arc<RetryProvider>,
-        mut tx: TypedTransaction,
+        (mut tx, factory_deps): (TypedTransaction, Vec<Vec<u8>>),
         kind: SendTransactionKind<'_>,
         sequential_broadcast: bool,
         fork_url: &str,
@@ -252,12 +257,16 @@ impl ScriptArgs {
                     self.estimate_gas(&mut tx, &provider).await?;
                 }
 
+                //TODO: convert to EIP712 if !factory_deps.is_empty()
+
                 // Submit the transaction
                 let pending = provider.send_transaction(tx, None).await?;
 
                 Ok(pending.tx_hash())
             }
-            SendTransactionKind::Raw(signer) => self.broadcast(provider, signer, tx).await,
+            SendTransactionKind::Raw(signer) => {
+                self.broadcast(provider, signer, (tx, factory_deps)).await
+            }
         }
     }
 
@@ -409,6 +418,7 @@ impl ScriptArgs {
                 .map(|btx| {
                     let mut tx = TransactionWithMetadata::from_typed_transaction(btx.transaction);
                     tx.rpc = btx.rpc;
+                    tx.factory_deps = btx.factory_deps;
                     tx
                 })
                 .collect()
@@ -573,10 +583,8 @@ impl ScriptArgs {
         &self,
         provider: Arc<RetryProvider>,
         signer: &WalletSigner,
-        mut legacy_or_1559: TypedTransaction,
+        (mut legacy_or_1559, factory_deps): (TypedTransaction, Vec<Vec<u8>>),
     ) -> Result<TxHash> {
-        debug!("sending transaction: {:?}", legacy_or_1559);
-
         // Chains which use `eth_estimateGas` are being sent sequentially and require their gas
         // to be re-estimated right before broadcasting.
         if has_different_gas_calc(signer.chain_id()) || self.skip_simulation {
@@ -588,15 +596,54 @@ impl ScriptArgs {
             self.estimate_gas(&mut legacy_or_1559, &provider).await?;
         }
 
-        // Signing manually so we skip `fill_transaction` and its `eth_createAccessList`
-        // request.
-        let signature = signer
-            .sign_transaction(&legacy_or_1559)
-            .await
-            .wrap_err("Failed to sign transaction")?;
+        let rlp_signed = if factory_deps.is_empty() {
+            // Signing manually so we skip `fill_transaction` and its `eth_createAccessList`
+            // request.
+            let signature = signer
+                .sign_transaction(&legacy_or_1559)
+                .await
+                .wrap_err("Failed to sign transaction")?;
+            debug!("sending transaction: {:?}", legacy_or_1559);
+
+            legacy_or_1559.rlp_signed(&signature)
+        } else {
+            let custom_data = Eip712Meta::new().factory_deps(factory_deps);
+
+            let mut deploy_request = Eip712TransactionRequest::new()
+                .r#type(EIP712_TX_TYPE)
+                .from(*legacy_or_1559.from().unwrap())
+                .to(*legacy_or_1559.to().and_then(|to| to.as_address()).unwrap())
+                .chain_id(legacy_or_1559.chain_id().unwrap().as_u64())
+                .nonce(legacy_or_1559.nonce().unwrap())
+                .gas_price(legacy_or_1559.gas_price().unwrap())
+                .max_fee_per_gas(legacy_or_1559.max_cost().unwrap())
+                .data(legacy_or_1559.data().cloned().unwrap())
+                .custom_data(custom_data);
+
+            let gas_price = provider.get_gas_price().await?;
+            let fee: zksync_web3_rs::zks_provider::types::Fee =
+                provider.request("zks_estimateFee", [deploy_request.clone()]).await.unwrap();
+
+            deploy_request = deploy_request
+                .gas_limit(fee.gas_limit)
+                .max_fee_per_gas(fee.max_fee_per_gas)
+                .max_priority_fee_per_gas(fee.max_priority_fee_per_gas)
+                .gas_price(gas_price);
+
+            let signable: Eip712Transaction =
+                deploy_request.clone().try_into().expect("converting deploy request");
+            debug!("sending transaction: {:?}", signable);
+
+            let signature =
+                signer.sign_typed_data(&signable).await.wrap_err("Failed to sign typed data")?;
+
+            let encoded_rlp =
+                &*deploy_request.rlp_signed(signature).expect("able to rlp encode deploy request");
+            [&[EIP712_TX_TYPE], encoded_rlp].concat().into()
+        };
 
         // Submit the raw transaction
-        let pending = provider.send_raw_transaction(legacy_or_1559.rlp_signed(&signature)).await?;
+        let pending = provider.send_raw_transaction(rlp_signed).await?;
 
         Ok(pending.tx_hash())
     }
