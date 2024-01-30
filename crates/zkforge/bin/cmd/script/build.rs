@@ -1,13 +1,12 @@
+use crate::cmd::install;
+
 use super::*;
 use alloy_primitives::{Address, Bytes};
 use eyre::{Context, ContextCompat, Result};
 
+use foundry_cli::utils::LoadConfig;
 use foundry_common::{
-    compact_to_contract,
-    compile::ContractSources,
-    fs,
-    zk_compile::ZkSolc,
-    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
+    compact_to_contract, compile::ContractSources, fs, zksolc_manager::setup_zksolc_manager,
 };
 use foundry_compilers::{
     artifacts::{CompactContractBytecode, ContractBytecode, ContractBytecodeSome, Libraries},
@@ -236,25 +235,33 @@ impl ScriptArgs {
         &mut self,
         script_config: &ScriptConfig,
     ) -> Result<(Project, ProjectCompileOutput)> {
-        let project = script_config.config.project()?;
+        let mut project = script_config.config.project()?;
         let mut zksolc_cfg = script_config.config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-
+        let mut config = script_config.config.clone();
         let contract = ContractInfo::from_str(&self.path)?;
         self.target_contract = Some(contract.name.clone());
 
         // A contract was specified by path
         // TODO: uncomment the `if let` block once we support script by contract name
         // if let Ok(_) = dunce::canonicalize(&self.path) {
-        let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
+        let compiler_path = setup_zksolc_manager(self.opts.args.use_zksolc.clone()).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
-        let mut zksolc = ZkSolc::new(zksolc_cfg, project);
-        match zksolc.compile() {
-            Ok((output, _)) => Ok((script_config.config.project()?, output)),
+        if install::install_missing_dependencies(&mut config, self.opts.args.silent) &&
+            script_config.config.auto_detect_remappings
+        {
+            // need to re-configure here to also catch additional remappings
+            config = self.opts.load_config();
+            project = config.project()?;
+            zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
+        }
+
+        match foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project) {
+            Ok((project_compile_output, _contract_bytecodes)) => {
+                Ok((config.project()?, project_compile_output))
+            }
             Err(e) => eyre::bail!("Failed to compile with zksolc: {e}"),
         }
-        // }
-
         //FIXME: add support for specifying contract name only in `script` invocations
 
         // // If we get here we received a contract name since the path wasn't valid.
