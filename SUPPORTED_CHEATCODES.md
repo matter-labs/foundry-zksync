@@ -56,3 +56,5 @@ The `status` options are:
 | `vm.isPersistent`      | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/is-persistent.html) |
 | `vm.rollFork`          | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/roll-fork.html) |
 | `vm.assume`            | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/assume)        |
+| `vm.mockCall`          | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/mock-call)        |
+| `vm.clearMockedCall`   | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/clear-mocked-calls#clearmockedcalls)        |
