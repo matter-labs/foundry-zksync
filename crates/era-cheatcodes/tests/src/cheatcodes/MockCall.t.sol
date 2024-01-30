@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
-
 import {Test, console2 as console} from "../../lib/forge-std/src/Test.sol";
 import {Constants} from "./Constants.sol";
 
@@ -58,6 +57,7 @@ contract MockCallTest is Test {
 
         // post-mock
         console.log("numberB", target.numberB());
+        assertEq(target.numberA(), 1);
         require(target.numberB() == 30, "numberB failed mock");
     }
 }

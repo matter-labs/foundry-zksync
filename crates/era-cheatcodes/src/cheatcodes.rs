@@ -1,5 +1,6 @@
 use crate::{
     events::LogEntry,
+    farcall::FarCallHandler,
     utils::{ToH160, ToH256, ToU256},
 };
 use alloy_sol_types::{SolInterface, SolValue};
@@ -133,13 +134,15 @@ pub struct CheatcodeTracer {
     saved_snapshots: HashMap<U256, SavedSnapshot>,
     broadcastable_transactions: Vec<BroadcastableTransaction>,
     pub mock_calls: Vec<MockCall>,
-    last_pc: Option<PcOrImm>,
+    // active_farcall_stack: Option<CallStackEntry>,
+    farcall_handler: FarCallHandler,
+    // current_opcode: CurrentOpcode,
+    // current_opcode_track: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct MockCall {
     filter: FilterOps,
-    mock_next: Option<Vec<zksync_types::U256>>,
 }
 
 #[derive(Debug, Clone)]
@@ -280,9 +283,11 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         &mut self,
         state: VmLocalStateData<'_>,
         data: multivm::zk_evm_1_4_0::tracing::BeforeExecutionData,
-        _memory: &SimpleMemory<H>,
-        _storage: StoragePtr<EraDb<S>>,
+        memory: &SimpleMemory<H>,
+        storage: StoragePtr<EraDb<S>>,
     ) {
+        self.farcall_handler.track_active_far_calls(state, data, memory, storage);
+
         //store the current exception handler in expect revert
         // to be used to force a revert
         if let Some(ActionOnReturn::ExpectRevert {
@@ -378,7 +383,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             self.reset_test_status();
         }
 
-        // Checks returns from caontracts for expectRevert cheatcode
+        // Checks returns from contracts for expectRevert cheatcode
         self.handle_return(&state, &data, memory);
 
         // Checks contract calls for expectCall cheatcode
@@ -408,21 +413,18 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }
 
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            println!("mock call found");
             let current = state.vm_local_state.callstack.current;
             let calldata = get_calldata(&state, memory);
             for mock_call in &mut self.mock_calls {
                 if mock_call.filter.address == current.code_address &&
                     mock_call.filter.calldata == calldata
                 {
-                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
-                        data: mock_call.filter.return_data.clone(),
-                        continue_pc: self.last_pc.unwrap(),
-                    })
-                    // println!("return data: {:?}", self.return_data);
-                    // println!("depth {}", state.vm_local_state.callstack.depth());
-                    // println!("mock call found");
-                    // mock_call.mock_next = Some(mock_call.filter.return_data.clone());
+                    tracing::info!(
+                        calldata = hex::encode(&calldata),
+                        return_data = hex::encode(&mock_call.filter.return_data),
+                        "mock call matched"
+                    );
+                    self.farcall_handler.set_immediate_return(mock_call.filter.return_data.clone());
                 }
             }
         }
@@ -910,7 +912,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(snapshot_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
-                    println!("HERE");
                     tracing::debug!("!!!! FORCING RETURN");
 
                     self.return_data = Some(data.to_return_data());
@@ -965,13 +966,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             }
         }
 
-        // for mock_call in &mut self.mock_calls {
-        //     if mock_call.mock_next.is_some() {
-        //         println!("depth {}", state.local_state.callstack.depth());
-        //         println!("FINISHHHH: {:?}", mock_call);
-        //         self.return_data = mock_call.mock_next.take();
-        //     }
-        // }
+        self.farcall_handler.maybe_return_early(state, bootloader_state, storage);
 
         //Set return data, if any
         if let Some(fat_pointer) = self.return_ptr.take() {
@@ -1032,7 +1027,6 @@ impl CheatcodeTracer {
                     if call_depth == state.vm_local_state.callstack.depth() + 1 {
                         self.test_status = FoundryTestState::Finished;
                         tracing::info!("Test finished {}", state.vm_local_state.callstack.depth());
-                        // panic!("Test finished")
                     }
                 }
             }
@@ -1304,7 +1298,6 @@ impl CheatcodeTracer {
                         calldata: data,
                         return_data: returnData,
                     },
-                    mock_next: None,
                 })
             }
             recordLogs(recordLogsCall {}) => {
