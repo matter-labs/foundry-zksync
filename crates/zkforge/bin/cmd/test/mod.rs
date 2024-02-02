@@ -44,7 +44,6 @@ use foundry_common::{
     zk_compile::ZkSolc,
     zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
 };
-use foundry_compilers::{Project, ProjectPathsConfig};
 
 
 // Loads project's figment and merges the build cli arguments into it
@@ -177,7 +176,7 @@ impl TestArgs {
 
         // set up non zk project for compilation
         let mut non_zk_project = config.project()?;
-        
+
         let non_zk_out_path = non_zk_project.paths.root.join("out");
         non_zk_project.paths.artifacts = non_zk_out_path;
 
