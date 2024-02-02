@@ -44,6 +44,8 @@ use foundry_common::{
     zk_compile::ZkSolc,
     zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
 };
+use foundry_compilers::{Project, ProjectPathsConfig};
+
 
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
@@ -147,7 +149,7 @@ impl TestArgs {
         let mut filter = self.filter(&config);
         trace!(target: "zkforge::test", ?filter, "using filter");
 
-        // Set up the project
+        // Set up the zk project
         let mut project = config.project()?;
         // load the zkSolc config
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
@@ -173,10 +175,23 @@ impl TestArgs {
         let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
+        // set up non zk project for compilation
+        let mut non_zk_project = config.project()?;
+        
+        let non_zk_out_path = non_zk_project.paths.root.join("out");
+        non_zk_project.paths.artifacts = non_zk_out_path;
+
+
+        let output_solc = match non_zk_project.compile() {
+            Ok(compiled) => compiled,
+            Err(e) => return Err(eyre::eyre!("Failed to compile with solc: {}", e)),
+        };
+
         let mut zksolc = ZkSolc::new(zksolc_cfg, project);
         let (output, contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
+
         };
 
         let project = config.project()?;
