@@ -99,14 +99,11 @@ jobs:
         run: |
           mkdir -p artifacts
           mv target/${{ matrix.target }}/release/* ./artifacts
-          ls -la artifacts
 
       - name: Create artifacts
         run: |
           cd artifacts
-          ls -la  # List files in artifacts directory for debugging
           tar -czf foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz *
-          ls -la  # List files after tar to verify
           mv foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz ../
           echo "ARTIFACT=foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz" >> $GITHUB_OUTPUT
   
@@ -132,9 +129,6 @@ jobs:
 
       - name: Download artifacts
         uses: actions/download-artifact@v3
-
-      - name: List downloaded artifacts
-        run: ls -la
 
       - name: Generate full changelog
         id: changelog
