@@ -167,6 +167,7 @@ pub struct CheatcodeTracer {
     transact_logs: Vec<LogEntry>,
     mocked_calls: MockedCalls,
     farcall_handler: FarCallHandler,
+    stored_forks: HashMap<U256, String>
 }
 
 #[derive(Debug, Clone)]
@@ -845,6 +846,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             &url_or_alias,
                         ))
                         .unwrap();
+                    self.stored_forks.insert(fork_id.to_return_data()[0], url_or_alias);
                     self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
@@ -1920,6 +1922,12 @@ impl CheatcodeTracer {
             }
             selectFork(selectForkCall { forkId }) => {
                 tracing::info!("👷 Selecting fork {}", forkId);
+
+                //check in whitelist whether we are changing to evm domain of zkevm
+                let rpc_url_or_alias = self.stored_forks.get(&forkId.to_u256()).unwrap();
+                if rpc_url_or_alias.contains("evm") {
+
+                }
 
                 if self.permanent_actions.broadcast.is_none() {
                     self.one_time_actions
