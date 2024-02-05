@@ -16,7 +16,7 @@ use foundry_common::{
     conversion_utils::h160_to_address,
     is_known_system_sender,
     types::{ToAlloy, ToEthers},
-    AsTracerPointer, StorageModificationRecorder, SYSTEM_TRANSACTION_TYPE,
+    AsTracerPointer, StorageModificationRecorder, EnvironmentTracker,SYSTEM_TRANSACTION_TYPE,
 };
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -770,7 +770,8 @@ impl Backend {
     where
         INSP: Inspector<Self>
             + AsTracerPointer<StorageView<RevmDatabaseForEra<&'a mut Self>>, HistoryDisabled>
-            + StorageModificationRecorder,
+            + StorageModificationRecorder
+            + EnvironmentTracker,
     {
         self.initialize(env);
 

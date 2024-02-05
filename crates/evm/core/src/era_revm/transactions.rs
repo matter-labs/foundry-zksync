@@ -29,7 +29,7 @@ use foundry_common::{
         conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
         factory_deps::PackedEraBytecode,
     },
-    AsTracerPointer, StorageModificationRecorder, StorageModifications,
+    AsTracerPointer, EnvironmentTracker, StorageModificationRecorder, StorageModifications,
 };
 
 use super::db::RevmDatabaseForEra;
@@ -125,7 +125,8 @@ where
     DB: DatabaseExt + Send,
     <DB as revm::Database>::Error: Debug,
     INSP: AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
-        + StorageModificationRecorder,
+        + StorageModificationRecorder
+        + EnvironmentTracker,
 {
     let mut era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
     let (num, ts) = era_db.get_l2_block_number_and_timestamp();
@@ -150,6 +151,10 @@ where
         31337
     };
 
+    println!("HERE?");
+    // Record the environment in the inspector.
+    inspector.record_environment(env.clone());
+
     let mut l2_tx =
         tx_env_to_era_tx(env.tx.clone(), nonce, &inspector.get_storage_modifications().bytecodes);
 
@@ -159,6 +164,7 @@ where
         l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
     }
     let tracer = inspector.as_tracer_pointer();
+
     let storage = era_db.clone().into_storage_view_with_system_contracts(chain_id_u32);
 
     let storage_ptr = storage.into_rc_ptr();
@@ -364,17 +370,26 @@ where
 pub struct NoopEraInspector<S, H> {
     _phantom: PhantomData<(S, H)>,
     storage_modifications: StorageModifications,
+    outer_env: Option<Env>,
 }
 
 impl<S, H> Default for NoopEraInspector<S, H> {
     fn default() -> Self {
-        Self { _phantom: Default::default(), storage_modifications: Default::default() }
+        Self {
+            _phantom: Default::default(),
+            storage_modifications: Default::default(),
+            outer_env: Default::default(),
+        }
     }
 }
 
 impl<S, H> Clone for NoopEraInspector<S, H> {
     fn clone(&self) -> Self {
-        Self { _phantom: self._phantom, storage_modifications: self.storage_modifications.clone() }
+        Self {
+            _phantom: self._phantom,
+            storage_modifications: self.storage_modifications.clone(),
+            outer_env: self.outer_env.clone(),
+        }
     }
 }
 
@@ -393,6 +408,14 @@ impl<S, H> StorageModificationRecorder for NoopEraInspector<S, H> {
 
     fn get_storage_modifications(&self) -> &StorageModifications {
         &self.storage_modifications
+    }
+}
+
+impl<S, H> EnvironmentTracker for NoopEraInspector<S, H> {
+    fn record_environment(&mut self, _environment: Env) {}
+
+    fn get_environment(&self) -> &Env {
+        self.outer_env.as_ref().unwrap()
     }
 }
 

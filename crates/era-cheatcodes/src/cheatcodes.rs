@@ -146,6 +146,7 @@ enum FoundryTestState {
 
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
+    outer_env: Option<Env>,
     storage_modifications: StorageModifications,
     one_time_actions: Vec<FinishCycleOneTimeActions>,
     next_return_action: Option<NextReturnAction>,
@@ -167,7 +168,7 @@ pub struct CheatcodeTracer {
     transact_logs: Vec<LogEntry>,
     mocked_calls: MockedCalls,
     farcall_handler: FarCallHandler,
-    stored_forks: HashMap<U256, String>
+    stored_forks: HashMap<U256, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1124,11 +1125,13 @@ impl CheatcodeTracer {
         cheatcodes_config: Arc<CheatsConfig>,
         storage_modifications: StorageModifications,
         broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
+        env: Env,
     ) -> Self {
         Self {
             config: cheatcodes_config,
             storage_modifications,
             broadcastable_transactions,
+            outer_env: Some(env),
             ..Default::default()
         }
     }
@@ -1925,9 +1928,7 @@ impl CheatcodeTracer {
 
                 //check in whitelist whether we are changing to evm domain of zkevm
                 let rpc_url_or_alias = self.stored_forks.get(&forkId.to_u256()).unwrap();
-                if rpc_url_or_alias.contains("evm") {
-
-                }
+                if rpc_url_or_alias.contains("evm") {}
 
                 if self.permanent_actions.broadcast.is_none() {
                     self.one_time_actions

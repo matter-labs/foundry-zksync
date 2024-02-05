@@ -9,7 +9,7 @@ use crate::{
 };
 use alloy_primitives::{Address, B256, U256};
 use ethers_core::utils::GenesisAccount;
-use foundry_common::{AsTracerPointer, StorageModificationRecorder};
+use foundry_common::{AsTracerPointer, StorageModificationRecorder, EnvironmentTracker};
 use revm::{
     db::DatabaseRef,
     primitives::{AccountInfo, Bytecode, EVMResult, Env, ResultAndState},
@@ -60,7 +60,8 @@ impl<'a> FuzzBackendWrapper<'a> {
     where
         INSP: Inspector<Self>
             + AsTracerPointer<StorageView<RevmDatabaseForEra<&'b mut Self>>, HistoryDisabled>
-            + StorageModificationRecorder,
+            + StorageModificationRecorder
+            + EnvironmentTracker,
     {
         self.is_initialized = false;
 

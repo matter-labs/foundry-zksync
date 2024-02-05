@@ -30,6 +30,7 @@
 use eyre::Result;
 use foundry_config::Chain;
 use multivm::vm_latest::TracerPointer;
+use revm::primitives::Env;
 use std::{collections::HashMap, num::ParseIntError};
 use url::Url;
 use zksync_basic_types::U256;
@@ -187,6 +188,15 @@ impl StorageModifications {
         self.bytecodes.extend(other.bytecodes);
         self.known_codes.extend(other.known_codes);
     }
+}
+
+/// Keeps track of the environment so that the cheatcode tracer can handle the multiVM executions.
+pub trait EnvironmentTracker{
+    /// Record the environment
+    fn record_environment(&mut self, environment: Env);
+
+    /// Return the environment
+    fn get_environment(&self) -> &Env;
 }
 
 /// Keeps track of storage modifications performed during test executions.

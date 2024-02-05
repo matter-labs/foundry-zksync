@@ -5,7 +5,9 @@ use super::{
 use alloy_primitives::{Address, Bytes, B256, U256};
 use ethers_core::types::Log;
 use ethers_signers::LocalWallet;
-use foundry_common::{AsTracerPointer, StorageModificationRecorder, StorageModifications};
+use foundry_common::{
+    AsTracerPointer, EnvironmentTracker, StorageModificationRecorder, StorageModifications,
+};
 use foundry_evm_core::{
     backend::DatabaseExt, debug::DebugArena, era_revm::storage_view::StorageView,
 };
@@ -211,6 +213,7 @@ pub struct InspectorStack {
     pub printer: Option<TracePrinter>,
     pub tracer: Option<Tracer>,
     pub storage_modifications: StorageModifications,
+    pub outer_env: Option<Env>,
 }
 
 impl InspectorStack {
@@ -593,6 +596,7 @@ impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>
                 .as_ref()
                 .map(|c| c.broadcastable_transactions.clone())
                 .unwrap_or_default(),
+            self.outer_env.as_ref().unwrap().clone(),
         )
         .into_tracer_pointer()
     }
@@ -605,5 +609,15 @@ impl StorageModificationRecorder for &mut InspectorStack {
 
     fn get_storage_modifications(&self) -> &StorageModifications {
         &self.storage_modifications
+    }
+}
+
+impl EnvironmentTracker for &mut InspectorStack {
+    fn record_environment(&mut self, environment: Env) {
+        self.outer_env = Some(environment);
+    }
+
+    fn get_environment(&self) -> &Env {
+        self.outer_env.as_ref().unwrap()
     }
 }
