@@ -1,6 +1,7 @@
 use crate::{
     events::LogEntry,
     farcall::{FarCallHandler, MockCall, MockedCalls},
+    multivm::Executor,
     utils::{ToH160, ToH256, ToU256},
 };
 use alloy_sol_types::{SolInterface, SolValue};
@@ -169,6 +170,7 @@ pub struct CheatcodeTracer {
     mocked_calls: MockedCalls,
     farcall_handler: FarCallHandler,
     stored_forks: HashMap<U256, String>,
+    is_switched_to_evm: Option<Executor>,
 }
 
 #[derive(Debug, Clone)]
@@ -510,14 +512,14 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
 
             if current.code_address != CHEATCODE_ADDRESS {
-                if let Some(broadcast) = self.permanent_actions.broadcast.as_ref() {
-                    let prev_cs = state
-                        .vm_local_state
-                        .callstack
-                        .inner
-                        .last()
-                        .expect("callstack before the current");
+                let prev_cs = state
+                    .vm_local_state
+                    .callstack
+                    .inner
+                    .last()
+                    .expect("callstack before the current");
 
+                if let Some(broadcast) = self.permanent_actions.broadcast.as_ref() {
                     if state.vm_local_state.callstack.depth() == broadcast.depth &&
                         prev_cs.this_address == broadcast.original_caller &&
                         !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address)
@@ -625,6 +627,57 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         self.set_nonce(new_origin, (Some(nonce + 1 + nonce_offset), None), handle);
                     }
                 }
+
+                if let Some(executor) = &mut self.is_switched_to_evm {
+                    let from = current.msg_sender;
+                    let from = revm::primitives::Address::from(from.to_fixed_bytes());
+
+                    let (value, to) =
+                        if current.code_address == zksync_types::MSG_VALUE_SIMULATOR_ADDRESS {
+                            //when some eth is sent to an address in zkevm the call is replaced
+                            // with a call to MsgValueSimulator, which does a mimic_call later
+                            // to the original destination
+                            // The value is stored in the 1st system abi register, and the
+                            // original address is stored in the 2nd register
+                            // see: https://github.com/matter-labs/era-test-node/blob/6ee7d29e876b75506f58355218e1ea755a315d17/etc/system-contracts/contracts/MsgValueSimulator.sol#L26-L27
+                            let msg_value_simulator_value_reg_idx = CALL_SYSTEM_ABI_REGISTERS.start;
+                            let msg_value_simulator_address_reg_idx =
+                                msg_value_simulator_value_reg_idx + 1;
+                            let value = state.vm_local_state.registers
+                                [msg_value_simulator_value_reg_idx as usize];
+
+                            let address = state.vm_local_state.registers
+                                [msg_value_simulator_address_reg_idx as usize];
+
+                            let mut bytes = [0u8; 32];
+                            address.value.to_big_endian(&mut bytes);
+                            let address = H256::from(bytes);
+
+                            (Some(value.value), address.into())
+                        } else {
+                            (None, current.code_address)
+                        };
+                    let to = revm::primitives::Address::from(to.to_fixed_bytes());
+
+                    let calldata = get_calldata(&state, memory);
+
+                    //TODO: determine if deployment and call deploy instead
+                    let result = executor
+                        .call_raw_committing(
+                            from,
+                            to,
+                            calldata.into(),
+                            rU256::from_limbs(value.unwrap_or_default().0),
+                        )
+                        //TODO: handle errors
+                        .unwrap();
+
+                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
+                        data: result.out.unwrap().into_data().into(),
+                        continue_pc: prev_cs.pc,
+                    });
+                }
+
                 return
             }
 
@@ -1928,7 +1981,45 @@ impl CheatcodeTracer {
 
                 //check in whitelist whether we are changing to evm domain of zkevm
                 let rpc_url_or_alias = self.stored_forks.get(&forkId.to_u256()).unwrap();
-                if rpc_url_or_alias.contains("evm") {}
+                if rpc_url_or_alias.contains("evm") {
+                    // let db = match &script_config.evm_opts.fork_url {
+                    //     Some(url) => match script_config.backends.get(url) {
+                    //         Some(db) => db.clone(),
+                    //         None => {
+                    //             let backend = Backend::spawn(
+                    //                 script_config
+                    //                     .evm_opts
+                    //                     .get_fork(&script_config.config, env.clone()),
+                    //             )
+                    //             .await;
+                    //             script_config.backends.insert(url.clone(), backend);
+                    //             script_config.backends.get(url).unwrap().clone()
+                    //         }
+                    //     },
+                    //     None => {
+                    //         // It's only really `None`, when we don't pass any `--fork-url`. And
+                    // if         // so, there is no need to cache it, since
+                    //         // there won't be any onchain simulation that we'd need
+                    //         // to cache the backend for.
+                    //         Backend::spawn(
+                    //             script_config.evm_opts.get_fork(&script_config.config,
+                    // env.clone()),         )
+                    //         .await
+                    //     }
+                    // };
+                    let db = todo!("backend db");
+                    let env = self.outer_env.unwrap().clone();
+
+                    let executor = Executor::new(
+                        db,
+                        env,
+                        rU256::from(self.env.get().unwrap().system_env.gas_limit),
+                    );
+
+                    self.is_switched_to_evm.replace(executor);
+                } else {
+                    self.is_switched_to_evm.take();
+                }
 
                 if self.permanent_actions.broadcast.is_none() {
                     self.one_time_actions
