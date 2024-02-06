@@ -6,7 +6,8 @@ use crate::{
 use alloy_primitives::{Address, Bytes, FixedBytes, I256 as rI256};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::utils::bytecode_to_factory_dep;
-use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
+use ethers::{signers::Signer, types::TransactionRequest};
+use eyre::Context;
 use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_common::{
@@ -1786,7 +1787,7 @@ impl CheatcodeTracer {
                 //write to serialized_objects
                 self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
-                let address_with_checksum = to_checksum(&value.to_h160(), None);
+                let address_with_checksum = value.to_checksum(None);
                 self.return_data = Some(address_with_checksum.to_return_data());
             }
             serializeBool_0(serializeBool_0Call {
@@ -1928,17 +1929,17 @@ impl CheatcodeTracer {
             }
             toString_0(toString_0Call { value }) => {
                 tracing::info!("Converting address into string");
-                let address_with_checksum = to_checksum(&value.to_h160(), None);
+                let address_with_checksum = value.to_checksum(None);
                 self.return_data = Some(address_with_checksum.to_return_data());
             }
             toString_1(toString_1Call { value }) => {
                 tracing::info!("Converting bytes into string");
-                let bytes_value = format!("0x{}", hex::encode(value));
+                let bytes_value = hex::encode_prefixed(value);
                 self.return_data = Some(bytes_value.to_return_data());
             }
             toString_2(toString_2Call { value }) => {
                 tracing::info!("Converting bytes32 into string");
-                let bytes_value = format!("0x{}", hex::encode(value));
+                let bytes_value = hex::encode_prefixed(value);
                 self.return_data = Some(bytes_value.to_return_data());
             }
             toString_3(toString_3Call { value }) => {
