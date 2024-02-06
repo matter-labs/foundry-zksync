@@ -23,7 +23,9 @@ foundry-evm-core.workspace = true
 foundry-common.workspace = true
 foundry-cheatcodes-spec.workspace = true
 foundry-cheatcodes.workspace = true
+alloy-primitives.workspace = true
 alloy-sol-types = { workspace = true, features = ["json"] }
+eyre.workspace = true
 
 ethabi = "18.0.0"
 itertools = "0.12.0"

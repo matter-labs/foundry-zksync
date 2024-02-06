@@ -3,6 +3,7 @@ use crate::{
     farcall::{FarCallHandler, MockCall, MockedCalls},
     utils::{ToH160, ToH256, ToU256},
 };
+use alloy_primitives::{Address, Bytes, FixedBytes, I256 as rI256};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::utils::bytecode_to_factory_dep;
 use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
@@ -1224,32 +1225,179 @@ impl CheatcodeTracer {
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
             }
+            envAddress_0(envAddress_0Call { name }) => {
+                tracing::info!("👷 Getting address env variable {name}");
+                let env_var: Address =
+                    parse_env(&name, |var| var.parse()).expect("Env var not address");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envAddress_1(envAddress_1Call { name, delim }) => {
+                tracing::info!("👷 Getting address env variable {name} with delimiter {delim}");
+                let env_vars: Vec<Address> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not address");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envBool_0(envBool_0Call { name }) => {
+                tracing::info!("👷 Getting bool env variable {name}");
+                let env_var: bool = parse_env(&name, |var| var.parse()).expect("Env var not bool");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envBool_1(envBool_1Call { name, delim }) => {
+                tracing::info!("👷 Getting bool env variable {name} with delimiter {delim}");
+                let env_vars: Vec<bool> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not bool");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envBytes_0(envBytes_0Call { name }) => {
+                tracing::info!("👷 Getting bytes env variable {name}");
+                let env_var: Bytes =
+                    parse_env(&name, |var| var.parse()).expect("Env var not bytes");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envBytes_1(envBytes_1Call { name, delim }) => {
+                tracing::info!("👷 Getting bytes env variable {name} with delimiter {delim}");
+                let env_vars: Vec<Bytes> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not bytes");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envBytes32_0(envBytes32_0Call { name }) => {
+                tracing::info!("👷 Getting bytes32 env variable {name}");
+                let env_var: FixedBytes<32> =
+                    parse_env(&name, |var| var.parse()).expect("Env var not bytes32");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envBytes32_1(envBytes32_1Call { name, delim }) => {
+                tracing::info!("👷 Getting bytes32 env variable {name} with delimiter {delim}");
+                let env_vars: Vec<FixedBytes<32>> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not bytes32");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envInt_0(envInt_0Call { name }) => {
+                tracing::info!("👷 Getting int256 env variable {name}");
+                let env_var: rI256 = parse_env(&name, |var| var.parse()).expect("Env var not int");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envInt_1(envInt_1Call { name, delim }) => {
+                tracing::info!("👷 Getting int256 env variable {name} with delimiter {delim}");
+                let env_vars: Vec<rI256> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not int");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envString_0(envString_0Call { name }) => {
+                tracing::info!("👷 Getting string env variable {name}");
+                let env_var: String =
+                    parse_env(&name, |var| var.parse()).expect("Env var not string");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envString_1(envString_1Call { name, delim }) => {
+                tracing::info!("👷 Getting string env variable {name} with delimiter {delim}");
+                let env_vars: Vec<String> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not string");
+                self.return_data = Some(env_vars.to_return_data());
+            }
             envUint_0(envUint_0Call { name }) => {
-                tracing::info!("👷 Getting env variable {name}");
-                let env_var = std::env::var(&name).expect("Env var not found");
-                let env_var = if let Some(var) = env_var.strip_prefix("0x") {
-                    let hex = hex::decode(var).expect("Env var not hex");
-                    rU256::from_be_slice(&hex)
-                } else {
-                    rU256::from_str(&env_var).expect("Env var not uint")
-                };
+                tracing::info!("👷 Getting uint256 env variable {name}");
+                let env_var: rU256 = parse_env(&name, |var| var.parse()).expect("Env var not int");
                 self.return_data = Some(env_var.to_return_data());
             }
             envUint_1(envUint_1Call { name, delim }) => {
-                tracing::info!("👷 Getting env variable {name} with delimiter {delim}");
-                let env_var = std::env::var(&name).expect("Env var not found");
-                let env_vars: Vec<rU256> = env_var
-                    .split(&delim)
-                    .filter(|var| !var.is_empty())
-                    .map(|var| {
-                        if let Some(var) = var.strip_prefix("0x") {
-                            let hex = hex::decode(var).expect("Env var not hex");
-                            rU256::from_be_slice(&hex)
-                        } else {
-                            rU256::from_str(var).expect("Env var not uint")
-                        }
-                    })
-                    .collect();
+                tracing::info!("👷 Getting uint256 env variable {name} with delimiter {delim}");
+                let env_vars: Vec<rU256> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not int");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_0(envOr_0Call { name, defaultValue }) => {
+                tracing::info!("👷 Getting bool env variable {name} with fallback {defaultValue}");
+                let env_var: bool = parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_1(envOr_1Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting uint256 env variable {name} with fallback {defaultValue}"
+                );
+                let env_var: rU256 = parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_2(envOr_2Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting int256 env variable {name} with fallback {defaultValue}"
+                );
+                let env_var: rI256 = parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_3(envOr_3Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting address env variable {name} with fallback {defaultValue}"
+                );
+                let env_var: Address = parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_4(envOr_4Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting bytes32 env variable {name} with fallback {defaultValue}"
+                );
+                let env_var: FixedBytes<32> =
+                    parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_5(envOr_5Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting string env variable {name} with fallback {defaultValue}"
+                );
+                let env_var = parse_env(&name, |var| {
+                    Ok::<_, &(dyn std::error::Error + Send + Sync)>(var.to_string())
+                })
+                .unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_6(envOr_6Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting bytes env variable {name} with fallback {defaultValue:?}"
+                );
+                let env_var: Bytes =
+                    parse_env(&name, |var| var.parse()).unwrap_or(defaultValue.into());
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_7(envOr_7Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting bool env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<bool> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_8(envOr_8Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting uint256 env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<rU256> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_9(envOr_9Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting int256 env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<rI256> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_10(envOr_10Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting address env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<Address> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_11(envOr_11Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting bytes32 env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<FixedBytes<32>> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_12(envOr_12Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting string env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<String> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_13(envOr_13Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting bytes env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<Bytes> = parse_env_array(&name, &delim, |var| var.parse())
+                    .unwrap_or(defaultValue.into_iter().map(|v| v.into()).collect());
                 self.return_data = Some(env_vars.to_return_data());
             }
             expectRevert_0(expectRevert_0Call {}) => {
@@ -2556,4 +2704,29 @@ fn are_logs_equal(a: &LogEntry, b: &LogEntry, emit_checks: &EmitChecks) -> bool 
     let data_match = if emit_checks.data { a.data == b.data } else { true };
 
     address_match && topics_match && data_match
+}
+
+fn parse_env<F, T, E>(name: &str, parser_fn: F) -> eyre::Result<T>
+where
+    F: Fn(&str) -> Result<T, E>,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    let env_var = std::env::var(name).context("Env var not found")?;
+    let env_var = parser_fn(&env_var)?;
+    Ok(env_var)
+}
+
+fn parse_env_array<F, T, E>(name: &str, delim: &str, parser_fn: F) -> eyre::Result<Vec<T>>
+where
+    F: Fn(&str) -> Result<T, E>,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    let env_var = std::env::var(name).context("Env var not found")?;
+    let env_vars = env_var
+        .split(&delim)
+        .map(|var| var.trim())
+        .filter(|var| !var.is_empty())
+        .map(parser_fn)
+        .collect::<Result<Vec<_>, E>>()?;
+    Ok(env_vars)
 }
