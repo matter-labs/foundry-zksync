@@ -191,12 +191,22 @@ impl StorageModifications {
 }
 
 /// Keeps track of the environment so that the cheatcode tracer can handle the multiVM executions.
-pub trait EnvironmentTracker{
+pub trait EnvironmentTracker {
     /// Record the environment
     fn record_environment(&mut self, environment: Env);
 
     /// Return the environment
     fn get_environment(&self) -> &Env;
+}
+
+impl<T: EnvironmentTracker> EnvironmentTracker for &mut T {
+    fn record_environment(&mut self, environment: Env) {
+        T::record_environment(self, environment)
+    }
+
+    fn get_environment(&self) -> &Env {
+        T::get_environment(self)
+    }
 }
 
 /// Keeps track of storage modifications performed during test executions.
@@ -209,8 +219,24 @@ pub trait StorageModificationRecorder {
     fn get_storage_modifications(&self) -> &StorageModifications;
 }
 
+impl<T: StorageModificationRecorder> StorageModificationRecorder for &mut T {
+    fn record_storage_modifications(&mut self, storage_modifications: StorageModifications) {
+        T::record_storage_modifications(self, storage_modifications)
+    }
+
+    fn get_storage_modifications(&self) -> &StorageModifications {
+        T::get_storage_modifications(self)
+    }
+}
+
 /// Converts a reference to self into a tracer pointer.
 pub trait AsTracerPointer<S, H> {
     /// Returns reference to a [TracerPointer]
     fn as_tracer_pointer(&self) -> TracerPointer<S, H>;
+}
+
+impl<S, H, T: AsTracerPointer<S, H>> AsTracerPointer<S, H> for &mut T {
+    fn as_tracer_pointer(&self) -> TracerPointer<S, H> {
+        T::as_tracer_pointer(self)
+    }
 }

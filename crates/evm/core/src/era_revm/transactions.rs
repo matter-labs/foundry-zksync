@@ -373,6 +373,8 @@ pub struct NoopEraInspector<S, H> {
     outer_env: Option<Env>,
 }
 
+impl<S, H, DB: revm::Database> revm::Inspector<DB> for NoopEraInspector<S, H> {}
+
 impl<S, H> Default for NoopEraInspector<S, H> {
     fn default() -> Self {
         Self {
