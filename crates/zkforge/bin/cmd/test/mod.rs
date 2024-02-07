@@ -120,6 +120,10 @@ pub struct TestArgs {
     /// Print detailed test summary table.
     #[clap(long, help_heading = "Display options", requires = "summary")]
     pub detailed: bool,
+
+    /// Contracts to compile
+    #[clap(long, help_heading = "Contracts to compile")]
+    pub contracts_to_compile: Option<Vec<String>>,
 }
 
 impl TestArgs {
@@ -151,6 +155,7 @@ impl TestArgs {
         let mut project = config.project()?;
         // load the zkSolc config
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
+        zksolc_cfg.contracts_to_compile = self.contracts_to_compile.clone();
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
 

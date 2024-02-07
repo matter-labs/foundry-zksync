@@ -32,6 +32,9 @@ pub struct ZkSolcConfig {
 
     /// zkSolc compiler settings
     pub settings: Settings,
+
+    /// contracts to compile
+    pub contracts_to_compile: Option<Vec<String>>,
 }
 
 /// Compiler settings for zkSolc.
@@ -118,6 +121,7 @@ pub struct Optimizer {
 pub struct ZkSolcConfigBuilder {
     compiler_path: PathBuf,
     settings: Option<Settings>,
+    contracts_to_compile: Option<Vec<String>>,
 }
 
 impl ZkSolcConfigBuilder {
@@ -138,7 +142,11 @@ impl ZkSolcConfigBuilder {
     /// Builds the `ZkSolcConfig`.
     pub fn build(self) -> Result<ZkSolcConfig, String> {
         let settings = self.settings.unwrap_or_default();
-        Ok(ZkSolcConfig { compiler_path: self.compiler_path, settings })
+        Ok(ZkSolcConfig {
+            compiler_path: self.compiler_path,
+            settings,
+            contracts_to_compile: self.contracts_to_compile,
+        })
     }
 }
 
