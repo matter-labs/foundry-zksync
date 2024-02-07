@@ -697,9 +697,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.75"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
+checksum = "080e9890a082662b09c1ad45f567faeeb47f22b5fb23895fbe1e651e718e25ca"
 
 [[package]]
 name = "arbitrary"
@@ -3270,19 +3270,17 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 name = "era_cheatcodes"
 version = "0.2.0"
 dependencies = [
+ "alloy-primitives",
  "alloy-sol-types",
+ "const-hex",
  "era_test_node",
- "ethabi 18.0.0",
  "ethers",
  "eyre",
  "foundry-cheatcodes",
  "foundry-cheatcodes-spec",
  "foundry-common",
  "foundry-evm-core",
- "hashbrown 0.14.2",
- "hex",
  "itertools 0.12.0",
- "maplit",
  "multivm",
  "revm",
  "serde",
