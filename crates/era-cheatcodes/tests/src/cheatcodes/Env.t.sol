@@ -236,28 +236,28 @@ contract EnvTest is Test {
         );
     }
 
-    // function testEnvBytes32Arr() public {
-    //     string memory key = "_foundryCheatcodeEnvBytes32ArrTestKey";
-    //     string memory value = "0x463df98a03418e6196421718c1b96779a6d4f0bcff1702a9e8f2323bb49f6811,"
-    //     "0x0000000000000000000000000000000000000000000000000000000000000000";
-    //     bytes32[2] memory expected = [
-    //         bytes32(
-    //             0x463df98a03418e6196421718c1b96779a6d4f0bcff1702a9e8f2323bb49f6811
-    //         ),
-    //         bytes32(
-    //             0x0000000000000000000000000000000000000000000000000000000000000000
-    //         )
-    //     ];
+    function testEnvBytes32Arr() public {
+        string memory key = "_foundryCheatcodeEnvBytes32ArrTestKey";
+        string memory value = "0x463df98a03418e6196421718c1b96779a6d4f0bcff1702a9e8f2323bb49f6811,"
+        "0x0000000000000000000000000000000000000000000000000000000000000000";
+        bytes32[2] memory expected = [
+            bytes32(
+                0x463df98a03418e6196421718c1b96779a6d4f0bcff1702a9e8f2323bb49f6811
+            ),
+            bytes32(
+                0x0000000000000000000000000000000000000000000000000000000000000000
+            )
+        ];
 
-    //     vm.setEnv(key, value);
-    //     string memory delimiter = ",";
-    //     bytes32[] memory output = vm.envBytes32(key, delimiter);
-    //     require(
-    //         keccak256(abi.encodePacked((output))) ==
-    //             keccak256(abi.encodePacked((expected))),
-    //         "envBytes32Arr failed"
-    //     );
-    // }
+        vm.setEnv(key, value);
+        string memory delimiter = ",";
+        bytes32[] memory output = vm.envBytes32(key, delimiter);
+        require(
+            keccak256(abi.encodePacked((output))) ==
+                keccak256(abi.encodePacked((expected))),
+            "envBytes32Arr failed"
+        );
+    }
 
     function testEnvStringArr() public {
         string memory key = "_foundryCheatcodeEnvStringArrTestKey";
