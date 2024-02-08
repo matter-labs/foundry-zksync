@@ -7,8 +7,11 @@ use foundry_cli::{
     utils::{self, LoadConfig},
 };
 use foundry_common::{
-    compact_to_contract, compile::ContractSources, evm::EvmArgs, get_contract_name, get_file_name,
-    shell,
+    compact_to_contract,
+    compile::ContractSources,
+    evm::EvmArgs,
+    get_contract_name, get_file_name,
+    shell::{self, println},
 };
 use foundry_config::{
     figment,
