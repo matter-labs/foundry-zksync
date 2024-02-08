@@ -344,6 +344,9 @@ async fn main() -> Result<()> {
             println!("{}", Cast::new(&provider).transaction(tx_hash, field, raw, json).await?)
         }
 
+        Subcommands::ZkSendTx(cmd) => cmd.run().await?,
+        Subcommands::ZkDepositTx(cmd) => cmd.run().await?,
+
         // 4Byte
         Subcommands::FourByte { selector } => {
             let selector = stdin::unwrap_line(selector)?;
