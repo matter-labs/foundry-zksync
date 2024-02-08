@@ -41,7 +41,7 @@ pub struct Executor {
 impl Executor {
     #[inline]
     //no InspectorStack -> circular dependency
-    pub fn new(mut backend: Backend, env: Env, gas_limit: U256) -> Self {
+    pub fn new(backend: Backend, env: Env, gas_limit: U256) -> Self {
         Executor { backend, env, gas_limit, inspector: NoopInspector }
     }
 
@@ -128,8 +128,10 @@ impl Executor {
         calldata: Bytes,
         value: U256,
     ) -> eyre::Result<RawCallResult> {
+        tracing::info!(?from, ?to, ?calldata, ?value, "Calling EVM");
         let env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
         let mut result = self.call_raw_with_env(env)?;
+        tracing::info!(result = ?result.out, "Calling EVM, result");
         self.commit(&mut result);
         Ok(result)
     }
@@ -167,7 +169,7 @@ impl Executor {
         let mut env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
 
         let mut db = FuzzBackendWrapper::new(&self.backend);
-        let result = db.inspect_ref(&mut env, &mut inspector)?;
+        let result = db.inspect_ref_EVM(&mut env, &mut inspector)?;
 
         // Persist the snapshot failure recorded on the fuzz backend wrapper.
         let has_snapshot_failure = db.has_snapshot_failure();
@@ -185,7 +187,7 @@ impl Executor {
     pub fn call_raw_with_env(&mut self, mut env: Env) -> eyre::Result<RawCallResult> {
         // execute the call
         let mut inspector = self.inspector.clone();
-        let result = self.backend.inspect_ref(&mut env, &mut inspector)?;
+        let result = self.backend.inspect_ref_EVM(&mut env, &mut inspector)?;
         convert_executed_result(env, result, self.backend.has_snapshot_failure())
     }
 

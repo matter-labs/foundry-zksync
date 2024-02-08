@@ -628,12 +628,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                     }
                 }
 
-                if let Some(executor) = &mut self.is_switched_to_evm {
-                    let from = current.msg_sender;
-                    let from = revm::primitives::Address::from(from.to_fixed_bytes());
+                //TODO: avoid runnning internal calls even in era when forked to EVM
+                if !INTERNAL_CONTRACT_ADDRESSES.contains(&current.code_address) {
+                    if let Some(executor) = &mut self.is_switched_to_evm {
+                        let from = current.msg_sender;
+                        let from = revm::primitives::Address::from(from.to_fixed_bytes());
 
-                    let (value, to) =
-                        if current.code_address == zksync_types::MSG_VALUE_SIMULATOR_ADDRESS {
+                        let (value, to) = if current.code_address ==
+                            zksync_types::MSG_VALUE_SIMULATOR_ADDRESS
+                        {
                             //when some eth is sent to an address in zkevm the call is replaced
                             // with a call to MsgValueSimulator, which does a mimic_call later
                             // to the original destination
@@ -658,34 +661,35 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             (None, current.code_address)
                         };
 
-                    let value = rU256::from_limbs(value.unwrap_or_default().0);
-                    let to = revm::primitives::Address::from(to.to_fixed_bytes());
+                        let value = rU256::from_limbs(value.unwrap_or_default().0);
+                        let to = revm::primitives::Address::from(to.to_fixed_bytes());
 
-                    let calldata = get_calldata(&state, memory);
+                        let calldata = get_calldata(&state, memory);
 
-                    let is_deployment =
-                        current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
+                        let is_deployment =
+                            current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
-                    if is_deployment {
-                        let _result = executor
-                            .deploy(from, calldata.into(), value, None)
-                            //TODO: handle errors
-                            .expect("able to deploy in EVM");
+                        if is_deployment {
+                            let _result = executor
+                                .deploy(from, calldata.into(), value, None)
+                                //TODO: handle errors
+                                .expect("able to deploy in EVM");
 
-                        self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
-                            data: vec![],
-                            continue_pc: prev_cs.pc,
-                        });
-                    } else {
-                        let result = executor
-                            .call_raw_committing(from, to, calldata.into(), value)
-                            //TODO: handle errors
-                            .expect("multiVM EVM call failed");
+                            self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
+                                data: vec![],
+                                continue_pc: prev_cs.pc,
+                            });
+                        } else {
+                            let result = executor
+                                .call_raw_committing(from, to, calldata.into(), value)
+                                //TODO: handle errors
+                                .expect("multiVM EVM call failed");
 
-                        self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
-                            data: result.out.unwrap().into_data().into(),
-                            continue_pc: prev_cs.pc,
-                        });
+                            self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
+                                data: result.out.unwrap().into_data().into(),
+                                continue_pc: prev_cs.pc,
+                            });
+                        }
                     }
                 }
 
@@ -851,39 +855,24 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
-                    let mut storage = storage.borrow_mut();
-                    let modified_storage =
-                        self.get_modified_storage(storage.modified_storage_keys());
-                    let modified_bytecodes = self.get_modified_bytecodes(
-                        bootloader_state.get_last_tx_compressed_bytecodes(),
-                    );
-
-                    storage.clean_cache();
-                    storage.modified_storage_keys = modified_storage.clone();
-
-                    let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
-                    let mut db = era_db.db.lock().unwrap();
+                    let evm = false; //TODO: replace with logic
+                    tracing::debug!(?evm, "createSelectFork");
 
                     let era_env = self.env.get().unwrap();
-                    let mut env = into_revm_env(era_env);
-
                     let create_fork = create_fork_request(
                         era_env,
                         self.config.clone(),
                         block_number,
                         &url_or_alias,
                     );
-
-                    let evm = true; //TODO: logic
-
                     if evm {
-                        let db = Backend::spawn(Some(create_fork));
-                        self.evm_backends.push(db.clone());
+                        let backend = Backend::spawn(Some(create_fork));
+                        self.evm_backends.push(backend.clone());
 
                         let env = self.outer_env.clone().unwrap();
 
                         let executor = Executor::new(
-                            db,
+                            backend,
                             env,
                             rU256::from(self.env.get().unwrap().system_env.gas_limit),
                         );
@@ -895,40 +884,52 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         self.return_data =
                             Some(vec![U256::MAX - U256::from(self.evm_backends.len() - 1)]);
                     } else {
-                        self.is_switched_to_evm.take();
-
-                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
-                        state.decommittment_processor.populate(
-                            bytecodes
-                                .clone()
-                                .into_iter()
-                                .filter(|(key, _)| {
-                                    !state
-                                        .decommittment_processor
-                                        .known_bytecodes
-                                        .inner()
-                                        .contains_key(key)
-                                })
-                                .collect(),
-                            Timestamp(state.local_state.timestamp),
+                        let mut storage = storage.borrow_mut();
+                        let modified_storage =
+                            self.get_modified_storage(storage.modified_storage_keys());
+                        let modified_bytecodes = self.get_modified_bytecodes(
+                            bootloader_state.get_last_tx_compressed_bytecodes(),
                         );
 
-                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        journaled_state.state =
-                            storage_to_state(era_db, &modified_storage, bytecodes);
+                        storage.clean_cache();
+                        let fork_id = {
+                            let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
+                            let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                            state.decommittment_processor.populate(
+                                bytecodes
+                                    .clone()
+                                    .into_iter()
+                                    .filter(|(key, _)| {
+                                        !state
+                                            .decommittment_processor
+                                            .known_bytecodes
+                                            .inner()
+                                            .contains_key(key)
+                                    })
+                                    .collect(),
+                                Timestamp(state.local_state.timestamp),
+                            );
 
-                        let fork_id = db
-                            .create_select_fork(create_fork, &mut env, &mut journaled_state)
-                            .unwrap();
+                            let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                            journaled_state.state =
+                                storage_to_state(era_db, &modified_storage, bytecodes);
+
+                            let mut db = era_db.db.lock().unwrap();
+                            let era_env = self.env.get().unwrap();
+                            let mut env = into_revm_env(era_env);
+                            db.create_select_fork(create_fork, &mut env, &mut journaled_state)
+                                .unwrap()
+                        };
+
+                        storage.modified_storage_keys = modified_storage;
 
                         self.return_data = Some(fork_id.to_return_data());
                     }
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
                     let evm = true; //TODO: replace with logic
+                    tracing::debug!(?evm, "createFork");
 
-                    let era_db = &storage.borrow_mut().storage_handle;
-                    let mut db = era_db.db.lock().unwrap();
                     let era_env = self.env.get().unwrap();
                     let create_fork = create_fork_request(
                         era_env,
@@ -946,6 +947,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         self.return_data =
                             Some(vec![U256::MAX - U256::from(self.evm_backends.len() - 1)]);
                     } else {
+                        let era_db = &storage.borrow_mut().storage_handle;
+                        let mut db = era_db.db.lock().unwrap();
                         let fork_id = db.create_fork(create_fork).unwrap();
 
                         self.return_data = Some(fork_id.to_return_data());
@@ -994,7 +997,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.modified_storage_keys = modified_storage;
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
-                    let maybe_evm_fork_id = (U256::MAX - fork_id).as_u64() as usize;
+                    let maybe_evm_fork_id = (U256::MAX - fork_id).low_u64() as usize;
+                    tracing::debug!(
+                        maybe_evm_fork_id,
+                        evm_backends = self.evm_backends.len(),
+                        "selectFork"
+                    );
 
                     if maybe_evm_fork_id < self.evm_backends.len() {
                         let db = self.evm_backends[maybe_evm_fork_id].clone();

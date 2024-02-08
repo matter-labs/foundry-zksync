@@ -781,6 +781,23 @@ impl Backend {
         Ok(result.unwrap())
     }
 
+    /// Executes the configured test call of the `env` without committing state changes
+    pub fn inspect_ref_EVM<INSP>(
+        &mut self,
+        env: &mut Env,
+        mut inspector: INSP,
+    ) -> eyre::Result<ResultAndState>
+    where
+        INSP: Inspector<Self>,
+    {
+        self.initialize(env);
+
+        match revm::evm_inner::<Self>(env, self, Some(&mut inspector)).transact() {
+            Ok(res) => Ok(res),
+            Err(e) => eyre::bail!("backend: failed while inspecting: {e}"),
+        }
+    }
+
     /// Returns true if the address is a precompile
     pub fn is_existing_precompile(&self, addr: &Address) -> bool {
         self.inner.precompiles().contains(addr)
