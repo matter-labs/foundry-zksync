@@ -2,12 +2,11 @@ use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Function, JsonAbi};
 use foundry_common::abi::IntoFunction;
 use foundry_evm_core::{
-    backend::{Backend, DatabaseError, DatabaseExt, DatabaseResult},
+    backend::{Backend, DatabaseError, DatabaseExt, DatabaseResult, FuzzBackendWrapper},
     constants::{
         CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE,
     },
     decode,
-    era_revm::transactions::NoopEraInspector,
     utils::{eval_to_instruction_result, halt_to_instruction_result, StateChangeset},
 };
 use revm::{
@@ -16,9 +15,11 @@ use revm::{
         Address, BlockEnv, Bytes, CreateScheme, Env, ExecutionResult, Output, ResultAndState,
         SpecId, TransactTo, TxEnv, U256,
     },
-    Database, DatabaseCommit,
+    Database, DatabaseCommit, DatabaseRef,
 };
 use tracing::trace;
+
+use super::inspector::NoopInspector;
 
 /// A type that can execute calls
 ///
@@ -33,13 +34,15 @@ pub struct Executor {
     /// the passed in environment, as those limits are used by the EVM for certain opcodes like
     /// `gaslimit`.
     gas_limit: U256,
+    //we hold an inspector so it has &'self lifetime
+    inspector: NoopInspector,
 }
 
 impl Executor {
     #[inline]
     //no InspectorStack -> circular dependency
     pub fn new(mut backend: Backend, env: Env, gas_limit: U256) -> Self {
-        Executor { backend, env, gas_limit }
+        Executor { backend, env, gas_limit, inspector: NoopInspector }
     }
 
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
@@ -79,7 +82,7 @@ impl Executor {
 
     /// Gets the balance of an account
     pub fn get_balance(&self, address: Address) -> DatabaseResult<U256> {
-        Ok(self.backend.basic(address)?.map(|acc| acc.balance).unwrap_or_default())
+        Ok(self.backend.basic_ref(address)?.map(|acc| acc.balance).unwrap_or_default())
     }
 
     /// Set the nonce of an account.
@@ -159,14 +162,16 @@ impl Executor {
         calldata: Bytes,
         value: U256,
     ) -> eyre::Result<RawCallResult> {
-        let mut inspector = NoopEraInspector::default();
+        let mut inspector = self.inspector.clone();
         // Build VM
         let mut env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
-        let result = self.backend.inspect_ref(&mut env, &mut inspector)?;
+
+        let mut db = FuzzBackendWrapper::new(&self.backend);
+        let result = db.inspect_ref(&mut env, &mut inspector)?;
 
         // Persist the snapshot failure recorded on the fuzz backend wrapper.
-        self.backend.set_snapshot_failure(self.backend.has_snapshot_failure());
-        convert_executed_result(env, result, self.backend.has_snapshot_failure())
+        let has_snapshot_failure = db.has_snapshot_failure();
+        convert_executed_result(env, result, has_snapshot_failure)
     }
 
     /// Execute the transaction configured in `env.tx` and commit the changes
@@ -179,7 +184,7 @@ impl Executor {
     /// Execute the transaction configured in `env.tx`
     pub fn call_raw_with_env(&mut self, mut env: Env) -> eyre::Result<RawCallResult> {
         // execute the call
-        let mut inspector = NoopEraInspector::default();
+        let mut inspector = self.inspector.clone();
         let result = self.backend.inspect_ref(&mut env, &mut inspector)?;
         convert_executed_result(env, result, self.backend.has_snapshot_failure())
     }
@@ -311,7 +316,7 @@ impl Executor {
         // we only clone the test contract and cheatcode accounts, that's all we need to evaluate
         // success
         for addr in [address, CHEATCODE_ADDRESS] {
-            let acc = self.backend.basic(addr)?.unwrap_or_default();
+            let acc = self.backend.basic_ref(addr)?.unwrap_or_default();
             backend.insert_account_info(addr, acc);
         }
 

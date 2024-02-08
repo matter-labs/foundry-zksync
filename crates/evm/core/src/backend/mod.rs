@@ -402,8 +402,8 @@ pub struct Backend {
 
 impl Backend {
     /// Creates a new Backend with a spawned multi fork thread.
-    pub async fn spawn(fork: Option<CreateFork>) -> Self {
-        Self::new(MultiFork::spawn().await, fork)
+    pub fn spawn(fork: Option<CreateFork>) -> Self {
+        Self::new(MultiFork::spawn(), fork)
     }
 
     /// Creates a new instance of `Backend`
@@ -451,7 +451,7 @@ impl Backend {
         fork: Fork,
         journaled_state: JournaledState,
     ) -> Self {
-        let mut backend = Self::spawn(None).await;
+        let mut backend = Self::spawn(None);
         let fork_ids = backend.inner.insert_new_fork(id.clone(), fork.db, journaled_state);
         backend.inner.launched_with_fork = Some((id.clone(), fork_ids.0, fork_ids.1));
         backend.active_fork_ids = Some(fork_ids);

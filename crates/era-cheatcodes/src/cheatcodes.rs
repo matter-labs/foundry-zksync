@@ -14,7 +14,7 @@ use foundry_common::{
     StorageModifications,
 };
 use foundry_evm_core::{
-    backend::DatabaseExt,
+    backend::{Backend, DatabaseExt},
     constants::MAGIC_ASSUME,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
@@ -169,7 +169,7 @@ pub struct CheatcodeTracer {
     transact_logs: Vec<LogEntry>,
     mocked_calls: MockedCalls,
     farcall_handler: FarCallHandler,
-    stored_forks: HashMap<U256, String>,
+    evm_backends: Vec<foundry_evm_core::backend::Backend>,
     is_switched_to_evm: Option<Executor>,
 }
 
@@ -657,25 +657,36 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         } else {
                             (None, current.code_address)
                         };
+
+                    let value = rU256::from_limbs(value.unwrap_or_default().0);
                     let to = revm::primitives::Address::from(to.to_fixed_bytes());
 
                     let calldata = get_calldata(&state, memory);
 
-                    //TODO: determine if deployment and call deploy instead
-                    let result = executor
-                        .call_raw_committing(
-                            from,
-                            to,
-                            calldata.into(),
-                            rU256::from_limbs(value.unwrap_or_default().0),
-                        )
-                        //TODO: handle errors
-                        .unwrap();
+                    let is_deployment =
+                        current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
-                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
-                        data: result.out.unwrap().into_data().into(),
-                        continue_pc: prev_cs.pc,
-                    });
+                    if is_deployment {
+                        let _result = executor
+                            .deploy(from, calldata.into(), value, None)
+                            //TODO: handle errors
+                            .expect("able to deploy in EVM");
+
+                        self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
+                            data: vec![],
+                            continue_pc: prev_cs.pc,
+                        });
+                    } else {
+                        let result = executor
+                            .call_raw_committing(from, to, calldata.into(), value)
+                            //TODO: handle errors
+                            .expect("multiVM EVM call failed");
+
+                        self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
+                            data: result.out.unwrap().into_data().into(),
+                            continue_pc: prev_cs.pc,
+                        });
+                    }
                 }
 
                 return
@@ -848,8 +859,44 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     );
 
                     storage.clean_cache();
-                    let fork_id = {
-                        let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
+                    storage.modified_storage_keys = modified_storage.clone();
+
+                    let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+
+                    let era_env = self.env.get().unwrap();
+                    let mut env = into_revm_env(era_env);
+
+                    let create_fork = create_fork_request(
+                        era_env,
+                        self.config.clone(),
+                        block_number,
+                        &url_or_alias,
+                    );
+
+                    let evm = true; //TODO: logic
+
+                    if evm {
+                        let db = Backend::spawn(Some(create_fork));
+                        self.evm_backends.push(db.clone());
+
+                        let env = self.outer_env.clone().unwrap();
+
+                        let executor = Executor::new(
+                            db,
+                            env,
+                            rU256::from(self.env.get().unwrap().system_env.gas_limit),
+                        );
+
+                        self.is_switched_to_evm.replace(executor);
+
+                        //the evm fork_id is done this way to avoid overlapping
+                        // with the normal fork ids
+                        self.return_data =
+                            Some(vec![U256::MAX - U256::from(self.evm_backends.len() - 1)]);
+                    } else {
+                        self.is_switched_to_evm.take();
+
                         let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
                         state.decommittment_processor.populate(
                             bytecodes
@@ -870,40 +917,43 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         journaled_state.state =
                             storage_to_state(era_db, &modified_storage, bytecodes);
 
-                        let mut db = era_db.db.lock().unwrap();
-                        let era_env = self.env.get().unwrap();
-                        let mut env = into_revm_env(era_env);
-                        db.create_select_fork(
-                            create_fork_request(
-                                era_env,
-                                self.config.clone(),
-                                block_number,
-                                &url_or_alias,
-                            ),
-                            &mut env,
-                            &mut journaled_state,
-                        )
-                    };
-                    storage.modified_storage_keys = modified_storage;
+                        let fork_id = db
+                            .create_select_fork(create_fork, &mut env, &mut journaled_state)
+                            .unwrap();
 
-                    self.return_data = Some(fork_id.unwrap().to_return_data());
+                        self.return_data = Some(fork_id.to_return_data());
+                    }
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
+                    let evm = true; //TODO: replace with logic
+
                     let era_db = &storage.borrow_mut().storage_handle;
                     let mut db = era_db.db.lock().unwrap();
                     let era_env = self.env.get().unwrap();
-                    let fork_id = db
-                        .create_fork(create_fork_request(
-                            era_env,
-                            self.config.clone(),
-                            block_number,
-                            &url_or_alias,
-                        ))
-                        .unwrap();
-                    self.stored_forks.insert(fork_id.to_return_data()[0], url_or_alias);
-                    self.return_data = Some(fork_id.to_return_data());
+                    let create_fork = create_fork_request(
+                        era_env,
+                        self.config.clone(),
+                        block_number,
+                        &url_or_alias,
+                    );
+
+                    if evm {
+                        let backend = Backend::spawn(Some(create_fork));
+                        self.evm_backends.push(backend);
+
+                        //the evm fork_id is done this way to avoid overlapping
+                        // with the normal fork ids
+                        self.return_data =
+                            Some(vec![U256::MAX - U256::from(self.evm_backends.len() - 1)]);
+                    } else {
+                        let fork_id = db.create_fork(create_fork).unwrap();
+
+                        self.return_data = Some(fork_id.to_return_data());
+                    }
                 }
                 FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
+                    //TODO: check is_switched_to_evm
+
                     let modified_storage =
                         self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
                     let modified_bytecodes = self.get_modified_bytecodes(
@@ -944,48 +994,66 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.modified_storage_keys = modified_storage;
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
-                    let mut storage = storage.borrow_mut();
-                    let modified_storage =
-                        self.get_modified_storage(storage.modified_storage_keys());
-                    let modified_bytecodes = self.get_modified_bytecodes(
-                        bootloader_state.get_last_tx_compressed_bytecodes(),
-                    );
-                    {
-                        storage.clean_cache();
-                        let era_db = &storage.storage_handle;
-                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
-                        state.decommittment_processor.populate(
-                            bytecodes
-                                .clone()
-                                .into_iter()
-                                .filter(|(key, _)| {
-                                    !state
-                                        .decommittment_processor
-                                        .known_bytecodes
-                                        .inner()
-                                        .contains_key(key)
-                                })
-                                .collect(),
-                            Timestamp(state.local_state.timestamp),
+                    let maybe_evm_fork_id = (U256::MAX - fork_id).as_u64() as usize;
+
+                    if maybe_evm_fork_id < self.evm_backends.len() {
+                        let db = self.evm_backends[maybe_evm_fork_id].clone();
+                        let env = self.outer_env.clone().unwrap();
+
+                        let executor = Executor::new(
+                            db,
+                            env,
+                            rU256::from(self.env.get().unwrap().system_env.gas_limit),
                         );
 
-                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        journaled_state.state =
-                            storage_to_state(era_db, &modified_storage, bytecodes);
+                        self.is_switched_to_evm.replace(executor);
+                        self.return_data = Some(vec![fork_id]);
+                    } else {
+                        self.is_switched_to_evm.take();
 
-                        let mut db = era_db.db.lock().unwrap();
-                        let era_env = self.env.get().unwrap();
-                        let mut env = into_revm_env(era_env);
-                        db.select_fork(
-                            rU256::from(fork_id.as_u128()),
-                            &mut env,
-                            &mut journaled_state,
-                        )
-                        .unwrap();
+                        let mut storage = storage.borrow_mut();
+                        let modified_storage =
+                            self.get_modified_storage(storage.modified_storage_keys());
+                        let modified_bytecodes = self.get_modified_bytecodes(
+                            bootloader_state.get_last_tx_compressed_bytecodes(),
+                        );
+                        {
+                            storage.clean_cache();
+                            let era_db = &storage.storage_handle;
+                            let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                            state.decommittment_processor.populate(
+                                bytecodes
+                                    .clone()
+                                    .into_iter()
+                                    .filter(|(key, _)| {
+                                        !state
+                                            .decommittment_processor
+                                            .known_bytecodes
+                                            .inner()
+                                            .contains_key(key)
+                                    })
+                                    .collect(),
+                                Timestamp(state.local_state.timestamp),
+                            );
+
+                            let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                            journaled_state.state =
+                                storage_to_state(era_db, &modified_storage, bytecodes);
+
+                            let mut db = era_db.db.lock().unwrap();
+                            let era_env = self.env.get().unwrap();
+                            let mut env = into_revm_env(era_env);
+                            db.select_fork(
+                                rU256::from(fork_id.as_u128()),
+                                &mut env,
+                                &mut journaled_state,
+                            )
+                            .unwrap();
+                        }
+                        storage.modified_storage_keys = modified_storage;
+
+                        self.return_data = Some(vec![fork_id]);
                     }
-                    storage.modified_storage_keys = modified_storage;
-
-                    self.return_data = Some(vec![fork_id]);
                 }
                 FinishCycleOneTimeActions::RevertToSnapshot { snapshot_id } => {
                     let mut storage = storage.borrow_mut();
@@ -1978,52 +2046,10 @@ impl CheatcodeTracer {
             }
             selectFork(selectForkCall { forkId }) => {
                 tracing::info!("👷 Selecting fork {}", forkId);
-
-                //check in whitelist whether we are changing to evm domain of zkevm
-                let rpc_url_or_alias = self.stored_forks.get(&forkId.to_u256()).unwrap();
-                if rpc_url_or_alias.contains("evm") {
-                    // let db = match &script_config.evm_opts.fork_url {
-                    //     Some(url) => match script_config.backends.get(url) {
-                    //         Some(db) => db.clone(),
-                    //         None => {
-                    //             let backend = Backend::spawn(
-                    //                 script_config
-                    //                     .evm_opts
-                    //                     .get_fork(&script_config.config, env.clone()),
-                    //             )
-                    //             .await;
-                    //             script_config.backends.insert(url.clone(), backend);
-                    //             script_config.backends.get(url).unwrap().clone()
-                    //         }
-                    //     },
-                    //     None => {
-                    //         // It's only really `None`, when we don't pass any `--fork-url`. And
-                    // if         // so, there is no need to cache it, since
-                    //         // there won't be any onchain simulation that we'd need
-                    //         // to cache the backend for.
-                    //         Backend::spawn(
-                    //             script_config.evm_opts.get_fork(&script_config.config,
-                    // env.clone()),         )
-                    //         .await
-                    //     }
-                    // };
-                    let db = todo!("backend db");
-                    let env = self.outer_env.unwrap().clone();
-
-                    let executor = Executor::new(
-                        db,
-                        env,
-                        rU256::from(self.env.get().unwrap().system_env.gas_limit),
-                    );
-
-                    self.is_switched_to_evm.replace(executor);
-                } else {
-                    self.is_switched_to_evm.take();
-                }
+                let fork_id = forkId.to_u256();
 
                 if self.permanent_actions.broadcast.is_none() {
-                    self.one_time_actions
-                        .push(FinishCycleOneTimeActions::SelectFork { fork_id: forkId.to_u256() });
+                    self.one_time_actions.push(FinishCycleOneTimeActions::SelectFork { fork_id });
                 } else {
                     tracing::error!("cannot select fork during broadcast")
                 }

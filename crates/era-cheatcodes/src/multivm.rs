@@ -1,6 +1,8 @@
 pub mod executor;
 pub use executor::*;
 
+mod inspector;
+
 enum MultiVMState {
     Stop,
     Inactive { executor: executor::Executor },
