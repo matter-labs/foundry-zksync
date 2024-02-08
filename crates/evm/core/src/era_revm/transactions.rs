@@ -1,6 +1,10 @@
+use core::marker::PhantomData;
 use ethers_core::abi::ethabi::{self, ParamType};
 use itertools::Itertools;
-use multivm::vm_latest::HistoryDisabled;
+use multivm::{
+    interface::dyn_tracers::vm_1_4_0::DynTracer,
+    vm_latest::{HistoryDisabled, HistoryMode, SimpleMemory, VmTracer},
+};
 use revm::primitives::{
     Account, AccountInfo, Address, Bytes, EVMResult, Env, Eval, Halt, HashMap as rHashMap,
     OutOfGasError, ResultAndState, StorageSlot, TxEnv, B256, KECCAK_EMPTY, U256 as rU256,
@@ -12,18 +16,20 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
+use zksync_state::{ReadStorage, WriteStorage};
 use zksync_types::{
     fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
-    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
+    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
 };
-use zksync_utils::{h256_to_account_address, u256_to_h256};
+use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 
 use foundry_common::{
+    fix_l2_gas_limit, fix_l2_gas_price,
     zk_utils::{
         conversion_utils::{h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256},
         factory_deps::PackedEraBytecode,
     },
-    AsTracerPointer, StorageModificationRecorder,
+    AsTracerPointer, StorageModificationRecorder, StorageModifications,
 };
 
 use super::db::RevmDatabaseForEra;
@@ -61,18 +67,20 @@ pub fn encode_deploy_params_create(
 /// Extract the zkSync Fee based off the Revm transaction.
 pub fn tx_env_to_fee(tx_env: &TxEnv) -> Fee {
     Fee {
-        // Currently zkSync doesn't allow gas limits larger than u32.
-        gas_limit: U256::min(tx_env.gas_limit.into(), U256::from(2147483640)),
-        // Block base fee on L2 is 0.25 GWei - make sure that the max_fee_per_gas is set to higher
-        // value.
-        max_fee_per_gas: U256::max(revm_u256_to_u256(tx_env.gas_price), U256::from(260_000_000)),
+        gas_limit: fix_l2_gas_limit(tx_env.gas_limit.into()),
+        max_fee_per_gas: fix_l2_gas_price(revm_u256_to_u256(tx_env.gas_price)),
         max_priority_fee_per_gas: revm_u256_to_u256(tx_env.gas_priority_fee.unwrap_or_default()),
         gas_per_pubdata_limit: U256::from(800),
     }
 }
 
 /// Translates Revm transaction into era's L2Tx.
-pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64) -> L2Tx {
+pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64, factory_deps: &HashMap<H256, Vec<u8>>) -> L2Tx {
+    let factory_deps = if factory_deps.is_empty() {
+        None
+    } else {
+        Some(factory_deps.values().cloned().collect_vec())
+    };
     let mut l2tx = match tx_env.transact_to {
         revm::primitives::TransactTo::Call(contract_address) => L2Tx::new(
             H160::from(contract_address.0 .0),
@@ -81,7 +89,7 @@ pub fn tx_env_to_era_tx(tx_env: TxEnv, nonce: u64) -> L2Tx {
             tx_env_to_fee(&tx_env),
             H160::from(tx_env.caller.0 .0),
             revm_u256_to_u256(tx_env.value),
-            None, // factory_deps
+            factory_deps, // factory_deps
             PaymasterParams::default(),
         ),
         revm::primitives::TransactTo::Create(_scheme) => {
@@ -119,7 +127,7 @@ where
     INSP: AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
         + StorageModificationRecorder,
 {
-    let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
+    let mut era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
     let (num, ts) = era_db.get_l2_block_number_and_timestamp();
     let l1_num = num;
     let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
@@ -142,7 +150,8 @@ where
         31337
     };
 
-    let mut l2_tx = tx_env_to_era_tx(env.tx.clone(), nonce);
+    let mut l2_tx =
+        tx_env_to_era_tx(env.tx.clone(), nonce, &inspector.get_storage_modifications().bytecodes);
 
     if l2_tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -161,8 +170,39 @@ where
         vec![tracer],
     );
 
-    // record storage modifications in the inspector
-    inspector.record_modified_keys(&modified_storage);
+    // Record storage modifications in the inspector.
+    // We record known_codes only if they aren't already in the bytecodes changeset.
+    inspector.record_storage_modifications(StorageModifications {
+        keys: modified_storage.clone(),
+        bytecodes: bytecodes
+            .clone()
+            .into_iter()
+            .map(|(key, value)| {
+                let key = u256_to_h256(key);
+                let value = value
+                    .into_iter()
+                    .flat_map(|word| u256_to_h256(word).as_bytes().to_owned())
+                    .collect_vec();
+                (key, value)
+            })
+            .collect(),
+        known_codes: storage_ptr
+            .borrow()
+            .read_storage_keys
+            .iter()
+            .filter_map(|(key, value)| {
+                let hash = *key.key();
+                if key.address() == &KNOWN_CODES_STORAGE_ADDRESS &&
+                    !value.is_zero() &&
+                    !bytecodes.contains_key(&h256_to_u256(hash))
+                {
+                    era_db.load_factory_dep(hash).map(|bytecode| (hash, bytecode))
+                } else {
+                    None
+                }
+            })
+            .collect(),
+    });
 
     let execution_result = match tx_result.result {
         multivm::interface::ExecutionResult::Success { output, .. } => {
@@ -185,7 +225,7 @@ where
             };
             revm::primitives::ExecutionResult::Success {
                 reason: Eval::Return,
-                gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                gas_used: tx_result.statistics.gas_used as u64,
                 gas_refunded: tx_result.refunds.gas_refunded as u64,
                 logs,
                 output: revm::primitives::Output::Create(
@@ -321,14 +361,43 @@ where
     state
 }
 
+pub struct NoopEraInspector<S, H> {
+    _phantom: PhantomData<(S, H)>,
+    storage_modifications: StorageModifications,
+}
+
+impl<S, H> Default for NoopEraInspector<S, H> {
+    fn default() -> Self {
+        Self { _phantom: Default::default(), storage_modifications: Default::default() }
+    }
+}
+
+impl<S, H> Clone for NoopEraInspector<S, H> {
+    fn clone(&self) -> Self {
+        Self { _phantom: self._phantom, storage_modifications: self.storage_modifications.clone() }
+    }
+}
+
+impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for NoopEraInspector<S, H> {}
+impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for NoopEraInspector<S, H> {}
+impl<S: WriteStorage + 'static, H: HistoryMode + 'static> AsTracerPointer<S, H>
+    for NoopEraInspector<S, H>
+{
+    fn as_tracer_pointer(&self) -> multivm::vm_latest::TracerPointer<S, H> {
+        Box::new(self.clone())
+    }
+}
+
+impl<S, H> StorageModificationRecorder for NoopEraInspector<S, H> {
+    fn record_storage_modifications(&mut self, _storage_modifications: StorageModifications) {}
+
+    fn get_storage_modifications(&self) -> &StorageModifications {
+        &self.storage_modifications
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use core::marker::PhantomData;
-    use multivm::{
-        interface::dyn_tracers::vm_1_4_0::DynTracer,
-        vm_latest::{HistoryMode, SimpleMemory, VmTracer},
-    };
-    use zksync_state::WriteStorage;
 
     use super::*;
     use crate::era_revm::testing::MockDatabase;
@@ -360,8 +429,12 @@ mod tests {
         };
         let mock_db = MockDatabase::default();
 
-        let res = run_era_transaction::<_, ResultAndState, _>(&mut env, mock_db, Noop::default())
-            .expect("failed executing");
+        let res = run_era_transaction::<_, ResultAndState, _>(
+            &mut env,
+            mock_db,
+            NoopEraInspector::default(),
+        )
+        .expect("failed executing");
 
         assert!(!res.state.is_empty(), "unexpected failure: no states were touched");
         for (address, account) in res.state {
@@ -374,41 +447,5 @@ mod tests {
 
         assert_eq!(1, env.block.number.to::<u64>());
         assert_eq!(1, env.block.timestamp.to::<u64>());
-    }
-
-    struct Noop<S, H> {
-        _phantom: PhantomData<(S, H)>,
-        modified_storage_keys: HashMap<StorageKey, StorageValue>,
-    }
-
-    impl<S, H> Default for Noop<S, H> {
-        fn default() -> Self {
-            Self { _phantom: Default::default(), modified_storage_keys: Default::default() }
-        }
-    }
-
-    impl<S, H> Clone for Noop<S, H> {
-        fn clone(&self) -> Self {
-            Self {
-                _phantom: self._phantom,
-                modified_storage_keys: self.modified_storage_keys.clone(),
-            }
-        }
-    }
-
-    impl<S: WriteStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Noop<S, H> {}
-    impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for Noop<S, H> {}
-    impl<S: WriteStorage + 'static, H: HistoryMode + 'static> AsTracerPointer<S, H> for Noop<S, H> {
-        fn as_tracer_pointer(&self) -> multivm::vm_latest::TracerPointer<S, H> {
-            Box::new(self.clone())
-        }
-    }
-
-    impl<S, H> StorageModificationRecorder for Noop<S, H> {
-        fn record_modified_keys(&mut self, _modified_keys: &HashMap<StorageKey, StorageValue>) {}
-
-        fn get(&self) -> &HashMap<StorageKey, StorageValue> {
-            &self.modified_storage_keys
-        }
     }
 }

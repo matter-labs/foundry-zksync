@@ -70,8 +70,8 @@ impl ScriptRunner {
             .map(|traces| (TraceKind::Deployment, traces))
             .collect();
 
-        let sender_nonce = self.executor.get_nonce(CALLER)?;
-        let address = CALLER.create(sender_nonce);
+        let deployer_nonce = self.executor.get_nonce(CALLER)?;
+        let address = CALLER.create(deployer_nonce);
 
         // Set the contracts initial balance before deployment, so it is available during the
         // construction
@@ -104,7 +104,7 @@ impl ScriptRunner {
                 vec![],
             )
         } else {
-            match self.executor.setup(Some(self.sender), address) {
+            let res = match self.executor.setup(Some(self.sender), address) {
                 Ok(CallResult {
                     reverted,
                     traces: setup_traces,
@@ -118,8 +118,6 @@ impl ScriptRunner {
                 }) => {
                     traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
                     logs.extend_from_slice(&setup_logs);
-
-                    self.maybe_correct_nonce(sender_nonce, libraries.len())?;
 
                     (
                         !reverted,
@@ -145,8 +143,6 @@ impl ScriptRunner {
                     traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
                     logs.extend_from_slice(&setup_logs);
 
-                    self.maybe_correct_nonce(sender_nonce, libraries.len())?;
-
                     (
                         !reverted,
                         gas_used,
@@ -157,7 +153,10 @@ impl ScriptRunner {
                     )
                 }
                 Err(e) => return Err(e.into()),
-            }
+            };
+
+            self.correct_nonce(sender_nonce, libraries.len())?;
+            res
         };
 
         Ok((
@@ -181,26 +180,19 @@ impl ScriptRunner {
         ))
     }
 
-    /// We call the `setUp()` function with self.sender, and if there haven't been
-    /// any broadcasts, then the EVM cheatcode module hasn't corrected the nonce.
-    /// So we have to.
-    fn maybe_correct_nonce(
-        &mut self,
-        sender_initial_nonce: u64,
-        libraries_len: usize,
-    ) -> Result<()> {
-        if let Some(cheatcodes) = &self.executor.inspector.cheatcodes {
-            if !cheatcodes.corrected_nonce {
-                self.executor
-                    .set_nonce(self.sender, sender_initial_nonce + libraries_len as u64)?;
-            }
-            self.executor.inspector.cheatcodes.as_mut().unwrap().corrected_nonce = false;
-        }
+    /// We call the script/test functions with self.sender, this leaves the
+    /// sender account in an undesirable state for broadcasting (nonce +1)
+    fn correct_nonce(&mut self, sender_initial_nonce: u64, libraries_len: usize) -> Result<()> {
+        let new_nonce = sender_initial_nonce + libraries_len as u64;
+        trace!("correcting sender {:?} nonce to {}", self.sender, new_nonce);
+
+        self.executor.set_nonce(self.sender, new_nonce)?;
         Ok(())
     }
 
     /// Executes the method that will collect all broadcastable transactions.
     pub fn script(&mut self, address: Address, calldata: Bytes) -> Result<ScriptResult> {
+        self.executor.adjust_zksync_gas_parameters();
         self.call(self.sender, address, calldata, U256::ZERO, false)
     }
 
@@ -211,7 +203,15 @@ impl ScriptRunner {
         to: Option<NameOrAddress>,
         calldata: Option<Bytes>,
         value: Option<U256>,
+        factory_deps: &[Vec<u8>],
     ) -> Result<ScriptResult> {
+        for dep in factory_deps {
+            let hash = zksync_utils::bytecode::hash_bytecode(dep);
+            info!(?hash, "adding factory dep to storage modifications");
+
+            self.executor.inspector.storage_modifications.bytecodes.insert(hash, dep.clone());
+        }
+
         if let Some(NameOrAddress::Address(to)) = to {
             self.call(
                 from,

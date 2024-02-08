@@ -5,7 +5,10 @@ use ethers_providers::Middleware;
 use ethers_signers::Signer;
 use eyre::Result;
 use foundry_cli::utils::LoadConfig;
-use foundry_common::{contracts::flatten_contracts, try_get_http_provider, types::ToAlloy};
+use foundry_common::{
+    contracts::flatten_contracts, fix_l2_gas_limit, fix_l2_gas_price, try_get_http_provider,
+    types::ToAlloy,
+};
 use foundry_debugger::Debugger;
 use std::sync::Arc;
 
@@ -17,7 +20,24 @@ impl ScriptArgs {
     pub async fn run_script(mut self) -> Result<()> {
         trace!(target: "script", "executing script command");
 
-        let (config, evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
+        let (mut config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
+
+        // zksync vm allows max gas limit to be u32, and additionally the account balance must be
+        // able to pay for the gas + value. Hence we cap the gas limit what the caller can
+        // actually pay.
+        if let Some(gas_price) = evm_opts.env.gas_price {
+            evm_opts.env.gas_price = Some(fix_l2_gas_price(gas_price.into()).as_u64());
+        }
+        evm_opts.env.gas_limit = fix_l2_gas_limit(evm_opts.env.gas_limit.into()).as_u64();
+
+        {
+            //put all artifacts in `zkout` instead of whatever was configured
+            let mut outpath = config.out.clone();
+            outpath.pop();
+            outpath.push("zkout");
+            config.out = outpath;
+        }
+
         let mut script_config = ScriptConfig {
             // dapptools compatibility
             sender_nonce: 1,
@@ -38,7 +58,7 @@ impl ScriptArgs {
             script_config.config.libraries = Default::default();
         }
 
-        let build_output = self.compile(&mut script_config)?;
+        let build_output = self.compile(&mut script_config).await?;
 
         let mut verify = VerifyBundle::new(
             &build_output.project,
@@ -165,14 +185,9 @@ impl ScriptArgs {
             &script_config.evm_opts.fork_url,
         );
 
-        if let Some(txs) = &mut result.transactions {
-            for tx in txs.iter() {
-                lib_deploy.push_back(BroadcastableTransaction {
-                    rpc: tx.rpc.clone(),
-                    transaction: TypedTransaction::Legacy(tx.transaction.clone().into()),
-                });
-            }
-            *txs = lib_deploy;
+        if let Some(mut txs) = result.transactions.take() {
+            lib_deploy.append(&mut txs);
+            result.transactions.replace(lib_deploy);
         }
 
         Ok(None)
@@ -212,7 +227,7 @@ impl ScriptArgs {
         )
         .await
         .map_err(|err| {
-            eyre::eyre!("{err}\n\nIf you were trying to resume or verify a multi chain deployment, add `--multi` to your command invocation.") 
+            eyre::eyre!("{err}\n\nIf you were trying to resume or verify a multi chain deployment, add `--multi` to your command invocation.")
         })
     }
 
@@ -279,6 +294,7 @@ impl ScriptArgs {
                 Libraries::parse(&deployment_sequence.libraries)?,
                 script_config.config.sender, // irrelevant, since we're not creating any
                 0,                           // irrelevant, since we're not creating any
+                &script_config.config.script,
             )?;
 
             verify.known_contracts = flatten_contracts(&highlevel_known_contracts, false);
@@ -318,6 +334,7 @@ impl ScriptArgs {
             script_config.config.parsed_libraries()?,
             new_sender,
             nonce,
+            &script_config.config.script,
         )?;
 
         let mut txs = self.create_deploy_transactions(
@@ -333,6 +350,7 @@ impl ScriptArgs {
         if let Some(new_txs) = &result.transactions {
             for new_tx in new_txs.iter() {
                 txs.push_back(BroadcastableTransaction {
+                    factory_deps: vec![],
                     rpc: new_tx.rpc.clone(),
                     transaction: TypedTransaction::Legacy(new_tx.transaction.clone().into()),
                 });

@@ -14,7 +14,14 @@ use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, FixedBytes, B256, U256};
 use ethers_core::types::{Log, H256};
 use ethers_signers::LocalWallet;
-use foundry_common::{abi::IntoFunction, conversion_utils::address_to_h160, evm::Breakpoints};
+use foundry_common::{
+    abi::IntoFunction,
+    conversion_utils::{
+        address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_u256, u256_to_revm_u256,
+    },
+    evm::Breakpoints,
+    fix_l2_gas_limit, fix_l2_gas_price,
+};
 use foundry_evm_core::{
     backend::{Backend, DatabaseError, DatabaseExt, DatabaseResult, FuzzBackendWrapper},
     constants::{CALLER, CHEATCODE_ADDRESS},
@@ -33,7 +40,10 @@ use revm::{
 };
 use std::collections::BTreeMap;
 use zksync_types::{
+    get_nonce_key,
+    utils::{decompose_full_nonce, nonces_to_full_nonce},
     AccountTreeId, StorageKey, ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
+    NONCE_HOLDER_ADDRESS,
 };
 use zksync_utils::bytecode::hash_bytecode;
 
@@ -113,7 +123,7 @@ impl Executor {
             .expect("failed writing account storage for known codes storage address");
 
         // setup modified keys in inspector to persist cheatcode address setup across forks
-        inspector.modified_storage_keys.insert(
+        inspector.storage_modifications.keys.insert(
             StorageKey::new(
                 AccountTreeId::new(ACCOUNT_CODE_STORAGE_ADDRESS),
                 H256::from_slice(
@@ -122,7 +132,7 @@ impl Executor {
             ),
             H256::from_slice(&empty_contract_code_hash.0),
         );
-        inspector.modified_storage_keys.insert(
+        inspector.storage_modifications.keys.insert(
             StorageKey::new(
                 AccountTreeId::new(zksync_types::H160(CHEATCODE_ADDRESS.0 .0)),
                 H256::from_slice(&empty_contract_code_hash.0),
@@ -155,11 +165,22 @@ impl Executor {
         Ok(self.backend.basic_ref(address)?.map(|acc| acc.balance).unwrap_or_default())
     }
 
-    /// Set the nonce of an account.
+    /// Set the nonce of an account. We additionally update the nonce in the NONCE_HOLDER storage.
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> DatabaseResult<&mut Self> {
         let mut account = self.backend.basic_ref(address)?.unwrap_or_default();
         account.nonce = nonce;
 
+        let nonce_storage_slot = h256_to_revm_u256(*get_nonce_key(&address_to_h160(address)).key());
+        let nonce_holder_address = h160_to_address(NONCE_HOLDER_ADDRESS);
+        let full_nonce = self.backend.storage_ref(nonce_holder_address, nonce_storage_slot)?;
+        let (_, deploy_nonce) = decompose_full_nonce(revm_u256_to_u256(full_nonce));
+        let new_full_nonce = nonces_to_full_nonce(nonce.into(), deploy_nonce);
+
+        self.backend.insert_account_storage(
+            nonce_holder_address,
+            nonce_storage_slot,
+            u256_to_revm_u256(new_full_nonce),
+        )?;
         self.backend.insert_account_info(address, account);
         Ok(self)
     }
@@ -350,7 +371,7 @@ impl Executor {
         let result = self.backend.inspect_ref(&mut env, &mut inspector)?;
         // record storage modifications
         if result.result.is_success() {
-            self.inspector.modified_storage_keys = inspector.modified_storage_keys.clone();
+            self.inspector.storage_modifications = inspector.storage_modifications.clone();
         }
         convert_executed_result(env, inspector, result, self.backend.has_snapshot_failure())
     }
@@ -367,7 +388,7 @@ impl Executor {
         let mut cheatcodes = result.cheatcodes.take();
         if let Some(cheats) = cheatcodes.as_mut() {
             // Clear broadcastable transactions
-            cheats.broadcastable_transactions.clear();
+            cheats.broadcastable_transactions.write().unwrap().clear();
             debug!(target: "evm::executors", "cleared broadcastable transactions");
 
             // corrected_nonce value is needed outside of this context (setUp), so we don't
@@ -610,6 +631,29 @@ impl Executor {
             },
         }
     }
+
+    /// Adjust the gas parameters of an executor for ZKSync.
+    /// zksync vm allows max gas limit to be u32, and additionally the account balance must be able
+    /// to pay for the gas + value. Hence we cap the gas limit what the caller can actually pay.
+    pub fn adjust_zksync_gas_parameters(&mut self) {
+        let tx_env = &self.env.tx;
+        let caller_balance = self.get_balance(tx_env.caller).unwrap_or_default();
+        let min_gas_price =
+            u256_to_revm_u256(fix_l2_gas_price(revm_u256_to_u256(tx_env.gas_price)));
+        let max_allowed_gas_limit = caller_balance
+            .saturating_sub(tx_env.value)
+            .saturating_sub(U256::from(1))
+            .wrapping_div(min_gas_price);
+        let adjusted_gas_limit =
+            u256_to_revm_u256(fix_l2_gas_limit(revm_u256_to_u256(max_allowed_gas_limit)));
+        let gas_limit = U256::from(tx_env.gas_limit).min(adjusted_gas_limit);
+
+        debug!(
+            "calculated new gas parameters for caller {:?}, gas_limit={} gas_price={}",
+            tx_env.caller, gas_limit, min_gas_price
+        );
+        self.set_gas_limit(U256::from(gas_limit));
+    }
 }
 
 /// Represents the context after an execution error occurred.
@@ -839,8 +883,10 @@ fn convert_executed_result(
     } = inspector.collect();
 
     let transactions = match cheatcodes.as_ref() {
-        Some(cheats) if !cheats.broadcastable_transactions.is_empty() => {
-            Some(cheats.broadcastable_transactions.clone())
+        Some(cheats) => {
+            let broadcastable_transactions =
+                cheats.broadcastable_transactions.read().unwrap().clone();
+            Some(broadcastable_transactions)
         }
         _ => None,
     };

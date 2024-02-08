@@ -1,15 +1,22 @@
 use crate::{
     events::LogEntry,
+    farcall::{FarCallHandler, MockCall, MockedCalls},
     utils::{ToH160, ToH256, ToU256},
 };
+use alloy_primitives::{Address, Bytes, FixedBytes, I256 as rI256};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::utils::bytecode_to_factory_dep;
-use ethers::{signers::Signer, types::TransactionRequest, utils::to_checksum};
-use foundry_cheatcodes::{BroadcastableTransaction, CheatsConfig};
+use ethers::{signers::Signer, types::TransactionRequest};
+use eyre::Context;
+use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
-use foundry_common::conversion_utils::h160_to_address;
+use foundry_common::{
+    conversion_utils::{h160_to_address, revm_u256_to_u256},
+    StorageModifications,
+};
 use foundry_evm_core::{
     backend::DatabaseExt,
+    constants::MAGIC_ASSUME,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
     opts::EvmOpts,
@@ -45,7 +52,7 @@ use std::{
     ops::BitAnd,
     process::Command,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -53,10 +60,9 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, StorageValue, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
-    MSG_VALUE_SIMULATOR_ADDRESS,
+    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
-use zksync_utils::{h256_to_u256, u256_to_h256};
+use zksync_utils::{bytecode::CompressedBytecodeInfo, h256_to_u256, u256_to_h256};
 
 type EraDb<DB> = StorageView<RevmDatabaseForEra<DB>>;
 type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
@@ -94,6 +100,33 @@ const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
     H160::zero(),
 ];
 
+//same as above, except without
+// CONTRACT_DEPLOYER_ADDRESS
+// MSG_VALUE_SIMULATOR_ADDRESS
+// and with
+// CHEATCODE_ADDRESS
+const BROADCAST_IGNORED_CONTRACTS: [H160; 19] = [
+    zksync_types::BOOTLOADER_ADDRESS,
+    zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS,
+    zksync_types::NONCE_HOLDER_ADDRESS,
+    zksync_types::KNOWN_CODES_STORAGE_ADDRESS,
+    zksync_types::IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    zksync_types::CONTRACT_FORCE_DEPLOYER_ADDRESS,
+    zksync_types::L1_MESSENGER_ADDRESS,
+    zksync_types::KECCAK256_PRECOMPILE_ADDRESS,
+    zksync_types::L2_ETH_TOKEN_ADDRESS,
+    zksync_types::SYSTEM_CONTEXT_ADDRESS,
+    zksync_types::BOOTLOADER_UTILITIES_ADDRESS,
+    zksync_types::EVENT_WRITER_ADDRESS,
+    zksync_types::COMPRESSOR_ADDRESS,
+    zksync_types::COMPLEX_UPGRADER_ADDRESS,
+    zksync_types::ECRECOVER_PRECOMPILE_ADDRESS,
+    zksync_types::SHA256_PRECOMPILE_ADDRESS,
+    zksync_types::MINT_AND_BURN_ADDRESS,
+    CHEATCODE_ADDRESS,
+    H160::zero(),
+];
+
 #[derive(Debug, Clone)]
 struct EraEnv {
     l1_batch_env: L1BatchEnv,
@@ -115,7 +148,7 @@ enum FoundryTestState {
 
 #[derive(Debug, Default, Clone)]
 pub struct CheatcodeTracer {
-    modified_storage_keys: HashMap<StorageKey, StorageValue>,
+    storage_modifications: StorageModifications,
     one_time_actions: Vec<FinishCycleOneTimeActions>,
     next_return_action: Option<NextReturnAction>,
     permanent_actions: FinishCyclePermanentActions,
@@ -132,7 +165,10 @@ pub struct CheatcodeTracer {
     test_status: FoundryTestState,
     emit_config: EmitConfig,
     saved_snapshots: HashMap<U256, SavedSnapshot>,
-    broadcastable_transactions: Vec<BroadcastableTransaction>,
+    broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
+    transact_logs: Vec<LogEntry>,
+    mocked_calls: MockedCalls,
+    farcall_handler: FarCallHandler,
 }
 
 #[derive(Debug, Clone)]
@@ -181,6 +217,11 @@ enum FinishCycleOneTimeActions {
     RevertToSnapshot { snapshot_id: U256 },
     Snapshot,
     SetOrigin { origin: H160 },
+    Transact { fork_id: Option<U256>, tx_hash: H256 },
+    MakePersistentAccount { account: H160 },
+    MakePersistentAccounts { accounts: Vec<H160> },
+    RevokePersistentAccount { account: H160 },
+    RevokePersistentAccounts { accounts: Vec<H160> },
 }
 
 #[derive(Debug, Clone)]
@@ -199,6 +240,11 @@ enum ActionOnReturn {
         depth: usize,
         prev_continue_pc: Option<PcOrImm>,
         prev_exception_handler_pc: Option<PcOrImm>,
+    },
+    Revert {
+        depth: usize,
+        prev_exception_handler_pc: Option<PcOrImm>,
+        reason: Vec<u8>,
     },
 }
 
@@ -262,16 +308,18 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         &mut self,
         state: VmLocalStateData<'_>,
         data: multivm::zk_evm_1_4_0::tracing::BeforeExecutionData,
-        _memory: &SimpleMemory<H>,
-        _storage: StoragePtr<EraDb<S>>,
+        memory: &SimpleMemory<H>,
+        storage: StoragePtr<EraDb<S>>,
     ) {
+        self.farcall_handler.track_active_far_calls(state, data, memory, storage);
+
         //store the current exception handler in expect revert
         // to be used to force a revert
         if let Some(ActionOnReturn::ExpectRevert {
             prev_exception_handler_pc,
             prev_continue_pc,
             ..
-        }) = self.current_expect_revert()
+        }) = self.current_return_action()
         {
             if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
                 // Callstack on the desired depth, it has the correct pc for continue
@@ -291,6 +339,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                     prev_continue_pc.replace(last.pc);
                 }
 
+                prev_exception_handler_pc.replace(current.exception_handler_location);
+            }
+        }
+        if let Some(ActionOnReturn::Revert { prev_exception_handler_pc, .. }) =
+            self.current_return_action()
+        {
+            if matches!(data.opcode.variant.opcode, Opcode::Ret(_)) {
+                let current = &state.vm_local_state.callstack.current;
+                tracing::debug!(?current, "storing continuations");
                 prev_exception_handler_pc.replace(current.exception_handler_location);
             }
         }
@@ -360,7 +417,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             self.reset_test_status();
         }
 
-        // Checks returns from caontracts for expectRevert cheatcode
+        // Checks returns from contracts for expectRevert cheatcode
         self.handle_return(&state, &data, memory);
 
         // Checks contract calls for expectCall cheatcode
@@ -389,7 +446,22 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             }
         }
 
-        let current = state.vm_local_state.callstack.get_current_stack();
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.current;
+            let calldata = get_calldata(&state, memory);
+            if let Some(return_data) = self.mocked_calls.get_matching_return_data(
+                current.code_address,
+                &calldata,
+                U256::from(current.context_u128_value),
+            ) {
+                tracing::info!(
+                    calldata = hex::encode(&calldata),
+                    return_data = hex::encode(&return_data),
+                    "mock call matched"
+                );
+                self.farcall_handler.set_immediate_return(return_data);
+            }
+        }
 
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -409,9 +481,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
             if current.code_address != CHEATCODE_ADDRESS {
                 if let Some(broadcast) = &self.permanent_actions.broadcast {
                     if state.vm_local_state.callstack.depth() == broadcast.depth {
-                        //when the test ends, just make sure the tx origin is set to the original
-                        // one (should never get here unless .stopBroadcast
-                        // wasn't called)
+                        // when the test ends, just make sure the tx origin is set to the
+                        // original one (should never get here unless .stopBroadcast wasn't called)
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
                             origin: broadcast.original_origin,
                         });
@@ -448,7 +519,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         .expect("callstack before the current");
 
                     if state.vm_local_state.callstack.depth() == broadcast.depth &&
-                        prev_cs.this_address == broadcast.original_caller
+                        prev_cs.this_address == broadcast.original_caller &&
+                        !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address)
                     {
                         self.one_time_actions.push(FinishCycleOneTimeActions::SetOrigin {
                             origin: broadcast.new_origin,
@@ -456,13 +528,53 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         let new_origin = broadcast.new_origin;
                         let handle = &mut storage.borrow_mut();
-                        let (nonce, _) = Self::get_nonce(new_origin, handle);
                         let revm_db_for_era = &handle.storage_handle;
                         let rpc = revm_db_for_era.db.lock().unwrap().active_fork_url();
 
-                        let gas_limit = current.ergs_remaining;
+                        let calldata = get_calldata(&state, memory);
 
-                        let (value, to) = if current.code_address == MSG_VALUE_SIMULATOR_ADDRESS {
+                        let is_deployment =
+                            current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
+                        let factory_deps =
+                            if is_deployment {
+                                let test_contract_hash = handle.read_value(&StorageKey::new(
+                                    AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
+                                    TEST_ADDRESS.into(),
+                                ));
+
+                                self.get_modified_bytecodes(vec![])
+                                    .iter()
+                                    .chain(self.storage_modifications.known_codes.iter())
+                                    .filter_map(|(k, v)| {
+                                        if k != &test_contract_hash {
+                                            Some(v)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .cloned()
+                                    .collect_vec()
+                            } else {
+                                vec![]
+                            };
+
+                        // used to determine whether the nonce should be decreased, since
+                        // zkevm updates the nonce for the _sender_ already when we run the
+                        // script/test function therefore, we should fix it and obtain the nonce
+                        // that resembles the one to be used on-chain
+                        let is_sender_also_caller =
+                            new_origin == self.config.evm_opts.sender.to_h160();
+                        let nonce_offset = if is_sender_also_caller { 1 } else { 0 };
+
+                        let nonce = Self::get_nonce(new_origin, handle)
+                            .0
+                            .saturating_sub(nonce_offset.into());
+
+                        let _gas_limit = current.ergs_remaining;
+
+                        let (value, to) = if current.code_address ==
+                            zksync_types::MSG_VALUE_SIMULATOR_ADDRESS
+                        {
                             //when some eth is sent to an address in zkevm the call is replaced
                             // with a call to MsgValueSimulator, which does a mimic_call later
                             // to the original destination
@@ -489,15 +601,16 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         let tx = BroadcastableTransaction {
                             rpc,
+                            factory_deps,
                             transaction:
                                 ethers::types::transaction::eip2718::TypedTransaction::Legacy(
                                     TransactionRequest {
                                         from: Some(new_origin),
                                         to: Some(ethers::types::NameOrAddress::Address(to)),
-                                        //FIXME: set only if set manually by user
-                                        gas: Some(gas_limit.into()),
+                                        //TODO: set only if set manually by user in script
+                                        gas: None,
                                         value,
-                                        data: Some(get_calldata(&state, memory).into()),
+                                        data: Some(calldata.into()),
                                         nonce: Some(nonce),
                                         ..Default::default()
                                     },
@@ -505,13 +618,16 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         };
                         tracing::debug!(?tx, "storing for broadcast");
 
-                        self.broadcastable_transactions.push(tx);
-                        //FIXME: detect if this is a deployment and increase the other nonce too
-                        self.set_nonce(new_origin, (Some(nonce + 1), None), handle);
+                        self.broadcastable_transactions.write().unwrap().push_back(tx);
+
+                        // we increase the nonce so that future calls will have the nonce
+                        // increased, simulating the previous tx being executed
+                        self.set_nonce(new_origin, (Some(nonce + 1 + nonce_offset), None), handle);
                     }
                 }
                 return
             }
+
             if current.code_page.0 == 0 || current.ergs_remaining == 0 {
                 tracing::error!("cheatcode triggered, but no calldata or ergs available");
                 return
@@ -559,6 +675,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
             for log in logs {
                 self.recorded_logs.insert(log);
             }
+            //insert transact logs
+            for log in &self.transact_logs {
+                self.recorded_logs.insert(log.to_owned());
+            }
         }
 
         // This assert is triggered only once after the test execution finishes
@@ -604,7 +724,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 .into_iter()
                 .take(actual_events_initial_dimension.len() - actual_events_surplus)
                 .collect::<Vec<_>>();
-            let actual_logs = crate::events::parse_events(actual_events);
+            let mut actual_logs = crate::events::parse_events(actual_events);
+            actual_logs.extend(self.transact_logs.clone());
 
             assert!(compare_logs(&expected_logs, &actual_logs, self.emit_config.checks.clone()));
         }
@@ -626,6 +747,42 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         is_service: false,
                     });
                 }
+                FinishCycleOneTimeActions::MakePersistentAccount { account } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+
+                    let mut db = era_db.db.lock().unwrap();
+                    db.add_persistent_account(revm::primitives::Address::from(
+                        account.to_fixed_bytes(),
+                    ));
+                }
+                FinishCycleOneTimeActions::MakePersistentAccounts { accounts } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+
+                    let mut db = era_db.db.lock().unwrap();
+                    db.extend_persistent_accounts(
+                        accounts
+                            .into_iter()
+                            .map(|a: H160| revm::primitives::Address::from(a.to_fixed_bytes()))
+                            .collect::<Vec<revm::primitives::Address>>(),
+                    );
+                }
+                FinishCycleOneTimeActions::RevokePersistentAccount { account } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    db.remove_persistent_account(&revm::primitives::Address::from(
+                        account.to_fixed_bytes(),
+                    ));
+                }
+                FinishCycleOneTimeActions::RevokePersistentAccounts { accounts } => {
+                    let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    db.remove_persistent_accounts(
+                        accounts
+                            .into_iter()
+                            .map(|a: H160| revm::primitives::Address::from(a.to_fixed_bytes()))
+                            .collect::<Vec<revm::primitives::Address>>(),
+                    );
+                }
                 FinishCycleOneTimeActions::StoreFactoryDep { hash, bytecode } => state
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
@@ -633,15 +790,28 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let mut storage = storage.borrow_mut();
                     let modified_storage =
                         self.get_modified_storage(storage.modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
+                    );
 
                     storage.clean_cache();
                     let fork_id = {
-                        let era_db = &storage.storage_handle;
-                        let bytecodes = bootloader_state
-                            .get_last_tx_compressed_bytecodes()
-                            .iter()
-                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
-                            .collect();
+                        let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
+                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                        state.decommittment_processor.populate(
+                            bytecodes
+                                .clone()
+                                .into_iter()
+                                .filter(|(key, _)| {
+                                    !state
+                                        .decommittment_processor
+                                        .known_bytecodes
+                                        .inner()
+                                        .contains_key(key)
+                                })
+                                .collect(),
+                            Timestamp(state.local_state.timestamp),
+                        );
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
@@ -669,40 +839,47 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let era_db = &storage.borrow_mut().storage_handle;
                     let mut db = era_db.db.lock().unwrap();
                     let era_env = self.env.get().unwrap();
-                    let fork_id = db.create_fork(create_fork_request(
-                        era_env,
-                        self.config.clone(),
-                        block_number,
-                        &url_or_alias,
-                    ));
-                    self.return_data = Some(fork_id.unwrap().to_return_data());
+                    let fork_id = db
+                        .create_fork(create_fork_request(
+                            era_env,
+                            self.config.clone(),
+                            block_number,
+                            &url_or_alias,
+                        ))
+                        .unwrap();
+                    self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
-                    let mut modified_storage = self
-                        .modified_storage_keys
-                        .clone()
-                        .into_iter()
-                        .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
-                        .collect::<HashMap<_, _>>();
-                    modified_storage.extend(
-                        storage.borrow().modified_storage_keys.iter().filter(|(key, _)| {
-                            key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS
-                        }),
+                    let modified_storage =
+                        self.get_modified_storage(storage.borrow_mut().modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
                     );
+
                     let mut storage = storage.borrow_mut();
 
                     storage.clean_cache();
                     {
                         let era_db = &storage.storage_handle;
-                        let bytecodes = bootloader_state
-                            .get_last_tx_compressed_bytecodes()
-                            .iter()
-                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
-                            .collect();
+                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                        state.decommittment_processor.populate(
+                            bytecodes
+                                .clone()
+                                .into_iter()
+                                .filter(|(key, _)| {
+                                    !state
+                                        .decommittment_processor
+                                        .known_bytecodes
+                                        .inner()
+                                        .contains_key(key)
+                                })
+                                .collect(),
+                            Timestamp(state.local_state.timestamp),
+                        );
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                        let state = storage_to_state(era_db, &modified_storage, bytecodes);
-                        *journaled_state.state() = state;
+                        journaled_state.state =
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
@@ -716,14 +893,27 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     let mut storage = storage.borrow_mut();
                     let modified_storage =
                         self.get_modified_storage(storage.modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
+                    );
                     {
                         storage.clean_cache();
                         let era_db = &storage.storage_handle;
-                        let bytecodes = bootloader_state
-                            .get_last_tx_compressed_bytecodes()
-                            .iter()
-                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
-                            .collect();
+                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                        state.decommittment_processor.populate(
+                            bytecodes
+                                .clone()
+                                .into_iter()
+                                .filter(|(key, _)| {
+                                    !state
+                                        .decommittment_processor
+                                        .known_bytecodes
+                                        .inner()
+                                        .contains_key(key)
+                                })
+                                .collect(),
+                            Timestamp(state.local_state.timestamp),
+                        );
 
                         let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
                         journaled_state.state =
@@ -805,8 +995,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     self.return_data = Some(snapshot_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::ForceReturn { data, continue_pc: pc } => {
-                    tracing::debug!("!!!! FORCING RETURN");
-
+                    tracing::debug!(?data, pc, "Forcing return");
                     self.return_data = Some(data.to_return_data());
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
@@ -823,9 +1012,10 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     state.local_state.callstack.get_current_stack_mut().pc = pc;
                 }
                 FinishCycleOneTimeActions::ForceRevert { error, exception_handler: pc } => {
-                    tracing::debug!("!!! FORCING REVERT");
+                    tracing::debug!(?error, pc, "Forcing revert");
 
                     self.return_data = Some(error.to_return_data());
+
                     let ptr = state.local_state.registers
                         [RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
                     let fat_data_pointer = FatPointer::from_u256(ptr.value);
@@ -856,13 +1046,65 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                     storage.borrow_mut().set_value(key, origin.into());
                 }
+                FinishCycleOneTimeActions::Transact { fork_id, tx_hash } => {
+                    let journaled_state = {
+                        let bytecodes = bootloader_state
+                            .get_last_tx_compressed_bytecodes()
+                            .iter()
+                            .map(|b| bytecode_to_factory_dep(b.original.clone()))
+                            .collect();
+
+                        let storage = storage.borrow_mut();
+                        let modified_storage =
+                            self.get_modified_storage(storage.modified_storage_keys());
+
+                        let era_db = &storage.storage_handle;
+
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        journaled_state.state =
+                            storage_to_state(era_db, &modified_storage, bytecodes);
+
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+
+                        db.transact(
+                            fork_id.map(|id| {
+                                let mut arr = [0; 32];
+                                id.to_big_endian(&mut arr);
+                                Uint::from_be_bytes(arr)
+                            }),
+                            tx_hash.to_fixed_bytes().into(),
+                            &mut env,
+                            &mut journaled_state,
+                            &mut revm::inspectors::NoOpInspector,
+                        )
+                        .unwrap();
+
+                        journaled_state
+                    };
+
+                    storage.borrow_mut().read_storage_keys = Default::default();
+
+                    for log in journaled_state.logs {
+                        self.transact_logs.push(LogEntry {
+                            address: log.address.to_h160(),
+                            data: log.data.to_vec(),
+                            topics: log
+                                .topics
+                                .iter()
+                                .map(|b| H256::from_slice(b.as_slice()))
+                                .collect(),
+                        })
+                    }
+                }
             }
         }
 
-        // Set return data, if any
+        self.farcall_handler.maybe_return_early(state, bootloader_state, storage);
+
         if let Some(fat_pointer) = self.return_ptr.take() {
             let elements = self.return_data.take().unwrap();
-
             Self::set_return(fat_pointer, elements, &mut state.local_state, &mut state.memory);
         }
 
@@ -873,7 +1115,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                 state.local_state.callstack.current.msg_sender = start_prank_call.sender;
             }
         }
-
         TracerExecutionStatus::Continue
     }
 }
@@ -881,11 +1122,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 impl CheatcodeTracer {
     pub fn new(
         cheatcodes_config: Arc<CheatsConfig>,
-        modified_keys: HashMap<StorageKey, StorageValue>,
+        storage_modifications: StorageModifications,
+        broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
     ) -> Self {
         Self {
             config: cheatcodes_config,
-            modified_storage_keys: modified_keys,
+            storage_modifications,
+            broadcastable_transactions,
             ..Default::default()
         }
     }
@@ -924,7 +1167,6 @@ impl CheatcodeTracer {
                     if call_depth == state.vm_local_state.callstack.depth() + 1 {
                         self.test_status = FoundryTestState::Finished;
                         tracing::info!("Test finished {}", state.vm_local_state.callstack.depth());
-                        // panic!("Test finished")
                     }
                 }
             }
@@ -962,6 +1204,13 @@ impl CheatcodeTracer {
                 };
                 self.return_data = Some(h160_to_address(address).to_return_data());
             }
+            assume(assumeCall { condition }) => {
+                tracing::info!(condition, "👷 Skipping fuzz test run if condition is not met");
+                if condition {
+                    return
+                }
+                self.add_revert_test(MAGIC_ASSUME.to_vec(), state.vm_local_state.callstack.depth());
+            }
             deal(dealCall { account, newBalance: new_balance }) => {
                 tracing::info!("👷 Setting balance for {account:?} to {new_balance}");
                 self.write_storage(
@@ -976,6 +1225,181 @@ impl CheatcodeTracer {
                 let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
                 self.store_factory_dep(hash, code);
                 self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+            }
+            envAddress_0(envAddress_0Call { name }) => {
+                tracing::info!("👷 Getting address env variable {name}");
+                let env_var: Address =
+                    parse_env(&name, |var| var.parse()).expect("Env var not address");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envAddress_1(envAddress_1Call { name, delim }) => {
+                tracing::info!("👷 Getting address env variable {name} with delimiter {delim}");
+                let env_vars: Vec<Address> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not address");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envBool_0(envBool_0Call { name }) => {
+                tracing::info!("👷 Getting bool env variable {name}");
+                let env_var: bool = parse_env(&name, |var| var.parse()).expect("Env var not bool");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envBool_1(envBool_1Call { name, delim }) => {
+                tracing::info!("👷 Getting bool env variable {name} with delimiter {delim}");
+                let env_vars: Vec<bool> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not bool");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envBytes_0(envBytes_0Call { name }) => {
+                tracing::info!("👷 Getting bytes env variable {name}");
+                let env_var: Bytes =
+                    parse_env(&name, |var| var.parse()).expect("Env var not bytes");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envBytes_1(envBytes_1Call { name, delim }) => {
+                tracing::info!("👷 Getting bytes env variable {name} with delimiter {delim}");
+                let env_vars: Vec<Bytes> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not bytes");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envBytes32_0(envBytes32_0Call { name }) => {
+                tracing::info!("👷 Getting bytes32 env variable {name}");
+                let env_var: FixedBytes<32> =
+                    parse_env(&name, |var| var.parse()).expect("Env var not bytes32");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envBytes32_1(envBytes32_1Call { name, delim }) => {
+                tracing::info!("👷 Getting bytes32 env variable {name} with delimiter {delim}");
+                let env_vars: Vec<FixedBytes<32>> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not bytes32");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envInt_0(envInt_0Call { name }) => {
+                tracing::info!("👷 Getting int256 env variable {name}");
+                let env_var: rI256 = parse_env(&name, |var| var.parse()).expect("Env var not int");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envInt_1(envInt_1Call { name, delim }) => {
+                tracing::info!("👷 Getting int256 env variable {name} with delimiter {delim}");
+                let env_vars: Vec<rI256> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not int");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envString_0(envString_0Call { name }) => {
+                tracing::info!("👷 Getting string env variable {name}");
+                let env_var: String =
+                    parse_env(&name, |var| var.parse()).expect("Env var not string");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envString_1(envString_1Call { name, delim }) => {
+                tracing::info!("👷 Getting string env variable {name} with delimiter {delim}");
+                let env_vars: Vec<String> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not string");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envUint_0(envUint_0Call { name }) => {
+                tracing::info!("👷 Getting uint256 env variable {name}");
+                let env_var: rU256 = parse_env(&name, |var| var.parse()).expect("Env var not int");
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envUint_1(envUint_1Call { name, delim }) => {
+                tracing::info!("👷 Getting uint256 env variable {name} with delimiter {delim}");
+                let env_vars: Vec<rU256> =
+                    parse_env_array(&name, &delim, |var| var.parse()).expect("Env var not int");
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_0(envOr_0Call { name, defaultValue }) => {
+                tracing::info!("👷 Getting bool env variable {name} with fallback {defaultValue}");
+                let env_var: bool = parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_1(envOr_1Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting uint256 env variable {name} with fallback {defaultValue}"
+                );
+                let env_var: rU256 = parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_2(envOr_2Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting int256 env variable {name} with fallback {defaultValue}"
+                );
+                let env_var: rI256 = parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_3(envOr_3Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting address env variable {name} with fallback {defaultValue}"
+                );
+                let env_var: Address = parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_4(envOr_4Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting bytes32 env variable {name} with fallback {defaultValue}"
+                );
+                let env_var: FixedBytes<32> =
+                    parse_env(&name, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_5(envOr_5Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting string env variable {name} with fallback {defaultValue}"
+                );
+                let env_var = parse_env(&name, |var| {
+                    Ok::<_, &(dyn std::error::Error + Send + Sync)>(var.to_string())
+                })
+                .unwrap_or(defaultValue);
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_6(envOr_6Call { name, defaultValue }) => {
+                tracing::info!(
+                    "👷 Getting bytes env variable {name} with fallback {defaultValue:?}"
+                );
+                let env_var: Bytes =
+                    parse_env(&name, |var| var.parse()).unwrap_or(defaultValue.into());
+                self.return_data = Some(env_var.to_return_data());
+            }
+            envOr_7(envOr_7Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting bool env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<bool> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_8(envOr_8Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting uint256 env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<rU256> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_9(envOr_9Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting int256 env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<rI256> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_10(envOr_10Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting address env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<Address> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_11(envOr_11Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting bytes32 env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<FixedBytes<32>> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_12(envOr_12Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting string env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<String> =
+                    parse_env_array(&name, &delim, |var| var.parse()).unwrap_or(defaultValue);
+                self.return_data = Some(env_vars.to_return_data());
+            }
+            envOr_13(envOr_13Call { name, delim, defaultValue }) => {
+                tracing::info!("👷 Getting bytes env variable {name} with delimiter {delim} and fallback {defaultValue:?}");
+                let env_vars: Vec<Bytes> = parse_env_array(&name, &delim, |var| var.parse())
+                    .unwrap_or(defaultValue.into_iter().map(|v| v.into()).collect());
+                self.return_data = Some(env_vars.to_return_data());
             }
             expectRevert_0(expectRevert_0Call {}) => {
                 let depth = state.vm_local_state.callstack.depth();
@@ -1120,6 +1544,7 @@ impl CheatcodeTracer {
                     .recorded_logs
                     .iter()
                     .filter(|log| !log.data.is_empty())
+                    .filter(|log| !INTERNAL_CONTRACT_ADDRESSES.contains(&log.address))
                     .map(|log| Log {
                         topics: log
                             .topics
@@ -1138,6 +1563,15 @@ impl CheatcodeTracer {
                 //disable flag of recording logs
                 self.recording_logs = false;
             }
+            isPersistent(isPersistentCall { account }) => {
+                tracing::info!("👷 Checking if account {:?} is persistent", account);
+                let era_db: &RevmDatabaseForEra<S> = &storage.borrow_mut().storage_handle;
+                let db = era_db.db.lock().unwrap();
+                let is_persistent = db.is_persistent(&revm::primitives::Address::from(
+                    account.to_h160().to_fixed_bytes(),
+                ));
+                self.return_data = Some(is_persistent.to_return_data());
+            }
             load(loadCall { target, slot }) => {
                 if H160(target.0 .0) != CHEATCODE_ADDRESS {
                     tracing::info!("👷 Getting storage slot {:?} for account {:?}", slot, target);
@@ -1148,6 +1582,57 @@ impl CheatcodeTracer {
                 } else {
                     self.return_data = Some(vec![U256::zero()]);
                 }
+            }
+            makePersistent_0(makePersistent_0Call { account }) => {
+                tracing::info!("👷 Making account {:?} persistent", account);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccount {
+                    account: account.to_h160(),
+                });
+            }
+            makePersistent_1(makePersistent_1Call { account0, account1 }) => {
+                tracing::info!("👷 Making accounts {:?} and {:?} persistent", account0, account1);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: vec![account0.to_h160(), account1.to_h160()],
+                });
+            }
+            makePersistent_2(makePersistent_2Call { account0, account1, account2 }) => {
+                tracing::info!(
+                    "👷 Making accounts {:?}, {:?} and {:?} persistent",
+                    account0,
+                    account1,
+                    account2
+                );
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: vec![account0.to_h160(), account1.to_h160(), account2.to_h160()],
+                });
+            }
+            makePersistent_3(makePersistent_3Call { accounts }) => {
+                tracing::info!("👷 Making accounts {:?} persistent", accounts);
+                self.one_time_actions.push(FinishCycleOneTimeActions::MakePersistentAccounts {
+                    accounts: accounts.into_iter().map(|a| a.to_h160()).collect(),
+                });
+            }
+            mockCall_0(mockCall_0Call { callee, data, returnData }) => {
+                tracing::info!("👷 Mocking call to {callee:?}");
+                self.mocked_calls.insert(
+                    MockCall { address: callee.to_h160(), value: None, calldata: data },
+                    returnData,
+                )
+            }
+            mockCall_1(mockCall_1Call { callee, msgValue, data, returnData }) => {
+                tracing::info!("👷 Mocking call to {callee:?}");
+                self.mocked_calls.insert(
+                    MockCall {
+                        address: callee.to_h160(),
+                        value: Some(revm_u256_to_u256(msgValue)),
+                        calldata: data,
+                    },
+                    returnData,
+                )
+            }
+            clearMockedCalls(clearMockedCallsCall {}) => {
+                tracing::info!("👷 Clearing all mocked calls");
+                self.mocked_calls.clear();
             }
             recordLogs(recordLogsCall {}) => {
                 tracing::info!("👷 Recording logs");
@@ -1210,6 +1695,18 @@ impl CheatcodeTracer {
                     snapshot_id: snapshotId.to_u256(),
                 });
                 self.return_data = Some(true.to_return_data());
+            }
+            revokePersistent_0(revokePersistent_0Call { account }) => {
+                tracing::info!("👷 Revoking persistence for account {:?}", account);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RevokePersistentAccount {
+                    account: account.to_h160(),
+                });
+            }
+            revokePersistent_1(revokePersistent_1Call { accounts }) => {
+                tracing::info!("👷 Revoking persistence for accounts {:?}", accounts);
+                self.one_time_actions.push(FinishCycleOneTimeActions::RevokePersistentAccounts {
+                    accounts: accounts.into_iter().map(|a| a.to_h160()).collect(),
+                });
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
@@ -1290,7 +1787,7 @@ impl CheatcodeTracer {
                 //write to serialized_objects
                 self.serialized_objects.insert(object_key.clone(), json_value.to_string());
 
-                let address_with_checksum = to_checksum(&value.to_h160(), None);
+                let address_with_checksum = value.to_checksum(None);
                 self.return_data = Some(address_with_checksum.to_return_data());
             }
             serializeBool_0(serializeBool_0Call {
@@ -1333,6 +1830,10 @@ impl CheatcodeTracer {
                 let uint_value = value.to_string();
                 self.return_data = Some(uint_value.to_return_data());
             }
+            setEnv(setEnvCall { name, value }) => {
+                tracing::info!("👷 Setting env variable {name:?} to {value:?}");
+                std::env::set_var(name, value);
+            }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
                 let new_full_nonce = self.set_nonce(
@@ -1350,6 +1851,27 @@ impl CheatcodeTracer {
                 } else {
                     tracing::error!("👷 Setting nonces failed")
                 }
+            }
+            sign_0(sign_0Call { privateKey: private_key, digest }) => {
+                tracing::info!("👷 Signing digest with private key");
+                let Ok(signature) = zksync_types::PackedEthSignature::sign(
+                    &private_key.to_h256(),
+                    digest.as_slice(),
+                ) else {
+                    tracing::error!("Failed to sign digest with private key");
+                    return
+                };
+
+                let r = signature.r();
+                let s = signature.s();
+                // Ethereum signed message produced by most clients contains v where v = 27 +
+                // recovery_id(0,1,2,3), but for some clients v = recovery_id(0,1,2,3). The library
+                // that we use for signature verification (written for bitcoin)
+                // expects v = recovery_id and to able to recover the address from Solidity it
+                // expects v = 27 + recovery_id.
+                let v = signature.v() + 27;
+
+                self.return_data = Some(vec![v.into(), r.into(), s.into()])
             }
             snapshot(snapshotCall {}) => {
                 tracing::info!("👷 Creating snapshot");
@@ -1407,17 +1929,17 @@ impl CheatcodeTracer {
             }
             toString_0(toString_0Call { value }) => {
                 tracing::info!("Converting address into string");
-                let address_with_checksum = to_checksum(&value.to_h160(), None);
+                let address_with_checksum = value.to_checksum(None);
                 self.return_data = Some(address_with_checksum.to_return_data());
             }
             toString_1(toString_1Call { value }) => {
                 tracing::info!("Converting bytes into string");
-                let bytes_value = format!("0x{}", hex::encode(value));
+                let bytes_value = hex::encode_prefixed(value);
                 self.return_data = Some(bytes_value.to_return_data());
             }
             toString_2(toString_2Call { value }) => {
                 tracing::info!("Converting bytes32 into string");
-                let bytes_value = format!("0x{}", hex::encode(value));
+                let bytes_value = hex::encode_prefixed(value);
                 self.return_data = Some(bytes_value.to_return_data());
             }
             toString_3(toString_3Call { value }) => {
@@ -1435,7 +1957,20 @@ impl CheatcodeTracer {
                 let int_value = value.to_string();
                 self.return_data = Some(int_value.to_return_data());
             }
-
+            transact_0(transact_0Call { txHash }) => {
+                tracing::info!("👷 Transacting current fork with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: None,
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
+            transact_1(transact_1Call { forkId, txHash }) => {
+                tracing::info!("👷 Transacting fork {forkId} with: {txHash:x?}");
+                self.one_time_actions.push(FinishCycleOneTimeActions::Transact {
+                    fork_id: Some(forkId.to_u256()),
+                    tx_hash: H256::from(txHash.0),
+                });
+            }
             tryFfi(tryFfiCall { commandInput: command_input }) => {
                 tracing::info!("👷 Running try ffi: {command_input:?}");
                 let Some(first_arg) = command_input.get(0) else {
@@ -1585,8 +2120,8 @@ impl CheatcodeTracer {
                     tracing::error!("Failed to write file");
                 }
             }
-            _ => {
-                tracing::error!("👷 Unrecognized cheatcode");
+            code => {
+                tracing::error!("👷 Unrecognized cheatcode {:?}", code);
             }
         };
     }
@@ -1672,12 +2207,12 @@ impl CheatcodeTracer {
         );
     }
 
-    fn current_expect_revert(&mut self) -> Option<&mut ActionOnReturn> {
+    fn current_return_action(&mut self) -> Option<&mut ActionOnReturn> {
         self.next_return_action.as_mut().map(|action| &mut action.action)
     }
 
     fn add_expect_revert(&mut self, reason: Option<Vec<u8>>, depth: usize) {
-        if self.current_expect_revert().is_some() {
+        if self.current_return_action().is_some() {
             panic!("expectRevert already set")
         }
 
@@ -1694,7 +2229,20 @@ impl CheatcodeTracer {
             Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 1 });
     }
 
-    fn handle_except_revert<H: HistoryMode>(
+    fn add_revert_test(&mut self, reason: Vec<u8>, depth: usize) {
+        if self.current_return_action().is_some() {
+            panic!("revert test already set")
+        }
+
+        //-1: Because we are working with return opcode and it pops the stack after execution
+        let action =
+            ActionOnReturn::Revert { depth: depth - 1, prev_exception_handler_pc: None, reason };
+
+        self.next_return_action =
+            Some(NextReturnAction { target_depth: depth - 1, action, returns_to_skip: 0 });
+    }
+
+    fn handle_expect_revert<H: HistoryMode>(
         reason: Option<&Vec<u8>>,
         op: zkevm_opcode_defs::RetOpcode,
         state: &VmLocalStateData<'_>,
@@ -1825,58 +2373,76 @@ impl CheatcodeTracer {
 
         // Skip check if opcode is not Ret
         let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
-        // Check how many retunrs we need to skip before finding the actual one
-        if action.returns_to_skip != 0 {
-            action.returns_to_skip -= 1;
-            return
-        }
 
         // The desired return opcode was found
-        let ActionOnReturn::ExpectRevert {
-            reason,
-            depth,
-            prev_exception_handler_pc: exception_handler,
-            prev_continue_pc: continue_pc,
-        } = &action.action;
-        match op {
-            RetOpcode::Revert => {
-                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
-                let (Some(exception_handler), Some(continue_pc)) =
-                    (*exception_handler, *continue_pc)
-                else {
-                    tracing::error!("exceptRevert missing stored continuations");
+        match &action.action {
+            ActionOnReturn::ExpectRevert {
+                reason,
+                depth,
+                prev_exception_handler_pc: exception_handler,
+                prev_continue_pc: continue_pc,
+            } => {
+                // Check how many returns we need to skip before finding the actual one
+                if action.returns_to_skip != 0 {
+                    action.returns_to_skip -= 1;
                     return
-                };
+                }
 
-                self.one_time_actions.push(
-                    Self::handle_except_revert(reason.as_ref(), op, state, memory)
-                        .map(|_| FinishCycleOneTimeActions::ForceReturn {
-                                //dummy data
-                                data: // vec![0u8; 8192]
+                match op {
+                    RetOpcode::Revert => {
+                        tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
+                        let (Some(exception_handler), Some(continue_pc)) =
+                            (*exception_handler, *continue_pc)
+                        else {
+                            tracing::error!("exceptRevert missing stored continuations");
+                            return
+                        };
+
+                        self.one_time_actions.push(
+                            Self::handle_expect_revert(reason.as_ref(), op, state, memory)
+                                .map(|_| FinishCycleOneTimeActions::ForceReturn {
+                                    //dummy data
+                                    data: // vec![0u8; 8192]
                                     [0xde, 0xad, 0xbe, 0xef].to_vec(),
                                 continue_pc,
                             })
-                        .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
-                            error,
-                            exception_handler,
-                        }),
-                );
-                self.next_return_action = None;
+                                .unwrap_or_else(|error| FinishCycleOneTimeActions::ForceRevert {
+                                    error,
+                                    exception_handler,
+                                }),
+                        );
+                        self.next_return_action = None;
+                    }
+                    RetOpcode::Ok => {
+                        let Some(exception_handler) = *exception_handler else {
+                            tracing::error!("exceptRevert missing stored continuations");
+                            return
+                        };
+                        if let Err(error) =
+                            Self::handle_expect_revert(reason.as_ref(), op, state, memory)
+                        {
+                            self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                                error,
+                                exception_handler,
+                            });
+                        }
+                        self.next_return_action = None;
+                    }
+                    RetOpcode::Panic => (),
+                }
             }
-            RetOpcode::Ok => {
-                let Some(exception_handler) = *exception_handler else {
-                    tracing::error!("exceptRevert missing stored continuations");
+            ActionOnReturn::Revert { depth, reason, prev_exception_handler_pc: continue_pc } => {
+                tracing::debug!(wanted = %depth, current_depth = %callstack_depth, ?continue_pc, "revert");
+                let Some(continue_pc) = *continue_pc else {
+                    tracing::error!("revert missing stored continuations");
                     return
                 };
-                if let Err(err) = Self::handle_except_revert(reason.as_ref(), op, state, memory) {
-                    self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
-                        error: err,
-                        exception_handler,
-                    });
-                }
+                self.one_time_actions.push(FinishCycleOneTimeActions::ForceRevert {
+                    error: reason.to_owned(),
+                    exception_handler: continue_pc,
+                });
                 self.next_return_action = None;
             }
-            RetOpcode::Panic => (),
         }
     }
 
@@ -1967,7 +2533,8 @@ impl CheatcodeTracer {
         storage: &HashMap<StorageKey, H256>,
     ) -> HashMap<StorageKey, H256> {
         let mut modified_storage = self
-            .modified_storage_keys
+            .storage_modifications
+            .keys
             .clone()
             .into_iter()
             .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS)
@@ -1978,6 +2545,31 @@ impl CheatcodeTracer {
                 .filter(|(key, _)| key.address() != &zksync_types::SYSTEM_CONTEXT_ADDRESS),
         );
         modified_storage
+    }
+
+    /// Merge current modified bytecodes with the entire storage modifications made so far in the
+    /// test
+    fn get_modified_bytecodes(
+        &self,
+        bootloader_bytecodes: Vec<CompressedBytecodeInfo>,
+    ) -> HashMap<H256, Vec<u8>> {
+        let mut modified_bytecodes = self.storage_modifications.bytecodes.clone();
+        modified_bytecodes.extend(
+            bootloader_bytecodes
+                .iter()
+                .map(|b| {
+                    let (bytecode_key, bytecode_value) =
+                        bytecode_to_factory_dep(b.original.clone());
+                    let key = u256_to_h256(bytecode_key);
+                    let value = bytecode_value
+                        .into_iter()
+                        .flat_map(|v| u256_to_h256(v).as_bytes().to_owned())
+                        .collect_vec();
+                    (key, value)
+                })
+                .collect::<HashMap<_, _>>(),
+        );
+        modified_bytecodes
     }
 }
 
@@ -1996,6 +2588,17 @@ where
 
         abi_encoded_data.chunks(32).map(U256::from_big_endian).collect_vec()
     }
+}
+
+fn into_revm_bytecodes(zk_bytecodes: HashMap<H256, Vec<u8>>) -> HashMap<U256, Vec<U256>> {
+    zk_bytecodes
+        .into_iter()
+        .map(|(key, value)| {
+            let key = h256_to_u256(key);
+            let value = value.chunks(32).map(U256::from).collect_vec();
+            (key, value)
+        })
+        .collect()
 }
 
 fn into_revm_env(env: &EraEnv) -> Env {
@@ -2065,14 +2668,19 @@ fn compare_logs(expected_logs: &[LogEntry], actual_logs: &[LogEntry], checks: Em
     let mut actual_iter = actual_logs.iter();
 
     while let Some(expected_log) = expected_iter.peek() {
-        if let Some(actual_log) = actual_iter.next() {
+        let mut found = false;
+
+        for actual_log in actual_iter.by_ref() {
             if are_logs_equal(expected_log, actual_log, &checks) {
-                expected_iter.next(); // Move to the next expected log
-            } else {
-                return false
+                found = true;
+                break
             }
+        }
+
+        if found {
+            expected_iter.next(); // Move to the next expected log
         } else {
-            // No more actual logs to compare
+            // Expected log not found in the remaining actual logs
             return false
         }
     }
@@ -2097,4 +2705,29 @@ fn are_logs_equal(a: &LogEntry, b: &LogEntry, emit_checks: &EmitChecks) -> bool 
     let data_match = if emit_checks.data { a.data == b.data } else { true };
 
     address_match && topics_match && data_match
+}
+
+fn parse_env<F, T, E>(name: &str, parser_fn: F) -> eyre::Result<T>
+where
+    F: Fn(&str) -> Result<T, E>,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    let env_var = std::env::var(name).context("Env var not found")?;
+    let env_var = parser_fn(&env_var)?;
+    Ok(env_var)
+}
+
+fn parse_env_array<F, T, E>(name: &str, delim: &str, parser_fn: F) -> eyre::Result<Vec<T>>
+where
+    F: Fn(&str) -> Result<T, E>,
+    E: std::error::Error + Send + Sync + 'static,
+{
+    let env_var = std::env::var(name).context("Env var not found")?;
+    let env_vars = env_var
+        .split(&delim)
+        .map(|var| var.trim())
+        .filter(|var| !var.is_empty())
+        .map(parser_fn)
+        .collect::<Result<Vec<_>, E>>()?;
+    Ok(env_vars)
 }
