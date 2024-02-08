@@ -10,8 +10,7 @@ use foundry_common::{
     compact_to_contract,
     compile::ContractSources,
     evm::EvmArgs,
-    get_contract_name, get_file_name,
-    shell::{self, println},
+    get_contract_name, get_file_name, shell,
 };
 use foundry_config::{
     figment,
@@ -127,6 +126,10 @@ pub struct TestArgs {
     /// Contracts to compile
     #[clap(long, help_heading = "Contracts to compile", value_delimiter = ',')]
     pub contracts_to_compile: Option<Vec<String>>,
+
+    /// Contracts to avoid compiling
+    #[clap(long, help_heading = "Contracts to avoid compilation", value_delimiter = ',')]
+    pub avoid_contracts: Option<Vec<String>>,
 }
 
 impl TestArgs {
@@ -159,6 +162,7 @@ impl TestArgs {
         // load the zkSolc config
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         zksolc_cfg.contracts_to_compile = self.contracts_to_compile.clone();
+        zksolc_cfg.avoid_contracts = self.avoid_contracts.clone();
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
 

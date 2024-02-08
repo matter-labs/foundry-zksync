@@ -35,6 +35,9 @@ pub struct ZkSolcConfig {
 
     /// contracts to compile
     pub contracts_to_compile: Option<Vec<String>>,
+
+    /// contracts to avoid compiling
+    pub avoid_contracts: Option<Vec<String>>,
 }
 
 /// Compiler settings for zkSolc.
@@ -122,6 +125,7 @@ pub struct ZkSolcConfigBuilder {
     compiler_path: PathBuf,
     settings: Option<Settings>,
     contracts_to_compile: Option<Vec<String>>,
+    avoid_contracts: Option<Vec<String>>,
 }
 
 impl ZkSolcConfigBuilder {
@@ -146,6 +150,7 @@ impl ZkSolcConfigBuilder {
             compiler_path: self.compiler_path,
             settings,
             contracts_to_compile: self.contracts_to_compile,
+            avoid_contracts: self.avoid_contracts,
         })
     }
 }
