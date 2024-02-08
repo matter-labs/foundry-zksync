@@ -48,7 +48,6 @@ The `status` options are:
 | `vm.startBroadcast` | SUPPORTED | [Link](https://book.getfoundry.sh/cheatcodes/start-broadcast) |
 | `vm.stopBroadcast` | SUPPORTED | [Link](https://book.getfoundry.sh/cheatcodes/stop-broadcast) |
 | `vm.sign`              | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/sign)          |
-| `vm.envUint`           | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-uint)      |
 | `vm.setEnv`            | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/set-env.html)  |
 | `vm.transact`          | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/transact.html) |
 | `vm.makePersistance`   | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/make-persistent.html) |
@@ -58,3 +57,10 @@ The `status` options are:
 | `vm.assume`            | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/assume)        |
 | `vm.mockCall`          | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/mock-call)        |
 | `vm.clearMockedCall`   | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/clear-mocked-calls#clearmockedcalls)        |
+| `vm.envUint`           | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-uint)      |
+| `vm.envBool`           | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-bool)      |
+| `vm.envInt`            | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-int)      |
+| `vm.envAddress`        | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-address)      |
+| `vm.envBytes32`        | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-bytes32)      |
+| `vm.envString`         | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-string)     |
+| `vm.envBytes`          | SUPPORTED  | [Link](https://book.getfoundry.sh/cheatcodes/env-bytes)      |
