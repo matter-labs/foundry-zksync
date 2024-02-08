@@ -199,6 +199,10 @@ pub struct ScriptArgs {
 
     #[clap(flatten)]
     pub retry: RetryArgs,
+
+    /// Contracts to compile
+    #[clap(long, help_heading = "Contracts to compile", value_delimiter = ',')]
+    pub contracts_to_compile: Option<Vec<String>>,
 }
 
 // === impl ScriptArgs ===

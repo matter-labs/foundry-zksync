@@ -122,7 +122,7 @@ pub struct TestArgs {
     pub detailed: bool,
 
     /// Contracts to compile
-    #[clap(long, help_heading = "Contracts to compile")]
+    #[clap(long, help_heading = "Contracts to compile", value_delimiter = ',')]
     pub contracts_to_compile: Option<Vec<String>>,
 }
 
