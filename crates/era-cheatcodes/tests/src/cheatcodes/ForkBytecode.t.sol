@@ -15,7 +15,7 @@ contract ForkBytecodeTest is Test {
 
     function testCreateSelectForkHasNonDeployedBytecodes() public {
         console.log("run");
-        vm.createSelectFork("mainnet", FORK_BLOCK);
+        vm.createSelectFork("local", FORK_BLOCK);
 
         // target should be able to deploy
         Target target = new Target();
@@ -23,7 +23,7 @@ contract ForkBytecodeTest is Test {
     }
 
     function testSelectForkForkHasNonDeployedBytecodes() public {
-        uint256 forkId = vm.createFork("mainnet", FORK_BLOCK);
+        uint256 forkId = vm.createFork("local", FORK_BLOCK);
         vm.selectFork(forkId);
 
         // target should be able to deploy

@@ -17,7 +17,7 @@ contract CheatcodeTransactTest is Test {
 
     function testTransact() public {
         // A random block https://explorer.zksync.io/block/23942350
-        vm.createSelectFork("mainnet", 23942350);
+        vm.createSelectFork("local", 23942350);
 
         // A random transfer in the next block
         bytes32 transaction = 0x272c2251368cae9eceaea67f52855c9858fd6b00dd68d6dfadab3ab1d66f9e4b;
@@ -50,7 +50,7 @@ contract CheatcodeTransactTest is Test {
 
     function testTransactCooperatesWithCheatcodes() public {
         // A random block https://explorer.zksync.io/block/20570164
-        vm.createSelectFork("mainnet", 20570164);
+        vm.createSelectFork("local", 20570164);
 
         // a random ERC20 USDT transfer transaction in the next block: https://explorer.zksync.io/tx/0xa4124eed3fcb2eea3883915839004107a76597107a74c5eaf00a7d6c43638152
         bytes32 transaction = 0xa4124eed3fcb2eea3883915839004107a76597107a74c5eaf00a7d6c43638152;

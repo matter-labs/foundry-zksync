@@ -22,7 +22,7 @@ contract ForkTest is Test {
             "Local node doesn't have blocks above 1000"
         );
 
-        vm.createSelectFork("mainnet", FORK_BLOCK);
+        vm.createSelectFork("local", FORK_BLOCK);
 
         require(decimals_before == 0, "Contract exists locally");
     }
@@ -46,7 +46,7 @@ contract ForkTest is Test {
     }
 
     function testCreateSelectFork() public {
-        uint256 forkId = vm.createFork("mainnet", FORK_BLOCK + 100);
+        uint256 forkId = vm.createFork("local", FORK_BLOCK + 100);
 
         vm.selectFork(forkId);
 
@@ -69,7 +69,7 @@ contract ForkTest is Test {
     }
 
     function testActiveFork() public {
-        uint256 data = vm.createFork("mainnet", FORK_BLOCK + 100);
+        uint256 data = vm.createFork("local", FORK_BLOCK + 100);
 
         uint256 forkId = uint256(bytes32(data));
         vm.selectFork(forkId);

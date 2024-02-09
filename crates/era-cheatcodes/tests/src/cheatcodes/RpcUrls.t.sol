@@ -10,7 +10,9 @@ contract RpcUrlsTest is Test {
         string memory rpc_url = vm.rpcUrl("mainnet");
         require(
             keccak256(bytes(rpc_url)) ==
-                keccak256(abi.encodePacked(vm.envString("RPC_MAINNET"))),
+                keccak256(
+                    abi.encodePacked("https://mainnet.era.zksync.io:443")
+                ),
             "rpc url retrieved does not match expected value"
         );
     }
@@ -32,7 +34,7 @@ contract RpcUrlsTest is Test {
         );
         require(
             keccak256(bytes(rpc_urls[1][1])) ==
-                keccak256(bytes(vm.envString("RPC_MAINNET"))),
+                keccak256("https://mainnet.era.zksync.io:443"),
             "invalid url for [1]"
         );
         require(
