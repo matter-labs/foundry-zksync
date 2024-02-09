@@ -66,9 +66,10 @@ pub enum ZkSolcVersion {
     V1318,
     V1319,
     V1321,
+    V1322,
 }
 
-pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.3.21";
+pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.3.22";
 
 /// `parse_version` parses a string representation of a `zksolc` compiler version
 /// and returns the `ZkSolcVersion` enum variant if it matches a supported version.
@@ -97,6 +98,7 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.18" => Ok(ZkSolcVersion::V1318),
         "v1.3.19" => Ok(ZkSolcVersion::V1319),
         "v1.3.21" => Ok(ZkSolcVersion::V1321),
+        "v1.3.22" => Ok(ZkSolcVersion::V1322),
         _ => Err(Error::msg(
             "ZkSolc compiler version not supported. Proper version format: 'v1.3.x'",
         )),
@@ -125,6 +127,7 @@ impl ZkSolcVersion {
             ZkSolcVersion::V1318 => "v1.3.18",
             ZkSolcVersion::V1319 => "v1.3.19",
             ZkSolcVersion::V1321 => "v1.3.21",
+            ZkSolcVersion::V1322 => "v1.3.22",
         }
     }
 }
@@ -231,7 +234,7 @@ impl ZkSolcManagerOpts {
 ///
 /// ```ignore
 /// use zkforge::zksolc_manager::{ZkSolcManagerBuilder, ZkSolcManagerOpts};
-/// let opts = ZkSolcManagerOpts::new("v1.3.19")
+/// let opts = ZkSolcManagerOpts::new("v1.3.22")
 /// let zk_solc_manager = ZkSolcManagerBuilder::new(opts)
 ///     .build()
 ///     .expect("Failed to build ZkSolcManager");
@@ -363,7 +366,7 @@ impl ZkSolcManagerBuilder {
 /// ```ignore
 /// let compilers_path = PathBuf::from("/path/to/compilers");
 /// let version = ZkSolcVersion::V139;
-/// let compiler = "zksolc-linux-amd64-musl-v1.3.19".to_string();
+/// let compiler = "zksolc-linux-amd64-musl-v1.3.22".to_string();
 /// let download_url = Url::parse("https://github.com/matter-labs/zksolc-bin/releases/download/").unwrap();
 ///
 /// let zksolc_manager = ZkSolcManager::new(compilers_path, version, compiler, download_url);
