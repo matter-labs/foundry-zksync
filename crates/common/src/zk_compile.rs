@@ -310,10 +310,34 @@ impl ZkSolc {
                     .to_str()
                     .unwrap()
                     .to_string();
+
+                // Step 5: Run Compiler (or use cached) and Handle Output
+                let mut should_compile = match self.config.contracts_to_compile {
+                    Some(ref contracts_to_compile) => {
+                        //compare if there is some member of the vector contracts_to_compile
+                        // present in the filename
+                        contracts_to_compile.iter().any(|c| filename == *c)
+                    }
+                    None => true,
+                };
+
+                should_compile = match self.config.avoid_contracts {
+                    Some(ref avoid_contracts) => {
+                        //compare if there is some member of the vector avoid_contracts
+                        // present in the filename
+                        !avoid_contracts.iter().any(|c| filename == *c)
+                    }
+                    None => should_compile,
+                };
+
+                if !should_compile {
+                    continue
+                }
+
                 let artifact_paths =
                     ZkSolcArtifactPaths::new(self.project.paths.artifacts.join(&filename));
 
-                // Step 5: Run Compiler (or use cached) and Handle Output
+                info!("\nCompiling {:?}...", contract_path);
                 let (output, maybe_artifact_paths) = match self
                     .check_cache(&artifact_paths, &contract_hash)
                 {
