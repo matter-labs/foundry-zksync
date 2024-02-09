@@ -27,7 +27,7 @@ impl StorageModificationRecorder for NoopInspector {
     fn record_storage_modifications(&mut self, _storage_modifications: StorageModifications) {}
 
     fn get_storage_modifications(&self) -> &StorageModifications {
-        let mods = Box::new(StorageModifications::default());
+        let mods = Box::<StorageModifications>::default();
         Box::leak(mods)
     }
 }
@@ -36,7 +36,7 @@ impl EnvironmentTracker for NoopInspector {
     fn record_environment(&mut self, _environment: Env) {}
 
     fn get_environment(&self) -> &Env {
-        let env = Box::new(Env::default());
+        let env = Box::<Env>::default();
         Box::leak(env)
     }
 }

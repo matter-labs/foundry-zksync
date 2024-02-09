@@ -3,12 +3,14 @@ pub use executor::*;
 
 mod inspector;
 
+#[allow(dead_code)]
 enum MultiVMState {
     Stop,
     Inactive { executor: executor::Executor },
     Active { executor: executor::Executor },
 }
 
+#[allow(dead_code)]
 pub struct MultiMV {
     state: MultiVMState,
 }

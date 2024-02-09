@@ -1,11 +1,7 @@
-use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
+use alloy_dyn_abi::{DynSolValue, FunctionExt};
 use alloy_json_abi::{Function, JsonAbi};
-use foundry_common::abi::IntoFunction;
 use foundry_evm_core::{
-    backend::{Backend, DatabaseError, DatabaseExt, DatabaseResult, FuzzBackendWrapper},
-    constants::{
-        CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE,
-    },
+    backend::{Backend, DatabaseExt, DatabaseResult},
     decode,
     utils::{eval_to_instruction_result, halt_to_instruction_result, StateChangeset},
 };
@@ -15,7 +11,7 @@ use revm::{
         Address, BlockEnv, Bytes, CreateScheme, Env, ExecutionResult, Output, ResultAndState,
         SpecId, TransactTo, TxEnv, U256,
     },
-    Database, DatabaseCommit, DatabaseRef,
+    Database, DatabaseCommit,
 };
 use tracing::trace;
 
@@ -58,31 +54,6 @@ impl Executor {
         executor
     }
 
-    /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
-    pub fn deploy_create2_deployer(&mut self) -> eyre::Result<()> {
-        trace!("deploying local create2 deployer");
-        let create2_deployer_account = self
-            .backend
-            .basic(DEFAULT_CREATE2_DEPLOYER)?
-            .ok_or(DatabaseError::MissingAccount(DEFAULT_CREATE2_DEPLOYER))?;
-
-        // if the deployer is not currently deployed, deploy the default one
-        if create2_deployer_account.code.map_or(true, |code| code.is_empty()) {
-            let creator = "0x3fAB184622Dc19b6109349B94811493BF2a45362".parse().unwrap();
-
-            // Probably 0, but just in case.
-            let initial_balance = self.get_balance(creator)?;
-
-            self.set_balance(creator, U256::MAX)?;
-            let res =
-                self.deploy(creator, DEFAULT_CREATE2_DEPLOYER_CODE.into(), U256::ZERO, None)?;
-            trace!(create2=?res.address, "deployed local create2 deployer");
-
-            self.set_balance(creator, initial_balance)?;
-        }
-        Ok(())
-    }
-
     /// Set the balance of an account.
     pub fn set_balance(&mut self, address: Address, amount: U256) -> DatabaseResult<&mut Self> {
         trace!(?address, ?amount, "setting account balance");
@@ -91,44 +62,6 @@ impl Executor {
 
         self.backend.insert_account_info(address, account);
         Ok(self)
-    }
-
-    /// Gets the balance of an account
-    pub fn get_balance(&self, address: Address) -> DatabaseResult<U256> {
-        Ok(self.backend.basic_ref(address)?.map(|acc| acc.balance).unwrap_or_default())
-    }
-
-    /// Set the nonce of an account.
-    pub fn set_nonce(&mut self, address: Address, nonce: u64) -> DatabaseResult<&mut Self> {
-        let mut account = self.backend.basic(address)?.unwrap_or_default();
-        account.nonce = nonce;
-
-        self.backend.insert_account_info(address, account);
-        Ok(self)
-    }
-
-    #[inline]
-    pub fn set_gas_limit(&mut self, gas_limit: U256) -> &mut Self {
-        self.gas_limit = gas_limit;
-        self
-    }
-
-    /// Performs a call to an account on the current state of the VM.
-    ///
-    /// The state after the call is persisted.
-    pub fn call_committing<T: Into<Vec<DynSolValue>>, F: IntoFunction>(
-        &mut self,
-        from: Address,
-        to: Address,
-        func: F,
-        args: T,
-        value: U256,
-        abi: Option<&JsonAbi>,
-    ) -> Result<CallResult, EvmError> {
-        let func = func.into();
-        let calldata = Bytes::from(func.abi_encode_input(&args.into())?.to_vec());
-        let result = self.call_raw_committing(from, to, calldata, value)?;
-        convert_call_result(abi, &func, result)
     }
 
     /// Performs a raw call to an account on the current state of the VM.
@@ -149,53 +82,6 @@ impl Executor {
         Ok(result)
     }
 
-    /// Performs a call to an account on the current state of the VM.
-    ///
-    /// The state after the call is not persisted.
-    pub fn call<T: Into<Vec<DynSolValue>>, F: IntoFunction>(
-        &self,
-        from: Address,
-        to: Address,
-        func: F,
-        args: T,
-        value: U256,
-        abi: Option<&JsonAbi>,
-    ) -> Result<CallResult, EvmError> {
-        let func = func.into();
-        let calldata = Bytes::from(func.abi_encode_input(&args.into())?.to_vec());
-        let call_result = self.call_raw(from, to, calldata, value)?;
-        convert_call_result(abi, &func, call_result)
-    }
-
-    /// Performs a raw call to an account on the current state of the VM.
-    ///
-    /// Any state modifications made by the call are not committed.
-    pub fn call_raw(
-        &self,
-        from: Address,
-        to: Address,
-        calldata: Bytes,
-        value: U256,
-    ) -> eyre::Result<RawCallResult> {
-        let mut inspector = self.inspector.clone();
-        // Build VM
-        let mut env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
-
-        let mut db = FuzzBackendWrapper::new(&self.backend);
-        let result = db.inspect_ref_evm(&mut env, &mut inspector)?;
-
-        // Persist the snapshot failure recorded on the fuzz backend wrapper.
-        let has_snapshot_failure = db.has_snapshot_failure();
-        convert_executed_result(env, result, has_snapshot_failure)
-    }
-
-    /// Execute the transaction configured in `env.tx` and commit the changes
-    pub fn commit_tx_with_env(&mut self, env: Env) -> eyre::Result<RawCallResult> {
-        let mut result = self.call_raw_with_env(env)?;
-        self.commit(&mut result);
-        Ok(result)
-    }
-
     /// Execute the transaction configured in `env.tx`
     pub fn call_raw_with_env(&mut self, mut env: Env) -> eyre::Result<RawCallResult> {
         // execute the call
@@ -206,7 +92,7 @@ impl Executor {
 
     /// Commit the changeset to the database and adjust `self.inspector_config`
     /// values according to the executed call result
-    fn commit(&mut self, result: &mut RawCallResult) {
+    fn commit(&mut self, result: &RawCallResult) {
         // Persist changes to db
         if let Some(changes) = &result.state_changeset {
             self.backend.commit(changes.clone());
@@ -286,72 +172,6 @@ impl Executor {
     ) -> Result<DeployResult, EvmError> {
         let env = self.build_test_env(from, TransactTo::Create(CreateScheme::Create), code, value);
         self.deploy_with_env(env, abi)
-    }
-
-    /// Check if a call to a test contract was successful.
-    ///
-    /// This function checks both the VM status of the call, DSTest's `failed` status and the
-    /// `globalFailed` flag which is stored in `failed` inside the `CHEATCODE_ADDRESS` contract.
-    ///
-    /// DSTest will not revert inside its `assertEq`-like functions which allows
-    /// to test multiple assertions in 1 test function while also preserving logs.
-    ///
-    /// If an `assert` is violated, the contract's `failed` variable is set to true, and the
-    /// `globalFailure` flag inside the `CHEATCODE_ADDRESS` is also set to true, this way, failing
-    /// asserts from any contract are tracked as well.
-    ///
-    /// In order to check whether a test failed, we therefore need to evaluate the contract's
-    /// `failed` variable and the `globalFailure` flag, which happens by calling
-    /// `contract.failed()`.
-    pub fn is_success(
-        &self,
-        address: Address,
-        reverted: bool,
-        state_changeset: StateChangeset,
-        should_fail: bool,
-    ) -> bool {
-        self.ensure_success(address, reverted, state_changeset, should_fail).unwrap_or_default()
-    }
-
-    fn ensure_success(
-        &self,
-        address: Address,
-        reverted: bool,
-        state_changeset: StateChangeset,
-        should_fail: bool,
-    ) -> Result<bool, DatabaseError> {
-        if self.backend.has_snapshot_failure() {
-            // a failure occurred in a reverted snapshot, which is considered a failed test
-            return Ok(should_fail)
-        }
-
-        // Construct a new VM with the state changeset
-        let mut backend = self.backend.clone_empty();
-
-        // we only clone the test contract and cheatcode accounts, that's all we need to evaluate
-        // success
-        for addr in [address, CHEATCODE_ADDRESS] {
-            let acc = self.backend.basic_ref(addr)?.unwrap_or_default();
-            backend.insert_account_info(addr, acc);
-        }
-
-        // If this test failed any asserts, then this changeset will contain changes `false -> true`
-        // for the contract's `failed` variable and the `globalFailure` flag in the state of the
-        // cheatcode address which are both read when call `"failed()(bool)"` in the next step
-        backend.commit(state_changeset);
-        let executor = Executor::new(backend, self.env.clone(), self.gas_limit);
-
-        let mut success = !reverted;
-        if success {
-            // Check if a DSTest assertion failed
-            let call = executor.call(CALLER, address, "failed()(bool)", vec![], U256::ZERO, None);
-
-            if let Ok(CallResult { result: failed, .. }) = call {
-                success = !failed.as_bool().unwrap();
-            }
-        }
-
-        Ok(should_fail ^ success)
     }
 
     /// Creates the environment to use when executing a transaction in a test context
@@ -540,6 +360,7 @@ fn calc_stipend(calldata: &[u8], spec: SpecId) -> u64 {
     calldata.iter().fold(21000, |sum, byte| sum + if *byte == 0 { 4 } else { non_zero_data_cost })
 }
 
+#[allow(dead_code)]
 fn convert_call_result(
     abi: Option<&JsonAbi>,
     func: &Function,
