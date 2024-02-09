@@ -22,8 +22,8 @@ contract ForkPersistentTest is Test {
 
     /// checks that marking as persistent works
     function testMakePersistent() public {
-        uint256 fork1 = vm.createFork("mainnet", FORK_BLOCK + 100);
-        uint256 fork2 = vm.createFork("mainnet", FORK_BLOCK + 100);
+        uint256 fork1 = vm.createFork("local", FORK_BLOCK + 100);
+        uint256 fork2 = vm.createFork("local", FORK_BLOCK + 100);
 
         DummyContract dummy = new DummyContract();
 
