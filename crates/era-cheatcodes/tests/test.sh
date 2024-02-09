@@ -7,6 +7,7 @@ REPO_ROOT="../../.."
 SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
 BINARY_PATH="${REPO_ROOT}/target/release/zkforge"
+RPC_MAINNET=${RPC_MAINNET:-"https://mainnet.era.zksync.io:443"}
 
 function download_solc() {
   case "$(uname -s)" in

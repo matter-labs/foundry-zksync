@@ -96,11 +96,11 @@ jobs:
 
       steps:
       - name: Checkout code
-        uses: actions/checkout@v4 
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           ref: ${{ github.event.pull_request.head.sha }}
-      
+
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -115,15 +115,33 @@ jobs:
       name: cheatcode-test
       runs-on: ubuntu-22.04-github-hosted-16core
       steps:
-        - uses: actions/checkout@v3
+        - uses: actions/checkout@v4
           with:
             submodules: recursive
             ref: ${{ github.event.pull_request.head.sha }}
-  
+
         - name: Install Rust
           uses: actions-rust-lang/setup-rust-toolchain@v1
           with:
             toolchain: nightly-2023-09-30
-  
+
+        - name: Run era-test-node
+          uses: dutterbutter/era-test-node-action@latest
+          with:
+            mode: fork
+            network: mainnet
+            log: info
+            logFilePath: era_test_node.log
+            target: x86_64-unknown-linux-gnu
+            releaseTag: latest
+
         - name: Test Cheatcodes
+          env:
+            RPC_MAINNET: http://localhost:8011
           run: cd crates/era-cheatcodes/tests && ./test.sh
+
+        - name: Upload era_test_node log
+          uses: actions/upload-artifact@v3
+          with:
+            name: era_test_node.log
+            path: era_test_node.log
