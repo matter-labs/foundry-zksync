@@ -46,9 +46,7 @@ contract ForkTest is Test {
     }
 
     function testCreateSelectFork() public {
-        uint256 forkId = vm.createFork("mainnet", FORK_BLOCK + 100);
-
-        vm.selectFork(forkId);
+        vm.createSelectFork("mainnet", FORK_BLOCK + 100);
 
         /// After createSelect fork the decimals  should exist
         (bool success2, bytes memory data2) = TOKEN_ADDRESS.call(
@@ -69,7 +67,7 @@ contract ForkTest is Test {
     }
 
     function testActiveFork() public {
-        uint256 data = vm.createFork("mainnet", FORK_BLOCK + 100);
+       uint256 data = vm.createSelectFork("mainnet", FORK_BLOCK + 100);
 
         uint256 forkId = uint256(bytes32(data));
         vm.selectFork(forkId);
