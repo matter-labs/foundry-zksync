@@ -137,7 +137,7 @@ jobs:
 
         - name: Test Cheatcodes
           env:
-            RPC_MAINNET: http://localhost:8011
+            ERA_TEST_NODE_RPC_URL: http://localhost:8011
           run: cd crates/era-cheatcodes/tests && ./test.sh
 
         - name: Upload era_test_node log
