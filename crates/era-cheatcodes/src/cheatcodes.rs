@@ -628,9 +628,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                     }
                 }
 
-                //TODO: avoid runnning internal calls even in era when forked to EVM
-                if !INTERNAL_CONTRACT_ADDRESSES.contains(&current.code_address) {
-                    if let Some(executor) = &mut self.is_switched_to_evm {
+                if let Some(executor) = &mut self.is_switched_to_evm {
+                    if !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address) {
                         let from = current.msg_sender;
                         let from = revm::primitives::Address::from(from.to_fixed_bytes());
 
@@ -670,12 +669,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
                         if is_deployment {
-                            let _result = executor
+                            let result = executor
                                 .deploy(from, calldata.into(), value, None)
                                 //TODO: handle errors
                                 .expect("able to deploy in EVM");
 
-                            self.farcall_handler.set_immediate_return(vec![]);
+                            let address = result.address.0;
+                            self.farcall_handler.set_immediate_return(address.to_vec());
                         } else {
                             let result = executor
                                 .call_raw_committing(from, to, calldata.into(), value)
@@ -685,6 +685,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             self.farcall_handler
                                 .set_immediate_return(result.out.unwrap().into_data().into());
                         }
+                    } else {
+                        //TODO? avoid runnning internal calls even in era when forked to EVM
                     }
                 }
 
