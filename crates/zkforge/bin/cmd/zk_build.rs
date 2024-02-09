@@ -124,7 +124,8 @@ impl ZkBuildArgs {
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-
+        zksolc_cfg.contracts_to_compile = self.args.compiler.contracts_to_compile.clone();
+        zksolc_cfg.avoid_contracts = self.args.compiler.avoid_contracts.clone();
         //set zk out path
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
