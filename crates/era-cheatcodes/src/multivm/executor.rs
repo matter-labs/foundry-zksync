@@ -19,6 +19,8 @@ use revm::{
 };
 use tracing::trace;
 
+use crate::cheatcodes::TEST_ADDRESS;
+
 use super::inspector::NoopInspector;
 
 /// A type that can execute calls
@@ -43,6 +45,17 @@ impl Executor {
     //no InspectorStack -> circular dependency
     pub fn new(backend: Backend, env: Env, gas_limit: U256) -> Self {
         Executor { backend, env, gas_limit, inspector: NoopInspector }
+    }
+
+    pub fn new_for_cheatcodes(backend: Backend, env: Env, gas_limit: U256) -> Self {
+        let mut executor = Self::new(backend, env, gas_limit);
+
+        let test_address = revm::primitives::Address::from(TEST_ADDRESS.to_fixed_bytes());
+        executor
+            .set_balance(test_address, gas_limit.saturating_mul(U256::from(2)))
+            .expect("setBalance on Test address");
+
+        executor
     }
 
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.

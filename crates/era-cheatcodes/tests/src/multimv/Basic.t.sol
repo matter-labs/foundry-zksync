@@ -4,7 +4,6 @@ pragma solidity ^0.8.13;
 import {Test, console2 as console, Vm} from "../../lib/forge-std/src/Test.sol";
 
 contract Nautilus {
-
     uint256 _value = 0;
 
     function set(uint256 val) public {
@@ -33,7 +32,7 @@ contract MultiVMBasicTest is Test {
     uint256 constant ERA_FORK_BLOCK = 9350;
 
     address constant ETH_TOKEN_ADDRESS = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    uint256 constant ETH_FORK_BLOCK = 6082466;
+    uint256 constant ETH_FORK_BLOCK = 19191416;
 
     uint256 forkEra;
     uint256 forkEth;

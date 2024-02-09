@@ -73,7 +73,7 @@ const CHEATCODE_ADDRESS: H160 = H160([
 ]);
 
 // 0x2e1908b13b8b625ed13ecf03c87d45c499d1f325
-const TEST_ADDRESS: H160 =
+pub(crate) const TEST_ADDRESS: H160 =
     H160([46, 25, 8, 177, 59, 139, 98, 94, 209, 62, 207, 3, 200, 125, 69, 196, 153, 209, 243, 37]);
 
 const INTERNAL_CONTRACT_ADDRESSES: [H160; 20] = [
@@ -669,6 +669,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                             current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
                         if is_deployment {
+                            //FIXME: get calldata of EVM contract, not zkEVM!!!
+                            // this here is Nautilus bytecode hardcoded for now
+                            let calldata = hex::decode("608060405234801561001057600080fd5b50600436106100415760003560e01c80634cd4d87d1461004657806360fe47b1146100505780636d4ce63c14610063575b600080fd5b61004e610078565b005b61004e61005e366004610175565b600055565b60005460405190815260200160405180910390f35b6040516001625e79b760e01b031981527fac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80600482018190529073f39fd6e51aad88f6f4ce6ab8827279cfffb92266907f885cb69240a935d632d79c317109709ecfa91a80626ff3989d68f67f5b1dd12d90600090737109709ecfa91a80626ff3989d68f67f5b1dd12d9063ffa1864990602401602060405180830381865afa158015610128573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061014c919061018e565b9050826001600160a01b0316816001600160a01b03161461016f5761016f6101be565b50505050565b60006020828403121561018757600080fd5b5035919050565b6000602082840312156101a057600080fd5b81516001600160a01b03811681146101b757600080fd5b9392505050565b634e487b7160e01b600052600160045260246000fdfea2646970667358221220a71eaf0c4f9d146b147db14d7a43257090248fb7d9fcb6e7c615d76eb1a748ff64736f6c63430008140033").unwrap();
                             let result = executor
                                 .deploy(from, calldata.into(), value, None)
                                 //TODO: handle errors
@@ -868,7 +871,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
 
                         let env = self.outer_env.clone().unwrap();
 
-                        let executor = Executor::new(
+                        let executor = Executor::new_for_cheatcodes(
                             backend,
                             env,
                             rU256::from(self.env.get().unwrap().system_env.gas_limit),
@@ -1005,7 +1008,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         let db = self.evm_backends[maybe_evm_fork_id].clone();
                         let env = self.outer_env.clone().unwrap();
 
-                        let executor = Executor::new(
+                        let executor = Executor::new_for_cheatcodes(
                             db,
                             env,
                             rU256::from(self.env.get().unwrap().system_env.gas_limit),
