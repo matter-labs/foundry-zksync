@@ -675,20 +675,15 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                                 //TODO: handle errors
                                 .expect("able to deploy in EVM");
 
-                            self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
-                                data: vec![],
-                                continue_pc: prev_cs.pc,
-                            });
+                            self.farcall_handler.set_immediate_return(vec![]);
                         } else {
                             let result = executor
                                 .call_raw_committing(from, to, calldata.into(), value)
                                 //TODO: handle errors
                                 .expect("multiVM EVM call failed");
 
-                            self.one_time_actions.push(FinishCycleOneTimeActions::ForceReturn {
-                                data: result.out.unwrap().into_data().into(),
-                                continue_pc: prev_cs.pc,
-                            });
+                            self.farcall_handler
+                                .set_immediate_return(result.out.unwrap().into_data().into());
                         }
                     }
                 }
