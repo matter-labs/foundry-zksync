@@ -182,7 +182,7 @@ impl Executor {
         let mut env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
 
         let mut db = FuzzBackendWrapper::new(&self.backend);
-        let result = db.inspect_ref_EVM(&mut env, &mut inspector)?;
+        let result = db.inspect_ref_evm(&mut env, &mut inspector)?;
 
         // Persist the snapshot failure recorded on the fuzz backend wrapper.
         let has_snapshot_failure = db.has_snapshot_failure();
@@ -200,7 +200,7 @@ impl Executor {
     pub fn call_raw_with_env(&mut self, mut env: Env) -> eyre::Result<RawCallResult> {
         // execute the call
         let mut inspector = self.inspector.clone();
-        let result = self.backend.inspect_ref_EVM(&mut env, &mut inspector)?;
+        let result = self.backend.inspect_ref_evm(&mut env, &mut inspector)?;
         convert_executed_result(env, result, self.backend.has_snapshot_failure())
     }
 
@@ -498,7 +498,7 @@ impl Default for RawCallResult {
 fn convert_executed_result(
     env: Env,
     result: ResultAndState,
-    has_snapshot_failure: bool,
+    _has_snapshot_failure: bool,
 ) -> eyre::Result<RawCallResult> {
     let ResultAndState { result: exec_result, state: state_changeset } = result;
     let (exit_reason, gas_refunded, gas_used, out) = match exec_result {

@@ -52,7 +52,7 @@ impl<'a> FuzzBackendWrapper<'a> {
     }
 
     /// Executes the configured transaction of the `env` without committing state changes
-    pub fn inspect_ref_EVM<INSP>(
+    pub fn inspect_ref_evm<INSP>(
         &mut self,
         env: &mut Env,
         mut inspector: INSP,

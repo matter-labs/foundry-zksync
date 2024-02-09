@@ -151,7 +151,6 @@ where
         31337
     };
 
-    println!("HERE?");
     // Record the environment in the inspector.
     inspector.record_environment(env.clone());
 

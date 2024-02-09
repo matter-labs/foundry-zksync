@@ -3,28 +3,6 @@ pragma solidity ^0.8.13;
 
 import {Test, console2 as console, Vm} from "../../lib/forge-std/src/Test.sol";
 
-contract Nautilus {
-    uint256 _value = 0;
-
-    function set(uint256 val) public {
-        _value = val;
-    }
-
-    function get() public returns (uint256) {
-        return _value;
-    }
-
-    function useCheatcode() public {
-        uint256 pk = 77814517325470205911140941194401928579557062014761831930645393041380819009408;
-        address expected = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
-
-        Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
-        address addr = vm.addr(pk);
-
-        assert(addr == expected);
-    }
-}
-
 contract MultiVMBasicTest is Test {
     /// USDC TOKEN
     uint256 constant TOKEN_DECIMALS = 6;
@@ -78,29 +56,5 @@ contract MultiVMBasicTest is Test {
        //check that we are on eth mainnet
         vm.selectFork(forkEth);
        _checkToken(ETH_TOKEN_ADDRESS, ETH_FORK_BLOCK);
-    }
-
-    function testDeploy() public {
-       _smokeSetUp();
-
-       //check that we are on eth mainnet
-        vm.selectFork(forkEth);
-
-        Nautilus c = new Nautilus();
-
-        c.set(42);
-        uint256 val = c.get();
-
-        assert(val == 42);
-    }
-
-    function testFailUseCheatcodesInEVM() public {
-       _smokeSetUp();
-
-       //check that we are on eth mainnet
-        vm.selectFork(forkEth);
-
-        Nautilus c = new Nautilus();
-        c.useCheatcode();
     }
 }

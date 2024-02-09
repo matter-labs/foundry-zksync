@@ -45,7 +45,6 @@ use foundry_common::{
     zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
 };
 
-
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
 
@@ -182,8 +181,7 @@ impl TestArgs {
         let non_zk_out_path = non_zk_project.paths.root.join("out");
         non_zk_project.paths.artifacts = non_zk_out_path;
 
-
-        let output_solc = match non_zk_project.compile() {
+        let _output_solc = match non_zk_project.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with solc: {}", e)),
         };
@@ -192,7 +190,6 @@ impl TestArgs {
         let (output, contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
-
         };
 
         let project = config.project()?;

@@ -16,7 +16,7 @@ use foundry_common::{
     conversion_utils::h160_to_address,
     is_known_system_sender,
     types::{ToAlloy, ToEthers},
-    AsTracerPointer, StorageModificationRecorder, EnvironmentTracker,SYSTEM_TRANSACTION_TYPE,
+    AsTracerPointer, EnvironmentTracker, StorageModificationRecorder, SYSTEM_TRANSACTION_TYPE,
 };
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -782,7 +782,7 @@ impl Backend {
     }
 
     /// Executes the configured test call of the `env` without committing state changes
-    pub fn inspect_ref_EVM<INSP>(
+    pub fn inspect_ref_evm<INSP>(
         &mut self,
         env: &mut Env,
         mut inspector: INSP,

@@ -1,13 +1,13 @@
 use foundry_common::{
     AsTracerPointer, EnvironmentTracker, StorageModificationRecorder, StorageModifications,
 };
-use foundry_evm_core::{backend::DatabaseExt, era_revm::db::RevmDatabaseForEra};
+use foundry_evm_core::backend::DatabaseExt;
 use multivm::{
     interface::dyn_tracers::vm_1_4_0::DynTracer,
-    vm_latest::{HistoryDisabled, HistoryMode, SimpleMemory, VmTracer},
+    vm_latest::{HistoryMode, SimpleMemory, VmTracer},
 };
 use revm::{primitives::Env, Inspector};
-use zksync_state::{StorageView, WriteStorage};
+use zksync_state::WriteStorage;
 
 #[derive(Clone, Debug)]
 pub struct NoopInspector;
