@@ -22,7 +22,7 @@ contract ForkStorageTest is Test {
         // Contract gets successfully deployed
         require(255 == target.output(), "incorrect output");
 
-        vm.createSelectFork("mainnet", FORK_BLOCK);
+        vm.createSelectFork("local", FORK_BLOCK);
 
         // Contract is still deployed
         require(255 == target.output(), "incorrect output after fork");

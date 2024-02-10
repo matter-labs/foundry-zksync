@@ -8,7 +8,7 @@ contract RollForkTest is Test {
     uint256 mainnetFork;
 
     function setUp() public {
-        mainnetFork = vm.createFork("mainnet");
+        mainnetFork = vm.createFork("local");
     }
 
     // test that we can switch between forks, and "roll" blocks
@@ -22,7 +22,7 @@ contract RollForkTest is Test {
         assertEq(block.number, mainBlock - 1);
 
         // can also roll by id
-        uint256 otherMain = vm.createFork("mainnet", block.number - 1);
+        uint256 otherMain = vm.createFork("local", block.number - 1);
         vm.rollFork(otherMain, mainBlock - 10);
 
         assertEq(block.number, mainBlock - 1); // should not have rolled

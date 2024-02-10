@@ -14,7 +14,7 @@ contract ForkBytecodeSetup2Test is Test {
     uint256 constant FORK_BLOCK = 19579636;
 
     function setUp() public {
-        vm.createSelectFork("mainnet", FORK_BLOCK);
+        vm.createSelectFork("local", FORK_BLOCK);
     }
 
     function testForkBytecodeSetup2Success() public {

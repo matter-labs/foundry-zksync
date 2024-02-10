@@ -17,7 +17,7 @@ contract RpcUrlsTest is Test {
         );
     }
 
-    function testRpcUrls() public view {
+    function testRpcUrls() public {
         string[2][] memory rpc_urls = vm.rpcUrls();
 
         require(
@@ -25,7 +25,15 @@ contract RpcUrlsTest is Test {
             "invalid alias for [0]"
         );
         require(
-            keccak256(bytes(rpc_urls[0][1])) == keccak256("local"),
+            keccak256(bytes(rpc_urls[0][1])) ==
+                keccak256(
+                    bytes(
+                        vm.envOr(
+                            string("ERA_TEST_NODE_RPC_URL"),
+                            string("local")
+                        )
+                    )
+                ),
             "invalid url for [0]"
         );
         require(
