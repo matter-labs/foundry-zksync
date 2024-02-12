@@ -71,6 +71,12 @@ Each tool within our suite can be installed individually, or you can install the
 
 ### Installing `zkforge` 🛠️
 
+Get foundry-zksync project
+```bash
+git clone https://github.com/matter-labs/foundry-zksync
+cd foundry-zksync
+```
+
 Run the following command:
 
 ```bash
