@@ -63,7 +63,17 @@ For the most effective use of our library, we recommend familiarizing yourself w
 
 ## 📝 Prerequisites
 
-- [Rust Compiler](https://www.rust-lang.org/tools/install)
+- Install Rust with the following command:
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+The current implementation makes use of `nightly-2023-09-30`. Please be sure to have the proper toolchain installed:
+
+```
+# rustup install nightly-2023-09-30-<YOUR-TARGET>
+rustup install nightly-2023-09-30-aarch64-apple-darwin
+```
 
 ## 💾 Installation
 
@@ -171,8 +181,7 @@ libs = ['lib']
 src = 'src'
 libs = ['lib']
 fallback_oz = true
-is_system = true
-mode = "2"
+mode = "3"
 ```
 
 ### Additional Configuration
