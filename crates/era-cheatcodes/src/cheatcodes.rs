@@ -246,6 +246,7 @@ enum ActionOnReturn {
         prev_exception_handler_pc: Option<PcOrImm>,
         reason: Vec<u8>,
     },
+    StopPrank,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -418,7 +419,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
         }
 
         // Checks returns from contracts for expectRevert cheatcode
-        self.handle_return(&state, &data, memory);
+        self.handle_return(&state, &data, memory, &storage);
 
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
@@ -1634,6 +1635,24 @@ impl CheatcodeTracer {
                 tracing::info!("👷 Clearing all mocked calls");
                 self.mocked_calls.clear();
             }
+            prank_0(prank_0Call { msgSender: msg_sender }) => {
+                tracing::info!("👷 Pranking to {msg_sender:?}");
+                self.prank(
+                    state.vm_local_state.callstack.depth(),
+                    &storage,
+                    msg_sender.to_h160(),
+                    None,
+                )
+            }
+            prank_1(prank_1Call { msgSender: msg_sender, txOrigin: tx_origin }) => {
+                tracing::info!("👷 Pranking to {msg_sender:?} with origin {tx_origin:?}");
+                self.prank(
+                    state.vm_local_state.callstack.depth(),
+                    &storage,
+                    msg_sender.to_h160(),
+                    Some(tx_origin.to_h160()),
+                )
+            }
             recordLogs(recordLogsCall {}) => {
                 tracing::info!("👷 Recording logs");
                 tracing::info!(
@@ -2357,11 +2376,12 @@ impl CheatcodeTracer {
         }
     }
 
-    fn handle_return<H: HistoryMode>(
+    fn handle_return<H: HistoryMode, S: DatabaseExt + Send>(
         &mut self,
         state: &VmLocalStateData<'_>,
         data: &AfterExecutionData,
         memory: &SimpleMemory<H>,
+        storage: &StoragePtr<EraDb<S>>,
     ) {
         // Skip check if there are no expected actions
         let Some(action) = self.next_return_action.as_mut() else { return };
@@ -2443,7 +2463,28 @@ impl CheatcodeTracer {
                 });
                 self.next_return_action = None;
             }
+            ActionOnReturn::StopPrank => self.stop_prank(&storage),
         }
+    }
+
+    fn prank<S: DatabaseExt + Send>(
+        &mut self,
+        current_depth: usize,
+        storage: &StoragePtr<EraDb<S>>,
+        sender: H160,
+        origin: Option<H160>,
+    ) {
+        if self.permanent_actions.broadcast.is_some() {
+            tracing::error!("prank is incompatible with broadcast");
+            return
+        }
+
+        self.start_prank(storage, sender, origin);
+        self.next_return_action.replace(NextReturnAction {
+            target_depth: current_depth - 1,
+            action: ActionOnReturn::StopPrank,
+            returns_to_skip: 1,
+        });
     }
 
     fn start_prank<S: DatabaseExt + Send>(
