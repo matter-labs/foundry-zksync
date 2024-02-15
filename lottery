@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Lottery {
+    address public owner;
+    address[] public participants;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function enterLottery() external {
+        participants.push(msg.sender);
+    }
+
+    function pickWinner() external {
+        require(msg.sender == owner, "Not the owner");
+        require(participants.length > 0, "No participants");
+
+        uint256 winnerIndex = uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, block.number))) % participants.length;
+        address winner = participants[winnerIndex];
+        // Handle winner logic
+    }
+}
