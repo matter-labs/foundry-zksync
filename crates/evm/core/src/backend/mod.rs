@@ -398,6 +398,22 @@ pub struct Backend {
     inner: BackendInner,
 }
 
+pub trait BackendCloner {
+    fn clone_as_backend(&self) -> Backend;
+}
+
+impl BackendCloner for Backend {
+    fn clone_as_backend(&self) -> Backend {
+        self.clone()
+    }
+}
+
+impl<T: BackendCloner> BackendCloner for &mut T {
+    fn clone_as_backend(&self) -> Backend {
+       T::clone_as_backend(self)
+    }
+}
+
 // === impl Backend ===
 
 impl Backend {
@@ -792,6 +808,7 @@ impl Backend {
     {
         self.initialize(env);
 
+        println!("CALL #{}", env.block.number);
         match revm::evm_inner::<Self>(env, self, Some(&mut inspector)).transact() {
             Ok(res) => Ok(res),
             Err(e) => eyre::bail!("backend: failed while inspecting: {e}"),
@@ -1058,8 +1075,9 @@ impl DatabaseExt for Backend {
         let idx = self.inner.ensure_fork_index(&fork_id)?;
         let fork_env = self
             .forks
-            .get_env(fork_id)?
+            .get_env(fork_id.clone())?
             .ok_or_else(|| eyre::eyre!("Requested fork `{}` does not exit", id))?;
+        println!("fork-env {} #{}", fork_id, fork_env.block.number);
 
         // If we're currently in forking mode we need to update the journaled_state to this point,
         // this ensures the changes performed while the fork was active are recorded

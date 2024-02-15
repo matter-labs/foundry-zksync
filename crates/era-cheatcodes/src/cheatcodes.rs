@@ -12,17 +12,18 @@ use eyre::Context;
 use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_common::{
-    conversion_utils::{h160_to_address, revm_u256_to_u256},
-    StorageModifications,
+    conversion_utils::{h160_to_address, revm_u256_to_u256, u256_to_revm_u256},
+    try_get_http_provider, StorageModifications,
 };
 use foundry_evm_core::{
-    backend::{Backend, DatabaseExt},
+    backend::{Backend, DatabaseExt, LocalForkId},
     constants::MAGIC_ASSUME,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
     opts::EvmOpts,
 };
 use itertools::Itertools;
+use maplit::hashmap;
 use multivm::{
     interface::{dyn_tracers::vm_1_4_0::DynTracer, tracer::TracerExecutionStatus, VmRevertReason},
     vm_latest::{
@@ -42,10 +43,11 @@ use multivm::{
 };
 use revm::{
     primitives::{ruint::Uint, BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
-    JournaledState,
+    Database, DatabaseCommit, DatabaseRef, JournaledState,
 };
 use serde::Serialize;
 use std::{
+    borrow::BorrowMut,
     cell::{OnceCell, RefMut},
     collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Debug,
@@ -55,7 +57,7 @@ use std::{
     str::FromStr,
     sync::{Arc, RwLock},
 };
-use zksync_basic_types::{AccountTreeId, H160, H256, U256};
+use zksync_basic_types::{web3::block_on, AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
@@ -128,6 +130,13 @@ const BROADCAST_IGNORED_CONTRACTS: [H160; 19] = [
     H160::zero(),
 ];
 
+fn create_fork_id(url: &str, num: Option<u64>) -> foundry_evm_core::fork::ForkId {
+    let num = num
+        .map(|num| ethers::types::BlockNumber::Number(num.into()))
+        .unwrap_or(ethers::types::BlockNumber::Latest);
+    foundry_evm_core::fork::ForkId(format!("{url}@{num}"))
+}
+
 #[derive(Debug, Clone)]
 struct EraEnv {
     l1_batch_env: L1BatchEnv,
@@ -145,6 +154,12 @@ enum FoundryTestState {
     Running { call_depth: usize },
     /// The test function has finished executing
     Finished,
+}
+
+#[derive(Debug, Clone)]
+enum ForkUrlType {
+    Evm,
+    Zk,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -171,8 +186,11 @@ pub struct CheatcodeTracer {
     transact_logs: Vec<LogEntry>,
     mocked_calls: MockedCalls,
     farcall_handler: FarCallHandler,
-    evm_backends: Vec<foundry_evm_core::backend::Backend>,
-    is_switched_to_evm: Option<Executor>,
+    // evm_backends: Vec<foundry_evm_core::backend::Backend>,
+    use_evm_farcall: Option<LocalForkId>,
+    last_zk_block: Option<U256>,
+    evm_executors: HashMap<LocalForkId, Executor>,
+    fork_urls: HashMap<String, ForkUrlType>,
 }
 
 #[derive(Debug, Clone)]
@@ -305,8 +323,8 @@ struct BroadcastOpts {
     depth: usize,
 }
 
-impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
-    for CheatcodeTracer
+impl<S: DatabaseExt + foundry_evm_core::backend::BackendCloner + Send, H: HistoryMode>
+    DynTracer<EraDb<S>, SimpleMemory<H>> for CheatcodeTracer
 {
     fn before_execution(
         &mut self,
@@ -630,7 +648,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                     }
                 }
 
-                if let Some(executor) = &mut self.is_switched_to_evm {
+                if let Some(executor) =
+                    self.use_evm_farcall.and_then(|fork_id| self.evm_executors.get_mut(&fork_id))
+                {
+                    // let mut env = into_revm_env(self.env.get().unwrap());
+                    // env.cfg.disable_eip3607 = true;
+                    // executor.env = env;
+                    println!("using evm executor #{}", executor.env.block.number);
                     if !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address) {
                         let from = current.msg_sender;
                         let from = revm::primitives::Address::from(from.to_fixed_bytes());
@@ -670,6 +694,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         let is_deployment =
                             current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
 
+                        println!(
+                            "addr {:?} calldata {} deploy?={}",
+                            current.code_address,
+                            hex::encode(&calldata),
+                            is_deployment
+                        );
                         if is_deployment {
                             //FIXME: get calldata of EVM contract, not zkEVM!!!
                             // this here is Nautilus bytecode hardcoded for now that deploys
@@ -697,6 +727,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 }
 
                 return
+            } else {
+                println!("using normal farcall");
             }
 
             if current.code_page.0 == 0 || current.ergs_remaining == 0 {
@@ -719,7 +751,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     }
 }
 
-impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeTracer {
+impl<S: DatabaseExt + foundry_evm_core::backend::BackendCloner + Send, H: HistoryMode>
+    VmTracer<EraDb<S>, H> for CheatcodeTracer
+{
     fn initialize_tracer(
         &mut self,
         _state: &mut ZkSyncVmState<EraDb<S>, H>,
@@ -858,9 +892,6 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     .decommittment_processor
                     .populate(vec![(hash, bytecode)], Timestamp(state.local_state.timestamp)),
                 FinishCycleOneTimeActions::CreateSelectFork { url_or_alias, block_number } => {
-                    let evm = false; //TODO: replace with logic
-                    tracing::debug!(?evm, "createSelectFork");
-
                     let era_env = self.env.get().unwrap();
                     let create_fork = create_fork_request(
                         era_env,
@@ -868,72 +899,140 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         block_number,
                         &url_or_alias,
                     );
-                    if evm {
-                        let backend = Backend::spawn(Some(create_fork));
-                        self.evm_backends.push(backend.clone());
+                    let mut storage = storage.borrow_mut();
+                    let modified_storage =
+                        self.get_modified_storage(storage.modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
+                    );
 
-                        let env = self.outer_env.clone().unwrap();
-
-                        let executor = Executor::new_for_cheatcodes(
-                            backend,
-                            env,
-                            rU256::from(self.env.get().unwrap().system_env.gas_limit),
+                    storage.clean_cache();
+                    let fork_id = {
+                        let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
+                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                        state.decommittment_processor.populate(
+                            bytecodes
+                                .clone()
+                                .into_iter()
+                                .filter(|(key, _)| {
+                                    !state
+                                        .decommittment_processor
+                                        .known_bytecodes
+                                        .inner()
+                                        .contains_key(key)
+                                })
+                                .collect(),
+                            Timestamp(state.local_state.timestamp),
                         );
 
-                        self.is_switched_to_evm.replace(executor);
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        journaled_state.state =
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
-                        //the evm fork_id is done this way to avoid overlapping
-                        // with the normal fork ids
-                        self.return_data =
-                            Some(vec![U256::MAX - U256::from(self.evm_backends.len() - 1)]);
-                    } else {
-                        let mut storage = storage.borrow_mut();
-                        let modified_storage =
-                            self.get_modified_storage(storage.modified_storage_keys());
-                        let modified_bytecodes = self.get_modified_bytecodes(
-                            bootloader_state.get_last_tx_compressed_bytecodes(),
-                        );
-
-                        storage.clean_cache();
-                        let fork_id = {
-                            let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
-                            let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
-                            state.decommittment_processor.populate(
-                                bytecodes
-                                    .clone()
-                                    .into_iter()
-                                    .filter(|(key, _)| {
-                                        !state
-                                            .decommittment_processor
-                                            .known_bytecodes
-                                            .inner()
-                                            .contains_key(key)
-                                    })
-                                    .collect(),
-                                Timestamp(state.local_state.timestamp),
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        if matches!(self.get_fork_url_type(&create_fork), ForkUrlType::Evm) {
+                            // let fork_id = db.create_fork(create_fork.clone()).unwrap();
+                            // let backend = Backend::spawn(Some(create_fork));
+                            let mut evm_backend = db.clone_as_backend();
+                            let fork_id = evm_backend
+                                .create_select_fork(
+                                    create_fork.clone(),
+                                    &mut env,
+                                    &mut journaled_state,
+                                )
+                                .unwrap();
+                            println!("forking and selecting EVM chain {}", fork_id);
+                            let mut env = self.outer_env.clone().unwrap();
+                            env.cfg.disable_eip3607 = true;
+                            let executor = Executor::new_for_cheatcodes(
+                                evm_backend,
+                                // Backend::spawn(Some(create_fork)),
+                                env,
+                                rU256::from(self.env.get().unwrap().system_env.gas_limit),
                             );
+                            self.evm_executors.insert(fork_id, executor);
 
-                            let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                            journaled_state.state =
-                                storage_to_state(era_db, &modified_storage, bytecodes);
-
-                            let mut db = era_db.db.lock().unwrap();
-                            let era_env = self.env.get().unwrap();
-                            let mut env = into_revm_env(era_env);
+                            self.use_evm_farcall.replace(fork_id);
+                            fork_id
+                        } else {
                             db.create_select_fork(create_fork, &mut env, &mut journaled_state)
                                 .unwrap()
-                        };
+                        }
+                    };
 
-                        storage.modified_storage_keys = modified_storage;
+                    storage.modified_storage_keys = modified_storage;
 
-                        self.return_data = Some(fork_id.to_return_data());
-                    }
+                    self.return_data = Some(fork_id.to_return_data());
+
+                    // if evm {
+                    //     let backend = Backend::spawn(Some(create_fork));
+                    //     self.evm_forks.push(backend.clone());
+
+                    //     let env = self.outer_env.clone().unwrap();
+
+                    //     let executor = Executor::new_for_cheatcodes(
+                    //         backend,
+                    //         env,
+                    //         rU256::from(self.env.get().unwrap().system_env.gas_limit),
+                    //     );
+
+                    //     self.is_switched_to_evm.replace(executor);
+
+                    //     //the evm fork_id is done this way to avoid overlapping
+                    //     // with the normal fork ids
+                    //     self.return_data =
+                    //         Some(vec![U256::MAX - U256::from(self.evm_forks.len() - 1)]);
+                    // } else {
+                    //     let mut storage = storage.borrow_mut();
+                    //     let modified_storage =
+                    //         self.get_modified_storage(storage.modified_storage_keys());
+                    //     let modified_bytecodes = self.get_modified_bytecodes(
+                    //         bootloader_state.get_last_tx_compressed_bytecodes(),
+                    //     );
+
+                    //     storage.clean_cache();
+                    //     let fork_id = {
+                    //         let era_db: &RevmDatabaseForEra<S> = &storage.storage_handle;
+                    //         let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                    //         state.decommittment_processor.populate(
+                    //             bytecodes
+                    //                 .clone()
+                    //                 .into_iter()
+                    //                 .filter(|(key, _)| {
+                    //                     !state
+                    //                         .decommittment_processor
+                    //                         .known_bytecodes
+                    //                         .inner()
+                    //                         .contains_key(key)
+                    //                 })
+                    //                 .collect(),
+                    //             Timestamp(state.local_state.timestamp),
+                    //         );
+
+                    //         let mut journaled_state = JournaledState::new(SpecId::LATEST,
+                    // vec![]);         journaled_state.state =
+                    //             storage_to_state(era_db, &modified_storage, bytecodes);
+
+                    //         let mut db = era_db.db.lock().unwrap();
+                    //         let era_env = self.env.get().unwrap();
+                    //         let mut env = into_revm_env(era_env);
+                    //         db.create_select_fork(create_fork, &mut env, &mut journaled_state)
+                    //             .unwrap()
+                    //     };
+
+                    //     storage.modified_storage_keys = modified_storage;
+
+                    //     self.return_data = Some(fork_id.to_return_data());
+                    // }
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
-                    let evm = true; //TODO: replace with logic
-                    tracing::debug!(?evm, "createFork");
-
                     let era_env = self.env.get().unwrap();
+                    let mut env = into_revm_env(era_env); //self.outer_env.clone().unwrap();
+
+                    let unique_fork_id = create_fork_id(&url_or_alias, block_number.clone());
+
                     let create_fork = create_fork_request(
                         era_env,
                         self.config.clone(),
@@ -941,21 +1040,61 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         &url_or_alias,
                     );
 
-                    if evm {
-                        let backend = Backend::spawn(Some(create_fork));
-                        self.evm_backends.push(backend);
+                    // if evm {
+                    //     //the evm fork_id is done this way to avoid overlapping
+                    //     // with the normal fork ids
+                    //     self.return_data =
+                    //         Some(vec![U256::MAX - U256::from(self.evm_backends.len() - 1)]);
+                    // } else {
+                    //     let era_db = &storage.borrow_mut().storage_handle;
+                    //     let mut db = era_db.db.lock().unwrap();
+                    //     let fork_id = db.create_fork(create_fork).unwrap();
+                    //     let backend = Backend::spawn(Some(create_fork));
+                    //     self.evm_backends.insert(fork_id, backend);
 
-                        //the evm fork_id is done this way to avoid overlapping
-                        // with the normal fork ids
-                        self.return_data =
-                            Some(vec![U256::MAX - U256::from(self.evm_backends.len() - 1)]);
-                    } else {
-                        let era_db = &storage.borrow_mut().storage_handle;
-                        let mut db = era_db.db.lock().unwrap();
-                        let fork_id = db.create_fork(create_fork).unwrap();
+                    //     self.return_data = Some(fork_id.to_return_data());
+                    // }
 
-                        self.return_data = Some(fork_id.to_return_data());
-                    }
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+
+                    let fork_id =
+                        if matches!(self.get_fork_url_type(&create_fork), ForkUrlType::Evm) {
+                            let fork_id = db.create_fork(create_fork.clone()).unwrap();
+                            let evm_backend = db.clone_as_backend();
+                            // let key = StorageKey::new(
+                            //     AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                            //     zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
+                            // );
+                            // let (_, block_timestamp) =
+                            //     unpack_block_info(h256_to_u256(storage.read_value(&key)));
+                            // self.write_storage(
+                            //     key,
+                            //     u256_to_h256(pack_block_info(new_height.as_limbs()[0],
+                            // block_timestamp)),     &mut storage,
+                            // );
+                            let evm_fork_id = fork_id.saturating_add(rU256::from(u128::MAX));
+                            println!(
+                                "forking EVM chain {} ({}), {:?}{:?}",
+                                evm_fork_id, fork_id, block_number, create_fork
+                            );
+                            // println!("OENV {:#?}", self.outer_env.clone().unwrap());
+                            // println!("SENV {:#?}", into_revm_env(self.env.get().unwrap()));
+                            env.cfg.disable_eip3607 = true;
+                            let executor = Executor::new_for_cheatcodes(
+                                evm_backend,
+                                // Backend::spawn(Some(create_fork)),
+                                env,
+                                rU256::from(self.env.get().unwrap().system_env.gas_limit),
+                            );
+
+                            self.evm_executors.insert(evm_fork_id, executor);
+                            evm_fork_id
+                        } else {
+                            db.create_fork(create_fork.clone()).unwrap()
+                        };
+
+                    self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
                     //TODO: check is_switched_to_evm
@@ -1000,71 +1139,116 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     storage.modified_storage_keys = modified_storage;
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
-                    let maybe_evm_fork_id = (U256::MAX - fork_id).low_u64() as usize;
-                    tracing::debug!(
-                        maybe_evm_fork_id,
-                        evm_backends = self.evm_backends.len(),
-                        "selectFork"
+                    // let storage = storage.borrow();
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
+                    );
+                    let (block_num, block_timestamp) =
+                        unpack_block_info(h256_to_u256(storage.borrow().read_value(&key)));
+                    let s = storage.borrow_mut().storage_handle;
+                    self.write_storage(
+                        key,
+                        u256_to_h256(pack_block_info(new_height.as_limbs()[0], block_timestamp)),
+                        s,
                     );
 
-                    if maybe_evm_fork_id < self.evm_backends.len() {
-                        let db = self.evm_backends[maybe_evm_fork_id].clone();
-                        let env = self.outer_env.clone().unwrap();
-
-                        let executor = Executor::new_for_cheatcodes(
-                            db,
-                            env,
-                            rU256::from(self.env.get().unwrap().system_env.gas_limit),
+                    let fork_id = u256_to_revm_u256(fork_id);
+                    let mut storage = storage.borrow_mut();
+                    let modified_storage =
+                        self.get_modified_storage(storage.modified_storage_keys());
+                    let modified_bytecodes = self.get_modified_bytecodes(
+                        bootloader_state.get_last_tx_compressed_bytecodes(),
+                    );
+                    {
+                        storage.clean_cache();
+                        let era_db = &storage.storage_handle;
+                        let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
+                        state.decommittment_processor.populate(
+                            bytecodes
+                                .clone()
+                                .into_iter()
+                                .filter(|(key, _)| {
+                                    !state
+                                        .decommittment_processor
+                                        .known_bytecodes
+                                        .inner()
+                                        .contains_key(key)
+                                })
+                                .collect(),
+                            Timestamp(state.local_state.timestamp),
                         );
 
-                        self.is_switched_to_evm.replace(executor);
-                        self.return_data = Some(vec![fork_id]);
-                    } else {
-                        self.is_switched_to_evm.take();
+                        let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
+                        journaled_state.state =
+                            storage_to_state(era_db, &modified_storage, bytecodes);
 
-                        let mut storage = storage.borrow_mut();
-                        let modified_storage =
-                            self.get_modified_storage(storage.modified_storage_keys());
-                        let modified_bytecodes = self.get_modified_bytecodes(
-                            bootloader_state.get_last_tx_compressed_bytecodes(),
-                        );
-                        {
-                            storage.clean_cache();
-                            let era_db = &storage.storage_handle;
-                            let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
-                            state.decommittment_processor.populate(
-                                bytecodes
-                                    .clone()
-                                    .into_iter()
-                                    .filter(|(key, _)| {
-                                        !state
-                                            .decommittment_processor
-                                            .known_bytecodes
-                                            .inner()
-                                            .contains_key(key)
-                                    })
-                                    .collect(),
-                                Timestamp(state.local_state.timestamp),
+                        let mut db = era_db.db.lock().unwrap();
+                        let era_env = self.env.get().unwrap();
+                        let mut env = into_revm_env(era_env);
+                        if let Some(executor) = self.evm_executors.get_mut(&fork_id) {
+                            let internal_fork_id = fork_id.saturating_sub(rU256::from(u128::MAX));
+                            println!(
+                                "selecting EVM executor for {} ({}) #{}",
+                                fork_id, internal_fork_id, executor.env.block.number
                             );
+                            let mut env = executor.env.clone();
+                            executor
+                                .backend
+                                .select_fork(internal_fork_id, &mut env, &mut journaled_state)
+                                .unwrap();
+                            executor.env.block.number = env.block.number;
+                            println!("new block #{}", executor.env.block.number);
 
-                            let mut journaled_state = JournaledState::new(SpecId::LATEST, vec![]);
-                            journaled_state.state =
-                                storage_to_state(era_db, &modified_storage, bytecodes);
+                           
 
-                            let mut db = era_db.db.lock().unwrap();
-                            let era_env = self.env.get().unwrap();
-                            let mut env = into_revm_env(era_env);
-                            db.select_fork(
-                                rU256::from(fork_id.as_u128()),
-                                &mut env,
-                                &mut journaled_state,
-                            )
-                            .unwrap();
+                            // let address = h160_to_address(zksync_types::SYSTEM_CONTEXT_ADDRESS);
+                            // let index =
+                            // u256_to_revm_u256(h256_to_u256(zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION));
+                            // let info =
+                            // executor.backend.basic(address).ok().flatten().unwrap_or_default();
+                            // let block_info = executor.backend.storage_ref(address,
+                            // index).unwrap_or_default();
+                            // println!("BLOCK {:?} need {}", block_info,
+                            // executor.env.block.number); // let (_,
+                            // block_timestamp) = unpack_block_info(revm_u256_to_u256(block_info));
+                            // let new_block_info =
+                            // pack_block_info(executor.env.block.number.as_limbs()[0], 0);
+                            // let mut storage = hashbrown::HashMap::new();
+                            // storage.insert(index,  revm::primitives::StorageSlot {
+                            //     previous_or_original_value: block_info,
+                            //     present_value: u256_to_revm_u256(new_block_info),
+                            // });
+                            // let account = revm::primitives::Account {
+                            //     info,
+                            //     storage,
+                            //     status: revm::primitives::AccountStatus::Touched,
+                            // };
+                            // let mut changes = hashbrown::HashMap::new();
+                            // changes.insert(address, account);
+                            // executor.backend.commit(changes);
+
+                            // let block_info = executor.backend.storage_ref(address,
+                            // index).unwrap_or_default(); println!("NEW
+                            // BLOCK {:?}", block_info);
+
+                            // for (k,v) in &executor.backend.inner.issued_local_fork_ids {
+                            //     println!("sel? {} {:?}", k, v);
+                            // }
+                            // println!("ACC {:#?}",
+                            // executor.backend.basic(alloy_primitives::address!("
+                            // A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")));
+                            self.use_evm_farcall.replace(fork_id);
+                        } else {
+                            println!("selecting ZK executor {} #{}", fork_id, env.block.number);
+                            self.use_evm_farcall.take();
+                            db.select_fork(fork_id, &mut env, &mut journaled_state).unwrap();
+                            println!("new block #{}", env.block.number);
                         }
-                        storage.modified_storage_keys = modified_storage;
-
-                        self.return_data = Some(vec![fork_id]);
                     }
+                    storage.modified_storage_keys = modified_storage;
+
+                    self.return_data = Some(vec![fork_id].to_return_data());
                 }
                 FinishCycleOneTimeActions::RevertToSnapshot { snapshot_id } => {
                     let mut storage = storage.borrow_mut();
@@ -1266,6 +1450,32 @@ impl CheatcodeTracer {
             outer_env: Some(env),
             ..Default::default()
         }
+    }
+
+    fn get_fork_url_type(&mut self, fork: &CreateFork) -> ForkUrlType {
+        if let Some(fork_url_type) = self.fork_urls.get(&fork.url) {
+            return fork_url_type.clone()
+        }
+
+        let is_zk_url = try_get_http_provider(&fork.url)
+            .and_then(|provider| {
+                let is_zk_url = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(provider.request("zks_getTokenPrice", [H160::zero()]))
+                    .map(|_: String| true)
+                    .unwrap_or_default();
+
+                Ok(is_zk_url)
+            })
+            .unwrap_or_default();
+
+        let fork_url_type = if is_zk_url { ForkUrlType::Zk } else { ForkUrlType::Evm };
+        println!("fork_url = {} {:?}", fork.url, fork_url_type);
+        self.fork_urls.insert(fork.url.clone(), fork_url_type.clone());
+
+        fork_url_type
     }
 
     /// Resets the test state to [TestStatus::NotStarted]

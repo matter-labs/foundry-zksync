@@ -201,9 +201,20 @@ ethers-signers = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194
 ethers-middleware = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
 ethers-solc = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09c533feb10d1a686ddb9e5946ec107" }
 
-revm = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
-revm-interpreter = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
-revm-precompile = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
-revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+# revm = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+# revm-interpreter = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+# revm-precompile = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+# revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze" }
+revm = { path = "../revm/crates/revm" }
+revm-interpreter = { path = "../revm/crates/interpreter" }
+revm-primitives = { path = "../revm/crates/primitives" }
+revm-precompile = { path = "../revm/crates/precompile" }
 
 foundry-compilers = { git  = "https://github.com/foundry-rs/compilers", rev = "b1561d807c246c066c7c4b0c72c8eb64c696a43d", default-features = false }
+
+# [patch."https://github.com/bluealloy/revm"]
+# revm = { path = "../revm/crates/revm" }
+# revm-interpreter = { path = "../revm/crates/interpreter" }
+# revm-primitives = { path = "../revm/crates/primitives" }
+# revm-precompile = { path = "../revm/crates/precompile" }
+

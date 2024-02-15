@@ -46,6 +46,12 @@ pub struct FuzzBackendWrapper<'a> {
     is_initialized: bool,
 }
 
+impl<'a> super::BackendCloner for FuzzBackendWrapper<'a> {
+    fn clone_as_backend(&self) -> Backend {
+        self.backend.clone_as_backend()
+    }
+}
+
 impl<'a> FuzzBackendWrapper<'a> {
     pub fn new(backend: &'a Backend) -> Self {
         Self { backend: Cow::Borrowed(backend), is_initialized: false }

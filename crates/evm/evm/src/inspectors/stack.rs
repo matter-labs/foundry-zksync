@@ -581,7 +581,7 @@ use era_cheatcodes::cheatcodes::CheatcodeTracer;
 use foundry_evm_core::era_revm::db::RevmDatabaseForEra;
 use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
 
-impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
+impl<DB: DatabaseExt + foundry_evm_core::backend::BackendCloner + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
     for &mut InspectorStack
 {
     fn as_tracer_pointer(
