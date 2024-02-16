@@ -2393,6 +2393,11 @@ impl CheatcodeTracer {
 
         // Skip check if opcode is not Ret
         let Opcode::Ret(op) = data.opcode.variant.opcode else { return };
+        // Check how many returns we need to skip before finding the actual one
+        if action.returns_to_skip != 0 {
+            action.returns_to_skip -= 1;
+            return
+        }
 
         // The desired return opcode was found
         match &action.action {
@@ -2402,12 +2407,6 @@ impl CheatcodeTracer {
                 prev_exception_handler_pc: exception_handler,
                 prev_continue_pc: continue_pc,
             } => {
-                // Check how many returns we need to skip before finding the actual one
-                if action.returns_to_skip != 0 {
-                    action.returns_to_skip -= 1;
-                    return
-                }
-
                 match op {
                     RetOpcode::Revert => {
                         tracing::debug!(wanted = %depth, current_depth = %callstack_depth, opcode = ?data.opcode.variant.opcode, "expectRevert");
@@ -2463,7 +2462,10 @@ impl CheatcodeTracer {
                 });
                 self.next_return_action = None;
             }
-            ActionOnReturn::StopPrank => self.stop_prank(&storage),
+            ActionOnReturn::StopPrank => {
+                self.stop_prank(&storage);
+                self.next_return_action = None;
+            }
         }
     }
 
@@ -2483,7 +2485,7 @@ impl CheatcodeTracer {
         self.next_return_action.replace(NextReturnAction {
             target_depth: current_depth - 1,
             action: ActionOnReturn::StopPrank,
-            returns_to_skip: 1,
+            returns_to_skip: 3,
         });
     }
 
