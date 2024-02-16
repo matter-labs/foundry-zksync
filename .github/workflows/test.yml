@@ -126,14 +126,13 @@ jobs:
             toolchain: nightly-2023-09-30
 
         - name: Run era-test-node
-          uses: dutterbutter/era-test-node-action@latest
+          uses: dutterbutter/era-test-node-action@v1
           with:
-            mode: fork
-            network: mainnet
+            mode: run
             log: info
             logFilePath: era_test_node.log
             target: x86_64-unknown-linux-gnu
-            releaseTag: latest
+            releaseTag: v0.1.0-alpha.15
 
         - name: Test Cheatcodes
           env:
