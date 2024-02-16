@@ -89,7 +89,7 @@ impl Cheatcode for rememberKeyCall {
         let Self { privateKey } = self;
         let wallet = parse_wallet(privateKey)?.with_chain_id(ccx.data.env.cfg.chain_id);
         let address = wallet.address();
-        ccx.state.script_wallets.push(wallet);
+        ccx.state.script_wallets.write().unwrap().push(wallet);
         Ok(address.to_alloy().abi_encode())
     }
 }

@@ -144,7 +144,10 @@ impl ScriptArgs {
                     .get(transaction.rpc.as_ref().expect("to have been filled already."))
                     .expect("to have been built.")
                     .write();
-                runner.executor.adjust_zksync_gas_parameters();
+
+                runner.executor.adjust_zksync_gas_parameters(
+                    transaction.transaction.from().map(|a| a.to_alloy()),
+                );
 
                 let deps = transaction.factory_deps;
                 if let TypedTransaction::Legacy(mut tx) = transaction.transaction {
