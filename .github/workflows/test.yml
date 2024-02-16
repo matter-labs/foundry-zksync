@@ -128,7 +128,9 @@ jobs:
         - name: Run era-test-node
           uses: dutterbutter/era-test-node-action@v1
           with:
-            mode: run
+            mode: fork
+            forkAtHeight: '20760265'
+            network: mainnet
             log: info
             logFilePath: era_test_node.log
             target: x86_64-unknown-linux-gnu
