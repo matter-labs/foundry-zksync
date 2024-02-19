@@ -258,7 +258,9 @@ struct FinishCyclePermanentActions {
 #[derive(Debug, Clone)]
 struct StartPrankOpts {
     sender: H160,
-    origin: Option<H160>,
+    origin: Option<(H160, H160)>,
+    depth: usize,
+    prankster: H160,
 }
 
 /// Tracks the expected calls per address.
@@ -463,6 +465,58 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                 self.farcall_handler.set_immediate_return(return_data);
             }
         }
+
+        // ---- START: prank origin only at desired depth
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.depth();
+
+            if !BROADCAST_IGNORED_CONTRACTS
+                .contains(&state.vm_local_state.callstack.current.this_address)
+            {
+                if let Some(StartPrankOpts { sender: _, origin, depth, prankster }) =
+                    self.permanent_actions.start_prank.as_ref()
+                {
+                    if let Some((_, new_origin)) = origin {
+                        if &current == depth &&
+                            &state.vm_local_state.callstack.inner.last().unwrap().this_address ==
+                                prankster
+                        {
+                            let key = StorageKey::new(
+                                AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                                zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                            );
+                            let storage = &mut storage.borrow_mut();
+                            self.write_storage(key, H256::from(*new_origin), storage)
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Opcode::Ret(_) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.depth();
+            if !BROADCAST_IGNORED_CONTRACTS
+                .contains(&state.vm_local_state.callstack.current.this_address)
+            {
+                if let Some(StartPrankOpts { sender: _, origin, depth, prankster }) =
+                    self.permanent_actions.start_prank.as_ref()
+                {
+                    if let Some((old_origin, _)) = origin {
+                        if *depth == current + 1 &&
+                            &state.vm_local_state.callstack.current.this_address == prankster
+                        {
+                            let key = StorageKey::new(
+                                AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                                zksync_types::SYSTEM_CONTEXT_TX_ORIGIN_POSITION,
+                            );
+                            let storage = &mut storage.borrow_mut();
+                            self.write_storage(key, H256::from(*old_origin), storage)
+                        }
+                    }
+                }
+            }
+        }
+        // ---- END: prank origin only at desired depth
 
         if self.return_data.is_some() {
             if let Opcode::Ret(_call) = data.opcode.variant.opcode {
@@ -1110,10 +1164,12 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
         }
 
         // Sets the sender address for startPrank cheatcode
-        if let Some(start_prank_call) = &self.permanent_actions.start_prank {
+        if let Some(start_prank_opts) = &self.permanent_actions.start_prank {
             let this_address = state.local_state.callstack.current.this_address;
-            if !INTERNAL_CONTRACT_ADDRESSES.contains(&this_address) {
-                state.local_state.callstack.current.msg_sender = start_prank_call.sender;
+            if !INTERNAL_CONTRACT_ADDRESSES.contains(&this_address) &&
+                state.local_state.callstack.current.msg_sender == start_prank_opts.prankster
+            {
+                state.local_state.callstack.current.msg_sender = start_prank_opts.sender;
             }
         }
         TracerExecutionStatus::Continue
@@ -1642,6 +1698,7 @@ impl CheatcodeTracer {
                     &storage,
                     msg_sender.to_h160(),
                     None,
+                    state.vm_local_state.callstack.inner.last().unwrap().this_address,
                 )
             }
             prank_1(prank_1Call { msgSender: msg_sender, txOrigin: tx_origin }) => {
@@ -1651,6 +1708,7 @@ impl CheatcodeTracer {
                     &storage,
                     msg_sender.to_h160(),
                     Some(tx_origin.to_h160()),
+                    state.vm_local_state.callstack.inner.last().unwrap().this_address,
                 )
             }
             recordLogs(recordLogsCall {}) => {
@@ -1921,11 +1979,23 @@ impl CheatcodeTracer {
             }
             startPrank_0(startPrank_0Call { msgSender: msg_sender }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?}");
-                self.start_prank(&storage, msg_sender.to_h160(), None);
+                self.start_prank(
+                    &storage,
+                    msg_sender.to_h160(),
+                    None,
+                    state.vm_local_state.callstack.depth(),
+                    state.vm_local_state.callstack.inner.last().unwrap().this_address,
+                );
             }
             startPrank_1(startPrank_1Call { msgSender: msg_sender, txOrigin: tx_origin }) => {
                 tracing::info!("👷 Starting prank to {msg_sender:?} with origin {tx_origin:?}");
-                self.start_prank(&storage, msg_sender.to_h160(), Some(tx_origin.to_h160()))
+                self.start_prank(
+                    &storage,
+                    msg_sender.to_h160(),
+                    Some(tx_origin.to_h160()),
+                    state.vm_local_state.callstack.depth(),
+                    state.vm_local_state.callstack.inner.last().unwrap().this_address,
+                )
             }
             stopBroadcast(stopBroadcastCall {}) => {
                 tracing::info!("👷 Stopping broadcast");
@@ -2463,6 +2533,7 @@ impl CheatcodeTracer {
                 self.next_return_action = None;
             }
             ActionOnReturn::StopPrank => {
+                tracing::debug!("Stopping prank");
                 self.stop_prank(&storage);
                 self.next_return_action = None;
             }
@@ -2475,17 +2546,18 @@ impl CheatcodeTracer {
         storage: &StoragePtr<EraDb<S>>,
         sender: H160,
         origin: Option<H160>,
+        prankster: H160,
     ) {
         if self.permanent_actions.broadcast.is_some() {
             tracing::error!("prank is incompatible with broadcast");
             return
         }
 
-        self.start_prank(storage, sender, origin);
+        self.start_prank(storage, sender, origin, current_depth, prankster);
         self.next_return_action.replace(NextReturnAction {
             target_depth: current_depth - 1,
             action: ActionOnReturn::StopPrank,
-            returns_to_skip: 3,
+            returns_to_skip: 2,
         });
     }
 
@@ -2494,6 +2566,8 @@ impl CheatcodeTracer {
         storage: &StoragePtr<EraDb<S>>,
         sender: H160,
         origin: Option<H160>,
+        depth: usize,
+        prankster: H160,
     ) {
         if self.permanent_actions.broadcast.is_some() {
             tracing::error!("prank is incompatible with broadcast");
@@ -2502,7 +2576,12 @@ impl CheatcodeTracer {
 
         match origin {
             None => {
-                self.permanent_actions.start_prank.replace(StartPrankOpts { sender, origin: None });
+                self.permanent_actions.start_prank.replace(StartPrankOpts {
+                    sender,
+                    origin: None,
+                    depth,
+                    prankster,
+                });
             }
             Some(tx_origin) => {
                 let key = StorageKey::new(
@@ -2511,18 +2590,20 @@ impl CheatcodeTracer {
                 );
                 let storage = &mut storage.borrow_mut();
                 let original_tx_origin = storage.read_value(&key);
-                self.write_storage(key, tx_origin.into(), storage);
 
-                self.permanent_actions
-                    .start_prank
-                    .replace(StartPrankOpts { sender, origin: Some(original_tx_origin.into()) });
+                self.permanent_actions.start_prank.replace(StartPrankOpts {
+                    sender,
+                    origin: Some((original_tx_origin.into(), tx_origin)),
+                    depth,
+                    prankster,
+                });
             }
         }
     }
 
     fn stop_prank<S: DatabaseExt + Send>(&mut self, storage: &StoragePtr<EraDb<S>>) {
         if let Some(original_tx_origin) =
-            self.permanent_actions.start_prank.take().and_then(|v| v.origin)
+            self.permanent_actions.start_prank.take().and_then(|v| v.origin).map(|origin| origin.0)
         {
             let key = StorageKey::new(
                 AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
