@@ -1049,6 +1049,7 @@ impl Config {
             mode: Some(mode),
             details,
             fallback_to_optimizing_for_size: Some(self.fallback_oz),
+            disable_system_request_memoization: false,
         }
     }
 
