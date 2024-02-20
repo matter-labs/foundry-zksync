@@ -5,7 +5,6 @@ import {Test, console2 as console} from "../../lib/forge-std/src/Test.sol";
 import {Constants} from "./Constants.sol";
 
 contract CheatcodeRollTest is Test {
-    address constant TEST_ADDRESS = 0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a;
     uint256 constant NEW_BLOCK_NUMBER = 10;
 
     function testRoll() public {
