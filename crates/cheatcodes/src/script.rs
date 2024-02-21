@@ -112,7 +112,7 @@ fn broadcast_key<DB: DatabaseExt>(
 
     let result = broadcast(ccx, Some(new_origin), single_call);
     if result.is_ok() {
-        ccx.state.script_wallets.push(wallet);
+        ccx.state.script_wallets.write().unwrap().push(wallet);
     }
     result
 }

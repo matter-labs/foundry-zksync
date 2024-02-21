@@ -118,6 +118,9 @@ pub struct Optimizer {
     /// Whether to try to recompile with -Oz if the bytecode is too large.
     #[serde(rename = "fallbackToOptimizingForSize")]
     pub fallback_to_optimizing_for_size: Option<bool>,
+    /// Whether to disable the system request memoization.
+    #[serde(rename = "disableSystemRequestMemoization")]
+    pub disable_system_request_memoization: bool,
 }
 /// A builder for `ZkSolcConfig`.
 #[derive(Default)]
