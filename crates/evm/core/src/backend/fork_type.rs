@@ -34,7 +34,7 @@ impl CachedForkType {
         }
 
         let is_zk_url = foundry_common::try_get_http_provider(fork_url)
-            .and_then(|provider| {
+            .map(|provider| {
                 let is_zk_url = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
@@ -43,7 +43,7 @@ impl CachedForkType {
                     .map(|_: String| true)
                     .unwrap_or_default();
 
-                Ok(is_zk_url)
+                is_zk_url
             })
             .unwrap_or_default();
 

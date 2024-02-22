@@ -1,12 +1,12 @@
 use crate::{
-    backend::{Backend, DatabaseError, DatabaseExt, LocalForkId},
+    backend::{Backend, DatabaseError, DatabaseExt, ForkInfo, LocalForkId},
     fork::{CreateFork, ForkId},
 };
 
 use crate::backend::RevertDiagnostic;
 use ethers_core::utils::GenesisAccount;
 use revm::{
-    primitives::{AccountInfo, Address, Bytecode, Env, B256, U256},
+    primitives::{AccountInfo, Address, Bytecode, Env, ResultAndState, B256, U256},
     Inspector, JournaledState,
 };
 use std::collections::HashMap;
@@ -37,6 +37,14 @@ impl revm::Database for MockDatabase {
 }
 
 impl DatabaseExt for MockDatabase {
+    fn call_with_evm(&mut self, _env: Env) -> eyre::Result<ResultAndState> {
+        todo!()
+    }
+
+    fn get_fork_info(&mut self, _id: LocalForkId) -> eyre::Result<ForkInfo> {
+        todo!()
+    }
+
     fn snapshot(&mut self, _journaled_state: &JournaledState, _env: &Env) -> U256 {
         todo!()
     }

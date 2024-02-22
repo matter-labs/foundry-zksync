@@ -640,97 +640,9 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode>
                     }
                 }
 
-                // check if the FarCall needs to be executed in EVM mode, and return if handled
                 if self.handle_evm_far_call(state, memory, storage) {
                     return
                 }
-                // if let Some(fork_env) = &self.use_evm_fork {
-                //     let call = farcall::parse(&state, &memory);
-
-                //     if call.to() == &SYSTEM_CONTEXT_ADDRESS {
-                //         if call.selector() == farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER {
-                //             self.farcall_handler
-                //                 .set_immediate_return(fork_env.block.number.to_be_bytes_vec());
-                //         } else if call.selector() ==
-                //             farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP
-                //         {
-                //             self.farcall_handler
-                //
-                // .set_immediate_return(fork_env.block.timestamp.to_be_bytes_vec());
-                //         }
-                //         return
-                //     }
-
-                //     if call.to() == &L2_ETH_TOKEN_ADDRESS &&
-                //         call.selector() == farcall::SELECTOR_L2_ETH_BALANCE_OF
-                //     {
-                //         let account = call.params()[0];
-                //         let account = h256_to_h160(&H256::from(account));
-
-                //         let handle = &mut storage.borrow_mut();
-                //         let era_db = &handle.storage_handle;
-                //         let info = era_db
-                //             .db
-                //             .lock()
-                //             .unwrap()
-                //             .basic(h160_to_address(account))
-                //             .unwrap()
-                //             .unwrap();
-                //         tracing::debug!(
-                //             "returning evm balance {:?} for {:?}",
-                //             info.balance,
-                //             account
-                //         );
-
-                //         self.farcall_handler.set_immediate_return(info.balance.
-                // to_be_bytes_vec());         return
-                //     }
-
-                //     if !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address) {
-                //         tracing::info!("Executing in EVM mode {:?}", call);
-
-                //         let from = h160_to_address(current.msg_sender);
-                //         let (value, to) = match call {
-                //             ParsedFarCall::SimpleCall { to, .. } => (rU256::ZERO, to),
-                //             ParsedFarCall::ValueCall { recipient, value, .. } => {
-                //                 (u256_to_revm_u256(value), recipient)
-                //             }
-                //         };
-                //         let to = h160_to_address(to);
-                //         let calldata = call.calldata().to_vec();
-
-                //         let era_env = self.env.get().unwrap();
-                //         let mut env = into_revm_env(era_env);
-                //         env.block = fork_env.block.clone();
-                //         env.cfg.disable_eip3607 = true;
-                //         env.cfg.disable_base_fee = true;
-                //         env.cfg.disable_block_gas_limit = true;
-                //         env.tx = revm::primitives::TxEnv {
-                //             caller: from,
-                //             transact_to: revm::primitives::TransactTo::Call(to.into()),
-                //             data: calldata.into(),
-                //             value,
-                //             // As above, we set the gas price to 0.
-                //             gas_price: rU256::from(0),
-                //             gas_priority_fee: None,
-                //             gas_limit: era_env.system_env.gas_limit as u64,
-                //             ..env.tx
-                //         };
-
-                //         let era_db = &storage.borrow_mut().storage_handle;
-                //         let mut db = era_db.db.lock().unwrap();
-                //         let result = db.call_with_evm(env).expect("failed running evm call");
-                //         let output = result.result.output().unwrap().clone();
-
-                //         // update state in current EVM after performing any storage translations
-                //         if !result.state.is_empty() {
-                //             db.commit(result.state);
-                //         }
-
-                //         self.farcall_handler.set_immediate_return(output.into());
-                //         return
-                //     }
-                // }
 
                 return
             }
