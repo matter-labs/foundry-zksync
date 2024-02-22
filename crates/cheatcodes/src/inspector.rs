@@ -132,7 +132,7 @@ pub struct Cheatcodes {
     pub labels: HashMap<Address, String>,
 
     /// Remembered private keys
-    pub script_wallets: Vec<LocalWallet>,
+    pub script_wallets: Arc<RwLock<Vec<LocalWallet>>>,
 
     /// Whether the skip cheatcode was activated
     pub skip: bool,

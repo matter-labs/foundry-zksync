@@ -176,6 +176,9 @@ impl TestArgs {
         let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
+        // Disable system request memoization to allow modifying system contracts storage
+        zksolc_cfg.settings.optimizer.disable_system_request_memoization = true;
+
         let mut zksolc = ZkSolc::new(zksolc_cfg, project);
         let (output, contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,

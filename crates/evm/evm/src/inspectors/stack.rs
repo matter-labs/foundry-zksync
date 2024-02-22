@@ -316,7 +316,7 @@ impl InspectorStack {
             script_wallets: self
                 .cheatcodes
                 .as_ref()
-                .map(|cheatcodes| cheatcodes.script_wallets.clone())
+                .map(|cheatcodes| cheatcodes.script_wallets.read().unwrap().clone())
                 .unwrap_or_default(),
             cheatcodes: self.cheatcodes,
             chisel_state: self.chisel_state.and_then(|state| state.state),
@@ -597,6 +597,7 @@ impl<DB: DatabaseExt + revm::DatabaseCommit + Send>
                 .map(|c| c.broadcastable_transactions.clone())
                 .unwrap_or_default(),
             self.dual_compiled_contracts.clone(),
+            self.cheatcodes.as_ref().map(|c| c.script_wallets.clone()).unwrap_or_default(),
         )
         .into_tracer_pointer()
     }
