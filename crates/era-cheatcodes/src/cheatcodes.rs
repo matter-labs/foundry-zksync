@@ -854,7 +854,7 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                             )
                             .unwrap();
 
-                        self.maybe_switch_vm(db, fork_id.clone(), false);
+                        self.maybe_switch_vm(db, fork_id, false);
 
                         fork_id
                     };
@@ -916,7 +916,7 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                             .unwrap();
 
                         let fork_id = fork_id.unwrap();
-                        self.maybe_switch_vm(db, fork_id.clone(), true);
+                        self.maybe_switch_vm(db, fork_id, true);
                     };
                     storage.modified_storage_keys = modified_storage;
                 }

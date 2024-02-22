@@ -91,7 +91,7 @@ contract MultiVmBridgeTest is Test {
         vm.selectFork(forkEth);
         require(number.ten() == 10, "eth setUp contract value mismatch");
 
-        vm.selectFork(forkEra);
+        // vm.selectFork(forkEra);
     }
 
     function testBridgeInlineDeployedContractNoArgs() public {
