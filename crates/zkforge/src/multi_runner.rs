@@ -8,10 +8,13 @@ use crate::{
 use alloy_json_abi::{Function, JsonAbi as Abi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
-use foundry_common::{zk_compile::ContractBytecodes, ContractsByArtifact, TestFunctionExt};
+use foundry_common::{
+    factory_deps::PackedEraBytecode, zk_compile::ContractBytecodes, ContractsByArtifact,
+    DualCompiledContract, TestFunctionExt,
+};
 use foundry_compilers::{
     artifacts::CompactContractBytecode, contracts::ArtifactContracts, Artifact, ArtifactId,
-    ArtifactOutput, ProjectCompileOutput,
+    ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput,
 };
 use foundry_evm::{
     backend::Backend,
@@ -24,7 +27,7 @@ use foundry_evm::{
 use rayon::prelude::*;
 use revm::primitives::SpecId;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     iter::Iterator,
     path::Path,
     sync::{mpsc, Arc},
@@ -64,6 +67,8 @@ pub struct MultiContractRunner {
     pub debug: bool,
     /// Settings related to fuzz and/or invariant tests
     pub test_options: TestOptions,
+    /// ZKSolc -> Solc Contract codes
+    pub dual_compiled_contracts: Vec<DualCompiledContract>,
 }
 
 impl MultiContractRunner {
@@ -176,7 +181,7 @@ impl MultiContractRunner {
             .filter(|(id, _)| filter.matches_path(&id.source) && filter.matches_contract(&id.name))
             .filter(|(_, (abi, _, _))| abi.functions().any(|func| filter.matches_test(&func.name)))
             .for_each_with(stream_result, |stream_result, (id, (abi, deploy_code, libs))| {
-                let executor = ExecutorBuilder::new()
+                let mut executor = ExecutorBuilder::new()
                     .inspectors(|stack| {
                         stack
                             .cheatcodes(self.cheats_config.clone())
@@ -187,6 +192,8 @@ impl MultiContractRunner {
                     .spec(self.evm_spec)
                     .gas_limit(self.evm_opts.gas_limit())
                     .build(self.env.clone(), db.clone());
+                executor.inspector.dual_compiled_contracts = self.dual_compiled_contracts.clone();
+
                 let identifier = id.identifier();
                 trace!(contract=%identifier, "start executing all tests in contract");
 
@@ -255,19 +262,81 @@ pub struct MultiContractRunnerBuilder {
     pub test_options: Option<TestOptions>,
 }
 
+#[derive(Debug)]
+pub struct ProjectCompileDualOutput<A: ArtifactOutput = ConfigurableArtifacts> {
+    pub zk_output: ProjectCompileOutput<A>,
+    pub solc_output: Option<ProjectCompileOutput<A>>,
+}
+
+impl<A: ArtifactOutput> ProjectCompileDualOutput<A> {
+    pub fn only_zk(zk_output: ProjectCompileOutput<A>) -> Self {
+        ProjectCompileDualOutput { zk_output, solc_output: None }
+    }
+}
+
 impl MultiContractRunnerBuilder {
     /// Given an EVM, proceeds to return a runner which is able to execute all tests
     /// against that evm
     pub fn build<A>(
         self,
         root: impl AsRef<Path>,
-        output: ProjectCompileOutput<A>,
+        output: ProjectCompileDualOutput<A>,
+        // solc_output: ProjectCompileOutput<A>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
     ) -> Result<MultiContractRunner>
     where
         A: ArtifactOutput,
     {
+        let mut dual_compiled_contracts = vec![];
+        if let Some(solc_output) = output.solc_output {
+            println!("solc bytecodes provided, building dual compiled contracts");
+            let mut solc_bytecodes = HashMap::new();
+            for (contract_name, artifact) in solc_output.artifacts() {
+                let deployed_bytecode = artifact.get_deployed_bytecode();
+                let deployed_bytecode = deployed_bytecode
+                    .as_ref()
+                    .map(|d| d.bytecode.as_ref().map(|b| b.object.as_bytes()).flatten())
+                    .flatten();
+                let bytecode = artifact.get_bytecode();
+                let bytecode = bytecode
+                    .as_ref()
+                    .map(|b| b.object.as_bytes())
+                    .flatten()
+                    .expect("bytecode was expected");
+                if let Some(deployed_bytecode) = deployed_bytecode {
+                    solc_bytecodes.insert(
+                        contract_name.clone(),
+                        (bytecode.clone(), deployed_bytecode.clone()),
+                    );
+                }
+            }
+
+            for (contract_name, artifact) in output.zk_output.artifacts() {
+                let deployed_bytecode = artifact.get_deployed_bytecode();
+                let deployed_bytecode = deployed_bytecode
+                    .as_ref()
+                    .map(|d| d.bytecode.as_ref().map(|b| b.object.as_bytes()).flatten())
+                    .flatten();
+                if let Some(deployed_bytecode) = deployed_bytecode {
+                    let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
+                    if let Some((solc_bytecode, solc_deployed_bytecode)) =
+                        solc_bytecodes.get(&contract_name)
+                    {
+                        dual_compiled_contracts.push(DualCompiledContract {
+                            name: contract_name,
+                            zk_bytecode_hash: packed_bytecode.bytecode_hash(),
+                            zk_deployed_bytecode: packed_bytecode.bytecode(),
+                            evm_bytecode: solc_bytecode.to_vec(),
+                            evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
+                        });
+                    }
+                }
+            }
+        }
+
+        let output = output.zk_output;
+
         // This is just the contracts compiled, but we need to merge this with the read cached
         // artifacts
         let contracts = output
@@ -366,6 +435,7 @@ impl MultiContractRunnerBuilder {
             coverage: self.coverage,
             debug: self.debug,
             test_options: self.test_options.unwrap_or_default(),
+            dual_compiled_contracts,
         })
     }
 

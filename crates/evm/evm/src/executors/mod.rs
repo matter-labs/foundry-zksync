@@ -411,7 +411,7 @@ impl Executor {
             matches!(env.tx.transact_to, TransactTo::Create(_)),
             "Expect create transaction"
         );
-        trace!(sender=?env.tx.caller, "deploying contract");
+        info!(sender=?env.tx.caller, "deploying contract");
 
         let mut result = self.call_raw_with_env(env)?;
         self.commit(&mut result);
@@ -480,7 +480,7 @@ impl Executor {
         // persistent across fork swaps in forking mode
         self.backend.add_persistent_account(address);
 
-        trace!(address=?address, "deployed contract");
+        info!(address=?address, "deployed contract");
 
         Ok(DeployResult { address, gas_used, gas_refunded, logs, traces, debug, env, coverage })
     }

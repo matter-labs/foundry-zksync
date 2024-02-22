@@ -3285,6 +3285,7 @@ dependencies = [
  "revm",
  "serde",
  "serde_json",
+ "tokio",
  "tracing",
  "zksync_basic_types",
  "zksync_state",

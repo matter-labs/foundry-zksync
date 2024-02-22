@@ -20,6 +20,8 @@ use std::{borrow::Cow, collections::HashMap};
 use crate::era_revm::db::RevmDatabaseForEra;
 use multivm::vm_latest::HistoryDisabled;
 
+use super::ForkInfo;
+
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
 /// Any changes made during its existence that affect the caching layer of the underlying Database
@@ -91,7 +93,28 @@ impl<'a> FuzzBackendWrapper<'a> {
     }
 }
 
+impl<'a> revm::DatabaseCommit for FuzzBackendWrapper<'a> {
+    fn commit(&mut self, _changes: crate::backend::Map<Address, crate::backend::Account>) {
+        todo!()
+    }
+}
+
 impl<'a> DatabaseExt for FuzzBackendWrapper<'a> {
+    fn call_with_evm(&mut self, mut env: Env) -> eyre::Result<ResultAndState> {
+        let mut db = self.backend.clone().into_owned();
+        db.initialize(&env);
+        let result = match revm::evm_inner(&mut env, &mut db, None).transact() {
+            Ok(res) => Ok(res),
+            Err(e) => eyre::bail!("failed running EVM call: {e}"),
+        };
+
+        result
+    }
+
+    fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
+        self.backend.to_mut().get_fork_info(id)
+    }
+
     fn snapshot(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
         trace!("fuzz: create snapshot");
         self.backend_mut(env).snapshot(journaled_state, env)

@@ -5,7 +5,9 @@ use super::{
 use alloy_primitives::{Address, Bytes, B256, U256};
 use ethers_core::types::Log;
 use ethers_signers::LocalWallet;
-use foundry_common::{AsTracerPointer, StorageModificationRecorder, StorageModifications};
+use foundry_common::{
+    AsTracerPointer, DualCompiledContract, StorageModificationRecorder, StorageModifications,
+};
 use foundry_evm_core::{
     backend::DatabaseExt, debug::DebugArena, era_revm::storage_view::StorageView,
 };
@@ -211,6 +213,7 @@ pub struct InspectorStack {
     pub printer: Option<TracePrinter>,
     pub tracer: Option<Tracer>,
     pub storage_modifications: StorageModifications,
+    pub dual_compiled_contracts: Vec<DualCompiledContract>,
 }
 
 impl InspectorStack {
@@ -578,8 +581,8 @@ use era_cheatcodes::cheatcodes::CheatcodeTracer;
 use foundry_evm_core::era_revm::db::RevmDatabaseForEra;
 use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
 
-impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
-    for &mut InspectorStack
+impl<DB: DatabaseExt + revm::DatabaseCommit + Send>
+    AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled> for &mut InspectorStack
 {
     fn as_tracer_pointer(
         &self,
@@ -593,6 +596,7 @@ impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>
                 .as_ref()
                 .map(|c| c.broadcastable_transactions.clone())
                 .unwrap_or_default(),
+            self.dual_compiled_contracts.clone(),
         )
         .into_tracer_pointer()
     }

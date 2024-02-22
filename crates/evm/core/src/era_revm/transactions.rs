@@ -19,7 +19,8 @@ use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
 use zksync_state::{ReadStorage, WriteStorage};
 use zksync_types::{
     fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
-    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
+    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
+    KNOWN_CODES_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 
@@ -197,6 +198,20 @@ where
                     !bytecodes.contains_key(&h256_to_u256(hash))
                 {
                     era_db.load_factory_dep(hash).map(|bytecode| (hash, bytecode))
+                } else {
+                    None
+                }
+            })
+            .collect(),
+        deployed_codes: tx_result
+            .logs
+            .events
+            .iter()
+            .filter_map(|ev| {
+                if ev.address == CONTRACT_DEPLOYER_ADDRESS {
+                    let address = h256_to_h160(&ev.indexed_topics[3]);
+                    let bytecode_hash = ev.indexed_topics[2];
+                    Some((address, bytecode_hash))
                 } else {
                     None
                 }
