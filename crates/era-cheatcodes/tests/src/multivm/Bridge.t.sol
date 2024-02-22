@@ -202,7 +202,7 @@ contract MultiVmBridgeTest is Test {
         );
     }
 
-    function testBridgeContract() public {
+    function testBridgeExistingContract() public {
         vm.selectFork(forkEra);
         _verifyToken(ERA_TOKEN_ADDRESS);
 
@@ -227,43 +227,4 @@ contract MultiVmBridgeTest is Test {
 
         vm.selectFork(forkEra);
     }
-
-    // function testSmoke() public {
-    //     // _setUp();
-    //     console.log(block.number);
-
-    //     // console.log("check era");
-    //     vm.selectFork(forkEra);
-    //     console.log(
-    //         "zk block number  (actual, expected)",
-    //         block.number,
-    //         ERA_FORK_BLOCK
-    //     );
-    //     // console.log(ETH_CONTRACT.balance);
-    //     // _verifyToken(ERA_TOKEN_ADDRESS);
-
-    //     // console.log("check evm");
-    //     // forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
-    //     vm.selectFork(forkEth);
-    //     // payer.foo{value: 10}();
-    //     //  (bool sent, bytes memory data) = ETH_CONTRACT.call{value: 10}();
-    //     // require(sent, "Failed to send Ether");
-    //     console.log(
-    //         "evm block number (actual, expected)",
-    //         block.number,
-    //         ETH_FORK_BLOCK
-    //     );
-    //     // bytes32 a = blockhash(block.number);
-    //     // uint256 a = ETH_CONTRACT.balance +1;
-    //     // uint256 b = block.number +1;
-    //     // console.log(ETH_CONTRACT.balance);
-    //     // _verifyToken(ETH_TOKEN_ADDRESS);
-
-    //     // need to switch back to mainnet always
-    //     vm.selectFork(forkEra);
-    //     // console.logBytes32(a);
-    //     // console.log(a);
-    // }
 }
-
-// 9cc7f70800000000000000000000000032400084c286cf3e17e7b677ea9583e60a000324
