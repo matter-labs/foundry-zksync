@@ -296,7 +296,7 @@ impl MultiContractRunnerBuilder {
                 let deployed_bytecode = artifact.get_deployed_bytecode();
                 let deployed_bytecode = deployed_bytecode
                     .as_ref()
-                    .and_then(|d| d.bytecode.as_ref().map(|b| b.object.as_bytes()).flatten());
+                    .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
                 let bytecode = artifact.get_bytecode();
                 let bytecode = bytecode
                     .as_ref()
