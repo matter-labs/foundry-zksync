@@ -954,9 +954,8 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                         )
                         .unwrap();
 
-                        let fork_info = db
-                            .get_fork_info(revm_fork_id.clone())
-                            .expect("failed getting fork info");
+                        let fork_info =
+                            db.get_fork_info(revm_fork_id).expect("failed getting fork info");
                         self.use_evm_fork = if fork_info.fork_type.is_evm() {
                             tracing::info!("switch mode: EVM");
 
@@ -2670,7 +2669,7 @@ impl CheatcodeTracer {
         if let Some(fork_env) = &self.use_evm_fork {
             let current = state.vm_local_state.callstack.get_current_stack();
 
-            let call = farcall::parse(&state, &memory);
+            let call = farcall::parse(&state, memory);
 
             if call.to() == &SYSTEM_CONTEXT_ADDRESS {
                 if call.selector() == farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER {
@@ -2777,7 +2776,7 @@ impl CheatcodeTracer {
                     db.commit(result.state);
                 }
 
-                self.farcall_handler.set_immediate_return(output.into());
+                self.farcall_handler.set_immediate_return(output);
                 return true
             }
 
@@ -2833,7 +2832,7 @@ impl CheatcodeTracer {
             }
         }
 
-        return false
+        false
     }
 }
 
