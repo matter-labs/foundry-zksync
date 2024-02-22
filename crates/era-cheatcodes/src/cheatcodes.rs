@@ -915,8 +915,9 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                         db.roll_fork(fork_id, block_number, &mut env, &mut journaled_state)
                             .unwrap();
 
-                        let fork_id = fork_id.unwrap();
-                        self.maybe_switch_vm(db, fork_id, true);
+                        if let Some(fork_id) = fork_id {
+                            self.maybe_switch_vm(db, fork_id, true);
+                        }
                     };
                     storage.modified_storage_keys = modified_storage;
                 }
