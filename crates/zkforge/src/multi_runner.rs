@@ -296,13 +296,11 @@ impl MultiContractRunnerBuilder {
                 let deployed_bytecode = artifact.get_deployed_bytecode();
                 let deployed_bytecode = deployed_bytecode
                     .as_ref()
-                    .map(|d| d.bytecode.as_ref().map(|b| b.object.as_bytes()).flatten())
-                    .flatten();
+                    .and_then(|d| d.bytecode.as_ref().map(|b| b.object.as_bytes()).flatten());
                 let bytecode = artifact.get_bytecode();
                 let bytecode = bytecode
                     .as_ref()
-                    .map(|b| b.object.as_bytes())
-                    .flatten()
+                    .and_then(|b| b.object.as_bytes())
                     .expect("bytecode was expected");
                 if let Some(deployed_bytecode) = deployed_bytecode {
                     solc_bytecodes.insert(
@@ -316,8 +314,7 @@ impl MultiContractRunnerBuilder {
                 let deployed_bytecode = artifact.get_deployed_bytecode();
                 let deployed_bytecode = deployed_bytecode
                     .as_ref()
-                    .map(|d| d.bytecode.as_ref().map(|b| b.object.as_bytes()).flatten())
-                    .flatten();
+                    .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
                 if let Some(deployed_bytecode) = deployed_bytecode {
                     let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
                     if let Some((solc_bytecode, solc_deployed_bytecode)) =

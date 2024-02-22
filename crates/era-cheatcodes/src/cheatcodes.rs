@@ -58,7 +58,7 @@ use std::{
     ops::BitAnd,
     process::Command,
     str::FromStr,
-    sync::{Arc, RwLock},
+    sync::{Arc, MutexGuard, RwLock},
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -841,20 +841,26 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
                         let mut env = into_revm_env(era_env);
-                        db.create_select_fork(
-                            create_fork_request(
-                                era_env,
-                                self.config.clone(),
-                                block_number,
-                                &url_or_alias,
-                            ),
-                            &mut env,
-                            &mut journaled_state,
-                        )
+                        let fork_id = db
+                            .create_select_fork(
+                                create_fork_request(
+                                    era_env,
+                                    self.config.clone(),
+                                    block_number,
+                                    &url_or_alias,
+                                ),
+                                &mut env,
+                                &mut journaled_state,
+                            )
+                            .unwrap();
+
+                        self.maybe_switch_vm(db, fork_id.clone(), false);
+
+                        fork_id
                     };
                     storage.modified_storage_keys = modified_storage;
 
-                    self.return_data = Some(fork_id.unwrap().to_return_data());
+                    self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
                     // TODO MULTIVM spin up the new fork in EVM
@@ -908,6 +914,9 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                         let mut env = into_revm_env(era_env);
                         db.roll_fork(fork_id, block_number, &mut env, &mut journaled_state)
                             .unwrap();
+
+                        let fork_id = fork_id.unwrap();
+                        self.maybe_switch_vm(db, fork_id.clone(), true);
                     };
                     storage.modified_storage_keys = modified_storage;
                 }
@@ -954,61 +963,7 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                         )
                         .unwrap();
 
-                        let fork_info =
-                            db.get_fork_info(revm_fork_id).expect("failed getting fork info");
-                        self.use_evm_fork = if fork_info.fork_type.is_evm() {
-                            tracing::info!("switch mode: EVM");
-
-                            if !self.initialized_evm_forks.contains(&revm_fork_id) {
-                                // initialize all deployed contracts
-                                let mut changes = rHashMap::new();
-                                for (deployed_address, deployed_bytecode_hash) in
-                                    &self.storage_modifications.deployed_codes
-                                {
-                                    if let Some(contract) =
-                                        self.dual_compiled_contracts.iter().find(|contract| {
-                                            &contract.zk_bytecode_hash == deployed_bytecode_hash
-                                        })
-                                    {
-                                        use revm::primitives::{
-                                            Account, AccountInfo, AccountStatus, Bytecode,
-                                        };
-
-                                        tracing::info!("overwriting {deployed_address:?} with evm contract code");
-                                        let address = h160_to_address(*deployed_address);
-                                        let info = db
-                                            .basic(address)
-                                            .expect("failed getting account info")
-                                            .expect("expected some account info");
-
-                                        // code_hash is computed on commit
-                                        changes.insert(
-                                            address,
-                                            Account {
-                                                info: AccountInfo {
-                                                    balance: info.balance,
-                                                    nonce: info.nonce,
-                                                    code_hash: KECCAK_EMPTY,
-                                                    code: Some(Bytecode::new_raw(Bytes::from(
-                                                        contract.evm_deployed_bytecode.clone(),
-                                                    ))),
-                                                },
-                                                storage: Default::default(),
-                                                status: AccountStatus::Touched,
-                                            },
-                                        );
-                                    }
-                                }
-
-                                db.commit(changes);
-                                self.initialized_evm_forks.insert(revm_fork_id);
-                            }
-
-                            Some(fork_info.fork_env.clone())
-                        } else {
-                            tracing::info!("switch mode: ZK");
-                            None
-                        };
+                        self.maybe_switch_vm(db, revm_fork_id, false);
                     }
                     storage.modified_storage_keys = modified_storage;
 
@@ -2656,6 +2611,69 @@ impl CheatcodeTracer {
                 .collect::<HashMap<_, _>>(),
         );
         modified_bytecodes
+    }
+
+    /// Initializes the EVM fork
+    /// Translates all deployed contract bytecodes with EVM bytecodes
+    /// Sets the EVM env to use for execution with the latest fork environment
+    fn maybe_switch_vm<S: DatabaseExt + DatabaseCommit + Send>(
+        &mut self,
+        mut db: MutexGuard<'_, Box<S>>,
+        fork_id: LocalForkId,
+        force_initialized: bool,
+    ) {
+        let fork_info = db.get_fork_info(fork_id).expect("failed getting fork info");
+        self.use_evm_fork = if fork_info.fork_type.is_evm() {
+            tracing::info!("switch mode: EVM");
+
+            if !self.initialized_evm_forks.contains(&fork_id) || force_initialized {
+                // initialize all deployed contracts
+                let mut changes = rHashMap::new();
+                for (deployed_address, deployed_bytecode_hash) in
+                    &self.storage_modifications.deployed_codes
+                {
+                    if let Some(contract) = self
+                        .dual_compiled_contracts
+                        .iter()
+                        .find(|contract| &contract.zk_bytecode_hash == deployed_bytecode_hash)
+                    {
+                        use revm::primitives::{Account, AccountInfo, AccountStatus, Bytecode};
+
+                        tracing::info!("overwriting {deployed_address:?} with evm contract code");
+                        let address = h160_to_address(*deployed_address);
+                        let info = db
+                            .basic(address)
+                            .expect("failed getting account info")
+                            .expect("expected some account info");
+
+                        // code_hash is computed on commit
+                        changes.insert(
+                            address,
+                            Account {
+                                info: AccountInfo {
+                                    balance: info.balance,
+                                    nonce: info.nonce,
+                                    code_hash: KECCAK_EMPTY,
+                                    code: Some(Bytecode::new_raw(Bytes::from(
+                                        contract.evm_deployed_bytecode.clone(),
+                                    ))),
+                                },
+                                storage: Default::default(),
+                                status: AccountStatus::Touched,
+                            },
+                        );
+                    }
+                }
+
+                db.commit(changes);
+                self.initialized_evm_forks.insert(fork_id);
+            }
+
+            Some(fork_info.fork_env.clone())
+        } else {
+            tracing::info!("switch mode: ZK");
+            None
+        };
     }
 
     /// Handles a FarCall within an EVM if the `use_evm_fork` is set.
