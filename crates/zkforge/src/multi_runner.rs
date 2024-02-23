@@ -181,18 +181,18 @@ impl MultiContractRunner {
             .filter(|(id, _)| filter.matches_path(&id.source) && filter.matches_contract(&id.name))
             .filter(|(_, (abi, _, _))| abi.functions().any(|func| filter.matches_test(&func.name)))
             .for_each_with(stream_result, |stream_result, (id, (abi, deploy_code, libs))| {
-                let mut executor = ExecutorBuilder::new()
+                let executor = ExecutorBuilder::new()
                     .inspectors(|stack| {
                         stack
                             .cheatcodes(self.cheats_config.clone())
                             .trace(self.evm_opts.verbosity >= 3 || self.debug)
                             .debug(self.debug)
                             .coverage(self.coverage)
+                            .dual_compiled_contracts(self.dual_compiled_contracts.clone())
                     })
                     .spec(self.evm_spec)
                     .gas_limit(self.evm_opts.gas_limit())
                     .build(self.env.clone(), db.clone());
-                executor.inspector.dual_compiled_contracts = self.dual_compiled_contracts.clone();
 
                 let identifier = id.identifier();
                 trace!(contract=%identifier, "start executing all tests in contract");
@@ -281,7 +281,6 @@ impl MultiContractRunnerBuilder {
         self,
         root: impl AsRef<Path>,
         output: ProjectCompileDualOutput<A>,
-        // solc_output: ProjectCompileOutput<A>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
     ) -> Result<MultiContractRunner>

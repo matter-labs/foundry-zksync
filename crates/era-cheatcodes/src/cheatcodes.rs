@@ -640,7 +640,7 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode>
                     }
                 }
 
-                if self.handle_evm_far_call(state, memory, storage) {
+                if self.maybe_handle_evm_far_call(state, memory, storage) {
                     return
                 }
 
@@ -2679,7 +2679,7 @@ impl CheatcodeTracer {
 
     /// Handles a FarCall within an EVM if the `use_evm_fork` is set.
     /// Returns true if the call was handled, false otherwise.
-    fn handle_evm_far_call<H: HistoryMode, S: DatabaseExt + DatabaseCommit + Send>(
+    fn maybe_handle_evm_far_call<H: HistoryMode, S: DatabaseExt + DatabaseCommit + Send>(
         &mut self,
         state: VmLocalStateData<'_>,
         memory: &SimpleMemory<H>,

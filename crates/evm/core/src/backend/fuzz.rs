@@ -94,8 +94,8 @@ impl<'a> FuzzBackendWrapper<'a> {
 }
 
 impl<'a> revm::DatabaseCommit for FuzzBackendWrapper<'a> {
-    fn commit(&mut self, _changes: crate::backend::Map<Address, crate::backend::Account>) {
-        todo!()
+    fn commit(&mut self, changes: crate::backend::Map<Address, crate::backend::Account>) {
+        self.backend.to_mut().commit(changes)
     }
 }
 
