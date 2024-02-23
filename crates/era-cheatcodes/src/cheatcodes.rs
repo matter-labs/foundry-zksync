@@ -918,7 +918,6 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                         if let Some(fork_id) = fork_id {
                             self.maybe_switch_vm(db, fork_id, true);
                         }
-                        self.maybe_switch_vm(db, fork_id, true);
                     };
                     storage.modified_storage_keys = modified_storage;
                 }
