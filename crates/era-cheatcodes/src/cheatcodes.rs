@@ -6,7 +6,10 @@ use crate::{
 use alloy_primitives::{Address, Bytes, FixedBytes, I256 as rI256};
 use alloy_sol_types::{SolInterface, SolValue};
 use era_test_node::utils::bytecode_to_factory_dep;
-use ethers::{signers::Signer, types::TransactionRequest};
+use ethers::{
+    signers::{LocalWallet, Signer},
+    types::TransactionRequest,
+};
 use eyre::Context;
 use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
@@ -192,6 +195,7 @@ pub struct CheatcodeTracer {
     transact_logs: Vec<LogEntry>,
     mocked_calls: MockedCalls,
     farcall_handler: FarCallHandler,
+    script_wallets: Arc<RwLock<Vec<LocalWallet>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -1190,11 +1194,13 @@ impl CheatcodeTracer {
         cheatcodes_config: Arc<CheatsConfig>,
         storage_modifications: StorageModifications,
         broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
+        script_wallets: Arc<RwLock<Vec<LocalWallet>>>,
     ) -> Self {
         Self {
             config: cheatcodes_config,
             storage_modifications,
             broadcastable_transactions,
+            script_wallets,
             ..Default::default()
         }
     }
@@ -1984,6 +1990,7 @@ impl CheatcodeTracer {
 
                 let origin = wallet.address();
                 tracing::info!("👷 Starting broadcast with origin from private key: {origin}");
+                self.script_wallets.write().unwrap().push(wallet);
                 self.start_broadcast(&storage, &state, Some(origin))
             }
             startPrank_0(startPrank_0Call { msgSender: msg_sender }) => {

@@ -313,7 +313,7 @@ impl InspectorStack {
             script_wallets: self
                 .cheatcodes
                 .as_ref()
-                .map(|cheatcodes| cheatcodes.script_wallets.clone())
+                .map(|cheatcodes| cheatcodes.script_wallets.read().unwrap().clone())
                 .unwrap_or_default(),
             cheatcodes: self.cheatcodes,
             chisel_state: self.chisel_state.and_then(|state| state.state),
@@ -593,6 +593,7 @@ impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>
                 .as_ref()
                 .map(|c| c.broadcastable_transactions.clone())
                 .unwrap_or_default(),
+            self.cheatcodes.as_ref().map(|c| c.script_wallets.clone()).unwrap_or_default(),
         )
         .into_tracer_pointer()
     }

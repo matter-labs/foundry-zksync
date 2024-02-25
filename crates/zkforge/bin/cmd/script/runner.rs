@@ -192,7 +192,7 @@ impl ScriptRunner {
 
     /// Executes the method that will collect all broadcastable transactions.
     pub fn script(&mut self, address: Address, calldata: Bytes) -> Result<ScriptResult> {
-        self.executor.adjust_zksync_gas_parameters();
+        self.executor.adjust_zksync_gas_parameters(None);
         self.call(self.sender, address, calldata, U256::ZERO, false)
     }
 
