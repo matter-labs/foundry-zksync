@@ -16,13 +16,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
-use zksync_state::{ReadStorage, WriteStorage};
+use zksync_state::WriteStorage;
 use zksync_types::{
     fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
     StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
     KNOWN_CODES_STORAGE_ADDRESS,
 };
-use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
+use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
 use foundry_common::{
     fix_l2_gas_limit, fix_l2_gas_price,
@@ -128,7 +128,7 @@ where
     INSP: AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
         + StorageModificationRecorder,
 {
-    let mut era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
+    let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
     let (num, ts) = era_db.get_l2_block_number_and_timestamp();
     let l1_num = num;
     let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
@@ -187,17 +187,19 @@ where
                 (key, value)
             })
             .collect(),
-        known_codes: storage_ptr
-            .borrow()
-            .read_storage_keys
+        known_codes: tx_result
+            .logs
+            .events
             .iter()
-            .filter_map(|(key, value)| {
-                let hash = *key.key();
-                if key.address() == &KNOWN_CODES_STORAGE_ADDRESS &&
-                    !value.is_zero() &&
-                    !bytecodes.contains_key(&h256_to_u256(hash))
-                {
-                    era_db.load_factory_dep(hash).map(|bytecode| (hash, bytecode))
+            .filter_map(|ev| {
+                if ev.address == KNOWN_CODES_STORAGE_ADDRESS {
+                    let hash = ev.indexed_topics[1];
+                    let bytecode = bytecodes
+                        .get(&h256_to_u256(hash))
+                        .as_ref()
+                        .map(|bytecode| be_words_to_bytes(&bytecode))
+                        .expect("bytecode must exist");
+                    Some((hash, bytecode))
                 } else {
                     None
                 }
