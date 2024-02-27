@@ -171,6 +171,7 @@ where
         vec![tracer],
     );
 
+    let modifications: &StorageModifications = inspector.get_storage_modifications();
     let mut known_codes = tx_result
         .logs
         .events
@@ -192,6 +193,9 @@ where
     // We need to track requested known_codes for scripting purposes
     // Any contracts deployed before will not be known, and thus
     // need their bytecode to be fetched from storage.
+    // We exclude making the `load_factory_dep` when we already known the bytecide
+    // to ensure forks are not queried for bytecodes, which can lead to "code should already be
+    // loaded" errors.
     let requested_known_codes = storage_ptr
         .borrow()
         .read_storage_keys
@@ -201,7 +205,9 @@ where
             if key.address() == &KNOWN_CODES_STORAGE_ADDRESS &&
                 !value.is_zero() &&
                 !bytecodes.contains_key(&h256_to_u256(hash)) &&
-                !known_codes.contains_key(&hash)
+                !known_codes.contains_key(&hash) &&
+                !modifications.bytecodes.contains_key(&hash) &&
+                !modifications.known_codes.contains_key(&hash)
             {
                 zksync_state::ReadStorage::load_factory_dep(&mut era_db, hash)
                     .map(|bytecode| (hash, bytecode))
