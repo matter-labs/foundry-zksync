@@ -44,8 +44,8 @@ use multivm::{
 };
 use revm::{
     primitives::{
-        ruint::Uint, BlockEnv, CfgEnv, CreateScheme, Env, HashMap as rHashMap, SpecId,
-        KECCAK_EMPTY, U256 as rU256,
+        ruint::Uint, Account, AccountInfo, AccountStatus, BlockEnv, Bytecode, CfgEnv, CreateScheme,
+        Env, HashMap as rHashMap, SpecId, KECCAK_EMPTY, U256 as rU256,
     },
     DatabaseCommit, JournaledState,
 };
@@ -1220,7 +1220,7 @@ impl CheatcodeTracer {
         &self.test_status
     }
 
-    pub fn dispatch_cheatcode<S: DatabaseExt + Send, H: HistoryMode>(
+    pub fn dispatch_cheatcode<S: DatabaseExt + DatabaseCommit + Send, H: HistoryMode>(
         &mut self,
         state: VmLocalStateData<'_>,
         _data: AfterExecutionData,
@@ -1257,18 +1257,70 @@ impl CheatcodeTracer {
             }
             deal(dealCall { account, newBalance: new_balance }) => {
                 tracing::info!("👷 Setting balance for {account:?} to {new_balance}");
-                self.write_storage(
-                    storage_key_for_eth_balance(&account.to_h160()),
-                    new_balance.to_h256(),
-                    &mut storage.borrow_mut(),
-                );
+                if self.use_evm_fork.is_some() {
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    let info = db
+                        .basic(account)
+                        .expect("failed getting account info")
+                        .expect("expected some account info");
+
+                    // code_hash is computed on commit
+                    let mut changes = rHashMap::new();
+                    changes.insert(
+                        account,
+                        Account {
+                            info: AccountInfo {
+                                balance: new_balance,
+                                nonce: info.nonce,
+                                code_hash: KECCAK_EMPTY,
+                                code: None,
+                            },
+                            storage: Default::default(),
+                            status: AccountStatus::Touched,
+                        },
+                    );
+                    db.commit(changes);
+                } else {
+                    self.write_storage(
+                        storage_key_for_eth_balance(&account.to_h160()),
+                        new_balance.to_h256(),
+                        &mut storage.borrow_mut(),
+                    );
+                }
             }
             etch(etchCall { target, newRuntimeBytecode: new_runtime_bytecode }) => {
                 tracing::info!("👷 Setting address code for {target:?}");
-                let code_key = get_code_key(&target.to_h160());
-                let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
-                self.store_factory_dep(hash, code);
-                self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+                if self.use_evm_fork.is_some() {
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    let info = db
+                        .basic(target)
+                        .expect("failed getting account info")
+                        .expect("expected some account info");
+
+                    // code_hash is computed on commit
+                    let mut changes = rHashMap::new();
+                    changes.insert(
+                        target,
+                        Account {
+                            info: AccountInfo {
+                                balance: info.balance,
+                                nonce: info.nonce,
+                                code_hash: KECCAK_EMPTY,
+                                code: Some(Bytecode::new_raw(Bytes::from(new_runtime_bytecode))),
+                            },
+                            storage: Default::default(),
+                            status: AccountStatus::Touched,
+                        },
+                    );
+                    db.commit(changes);
+                } else {
+                    let code_key = get_code_key(&target.to_h160());
+                    let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
+                    self.store_factory_dep(hash, code);
+                    self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+                }
             }
             envAddress_0(envAddress_0Call { name }) => {
                 tracing::info!("👷 Getting address env variable {name}");
@@ -1762,18 +1814,22 @@ impl CheatcodeTracer {
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
-                let key = StorageKey::new(
-                    AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                    zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
-                );
-                let mut storage = storage.borrow_mut();
-                let (_, block_timestamp) =
-                    unpack_block_info(h256_to_u256(storage.read_value(&key)));
-                self.write_storage(
-                    key,
-                    u256_to_h256(pack_block_info(new_height.as_limbs()[0], block_timestamp)),
-                    &mut storage,
-                );
+                if let Some(env) = self.use_evm_fork.as_mut() {
+                    env.block.number = new_height;
+                } else {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
+                    );
+                    let mut storage = storage.borrow_mut();
+                    let (_, block_timestamp) =
+                        unpack_block_info(h256_to_u256(storage.read_value(&key)));
+                    self.write_storage(
+                        key,
+                        u256_to_h256(pack_block_info(new_height.as_limbs()[0], block_timestamp)),
+                        &mut storage,
+                    );
+                }
             }
             rollFork_0(rollFork_0Call { blockNumber }) => {
                 tracing::info!("👷 Rolling active fork to block number {}", blockNumber);
@@ -1888,21 +1944,45 @@ impl CheatcodeTracer {
             }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
-                let new_full_nonce = self.set_nonce(
-                    account.to_h160(),
-                    (Some(new_nonce.into()), Some(new_nonce.into())),
-                    &mut storage.borrow_mut(),
-                );
+                if self.use_evm_fork.is_some() {
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    let info = db
+                        .basic(account)
+                        .expect("failed getting account info")
+                        .expect("expected some account info");
 
-                if new_full_nonce.is_some() {
-                    tracing::info!(
-                        "👷 Nonces for account {:?} have been set to {}",
+                    // code_hash is computed on commit
+                    let mut changes = rHashMap::new();
+                    changes.insert(
                         account,
-                        new_nonce
+                        Account {
+                            info: AccountInfo {
+                                balance: info.balance,
+                                nonce: new_nonce,
+                                code_hash: KECCAK_EMPTY,
+                                code: None,
+                            },
+                            storage: Default::default(),
+                            status: AccountStatus::Touched,
+                        },
                     );
+                    db.commit(changes);
                 } else {
-                    tracing::error!("👷 Setting nonces failed")
-                }
+                    if self
+                        .set_nonce(
+                            account.to_h160(),
+                            (Some(new_nonce.into()), Some(new_nonce.into())),
+                            &mut storage.borrow_mut(),
+                        )
+                        .is_none()
+                    {
+                        tracing::error!("👷 Setting nonces failed");
+                        return
+                    }
+                };
+
+                tracing::info!("👷 Nonce for account {:?} has been set to {}", account, new_nonce);
             }
             sign_0(sign_0Call { privateKey: private_key, digest }) => {
                 tracing::info!("👷 Signing digest with private key");
@@ -2063,17 +2143,22 @@ impl CheatcodeTracer {
             warp(warpCall { newTimestamp: new_timestamp }) => {
                 tracing::info!("👷 Setting block timestamp {}", new_timestamp);
 
-                let key = StorageKey::new(
-                    AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                    zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
-                );
-                let mut storage = storage.borrow_mut();
-                let (block_number, _) = unpack_block_info(h256_to_u256(storage.read_value(&key)));
-                self.write_storage(
-                    key,
-                    u256_to_h256(pack_block_info(block_number, new_timestamp.as_limbs()[0])),
-                    &mut storage,
-                );
+                if let Some(env) = self.use_evm_fork.as_mut() {
+                    env.block.timestamp = new_timestamp;
+                } else {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
+                    );
+                    let mut storage = storage.borrow_mut();
+                    let (block_number, _) =
+                        unpack_block_info(h256_to_u256(storage.read_value(&key)));
+                    self.write_storage(
+                        key,
+                        u256_to_h256(pack_block_info(block_number, new_timestamp.as_limbs()[0])),
+                        &mut storage,
+                    );
+                }
             }
             createSelectFork_0(createSelectFork_0Call { urlOrAlias }) => {
                 tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
@@ -2649,8 +2734,6 @@ impl CheatcodeTracer {
                         .iter()
                         .find(|contract| &contract.zk_bytecode_hash == deployed_bytecode_hash)
                     {
-                        use revm::primitives::{Account, AccountInfo, AccountStatus, Bytecode};
-
                         tracing::info!("overwriting {deployed_address:?} with evm contract code");
                         let address = h160_to_address(*deployed_address);
                         let info = db
