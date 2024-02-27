@@ -128,7 +128,7 @@ where
     INSP: AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
         + StorageModificationRecorder,
 {
-    let era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
+    let mut era_db = RevmDatabaseForEra::new(Arc::new(Mutex::new(Box::new(db))));
     let (num, ts) = era_db.get_l2_block_number_and_timestamp();
     let l1_num = num;
     let nonce = era_db.get_nonce_for_address(H160::from_slice(env.tx.caller.as_slice()));
@@ -171,6 +171,47 @@ where
         vec![tracer],
     );
 
+    let mut known_codes = tx_result
+        .logs
+        .events
+        .iter()
+        .filter_map(|ev| {
+            if ev.address == KNOWN_CODES_STORAGE_ADDRESS {
+                let hash = ev.indexed_topics[1];
+                let bytecode = bytecodes
+                    .get(&h256_to_u256(hash))
+                    .map(|bytecode| be_words_to_bytes(bytecode))
+                    .expect("bytecode must exist");
+                Some((hash, bytecode))
+            } else {
+                None
+            }
+        })
+        .collect::<HashMap<_, _>>();
+
+    // We need to track requested known_codes for scripting purposes
+    // Any contracts deployed before will not be known, and thus
+    // need their bytecode to be fetched from storage.
+    let requested_known_codes = storage_ptr
+        .borrow()
+        .read_storage_keys
+        .iter()
+        .filter_map(|(key, value)| {
+            let hash = *key.key();
+            if key.address() == &KNOWN_CODES_STORAGE_ADDRESS &&
+                !value.is_zero() &&
+                !bytecodes.contains_key(&h256_to_u256(hash)) &&
+                !known_codes.contains_key(&hash)
+            {
+                zksync_state::ReadStorage::load_factory_dep(&mut era_db, hash)
+                    .map(|bytecode| (hash, bytecode))
+            } else {
+                None
+            }
+        })
+        .collect::<HashMap<_, _>>();
+    known_codes.extend(requested_known_codes);
+
     // Record storage modifications in the inspector.
     // We record known_codes only if they aren't already in the bytecodes changeset.
     inspector.record_storage_modifications(StorageModifications {
@@ -187,23 +228,7 @@ where
                 (key, value)
             })
             .collect(),
-        known_codes: tx_result
-            .logs
-            .events
-            .iter()
-            .filter_map(|ev| {
-                if ev.address == KNOWN_CODES_STORAGE_ADDRESS {
-                    let hash = ev.indexed_topics[1];
-                    let bytecode = bytecodes
-                        .get(&h256_to_u256(hash))
-                        .map(|bytecode| be_words_to_bytes(bytecode))
-                        .expect("bytecode must exist");
-                    Some((hash, bytecode))
-                } else {
-                    None
-                }
-            })
-            .collect(),
+        known_codes,
         deployed_codes: tx_result
             .logs
             .events

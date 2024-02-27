@@ -549,28 +549,32 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode>
 
                         let is_deployment =
                             current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
-                        let factory_deps =
-                            if is_deployment {
-                                let test_contract_hash = handle.read_value(&StorageKey::new(
-                                    AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
-                                    TEST_ADDRESS.into(),
-                                ));
+                        let factory_deps = if is_deployment {
+                            let test_contract_hash = handle.read_value(&StorageKey::new(
+                                AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
+                                TEST_ADDRESS.into(),
+                            ));
 
-                                self.get_modified_bytecodes(vec![])
-                                    .iter()
-                                    .chain(self.storage_modifications.known_codes.iter())
-                                    .filter_map(|(k, v)| {
+                            let mut all_bytecodes = self.get_modified_bytecodes(vec![]);
+                            all_bytecodes
+                                .extend(self.storage_modifications.known_codes.clone().into_iter());
+
+                            all_bytecodes
+                                .iter()
+                                .filter_map(
+                                    |(k, v)| {
                                         if k != &test_contract_hash {
                                             Some(v)
                                         } else {
                                             None
                                         }
-                                    })
-                                    .cloned()
-                                    .collect_vec()
-                            } else {
-                                vec![]
-                            };
+                                    },
+                                )
+                                .cloned()
+                                .collect_vec()
+                        } else {
+                            vec![]
+                        };
 
                         // used to determine whether the nonce should be decreased, since
                         // zkevm updates the nonce for the _sender_ already when we run the
