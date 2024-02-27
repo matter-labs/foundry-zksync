@@ -556,8 +556,7 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode>
                             ));
 
                             let mut all_bytecodes = self.get_modified_bytecodes(vec![]);
-                            all_bytecodes
-                                .extend(self.storage_modifications.known_codes.clone().into_iter());
+                            all_bytecodes.extend(self.storage_modifications.known_codes.clone());
 
                             all_bytecodes
                                 .iter()
@@ -1572,13 +1571,21 @@ impl CheatcodeTracer {
             }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
-                let (account_nonce, _) =
-                    Self::get_nonce(account.to_h160(), &mut storage.borrow_mut());
-                tracing::info!(
-                    "👷 Nonces for account {:?} are {}",
-                    account,
-                    account_nonce.as_u64()
-                );
+                let account_nonce = if self.use_evm_fork.is_some() {
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    let info = db.basic(account).ok().flatten().expect("account info not found");
+                    U256::from(info.nonce)
+                } else {
+                    let (account_nonce, _) =
+                        Self::get_nonce(account.to_h160(), &mut storage.borrow_mut());
+                    tracing::info!(
+                        "👷 Nonces for account {:?} are {}",
+                        account,
+                        account_nonce.as_u64()
+                    );
+                    account_nonce
+                };
                 tracing::info!("👷 Setting returndata",);
                 tracing::info!("👷 Returndata is {:?}", account_nonce);
                 self.return_data = Some(vec![account_nonce]);
