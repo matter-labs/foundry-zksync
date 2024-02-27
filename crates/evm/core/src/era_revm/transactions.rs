@@ -196,8 +196,7 @@ where
                     let hash = ev.indexed_topics[1];
                     let bytecode = bytecodes
                         .get(&h256_to_u256(hash))
-                        .as_ref()
-                        .map(|bytecode| be_words_to_bytes(&bytecode))
+                        .map(|bytecode| be_words_to_bytes(bytecode))
                         .expect("bytecode must exist");
                     Some((hash, bytecode))
                 } else {
