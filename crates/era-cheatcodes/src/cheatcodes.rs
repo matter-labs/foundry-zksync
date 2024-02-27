@@ -1968,19 +1968,17 @@ impl CheatcodeTracer {
                         },
                     );
                     db.commit(changes);
-                } else {
-                    if self
-                        .set_nonce(
-                            account.to_h160(),
-                            (Some(new_nonce.into()), Some(new_nonce.into())),
-                            &mut storage.borrow_mut(),
-                        )
-                        .is_none()
-                    {
-                        tracing::error!("👷 Setting nonces failed");
-                        return
-                    }
-                };
+                } else if self
+                    .set_nonce(
+                        account.to_h160(),
+                        (Some(new_nonce.into()), Some(new_nonce.into())),
+                        &mut storage.borrow_mut(),
+                    )
+                    .is_none()
+                {
+                    tracing::error!("👷 Setting nonces failed");
+                    return
+                }
 
                 tracing::info!("👷 Nonce for account {:?} has been set to {}", account, new_nonce);
             }
