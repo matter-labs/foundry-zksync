@@ -866,7 +866,6 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                     self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
-                    // TODO MULTIVM spin up the new fork in EVM
                     let era_env = self.env.get().unwrap();
                     let fork = create_fork_request(
                         era_env,
@@ -925,7 +924,6 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                     storage.modified_storage_keys = modified_storage;
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
-                    // TODO MULTIVM switch to EVM
                     let revm_fork_id = rU256::from(fork_id.as_u128());
 
                     let mut storage = storage.borrow_mut();
@@ -2814,7 +2812,6 @@ impl CheatcodeTracer {
                     call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE2)
             {
                 let salt = call.params()[0];
-                // TODO translate bytecode hash to evm bytecode
                 let bytecode_hash = H256::from(call.params()[1]);
                 // Skip salt + bytecode_hash + offset + byte marker
                 let input = call.param_bytes_after(4);
