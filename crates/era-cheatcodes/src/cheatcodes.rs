@@ -18,7 +18,7 @@ use foundry_common::{
     DualCompiledContract, StorageModifications,
 };
 use foundry_evm_core::{
-    backend::{DatabaseExt, ForkInfo, LocalForkId},
+    backend::{DatabaseExt, LocalForkId},
     constants::MAGIC_ASSUME,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
