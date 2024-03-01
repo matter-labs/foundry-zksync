@@ -18,7 +18,7 @@ use foundry_common::{
     DualCompiledContract, StorageModifications,
 };
 use foundry_evm_core::{
-    backend::{DatabaseExt, LocalForkId},
+    backend::{DatabaseExt, ForkInfo, LocalForkId},
     constants::MAGIC_ASSUME,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
@@ -559,17 +559,16 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode>
                             all_bytecodes.extend(self.storage_modifications.known_codes.clone());
 
                             all_bytecodes
-                                .iter()
+                                .into_iter()
                                 .filter_map(
                                     |(k, v)| {
-                                        if k != &test_contract_hash {
+                                        if k != test_contract_hash {
                                             Some(v)
                                         } else {
                                             None
                                         }
                                     },
                                 )
-                                .cloned()
                                 .collect_vec()
                         } else {
                             vec![]
@@ -643,8 +642,10 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode>
                     }
                 }
 
-                if self.maybe_handle_evm_far_call(state, memory, storage) {
-                    return
+                if let Some(fork_env) = &self.use_evm_fork {
+                    if self.handle_evm_far_call(fork_env.clone(), state, memory, storage) {
+                        return
+                    }
                 }
 
                 return
@@ -857,7 +858,7 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                             )
                             .unwrap();
 
-                        self.maybe_switch_vm(db, fork_id, false);
+                        self.select_fork_vm(db, fork_id, false);
 
                         fork_id
                     };
@@ -918,7 +919,7 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                             .unwrap();
 
                         if let Some(fork_id) = fork_id {
-                            self.maybe_switch_vm(db, fork_id, true);
+                            self.select_fork_vm(db, fork_id, true);
                         }
                     };
                     storage.modified_storage_keys = modified_storage;
@@ -965,7 +966,7 @@ impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraD
                         )
                         .unwrap();
 
-                        self.maybe_switch_vm(db, revm_fork_id, false);
+                        self.select_fork_vm(db, revm_fork_id, false);
                     }
                     storage.modified_storage_keys = modified_storage;
 
@@ -2706,10 +2707,14 @@ impl CheatcodeTracer {
         modified_bytecodes
     }
 
-    /// Initializes the EVM fork
-    /// Translates all deployed contract bytecodes with EVM bytecodes
-    /// Sets the EVM env to use for execution with the latest fork environment
-    fn maybe_switch_vm<S: DatabaseExt + DatabaseCommit + Send>(
+    /// Selects an appropriate VM for the fork. The default VM is always ZK-VM
+    ///
+    /// If the provided `fork_id` points to an EVM fork, all deployed bytecodes are
+    /// translated to their respective EVM bytecodes.
+    ///
+    /// If the provided `fork_id` points to a ZK fork, then no action is necessary,
+    /// as we are by default in ZK VM.
+    fn select_fork_vm<S: DatabaseExt + DatabaseCommit + Send>(
         &mut self,
         mut db: MutexGuard<'_, Box<S>>,
         fork_id: LocalForkId,
@@ -2769,175 +2774,162 @@ impl CheatcodeTracer {
 
     /// Handles a FarCall within an EVM if the `use_evm_fork` is set.
     /// Returns true if the call was handled, false otherwise.
-    fn maybe_handle_evm_far_call<H: HistoryMode, S: DatabaseExt + DatabaseCommit + Send>(
+    fn handle_evm_far_call<H: HistoryMode, S: DatabaseExt + DatabaseCommit + Send>(
         &mut self,
+        fork_env: Env,
         state: VmLocalStateData<'_>,
         memory: &SimpleMemory<H>,
         storage: StoragePtr<EraDb<S>>,
     ) -> bool {
-        if let Some(fork_env) = &self.use_evm_fork {
-            let current = state.vm_local_state.callstack.get_current_stack();
+        let current = state.vm_local_state.callstack.get_current_stack();
 
-            let call = farcall::parse(&state, memory);
+        let call = farcall::parse(&state, memory);
 
-            if call.to() == &SYSTEM_CONTEXT_ADDRESS {
-                if call.selector() == farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER {
-                    self.farcall_handler
-                        .set_immediate_return(fork_env.block.number.to_be_bytes_vec());
-                } else if call.selector() == farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP {
-                    self.farcall_handler
-                        .set_immediate_return(fork_env.block.timestamp.to_be_bytes_vec());
-                }
-                return true
+        if call.to() == &SYSTEM_CONTEXT_ADDRESS {
+            if call.selector() == farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER {
+                self.farcall_handler.set_immediate_return(fork_env.block.number.to_be_bytes_vec());
+            } else if call.selector() == farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP {
+                self.farcall_handler
+                    .set_immediate_return(fork_env.block.timestamp.to_be_bytes_vec());
             }
+            return true
+        }
 
-            if call.to() == &L2_ETH_TOKEN_ADDRESS &&
-                call.selector() == farcall::SELECTOR_L2_ETH_BALANCE_OF
-            {
-                let account = call.params()[0];
-                let account = h256_to_h160(&H256::from(account));
+        if call.to() == &L2_ETH_TOKEN_ADDRESS &&
+            call.selector() == farcall::SELECTOR_L2_ETH_BALANCE_OF
+        {
+            let account = call.params()[0];
+            let account = h256_to_h160(&H256::from(account));
 
-                let handle = &mut storage.borrow_mut();
-                let era_db = &handle.storage_handle;
-                let info =
-                    era_db.db.lock().unwrap().basic(h160_to_address(account)).unwrap().unwrap();
-                tracing::debug!("returning evm balance {:?} for {:?}", info.balance, account);
+            let handle = &mut storage.borrow_mut();
+            let era_db = &handle.storage_handle;
+            let info = era_db.db.lock().unwrap().basic(h160_to_address(account)).unwrap().unwrap();
+            tracing::debug!("returning evm balance {:?} for {:?}", info.balance, account);
 
-                self.farcall_handler.set_immediate_return(info.balance.to_be_bytes_vec());
-                return true
-            }
+            self.farcall_handler.set_immediate_return(info.balance.to_be_bytes_vec());
+            return true
+        }
 
-            if call.to() == &CONTRACT_DEPLOYER_ADDRESS &&
-                (call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE ||
-                    call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE2)
-            {
-                let salt = call.params()[0];
-                let bytecode_hash = H256::from(call.params()[1]);
-                // Skip salt + bytecode_hash + offset + byte marker
-                let input = call.param_bytes_after(4);
+        // prepare env
+        let era_env = self.env.get().unwrap();
+        let mut env = into_revm_env(era_env);
+        env.block = fork_env.block.clone();
+        env.cfg.chain_id = fork_env.cfg.chain_id;
+        env.cfg.disable_eip3607 = true;
+        env.cfg.disable_base_fee = true;
+        env.cfg.disable_block_gas_limit = true;
 
-                let bytecode = self
-                    .dual_compiled_contracts
-                    .iter()
-                    .find_map(|contract| {
-                        if contract.zk_bytecode_hash == bytecode_hash {
-                            Some(contract.evm_bytecode.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "cannot find matching bytecode to deploy for hash {:?}",
-                            bytecode_hash
-                        )
-                    });
+        if call.to() == &CONTRACT_DEPLOYER_ADDRESS &&
+            (call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE ||
+                call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE2)
+        {
+            let salt = call.params()[0];
+            let bytecode_hash = H256::from(call.params()[1]);
+            // Skip salt + bytecode_hash + offset + byte marker
+            let input = call.param_bytes_after(4);
 
-                let from = h160_to_address(current.msg_sender);
-                let value = call.value();
-                let data = [bytecode, input].concat();
-
-                let era_env = self.env.get().unwrap();
-                let mut env = into_revm_env(era_env);
-                env.block = fork_env.block.clone();
-                env.cfg.chain_id = fork_env.cfg.chain_id;
-                env.cfg.disable_eip3607 = true;
-                env.cfg.disable_base_fee = true;
-                env.cfg.disable_block_gas_limit = true;
-                let create_scheme = if call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE
-                {
-                    CreateScheme::Create
-                } else {
-                    CreateScheme::Create2 { salt: rU256::from_be_bytes(salt) }
-                };
-                env.tx = revm::primitives::TxEnv {
-                    caller: from,
-                    transact_to: revm::primitives::TransactTo::Create(create_scheme),
-                    data: data.into(),
-                    value: u256_to_revm_u256(*value),
-                    // As above, we set the gas price to 0.
-                    gas_price: rU256::from(0),
-                    gas_priority_fee: None,
-                    gas_limit: era_env.system_env.gas_limit as u64,
-                    ..env.tx
-                };
-
-                let handle = &mut storage.borrow_mut();
-                let era_db = &handle.storage_handle;
-                let mut db = era_db.db.lock().unwrap();
-
-                let result = db.call_with_evm(env).expect("failed running evm call");
-
-                let address = match result.result {
-                    revm::primitives::ExecutionResult::Success {
-                        output: revm::primitives::Output::Create(_, Some(address)),
-                        ..
-                    } => address,
-                    _ => panic!("failed deploying contract: {:?}", result.result),
-                };
-
-                tracing::info!("deployed contract address: {:?}", address);
-                let output = address.to_vec();
-
-                // update state in current EVM after performing any storage translations
-                if !result.state.is_empty() {
-                    db.commit(result.state);
-                }
-
-                self.farcall_handler.set_immediate_return(output);
-                return true
-            }
-
-            if !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address) {
-                tracing::info!("Executing in EVM mode {:?}", call);
-
-                let from = h160_to_address(current.msg_sender);
-                let (value, to) = match call {
-                    ParsedFarCall::SimpleCall { to, .. } => (rU256::ZERO, to),
-                    ParsedFarCall::ValueCall { recipient, value, .. } => {
-                        (u256_to_revm_u256(value), recipient)
+            let bytecode = self
+                .dual_compiled_contracts
+                .iter()
+                .find_map(|contract| {
+                    if contract.zk_bytecode_hash == bytecode_hash {
+                        Some(contract.evm_bytecode.clone())
+                    } else {
+                        None
                     }
-                };
-                // let to = h160_to_address(to);
-                let calldata = call.calldata().to_vec();
+                })
+                .unwrap_or_else(|| {
+                    panic!("cannot find matching bytecode to deploy for hash {:?}", bytecode_hash)
+                });
 
-                let era_env = self.env.get().unwrap();
-                let mut env = into_revm_env(era_env);
-                env.block = fork_env.block.clone();
-                env.cfg.disable_eip3607 = true;
-                env.cfg.disable_base_fee = true;
-                env.cfg.disable_block_gas_limit = true;
-                env.tx = revm::primitives::TxEnv {
-                    caller: from,
-                    transact_to: revm::primitives::TransactTo::Call(h160_to_address(to)),
-                    data: calldata.into(),
-                    value,
-                    // As above, we set the gas price to 0.
-                    gas_price: rU256::from(0),
-                    gas_priority_fee: None,
-                    gas_limit: era_env.system_env.gas_limit as u64,
-                    ..env.tx
-                };
+            let from = h160_to_address(current.msg_sender);
+            let value = call.value();
+            let data = [bytecode, input].concat();
 
-                let era_db = &storage.borrow_mut().storage_handle;
-                let mut db = era_db.db.lock().unwrap();
+            let create_scheme = if call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE {
+                CreateScheme::Create
+            } else {
+                CreateScheme::Create2 { salt: rU256::from_be_bytes(salt) }
+            };
+            env.tx = revm::primitives::TxEnv {
+                caller: from,
+                transact_to: revm::primitives::TransactTo::Create(create_scheme),
+                data: data.into(),
+                value: u256_to_revm_u256(*value),
+                gas_price: rU256::from(0),
+                gas_priority_fee: None,
+                gas_limit: era_env.system_env.gas_limit as u64,
+                ..env.tx
+            };
 
-                let result = db.call_with_evm(env).expect("failed running evm call");
-                if !result.result.is_success() {
-                    panic!("failed deploying contract: {:?}", result.result);
-                }
+            let handle = &mut storage.borrow_mut();
+            let era_db = &handle.storage_handle;
+            let mut db = era_db.db.lock().unwrap();
 
-                let output = result.result.output().unwrap().clone();
-                tracing::info!("result: {:?}", output);
+            let result = db.call_with_evm(env).expect("failed running evm call");
 
-                // update state in current EVM after performing any storage translations
-                if !result.state.is_empty() {
-                    db.commit(result.state);
-                }
+            let address = match result.result {
+                revm::primitives::ExecutionResult::Success {
+                    output: revm::primitives::Output::Create(_, Some(address)),
+                    ..
+                } => address,
+                _ => panic!("failed deploying contract: {:?}", result.result),
+            };
 
-                self.farcall_handler.set_immediate_return(output.into());
-                return true
+            tracing::info!("deployed contract address: {:?}", address);
+            let output = address.to_vec();
+
+            // update state in current EVM after performing any storage translations
+            if !result.state.is_empty() {
+                db.commit(result.state);
             }
+
+            self.farcall_handler.set_immediate_return(output);
+            return true
+        }
+
+        if !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address) {
+            tracing::info!("Executing in EVM mode {:?}", call);
+
+            let from = h160_to_address(current.msg_sender);
+            let (value, to) = match call {
+                ParsedFarCall::SimpleCall { to, .. } => (rU256::ZERO, to),
+                ParsedFarCall::ValueCall { recipient, value, .. } => {
+                    (u256_to_revm_u256(value), recipient)
+                }
+            };
+            // let to = h160_to_address(to);
+            let calldata = call.calldata().to_vec();
+
+            env.tx = revm::primitives::TxEnv {
+                caller: from,
+                transact_to: revm::primitives::TransactTo::Call(h160_to_address(to)),
+                data: calldata.into(),
+                value,
+                gas_price: rU256::from(0),
+                gas_priority_fee: None,
+                gas_limit: era_env.system_env.gas_limit as u64,
+                ..env.tx
+            };
+
+            let era_db = &storage.borrow_mut().storage_handle;
+            let mut db = era_db.db.lock().unwrap();
+
+            let result = db.call_with_evm(env).expect("failed running evm call");
+            if !result.result.is_success() {
+                panic!("failed deploying contract: {:?}", result.result);
+            }
+
+            let output = result.result.output().unwrap().clone();
+            tracing::info!("result: {:?}", output);
+
+            // update state in current EVM after performing any storage translations
+            if !result.state.is_empty() {
+                db.commit(result.state);
+            }
+
+            self.farcall_handler.set_immediate_return(output.into());
+            return true
         }
 
         false
