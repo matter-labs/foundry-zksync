@@ -34,7 +34,19 @@ alloy-json-rpc.workspace = true
 alloy-pubsub.workspace = true
 alloy-sol-types.workspace = true
 
+zksync-web3-rs.workspace = true
+zksync_basic_types.workspace = true
+zksync_types.workspace = true
+zksync_utils.workspace = true
+revm.workspace = true
+multivm.workspace = true
+
 tower.workspace = true
+
+ansi_term = "0.12.1"
+anyhow = {version = "1.0.70"}
+dirs = {version = "5.0.0"}
+xxhash-rust = { version = "0.8.7", features = ["const_xxh3"] }
 
 async-trait = "0.1"
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }

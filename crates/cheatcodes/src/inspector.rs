@@ -12,34 +12,50 @@ use crate::{
         self, ExpectedCallData, ExpectedCallTracker, ExpectedCallType, ExpectedEmit,
         ExpectedRevert, ExpectedRevertKind,
     },
-    CheatsConfig, CheatsCtxt, Error, Result, Vm,
-    Vm::AccountAccess,
+    zk, CheatsConfig, CheatsCtxt, Error, Result,
+    Vm::{self, AccountAccess},
 };
 use alloy_primitives::{Address, Bytes, B256, U256, U64};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolInterface, SolValue};
-use foundry_common::{evm::Breakpoints, provider::alloy::RpcUrl};
+use foundry_common::{
+    conversion_utils::{address_to_h160, h160_to_address, h256_to_revm_u256, u256_to_revm_u256},
+    evm::Breakpoints,
+    provider::alloy::RpcUrl,
+    DualCompiledContract,
+};
 use foundry_evm_core::{
-    backend::{DatabaseError, DatabaseExt, RevertDiagnostic},
+    backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS},
 };
 use itertools::Itertools;
+use multivm::zkevm_test_harness_latest::helper::artifact_utils::ACCOUNT_CODE_STORAGE_ADDRESS;
 use revm::{
     interpreter::{
         opcode, CallInputs, CallScheme, CreateInputs, Gas, InstructionResult, Interpreter,
     },
-    primitives::{BlockEnv, CreateScheme, TransactTo},
-    EVMData, Inspector,
+    primitives::{
+        Account, AccountInfo, AccountStatus, BlockEnv, Bytecode, CreateScheme, ExecutionResult,
+        HashMap as rHashMap, Output, StorageSlot, TransactTo, KECCAK_EMPTY,
+    },
+    DatabaseCommit, EVMData, Inspector,
 };
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
     path::PathBuf,
     sync::Arc,
 };
+use zksync_types::{
+    block::pack_block_info, get_nonce_key, get_system_context_key,
+    utils::storage_key_for_eth_balance, CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
+    KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS,
+};
+use zksync_utils::address_to_h256;
 
 macro_rules! try_or_continue {
     ($e:expr) => {
@@ -203,6 +219,14 @@ pub struct Cheatcodes {
     /// Breakpoints supplied by the `breakpoint` cheatcode.
     /// `char -> (address, pc)`
     pub breakpoints: Breakpoints,
+
+    /// Use ZK-VM to execute CALLs.
+    pub use_zk_vm: bool,
+
+    /// Dual compiled contracts
+    pub dual_compiled_contracts: Vec<DualCompiledContract>,
+
+    initialized_zk_forks: HashSet<LocalForkId>,
 }
 
 impl Cheatcodes {
@@ -211,10 +235,18 @@ impl Cheatcodes {
     pub fn new(config: Arc<CheatsConfig>) -> Self {
         let labels = config.labels.clone();
         let script_wallets = config.script_wallets.clone();
-        Self { config, fs_commit: true, labels, script_wallets, ..Default::default() }
+        let dual_compiled_contracts = config.dual_compiled_contracts.clone();
+        Self {
+            config,
+            fs_commit: true,
+            labels,
+            script_wallets,
+            dual_compiled_contracts,
+            ..Default::default()
+        }
     }
 
-    fn apply_cheatcode<DB: DatabaseExt>(
+    fn apply_cheatcode<DB: DatabaseExt + DatabaseCommit>(
         &mut self,
         data: &mut EVMData<'_, DB>,
         call: &CallInputs,
@@ -285,9 +317,199 @@ impl Cheatcodes {
             }
         }
     }
+
+    /// Initializes the EVM fork
+    ///
+    /// Additionally:
+    /// * Translates balances and nonces to ZK storage
+    /// * Translates all persisted bytecodes with ZK bytecodes
+    /// * Sets the ZK block information
+    pub fn select_fork_vm<DB: DatabaseExt + DatabaseCommit>(
+        &mut self,
+        db: &mut DB,
+        fork_id: LocalForkId,
+    ) {
+        let fork_info = db.get_fork_info(fork_id).expect("failed getting fork info");
+        self.use_zk_vm = if fork_info.fork_type.is_evm() {
+            tracing::info!("switch mode: EVM");
+            false
+        } else {
+            tracing::info!("switch mode: ZK");
+
+            // when switching to zk we need to translate block info, balances, nonces and deployed
+            // codes on the first switch
+            if !self.initialized_zk_forks.contains(&fork_id) {
+                let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
+                let block_info_key: alloy_primitives::Uint<256, 4> =
+                    h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
+                let block_info = pack_block_info(
+                    fork_info.fork_env.block.number.as_limbs()[0],
+                    fork_info.fork_env.block.timestamp.as_limbs()[0],
+                );
+                system_storage
+                    .insert(block_info_key, StorageSlot::new(u256_to_revm_u256(block_info)));
+
+                let mut l2_eth_storage: rHashMap<U256, StorageSlot> = Default::default();
+                let mut nonce_storage: rHashMap<U256, StorageSlot> = Default::default();
+                let mut account_code_storage: rHashMap<U256, StorageSlot> = Default::default();
+                let mut known_codes_storage: rHashMap<U256, StorageSlot> = Default::default();
+                let mut deployed_codes: HashMap<Address, AccountInfo> = Default::default();
+
+                for account in db.persistent_accounts() {
+                    info!(?account, "importing to zk state");
+
+                    if let Some(info) = db.basic(account).ok().flatten() {
+                        let address = address_to_h160(account);
+
+                        let balance_key =
+                            h256_to_revm_u256(*storage_key_for_eth_balance(&address).key());
+                        let nonce_key = h256_to_revm_u256(*get_nonce_key(&address).key());
+
+                        l2_eth_storage.insert(balance_key, StorageSlot::new(info.balance));
+                        nonce_storage.insert(nonce_key, StorageSlot::new(U256::from(info.nonce)));
+
+                        if let Some(code) = &info.code {
+                            let code = code.bytecode.to_vec();
+                            if let Some(zk_contract) = self
+                                .dual_compiled_contracts
+                                .iter()
+                                .find(|contract| contract.evm_bytecode == code)
+                            {
+                                account_code_storage.insert(
+                                    h256_to_revm_u256(address_to_h256(&address)),
+                                    StorageSlot::new(h256_to_revm_u256(
+                                        zk_contract.zk_bytecode_hash,
+                                    )),
+                                );
+                                known_codes_storage.insert(
+                                    h256_to_revm_u256(zk_contract.zk_bytecode_hash),
+                                    StorageSlot::new(U256::ZERO),
+                                );
+
+                                let code_hash =
+                                    B256::from_slice(zk_contract.zk_bytecode_hash.as_bytes());
+                                deployed_codes.insert(
+                                    account,
+                                    AccountInfo {
+                                        balance: info.balance,
+                                        nonce: info.nonce,
+                                        code_hash,
+                                        code: Some(Bytecode::new_raw(Bytes::from(
+                                            zk_contract.zk_deployed_bytecode.clone(),
+                                        ))),
+                                    },
+                                );
+                            }
+                        }
+                    }
+                }
+
+                let mut changes = rHashMap::new();
+
+                let system_account = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
+                let system_info = db.basic(system_account).ok().flatten().unwrap_or_default();
+                changes.insert(
+                    system_account,
+                    Account {
+                        info: AccountInfo {
+                            balance: system_info.balance,
+                            nonce: system_info.nonce,
+                            code_hash: KECCAK_EMPTY,
+                            code: None,
+                        },
+                        storage: system_storage,
+                        status: AccountStatus::Touched,
+                    },
+                );
+
+                let balance_account = h160_to_address(L2_ETH_TOKEN_ADDRESS);
+                let balance_info = db.basic(balance_account).ok().flatten().unwrap_or_default();
+                changes.insert(
+                    balance_account,
+                    Account {
+                        info: AccountInfo {
+                            balance: balance_info.balance,
+                            nonce: balance_info.nonce,
+                            code_hash: KECCAK_EMPTY,
+                            code: None,
+                        },
+                        storage: l2_eth_storage,
+                        status: AccountStatus::Touched,
+                    },
+                );
+
+                let nonce_account = h160_to_address(NONCE_HOLDER_ADDRESS);
+                let nonce_info = db.basic(nonce_account).ok().flatten().unwrap_or_default();
+                changes.insert(
+                    nonce_account,
+                    Account {
+                        info: AccountInfo {
+                            balance: nonce_info.balance,
+                            nonce: nonce_info.nonce,
+                            code_hash: KECCAK_EMPTY,
+                            code: None,
+                        },
+                        storage: nonce_storage,
+                        status: AccountStatus::Touched,
+                    },
+                );
+
+                let account_code_account = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
+                let account_code_info =
+                    db.basic(account_code_account).ok().flatten().unwrap_or_default();
+                changes.insert(
+                    account_code_account,
+                    Account {
+                        info: AccountInfo {
+                            balance: account_code_info.balance,
+                            nonce: account_code_info.nonce,
+                            code_hash: KECCAK_EMPTY,
+                            code: None,
+                        },
+                        storage: account_code_storage,
+                        status: AccountStatus::Touched,
+                    },
+                );
+
+                let known_code_account = h160_to_address(KNOWN_CODES_STORAGE_ADDRESS);
+                let known_code_info =
+                    db.basic(known_code_account).ok().flatten().unwrap_or_default();
+                changes.insert(
+                    known_code_account,
+                    Account {
+                        info: AccountInfo {
+                            balance: known_code_info.balance,
+                            nonce: known_code_info.nonce,
+                            code_hash: KECCAK_EMPTY,
+                            code: None,
+                        },
+                        storage: known_codes_storage,
+                        status: AccountStatus::Touched,
+                    },
+                );
+
+                for (account, info) in deployed_codes {
+                    changes.insert(
+                        account,
+                        Account {
+                            info,
+                            storage: Default::default(),
+                            status: AccountStatus::Touched,
+                        },
+                    );
+                }
+
+                db.commit(changes);
+
+                self.initialized_zk_forks.insert(fork_id);
+            }
+
+            true
+        };
+    }
 }
 
-impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
+impl<DB: DatabaseExt + DatabaseCommit> Inspector<DB> for Cheatcodes {
     #[inline]
     fn initialize_interp(&mut self, _: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
         // When the first interpreter is initialized we've circumvented the balance and gas checks,
@@ -302,6 +524,82 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
     fn step(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
         self.pc = interpreter.program_counter();
+
+        // println!("{}", opcode::OPCODE_JUMPMAP[interpreter.current_opcode() as usize].unwrap());
+
+        // if matches!(interpreter.current_opcode(), opcode::CREATE | opcode::CREATE2) {
+        //     // maybe calling in ZK
+        //     if self.use_zk_vm {
+        //         info!("running in ZK-VM");
+        //         if interpreter.stack.len() < 3 {
+        //             interpreter.instruction_result = InstructionResult::StackUnderflow;
+        //             return;
+        //         }
+        //         // Safety: Length is checked above.
+        //         let (value, code_offset, len) = unsafe { interpreter.stack.pop3_unsafe() };
+
+        //         let len = match as_usize_or_fail(interpreter, len) {
+        //             Some(len) => len,
+        //             None => return,
+        //         };
+
+        //         let code = if len == 0 {
+        //             Bytes::new()
+        //         } else {
+        //             let code_offset = match as_usize_or_fail(interpreter, code_offset) {
+        //                 Some(len) => len,
+        //                 None => return,
+        //             };
+
+        //             if let Some(new_size) =
+        //                 revm::interpreter::next_multiple_of_32(code_offset.saturating_add(len))
+        //             {
+        //                 if new_size > interpreter.shared_memory.len() {
+        //                     interpreter.shared_memory.resize(new_size);
+        //                 }
+        //             } else {
+        //                 interpreter.instruction_result = InstructionResult::MemoryOOG;
+        //                 return;
+        //             }
+
+        //             Bytes::copy_from_slice(interpreter.shared_memory.slice(code_offset, len))
+        //         };
+
+        //         // let scheme = if IS_CREATE2 {
+        //         //     pop!(interpreter, salt);
+        //         //     gas_or_fail!(interpreter, gas::create2_cost(len));
+        //         //     CreateScheme::Create2 { salt }
+        //         // } else {
+        //         //     gas!(interpreter, gas::CREATE);
+        //         //     CreateScheme::Create
+        //         // };
+
+        //         // let mut gas_limit = interpreter.gas().remaining();
+
+        //         println!("> {:?} {:?} {:?}", data.env.tx.caller, code, value);
+        //         let tx = revm::primitives::TxEnv {
+        //             caller: data.env.tx.caller,
+        //             gas_limit: 1_000_000,
+        //             gas_price: U256::from(250_000_000),
+        //             transact_to: revm::primitives::TransactTo::Create(CreateScheme::Create),
+        //             data: code.clone(),
+        //             value,
+        //             // data: serde_json::to_vec(&
+        //             // foundry_common::factory_deps::PackedEraBytecode::new(
+        //             //     hex::encode(zksync_utils::bytecode::hash_bytecode(&[0; 32])),
+        //             //     hex::encode([0; 32]),
+        //             //     vec![hex::encode([0; 32])],
+        //             // ))
+        //             // .unwrap()
+        //             // .into(),
+        //             ..Default::default()
+        //         };
+        //         let r: EVMResult<DatabaseError> = run_era_transaction(tx, &mut data.env,
+        // data.db);         println!("RES {r:#?}");
+        //         interpreter.instruction_result = InstructionResult::Return;
+        //         return
+        //     }
+        // }
 
         // reset gas if gas metering is turned off
         match self.gas_metering {
@@ -895,6 +1193,31 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
             }]);
         }
 
+        // maybe calling in ZK
+        if self.use_zk_vm {
+            info!("running CALL in ZK-VM");
+
+            if let Ok(result) = zk::call::<_, DatabaseError>(&call, &mut data.env, data.db) {
+                return match result.result {
+                    ExecutionResult::Success { output, .. } => match output {
+                        Output::Call(bytes) => {
+                            data.db.commit(result.state);
+                            (InstructionResult::Return, gas, bytes)
+                        }
+                        _ => (InstructionResult::Revert, gas, Bytes::new()),
+                    },
+                    ExecutionResult::Revert { output, .. } => {
+                        (InstructionResult::Revert, gas, output)
+                    }
+                    ExecutionResult::Halt { .. } => (
+                        InstructionResult::Revert,
+                        gas,
+                        Bytes::from_iter(String::from("zk vm halted").as_bytes()),
+                    ),
+                }
+            }
+        }
+
         (InstructionResult::Continue, gas, Bytes::new())
     }
 
@@ -1276,6 +1599,41 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
             }]);
         }
 
+        if self.use_zk_vm {
+            info!("running CREATE in ZK-VM");
+            println!("{:#?}", data.db.basic(call.caller));
+            let zk_contract = self
+                .dual_compiled_contracts
+                .iter()
+                .find(|contract| contract.evm_bytecode == call.init_code)
+                .expect("must exist");
+
+            if let Ok(result) =
+                zk::create::<_, DatabaseError>(call, &zk_contract, &mut data.env, data.db)
+            {
+                return match result.result {
+                    ExecutionResult::Success { reason, gas_used, gas_refunded, logs, output } => {
+                        match output {
+                            Output::Create(bytes, address) => {
+                                data.db.commit(result.state);
+                                (InstructionResult::Return, address, gas, bytes)
+                            }
+                            _ => (InstructionResult::Revert, None, gas, Bytes::new()),
+                        }
+                    }
+                    ExecutionResult::Revert { gas_used, output } => {
+                        (InstructionResult::Revert, None, gas, output)
+                    }
+                    ExecutionResult::Halt { reason, gas_used } => (
+                        InstructionResult::Revert,
+                        None,
+                        gas,
+                        Bytes::from_iter(String::from("zk vm halted").as_bytes()),
+                    ),
+                }
+            }
+        }
+
         (InstructionResult::Continue, None, gas, Bytes::new())
     }
 
@@ -1538,7 +1896,10 @@ fn check_if_fixed_gas_limit<DB: DatabaseExt>(data: &EVMData<'_, DB>, call_gas_li
 }
 
 /// Dispatches the cheatcode call to the appropriate function.
-fn apply_dispatch<DB: DatabaseExt>(calls: &Vm::VmCalls, ccx: &mut CheatsCtxt<DB>) -> Result {
+fn apply_dispatch<DB: DatabaseExt + DatabaseCommit>(
+    calls: &Vm::VmCalls,
+    ccx: &mut CheatsCtxt<DB>,
+) -> Result {
     macro_rules! match_ {
         ($($variant:ident),*) => {
             match calls {
@@ -1606,4 +1967,13 @@ fn append_storage_access(
             }
         }
     }
+}
+
+fn as_usize_or_fail(interpreter: &mut Interpreter<'_>, v: U256) -> Option<usize> {
+    let x = v.as_limbs();
+    if x[1] != 0 || x[2] != 0 || x[3] != 0 {
+        interpreter.instruction_result = InstructionResult::InvalidOperandOOG;
+        return None;
+    }
+    Some(x[0] as usize)
 }

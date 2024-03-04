@@ -37,12 +37,15 @@ type FullBlockFuture<Err> =
     Pin<Box<dyn Future<Output = (FullBlockSender, Result<Option<Block>, Err>, BlockId)> + Send>>;
 type TransactionFuture<Err> =
     Pin<Box<dyn Future<Output = (TransactionSender, Result<Transaction, Err>, B256)> + Send>>;
+type BytecodeHashFuture<Err> =
+    Pin<Box<dyn Future<Output = (ByteCodeHashSender, Result<Option<Bytecode>, Err>, B256)> + Send>>;
 
 type AccountInfoSender = OneshotSender<DatabaseResult<AccountInfo>>;
 type StorageSender = OneshotSender<DatabaseResult<U256>>;
 type BlockHashSender = OneshotSender<DatabaseResult<B256>>;
 type FullBlockSender = OneshotSender<DatabaseResult<Block>>;
 type TransactionSender = OneshotSender<DatabaseResult<Transaction>>;
+type ByteCodeHashSender = OneshotSender<DatabaseResult<Bytecode>>;
 
 /// Request variants that are executed by the provider
 enum ProviderRequest<Err> {
@@ -51,6 +54,7 @@ enum ProviderRequest<Err> {
     BlockHash(BlockHashFuture<Err>),
     FullBlock(FullBlockFuture<Err>),
     Transaction(TransactionFuture<Err>),
+    ByteCodeHash(BytecodeHashFuture<Err>),
 }
 
 /// The Request type the Backend listens for
@@ -68,6 +72,8 @@ enum BackendRequest {
     Transaction(B256, TransactionSender),
     /// Sets the pinned block to fetch data from
     SetPinnedBlock(BlockId),
+    /// Get the bytecode for the given hash
+    ByteCodeHash(B256, ByteCodeHashSender),
 }
 
 /// Handles an internal provider and listens for requests.
@@ -96,9 +102,18 @@ pub struct BackendHandler<P> {
     block_id: Option<BlockId>,
 }
 
+pub trait ZkSyncMiddleware: Send + Sync {
+    fn get_bytecode_by_hash(
+        &self,
+        hash: B256,
+        // ) -> alloy_transport::TransportResult<Option<Bytecode>>;
+    ) -> impl std::future::Future<Output = alloy_transport::TransportResult<Option<Bytecode>>>
+           + std::marker::Send;
+}
+
 impl<P> BackendHandler<P>
 where
-    P: TempProvider + Clone + 'static,
+    P: ZkSyncMiddleware + TempProvider + Clone + 'static,
 {
     fn new(
         provider: P,
@@ -163,6 +178,9 @@ where
             }
             BackendRequest::SetPinnedBlock(block_id) => {
                 self.block_id = Some(block_id);
+            }
+            BackendRequest::ByteCodeHash(code_hash, sender) => {
+                self.request_bytecode_by_hash(code_hash, sender);
             }
         }
     }
@@ -280,11 +298,24 @@ where
             }
         }
     }
+
+    fn request_bytecode_by_hash(&mut self, code_hash: B256, sender: ByteCodeHashSender) {
+        let provider = self.provider.clone();
+        let fut = Box::pin(async move {
+            let bytecode = provider
+                .get_bytecode_by_hash(code_hash)
+                .await
+                .wrap_err("could not get bytecode {code_hash}");
+            (sender, bytecode, code_hash)
+        });
+
+        self.pending_requests.push(ProviderRequest::ByteCodeHash(fut));
+    }
 }
 
 impl<P> Future for BackendHandler<P>
 where
-    P: TempProvider + Clone + Unpin + 'static,
+    P: ZkSyncMiddleware + TempProvider + Clone + Unpin + 'static,
 {
     type Output = ();
 
@@ -450,6 +481,20 @@ where
                             continue;
                         }
                     }
+                    ProviderRequest::ByteCodeHash(fut) => {
+                        if let Poll::Ready((sender, bytecode, code_hash)) = fut.poll_unpin(cx) {
+                            let msg = match bytecode {
+                                Ok(Some(bytecode)) => Ok(bytecode),
+                                Ok(None) => Err(DatabaseError::MissingCode(code_hash)),
+                                Err(err) => {
+                                    let err = Arc::new(err);
+                                    Err(DatabaseError::GetBytecode(code_hash, err))
+                                }
+                            };
+                            let _ = sender.send(msg);
+                            continue
+                        }
+                    }
                 }
                 // not ready, insert and poll again
                 pin.pending_requests.push(request);
@@ -513,7 +558,7 @@ impl SharedBackend {
     /// NOTE: this should be called with `Arc<Provider>`
     pub async fn spawn_backend<P>(provider: P, db: BlockchainDb, pin_block: Option<BlockId>) -> Self
     where
-        P: TempProvider + Unpin + 'static + Clone,
+        P: ZkSyncMiddleware + TempProvider + Unpin + 'static + Clone,
     {
         let (shared, handler) = Self::new(provider, db, pin_block);
         // spawn the provider handler to a task
@@ -530,7 +575,7 @@ impl SharedBackend {
         pin_block: Option<BlockId>,
     ) -> Self
     where
-        P: TempProvider + Unpin + 'static + Clone,
+        P: ZkSyncMiddleware + TempProvider + Unpin + 'static + Clone,
     {
         let (shared, handler) = Self::new(provider, db, pin_block);
 
@@ -559,7 +604,7 @@ impl SharedBackend {
         pin_block: Option<BlockId>,
     ) -> (Self, BackendHandler<P>)
     where
-        P: TempProvider + Clone + 'static,
+        P: ZkSyncMiddleware + TempProvider + Clone + 'static,
     {
         let (backend, backend_rx) = channel(1);
         let cache = Arc::new(FlushJsonBlockCacheDB(Arc::clone(db.cache())));
@@ -620,6 +665,15 @@ impl SharedBackend {
         })
     }
 
+    fn do_get_bytecode(&self, hash: B256) -> DatabaseResult<Bytecode> {
+        tokio::task::block_in_place(|| {
+            let (sender, rx) = oneshot_channel();
+            let req = BackendRequest::ByteCodeHash(hash, sender);
+            self.backend.clone().try_send(req)?;
+            rx.recv()?
+        })
+    }
+
     /// Flushes the DB to disk if caching is enabled
     pub(crate) fn flush_cache(&self) {
         self.cache.0.flush();
@@ -641,7 +695,14 @@ impl DatabaseRef for SharedBackend {
     }
 
     fn code_by_hash_ref(&self, hash: B256) -> Result<Bytecode, Self::Error> {
-        Err(DatabaseError::MissingCode(hash))
+        trace!(target: "sharedbackend", %hash, "request codehash");
+        self.do_get_bytecode(hash).map_err(|err| {
+            error!(target: "sharedbackend", %err, %hash, "Failed to send/recv `code_by_hash`");
+            if err.is_possibly_non_archive_node_error() {
+                error!(target: "sharedbackend", "{NON_ARCHIVE_NODE_WARNING}");
+            }
+            err
+        })
     }
 
     fn storage_ref(&self, address: Address, index: U256) -> Result<U256, Self::Error> {

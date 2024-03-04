@@ -1,7 +1,7 @@
 use super::Result;
 use crate::{script::ScriptWallets, Vm::Rpc};
 use alloy_primitives::Address;
-use foundry_common::fs::normalize_path;
+use foundry_common::{fs::normalize_path, DualCompiledContract};
 use foundry_compilers::{utils::canonicalize, ProjectPathsConfig};
 use foundry_config::{
     cache::StorageCachingConfig, fs_permissions::FsAccessKind, Config, FsPermissions,
@@ -40,11 +40,18 @@ pub struct CheatsConfig {
     pub labels: HashMap<Address, String>,
     /// Script wallets
     pub script_wallets: Option<ScriptWallets>,
+    /// ZKSolc -> Solc Contract codes
+    pub dual_compiled_contracts: Vec<DualCompiledContract>,
 }
 
 impl CheatsConfig {
     /// Extracts the necessary settings from the Config
-    pub fn new(config: &Config, evm_opts: EvmOpts, script_wallets: Option<ScriptWallets>) -> Self {
+    pub fn new(
+        config: &Config,
+        evm_opts: EvmOpts,
+        script_wallets: Option<ScriptWallets>,
+        dual_compiled_contracts: Vec<DualCompiledContract>,
+    ) -> Self {
         let mut allowed_paths = vec![config.__root.0.clone()];
         allowed_paths.extend(config.libs.clone());
         allowed_paths.extend(config.allow_paths.clone());
@@ -64,6 +71,7 @@ impl CheatsConfig {
             evm_opts,
             labels: config.labels.clone(),
             script_wallets,
+            dual_compiled_contracts,
         }
     }
 
@@ -180,6 +188,7 @@ impl Default for CheatsConfig {
             evm_opts: Default::default(),
             labels: Default::default(),
             script_wallets: None,
+            dual_compiled_contracts: Default::default(),
         }
     }
 }
@@ -194,6 +203,7 @@ mod tests {
             &Config { __root: PathBuf::from(root).into(), fs_permissions, ..Default::default() },
             Default::default(),
             None,
+            Default::default(),
         )
     }
 

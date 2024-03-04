@@ -4,8 +4,8 @@
 //! concurrently active pairs at once.
 
 use crate::fork::{BackendHandler, BlockchainDb, BlockchainDbMeta, CreateFork, SharedBackend};
-use alloy_providers::provider::Provider;
-use alloy_transport::BoxTransport;
+use alloy_providers::provider::{Provider, TempProvider};
+use alloy_transport::{BoxTransport, TransportResult};
 use foundry_common::provider::alloy::ProviderBuilder;
 use foundry_config::Config;
 use futures::{
@@ -515,4 +515,24 @@ async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork,
     let fork_id = ForkId::new(&fork.opts.url, number.into());
 
     Ok((fork_id, fork, handler))
+}
+
+impl<T: alloy_transport::Transport + Clone> super::backend::ZkSyncMiddleware for Provider<T> {
+    async fn get_bytecode_by_hash(
+        &self,
+        hash: alloy_primitives::B256,
+    ) -> TransportResult<Option<revm::primitives::Bytecode>> {
+        let bytecode: Option<alloy_primitives::Bytes> =
+            self.raw_request("zks_getBytecodeByHash", vec![hash]).await?;
+        Ok(bytecode.map(revm::primitives::Bytecode::new_raw))
+    }
+}
+
+impl<T: alloy_transport::Transport + Clone> super::backend::ZkSyncMiddleware for Arc<Provider<T>> {
+    async fn get_bytecode_by_hash(
+        &self,
+        hash: alloy_primitives::B256,
+    ) -> TransportResult<Option<revm::primitives::Bytecode>> {
+        self.as_ref().get_bytecode_by_hash(hash).await
+    }
 }

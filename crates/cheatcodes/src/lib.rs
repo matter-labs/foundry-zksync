@@ -12,7 +12,7 @@ extern crate tracing;
 
 use alloy_primitives::Address;
 use foundry_evm_core::backend::DatabaseExt;
-use revm::EVMData;
+use revm::{DatabaseCommit, EVMData};
 
 pub use spec::{CheatcodeDef, Vm};
 
@@ -35,6 +35,7 @@ mod script;
 mod string;
 mod test;
 mod utils;
+mod zk;
 
 pub use script::ScriptWallets;
 pub use test::expect::ExpectedCallTracker;
@@ -53,12 +54,12 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
     ///
     /// Implement this function if you need access to the EVM data.
     #[inline(always)]
-    fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_full<DB: DatabaseExt +  DatabaseCommit>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         self.apply(ccx.state)
     }
 
     #[inline]
-    fn apply_traced<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_traced<DB: DatabaseExt + DatabaseCommit>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let span = trace_span(self);
         let _enter = span.enter();
         trace_call();

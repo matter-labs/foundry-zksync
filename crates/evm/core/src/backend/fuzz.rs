@@ -16,6 +16,8 @@ use revm::{
 };
 use std::{borrow::Cow, collections::HashMap};
 
+use super::ForkInfo;
+
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
 /// Any changes made during its existence that affect the caching layer of the underlying Database
@@ -95,6 +97,10 @@ impl<'a> FuzzBackendWrapper<'a> {
 }
 
 impl<'a> DatabaseExt for FuzzBackendWrapper<'a> {
+    fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
+        self.backend.to_mut().get_fork_info(id)
+    }
+
     fn snapshot(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
         trace!("fuzz: create snapshot");
         self.backend_mut(env).snapshot(journaled_state, env)
@@ -217,6 +223,10 @@ impl<'a> DatabaseExt for FuzzBackendWrapper<'a> {
 
     fn is_persistent(&self, acc: &Address) -> bool {
         self.backend.is_persistent(acc)
+    }
+
+    fn persistent_accounts(&self) -> Vec<Address> {
+        self.backend.persistent_accounts()
     }
 
     fn remove_persistent_account(&mut self, account: &Address) -> bool {

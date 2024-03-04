@@ -46,6 +46,8 @@ pub enum DatabaseError {
          For a test environment, you can use `etch` to place the required bytecode at that address."
     )]
     MissingCreate2Deployer,
+    #[error("failed to get bytecode for {0:?}: {1}")]
+    GetBytecode(B256, Arc<eyre::Error>),
 }
 
 impl DatabaseError {
@@ -76,6 +78,7 @@ impl DatabaseError {
             Self::BlockNotFound(_) |
             Self::TransactionNotFound(_) |
             Self::MissingCreate2Deployer => None,
+            Self::GetBytecode(_, err) => Some(err),
         }
     }
 

@@ -401,7 +401,7 @@ impl InspectorStack {
         }
     }
 
-    fn do_call_end<DB: DatabaseExt>(
+    fn do_call_end<DB: DatabaseExt + DatabaseCommit>(
         &mut self,
         data: &mut EVMData<'_, DB>,
         call: &CallInputs,

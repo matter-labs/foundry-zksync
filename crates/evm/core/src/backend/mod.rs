@@ -10,6 +10,7 @@ use alloy_genesis::GenesisAccount;
 use alloy_primitives::{b256, keccak256, Address, B256, U256, U64};
 use alloy_rpc_types::{Block, BlockNumberOrTag, BlockTransactions, Transaction};
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
+use itertools::Itertools;
 use revm::{
     db::{CacheDB, DatabaseRef},
     inspectors::NoOpInspector,
@@ -40,6 +41,9 @@ pub use in_memory_db::{EmptyDBWrapper, FoundryEvmInMemoryDB, MemDb};
 mod snapshot;
 pub use snapshot::{BackendSnapshot, RevertSnapshotAction, StateSnapshot};
 
+mod fork_type;
+pub use fork_type::{CachedForkType, ForkType};
+
 // A `revm::Database` that is used in forking mode
 type ForkDB = CacheDB<SharedBackend>;
 
@@ -61,8 +65,23 @@ const DEFAULT_PERSISTENT_ACCOUNTS: [Address; 3] =
 const GLOBAL_FAILURE_SLOT: B256 =
     b256!("6661696c65640000000000000000000000000000000000000000000000000000");
 
+/// Defines the info of a fork
+pub struct ForkInfo {
+    /// The type of fork
+    pub fork_type: ForkType,
+    /// The fork's environment
+    pub fork_env: Env,
+}
+
 /// An extension trait that allows us to easily extend the `revm::Inspector` capabilities
 pub trait DatabaseExt: Database<Error = DatabaseError> {
+    /// Retrieves information about a fork
+    ///
+    /// The fork must already exist defined by the provided [LocalForkId].
+    /// If exists, we return the information about the fork, namely it's type (ZK or EVM)
+    /// and the the fork environment.
+    fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo>;
+
     /// Creates a new snapshot at the current point of execution.
     ///
     /// A snapshot is associated with a new unique id that's created for the snapshot.
@@ -265,6 +284,9 @@ pub trait DatabaseExt: Database<Error = DatabaseError> {
     /// Returns true if the given account is currently marked as persistent.
     fn is_persistent(&self, acc: &Address) -> bool;
 
+    /// Returns true if the given account is currently marked as persistent.
+    fn persistent_accounts(&self) -> Vec<Address>;
+
     /// Revokes persistent status from the given account.
     fn remove_persistent_account(&mut self, account: &Address) -> bool;
 
@@ -399,6 +421,8 @@ pub struct Backend {
     active_fork_ids: Option<(LocalForkId, ForkLookupIndex)>,
     /// holds additional Backend data
     inner: BackendInner,
+    /// Keeps track of the fork type
+    fork_url_type: CachedForkType,
 }
 
 // === impl Backend ===
@@ -427,6 +451,7 @@ impl Backend {
             fork_init_journaled_state: inner.new_journaled_state(),
             active_fork_ids: None,
             inner,
+            fork_url_type: Default::default(),
         };
 
         if let Some(fork) = fork {
@@ -470,6 +495,7 @@ impl Backend {
             fork_init_journaled_state: self.inner.new_journaled_state(),
             active_fork_ids: None,
             inner: Default::default(),
+            fork_url_type: Default::default(),
         }
     }
 
@@ -919,6 +945,21 @@ impl Backend {
 // === impl a bunch of `revm::Database` adjacent implementations ===
 
 impl DatabaseExt for Backend {
+    fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
+        let fork_id = self.ensure_fork_id(id).cloned()?;
+        let fork_env = self
+            .forks
+            .get_env(fork_id.clone())?
+            .ok_or_else(|| eyre::eyre!("Requested fork `{}` does not exit", id))?;
+        let fork_type = self
+            .forks
+            .get_fork_url(fork_id)?
+            .map(|url| self.fork_url_type.get(&url))
+            .unwrap_or(ForkType::Zk);
+
+        Ok(ForkInfo { fork_type, fork_env })
+    }
+
     fn snapshot(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
         trace!("create snapshot");
         let id = self.inner.snapshots.insert(BackendSnapshot::new(
@@ -1376,6 +1417,11 @@ impl DatabaseExt for Backend {
     fn is_persistent(&self, acc: &Address) -> bool {
         self.inner.persistent_accounts.contains(acc)
     }
+
+    fn persistent_accounts(&self) -> Vec<Address> {
+        self.inner.persistent_accounts.clone().into_iter().collect_vec()
+    }
+
 
     fn allow_cheatcode_access(&mut self, account: Address) -> bool {
         trace!(?account, "allow cheatcode access");
