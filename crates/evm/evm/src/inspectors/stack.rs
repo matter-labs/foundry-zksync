@@ -5,7 +5,9 @@ use super::{
 use alloy_primitives::{Address, Bytes, B256, U256};
 use ethers_core::types::Log;
 use ethers_signers::LocalWallet;
-use foundry_common::{AsTracerPointer, StorageModificationRecorder, StorageModifications};
+use foundry_common::{
+    AsTracerPointer, DualCompiledContract, StorageModificationRecorder, StorageModifications,
+};
 use foundry_evm_core::{
     backend::DatabaseExt, debug::DebugArena, era_revm::storage_view::StorageView,
 };
@@ -49,6 +51,8 @@ pub struct InspectorStackBuilder {
     pub print: Option<bool>,
     /// The chisel state inspector.
     pub chisel_state: Option<usize>,
+    /// Whether to use [DualCompiledContracts]s.
+    pub dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
 }
 
 impl InspectorStackBuilder {
@@ -128,6 +132,16 @@ impl InspectorStackBuilder {
         self
     }
 
+    /// Set [DualCompiledContracts]s.
+    #[inline]
+    pub fn dual_compiled_contracts(
+        mut self,
+        dual_compiled_contracts: Vec<DualCompiledContract>,
+    ) -> Self {
+        self.dual_compiled_contracts = Some(dual_compiled_contracts);
+        self
+    }
+
     /// Builds the stack of inspectors to use when transacting/committing on the EVM.
     ///
     /// See also [`revm::Evm::inspect_ref`] and [`revm::Evm::commit_ref`].
@@ -143,6 +157,7 @@ impl InspectorStackBuilder {
             coverage,
             print,
             chisel_state,
+            dual_compiled_contracts,
         } = self;
         let mut stack = InspectorStack::new();
 
@@ -168,6 +183,10 @@ impl InspectorStackBuilder {
         }
         if let Some(gas_price) = gas_price {
             stack.set_gas_price(gas_price);
+        }
+
+        if let Some(dual_compiled_contracts) = dual_compiled_contracts {
+            stack.dual_compiled_contracts = dual_compiled_contracts;
         }
 
         stack
@@ -211,6 +230,7 @@ pub struct InspectorStack {
     pub printer: Option<TracePrinter>,
     pub tracer: Option<Tracer>,
     pub storage_modifications: StorageModifications,
+    pub dual_compiled_contracts: Vec<DualCompiledContract>,
 }
 
 impl InspectorStack {
@@ -578,8 +598,8 @@ use era_cheatcodes::cheatcodes::CheatcodeTracer;
 use foundry_evm_core::era_revm::db::RevmDatabaseForEra;
 use multivm::vm_latest::{HistoryDisabled, ToTracerPointer};
 
-impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled>
-    for &mut InspectorStack
+impl<DB: DatabaseExt + revm::DatabaseCommit + Send>
+    AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>, HistoryDisabled> for &mut InspectorStack
 {
     fn as_tracer_pointer(
         &self,
@@ -593,6 +613,7 @@ impl<DB: DatabaseExt + Send> AsTracerPointer<StorageView<RevmDatabaseForEra<DB>>
                 .as_ref()
                 .map(|c| c.broadcastable_transactions.clone())
                 .unwrap_or_default(),
+            self.dual_compiled_contracts.clone(),
             self.cheatcodes.as_ref().map(|c| c.script_wallets.clone()).unwrap_or_default(),
         )
         .into_tracer_pointer()

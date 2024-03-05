@@ -27,7 +27,7 @@ use zkforge::{
     result::SuiteResult,
     revm::primitives::SpecId,
     utils::{build_ic_pc_map, ICPCMap},
-    MultiContractRunnerBuilder, TestOptions,
+    MultiContractRunnerBuilder, ProjectCompileDualOutput, TestOptions,
 };
 
 /// A map, keyed by contract ID, to a tuple of the deployment source map and the runtime source map.
@@ -303,7 +303,7 @@ impl CoverageArgs {
             .with_cheats_config(CheatsConfig::new(&config, evm_opts.clone()))
             .with_test_options(TestOptions { fuzz: config.fuzz, ..Default::default() })
             .set_coverage(true)
-            .build(root.clone(), output, env, evm_opts)?;
+            .build(root.clone(), ProjectCompileDualOutput::only_zk(output), env, evm_opts)?;
 
         // Run tests
         let known_contracts = runner.known_contracts.clone();

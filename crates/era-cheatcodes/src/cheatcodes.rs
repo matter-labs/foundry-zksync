@@ -1,6 +1,6 @@
 use crate::{
     events::LogEntry,
-    farcall::{FarCallHandler, MockCall, MockedCalls},
+    farcall::{self, FarCallHandler, MockCall, MockedCalls, ParsedFarCall},
     utils::{ToH160, ToH256, ToU256},
 };
 use alloy_primitives::{Address, Bytes, FixedBytes, I256 as rI256};
@@ -14,11 +14,11 @@ use eyre::Context;
 use foundry_cheatcodes::{BroadcastableTransaction, BroadcastableTransactions, CheatsConfig};
 use foundry_cheatcodes_spec::Vm;
 use foundry_common::{
-    conversion_utils::{h160_to_address, revm_u256_to_u256},
-    StorageModifications,
+    conversion_utils::{h160_to_address, h256_to_h160, revm_u256_to_u256, u256_to_revm_u256},
+    DualCompiledContract, StorageModifications,
 };
 use foundry_evm_core::{
-    backend::DatabaseExt,
+    backend::{DatabaseExt, LocalForkId},
     constants::MAGIC_ASSUME,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView, transactions::storage_to_state},
     fork::CreateFork,
@@ -43,8 +43,11 @@ use multivm::{
     },
 };
 use revm::{
-    primitives::{ruint::Uint, BlockEnv, CfgEnv, Env, SpecId, U256 as rU256},
-    JournaledState,
+    primitives::{
+        ruint::Uint, Account, AccountInfo, AccountStatus, BlockEnv, Bytecode, CfgEnv, CreateScheme,
+        Env, HashMap as rHashMap, SpecId, KECCAK_EMPTY, U256 as rU256,
+    },
+    DatabaseCommit, JournaledState,
 };
 use serde::Serialize;
 use std::{
@@ -55,7 +58,7 @@ use std::{
     ops::BitAnd,
     process::Command,
     str::FromStr,
-    sync::{Arc, RwLock},
+    sync::{Arc, MutexGuard, RwLock},
 };
 use zksync_basic_types::{AccountTreeId, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -63,7 +66,8 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
-    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS,
+    LogQuery, StorageKey, Timestamp, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
+    L2_ETH_TOKEN_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
 use zksync_utils::{bytecode::CompressedBytecodeInfo, h256_to_u256, u256_to_h256};
 
@@ -172,6 +176,9 @@ pub struct CheatcodeTracer {
     transact_logs: Vec<LogEntry>,
     mocked_calls: MockedCalls,
     farcall_handler: FarCallHandler,
+    use_evm_fork: Option<Env>,
+    initialized_evm_forks: HashSet<LocalForkId>,
+    dual_compiled_contracts: Vec<DualCompiledContract>,
     script_wallets: Arc<RwLock<Vec<LocalWallet>>>,
 }
 
@@ -305,8 +312,8 @@ struct BroadcastOpts {
     depth: usize,
 }
 
-impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
-    for CheatcodeTracer
+impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode>
+    DynTracer<EraDb<S>, SimpleMemory<H>> for CheatcodeTracer
 {
     fn before_execution(
         &mut self,
@@ -416,6 +423,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                     );
                 }
             }
+
+            // Reset EVM mode
+            self.use_evm_fork = None;
 
             // reset the test state to avoid checking again
             self.reset_test_status();
@@ -539,28 +549,30 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
 
                         let is_deployment =
                             current.code_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
-                        let factory_deps =
-                            if is_deployment {
-                                let test_contract_hash = handle.read_value(&StorageKey::new(
-                                    AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
-                                    TEST_ADDRESS.into(),
-                                ));
+                        let factory_deps = if is_deployment {
+                            let test_contract_hash = handle.read_value(&StorageKey::new(
+                                AccountTreeId::new(zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS),
+                                TEST_ADDRESS.into(),
+                            ));
 
-                                self.get_modified_bytecodes(vec![])
-                                    .iter()
-                                    .chain(self.storage_modifications.known_codes.iter())
-                                    .filter_map(|(k, v)| {
-                                        if k != &test_contract_hash {
+                            let mut all_bytecodes = self.get_modified_bytecodes(vec![]);
+                            all_bytecodes.extend(self.storage_modifications.known_codes.clone());
+
+                            all_bytecodes
+                                .into_iter()
+                                .filter_map(
+                                    |(k, v)| {
+                                        if k != test_contract_hash {
                                             Some(v)
                                         } else {
                                             None
                                         }
-                                    })
-                                    .cloned()
-                                    .collect_vec()
-                            } else {
-                                vec![]
-                            };
+                                    },
+                                )
+                                .collect_vec()
+                        } else {
+                            vec![]
+                        };
 
                         // used to determine whether the nonce should be decreased, since
                         // zkevm updates the nonce for the _sender_ already when we run the
@@ -629,6 +641,13 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
                         self.set_nonce(new_origin, (Some(nonce + 1 + nonce_offset), None), handle);
                     }
                 }
+
+                if let Some(fork_env) = &self.use_evm_fork {
+                    if self.handle_evm_far_call(fork_env.clone(), state, memory, storage) {
+                        return
+                    }
+                }
+
                 return
             }
 
@@ -652,7 +671,9 @@ impl<S: DatabaseExt + Send, H: HistoryMode> DynTracer<EraDb<S>, SimpleMemory<H>>
     }
 }
 
-impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeTracer {
+impl<S: DatabaseExt + revm::DatabaseCommit + Send, H: HistoryMode> VmTracer<EraDb<S>, H>
+    for CheatcodeTracer
+{
     fn initialize_tracer(
         &mut self,
         _state: &mut ZkSyncVmState<EraDb<S>, H>,
@@ -824,33 +845,39 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         let mut db = era_db.db.lock().unwrap();
                         let era_env = self.env.get().unwrap();
                         let mut env = into_revm_env(era_env);
-                        db.create_select_fork(
-                            create_fork_request(
-                                era_env,
-                                self.config.clone(),
-                                block_number,
-                                &url_or_alias,
-                            ),
-                            &mut env,
-                            &mut journaled_state,
-                        )
+                        let fork_id = db
+                            .create_select_fork(
+                                create_fork_request(
+                                    era_env,
+                                    self.config.clone(),
+                                    block_number,
+                                    &url_or_alias,
+                                ),
+                                &mut env,
+                                &mut journaled_state,
+                            )
+                            .unwrap();
+
+                        self.select_fork_vm(db, fork_id, false);
+
+                        fork_id
                     };
                     storage.modified_storage_keys = modified_storage;
 
-                    self.return_data = Some(fork_id.unwrap().to_return_data());
+                    self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::CreateFork { url_or_alias, block_number } => {
+                    let era_env = self.env.get().unwrap();
+                    let fork = create_fork_request(
+                        era_env,
+                        self.config.clone(),
+                        block_number,
+                        &url_or_alias,
+                    );
                     let era_db = &storage.borrow_mut().storage_handle;
                     let mut db = era_db.db.lock().unwrap();
-                    let era_env = self.env.get().unwrap();
-                    let fork_id = db
-                        .create_fork(create_fork_request(
-                            era_env,
-                            self.config.clone(),
-                            block_number,
-                            &url_or_alias,
-                        ))
-                        .unwrap();
+                    let fork_id = db.create_fork(fork).unwrap();
+
                     self.return_data = Some(fork_id.to_return_data());
                 }
                 FinishCycleOneTimeActions::RollFork { block_number, fork_id } => {
@@ -890,10 +917,16 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                         let mut env = into_revm_env(era_env);
                         db.roll_fork(fork_id, block_number, &mut env, &mut journaled_state)
                             .unwrap();
+
+                        if let Some(fork_id) = fork_id {
+                            self.select_fork_vm(db, fork_id, true);
+                        }
                     };
                     storage.modified_storage_keys = modified_storage;
                 }
                 FinishCycleOneTimeActions::SelectFork { fork_id } => {
+                    let revm_fork_id = rU256::from(fork_id.as_u128());
+
                     let mut storage = storage.borrow_mut();
                     let modified_storage =
                         self.get_modified_storage(storage.modified_storage_keys());
@@ -902,7 +935,7 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                     );
                     {
                         storage.clean_cache();
-                        let era_db = &storage.storage_handle;
+                        let era_db = &mut storage.storage_handle;
                         let bytecodes = into_revm_bytecodes(modified_bytecodes.clone());
                         state.decommittment_processor.populate(
                             bytecodes
@@ -932,6 +965,8 @@ impl<S: DatabaseExt + Send, H: HistoryMode> VmTracer<EraDb<S>, H> for CheatcodeT
                             &mut journaled_state,
                         )
                         .unwrap();
+
+                        self.select_fork_vm(db, revm_fork_id, false);
                     }
                     storage.modified_storage_keys = modified_storage;
 
@@ -1128,12 +1163,14 @@ impl CheatcodeTracer {
         cheatcodes_config: Arc<CheatsConfig>,
         storage_modifications: StorageModifications,
         broadcastable_transactions: Arc<RwLock<BroadcastableTransactions>>,
+        dual_compiled_contracts: Vec<DualCompiledContract>,
         script_wallets: Arc<RwLock<Vec<LocalWallet>>>,
     ) -> Self {
         Self {
             config: cheatcodes_config,
             storage_modifications,
             broadcastable_transactions,
+            dual_compiled_contracts,
             script_wallets,
             ..Default::default()
         }
@@ -1182,7 +1219,7 @@ impl CheatcodeTracer {
         &self.test_status
     }
 
-    pub fn dispatch_cheatcode<S: DatabaseExt + Send, H: HistoryMode>(
+    pub fn dispatch_cheatcode<S: DatabaseExt + DatabaseCommit + Send, H: HistoryMode>(
         &mut self,
         state: VmLocalStateData<'_>,
         _data: AfterExecutionData,
@@ -1219,18 +1256,70 @@ impl CheatcodeTracer {
             }
             deal(dealCall { account, newBalance: new_balance }) => {
                 tracing::info!("👷 Setting balance for {account:?} to {new_balance}");
-                self.write_storage(
-                    storage_key_for_eth_balance(&account.to_h160()),
-                    new_balance.to_h256(),
-                    &mut storage.borrow_mut(),
-                );
+                if self.use_evm_fork.is_some() {
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    let info = db
+                        .basic(account)
+                        .expect("failed getting account info")
+                        .expect("expected some account info");
+
+                    // code_hash is computed on commit
+                    let mut changes = rHashMap::new();
+                    changes.insert(
+                        account,
+                        Account {
+                            info: AccountInfo {
+                                balance: new_balance,
+                                nonce: info.nonce,
+                                code_hash: KECCAK_EMPTY,
+                                code: None,
+                            },
+                            storage: Default::default(),
+                            status: AccountStatus::Touched,
+                        },
+                    );
+                    db.commit(changes);
+                } else {
+                    self.write_storage(
+                        storage_key_for_eth_balance(&account.to_h160()),
+                        new_balance.to_h256(),
+                        &mut storage.borrow_mut(),
+                    );
+                }
             }
             etch(etchCall { target, newRuntimeBytecode: new_runtime_bytecode }) => {
                 tracing::info!("👷 Setting address code for {target:?}");
-                let code_key = get_code_key(&target.to_h160());
-                let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
-                self.store_factory_dep(hash, code);
-                self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+                if self.use_evm_fork.is_some() {
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    let info = db
+                        .basic(target)
+                        .expect("failed getting account info")
+                        .expect("expected some account info");
+
+                    // code_hash is computed on commit
+                    let mut changes = rHashMap::new();
+                    changes.insert(
+                        target,
+                        Account {
+                            info: AccountInfo {
+                                balance: info.balance,
+                                nonce: info.nonce,
+                                code_hash: KECCAK_EMPTY,
+                                code: Some(Bytecode::new_raw(Bytes::from(new_runtime_bytecode))),
+                            },
+                            storage: Default::default(),
+                            status: AccountStatus::Touched,
+                        },
+                    );
+                    db.commit(changes);
+                } else {
+                    let code_key = get_code_key(&target.to_h160());
+                    let (hash, code) = bytecode_to_factory_dep(new_runtime_bytecode);
+                    self.store_factory_dep(hash, code);
+                    self.write_storage(code_key, u256_to_h256(hash), &mut storage.borrow_mut());
+                }
             }
             envAddress_0(envAddress_0Call { name }) => {
                 tracing::info!("👷 Getting address env variable {name}");
@@ -1533,13 +1622,21 @@ impl CheatcodeTracer {
             }
             getNonce_0(getNonce_0Call { account }) => {
                 tracing::info!("👷 Getting nonce for {account:?}");
-                let (account_nonce, _) =
-                    Self::get_nonce(account.to_h160(), &mut storage.borrow_mut());
-                tracing::info!(
-                    "👷 Nonces for account {:?} are {}",
-                    account,
-                    account_nonce.as_u64()
-                );
+                let account_nonce = if self.use_evm_fork.is_some() {
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    let info = db.basic(account).ok().flatten().expect("account info not found");
+                    U256::from(info.nonce)
+                } else {
+                    let (account_nonce, _) =
+                        Self::get_nonce(account.to_h160(), &mut storage.borrow_mut());
+                    tracing::info!(
+                        "👷 Nonces for account {:?} are {}",
+                        account,
+                        account_nonce.as_u64()
+                    );
+                    account_nonce
+                };
                 tracing::info!("👷 Setting returndata",);
                 tracing::info!("👷 Returndata is {:?}", account_nonce);
                 self.return_data = Some(vec![account_nonce]);
@@ -1716,18 +1813,22 @@ impl CheatcodeTracer {
             }
             roll(rollCall { newHeight: new_height }) => {
                 tracing::info!("👷 Setting block number to {}", new_height);
-                let key = StorageKey::new(
-                    AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                    zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
-                );
-                let mut storage = storage.borrow_mut();
-                let (_, block_timestamp) =
-                    unpack_block_info(h256_to_u256(storage.read_value(&key)));
-                self.write_storage(
-                    key,
-                    u256_to_h256(pack_block_info(new_height.as_limbs()[0], block_timestamp)),
-                    &mut storage,
-                );
+                if let Some(env) = self.use_evm_fork.as_mut() {
+                    env.block.number = new_height;
+                } else {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
+                    );
+                    let mut storage = storage.borrow_mut();
+                    let (_, block_timestamp) =
+                        unpack_block_info(h256_to_u256(storage.read_value(&key)));
+                    self.write_storage(
+                        key,
+                        u256_to_h256(pack_block_info(new_height.as_limbs()[0], block_timestamp)),
+                        &mut storage,
+                    );
+                }
             }
             rollFork_0(rollFork_0Call { blockNumber }) => {
                 tracing::info!("👷 Rolling active fork to block number {}", blockNumber);
@@ -1842,21 +1943,43 @@ impl CheatcodeTracer {
             }
             setNonce(setNonceCall { account, newNonce: new_nonce }) => {
                 tracing::info!("👷 Setting nonce for {account:?} to {new_nonce}");
-                let new_full_nonce = self.set_nonce(
-                    account.to_h160(),
-                    (Some(new_nonce.into()), Some(new_nonce.into())),
-                    &mut storage.borrow_mut(),
-                );
+                if self.use_evm_fork.is_some() {
+                    let era_db = &storage.borrow_mut().storage_handle;
+                    let mut db = era_db.db.lock().unwrap();
+                    let info = db
+                        .basic(account)
+                        .expect("failed getting account info")
+                        .expect("expected some account info");
 
-                if new_full_nonce.is_some() {
-                    tracing::info!(
-                        "👷 Nonces for account {:?} have been set to {}",
+                    // code_hash is computed on commit
+                    let mut changes = rHashMap::new();
+                    changes.insert(
                         account,
-                        new_nonce
+                        Account {
+                            info: AccountInfo {
+                                balance: info.balance,
+                                nonce: new_nonce,
+                                code_hash: KECCAK_EMPTY,
+                                code: None,
+                            },
+                            storage: Default::default(),
+                            status: AccountStatus::Touched,
+                        },
                     );
-                } else {
-                    tracing::error!("👷 Setting nonces failed")
+                    db.commit(changes);
+                } else if self
+                    .set_nonce(
+                        account.to_h160(),
+                        (Some(new_nonce.into()), Some(new_nonce.into())),
+                        &mut storage.borrow_mut(),
+                    )
+                    .is_none()
+                {
+                    tracing::error!("👷 Setting nonces failed");
+                    return
                 }
+
+                tracing::info!("👷 Nonce for account {:?} has been set to {}", account, new_nonce);
             }
             sign_0(sign_0Call { privateKey: private_key, digest }) => {
                 tracing::info!("👷 Signing digest with private key");
@@ -2017,17 +2140,22 @@ impl CheatcodeTracer {
             warp(warpCall { newTimestamp: new_timestamp }) => {
                 tracing::info!("👷 Setting block timestamp {}", new_timestamp);
 
-                let key = StorageKey::new(
-                    AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
-                    zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
-                );
-                let mut storage = storage.borrow_mut();
-                let (block_number, _) = unpack_block_info(h256_to_u256(storage.read_value(&key)));
-                self.write_storage(
-                    key,
-                    u256_to_h256(pack_block_info(block_number, new_timestamp.as_limbs()[0])),
-                    &mut storage,
-                );
+                if let Some(env) = self.use_evm_fork.as_mut() {
+                    env.block.timestamp = new_timestamp;
+                } else {
+                    let key = StorageKey::new(
+                        AccountTreeId::new(zksync_types::SYSTEM_CONTEXT_ADDRESS),
+                        zksync_types::CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
+                    );
+                    let mut storage = storage.borrow_mut();
+                    let (block_number, _) =
+                        unpack_block_info(h256_to_u256(storage.read_value(&key)));
+                    self.write_storage(
+                        key,
+                        u256_to_h256(pack_block_info(block_number, new_timestamp.as_limbs()[0])),
+                        &mut storage,
+                    );
+                }
             }
             createSelectFork_0(createSelectFork_0Call { urlOrAlias }) => {
                 tracing::info!("👷 Creating and selecting fork {}", urlOrAlias,);
@@ -2577,6 +2705,234 @@ impl CheatcodeTracer {
                 .collect::<HashMap<_, _>>(),
         );
         modified_bytecodes
+    }
+
+    /// Selects an appropriate VM for the fork. The default VM is always ZK-VM
+    ///
+    /// If the provided `fork_id` points to an EVM fork, all deployed bytecodes are
+    /// translated to their respective EVM bytecodes.
+    ///
+    /// If the provided `fork_id` points to a ZK fork, then no action is necessary,
+    /// as we are by default in ZK VM.
+    fn select_fork_vm<S: DatabaseExt + DatabaseCommit + Send>(
+        &mut self,
+        mut db: MutexGuard<'_, Box<S>>,
+        fork_id: LocalForkId,
+        force_initialized: bool,
+    ) {
+        let fork_info = db.get_fork_info(fork_id).expect("failed getting fork info");
+        self.use_evm_fork = if fork_info.fork_type.is_evm() {
+            tracing::info!("switch mode: EVM");
+
+            if !self.initialized_evm_forks.contains(&fork_id) || force_initialized {
+                // initialize all deployed contracts
+                let mut changes = rHashMap::new();
+                for (deployed_address, deployed_bytecode_hash) in
+                    &self.storage_modifications.deployed_codes
+                {
+                    if let Some(contract) = self
+                        .dual_compiled_contracts
+                        .iter()
+                        .find(|contract| &contract.zk_bytecode_hash == deployed_bytecode_hash)
+                    {
+                        tracing::info!("overwriting {deployed_address:?} with evm contract code");
+                        let address = h160_to_address(*deployed_address);
+                        let info = db
+                            .basic(address)
+                            .expect("failed getting account info")
+                            .expect("expected some account info");
+
+                        // code_hash is computed on commit
+                        changes.insert(
+                            address,
+                            Account {
+                                info: AccountInfo {
+                                    balance: info.balance,
+                                    nonce: info.nonce,
+                                    code_hash: KECCAK_EMPTY,
+                                    code: Some(Bytecode::new_raw(Bytes::from(
+                                        contract.evm_deployed_bytecode.clone(),
+                                    ))),
+                                },
+                                storage: Default::default(),
+                                status: AccountStatus::Touched,
+                            },
+                        );
+                    }
+                }
+
+                db.commit(changes);
+                self.initialized_evm_forks.insert(fork_id);
+            }
+
+            Some(fork_info.fork_env.clone())
+        } else {
+            tracing::info!("switch mode: ZK");
+            None
+        };
+    }
+
+    /// Handles a FarCall within an EVM if the `use_evm_fork` is set.
+    /// Returns true if the call was handled, false otherwise.
+    fn handle_evm_far_call<H: HistoryMode, S: DatabaseExt + DatabaseCommit + Send>(
+        &mut self,
+        fork_env: Env,
+        state: VmLocalStateData<'_>,
+        memory: &SimpleMemory<H>,
+        storage: StoragePtr<EraDb<S>>,
+    ) -> bool {
+        let current = state.vm_local_state.callstack.get_current_stack();
+
+        let call = farcall::parse(&state, memory);
+
+        if call.to() == &SYSTEM_CONTEXT_ADDRESS {
+            if call.selector() == farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER {
+                self.farcall_handler.set_immediate_return(fork_env.block.number.to_be_bytes_vec());
+            } else if call.selector() == farcall::SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP {
+                self.farcall_handler
+                    .set_immediate_return(fork_env.block.timestamp.to_be_bytes_vec());
+            }
+            return true
+        }
+
+        if call.to() == &L2_ETH_TOKEN_ADDRESS &&
+            call.selector() == farcall::SELECTOR_L2_ETH_BALANCE_OF
+        {
+            let account = call.params()[0];
+            let account = h256_to_h160(&H256::from(account));
+
+            let handle = &mut storage.borrow_mut();
+            let era_db = &handle.storage_handle;
+            let info = era_db.db.lock().unwrap().basic(h160_to_address(account)).unwrap().unwrap();
+            tracing::debug!("returning evm balance {:?} for {:?}", info.balance, account);
+
+            self.farcall_handler.set_immediate_return(info.balance.to_be_bytes_vec());
+            return true
+        }
+
+        // prepare env
+        let era_env = self.env.get().unwrap();
+        let mut env = into_revm_env(era_env);
+        env.block = fork_env.block.clone();
+        env.cfg.chain_id = fork_env.cfg.chain_id;
+        env.cfg.disable_eip3607 = true;
+        env.cfg.disable_base_fee = true;
+        env.cfg.disable_block_gas_limit = true;
+
+        if call.to() == &CONTRACT_DEPLOYER_ADDRESS &&
+            (call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE ||
+                call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE2)
+        {
+            let salt = call.params()[0];
+            let bytecode_hash = H256::from(call.params()[1]);
+            // Skip salt + bytecode_hash + offset + byte marker
+            let input = call.param_bytes_after(4);
+
+            let bytecode = self
+                .dual_compiled_contracts
+                .iter()
+                .find_map(|contract| {
+                    if contract.zk_bytecode_hash == bytecode_hash {
+                        Some(contract.evm_bytecode.clone())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| {
+                    panic!("cannot find matching bytecode to deploy for hash {:?}", bytecode_hash)
+                });
+
+            let from = h160_to_address(current.msg_sender);
+            let value = call.value();
+            let data = [bytecode, input].concat();
+
+            let create_scheme = if call.selector() == farcall::SELECTOR_CONTRACT_DEPLOYER_CREATE {
+                CreateScheme::Create
+            } else {
+                CreateScheme::Create2 { salt: rU256::from_be_bytes(salt) }
+            };
+            env.tx = revm::primitives::TxEnv {
+                caller: from,
+                transact_to: revm::primitives::TransactTo::Create(create_scheme),
+                data: data.into(),
+                value: u256_to_revm_u256(*value),
+                gas_price: rU256::from(0),
+                gas_priority_fee: None,
+                gas_limit: era_env.system_env.gas_limit as u64,
+                ..env.tx
+            };
+
+            let handle = &mut storage.borrow_mut();
+            let era_db = &handle.storage_handle;
+            let mut db = era_db.db.lock().unwrap();
+
+            let result = db.call_with_evm(env).expect("failed running evm call");
+
+            let address = match result.result {
+                revm::primitives::ExecutionResult::Success {
+                    output: revm::primitives::Output::Create(_, Some(address)),
+                    ..
+                } => address,
+                _ => panic!("failed deploying contract: {:?}", result.result),
+            };
+
+            tracing::info!("deployed contract address: {:?}", address);
+            let output = address.to_vec();
+
+            // update state in current EVM after performing any storage translations
+            if !result.state.is_empty() {
+                db.commit(result.state);
+            }
+
+            self.farcall_handler.set_immediate_return(output);
+            return true
+        }
+
+        if !BROADCAST_IGNORED_CONTRACTS.contains(&current.code_address) {
+            tracing::info!("Executing in EVM mode {:?}", call);
+
+            let from = h160_to_address(current.msg_sender);
+            let (value, to) = match call {
+                ParsedFarCall::SimpleCall { to, .. } => (rU256::ZERO, to),
+                ParsedFarCall::ValueCall { recipient, value, .. } => {
+                    (u256_to_revm_u256(value), recipient)
+                }
+            };
+            // let to = h160_to_address(to);
+            let calldata = call.calldata().to_vec();
+
+            env.tx = revm::primitives::TxEnv {
+                caller: from,
+                transact_to: revm::primitives::TransactTo::Call(h160_to_address(to)),
+                data: calldata.into(),
+                value,
+                gas_price: rU256::from(0),
+                gas_priority_fee: None,
+                gas_limit: era_env.system_env.gas_limit as u64,
+                ..env.tx
+            };
+
+            let era_db = &storage.borrow_mut().storage_handle;
+            let mut db = era_db.db.lock().unwrap();
+
+            let result = db.call_with_evm(env).expect("failed running evm call");
+            if !result.result.is_success() {
+                panic!("failed deploying contract: {:?}", result.result);
+            }
+
+            let output = result.result.output().unwrap().clone();
+            tracing::info!("result: {:?}", output);
+
+            // update state in current EVM after performing any storage translations
+            if !result.state.is_empty() {
+                db.commit(result.state);
+            }
+
+            self.farcall_handler.set_immediate_return(output.into());
+            return true
+        }
+
+        false
     }
 }
 
