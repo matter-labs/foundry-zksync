@@ -15,19 +15,19 @@ use zksync_types::{StorageKey, StorageValue, H256};
 /// When executing transactions in the API sandbox, a dedicated view is used for each transaction;
 /// the only shared part is the read storage keys cache.
 #[derive(Debug)]
-pub struct StorageView<S> {
-    pub storage_handle: S,
+pub(crate) struct StorageView<S> {
+    pub(crate) storage_handle: S,
     // Used for caching and to get the list/count of modified keys
-    pub modified_storage_keys: HashMap<StorageKey, StorageValue>,
+    pub(crate) modified_storage_keys: HashMap<StorageKey, StorageValue>,
     // Used purely for caching
-    pub read_storage_keys: HashMap<StorageKey, StorageValue>,
+    pub(crate) read_storage_keys: HashMap<StorageKey, StorageValue>,
     // Cache for `contains_key()` checks. The cache is only valid within one L1 batch execution.
     initial_writes_cache: HashMap<StorageKey, bool>,
 }
 
 impl<S: ReadStorage + fmt::Debug> StorageView<S> {
     /// Creates a new storage view based on the underlying storage.
-    pub fn new(
+    pub(crate) fn new(
         storage_handle: S,
         modified_storage_keys: HashMap<StorageKey, StorageValue>,
     ) -> Self {
@@ -40,7 +40,7 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
     }
 
     #[allow(dead_code)]
-    pub fn clean_cache(&mut self) {
+    pub(crate) fn clean_cache(&mut self) {
         self.modified_storage_keys = Default::default();
         self.read_storage_keys = Default::default();
         self.initial_writes_cache = Default::default();
@@ -55,8 +55,9 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
             value
         })
     }
+    
     /// Make a Rc RefCell ptr to the storage
-    pub fn into_rc_ptr(self) -> Rc<RefCell<Self>> {
+    pub(crate) fn into_rc_ptr(self) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(self))
     }
 }
@@ -65,7 +66,7 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     fn read_value(&mut self, key: &StorageKey) -> StorageValue {
         let value = self.get_value_no_log(key);
 
-        tracing::info!(
+        tracing::trace!(
             "read value {:?} {:?} ({:?}/{:?})",
             key.hashed_key(),
             value,

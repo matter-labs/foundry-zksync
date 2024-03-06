@@ -8,8 +8,13 @@ use crate::{
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
-use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
-use foundry_compilers::{contracts::ArtifactContracts, Artifact, ArtifactId, ProjectCompileOutput};
+use foundry_common::{
+    get_contract_name, ContractsByArtifact, TestFunctionExt,
+};
+use foundry_compilers::{
+    contracts::ArtifactContracts, Artifact, ArtifactId, ArtifactOutput, ConfigurableArtifacts,
+    ProjectCompileOutput,
+};
 use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
@@ -263,6 +268,21 @@ pub struct MultiContractRunnerBuilder {
     pub isolation: bool,
     /// Settings related to fuzz and/or invariant tests
     pub test_options: Option<TestOptions>,
+}
+
+#[derive(Debug)]
+pub struct ProjectCompileDualOutput<A: ArtifactOutput = ConfigurableArtifacts> {
+    pub zk_output: Option<ProjectCompileOutput<A>>,
+    pub solc_output: Option<ProjectCompileOutput<A>>,
+}
+
+impl<A: ArtifactOutput> ProjectCompileDualOutput<A> {
+    pub fn only_zk(zk_output: ProjectCompileOutput<A>) -> Self {
+        ProjectCompileDualOutput { zk_output: Some(zk_output), solc_output: None }
+    }
+    pub fn only_evm(solc_output: ProjectCompileOutput<A>) -> Self {
+        ProjectCompileDualOutput { zk_output: None, solc_output: Some(solc_output) }
+    }
 }
 
 impl MultiContractRunnerBuilder {

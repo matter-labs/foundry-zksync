@@ -310,6 +310,7 @@ impl ScriptArgs {
                             &script_config.config,
                             script_config.evm_opts.clone(),
                             script_wallets,
+                            Default::default(),
                         )
                         .into(),
                     )

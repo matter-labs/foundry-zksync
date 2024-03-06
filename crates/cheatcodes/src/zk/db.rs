@@ -18,7 +18,7 @@ use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
     get_code_key, get_nonce_key, get_system_context_init_logs, utils::decompose_full_nonce, Nonce,
-    StorageKey, StorageLog, StorageLogKind, StorageValue, L2_ETH_TOKEN_ADDRESS,
+    StorageKey, StorageLog, StorageLogKind, StorageValue,
 };
 
 use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
@@ -68,14 +68,7 @@ impl<'a, DB: Database> ZKVMData<'a, DB> {
 
         let factory_deps = contracts
             .into_iter()
-            .map(|contract| {
-                println!(
-                    "{:?} => {:?}",
-                    contract.account_id.address(),
-                    hash_bytecode(&contract.bytecode)
-                );
-                (hash_bytecode(&contract.bytecode), contract.bytecode)
-            })
+            .map(|contract| (hash_bytecode(&contract.bytecode), contract.bytecode))
             .collect::<HashMap<_, _>>();
 
         Self { db, factory_deps, override_keys }

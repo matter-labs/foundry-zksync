@@ -9,7 +9,7 @@ use era_test_node::{
 };
 use foundry_common::{
     conversion_utils::address_to_h160,
-    factory_deps, fix_l2_gas_limit, fix_l2_gas_price,
+    fix_l2_gas_limit, fix_l2_gas_price,
     zk_utils::conversion_utils::{
         h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
     },
@@ -58,10 +58,11 @@ where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
+    let caller = env.tx.caller;
     let calldata =
         encode_create_params(&call.scheme, contract.zk_bytecode_hash, Default::default());
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
-    let nonce = ZKVMData::new(db).get_tx_nonce(call.caller);
+    let nonce = ZKVMData::new(db).get_tx_nonce(caller);
 
     let tx = L2Tx::new(
         CONTRACT_DEPLOYER_ADDRESS,
@@ -75,7 +76,7 @@ where
             ),
             gas_per_pubdata_limit: U256::from(800),
         },
-        address_to_h160(call.caller),
+        address_to_h160(caller),
         revm_u256_to_u256(call.value),
         Some(factory_deps),
         PaymasterParams::default(),
@@ -85,6 +86,7 @@ where
 
 pub(crate) fn call<'a, DB, E>(
     call: &CallInputs,
+    contract: Option<&DualCompiledContract>,
     env: &'a mut Env,
     db: &'a mut DB,
 ) -> EVMResult<ResultAndState>
@@ -92,7 +94,10 @@ where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    let nonce = ZKVMData::new(db).get_tx_nonce(call.context.caller);
+    info!(?call, "call tx");
+    let caller = env.tx.caller;
+    let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
+    let nonce: zksync_types::Nonce = ZKVMData::new(db).get_tx_nonce(caller);
     let tx = L2Tx::new(
         address_to_h160(call.contract),
         call.input.to_vec(),
@@ -105,9 +110,9 @@ where
             ),
             gas_per_pubdata_limit: U256::from(800),
         },
-        address_to_h160(call.context.caller),
+        address_to_h160(caller),
         revm_u256_to_u256(call.transfer.value),
-        None,
+        factory_deps,
         PaymasterParams::default(),
     );
     inspect(tx, env, db)
@@ -162,6 +167,8 @@ where
                 .and_then(|result| result.first().cloned())
                 .and_then(|result| result.into_bytes())
                 .unwrap_or_default();
+            info!("zk vm decoded result {}", hex::encode(&result));
+
             let address = if result.len() == 32 {
                 Some(h256_to_account_address(&H256::from_slice(&result)))
             } else {
@@ -288,6 +295,7 @@ fn inspect_inner<S: ReadStorage>(
     let tracers = vec![CallTracer::new(call_tracer_result.clone()).into_tracer_pointer()];
     let tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
     let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
+    trace!(?tx_result.result, "zk vm result");
 
     match &tx_result.result {
         ExecutionResult::Success { output } => {

@@ -1,4 +1,5 @@
 //! The `zk_utils` module provides utility functions specifically designed for interacting with
+use alloy_primitives::B256;
 /// zkSync, an Ethereum layer 2 scaling solution.
 ///
 /// This module encapsulates various functionalities related to zkSync, including retrieving
@@ -217,8 +218,10 @@ pub struct DualCompiledContract {
     pub zk_bytecode_hash: zksync_types::H256,
     /// Deployed bytecode hash with zksolc
     pub zk_deployed_bytecode: Vec<u8>,
-    /// Bytecode with solc
-    pub evm_bytecode: Vec<u8>,
+    /// Deployed bytecode hash with solc
+    pub evm_bytecode_hash: B256,
     /// Deployed bytecode with solc
     pub evm_deployed_bytecode: Vec<u8>,
+    /// Bytecode with solc
+    pub evm_bytecode: Vec<u8>,
 }

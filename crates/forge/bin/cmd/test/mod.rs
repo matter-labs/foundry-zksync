@@ -1,5 +1,5 @@
 use super::{install, test::filter::ProjectPathsAwareFilter, watch::WatchArgs};
-use alloy_primitives::U256;
+use alloy_primitives::{keccak256, U256};
 use clap::Parser;
 use eyre::Result;
 use forge::{
@@ -11,7 +11,8 @@ use forge::{
         identifier::{EtherscanIdentifier, LocalTraceIdentifier, SignaturesIdentifier},
         CallTraceDecoderBuilder, TraceKind,
     },
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
+    MultiContractRunner, MultiContractRunnerBuilder, TestOptions,
+    TestOptionsBuilder,
 };
 use foundry_cli::{
     opts::CoreBuildArgs,
@@ -20,8 +21,13 @@ use foundry_cli::{
 use foundry_common::{
     compile::{ContractSources, ProjectCompiler},
     evm::EvmArgs,
+    factory_deps::PackedEraBytecode,
     shell,
+    zk_compile::ZkSolc,
+    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
+    DualCompiledContract,
 };
+use foundry_compilers::Artifact;
 use foundry_config::{
     figment,
     figment::{
@@ -32,7 +38,7 @@ use foundry_config::{
 };
 use foundry_debugger::Debugger;
 use regex::Regex;
-use std::{sync::mpsc::channel, time::Instant};
+use std::{collections::HashMap, sync::mpsc::channel, time::Instant};
 use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
 
@@ -150,6 +156,13 @@ impl TestArgs {
         // Set up the project.
         let mut project = config.project()?;
 
+        // load the zkSolc config
+        let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
+        zksolc_cfg.contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
+        zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone();
+        let zk_out_path = project.paths.root.join("zkout");
+        project.paths.artifacts = zk_out_path;
+
         // Install missing dependencies.
         if install::install_missing_dependencies(&mut config, self.build_args().silent) &&
             config.auto_detect_remappings
@@ -167,6 +180,19 @@ impl TestArgs {
             compiler = compiler.filter(Box::new(filter.clone()));
         }
         let output = compiler.compile(&project)?;
+
+        let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
+        zksolc_cfg.compiler_path = compiler_path;
+
+        // Disable system request memoization to allow modifying system contracts storage
+        zksolc_cfg.settings.optimizer.disable_system_request_memoization = true;
+
+        let zksolc_project = config.project()?;
+        let mut zksolc = ZkSolc::new(zksolc_cfg, zksolc_project);
+        let (zk_output, _contract_bytecodes) = match zksolc.compile() {
+            Ok(compiled) => compiled,
+            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
+        };
 
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;
@@ -193,16 +219,66 @@ impl TestArgs {
         // Clone the output only if we actually need it later for the debugger.
         let output_clone = should_debug.then(|| output.clone());
 
+        // Dual compiled contracts
+        let mut dual_compiled_contracts = vec![];
+        println!("solc bytecodes provided, building dual compiled contracts");
+        let mut solc_bytecodes = HashMap::new();
+        for (contract_name, artifact) in output.artifacts() {
+            let deployed_bytecode = artifact.get_deployed_bytecode();
+            let deployed_bytecode = deployed_bytecode
+                .as_ref()
+                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+            let bytecode = artifact.get_bytecode();
+            let bytecode =
+                bytecode.as_ref().and_then(|b| b.object.as_bytes()).expect("bytecode was expected");
+            if let Some(deployed_bytecode) = deployed_bytecode {
+                solc_bytecodes
+                    .insert(contract_name.clone(), (bytecode.clone(), deployed_bytecode.clone()));
+            }
+        }
+        // TODO make zk optional and solc default
+        for (contract_name, artifact) in zk_output.artifacts() {
+            let deployed_bytecode = artifact.get_deployed_bytecode();
+            let deployed_bytecode = deployed_bytecode
+                .as_ref()
+                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+            if let Some(deployed_bytecode) = deployed_bytecode {
+                let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
+                if let Some((solc_bytecode, solc_deployed_bytecode)) =
+                    solc_bytecodes.get(&contract_name)
+                {
+                    dual_compiled_contracts.push(DualCompiledContract {
+                        name: contract_name,
+                        zk_bytecode_hash: packed_bytecode.bytecode_hash(),
+                        zk_deployed_bytecode: packed_bytecode.bytecode(),
+                        evm_bytecode_hash: keccak256(&solc_deployed_bytecode),
+                        evm_bytecode: solc_bytecode.to_vec(),
+                        evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
+                    });
+                }
+            }
+        }
+
         let runner = MultiContractRunnerBuilder::default()
             .set_debug(should_debug)
             .initial_balance(evm_opts.initial_balance)
             .evm_spec(config.evm_spec_id())
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
-            .with_cheats_config(CheatsConfig::new(&config, evm_opts.clone(), None))
+            .with_cheats_config(CheatsConfig::new(
+                &config,
+                evm_opts.clone(),
+                None,
+                dual_compiled_contracts,
+            ))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
-            .build(project_root, output, env, evm_opts)?;
+            .build(
+                project_root,
+                output,
+                env,
+                evm_opts,
+            )?;
 
         if let Some(debug_test_pattern) = &self.debug {
             let test_pattern = &mut filter.args_mut().test_pattern;

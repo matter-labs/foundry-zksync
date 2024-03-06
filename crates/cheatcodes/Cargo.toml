@@ -44,8 +44,6 @@ p256 = "0.13.2"
 thiserror = "1"
 
 # zk
-ethers-core.workspace = true
-ethers-providers.workspace = true
 multivm.workspace = true
 zksync_basic_types.workspace = true
 zksync_types.workspace = true

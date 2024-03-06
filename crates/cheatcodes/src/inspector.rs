@@ -19,7 +19,10 @@ use alloy_primitives::{Address, Bytes, B256, U256, U64};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolInterface, SolValue};
 use foundry_common::{
-    conversion_utils::{address_to_h160, h160_to_address, h256_to_revm_u256, u256_to_revm_u256},
+    conversion_utils::{
+        address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_h256, revm_u256_to_u256,
+        u256_to_revm_u256,
+    },
     evm::Breakpoints,
     provider::alloy::RpcUrl,
     DualCompiledContract,
@@ -35,14 +38,14 @@ use revm::{
         opcode, CallInputs, CallScheme, CreateInputs, Gas, InstructionResult, Interpreter,
     },
     primitives::{
-        Account, AccountInfo, AccountStatus, BlockEnv, Bytecode, CreateScheme, ExecutionResult,
-        HashMap as rHashMap, Output, StorageSlot, TransactTo, KECCAK_EMPTY,
+        Account, AccountInfo, AccountStatus, BlockEnv, Bytecode, CreateScheme, Env,
+        ExecutionResult, HashMap as rHashMap, Output, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
     DatabaseCommit, EVMData, Inspector,
 };
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
@@ -50,10 +53,11 @@ use std::{
     sync::Arc,
 };
 use zksync_types::{
-    block::pack_block_info, get_nonce_key, get_system_context_key,
-    utils::storage_key_for_eth_balance, CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-    SYSTEM_CONTEXT_ADDRESS,
+    block::{pack_block_info, unpack_block_info},
+    get_code_key, get_nonce_key,
+    utils::{decompose_full_nonce, storage_key_for_eth_balance},
+    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS,
+    NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
 use zksync_utils::address_to_h256;
 
@@ -225,8 +229,6 @@ pub struct Cheatcodes {
 
     /// Dual compiled contracts
     pub dual_compiled_contracts: Vec<DualCompiledContract>,
-
-    initialized_zk_forks: HashSet<LocalForkId>,
 }
 
 impl Cheatcodes {
@@ -326,186 +328,262 @@ impl Cheatcodes {
     /// * Sets the ZK block information
     pub fn select_fork_vm<DB: DatabaseExt + DatabaseCommit>(
         &mut self,
-        db: &mut DB,
+        data: &mut EVMData<'_, DB>,
         fork_id: LocalForkId,
-    ) {
-        let fork_info = db.get_fork_info(fork_id).expect("failed getting fork info");
-        self.use_zk_vm = if fork_info.fork_type.is_evm() {
-            tracing::info!("switch mode: EVM");
-            false
+    ) -> rHashMap<Address, Account> {
+        let fork_info = data.db.get_fork_info(fork_id).expect("failed getting fork info");
+        if fork_info.fork_type.is_evm() {
+            self.select_evm(data)
         } else {
-            tracing::info!("switch mode: ZK");
+            self.select_zk_vm(data, &fork_info.fork_env)
+        }
+    }
 
-            // when switching to zk we need to translate block info, balances, nonces and deployed
-            // codes on the first switch
-            if !self.initialized_zk_forks.contains(&fork_id) {
-                let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
-                let block_info_key: alloy_primitives::Uint<256, 4> =
-                    h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
-                let block_info = pack_block_info(
-                    fork_info.fork_env.block.number.as_limbs()[0],
-                    fork_info.fork_env.block.timestamp.as_limbs()[0],
-                );
-                system_storage
-                    .insert(block_info_key, StorageSlot::new(u256_to_revm_u256(block_info)));
+    /// Switch to EVM and translate block info, balances, nonces and deployed codes for persistent
+    /// accounts
+    fn select_evm<DB: DatabaseExt + DatabaseCommit>(
+        &mut self,
+        data: &mut EVMData<'_, DB>,
+    ) -> rHashMap<Address, Account> {
+        if !self.use_zk_vm {
+            return Default::default()
+        }
 
-                let mut l2_eth_storage: rHashMap<U256, StorageSlot> = Default::default();
-                let mut nonce_storage: rHashMap<U256, StorageSlot> = Default::default();
-                let mut account_code_storage: rHashMap<U256, StorageSlot> = Default::default();
-                let mut known_codes_storage: rHashMap<U256, StorageSlot> = Default::default();
-                let mut deployed_codes: HashMap<Address, AccountInfo> = Default::default();
+        tracing::info!("switch mode: EVM");
+        self.use_zk_vm = false;
 
-                for account in db.persistent_accounts() {
-                    info!(?account, "importing to zk state");
+        let system_account = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
+        let balance_account = h160_to_address(L2_ETH_TOKEN_ADDRESS);
+        let nonce_account = h160_to_address(NONCE_HOLDER_ADDRESS);
+        let account_code_account = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
 
-                    if let Some(info) = db.basic(account).ok().flatten() {
-                        let address = address_to_h160(account);
+        let block_info_key: alloy_primitives::Uint<256, 4> =
+            h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
+        let block_info = data.db.storage(system_account, block_info_key).unwrap_or_default();
+        let (block_number, block_timestamp) = unpack_block_info(revm_u256_to_u256(block_info));
+        data.env.block.number = U256::from(block_number);
+        data.env.block.timestamp = U256::from(block_timestamp);
 
-                        let balance_key =
-                            h256_to_revm_u256(*storage_key_for_eth_balance(&address).key());
-                        let nonce_key = h256_to_revm_u256(*get_nonce_key(&address).key());
+        let mut changes = rHashMap::<Address, Account>::new();
+        for address in data.db.persistent_accounts() {
+            info!(?address, "importing to evm state");
 
-                        l2_eth_storage.insert(balance_key, StorageSlot::new(info.balance));
-                        nonce_storage.insert(nonce_key, StorageSlot::new(U256::from(info.nonce)));
+            let zk_address = address_to_h160(address);
+            let balance_key = h256_to_revm_u256(*storage_key_for_eth_balance(&zk_address).key());
+            let nonce_key = h256_to_revm_u256(*get_nonce_key(&zk_address).key());
 
-                        if let Some(code) = &info.code {
-                            let code = code.bytecode.to_vec();
-                            if let Some(zk_contract) = self
-                                .dual_compiled_contracts
-                                .iter()
-                                .find(|contract| contract.evm_bytecode == code)
-                            {
-                                account_code_storage.insert(
-                                    h256_to_revm_u256(address_to_h256(&address)),
-                                    StorageSlot::new(h256_to_revm_u256(
-                                        zk_contract.zk_bytecode_hash,
-                                    )),
-                                );
-                                known_codes_storage.insert(
-                                    h256_to_revm_u256(zk_contract.zk_bytecode_hash),
-                                    StorageSlot::new(U256::ZERO),
-                                );
+            let balance = data.db.storage(balance_account, balance_key).unwrap_or_default();
+            let full_nonce = data.db.storage(nonce_account, nonce_key).unwrap_or_default();
+            let (tx_nonce, _deployment_nonce) = decompose_full_nonce(revm_u256_to_u256(full_nonce));
+            let nonce = tx_nonce.as_u64();
 
-                                let code_hash =
-                                    B256::from_slice(zk_contract.zk_bytecode_hash.as_bytes());
-                                deployed_codes.insert(
-                                    account,
-                                    AccountInfo {
-                                        balance: info.balance,
-                                        nonce: info.nonce,
-                                        code_hash,
-                                        code: Some(Bytecode::new_raw(Bytes::from(
-                                            zk_contract.zk_deployed_bytecode.clone(),
-                                        ))),
-                                    },
-                                );
-                            }
-                        }
-                    }
-                }
+            let account_code_key = h256_to_revm_u256(*get_code_key(&zk_address).key());
+            let (code_hash, code) = data
+                .db
+                .storage(account_code_account, account_code_key)
+                .ok()
+                .and_then(|zk_bytecode_hash| {
+                    let zk_bytecode_hash = revm_u256_to_h256(zk_bytecode_hash);
+                    self.dual_compiled_contracts
+                        .iter()
+                        .find(|c| c.zk_bytecode_hash == zk_bytecode_hash)
+                        .map(|contract| {
+                            (
+                                contract.evm_bytecode_hash,
+                                Some(Bytecode::new_raw(Bytes::from(
+                                    contract.evm_deployed_bytecode.clone(),
+                                ))),
+                            )
+                        })
+                })
+                .unwrap_or_else(|| (KECCAK_EMPTY, None));
 
-                let mut changes = rHashMap::new();
+            println!("{:?} balance={:?}", address, balance);
+            let account = journaled_account(data, address);
+            let _ = std::mem::replace(&mut account.info.balance, balance);
+            let _ = std::mem::replace(&mut account.info.nonce, nonce);
+            account.info.code_hash = code_hash;
+            account.info.code = code.clone();
+            changes.insert(
+                address,
+                Account {
+                    info: AccountInfo { balance, nonce, code_hash, code },
+                    storage: Default::default(),
+                    status: AccountStatus::Touched,
+                },
+            );
+        }
 
-                let system_account = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
-                let system_info = db.basic(system_account).ok().flatten().unwrap_or_default();
-                changes.insert(
-                    system_account,
-                    Account {
-                        info: AccountInfo {
-                            balance: system_info.balance,
-                            nonce: system_info.nonce,
-                            code_hash: KECCAK_EMPTY,
-                            code: None,
-                        },
-                        storage: system_storage,
-                        status: AccountStatus::Touched,
-                    },
-                );
+        changes
+    }
 
-                let balance_account = h160_to_address(L2_ETH_TOKEN_ADDRESS);
-                let balance_info = db.basic(balance_account).ok().flatten().unwrap_or_default();
-                changes.insert(
-                    balance_account,
-                    Account {
-                        info: AccountInfo {
-                            balance: balance_info.balance,
-                            nonce: balance_info.nonce,
-                            code_hash: KECCAK_EMPTY,
-                            code: None,
-                        },
-                        storage: l2_eth_storage,
-                        status: AccountStatus::Touched,
-                    },
-                );
+    /// Switch to ZK-VM and translate block info, balances, nonces and deployed codes for persistent
+    /// accounts
+    fn select_zk_vm<DB: DatabaseExt + DatabaseCommit>(
+        &mut self,
+        data: &mut EVMData<'_, DB>,
+        fork_env: &Env,
+    ) -> rHashMap<Address, Account> {
+        if self.use_zk_vm {
+            return Default::default()
+        }
 
-                let nonce_account = h160_to_address(NONCE_HOLDER_ADDRESS);
-                let nonce_info = db.basic(nonce_account).ok().flatten().unwrap_or_default();
-                changes.insert(
-                    nonce_account,
-                    Account {
-                        info: AccountInfo {
-                            balance: nonce_info.balance,
-                            nonce: nonce_info.nonce,
-                            code_hash: KECCAK_EMPTY,
-                            code: None,
-                        },
-                        storage: nonce_storage,
-                        status: AccountStatus::Touched,
-                    },
-                );
+        tracing::info!("switch mode: ZK");
+        self.use_zk_vm = true;
 
-                let account_code_account = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
-                let account_code_info =
-                    db.basic(account_code_account).ok().flatten().unwrap_or_default();
-                changes.insert(
-                    account_code_account,
-                    Account {
-                        info: AccountInfo {
-                            balance: account_code_info.balance,
-                            nonce: account_code_info.nonce,
-                            code_hash: KECCAK_EMPTY,
-                            code: None,
-                        },
-                        storage: account_code_storage,
-                        status: AccountStatus::Touched,
-                    },
-                );
+        let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
+        let block_info_key: alloy_primitives::Uint<256, 4> =
+            h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
+        let block_info = pack_block_info(
+            fork_env.block.number.as_limbs()[0],
+            fork_env.block.timestamp.as_limbs()[0],
+        );
+        system_storage.insert(block_info_key, StorageSlot::new(u256_to_revm_u256(block_info)));
 
-                let known_code_account = h160_to_address(KNOWN_CODES_STORAGE_ADDRESS);
-                let known_code_info =
-                    db.basic(known_code_account).ok().flatten().unwrap_or_default();
-                changes.insert(
-                    known_code_account,
-                    Account {
-                        info: AccountInfo {
-                            balance: known_code_info.balance,
-                            nonce: known_code_info.nonce,
-                            code_hash: KECCAK_EMPTY,
-                            code: None,
-                        },
-                        storage: known_codes_storage,
-                        status: AccountStatus::Touched,
-                    },
-                );
+        let mut l2_eth_storage: rHashMap<U256, StorageSlot> = Default::default();
+        let mut nonce_storage: rHashMap<U256, StorageSlot> = Default::default();
+        let mut account_code_storage: rHashMap<U256, StorageSlot> = Default::default();
+        let mut known_codes_storage: rHashMap<U256, StorageSlot> = Default::default();
+        let mut deployed_codes: HashMap<Address, AccountInfo> = Default::default();
 
-                for (account, info) in deployed_codes {
-                    changes.insert(
-                        account,
-                        Account {
-                            info,
-                            storage: Default::default(),
-                            status: AccountStatus::Touched,
+        for address in data.db.persistent_accounts() {
+            info!(?address, "importing to zk state");
+
+            if let Ok((account, _)) = data.journaled_state.load_account(address, data.db) {
+                let info = &account.info;
+                let zk_address = address_to_h160(address);
+
+                let balance_key =
+                    h256_to_revm_u256(*storage_key_for_eth_balance(&zk_address).key());
+                let nonce_key = h256_to_revm_u256(*get_nonce_key(&zk_address).key());
+                l2_eth_storage.insert(balance_key, StorageSlot::new(info.balance));
+                nonce_storage.insert(nonce_key, StorageSlot::new(U256::from(info.nonce)));
+                
+                
+                if let Some(contract) = self.dual_compiled_contracts.iter().find(|contract| {
+                    info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
+                }) {
+                    account_code_storage.insert(
+                        h256_to_revm_u256(address_to_h256(&zk_address)),
+                        StorageSlot::new(h256_to_revm_u256(contract.zk_bytecode_hash)),
+                    );
+                    known_codes_storage.insert(
+                        h256_to_revm_u256(contract.zk_bytecode_hash),
+                        StorageSlot::new(U256::ZERO),
+                    );
+
+                    let code_hash = B256::from_slice(contract.zk_bytecode_hash.as_bytes());
+                    deployed_codes.insert(
+                        address,
+                        AccountInfo {
+                            balance: info.balance,
+                            nonce: info.nonce,
+                            code_hash,
+                            code: Some(Bytecode::new_raw(Bytes::from(
+                                contract.zk_deployed_bytecode.clone(),
+                            ))),
                         },
                     );
                 }
-
-                db.commit(changes);
-
-                self.initialized_zk_forks.insert(fork_id);
             }
+        }
 
-            true
-        };
+        let mut changes = rHashMap::new();
+
+        let system_addr = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
+        let system_info = data.db.basic(system_addr).ok().flatten().unwrap_or_default();
+        changes.insert(
+            system_addr,
+            Account {
+                info: AccountInfo {
+                    balance: system_info.balance,
+                    nonce: system_info.nonce,
+                    code_hash: KECCAK_EMPTY,
+                    code: None,
+                },
+                storage: system_storage,
+                status: AccountStatus::Touched,
+            },
+        );
+
+        let balance_addr = h160_to_address(L2_ETH_TOKEN_ADDRESS);
+        let balance_info = data.db.basic(balance_addr).ok().flatten().unwrap_or_default();
+        changes.insert(
+            balance_addr,
+            Account {
+                info: AccountInfo {
+                    balance: balance_info.balance,
+                    nonce: balance_info.nonce,
+                    code_hash: KECCAK_EMPTY,
+                    code: None,
+                },
+                storage: l2_eth_storage,
+                status: AccountStatus::Touched,
+            },
+        );
+
+        let nonce_addr = h160_to_address(NONCE_HOLDER_ADDRESS);
+        let nonce_info = data.db.basic(nonce_addr).ok().flatten().unwrap_or_default();
+        changes.insert(
+            nonce_addr,
+            Account {
+                info: AccountInfo {
+                    balance: nonce_info.balance,
+                    nonce: nonce_info.nonce,
+                    code_hash: KECCAK_EMPTY,
+                    code: None,
+                },
+                storage: nonce_storage,
+                status: AccountStatus::Touched,
+            },
+        );
+
+        let account_code_addr = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
+        let account_code_info = data.db.basic(account_code_addr).ok().flatten().unwrap_or_default();
+        changes.insert(
+            account_code_addr,
+            Account {
+                info: AccountInfo {
+                    balance: account_code_info.balance,
+                    nonce: account_code_info.nonce,
+                    code_hash: KECCAK_EMPTY,
+                    code: None,
+                },
+                storage: account_code_storage,
+                status: AccountStatus::Touched,
+            },
+        );
+
+        let known_code_addr = h160_to_address(KNOWN_CODES_STORAGE_ADDRESS);
+        let known_code_info = data.db.basic(known_code_addr).ok().flatten().unwrap_or_default();
+        changes.insert(
+            known_code_addr,
+            Account {
+                info: AccountInfo {
+                    balance: known_code_info.balance,
+                    nonce: known_code_info.nonce,
+                    code_hash: KECCAK_EMPTY,
+                    code: None,
+                },
+                storage: known_codes_storage,
+                status: AccountStatus::Touched,
+            },
+        );
+
+        for (address, info) in deployed_codes {
+            let account = journaled_account(data, address);
+            let _ = std::mem::replace(&mut account.info.balance, info.balance);
+            let _ = std::mem::replace(&mut account.info.nonce, info.nonce);
+            account.info.code_hash = info.code_hash;
+            account.info.code = info.code.clone();
+
+            changes.insert(
+                address,
+                Account { info, storage: Default::default(), status: AccountStatus::Touched },
+            );
+        }
+
+        changes
     }
 }
 
@@ -1193,11 +1271,18 @@ impl<DB: DatabaseExt + DatabaseCommit> Inspector<DB> for Cheatcodes {
             }]);
         }
 
-        // maybe calling in ZK
         if self.use_zk_vm {
-            info!("running CALL in ZK-VM");
+            info!("running call in zk vm");
 
-            if let Ok(result) = zk::call::<_, DatabaseError>(&call, &mut data.env, data.db) {
+            let info = data.db.basic(call.contract).ok().flatten().unwrap_or_default();
+            let contract = self.dual_compiled_contracts.iter().find(|contract| {
+                info.code_hash != KECCAK_EMPTY &&
+                    zksync_types::H256::from(info.code_hash.0) == contract.zk_bytecode_hash
+            });
+
+            if let Ok(result) =
+                zk::call::<_, DatabaseError>(&call, contract, &mut data.env, data.db)
+            {
                 return match result.result {
                     ExecutionResult::Success { output, .. } => match output {
                         Output::Call(bytes) => {
@@ -1600,8 +1685,7 @@ impl<DB: DatabaseExt + DatabaseCommit> Inspector<DB> for Cheatcodes {
         }
 
         if self.use_zk_vm {
-            info!("running CREATE in ZK-VM");
-            println!("{:#?}", data.db.basic(call.caller));
+            info!("running create in zk vm");
             let zk_contract = self
                 .dual_compiled_contracts
                 .iter()
@@ -1612,19 +1696,17 @@ impl<DB: DatabaseExt + DatabaseCommit> Inspector<DB> for Cheatcodes {
                 zk::create::<_, DatabaseError>(call, &zk_contract, &mut data.env, data.db)
             {
                 return match result.result {
-                    ExecutionResult::Success { reason, gas_used, gas_refunded, logs, output } => {
-                        match output {
-                            Output::Create(bytes, address) => {
-                                data.db.commit(result.state);
-                                (InstructionResult::Return, address, gas, bytes)
-                            }
-                            _ => (InstructionResult::Revert, None, gas, Bytes::new()),
+                    ExecutionResult::Success { output, .. } => match output {
+                        Output::Create(bytes, address) => {
+                            data.db.commit(result.state);
+                            (InstructionResult::Return, address, gas, bytes)
                         }
-                    }
-                    ExecutionResult::Revert { gas_used, output } => {
+                        _ => (InstructionResult::Revert, None, gas, Bytes::new()),
+                    },
+                    ExecutionResult::Revert { output, .. } => {
                         (InstructionResult::Revert, None, gas, output)
                     }
-                    ExecutionResult::Halt { reason, gas_used } => (
+                    ExecutionResult::Halt { .. } => (
                         InstructionResult::Revert,
                         None,
                         gas,
@@ -1969,11 +2051,11 @@ fn append_storage_access(
     }
 }
 
-fn as_usize_or_fail(interpreter: &mut Interpreter<'_>, v: U256) -> Option<usize> {
-    let x = v.as_limbs();
-    if x[1] != 0 || x[2] != 0 || x[3] != 0 {
-        interpreter.instruction_result = InstructionResult::InvalidOperandOOG;
-        return None;
-    }
-    Some(x[0] as usize)
+fn journaled_account<'a, DB: DatabaseExt>(
+    data: &'a mut EVMData<'_, DB>,
+    addr: Address,
+) -> &'a mut Account {
+    data.journaled_state.load_account(addr, data.db).expect("must exist");
+    data.journaled_state.touch(&addr);
+    data.journaled_state.state.get_mut(&addr).expect("account is loaded")
 }

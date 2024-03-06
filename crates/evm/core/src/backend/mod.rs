@@ -1422,7 +1422,6 @@ impl DatabaseExt for Backend {
         self.inner.persistent_accounts.clone().into_iter().collect_vec()
     }
 
-
     fn allow_cheatcode_access(&mut self, account: Address) -> bool {
         trace!(?account, "allow cheatcode access");
         self.inner.cheatcode_access_accounts.insert(account)
@@ -1880,6 +1879,8 @@ fn merge_db_account_data<ExtDB: DatabaseRef>(
 
     if let Some(code) = active.contracts.get(&acc.info.code_hash).cloned() {
         fork_db.contracts.insert(acc.info.code_hash, code);
+    } else {
+        println!("NOT FOUND {:?}", acc.info.code_hash);
     }
 
     if let Some(fork_account) = fork_db.accounts.get_mut(&addr) {

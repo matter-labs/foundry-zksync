@@ -61,7 +61,6 @@ impl Cheatcode for loadCall {
         let Self { target, slot } = *self;
         ensure_not_precompile!(&target, ccx);
         ccx.data.journaled_state.load_account(target, ccx.data.db)?;
-        println!("loading > {:?} {:?}", target, slot);
         let (val, _) = ccx.data.journaled_state.sload(target, slot.into(), ccx.data.db)?;
         Ok(val.abi_encode())
     }

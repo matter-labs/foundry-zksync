@@ -118,8 +118,9 @@ impl Cheatcode for selectForkCall {
         // fork.
         ccx.state.corrected_nonce = true;
 
+        let changes = ccx.state.select_fork_vm(ccx.data, *forkId);
         ccx.data.db.select_fork(*forkId, ccx.data.env, &mut ccx.data.journaled_state)?;
-        ccx.state.select_fork_vm(ccx.data.db, *forkId);
+        ccx.data.db.commit(changes);
 
         Ok(Default::default())
     }

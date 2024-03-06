@@ -54,7 +54,7 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
     ///
     /// Implement this function if you need access to the EVM data.
     #[inline(always)]
-    fn apply_full<DB: DatabaseExt +  DatabaseCommit>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_full<DB: DatabaseExt + DatabaseCommit>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         self.apply(ccx.state)
     }
 
