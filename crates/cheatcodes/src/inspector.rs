@@ -1128,9 +1128,9 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
             });
 
             if let Ok(result) = zk::call::<_, DatabaseError>(
-                &call,
+                call,
                 contract,
-                &mut data.env,
+                data.env,
                 data.db,
                 &mut data.journaled_state,
             ) {
@@ -1542,8 +1542,8 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
             if let Ok(result) = zk::create::<_, DatabaseError>(
                 call,
-                &zk_contract,
-                &mut data.env,
+                zk_contract,
+                data.env,
                 data.db,
                 &mut data.journaled_state,
             ) {

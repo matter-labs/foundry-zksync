@@ -249,7 +249,7 @@ impl TestArgs {
                         name: contract_name,
                         zk_bytecode_hash: packed_bytecode.bytecode_hash(),
                         zk_deployed_bytecode: packed_bytecode.bytecode(),
-                        evm_bytecode_hash: keccak256(&solc_deployed_bytecode),
+                        evm_bytecode_hash: keccak256(solc_deployed_bytecode),
                         evm_bytecode: solc_bytecode.to_vec(),
                         evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
                     });
