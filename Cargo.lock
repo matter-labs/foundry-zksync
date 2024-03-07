@@ -14002,8 +14002,3 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
-
-[[patch.unused]]
-name = "profiling-target"
-version = "0.1.0"
-source = "git+https://github.com/nbaztec/era-boojum?branch=foundry-fix#3acc934bee1484316dd652a8b3e097e931bb13aa"

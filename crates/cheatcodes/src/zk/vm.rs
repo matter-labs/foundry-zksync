@@ -40,13 +40,11 @@ use zksync_types::{
 use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 
 use crate::zk::{
-    db::ZKVMData,
+    db::{ZKVMData, DEFAULT_CHAIN_ID},
     env::{create_l1_batch_env, create_system_env},
 };
 
 use super::storage_view::StorageView;
-
-const DEFAULT_CHAIN_ID: u32 = 31337;
 
 type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
 

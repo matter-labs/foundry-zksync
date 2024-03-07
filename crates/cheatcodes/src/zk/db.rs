@@ -23,6 +23,9 @@ use zksync_types::{
 
 use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
 
+/// Default chain id
+pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
+
 pub struct ZKVMData<'a, DB> {
     pub db: &'a mut DB,
     pub journaled_state: &'a mut JournaledState,
@@ -48,19 +51,20 @@ where
 {
     /// Create a new instance of [ZKEVMData].
     pub fn new(db: &'a mut DB, journaled_state: &'a mut JournaledState) -> Self {
-        let factory_deps = journaled_state
-            .state
-            .values()
-            .flat_map(|account| {
-                if account.info.is_empty_code_hash() {
-                    None
-                } else if let Some(code) = &account.info.code {
-                    Some((H256::from(account.info.code_hash.0), code.bytecode.to_vec()))
-                } else {
-                    None
-                }
-            })
-            .collect::<HashMap<_, _>>();
+        let factory_deps =
+            journaled_state
+                .state
+                .values()
+                .flat_map(|account| {
+                    if account.info.is_empty_code_hash() {
+                        None
+                    } else {
+                        account.info.code.as_ref().map(|code| {
+                            (H256::from(account.info.code_hash.0), code.bytecode.to_vec())
+                        })
+                    }
+                })
+                .collect::<HashMap<_, _>>();
 
         Self { db, journaled_state, factory_deps, override_keys: Default::default() }
     }
@@ -73,7 +77,7 @@ where
         let contracts = era_test_node::system_contracts::get_deployed_contracts(
             &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
         );
-        let chain_id = { L2ChainId::try_from(31337u32).unwrap() };
+        let chain_id = L2ChainId::from(DEFAULT_CHAIN_ID);
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         let mut override_keys = HashMap::default();
@@ -96,10 +100,12 @@ where
         factory_deps.extend(journaled_state.state.values().flat_map(|account| {
             if account.info.is_empty_code_hash() {
                 None
-            } else if let Some(code) = &account.info.code {
-                Some((H256::from(account.info.code_hash.0), code.bytecode.to_vec()))
             } else {
-                None
+                account
+                    .info
+                    .code
+                    .as_ref()
+                    .map(|code| (H256::from(account.info.code_hash.0), code.bytecode.to_vec()))
             }
         }));
 
@@ -116,31 +122,14 @@ where
     }
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
-        // let mut db = self.db.lock().unwrap();
         let addr = h160_to_address(address);
         self.journaled_state.load_account(addr, self.db).expect("failed loading account");
-        let (r1, _) = self
+        let (value, _) = self
             .journaled_state
             .sload(addr, u256_to_revm_u256(idx), self.db)
             .expect("failed sload");
-        // let r2 = self.db.storage(addr, u256_to_revm_u256(idx)).ok().unwrap_or_default();
-        // if r1 != r2 {
-        //     // let a1 = self.journaled_state.load_account(addr, self.db);
-        //     // let b1 = self.journaled_state.load_account(addr, self.db);
-        //     panic!("{r1:?} != {r2:?} | {address:?} {idx:?}");
-        // }
 
-        revm_u256_to_h256(r1)
-
-        // self.journaled_state
-        //     .load_account(addr, self.db)
-        //     .ok()
-        //     .and_then(|(account, _)| {
-        //         account.storage.get(&u256_to_revm_u256(idx)).map(|value| value.present_value)
-        //     })
-        //     .or_else(|| self.db.storage(addr, u256_to_revm_u256(idx)).ok())
-        //     .map(revm_u256_to_h256)
-        //     .unwrap_or_default()
+        revm_u256_to_h256(value)
     }
 }
 
