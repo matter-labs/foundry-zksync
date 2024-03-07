@@ -7,7 +7,6 @@ use eyre::WrapErr;
 use foundry_common::{provider::alloy::ProviderBuilder, types::ToEthers};
 use foundry_compilers::utils::RuntimeOrHandle;
 use foundry_evm_core::fork::CreateFork;
-use revm::DatabaseCommit;
 
 impl Cheatcode for activeForkCall {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
@@ -110,7 +109,7 @@ impl Cheatcode for rollFork_3Call {
 }
 
 impl Cheatcode for selectForkCall {
-    fn apply_full<DB: DatabaseExt + DatabaseCommit>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { forkId } = self;
         check_broadcast(ccx.state)?;
 

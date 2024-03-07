@@ -42,7 +42,7 @@ use revm::{
         AccountInfo, BlockEnv, Bytecode, CreateScheme, Env, ExecutionResult, HashMap as rHashMap,
         Output, StorageSlot, TransactTo, KECCAK_EMPTY,
     },
-    DatabaseCommit, EVMData, Inspector,
+    EVMData, Inspector,
 };
 use serde_json::Value;
 use std::{
@@ -249,7 +249,7 @@ impl Cheatcodes {
         }
     }
 
-    fn apply_cheatcode<DB: DatabaseExt + DatabaseCommit>(
+    fn apply_cheatcode<DB: DatabaseExt>(
         &mut self,
         data: &mut EVMData<'_, DB>,
         call: &CallInputs,
@@ -327,7 +327,7 @@ impl Cheatcodes {
     /// Additionally:
     /// * Translates block information
     /// * Translates all persisted addresses
-    pub fn select_fork_vm<DB: DatabaseExt + DatabaseCommit>(
+    pub fn select_fork_vm<DB: DatabaseExt>(
         &mut self,
         data: &mut EVMData<'_, DB>,
         fork_id: LocalForkId,
@@ -342,7 +342,7 @@ impl Cheatcodes {
 
     /// Switch to EVM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    fn select_evm<DB: DatabaseExt + DatabaseCommit>(&mut self, data: &mut EVMData<'_, DB>) {
+    fn select_evm<DB: DatabaseExt>(&mut self, data: &mut EVMData<'_, DB>) {
         if !self.use_zk_vm {
             return Default::default()
         }
@@ -415,11 +415,7 @@ impl Cheatcodes {
 
     /// Switch to ZK-VM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    fn select_zk_vm<DB: DatabaseExt + DatabaseCommit>(
-        &mut self,
-        data: &mut EVMData<'_, DB>,
-        fork_env: &Env,
-    ) {
+    fn select_zk_vm<DB: DatabaseExt>(&mut self, data: &mut EVMData<'_, DB>, fork_env: &Env) {
         if self.use_zk_vm {
             return Default::default()
         }
@@ -514,7 +510,7 @@ impl Cheatcodes {
     }
 }
 
-impl<DB: DatabaseExt + DatabaseCommit> Inspector<DB> for Cheatcodes {
+impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
     #[inline]
     fn initialize_interp(&mut self, _: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
         // When the first interpreter is initialized we've circumvented the balance and gas checks,
@@ -1837,10 +1833,7 @@ fn check_if_fixed_gas_limit<DB: DatabaseExt>(data: &EVMData<'_, DB>, call_gas_li
 }
 
 /// Dispatches the cheatcode call to the appropriate function.
-fn apply_dispatch<DB: DatabaseExt + DatabaseCommit>(
-    calls: &Vm::VmCalls,
-    ccx: &mut CheatsCtxt<DB>,
-) -> Result {
+fn apply_dispatch<DB: DatabaseExt>(calls: &Vm::VmCalls, ccx: &mut CheatsCtxt<DB>) -> Result {
     macro_rules! match_ {
         ($($variant:ident),*) => {
             match calls {
