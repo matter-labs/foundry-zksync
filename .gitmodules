@@ -1,0 +1,6 @@
+[submodule "zk-tests/lib/forge-std"]
+	path = zk-tests/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "zk-tests/lib/ds-test"]
+	path = zk-tests/lib/ds-test
+	url = https://github.com/dapphub/ds-test

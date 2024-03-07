@@ -1,183 +1,148 @@
 name: test
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+    cancel-in-progress: true
+    group: ${{github.workflow}}-${{github.ref}}
 
 env:
-  CARGO_TERM_COLOR: always
+    CARGO_TERM_COLOR: always
 
 jobs:
-  matrices:
-    name: build matrices
-    runs-on: ubuntu-latest
-    outputs:
-      test-matrix: ${{ steps.gen.outputs.test-matrix }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+    doctests:
+        name: doc tests
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                toolchain: nightly-2023-09-30
+            - uses: Swatinem/rust-cache@v2
+              with:
+                cache-on-failure: true
+            - name: cargo test
+              run: cargo test --doc -p zkforge -p zkcast
+              env:
+                RUST_TEST_THREADS: 2
+
+    clippy:
+        name: clippy
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@clippy
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - run: cargo clippy --workspace --all-targets --all-features
+              env:
+                  RUSTFLAGS: -Dwarnings
+
+    fmt:
+        name: fmt
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                  toolchain: nightly-2023-09-30
+                  components: rustfmt
+            - run: cargo fmt --all --check
+
+    forge-fmt:
+        name: forge fmt
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                  toolchain: nightly-2023-09-30
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - name: forge fmt
+              run: cargo run --bin forge -- fmt --check testdata/
+
+    feature-checks:
+        name: feature checks
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                toolchain: nightly-2023-09-30
+            - uses: taiki-e/install-action@cargo-hack
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - name: cargo hack
+              run: cargo hack check
+
+    smoke-test:
+      name: smoke-test
+      runs-on: ubuntu-22.04-github-hosted-16core
+
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          python-version: "3.11"
-      - name: Generate matrices
-        id: gen
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2023-09-30
+
+      - name: Run smoke-test
         env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          output=$(python3 .github/scripts/matrices.py)
-          echo "::debug::test-matrix=$output"
-          echo "test-matrix=$output" >> $GITHUB_OUTPUT
+          RUST_BACKTRACE: full
+        run: cd smoke-test && ./test.sh
 
-  test:
-    name: test ${{ matrix.name }}
-    runs-on: ${{ matrix.runner_label }}
-    timeout-minutes: 60
-    needs: matrices
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.matrices.outputs.test-matrix) }}
-    env:
-      ETH_RPC_URL: https://eth-mainnet.alchemyapi.io/v2/C3JEvfW6VgtqZQa-Qp1E-2srEiIc02sD
-      CARGO_PROFILE_DEV_DEBUG: 0
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          target: ${{ matrix.target }}
-      - uses: taiki-e/install-action@nextest
+    cheatcodes:
+      name: cheatcode-test
+      runs-on: ubuntu-22.04-github-hosted-16core
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            submodules: recursive
+            ref: ${{ github.event.pull_request.head.sha }}
 
-      # External tests dependencies
-      - name: Setup Node.js
-        if: contains(matrix.name, 'external')
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install Bun
-        if: contains(matrix.name, 'external') && !contains(matrix.runner_label, 'windows')
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - name: Setup Python
-        if: contains(matrix.name, 'external')
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
-      - name: Install Vyper
-        if: contains(matrix.name, 'external')
-        run: pip install vyper
+        - name: Install Rust
+          uses: actions-rust-lang/setup-rust-toolchain@v1
+          with:
+            toolchain: nightly-2023-09-30
 
-      - name: Forge RPC cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.foundry/cache
-            ~/.config/.foundry/cache
-          key: rpc-cache-${{ hashFiles('crates/forge/tests/rpc-cache-keyfile') }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: Setup Git config
-        run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "<>"
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-      - name: Test
-        env:
-          SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
-        run: cargo nextest run ${{ matrix.flags }}
+        - name: Run era-test-node
+          uses: dutterbutter/era-test-node-action@latest
+          with:
+            mode: fork
+            network: mainnet
+            log: info
+            logFilePath: era_test_node.log
+            target: x86_64-unknown-linux-gnu
+            releaseTag: latest
 
-  docs:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-      pages: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo doc --workspace --all-features --no-deps --document-private-items
-        env:
-          RUSTDOCFLAGS:
-            --cfg docsrs --show-type-layout --generate-link-to-definition --enable-index-page
-            -Zunstable-options
-      - name: Deploy documentation
-        uses: peaceiris/actions-gh-pages@v3
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: target/doc
-          force_orphan: true
+        - name: Test Cheatcodes
+          env:
+            ERA_TEST_NODE_RPC_URL: http://localhost:8011
+          run: cd crates/era-cheatcodes/tests && ./test.sh
 
-  doctest:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo test --workspace --doc
-
-  clippy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@clippy
-        with:
-          toolchain: nightly-2024-02-03
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo clippy --workspace --all-targets --all-features
-        env:
-          RUSTFLAGS: -Dwarnings
-
-  rustfmt:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly-2024-02-03
-          components: rustfmt
-      - run: cargo fmt --all --check
-
-  forge-fmt:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: forge fmt
-        shell: bash
-        # We have to ignore at shell level because testdata/ is not a valid Foundry project,
-        # so running `forge fmt` with `--root testdata` won't actually check anything
-        run: |
-          shopt -s extglob
-          cargo run --bin forge -- fmt --check testdata/**/!(Vm).sol
-
-  crate-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@cargo-hack
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo hack check
+        - name: Upload era_test_node log
+          uses: actions/upload-artifact@v3
+          if: always()
+          with:
+            name: era_test_node.log
+            path: era_test_node.log

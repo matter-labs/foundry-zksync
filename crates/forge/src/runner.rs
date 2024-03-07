@@ -314,7 +314,6 @@ impl<'a> ContractRunner<'a> {
     /// State modifications are not committed to the evm database but discarded after the call,
     /// similar to `eth_call`.
     pub fn run_test(&self, func: &Function, should_fail: bool, setup: TestSetup) -> TestResult {
-        println!("TEST {:?}", func.name);
         let span = info_span!("test", %should_fail);
         if !span.is_disabled() {
             let sig = &func.signature()[..];

@@ -1879,9 +1879,7 @@ fn merge_db_account_data<ExtDB: DatabaseRef>(
 
     if let Some(code) = active.contracts.get(&acc.info.code_hash).cloned() {
         fork_db.contracts.insert(acc.info.code_hash, code);
-    } else {
-        println!("NOT FOUND {:?}", acc.info.code_hash);
-    }
+    } 
 
     if let Some(fork_account) = fork_db.accounts.get_mut(&addr) {
         // This will merge the fork's tracked storage with active storage and update values

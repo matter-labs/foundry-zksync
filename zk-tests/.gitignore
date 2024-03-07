@@ -1,0 +1,9 @@
+/target
+/Cargo.lock
+
+zkout/
+solc-v*
+*.log
+era_test_node
+cache/
+broadcast/

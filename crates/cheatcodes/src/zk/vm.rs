@@ -25,9 +25,9 @@ use once_cell::sync::OnceCell;
 use revm::{
     interpreter::{CallInputs, CreateInputs},
     primitives::{
-        Account, AccountInfo, Address, Bytecode, Bytes, CreateScheme, EVMResult, Env, Eval,
+        Account, AccountInfo, Address, Bytecode, Bytes, CreateScheme, EVMResultGeneric, Env, Eval,
         ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, OutOfGasError,
-        Output, ResultAndState, StorageSlot, B256, KECCAK_EMPTY, U256 as rU256,
+        Output, StorageSlot, B256, KECCAK_EMPTY, U256 as rU256,
     },
     Database, JournaledState,
 };
@@ -48,13 +48,15 @@ use super::storage_view::StorageView;
 
 const DEFAULT_CHAIN_ID: u32 = 31337;
 
+type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
+
 pub(crate) fn create<'a, DB, E>(
     call: &CreateInputs,
     contract: &DualCompiledContract,
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
-) -> EVMResult<ResultAndState>
+) -> ZKVMResult<E>
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -91,7 +93,7 @@ pub(crate) fn call<'a, DB, E>(
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
-) -> EVMResult<ResultAndState>
+) -> ZKVMResult<E>
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -125,7 +127,7 @@ fn inspect<'a, DB, E>(
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
-) -> EVMResult<E>
+) -> ZKVMResult<E>
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -279,21 +281,24 @@ where
         state.insert(address, account);
     }
 
-    for (address, new_account) in &state {
-        let address = *address;
-        let (account, _) =
-            journaled_state.load_account(address, db).expect("account could not be loaded");
+    // update journal
+    for (address, new_account) in state {
+        journaled_state.load_account(address, db).expect("account could not be loaded");
+        journaled_state.touch(&address);
+        let account = journaled_state.state.get_mut(&address).expect("account is loaded");
+
         let _ = std::mem::replace(&mut account.info.balance, new_account.info.balance);
         let _ = std::mem::replace(&mut account.info.nonce, new_account.info.nonce);
         account.info.code_hash = new_account.info.code_hash;
         account.info.code = new_account.info.code.clone();
-        for (key, value) in &new_account.storage {
-            let key = *key;
-            journaled_state.sstore(address, key, value.present_value, db).expect("failed writing to slot");
+        for (key, value) in new_account.storage {
+            journaled_state
+                .sstore(address, key, value.present_value, db)
+                .expect("failed writing to slot");
         }
     }
 
-    Ok(ResultAndState { result: execution_result, state })
+    Ok(execution_result)
 }
 
 fn inspect_inner<S: ReadStorage>(
