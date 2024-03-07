@@ -30,16 +30,15 @@ use alloy_primitives::B256;
 ///   with the decoded byte vector if successful, or a `ParseIntError` if the decoding fails.
 use eyre::Result;
 use foundry_config::Chain;
-use multivm::vm_latest::TracerPointer;
-use std::{collections::HashMap, num::ParseIntError};
 use url::Url;
 use zksync_basic_types::U256;
-use zksync_types::{StorageKey, StorageValue, H160};
 use zksync_web3_rs::types::H256;
+
 /// Utils for conversion between zksync types and revm types
 pub mod conversion_utils;
 /// Tools for working with factory deps
 pub mod factory_deps;
+
 /// Gets the RPC URL for Ethereum.
 ///
 /// If the `eth.rpc_url` is `None`, an error is returned.
@@ -95,7 +94,7 @@ pub fn get_url_with_port(url_str: &str) -> Option<String> {
 pub fn get_private_key(private_key: &Option<String>) -> Result<H256> {
     match private_key {
         Some(pkey) => {
-            let val = decode_hex(pkey)
+            let val = hex::decode(pkey)
                 .map_err(|e| eyre::Report::msg(format!("Error parsing private key: {}", e)))?;
             Ok(H256::from_slice(&val))
         }
@@ -123,33 +122,6 @@ pub fn get_chain(chain: Option<Chain>) -> Result<Chain> {
         }
 }
 
-/// Decodes a hexadecimal string into a byte vector.
-///
-/// This function takes a hexadecimal string as input and decodes it into a vector of bytes.
-/// Each pair of hexadecimal characters in the input string represents one byte in the output
-/// vector.
-///
-/// # Arguments
-///
-/// * `s` - A string representing a hexadecimal value.
-///
-/// # Returns
-///
-/// A `Result` containing the decoded byte vector if successful, or a `ParseIntError` if the
-/// decoding fails.
-///
-/// # Examples
-///
-/// ```
-/// use foundry_common::zk_utils::decode_hex;
-/// let hex_string = "48656c6c6f2c20576f726c6421";
-/// let bytes = decode_hex(hex_string).expect("Error decoding hex");
-/// assert_eq!(bytes, vec![72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33]);
-/// ```
-pub fn decode_hex(s: &str) -> std::result::Result<Vec<u8>, ParseIntError> {
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16)).collect()
-}
-
 /// Fixes the gas price to be minimum of 0.26GWei which is above the block base fee on L2.
 /// This is required so the bootloader does not throw an error if baseFee < gasPrice.
 ///
@@ -168,45 +140,6 @@ pub fn fix_l2_gas_price(gas_price: U256) -> U256 {
 /// TODO: Remove this later to allow for dynamic gas prices that work in both tests and scripts.
 pub fn fix_l2_gas_limit(gas_limit: U256) -> U256 {
     U256::min(gas_limit, U256::from(u32::MAX >> 1))
-}
-
-/// Recorded storage modifications.
-#[derive(Default, Debug, Clone)]
-pub struct StorageModifications {
-    /// Storage key modifications.
-    pub keys: HashMap<StorageKey, StorageValue>,
-    /// Bytecode modifications.
-    pub bytecodes: HashMap<H256, Vec<u8>>,
-    /// Recorded known codes.
-    pub known_codes: HashMap<H256, Vec<u8>>,
-    /// Recorded deployed bytecodes.
-    pub deployed_codes: HashMap<H160, H256>,
-}
-
-impl StorageModifications {
-    /// Updates current modifications with the provided modifications.
-    pub fn extend(&mut self, other: StorageModifications) {
-        self.keys.extend(other.keys);
-        self.bytecodes.extend(other.bytecodes);
-        self.known_codes.extend(other.known_codes);
-        self.deployed_codes.extend(other.deployed_codes);
-    }
-}
-
-/// Keeps track of storage modifications performed during test executions.
-/// This is especially important when forking to re-apply changes.
-pub trait StorageModificationRecorder {
-    /// Merge modified keys and bytecodes into the existing modifications
-    fn record_storage_modifications(&mut self, storage_modifications: StorageModifications);
-
-    /// Return all modified keys
-    fn get_storage_modifications(&self) -> &StorageModifications;
-}
-
-/// Converts a reference to self into a tracer pointer.
-pub trait AsTracerPointer<S, H> {
-    /// Returns reference to a [TracerPointer]
-    fn as_tracer_pointer(&self) -> TracerPointer<S, H>;
 }
 
 /// Defines a contract that has been dual compiled with both zksolc and solc

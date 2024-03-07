@@ -242,7 +242,6 @@ where
     }
 
     for (address, storage) in storage {
-        // println!("{:?} {:#?}", address, storage);
         let (info, status) = match era_db.db.basic(address).ok().flatten() {
             Some(info) => (info, revm::primitives::AccountStatus::Touched),
             None => (AccountInfo::default(), revm::primitives::AccountStatus::Created),
@@ -261,7 +260,6 @@ where
     }
 
     for (address, (code_hash, code)) in codes {
-        // println!("{:?} {:?}", address, code_hash);
         let (info, status) = match era_db.db.basic(address).ok().flatten() {
             Some(info) => (info, revm::primitives::AccountStatus::Touched),
             None => (AccountInfo::default(), revm::primitives::AccountStatus::Created),

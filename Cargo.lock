@@ -4596,7 +4596,6 @@ dependencies = [
  "foundry-macros",
  "glob",
  "globset",
- "multivm",
  "once_cell",
  "pretty_assertions",
  "rand 0.8.5",

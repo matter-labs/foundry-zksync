@@ -106,7 +106,6 @@ pub trait ZkSyncMiddleware: Send + Sync {
     fn get_bytecode_by_hash(
         &self,
         hash: B256,
-        // ) -> alloy_transport::TransportResult<Option<Bytecode>>;
     ) -> impl std::future::Future<Output = alloy_transport::TransportResult<Option<Bytecode>>>
            + std::marker::Send;
 }

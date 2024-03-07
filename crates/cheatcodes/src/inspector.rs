@@ -1136,10 +1136,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
             ) {
                 return match result {
                     ExecutionResult::Success { output, .. } => match output {
-                        Output::Call(bytes) => {
-                            // data.db.commit(result.state);
-                            (InstructionResult::Return, gas, bytes)
-                        }
+                        Output::Call(bytes) => (InstructionResult::Return, gas, bytes),
                         _ => (InstructionResult::Revert, gas, Bytes::new()),
                     },
                     ExecutionResult::Revert { output, .. } => {
@@ -1553,7 +1550,6 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 return match result {
                     ExecutionResult::Success { output, .. } => match output {
                         Output::Create(bytes, address) => {
-                            // data.db.commit(result.state);
                             (InstructionResult::Return, address, gas, bytes)
                         }
                         _ => (InstructionResult::Revert, None, gas, Bytes::new()),

@@ -39,7 +39,6 @@ zksync_basic_types.workspace = true
 zksync_types.workspace = true
 zksync_utils.workspace = true
 revm.workspace = true
-multivm.workspace = true
 
 tower.workspace = true
 
