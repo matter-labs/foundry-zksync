@@ -21,6 +21,7 @@ contract CustomNumber {
     constructor(uint8 _value) {
         value = _value;
     }
+
     function number() public view returns (uint8) {
         return value;
     }
@@ -34,9 +35,11 @@ contract CustomStorage {
         str = _str;
         num = _num;
     }
+
     function getStr() public view returns (string memory) {
         return str;
     }
+
     function getNum() public view returns (uint8) {
         return num;
     }
@@ -49,18 +52,15 @@ contract InverseVmTest is Test {
     /// USDC TOKEN
     uint256 constant TOKEN_DECIMALS = 6;
 
-    address constant ERA_TOKEN_ADDRESS =
-        0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4;
+    address constant ERA_TOKEN_ADDRESS = 0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4;
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
 
-    address constant ETH_TOKEN_ADDRESS =
-        0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address constant ETH_TOKEN_ADDRESS = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     uint256 constant ETH_FORK_BLOCK = 19225195;
     uint256 constant ETH_FORK_BLOCK_TS = 1707901427;
 
-    address constant CONTRACT_ADDRESS =
-        0x32400084C286CF3E17e7B677ea9583e60a000324; //zkSync Diamond Proxy
+    address constant CONTRACT_ADDRESS = 0x32400084C286CF3E17e7B677ea9583e60a000324; //zkSync Diamond Proxy
     uint256 constant ERA_BALANCE = 372695034186505563;
     uint256 constant ETH_BALANCE = 153408823439331882193477;
 
@@ -77,14 +77,8 @@ contract InverseVmTest is Test {
         vm.makePersistent(address(customNumber));
 
         forkEra = vm.createFork("mainnet", ERA_FORK_BLOCK);
-        forkEth = vm.createFork(
-            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf",
-            ETH_FORK_BLOCK
-        );
-        forkOpt = vm.createFork(
-            "https://mainnet.optimism.io/",
-            ETH_FORK_BLOCK
-        );
+        forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
+        forkOpt = vm.createFork("https://mainnet.optimism.io/", ETH_FORK_BLOCK);
     }
 
     function testInverseBlockNumber() public {
@@ -97,16 +91,10 @@ contract InverseVmTest is Test {
 
     function testInverseBlockTimestamp() public {
         vm.selectFork(forkEra);
-        require(
-            block.timestamp == ERA_FORK_BLOCK_TS,
-            "era block timestamp mismatch"
-        );
+        require(block.timestamp == ERA_FORK_BLOCK_TS, "era block timestamp mismatch");
 
         vm.selectFork(forkEth);
-        require(
-            block.timestamp == ETH_FORK_BLOCK_TS,
-            "eth block timestamp mismatch"
-        );
+        require(block.timestamp == ETH_FORK_BLOCK_TS, "eth block timestamp mismatch");
     }
 
     function testInverseSetUpDeployedContractNoArgs() public {
@@ -139,36 +127,24 @@ contract InverseVmTest is Test {
         CustomStorage customStorage = new CustomStorage("hello", 10);
         vm.makePersistent(address(customStorage));
         require(
-            keccak256(abi.encodePacked(customStorage.getStr())) ==
-                keccak256(abi.encodePacked("hello")),
+            keccak256(abi.encodePacked(customStorage.getStr())) == keccak256(abi.encodePacked("hello")),
             "base inline contract value mismatch (complex args)"
         );
-        require(
-            customStorage.getNum() == 10,
-            "base inline contract value mismatch (complex args)"
-        );
+        require(customStorage.getNum() == 10, "base inline contract value mismatch (complex args)");
 
         vm.selectFork(forkEra);
         require(
-            keccak256(abi.encodePacked(customStorage.getStr())) ==
-                keccak256(abi.encodePacked("hello")),
+            keccak256(abi.encodePacked(customStorage.getStr())) == keccak256(abi.encodePacked("hello")),
             "era inline contract value mismatch (complex args)"
         );
-        require(
-            customStorage.getNum() == 10,
-            "era inline contract value mismatch (complex args)"
-        );
+        require(customStorage.getNum() == 10, "era inline contract value mismatch (complex args)");
 
         vm.selectFork(forkEth);
         require(
-            keccak256(abi.encodePacked(customStorage.getStr())) ==
-                keccak256(abi.encodePacked("hello")),
+            keccak256(abi.encodePacked(customStorage.getStr())) == keccak256(abi.encodePacked("hello")),
             "eth inline contract value mismatch (complex args)"
         );
-        require(
-            customStorage.getNum() == 10,
-            "era inline contract value mismatch (complex args)"
-        );
+        require(customStorage.getNum() == 10, "era inline contract value mismatch (complex args)");
     }
 
     function testInverseAddressBalance() public {
@@ -176,15 +152,9 @@ contract InverseVmTest is Test {
         vm.deal(TEST_ADDRESS, 100);
 
         vm.selectFork(forkEra);
-        require(
-            TEST_ADDRESS.balance == 100,
-            "era balance mismatch"
-        );
+        require(TEST_ADDRESS.balance == 100, "era balance mismatch");
 
         vm.selectFork(forkEth);
-        require(
-            TEST_ADDRESS.balance == 100,
-            "eth balance mismatch"
-        );
+        require(TEST_ADDRESS.balance == 100, "eth balance mismatch");
     }
 }
