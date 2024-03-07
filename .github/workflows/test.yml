@@ -29,7 +29,7 @@ jobs:
               with:
                 cache-on-failure: true
             - name: cargo test
-              run: cargo test --doc -p zkforge -p zkcast
+              run: cargo test --doc -p forge -p cast
               env:
                 RUST_TEST_THREADS: 2
 
