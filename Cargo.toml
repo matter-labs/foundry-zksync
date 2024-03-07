@@ -254,24 +254,15 @@ revm-precompile = { git = "https://github.com/bluealloy/revm", branch = "reth_fr
 # revm-test = { path = "../revm/bins/revm-test" }
 # revme = { path = "../revm/bins/revme" }
 
-packed_simd = { path = "../packed_simd" }
+packed_simd = { git = "https://github.com/nbaztec/packed_simd", branch = "foundry-fix" }
 
 # [patch."https://github.com/bluealloy/revm"]
 # revm = { path = "../revm/crates/revm" }
 
-[patch."https://github.com/matter-labs/era-test-node"]
-era_test_node = { path = "../era-test-node" }
+# [patch."https://github.com/matter-labs/era-test-node"]
+# era_test_node = { path = "../era-test-node" }
 
 [patch."https://github.com/matter-labs/era-boojum"]
-profiling-target = { path = "../era-boojum/profiling-target" }
-cs_derive = { path = "../era-boojum/cs_derive" }
-boojum = { path = "../era-boojum" }
-
-# digest = { git = "https://github.com/nbaztec/traits", branch = "update-stable", version = "=0.10.7" }
-# digest = { path = "../traits/digest", version = "=0.10.7" }
-# hmac = { path = "../MACs/hmac", version = "=0.11" }
-# md-5 = { git = "https://github.com/RustCrypto/hashes", rev = "dfe48e003a0559a47d24fcf5e57c45bef5aa7a2b" }
-# crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint", rev = "8326fddccfcefd2f3b4b8e8b445941b24bdcfd92" }
-
-# subtle = { git = "https://github.com/dalek-cryptography/subtle", rev = "574347d53cd2b354733cea0830dded0113286baf" }
-# curve25519-dalek = { git = "https://github.com/dalek-cryptography/curve25519-dalek", rev = "4ac84dd0668b1d2e51654fcdffe4ae6a687bef00" }
+profiling-target = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }
+cs_derive = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }
+boojum = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }
