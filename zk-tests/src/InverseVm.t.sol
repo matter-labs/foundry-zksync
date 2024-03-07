@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
+import {ConstantNumber} from "./ConstantNumber.sol";
 
 contract Number {
     function ten() public pure returns (uint8) {
@@ -156,5 +157,37 @@ contract InverseVmTest is Test {
 
         vm.selectFork(forkEth);
         require(TEST_ADDRESS.balance == 100, "eth balance mismatch");
+    }
+
+    function testInverseCreate2() public {
+        vm.selectFork(forkEra);
+
+        bytes32 bytecodeHash = 0x0100000fbb43aa073340811284a4666183e306fbe9c950df1d05ac3210ef9fc5;
+        address sender = address(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        bytes32 salt = "12345";
+        bytes32 constructorInputHash = keccak256(abi.encode());
+        address expectedDeployedAddress =
+            _computeCreate2Address(sender, salt, bytes32(bytecodeHash), constructorInputHash);
+
+        // deploy via create2
+        address actualDeployedAddress = address(new ConstantNumber{salt: salt}());
+
+        assertEq(expectedDeployedAddress, actualDeployedAddress);
+    }
+
+    function _computeCreate2Address(
+        address sender,
+        bytes32 salt,
+        bytes32 creationCodeHash,
+        bytes32 constructorInputHash
+    ) private pure returns (address) {
+        bytes32 zksync_create2_prefix = keccak256("zksyncCreate2");
+        bytes32 address_hash = keccak256(
+            bytes.concat(
+                zksync_create2_prefix, bytes32(uint256(uint160(sender))), salt, creationCodeHash, constructorInputHash
+            )
+        );
+
+        return address(uint160(uint256(address_hash)));
     }
 }
