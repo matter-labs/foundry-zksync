@@ -320,12 +320,12 @@ impl Cheatcodes {
         }
     }
 
-    /// Initializes the EVM fork
+    /// Selects the appropriate VM for the fork. Options: EVM, ZK-VM.
+    /// CALL and CREATE are handled by the selected VM.
     ///
     /// Additionally:
-    /// * Translates balances and nonces to ZK storage
-    /// * Translates all persisted bytecodes with ZK bytecodes
-    /// * Sets the ZK block information
+    /// * Translates block information
+    /// * Translates all persisted addresses
     pub fn select_fork_vm<DB: DatabaseExt + DatabaseCommit>(
         &mut self,
         data: &mut EVMData<'_, DB>,
@@ -349,17 +349,23 @@ impl Cheatcodes {
             return Default::default()
         }
 
-        tracing::info!("switch mode: EVM");
+        tracing::info!("switching to EVM");
         self.use_zk_vm = false;
 
         let system_account = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
+        journaled_account(data, system_account);
         let balance_account = h160_to_address(L2_ETH_TOKEN_ADDRESS);
+        journaled_account(data, balance_account);
         let nonce_account = h160_to_address(NONCE_HOLDER_ADDRESS);
+        journaled_account(data, nonce_account);
         let account_code_account = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
+        journaled_account(data, account_code_account);
 
         let block_info_key: alloy_primitives::Uint<256, 4> =
             h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
-        let block_info = data.db.storage(system_account, block_info_key).unwrap_or_default();
+        // let block_info = data.db.storage(system_account, block_info_key).unwrap_or_default();
+        let (block_info, _) =
+            data.journaled_state.sload(system_account, block_info_key, data.db).unwrap_or_default();
         let (block_number, block_timestamp) = unpack_block_info(revm_u256_to_u256(block_info));
         data.env.block.number = U256::from(block_number);
         data.env.block.timestamp = U256::from(block_timestamp);
@@ -372,15 +378,26 @@ impl Cheatcodes {
             let balance_key = h256_to_revm_u256(*storage_key_for_eth_balance(&zk_address).key());
             let nonce_key = h256_to_revm_u256(*get_nonce_key(&zk_address).key());
 
-            let balance = data.db.storage(balance_account, balance_key).unwrap_or_default();
-            let full_nonce = data.db.storage(nonce_account, nonce_key).unwrap_or_default();
+            // let balance = data.db.storage(balance_account, balance_key).unwrap_or_default();
+            let (balance, _) = data
+                .journaled_state
+                .sload(balance_account, balance_key, data.db)
+                .unwrap_or_default();
+            // let full_nonce = data.db.storage(nonce_account, nonce_key).unwrap_or_default();
+            let (full_nonce, _) =
+                data.journaled_state.sload(nonce_account, nonce_key, data.db).unwrap_or_default();
             let (tx_nonce, _deployment_nonce) = decompose_full_nonce(revm_u256_to_u256(full_nonce));
             let nonce = tx_nonce.as_u64();
 
             let account_code_key = h256_to_revm_u256(*get_code_key(&zk_address).key());
+            // let (code_hash, code) = data
+            //     .db
+            //     .storage(account_code_account, account_code_key)
+            //     .ok()
             let (code_hash, code) = data
-                .db
-                .storage(account_code_account, account_code_key)
+                .journaled_state
+                .sload(account_code_account, account_code_key, data.db)
+                .map(|(value, _)| value)
                 .ok()
                 .and_then(|zk_bytecode_hash| {
                     let zk_bytecode_hash = revm_u256_to_h256(zk_bytecode_hash);
@@ -398,12 +415,12 @@ impl Cheatcodes {
                 })
                 .unwrap_or_else(|| (KECCAK_EMPTY, None));
 
-            println!("{:?} balance={:?}", address, balance);
             let account = journaled_account(data, address);
             let _ = std::mem::replace(&mut account.info.balance, balance);
             let _ = std::mem::replace(&mut account.info.nonce, nonce);
             account.info.code_hash = code_hash;
             account.info.code = code.clone();
+            println!("{code_hash:?}");
             changes.insert(
                 address,
                 Account {
@@ -428,7 +445,7 @@ impl Cheatcodes {
             return Default::default()
         }
 
-        tracing::info!("switch mode: ZK");
+        tracing::info!("switching to ZK-VM");
         self.use_zk_vm = true;
 
         let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
@@ -458,8 +475,7 @@ impl Cheatcodes {
                 let nonce_key = h256_to_revm_u256(*get_nonce_key(&zk_address).key());
                 l2_eth_storage.insert(balance_key, StorageSlot::new(info.balance));
                 nonce_storage.insert(nonce_key, StorageSlot::new(U256::from(info.nonce)));
-                
-                
+
                 if let Some(contract) = self.dual_compiled_contracts.iter().find(|contract| {
                     info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
                 }) {
@@ -491,13 +507,14 @@ impl Cheatcodes {
         let mut changes = rHashMap::new();
 
         let system_addr = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
-        let system_info = data.db.basic(system_addr).ok().flatten().unwrap_or_default();
+        let system_account = journaled_account(data, system_addr);
+        system_account.storage.extend(system_storage.clone());
         changes.insert(
             system_addr,
             Account {
                 info: AccountInfo {
-                    balance: system_info.balance,
-                    nonce: system_info.nonce,
+                    balance: system_account.info.balance,
+                    nonce: system_account.info.nonce,
                     code_hash: KECCAK_EMPTY,
                     code: None,
                 },
@@ -507,13 +524,14 @@ impl Cheatcodes {
         );
 
         let balance_addr = h160_to_address(L2_ETH_TOKEN_ADDRESS);
-        let balance_info = data.db.basic(balance_addr).ok().flatten().unwrap_or_default();
+        let balance_account = journaled_account(data, balance_addr);
+        balance_account.storage.extend(l2_eth_storage.clone());
         changes.insert(
             balance_addr,
             Account {
                 info: AccountInfo {
-                    balance: balance_info.balance,
-                    nonce: balance_info.nonce,
+                    balance: balance_account.info.balance,
+                    nonce: balance_account.info.nonce,
                     code_hash: KECCAK_EMPTY,
                     code: None,
                 },
@@ -523,13 +541,14 @@ impl Cheatcodes {
         );
 
         let nonce_addr = h160_to_address(NONCE_HOLDER_ADDRESS);
-        let nonce_info = data.db.basic(nonce_addr).ok().flatten().unwrap_or_default();
+        let nonce_account = journaled_account(data, nonce_addr);
+        nonce_account.storage.extend(nonce_storage.clone());
         changes.insert(
             nonce_addr,
             Account {
                 info: AccountInfo {
-                    balance: nonce_info.balance,
-                    nonce: nonce_info.nonce,
+                    balance: nonce_account.info.balance,
+                    nonce: nonce_account.info.nonce,
                     code_hash: KECCAK_EMPTY,
                     code: None,
                 },
@@ -539,13 +558,14 @@ impl Cheatcodes {
         );
 
         let account_code_addr = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
-        let account_code_info = data.db.basic(account_code_addr).ok().flatten().unwrap_or_default();
+        let account_code_account = journaled_account(data, account_code_addr);
+        account_code_account.storage.extend(account_code_storage.clone());
         changes.insert(
             account_code_addr,
             Account {
                 info: AccountInfo {
-                    balance: account_code_info.balance,
-                    nonce: account_code_info.nonce,
+                    balance: account_code_account.info.balance,
+                    nonce: account_code_account.info.nonce,
                     code_hash: KECCAK_EMPTY,
                     code: None,
                 },
@@ -554,14 +574,15 @@ impl Cheatcodes {
             },
         );
 
-        let known_code_addr = h160_to_address(KNOWN_CODES_STORAGE_ADDRESS);
-        let known_code_info = data.db.basic(known_code_addr).ok().flatten().unwrap_or_default();
+        let known_codes_addr = h160_to_address(KNOWN_CODES_STORAGE_ADDRESS);
+        let known_codes_account = journaled_account(data, known_codes_addr);
+        known_codes_account.storage.extend(known_codes_storage.clone());
         changes.insert(
-            known_code_addr,
+            known_codes_addr,
             Account {
                 info: AccountInfo {
-                    balance: known_code_info.balance,
-                    nonce: known_code_info.nonce,
+                    balance: known_codes_account.info.balance,
+                    nonce: known_codes_account.info.nonce,
                     code_hash: KECCAK_EMPTY,
                     code: None,
                 },
@@ -1280,13 +1301,17 @@ impl<DB: DatabaseExt + DatabaseCommit> Inspector<DB> for Cheatcodes {
                     zksync_types::H256::from(info.code_hash.0) == contract.zk_bytecode_hash
             });
 
-            if let Ok(result) =
-                zk::call::<_, DatabaseError>(&call, contract, &mut data.env, data.db)
-            {
+            if let Ok(result) = zk::call::<_, DatabaseError>(
+                &call,
+                contract,
+                &mut data.env,
+                data.db,
+                &mut data.journaled_state,
+            ) {
                 return match result.result {
                     ExecutionResult::Success { output, .. } => match output {
                         Output::Call(bytes) => {
-                            data.db.commit(result.state);
+                            // data.db.commit(result.state);
                             (InstructionResult::Return, gas, bytes)
                         }
                         _ => (InstructionResult::Revert, gas, Bytes::new()),
@@ -1692,13 +1717,17 @@ impl<DB: DatabaseExt + DatabaseCommit> Inspector<DB> for Cheatcodes {
                 .find(|contract| contract.evm_bytecode == call.init_code)
                 .expect("must exist");
 
-            if let Ok(result) =
-                zk::create::<_, DatabaseError>(call, &zk_contract, &mut data.env, data.db)
-            {
+            if let Ok(result) = zk::create::<_, DatabaseError>(
+                call,
+                &zk_contract,
+                &mut data.env,
+                data.db,
+                &mut data.journaled_state,
+            ) {
                 return match result.result {
                     ExecutionResult::Success { output, .. } => match output {
                         Output::Create(bytes, address) => {
-                            data.db.commit(result.state);
+                            // data.db.commit(result.state);
                             (InstructionResult::Return, address, gas, bytes)
                         }
                         _ => (InstructionResult::Revert, None, gas, Bytes::new()),

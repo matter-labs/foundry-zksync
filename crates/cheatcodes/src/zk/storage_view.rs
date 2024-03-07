@@ -55,7 +55,7 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
             value
         })
     }
-    
+
     /// Make a Rc RefCell ptr to the storage
     pub(crate) fn into_rc_ptr(self) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(self))

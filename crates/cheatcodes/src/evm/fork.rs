@@ -118,9 +118,23 @@ impl Cheatcode for selectForkCall {
         // fork.
         ccx.state.corrected_nonce = true;
 
+        // let address = alloy_primitives::address!("f62849f9a0b5bf2913b396098f7c7019b51a820a");
+        // let v = ccx.data.db.storage(address, U256::ZERO);
+        // println!("BEFORE {:?}", v);
+        // if let Ok((x, _)) = ccx.data.journaled_state.load_account(address, ccx.data.db) {
+        //     println!("{:?}", x.storage);
+        // }
+
         let changes = ccx.state.select_fork_vm(ccx.data, *forkId);
         ccx.data.db.select_fork(*forkId, ccx.data.env, &mut ccx.data.journaled_state)?;
-        ccx.data.db.commit(changes);
+        // ccx.data.db.commit(changes);
+
+        // let address = alloy_primitives::address!("f62849f9a0b5bf2913b396098f7c7019b51a820a");
+        // let v = ccx.data.db.storage(address, U256::ZERO);
+        // println!("AFTER {:?}", v);
+        // if let Ok((x, _)) = ccx.data.journaled_state.load_account(address, ccx.data.db) {
+        //     println!("{:?}", x.storage);
+        // }
 
         Ok(Default::default())
     }

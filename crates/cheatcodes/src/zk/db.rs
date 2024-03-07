@@ -4,7 +4,7 @@
 /// in the Database object.
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
 /// is usually collecing all the diffs - and applies them to database itself.
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, str::FromStr};
 
 use alloy_primitives::Address;
 use foundry_common::{
@@ -13,7 +13,7 @@ use foundry_common::{
         h160_to_address, h256_to_b256, revm_u256_to_h256, u256_to_revm_u256,
     },
 };
-use revm::Database;
+use revm::{Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
@@ -25,6 +25,7 @@ use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
 
 pub struct ZKVMData<'a, DB> {
     pub db: &'a mut DB,
+    pub journaled_state: &'a mut JournaledState,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: HashMap<StorageKey, StorageValue>,
 }
@@ -33,20 +34,42 @@ impl<'a, DB> Debug for ZKVMData<'a, DB> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ZKVMData")
             .field("db", &"db")
+            .field("journaled_state", &"jouranled_state")
             .field("factory_deps", &self.factory_deps)
             .field("override_keys", &self.override_keys)
             .finish()
     }
 }
 
-impl<'a, DB: Database> ZKVMData<'a, DB> {
+impl<'a, DB> ZKVMData<'a, DB>
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
     /// Create a new instance of [ZKEVMData].
-    pub fn new(db: &'a mut DB) -> Self {
-        Self { db, factory_deps: Default::default(), override_keys: Default::default() }
+    pub fn new(db: &'a mut DB, journaled_state: &'a mut JournaledState) -> Self {
+        let factory_deps = journaled_state
+            .state
+            .values()
+            .flat_map(|account| {
+                if account.info.is_empty_code_hash() {
+                    None
+                } else if let Some(code) = &account.info.code {
+                    Some((H256::from(account.info.code_hash.0), code.bytecode.to_vec()))
+                } else {
+                    None
+                }
+            })
+            .collect::<HashMap<_, _>>();
+
+        Self { db, journaled_state, factory_deps, override_keys: Default::default() }
     }
 
     /// Create a new instance of [ZKEVMData] with system contracts.
-    pub fn new_with_system_contracts(db: &'a mut DB) -> Self {
+    pub fn new_with_system_contracts(
+        db: &'a mut DB,
+        journaled_state: &'a mut JournaledState,
+    ) -> Self {
         let contracts = era_test_node::system_contracts::get_deployed_contracts(
             &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
         );
@@ -66,12 +89,21 @@ impl<'a, DB: Database> ZKVMData<'a, DB> {
                     .then_some(override_keys.insert(log.key, log.value));
             });
 
-        let factory_deps = contracts
+        let mut factory_deps = contracts
             .into_iter()
             .map(|contract| (hash_bytecode(&contract.bytecode), contract.bytecode))
             .collect::<HashMap<_, _>>();
+        factory_deps.extend(journaled_state.state.values().flat_map(|account| {
+            if account.info.is_empty_code_hash() {
+                None
+            } else if let Some(code) = &account.info.code {
+                Some((H256::from(account.info.code_hash.0), code.bytecode.to_vec()))
+            } else {
+                None
+            }
+        }));
 
-        Self { db, factory_deps, override_keys }
+        Self { db, journaled_state, factory_deps, override_keys }
     }
 
     /// Returns the nonce for a given account from NonceHolder storage.
@@ -85,15 +117,37 @@ impl<'a, DB: Database> ZKVMData<'a, DB> {
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
         // let mut db = self.db.lock().unwrap();
-        let result =
-            self.db.storage(h160_to_address(address), u256_to_revm_u256(idx)).unwrap_or_default();
-        revm_u256_to_h256(result)
+        let addr = h160_to_address(address);
+        self.journaled_state.load_account(addr, self.db).expect("failed loading account");
+        let (r1, _) = self
+            .journaled_state
+            .sload(addr, u256_to_revm_u256(idx), self.db)
+            .expect("failed sload");
+        // let r2 = self.db.storage(addr, u256_to_revm_u256(idx)).ok().unwrap_or_default();
+        // if r1 != r2 {
+        //     // let a1 = self.journaled_state.load_account(addr, self.db);
+        //     // let b1 = self.journaled_state.load_account(addr, self.db);
+        //     panic!("{r1:?} != {r2:?} | {address:?} {idx:?}");
+        // }
+
+        revm_u256_to_h256(r1)
+
+        // self.journaled_state
+        //     .load_account(addr, self.db)
+        //     .ok()
+        //     .and_then(|(account, _)| {
+        //         account.storage.get(&u256_to_revm_u256(idx)).map(|value| value.present_value)
+        //     })
+        //     .or_else(|| self.db.storage(addr, u256_to_revm_u256(idx)).ok())
+        //     .map(revm_u256_to_h256)
+        //     .unwrap_or_default()
     }
 }
 
 impl<'a, DB> ReadStorage for &mut ZKVMData<'a, DB>
 where
     DB: Database,
+    <DB as Database>::Error: Debug,
 {
     fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
         self.read_db(*key.address(), h256_to_u256(*key.key()))

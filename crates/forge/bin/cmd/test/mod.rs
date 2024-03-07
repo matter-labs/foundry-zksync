@@ -11,8 +11,7 @@ use forge::{
         identifier::{EtherscanIdentifier, LocalTraceIdentifier, SignaturesIdentifier},
         CallTraceDecoderBuilder, TraceKind,
     },
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions,
-    TestOptionsBuilder,
+    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
 };
 use foundry_cli::{
     opts::CoreBuildArgs,
@@ -221,7 +220,6 @@ impl TestArgs {
 
         // Dual compiled contracts
         let mut dual_compiled_contracts = vec![];
-        println!("solc bytecodes provided, building dual compiled contracts");
         let mut solc_bytecodes = HashMap::new();
         for (contract_name, artifact) in output.artifacts() {
             let deployed_bytecode = artifact.get_deployed_bytecode();
@@ -273,12 +271,7 @@ impl TestArgs {
             ))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
-            .build(
-                project_root,
-                output,
-                env,
-                evm_opts,
-            )?;
+            .build(project_root, output, env, evm_opts)?;
 
         if let Some(debug_test_pattern) = &self.debug {
             let test_pattern = &mut filter.args_mut().test_pattern;

@@ -29,7 +29,7 @@ use revm::{
         ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, OutOfGasError,
         Output, ResultAndState, StorageSlot, B256, KECCAK_EMPTY, U256 as rU256,
     },
-    Database,
+    Database, JournaledState,
 };
 use zksync_basic_types::{L2ChainId, H256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
@@ -53,6 +53,7 @@ pub(crate) fn create<'a, DB, E>(
     contract: &DualCompiledContract,
     env: &'a mut Env,
     db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
 ) -> EVMResult<ResultAndState>
 where
     DB: Database,
@@ -62,7 +63,7 @@ where
     let calldata =
         encode_create_params(&call.scheme, contract.zk_bytecode_hash, Default::default());
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
-    let nonce = ZKVMData::new(db).get_tx_nonce(caller);
+    let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
     let tx = L2Tx::new(
         CONTRACT_DEPLOYER_ADDRESS,
@@ -81,7 +82,7 @@ where
         Some(factory_deps),
         PaymasterParams::default(),
     );
-    inspect(tx, env, db)
+    inspect(tx, env, db, journaled_state)
 }
 
 pub(crate) fn call<'a, DB, E>(
@@ -89,6 +90,7 @@ pub(crate) fn call<'a, DB, E>(
     contract: Option<&DualCompiledContract>,
     env: &'a mut Env,
     db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
 ) -> EVMResult<ResultAndState>
 where
     DB: Database,
@@ -97,7 +99,7 @@ where
     info!(?call, "call tx");
     let caller = env.tx.caller;
     let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
-    let nonce: zksync_types::Nonce = ZKVMData::new(db).get_tx_nonce(caller);
+    let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
     let tx = L2Tx::new(
         address_to_h160(call.contract),
         call.input.to_vec(),
@@ -115,17 +117,22 @@ where
         factory_deps,
         PaymasterParams::default(),
     );
-    inspect(tx, env, db)
+    inspect(tx, env, db, journaled_state)
 }
 
-fn inspect<'a, DB, E>(mut tx: L2Tx, env: &'a mut Env, db: &'a mut DB) -> EVMResult<E>
+fn inspect<'a, DB, E>(
+    mut tx: L2Tx,
+    env: &'a mut Env,
+    db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
+) -> EVMResult<E>
 where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    let mut era_db = ZKVMData::new_with_system_contracts(db);
+    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state);
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
-    tracing::info!(caller = ?env.tx.caller, "executing transaction in ZK vm");
+    tracing::trace!(caller = ?env.tx.caller, "executing transaction in zk vm");
 
     let chain_id_u32 = if env.cfg.chain_id <= u32::MAX as u64 {
         env.cfg.chain_id as u32
@@ -270,6 +277,20 @@ where
             status,
         };
         state.insert(address, account);
+    }
+
+    for (address, new_account) in &state {
+        let address = *address;
+        let (account, _) =
+            journaled_state.load_account(address, db).expect("account could not be loaded");
+        let _ = std::mem::replace(&mut account.info.balance, new_account.info.balance);
+        let _ = std::mem::replace(&mut account.info.nonce, new_account.info.nonce);
+        account.info.code_hash = new_account.info.code_hash;
+        account.info.code = new_account.info.code.clone();
+        for (key, value) in &new_account.storage {
+            let key = *key;
+            journaled_state.sstore(address, key, value.present_value, db).expect("failed writing to slot");
+        }
     }
 
     Ok(ResultAndState { result: execution_result, state })
