@@ -284,7 +284,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> {
     /// Returns true if the given account is currently marked as persistent.
     fn is_persistent(&self, acc: &Address) -> bool;
 
-    /// Returns true if the given account is currently marked as persistent.
+    /// Returns the accounts currently marked as persistent.
     fn persistent_accounts(&self) -> Vec<Address>;
 
     /// Revokes persistent status from the given account.
