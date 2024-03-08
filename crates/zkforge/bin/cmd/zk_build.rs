@@ -145,6 +145,7 @@ impl ZkBuildArgs {
 
         // TODO: add filter support
         foundry_common::zk_compile::compile_smart_contracts(zksolc_cfg, project)?;
+
         Ok(())
     }
     /// Returns the `Project` for the current workspace

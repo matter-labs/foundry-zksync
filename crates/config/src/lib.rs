@@ -1303,6 +1303,22 @@ impl Config {
         })
     }
 
+    /// Sets the `libraries` entry inside a `foundry.toml` file but only if it exists
+    ///
+    /// # Errors
+    ///
+    /// An error if the `foundry.toml` could not be parsed.
+    pub fn update_libraries(&self) -> eyre::Result<()> {
+        self.update(|doc| {
+            let profile = self.profile.as_str().as_str();
+            let libraries: toml_edit::Value =
+                self.libraries.iter().map(toml_edit::Value::from).collect();
+            let libraries = toml_edit::value(libraries);
+            doc[Config::PROFILE_SECTION][profile]["libraries"] = libraries;
+            true
+        })
+    }
+
     /// Serialize the config type as a String of TOML.
     ///
     /// This serializes to a table with the name of the profile
