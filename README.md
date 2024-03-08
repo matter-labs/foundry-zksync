@@ -138,6 +138,16 @@ Compiling smart contracts...
 Compiled Successfully
 ```
 
+#### Deploying missing libraries
+
+In case missing libraries are detected during the compilation, we can deploy them using the following command:
+
+```
+$ zkforge zkcreate --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID>
+```
+
+After deployment is done, the configuration file will be updated and contracts will be automatically compiled again.
+
 #### Running Tests
 
 You can run the tests using `zkforge test`. 
