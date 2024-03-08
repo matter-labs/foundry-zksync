@@ -48,6 +48,9 @@ pub use in_memory_db::{EmptyDBWrapper, FoundryEvmInMemoryDB, MemDb};
 mod snapshot;
 pub use snapshot::{BackendSnapshot, RevertSnapshotAction, StateSnapshot};
 
+mod fork_type;
+pub use fork_type::{CachedForkType, ForkType};
+
 // A `revm::Database` that is used in forking mode
 type ForkDB = CacheDB<SharedBackend>;
 
@@ -69,9 +72,29 @@ const DEFAULT_PERSISTENT_ACCOUNTS: [Address; 3] =
 const GLOBAL_FAILURE_SLOT: B256 =
     b256!("6661696c65640000000000000000000000000000000000000000000000000000");
 
+/// Defines the info of a fork
+pub struct ForkInfo {
+    /// The type of fork
+    pub fork_type: ForkType,
+    /// The fork's environment
+    pub fork_env: Env,
+}
+
 /// An extension trait that allows us to easily extend the `revm::Inspector` capabilities
 #[auto_impl::auto_impl(&mut, Box)]
 pub trait DatabaseExt: Database<Error = DatabaseError> {
+    /// Execute a call on the current backend using [revm::EVM]
+    ///
+    /// Any changes performed during the call will not be committed onto the backend.
+    fn call_with_evm(&mut self, env: Env) -> eyre::Result<ResultAndState>;
+
+    /// Retrieves information about a fork
+    ///
+    /// The fork must already exist defined by the provided [LocalForkId].
+    /// If exists, we return the information about the fork, namely it's type (ZK or EVM)
+    /// and the the fork environment.
+    fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo>;
+
     /// Creates a new snapshot at the current point of execution.
     ///
     /// A snapshot is associated with a new unique id that's created for the snapshot.
@@ -396,6 +419,8 @@ pub struct Backend {
     active_fork_ids: Option<(LocalForkId, ForkLookupIndex)>,
     /// holds additional Backend data
     inner: BackendInner,
+    /// Keeps track of the fork type
+    fork_url_type: CachedForkType,
 }
 
 // === impl Backend ===
@@ -424,6 +449,7 @@ impl Backend {
             fork_init_journaled_state: inner.new_journaled_state(),
             active_fork_ids: None,
             inner,
+            fork_url_type: CachedForkType::default(),
         };
 
         if let Some(fork) = fork {
@@ -467,6 +493,7 @@ impl Backend {
             fork_init_journaled_state: self.inner.new_journaled_state(),
             active_fork_ids: None,
             inner: Default::default(),
+            fork_url_type: self.fork_url_type.clone(),
         }
     }
 
@@ -910,6 +937,32 @@ impl Backend {
 // === impl a bunch of `revm::Database` adjacent implementations ===
 
 impl DatabaseExt for Backend {
+    fn call_with_evm(&mut self, mut env: Env) -> eyre::Result<ResultAndState> {
+        let mut db = self.clone();
+        db.initialize(&env);
+        let result = match revm::evm_inner::<Self>(&mut env, &mut db, None).transact() {
+            Ok(res) => Ok(res),
+            Err(e) => eyre::bail!("backend: failed while inspecting: {e}"),
+        };
+
+        result
+    }
+
+    fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
+        let fork_id = self.ensure_fork_id(id).cloned()?;
+        let fork_env = self
+            .forks
+            .get_env(fork_id.clone())?
+            .ok_or_else(|| eyre::eyre!("Requested fork `{}` does not exit", id))?;
+        let fork_type = self
+            .forks
+            .get_fork_url(fork_id)?
+            .map(|url| self.fork_url_type.get(&url))
+            .unwrap_or(ForkType::Zk);
+
+        Ok(ForkInfo { fork_type, fork_env })
+    }
+
     fn snapshot(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
         trace!("create snapshot");
         let id = self.inner.snapshots.insert(BackendSnapshot::new(

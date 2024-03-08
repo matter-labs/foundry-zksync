@@ -13,7 +13,8 @@ use itertools::Itertools;
 use std::{collections::BTreeMap, path::Path};
 use zkforge::{
     result::{SuiteResult, TestStatus},
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
+    MultiContractRunner, MultiContractRunnerBuilder, ProjectCompileDualOutput, TestOptions,
+    TestOptionsBuilder,
 };
 
 /// How to execute a test run.
@@ -164,7 +165,7 @@ pub async fn runner_with_config(mut config: Config) -> MultiContractRunner {
         .with_test_options(test_opts())
         .with_cheats_config(CheatsConfig::new(&config, opts.clone()))
         .sender(config.sender)
-        .build(root, output, env, opts.clone())
+        .build(root, ProjectCompileDualOutput::only_zk(output), env, opts.clone())
         .unwrap()
 }
 
@@ -175,7 +176,7 @@ pub async fn tracing_runner() -> MultiContractRunner {
     base_runner()
         .build(
             &PROJECT.paths.root,
-            (*COMPILED).clone(),
+            ProjectCompileDualOutput::only_zk((*COMPILED).clone()),
             EVM_OPTS.evm_env().await.expect("Could not instantiate fork environment"),
             opts,
         )
@@ -193,7 +194,12 @@ pub async fn forked_runner(rpc: &str) -> MultiContractRunner {
 
     base_runner()
         .with_fork(fork)
-        .build(&PROJECT.paths.root, (*COMPILED).clone(), env, opts)
+        .build(
+            &PROJECT.paths.root,
+            ProjectCompileDualOutput::only_zk((*COMPILED).clone()),
+            env,
+            opts,
+        )
         .unwrap()
 }
 

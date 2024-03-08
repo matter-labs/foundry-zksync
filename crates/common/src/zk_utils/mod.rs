@@ -33,7 +33,7 @@ use multivm::vm_latest::TracerPointer;
 use std::{collections::HashMap, num::ParseIntError};
 use url::Url;
 use zksync_basic_types::U256;
-use zksync_types::{StorageKey, StorageValue};
+use zksync_types::{StorageKey, StorageValue, H160};
 use zksync_web3_rs::types::H256;
 /// Utils for conversion between zksync types and revm types
 pub mod conversion_utils;
@@ -178,6 +178,8 @@ pub struct StorageModifications {
     pub bytecodes: HashMap<H256, Vec<u8>>,
     /// Recorded known codes.
     pub known_codes: HashMap<H256, Vec<u8>>,
+    /// Recorded deployed bytecodes.
+    pub deployed_codes: HashMap<H160, H256>,
 }
 
 impl StorageModifications {
@@ -186,6 +188,7 @@ impl StorageModifications {
         self.keys.extend(other.keys);
         self.bytecodes.extend(other.bytecodes);
         self.known_codes.extend(other.known_codes);
+        self.deployed_codes.extend(other.deployed_codes);
     }
 }
 
@@ -203,4 +206,19 @@ pub trait StorageModificationRecorder {
 pub trait AsTracerPointer<S, H> {
     /// Returns reference to a [TracerPointer]
     fn as_tracer_pointer(&self) -> TracerPointer<S, H>;
+}
+
+/// Defines a contract that has been dual compiled with both zksolc and solc
+#[derive(Debug, Default, Clone)]
+pub struct DualCompiledContract {
+    /// Contract name
+    pub name: String,
+    /// Deployed bytecode with zksolc
+    pub zk_bytecode_hash: zksync_types::H256,
+    /// Deployed bytecode hash with zksolc
+    pub zk_deployed_bytecode: Vec<u8>,
+    /// Bytecode with solc
+    pub evm_bytecode: Vec<u8>,
+    /// Deployed bytecode with solc
+    pub evm_deployed_bytecode: Vec<u8>,
 }
