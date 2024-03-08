@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
+use foundry_common::conversion_utils::h256_to_h160;
 use foundry_evm_core::{
     backend::DatabaseExt,
     era_revm::{db::RevmDatabaseForEra, storage_view::StorageView},
@@ -13,13 +14,15 @@ use multivm::{
         vm_state::{self, PrimitiveValue},
         zkevm_opcode_defs::{
             decoding::{EncodingModeProduction, VmEncodingMode},
-            FatPointer, Opcode, RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
+            FarCallABI, FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
+            CALL_SYSTEM_ABI_REGISTERS, RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
         },
     },
 };
 use zksync_basic_types::{H160, U256};
 use zksync_state::StoragePtr;
-use zksync_types::Timestamp;
+use zksync_types::{Timestamp, MSG_VALUE_SIMULATOR_ADDRESS};
+use zksync_utils::u256_to_h256;
 
 type EraDb<DB> = StorageView<RevmDatabaseForEra<DB>>;
 type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
@@ -195,5 +198,158 @@ impl MockedCalls {
         }
 
         best_match.map(|(_, return_data)| return_data.clone())
+    }
+}
+
+/// Selector for `L2EthToken::balanceOf(uint256)`
+pub const SELECTOR_L2_ETH_BALANCE_OF: &str = "9cc7f708";
+/// Selector for `SystemContext::getBlockNumber()`
+pub const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: &str = "42cbb15c";
+/// Selector for `SystemContext::getBlockTimestamp()`
+pub const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: &str = "796b89b9";
+// Selector for `ContractDeployer::create(bytes32, bytes32, bytes)`
+pub const SELECTOR_CONTRACT_DEPLOYER_CREATE: &str = "9c4d535b";
+// Selector for `ContractDeployer::create2(bytes32, bytes32, bytes)`
+pub const SELECTOR_CONTRACT_DEPLOYER_CREATE2: &str = "3cda3351";
+
+/// Represents a parsed FarCall from the ZK-EVM
+pub enum ParsedFarCall {
+    /// A call to MsgValueSimulator contract used when transferring ETH
+    ValueCall { to: H160, value: U256, calldata: Vec<u8>, recipient: H160, is_system_call: bool },
+    /// A simple FarCall with calldata.
+    SimpleCall { to: H160, value: U256, calldata: Vec<u8> },
+}
+
+impl ParsedFarCall {
+    /// Retrieves the `to` address for the call, if any
+    pub fn to(&self) -> &H160 {
+        match self {
+            ParsedFarCall::ValueCall { to, .. } => to,
+            ParsedFarCall::SimpleCall { to, .. } => to,
+        }
+    }
+
+    /// Retrieves the `value` for the call
+    pub fn value(&self) -> &U256 {
+        match self {
+            ParsedFarCall::ValueCall { value, .. } => value,
+            ParsedFarCall::SimpleCall { value, .. } => value,
+        }
+    }
+
+    /// Retrieves the selector for the call, or returns an empty string if none.
+    pub fn selector(&self) -> String {
+        let calldata = self.calldata();
+
+        if calldata.len() < 4 {
+            String::from("")
+        } else {
+            hex::encode(&calldata[0..4])
+        }
+    }
+
+    /// Retrieves the calldata for the call, if any
+    pub fn calldata(&self) -> &[u8] {
+        match self {
+            ParsedFarCall::ValueCall { calldata, .. } => calldata,
+            ParsedFarCall::SimpleCall { calldata, .. } => calldata,
+        }
+    }
+
+    /// Retrieves the parameters from calldata, if any
+    pub fn params(&self) -> Vec<[u8; 32]> {
+        let params = &match self {
+            ParsedFarCall::ValueCall { calldata, .. } => calldata,
+            ParsedFarCall::SimpleCall { calldata, .. } => calldata,
+        }[4..];
+        if params.is_empty() {
+            return Vec::new()
+        }
+
+        params
+            .chunks(32)
+            .map(|c| c.try_into().expect("chunk must be exactly 32 bytes"))
+            .collect_vec()
+    }
+
+    /// Retrieves all bytes after the `offset` number of 32byte words
+    pub fn param_bytes_after(&self, offset_words: usize) -> Vec<u8> {
+        let params = &match self {
+            ParsedFarCall::ValueCall { calldata, .. } => calldata,
+            ParsedFarCall::SimpleCall { calldata, .. } => calldata,
+        }[4..];
+        if params.is_empty() || params.len() < 32 * offset_words {
+            return Vec::new()
+        }
+
+        params[32 * offset_words..].to_vec()
+    }
+}
+
+impl Debug for ParsedFarCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParsedFarCall::ValueCall { to, value, calldata, recipient, is_system_call } => f
+                .debug_struct("ValueCall")
+                .field("to", to)
+                .field("value", value)
+                .field("calldata", &hex::encode(calldata))
+                .field("recipient", recipient)
+                .field("is_system_call", is_system_call)
+                .finish(),
+            ParsedFarCall::SimpleCall { to, value, calldata } => f
+                .debug_struct("SimpleCall")
+                .field("to", to)
+                .field("value", value)
+                .field("calldata", &hex::encode(calldata))
+                .finish(),
+        }
+    }
+}
+
+const MSG_VALUE_SIMULATOR_ADDRESS_EXTRA_PARAM_REG_OFFSET: u8 = CALL_SYSTEM_ABI_REGISTERS.start;
+const MSG_VALUE_SIMULATOR_DATA_VALUE_REG: u8 = MSG_VALUE_SIMULATOR_ADDRESS_EXTRA_PARAM_REG_OFFSET;
+const MSG_VALUE_SIMULATOR_DATA_ADDRESS_REG: u8 =
+    MSG_VALUE_SIMULATOR_ADDRESS_EXTRA_PARAM_REG_OFFSET + 1;
+const MSG_VALUE_SIMULATOR_DATA_IS_SYSTEM_REG: u8 =
+    MSG_VALUE_SIMULATOR_ADDRESS_EXTRA_PARAM_REG_OFFSET + 2;
+const MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT: u8 = 1;
+
+/// Parses a FarCall into ZKSync's normal calls or MsgValue calls.
+/// For MsgValueSimulator call parsing, see https://github.com/matter-labs/era-system-contracts/blob/main/contracts/MsgValueSimulator.sol#L25
+/// For normal call parsing, see https://github.com/matter-labs/zksync-era/blob/main/core/lib/multivm/src/tracers/call_tracer/vm_latest/mod.rs#L115
+pub fn parse<H: HistoryMode>(
+    state: &VmLocalStateData<'_>,
+    memory: &SimpleMemory<H>,
+) -> ParsedFarCall {
+    let current = state.vm_local_state.callstack.get_current_stack();
+    let reg = &state.vm_local_state.registers;
+    let value = U256::from(current.context_u128_value);
+
+    let packed_abi = reg[CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
+    assert!(packed_abi.is_pointer);
+    let far_call_abi = FarCallABI::from_u256(packed_abi.value);
+    let calldata = memory.read_unaligned_bytes(
+        far_call_abi.memory_quasi_fat_pointer.memory_page as usize,
+        far_call_abi.memory_quasi_fat_pointer.start as usize,
+        far_call_abi.memory_quasi_fat_pointer.length as usize,
+    );
+    if current.code_address == MSG_VALUE_SIMULATOR_ADDRESS {
+        let value = U256::from(reg[MSG_VALUE_SIMULATOR_DATA_VALUE_REG as usize].value.low_u128());
+        let address = u256_to_h256(reg[MSG_VALUE_SIMULATOR_DATA_ADDRESS_REG as usize].value);
+        let address = h256_to_h160(&address);
+        let is_system_call = reg[MSG_VALUE_SIMULATOR_DATA_IS_SYSTEM_REG as usize]
+            .value
+            .bit(MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT as usize);
+
+        ParsedFarCall::ValueCall {
+            to: current.code_address,
+            value,
+            calldata,
+            recipient: address,
+            is_system_call,
+        }
+    } else {
+        ParsedFarCall::SimpleCall { to: current.code_address, value, calldata }
     }
 }
