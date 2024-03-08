@@ -1,6 +1,6 @@
 //! Implementations of [`Evm`](crate::Group::Evm) cheatcodes.
 
-use crate::{Cheatcode, Cheatcodes, CheatsCtxt, Result, Vm::*};
+use crate::{zk, Cheatcode, Cheatcodes, CheatsCtxt, Result, Vm::*};
 use alloy_genesis::{Genesis, GenesisAccount};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_signer::Signer;
@@ -264,6 +264,16 @@ impl Cheatcode for prevrandaoCall {
 impl Cheatcode for rollCall {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { newHeight } = self;
+        if ccx.state.use_zk_vm {
+            zk::cheatcodes::roll(
+                *newHeight,
+                ccx.data.env,
+                ccx.data.db,
+                &mut ccx.data.journaled_state,
+            );
+            return Ok(Default::default())
+        }
+
         ccx.data.env.block.number = *newHeight;
         Ok(Default::default())
     }
@@ -287,7 +297,17 @@ impl Cheatcode for txGasPriceCall {
 impl Cheatcode for warpCall {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { newTimestamp } = self;
+        if ccx.state.use_zk_vm {
+            zk::cheatcodes::warp(
+                *newTimestamp,
+                ccx.data.env,
+                ccx.data.db,
+                &mut ccx.data.journaled_state,
+            );
+            return Ok(Default::default())
+        }
         ccx.data.env.block.timestamp = *newTimestamp;
+
         Ok(Default::default())
     }
 }
@@ -302,8 +322,13 @@ impl Cheatcode for getBlockTimestampCall {
 impl Cheatcode for dealCall {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { account: address, newBalance: new_balance } = *self;
-        let account = journaled_account(ccx.data, address)?;
-        let old_balance = std::mem::replace(&mut account.info.balance, new_balance);
+        let old_balance = if ccx.state.use_zk_vm {
+            zk::cheatcodes::deal(address, new_balance, ccx.data.db, &mut ccx.data.journaled_state)
+        } else {
+            let account = journaled_account(ccx.data, address)?;
+            std::mem::replace(&mut account.info.balance, new_balance)
+        };
+
         let record = DealRecord { address, old_balance, new_balance };
         ccx.state.eth_deals.push(record);
         Ok(Default::default())

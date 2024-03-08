@@ -16,6 +16,21 @@ contract FixedNumber {
     }
 }
 
+contract PayableFixedNumber {
+    address sender;
+    uint256 value;
+
+    constructor() payable {
+        sender = msg.sender;
+        value = msg.value;
+        console.log(msg.value);
+    }
+
+    function five() public pure returns (uint8) {
+        return 5;
+    }
+}
+
 contract CustomNumber {
     uint8 value;
 
@@ -46,30 +61,18 @@ contract CustomStorage {
     }
 }
 
-contract InverseVmTest is Test {
+contract ZkContractsTest is Test {
     Number number;
     CustomNumber customNumber;
 
-    /// USDC TOKEN
-    uint256 constant TOKEN_DECIMALS = 6;
-
-    address constant ERA_TOKEN_ADDRESS = 0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4;
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
 
-    address constant ETH_TOKEN_ADDRESS = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     uint256 constant ETH_FORK_BLOCK = 19225195;
     uint256 constant ETH_FORK_BLOCK_TS = 1707901427;
 
-    address constant CONTRACT_ADDRESS = 0x32400084C286CF3E17e7B677ea9583e60a000324; //zkSync Diamond Proxy
-    uint256 constant ERA_BALANCE = 372695034186505563;
-    uint256 constant ETH_BALANCE = 153408823439331882193477;
-
-    address constant TEST_ADDRESS = 0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a;
-
     uint256 forkEra;
     uint256 forkEth;
-    uint256 forkOpt;
 
     function setUp() public {
         number = new Number();
@@ -79,26 +82,9 @@ contract InverseVmTest is Test {
 
         forkEra = vm.createFork("mainnet", ERA_FORK_BLOCK);
         forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
-        forkOpt = vm.createFork("https://mainnet.optimism.io/", ETH_FORK_BLOCK);
     }
 
-    function testInverseBlockNumber() public {
-        vm.selectFork(forkEra);
-        require(block.number == ERA_FORK_BLOCK, "era block number mismatch");
-
-        vm.selectFork(forkEth);
-        require(block.number == ETH_FORK_BLOCK, "eth block number mismatch");
-    }
-
-    function testInverseBlockTimestamp() public {
-        vm.selectFork(forkEra);
-        require(block.timestamp == ERA_FORK_BLOCK_TS, "era block timestamp mismatch");
-
-        vm.selectFork(forkEth);
-        require(block.timestamp == ETH_FORK_BLOCK_TS, "eth block timestamp mismatch");
-    }
-
-    function testInverseSetUpDeployedContractNoArgs() public {
+    function testZkContractsPersistedDeployedContractNoArgs() public {
         require(number.ten() == 10, "base setUp contract value mismatch");
 
         vm.selectFork(forkEra);
@@ -108,7 +94,7 @@ contract InverseVmTest is Test {
         require(number.ten() == 10, "eth setUp contract value mismatch");
     }
 
-    function testInverseSetUpDeployedContractArgs() public {
+    function testZkContractsPersistedDeployedContractArgs() public {
         require(customNumber.number() == 20, "base setUp contract value mismatch");
 
         vm.selectFork(forkEra);
@@ -118,13 +104,19 @@ contract InverseVmTest is Test {
         require(customNumber.number() == 20, "eth setUp contract value mismatch");
     }
 
-    function testInverseInlineDeployedContractNoArgs() public {
+    function testZkContractsInlineDeployedContractNoArgs() public {
         vm.selectFork(forkEra);
         FixedNumber fixedNumber = new FixedNumber();
         require(fixedNumber.five() == 5, "era deployed contract value mismatch");
     }
 
-    function testInverseInlineDeployedContractComplexArgs() public {
+    function testZkContractsInlineDeployedContractBalance() public {
+        vm.selectFork(forkEra);
+        PayableFixedNumber payableFixedNumber = new PayableFixedNumber{value: 10}();
+        require(address(payableFixedNumber).balance == 10, "incorrect balance");
+    }
+
+    function testZkContractsInlineDeployedContractComplexArgs() public {
         CustomStorage customStorage = new CustomStorage("hello", 10);
         vm.makePersistent(address(customStorage));
         require(
@@ -148,18 +140,7 @@ contract InverseVmTest is Test {
         require(customStorage.getNum() == 10, "era inline contract value mismatch (complex args)");
     }
 
-    function testInverseAddressBalance() public {
-        vm.makePersistent(TEST_ADDRESS);
-        vm.deal(TEST_ADDRESS, 100);
-
-        vm.selectFork(forkEra);
-        require(TEST_ADDRESS.balance == 100, "era balance mismatch");
-
-        vm.selectFork(forkEth);
-        require(TEST_ADDRESS.balance == 100, "eth balance mismatch");
-    }
-
-    function testInverseCreate2() public {
+    function testZkContractsCreate2() public {
         vm.selectFork(forkEra);
 
         bytes32 bytecodeHash = 0x0100000fbb43aa073340811284a4666183e306fbe9c950df1d05ac3210ef9fc5;

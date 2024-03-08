@@ -8,7 +8,7 @@ use era_test_node::{
     utils::bytecode_to_factory_dep,
 };
 use foundry_common::{
-    conversion_utils::address_to_h160,
+    conversion_utils::{address_to_h160, u256_to_revm_u256},
     fix_l2_gas_limit, fix_l2_gas_price,
     zk_utils::conversion_utils::{
         h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
@@ -47,6 +47,19 @@ use crate::zk::{
 use super::storage_view::StorageView;
 
 type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
+
+pub(crate) fn balance<'a, DB>(
+    address: Address,
+    db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
+) -> rU256
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    let balance = ZKVMData::new(db, journaled_state).get_balance(address);
+    u256_to_revm_u256(balance)
+}
 
 pub(crate) fn create<'a, DB, E>(
     call: &CreateInputs,

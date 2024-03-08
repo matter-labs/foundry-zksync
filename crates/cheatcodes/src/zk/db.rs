@@ -17,8 +17,9 @@ use revm::{Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
-    get_code_key, get_nonce_key, get_system_context_init_logs, utils::decompose_full_nonce, Nonce,
-    StorageKey, StorageLog, StorageLogKind, StorageValue,
+    get_code_key, get_nonce_key, get_system_context_init_logs,
+    utils::{decompose_full_nonce, storage_key_for_eth_balance},
+    Nonce, StorageKey, StorageLog, StorageLogKind, StorageValue,
 };
 
 use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
@@ -119,6 +120,15 @@ where
         let nonce_storage = self.read_db(*nonce_key.address(), h256_to_u256(*nonce_key.key()));
         let (tx_nonce, _deploy_nonce) = decompose_full_nonce(h256_to_u256(nonce_storage));
         Nonce(tx_nonce.as_u32())
+    }
+
+    /// Returns the nonce for a given account from NonceHolder storage.
+    pub fn get_balance(&mut self, address: Address) -> U256 {
+        let address = address_to_h160(address);
+        let balance_key = storage_key_for_eth_balance(&address);
+        let balance_storage =
+            self.read_db(*balance_key.address(), h256_to_u256(*balance_key.key()));
+        h256_to_u256(balance_storage)
     }
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {

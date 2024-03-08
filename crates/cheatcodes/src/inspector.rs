@@ -523,6 +523,35 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         }
     }
 
+    fn step_end(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
+        if self.use_zk_vm {
+            match interpreter.current_opcode() {
+                opcode::BALANCE => {
+                    if interpreter.stack.len() < 1 {
+                        interpreter.instruction_result = InstructionResult::StackUnderflow;
+                        return;
+                    }
+                    // Safety: Length is checked above.
+                    let address =
+                        Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }));
+                    let balance = zk::balance(address, data.db, &mut data.journaled_state);
+
+                    // Skip the current BALANCE instruction since we've already handled it
+                    match interpreter.stack.push(balance) {
+                        Ok(_) => unsafe {
+                            interpreter.instruction_pointer =
+                                interpreter.instruction_pointer.add(1);
+                        },
+                        Err(e) => {
+                            interpreter.instruction_result = e;
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
     fn step(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
         self.pc = interpreter.program_counter();
 
