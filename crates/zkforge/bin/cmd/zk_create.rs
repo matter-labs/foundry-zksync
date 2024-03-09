@@ -1,7 +1,10 @@
 use alloy_primitives::Bytes;
+use async_recursion::async_recursion;
 use clap::{Parser, ValueHint};
-use ethers_core::abi::Abi;
-use eyre::Context;
+use ethers_core::{abi::Abi, types::TransactionReceipt};
+use eyre::{Context, ContextCompat};
+
+use super::zk_build::ZkBuildArgs;
 /// ZKSync Contract Deployment Module
 /// This module encapsulates the logic required for contract deployment, including:
 /// - Retrieving the contract bytecode and ABI from the Solidity project
@@ -49,14 +52,19 @@ use eyre::Context;
 /// - `ethers`
 /// - `zksync`
 use foundry_cli::{
-    opts::{CoreBuildArgs, EthereumOpts, TransactionOpts},
+    opts::{CompilerArgs, CoreBuildArgs, EthereumOpts, TransactionOpts},
     utils::read_constructor_args_file,
 };
-use foundry_common::zk_utils::{get_chain, get_private_key, get_rpc_url};
-use foundry_compilers::{info::ContractInfo, Project};
-use foundry_config::Config;
+use foundry_common::{
+    zk_compile::{get_missing_libraries_cache_path, ZkMissingLibrary},
+    zk_utils::{get_chain, get_private_key, get_rpc_url},
+    zksolc_manager::DEFAULT_ZKSOLC_VERSION,
+};
+use foundry_compilers::{info::ContractInfo, ConfigurableArtifacts, Project};
+use foundry_config::{Chain, Config};
 use serde_json::Value;
 use std::{fs, path::PathBuf, str::FromStr};
+use zksync_types::H256;
 use zksync_web3_rs::{
     providers::Provider,
     signers::{LocalWallet, Signer},
@@ -95,7 +103,7 @@ pub struct ZkCreateArgs {
         help = "The contract identifier in the form `<path>:<contractname>`.",
         value_name = "CONTRACT"
     )]
-    contract: ContractInfo,
+    contract: Option<ContractInfo>,
 
     /// The constructor arguments.
     #[clap(
@@ -118,6 +126,13 @@ pub struct ZkCreateArgs {
     value_name = "FILE"
     )]
     constructor_args_path: Option<PathBuf>,
+
+    #[clap(
+        long,
+        help = "Deploy the missing dependency libraries from last build.",
+        default_value_t = false
+    )]
+    deploy_missing_libraries: bool,
 
     /// The factory dependencies in the form `<path>:<contractname>`.
     #[clap(
@@ -160,12 +175,201 @@ impl ZkCreateArgs {
     pub async fn run(self) -> eyre::Result<()> {
         let private_key = get_private_key(&self.eth.wallet.raw.private_key)?;
         let rpc_url = get_rpc_url(&self.eth.rpc.url)?;
-        let config = Config::from(&self.eth);
+        let mut config = Config::from(&self.eth);
         let chain = get_chain(config.chain)?;
         let mut project = self.opts.project()?;
         project.paths.artifacts = project.paths.root.join("zkout");
 
-        let bytecode = match Self::get_bytecode_from_contract(&project, &self.contract) {
+        if self.deploy_missing_libraries {
+            let library_paths = get_missing_libraries_cache_path(project.root());
+            if !library_paths.exists() {
+                eyre::bail!("No missing libraries found");
+            }
+
+            let mut missing_libraries: Vec<ZkMissingLibrary> =
+                serde_json::from_reader(std::fs::File::open(&library_paths)?)?;
+
+            let mut all_deployed_libraries: Vec<DeployedContractInfo> = Vec::new();
+            for library in &config.libraries {
+                let split_lib = library.split(':').collect::<Vec<&str>>();
+                let lib_path = split_lib[0];
+                let lib_name = split_lib[1];
+                let lib_address = split_lib[2];
+                all_deployed_libraries.push(DeployedContractInfo {
+                    name: lib_name.to_string(),
+                    path: lib_path.to_string(),
+                    address: lib_address.to_string(),
+                });
+            }
+
+            info!("Deploying missing libraries");
+            for library in missing_libraries.clone() {
+                self.deploy_library(
+                    &mut config,
+                    &project,
+                    rpc_url.clone(),
+                    private_key,
+                    chain,
+                    &library,
+                    &mut all_deployed_libraries,
+                    &mut missing_libraries,
+                )
+                .await?;
+            }
+
+            // Delete the missing libraries file
+            std::fs::remove_file(library_paths)?;
+
+            info!("All missing libraries deployed, compiling project...");
+            let zkbuild_args = ZkBuildArgs {
+                args: CoreBuildArgs {
+                    compiler: CompilerArgs::default(),
+                    use_zksolc: DEFAULT_ZKSOLC_VERSION.to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            zkbuild_args.run().await?;
+
+            return Ok(())
+        }
+
+        // If `--deploy-missing-libraries` was not passed, then
+        // contract to deploy should've been passed
+        let contract = self
+            .contract
+            .clone()
+            .ok_or_else(|| eyre::eyre!("Contract to deploy must be passed"))?;
+
+        self.deploy_contract(&project, &contract, &rpc_url, &chain, &private_key).await?;
+
+        Ok(())
+    }
+
+    #[async_recursion]
+    #[allow(clippy::too_many_arguments)]
+    async fn deploy_library(
+        &self,
+        config: &mut Config,
+        project: &Project<ConfigurableArtifacts>,
+        rpc_url: String,
+        private_key: zksync_types::H256,
+        chain: foundry_config::Chain,
+        library: &ZkMissingLibrary,
+        all_deployed_libraries: &mut Vec<DeployedContractInfo>,
+        missing_libraries: &mut Vec<ZkMissingLibrary>,
+    ) -> eyre::Result<DeployedContractInfo> {
+        info!("Deploying missing library: {}:{}", library.contract_path, library.contract_name);
+
+        let deployed_library = all_deployed_libraries
+            .iter()
+            .find(|x| x.name == library.contract_name && x.path == library.contract_path);
+        if let Some(found_library) = deployed_library {
+            trace!("Library already deployed: {:?}", found_library);
+            return Ok(found_library.clone())
+        }
+
+        let library_info = ContractInfo {
+            path: Some(library.contract_path.clone()),
+            name: library.contract_name.clone(),
+        };
+
+        if library.missing_libraries.is_empty() {
+            trace!("Library has no dependencies, deploying: {:?}", library);
+
+            Self::build_library(project, &library_info).await?;
+            let receipt = self
+                .deploy_contract(project, &library_info, &rpc_url, &chain, &private_key)
+                .await?;
+
+            info!("Writing deployed library data to foundry.toml");
+            let deployed_address =
+                receipt.contract_address.wrap_err("Error retrieving deployed address")?;
+            config.libraries.push(format!(
+                "{}:{}:{:#02x}",
+                library.contract_path, library.contract_name, deployed_address
+            ));
+            config.update_libraries()?;
+            all_deployed_libraries.push(DeployedContractInfo {
+                name: library.contract_name.clone(),
+                path: library.contract_path.clone(),
+                address: deployed_address.to_string(),
+            });
+
+            return Ok(DeployedContractInfo {
+                name: library.contract_name.clone(),
+                path: library.contract_path.clone(),
+                address: deployed_address.to_string(),
+            })
+        }
+
+        info!(
+            "Library {}:{} has dependencies, deploying them first",
+            library.contract_path, library.contract_name
+        );
+        let dependent_libraries: Vec<ZkMissingLibrary> = library
+            .missing_libraries
+            .iter()
+            .map(|lib| {
+                let mut split = lib.split(':');
+                let lib_path = split.next().unwrap();
+                let lib_name = split.next().unwrap();
+
+                missing_libraries
+                    .iter()
+                    .find(|ml| ml.contract_name == lib_name && ml.contract_path == lib_path)
+                    .cloned()
+                    .ok_or(eyre::eyre!("Missing library not found"))
+            })
+            .collect::<eyre::Result<Vec<ZkMissingLibrary>>>()?;
+        for library in dependent_libraries {
+            self.deploy_library(
+                config,
+                project,
+                rpc_url.clone(),
+                private_key,
+                chain,
+                &library,
+                all_deployed_libraries,
+                missing_libraries,
+            )
+            .await?;
+        }
+
+        Self::build_library(project, &library_info).await?;
+        let receipt =
+            self.deploy_contract(project, &library_info, &rpc_url, &chain, &private_key).await?;
+        let deployed_address =
+            receipt.contract_address.wrap_err("Error retrieving deployed address")?;
+
+        trace!("Writing deployed library data to foundry.toml");
+        config.libraries.push(format!(
+            "{}:{}:{:#02x}",
+            library.contract_path, library.contract_name, deployed_address
+        ));
+        config.update_libraries()?;
+        all_deployed_libraries.push(DeployedContractInfo {
+            name: library.contract_name.clone(),
+            path: library.contract_path.clone(),
+            address: deployed_address.to_string(),
+        });
+
+        return Ok(DeployedContractInfo {
+            name: library.contract_name.clone(),
+            path: library.contract_path.clone(),
+            address: deployed_address.to_string(),
+        })
+    }
+
+    async fn deploy_contract(
+        &self,
+        project: &Project<ConfigurableArtifacts>,
+        contract_info: &ContractInfo,
+        rpc_url: &str,
+        chain: &Chain,
+        private_key: &H256,
+    ) -> eyre::Result<TransactionReceipt> {
+        let bytecode = match Self::get_bytecode_from_contract(project, contract_info) {
             Ok(bytecode) => bytecode,
             Err(e) => {
                 eyre::bail!("Error getting bytecode from contract: {}", e);
@@ -176,10 +380,10 @@ impl ZkCreateArgs {
         let factory_dependencies = self
             .factory_deps
             .as_ref()
-            .map(|fdep_contract_info| self.get_factory_dependencies(&project, fdep_contract_info));
+            .map(|fdep_contract_info| self.get_factory_dependencies(project, fdep_contract_info));
 
         // get abi
-        let abi = match Self::get_abi_from_contract(&project, &self.contract) {
+        let abi = match Self::get_abi_from_contract(project, contract_info) {
             Ok(abi) => abi,
             Err(e) => {
                 eyre::bail!("Error gettting ABI from contract: {}", e);
@@ -196,7 +400,7 @@ impl ZkCreateArgs {
         let constructor_args = self.get_constructor_args(&contract);
 
         let provider = Provider::try_from(rpc_url)?;
-        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?.with_chain_id(chain);
+        let wallet = LocalWallet::from_str(&format!("{private_key:?}"))?.with_chain_id(*chain);
         let zk_wallet = ZKSWallet::new(wallet, None, Some(provider), None)?;
 
         let rcpt = zk_wallet
@@ -209,14 +413,19 @@ impl ZkCreateArgs {
         let block_number = rcpt.block_number.expect("Error retrieving block number");
 
         println!("+-------------------------------------------------+");
-        println!("Contract successfully deployed to address: {:#?}", deployed_address);
+        println!(
+            "Contract {}:{} successfully deployed to address: {:#?}",
+            contract_info.path.clone().unwrap_or("".to_string()),
+            contract_info.name,
+            deployed_address
+        );
         println!("Transaction Hash: {:#?}", rcpt.transaction_hash);
         println!("Gas used: {:#?}", gas_used);
         println!("Effective gas price: {:#?}", gas_price);
         println!("Block Number: {:#?}", block_number);
         println!("+-------------------------------------------------+");
 
-        Ok(())
+        Ok(rcpt)
     }
 
     /// This function retrieves the constructor arguments for the contract.
@@ -370,4 +579,40 @@ impl ZkCreateArgs {
         }
         factory_deps
     }
+
+    /// Compiles a given library if it does not exist in the zkout directory.
+    async fn build_library(
+        project: &Project<ConfigurableArtifacts>,
+        contract_info: &ContractInfo,
+    ) -> eyre::Result<()> {
+        let output_path = Self::get_path_for_contract_output(project, contract_info);
+        if output_path.exists() {
+            return Ok(())
+        }
+
+        let filename = contract_info.path.clone().unwrap();
+        let filename = filename.split('/').last().unwrap().to_string();
+
+        let zkbuild_args = ZkBuildArgs {
+            args: CoreBuildArgs {
+                compiler: CompilerArgs {
+                    contracts_to_compile: Some(vec![filename]),
+                    ..Default::default()
+                },
+                use_zksolc: DEFAULT_ZKSOLC_VERSION.to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        zkbuild_args.run().await?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DeployedContractInfo {
+    pub name: String,
+    pub path: String,
+    pub address: String,
 }
