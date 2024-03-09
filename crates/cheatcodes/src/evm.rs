@@ -52,6 +52,13 @@ impl Cheatcode for addrCall {
 impl Cheatcode for getNonce_0Call {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { account } = self;
+
+        if ccx.state.use_zk_vm {
+            let nonce =
+                zk::cheatcodes::get_nonce(*account, ccx.data.db, &mut ccx.data.journaled_state);
+            return Ok(nonce.abi_encode());
+        }
+
         get_nonce(ccx, account)
     }
 }
@@ -338,6 +345,16 @@ impl Cheatcode for dealCall {
 impl Cheatcode for etchCall {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { target, newRuntimeBytecode } = self;
+        if ccx.state.use_zk_vm {
+            zk::cheatcodes::etch(
+                *target,
+                newRuntimeBytecode,
+                ccx.data.db,
+                &mut ccx.data.journaled_state,
+            );
+            return Ok(Default::default());
+        }
+
         ensure_not_precompile!(target, ccx);
         ccx.data.journaled_state.load_account(*target, ccx.data.db)?;
         let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(newRuntimeBytecode)).to_checked();
@@ -349,6 +366,16 @@ impl Cheatcode for etchCall {
 impl Cheatcode for resetNonceCall {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { account } = self;
+        if ccx.state.use_zk_vm {
+            zk::cheatcodes::set_nonce(
+                *account,
+                U256::ZERO,
+                ccx.data.db,
+                &mut ccx.data.journaled_state,
+            );
+            return Ok(Default::default());
+        }
+
         let account = journaled_account(ccx.data, *account)?;
         // Per EIP-161, EOA nonces start at 0, but contract nonces
         // start at 1. Comparing by code_hash instead of code
@@ -364,6 +391,17 @@ impl Cheatcode for resetNonceCall {
 impl Cheatcode for setNonceCall {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { account, newNonce } = *self;
+
+        if ccx.state.use_zk_vm {
+            zk::cheatcodes::set_nonce(
+                account,
+                U256::from(newNonce),
+                ccx.data.db,
+                &mut ccx.data.journaled_state,
+            );
+            return Ok(Default::default());
+        }
+
         let account = journaled_account(ccx.data, account)?;
         // nonce must increment only
         let current = account.info.nonce;
@@ -380,6 +418,17 @@ impl Cheatcode for setNonceCall {
 impl Cheatcode for setNonceUnsafeCall {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { account, newNonce } = *self;
+
+        if ccx.state.use_zk_vm {
+            zk::cheatcodes::set_nonce(
+                account,
+                U256::from(newNonce),
+                ccx.data.db,
+                &mut ccx.data.journaled_state,
+            );
+            return Ok(Default::default());
+        }
+
         let account = journaled_account(ccx.data, account)?;
         account.info.nonce = newNonce;
         Ok(Default::default())

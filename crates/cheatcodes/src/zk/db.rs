@@ -138,7 +138,6 @@ where
             .journaled_state
             .sload(addr, u256_to_revm_u256(idx), self.db)
             .expect("failed sload");
-
         revm_u256_to_h256(value)
     }
 }

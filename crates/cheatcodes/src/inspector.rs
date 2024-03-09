@@ -1150,11 +1150,18 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         if self.use_zk_vm {
             info!("running call in zk vm");
 
-            let info = data.db.basic(call.contract).ok().flatten().unwrap_or_default();
+            let code_hash = data
+                .journaled_state
+                .load_account(call.contract, data.db)
+                .map(|(account, _)| account.info.code_hash.clone())
+                .unwrap_or_default();
             let contract = self.dual_compiled_contracts.iter().find(|contract| {
-                info.code_hash != KECCAK_EMPTY &&
-                    zksync_types::H256::from(info.code_hash.0) == contract.zk_bytecode_hash
+                code_hash != KECCAK_EMPTY &&
+                    zksync_types::H256::from(code_hash.0) == contract.zk_bytecode_hash
             });
+            if contract.is_none() {
+                warn!("no zk contract was found for {code_hash:?}");
+            }
 
             if let Ok(result) = zk::call::<_, DatabaseError>(
                 call,

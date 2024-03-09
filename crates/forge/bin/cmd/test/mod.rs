@@ -155,13 +155,6 @@ impl TestArgs {
         // Set up the project.
         let mut project = config.project()?;
 
-        // load the zkSolc config
-        let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-        zksolc_cfg.contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
-        zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone();
-        let zk_out_path = project.paths.root.join("zkout");
-        project.paths.artifacts = zk_out_path;
-
         // Install missing dependencies.
         if install::install_missing_dependencies(&mut config, self.build_args().silent) &&
             config.auto_detect_remappings
@@ -180,13 +173,19 @@ impl TestArgs {
         }
         let output = compiler.compile(&project)?;
 
+        // load the zkSolc config
+
+        let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
+        zksolc_cfg.contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
+        zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone();
         let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
         // Disable system request memoization to allow modifying system contracts storage
         zksolc_cfg.settings.optimizer.disable_system_request_memoization = true;
 
-        let zksolc_project = config.project()?;
+        let mut zksolc_project = config.project()?;
+        zksolc_project.paths.artifacts = project.paths.root.join("zkout");
         let mut zksolc = ZkSolc::new(zksolc_cfg, zksolc_project);
         let (zk_output, _contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
