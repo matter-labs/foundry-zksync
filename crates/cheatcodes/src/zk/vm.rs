@@ -1,7 +1,8 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
+use alloy_primitives::Log;
+use alloy_sol_types::{SolEvent, SolInterface, SolValue};
 use era_test_node::{
-    console_log::ConsoleLogHandler,
     formatter,
     node::ShowCalls,
     system_contracts::{Options, SystemContracts},
@@ -10,10 +11,15 @@ use era_test_node::{
 use foundry_common::{
     conversion_utils::{address_to_h160, u256_to_revm_u256},
     fix_l2_gas_limit, fix_l2_gas_price,
+    fmt::ConsoleFmt,
     zk_utils::conversion_utils::{
         h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
     },
     DualCompiledContract,
+};
+use foundry_evm_core::{
+    abi::{patch_hh_console_selector, Console, HardhatConsole},
+    constants::HARDHAT_CONSOLE_ADDRESS,
 };
 use itertools::Itertools;
 use multivm::{
@@ -34,8 +40,13 @@ use revm::{
 use zksync_basic_types::{L2ChainId, H256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature,
-    StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, U256,
+    ethabi::{self},
+    fee::Fee,
+    l2::L2Tx,
+    transaction_request::PaymasterParams,
+    vm_trace::Call,
+    PackedEthSignature, StorageKey, Transaction, VmEvent, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, H160, U256,
 };
 use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 
@@ -182,6 +193,7 @@ where
                     data: event.value.into(),
                 })
                 .collect_vec();
+
             let result = ethabi::decode(&[ethabi::ParamType::Bytes], &output)
                 .ok()
                 .and_then(|result| result.first().cloned())
@@ -328,7 +340,7 @@ fn inspect_inner<S: ReadStorage>(
     vm.push_transaction(tx.clone());
     let call_tracer_result = Arc::new(OnceCell::default());
     let tracers = vec![CallTracer::new(call_tracer_result.clone()).into_tracer_pointer()];
-    let tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
+    let mut tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
     let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
     trace!(?tx_result.result, "zk vm result");
 
@@ -347,9 +359,16 @@ fn inspect_inner<S: ReadStorage>(
     formatter::print_vm_details(&tx_result);
 
     tracing::info!("=== Console Logs: ");
-    let console_log_handler = ConsoleLogHandler::default();
-    for call in &call_traces {
-        console_log_handler.handle_call_recursive(call);
+    let log_parser = ConsoleLogParser::new();
+    let console_logs = log_parser.get_logs(&call_traces, true);
+
+    for log in console_logs {
+        tx_result.logs.events.push(VmEvent {
+            location: Default::default(),
+            address: H160::zero(),
+            indexed_topics: log.topics().into_iter().map(|topic| H256::from(topic.0)).collect(),
+            value: log.data.data.to_vec(),
+        });
     }
 
     let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
@@ -370,6 +389,65 @@ fn inspect_inner<S: ReadStorage>(
         .collect();
     let modified_keys = storage.borrow().modified_storage_keys().clone();
     (tx_result, bytecodes, modified_keys)
+}
+
+struct ConsoleLogParser {
+    hardhat_console_address: H160,
+}
+
+impl ConsoleLogParser {
+    fn new() -> Self {
+        Self { hardhat_console_address: address_to_h160(HARDHAT_CONSOLE_ADDRESS) }
+    }
+
+    pub(crate) fn get_logs(&self, call_traces: &[Call], print: bool) -> Vec<Log> {
+        let mut logs = vec![];
+        for call in call_traces {
+            self.parse_call_recursive(call, &mut logs, print);
+        }
+        logs
+    }
+
+    fn parse_call_recursive(&self, current_call: &Call, logs: &mut Vec<Log>, print: bool) {
+        self.parse_call(current_call, logs, print);
+        for call in &current_call.calls {
+            self.parse_call_recursive(call, logs, print);
+        }
+    }
+
+    fn parse_call(&self, current_call: &Call, logs: &mut Vec<Log>, print: bool) {
+        if current_call.to != self.hardhat_console_address {
+            return;
+        }
+        if current_call.input.len() < 4 {
+            return;
+        }
+
+        let mut input = current_call.input.clone();
+
+        // Patch the Hardhat-style selector (`uint` instead of `uint256`)
+        patch_hh_console_selector(&mut input);
+
+        // Decode the call
+        let Ok(call) = HardhatConsole::HardhatConsoleCalls::abi_decode(&input, false) else {
+            return;
+        };
+
+        // Convert the parameters of the call to their string representation using `ConsoleFmt`.
+        let message = call.fmt(Default::default());
+        let log = Log::new(
+            Address::default(),
+            vec![Console::log::SIGNATURE_HASH],
+            message.abi_encode().into(),
+        )
+        .unwrap_or_else(|| Log { ..Default::default() });
+
+        logs.push(log);
+
+        if print {
+            tracing::info!("{}", message);
+        }
+    }
 }
 
 /// Prepares calldata to invoke deployer contract.

@@ -16,7 +16,7 @@ use crate::{
     zk, CheatsConfig, CheatsCtxt, Error, Result,
     Vm::{self, AccountAccess},
 };
-use alloy_primitives::{Address, Bytes, B256, U256, U64};
+use alloy_primitives::{Address, Bytes, Log, LogData, B256, U256, U64};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolInterface, SolValue};
 use foundry_common::{
@@ -230,6 +230,10 @@ pub struct Cheatcodes {
 
     /// Dual compiled contracts
     pub dual_compiled_contracts: Vec<DualCompiledContract>,
+
+    /// Logs printed during ZK-VM execution, EVM logs have the value `None`
+    /// since they are recorded by [foundry_evm::inspectors::LogCollector] tracer.
+    pub combined_logs: Vec<Option<Log>>,
 }
 
 impl Cheatcodes {
@@ -527,7 +531,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         if self.use_zk_vm {
             match interpreter.current_opcode() {
                 opcode::BALANCE => {
-                    if interpreter.stack.len() < 1 {
+                    if interpreter.stack.is_empty() {
                         interpreter.instruction_result = InstructionResult::StackUnderflow;
                         return;
                     }
@@ -964,6 +968,8 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         }
 
         if call.contract == HARDHAT_CONSOLE_ADDRESS {
+            self.combined_logs.push(None);
+
             return (InstructionResult::Continue, gas, Bytes::new());
         }
 
@@ -1153,7 +1159,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
             let code_hash = data
                 .journaled_state
                 .load_account(call.contract, data.db)
-                .map(|(account, _)| account.info.code_hash.clone())
+                .map(|(account, _)| account.info.code_hash)
                 .unwrap_or_default();
             let contract = self.dual_compiled_contracts.iter().find(|contract| {
                 code_hash != KECCAK_EMPTY &&
@@ -1171,8 +1177,16 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 &mut data.journaled_state,
             ) {
                 return match result {
-                    ExecutionResult::Success { output, .. } => match output {
-                        Output::Call(bytes) => (InstructionResult::Return, gas, bytes),
+                    ExecutionResult::Success { output, logs, .. } => match output {
+                        Output::Call(bytes) => {
+                            self.combined_logs.extend(logs.into_iter().map(|log| {
+                                Some(Log {
+                                    address: log.address,
+                                    data: LogData::new_unchecked(log.topics, log.data),
+                                })
+                            }));
+                            (InstructionResult::Return, gas, bytes)
+                        }
                         _ => (InstructionResult::Revert, gas, Bytes::new()),
                     },
                     ExecutionResult::Revert { output, .. } => {
@@ -1584,8 +1598,14 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 &mut data.journaled_state,
             ) {
                 return match result {
-                    ExecutionResult::Success { output, .. } => match output {
+                    ExecutionResult::Success { output, logs, .. } => match output {
                         Output::Create(bytes, address) => {
+                            self.combined_logs.extend(logs.into_iter().map(|log| {
+                                Some(Log {
+                                    address: log.address,
+                                    data: LogData::new_unchecked(log.topics, log.data),
+                                })
+                            }));
                             (InstructionResult::Return, address, gas, bytes)
                         }
                         _ => (InstructionResult::Revert, None, gas, Bytes::new()),

@@ -1120,6 +1120,7 @@ impl Backend {
                 },
             },
         };
+        println!("CALL-STATE");
         let state = result_and_state.state;
         let (exit_reason, gas_used, out) = match result_and_state.result {
             ExecutionResult::Success { reason, gas_used, output, .. } => {
@@ -1154,6 +1155,7 @@ impl Backend {
                     Ok(result_and_state) => result_and_state,
                     Err(e) => return Err(e.into()),
                 };
+                println!("CALL-WITH-TRACING");
             let (exit_reason, gas_used, out, ) = match result_and_state.result {
                 ExecutionResult::Success { reason, gas_used, output, .. } => {
                     (eval_to_instruction_result(reason), gas_used, Some(output), )
@@ -1207,6 +1209,7 @@ impl Backend {
             Ok(result_and_state) => result_and_state,
             Err(e) => return Err(e.into()),
         };
+        println!("BUILD-LIST");
         let (exit_reason, gas_used, out) = match result_and_state.result {
             ExecutionResult::Success { reason, gas_used, output, .. } => {
                 (eval_to_instruction_result(reason), gas_used, Some(output))

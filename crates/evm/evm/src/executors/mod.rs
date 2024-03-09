@@ -24,6 +24,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::CallTraceArena;
+use itertools::Itertools;
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
     interpreter::{return_ok, CreateScheme, InstructionResult, Stack},
@@ -771,8 +772,22 @@ fn convert_executed_result(
         _ => Bytes::new(),
     };
 
-    let InspectorData { logs, labels, traces, coverage, debug, cheatcodes, chisel_state } =
+    let combined_logs =
+        inspector.cheatcodes.as_ref().map(|cheatcodes| cheatcodes.combined_logs.clone());
+    let InspectorData { mut logs, labels, traces, coverage, debug, cheatcodes, chisel_state } =
         inspector.collect();
+
+    let logs = match combined_logs {
+        Some(combined_logs) => {
+            let new_logs = combined_logs
+                .into_iter()
+                .map(|log| log.unwrap_or_else(|| logs.remove(0)))
+                .collect_vec();
+            assert!(logs.is_empty(), "logs were not fully combined");
+            new_logs
+        }
+        None => logs,
+    };
 
     let transactions = match cheatcodes.as_ref() {
         Some(cheats) if !cheats.broadcastable_transactions.is_empty() => {
