@@ -452,7 +452,7 @@ fn do_check_minimal_version(zksolc_version: &str) -> bool {
         return false
     }
 
-    !std::env::var(ZKSOLC_SKIP_MINIMAL_VERSION_CHECK_ENV).is_ok()
+    std::env::var(ZKSOLC_SKIP_MINIMAL_VERSION_CHECK_ENV).is_err()
 }
 
 /// The `setup_zksolc_manager` function creates and prepares an instance of `ZkSolcManager`.
