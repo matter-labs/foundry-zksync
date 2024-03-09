@@ -8,6 +8,20 @@ use foundry_evm_core::constants::{MAGIC_ASSUME, MAGIC_SKIP};
 pub(crate) mod assert;
 pub(crate) mod expect;
 
+impl Cheatcode for zkVmCall {
+    fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { enable } = *self;
+
+        if enable {
+            ccx.state.select_zk_vm(ccx.data, None);
+        } else {
+            ccx.state.select_evm(ccx.data);
+        }
+
+        Ok(Default::default())
+    }
+}
+
 impl Cheatcode for assumeCall {
     fn apply(&self, _state: &mut Cheatcodes) -> Result {
         let Self { condition } = self;

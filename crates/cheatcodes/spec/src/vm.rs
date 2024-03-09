@@ -591,6 +591,10 @@ interface Vm {
 
     // ======== Test Assertions and Utilities ========
 
+    /// Enables/Disables use ZK-VM usage for transact/call and create instructions.
+    #[cheatcode(group = Testing, safety = Safe)]
+    function zkVm(bool enable) external pure;
+
     /// If the condition is false, discard this run's fuzz inputs and generate new ones.
     #[cheatcode(group = Testing, safety = Safe)]
     function assume(bool condition) external pure;

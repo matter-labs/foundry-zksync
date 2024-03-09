@@ -340,13 +340,13 @@ impl Cheatcodes {
         if fork_info.fork_type.is_evm() {
             self.select_evm(data)
         } else {
-            self.select_zk_vm(data, &fork_info.fork_env)
+            self.select_zk_vm(data, Some(&fork_info.fork_env))
         }
     }
 
     /// Switch to EVM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    fn select_evm<DB: DatabaseExt>(&mut self, data: &mut EVMData<'_, DB>) {
+    pub fn select_evm<DB: DatabaseExt>(&mut self, data: &mut EVMData<'_, DB>) {
         if !self.use_zk_vm {
             return Default::default()
         }
@@ -419,7 +419,11 @@ impl Cheatcodes {
 
     /// Switch to ZK-VM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    fn select_zk_vm<DB: DatabaseExt>(&mut self, data: &mut EVMData<'_, DB>, fork_env: &Env) {
+    pub fn select_zk_vm<DB: DatabaseExt>(
+        &mut self,
+        data: &mut EVMData<'_, DB>,
+        new_env: Option<&Env>,
+    ) {
         if self.use_zk_vm {
             return Default::default()
         }
@@ -427,13 +431,13 @@ impl Cheatcodes {
         tracing::info!("switching to ZK-VM");
         self.use_zk_vm = true;
 
+        let env = new_env.unwrap_or_else(|| data.env);
+
         let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
         let block_info_key: alloy_primitives::Uint<256, 4> =
             h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
-        let block_info = pack_block_info(
-            fork_env.block.number.as_limbs()[0],
-            fork_env.block.timestamp.as_limbs()[0],
-        );
+        let block_info =
+            pack_block_info(env.block.number.as_limbs()[0], env.block.timestamp.as_limbs()[0]);
         system_storage.insert(block_info_key, StorageSlot::new(u256_to_revm_u256(block_info)));
 
         let mut l2_eth_storage: rHashMap<U256, StorageSlot> = Default::default();
@@ -951,6 +955,8 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 emitter: *address,
             });
         }
+
+        self.combined_logs.push(None);
     }
 
     fn call(

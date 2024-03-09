@@ -7497,6 +7497,26 @@
       "group": "filesystem",
       "status": "stable",
       "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkVm",
+        "description": "Enables/Disables use ZK-VM usage for transact/call and create instructions.",
+        "declaration": "function zkVm(bool enable) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkVm(bool)",
+        "selector": "0x9d7804fe",
+        "selectorBytes": [
+          157,
+          120,
+          4,
+          254
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
     }
   ]
 }

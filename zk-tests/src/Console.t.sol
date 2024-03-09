@@ -21,7 +21,8 @@ contract ZkConsoleTest is Test {
 
     // The test must be run with parameter `-vv` to print logs
     function testZkConsoleOutput() public {
-        vm.selectFork(forkEra);
+        vm.zkVm(true);
+        
         Printer printer = new Printer();
         printer.print();
         console.log("outer print");
