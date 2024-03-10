@@ -258,7 +258,14 @@ impl ScriptArgs {
         // A contract was specified by path
         // TODO: uncomment the `if let` block once we support script by contract name
         // if let Ok(_) = dunce::canonicalize(&self.path) {
-        let compiler_path = setup_zksolc_manager(self.opts.args.use_zksolc.clone()).await?;
+
+        let zksolc_version = self.opts.args.use_zksolc.as_ref()
+            .map(|zksolc_version_raw|
+                semver::Version::parse(zksolc_version_raw)
+                    .map_err(|e| eyre::eyre!("Failed to parse zksolc version: {:#}", e)),
+            ).transpose()?;
+        
+        let compiler_path = setup_zksolc_manager(zksolc_version).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
         if install::install_missing_dependencies(&mut config, self.opts.args.silent) &&

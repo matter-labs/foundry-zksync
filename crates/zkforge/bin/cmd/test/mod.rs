@@ -44,7 +44,7 @@ use summary::TestSummaryReporter;
 pub use filter::FilterArgs;
 use foundry_common::{
     zk_compile::ZkSolc,
-    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
+    zksolc_manager::setup_zksolc_manager,
 };
 
 // Loads project's figment and merges the build cli arguments into it
@@ -185,7 +185,7 @@ impl TestArgs {
         let toml = config.get_config_path();
         let profiles = get_available_profiles(toml)?;
 
-        let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
+        let compiler_path = setup_zksolc_manager(None).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
         // Disable system request memoization to allow modifying system contracts storage
