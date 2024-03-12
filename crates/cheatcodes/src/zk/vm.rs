@@ -366,7 +366,7 @@ fn inspect_inner<S: ReadStorage>(
         tx_result.logs.events.push(VmEvent {
             location: Default::default(),
             address: H160::zero(),
-            indexed_topics: log.topics().into_iter().map(|topic| H256::from(topic.0)).collect(),
+            indexed_topics: log.topics().iter().map(|topic| H256::from(topic.0)).collect(),
             value: log.data.data.to_vec(),
         });
     }
