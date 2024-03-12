@@ -5,7 +5,6 @@ import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 import "../logs/console.sol";
 
-
 contract Printer {
     function print() public view {
         console.log("print");
@@ -17,7 +16,7 @@ contract ZkConsoleTest is DSTest {
 
     function testZkConsoleOutput() public {
         vm.zkVm(true);
-        
+
         Printer printer = new Printer();
         printer.print();
         console.log("outer print");
