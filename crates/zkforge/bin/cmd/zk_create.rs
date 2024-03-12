@@ -221,10 +221,7 @@ impl ZkCreateArgs {
 
             info!("All missing libraries deployed, compiling project...");
             let zkbuild_args = ZkBuildArgs {
-                args: CoreBuildArgs {
-                    compiler: CompilerArgs::default(),
-                    ..Default::default()
-                },
+                args: CoreBuildArgs { compiler: CompilerArgs::default(), ..Default::default() },
                 ..Default::default()
             };
             zkbuild_args.run().await?;

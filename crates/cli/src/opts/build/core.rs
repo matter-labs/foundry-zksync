@@ -62,9 +62,9 @@ pub struct CoreBuildArgs {
     ///
     /// Valid values are in the format `x.y.z`, `zksolc:x.y.z` or `path/to/zksolc`.
     #[clap(
-    help_heading = "zkSync Compiler options",
-    value_name = "ZK_SOLC_VERSION",
-    long = "use-zksolc",
+        help_heading = "zkSync Compiler options",
+        value_name = "ZK_SOLC_VERSION",
+        long = "use-zksolc"
     )]
     #[serde(skip)]
     pub use_zksolc: Option<String>,

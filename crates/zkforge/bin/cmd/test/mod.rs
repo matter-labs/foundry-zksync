@@ -42,10 +42,7 @@ mod summary;
 use summary::TestSummaryReporter;
 
 pub use filter::FilterArgs;
-use foundry_common::{
-    zk_compile::ZkSolc,
-    zksolc_manager::setup_zksolc_manager,
-};
+use foundry_common::{zk_compile::ZkSolc, zksolc_manager::setup_zksolc_manager};
 
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);

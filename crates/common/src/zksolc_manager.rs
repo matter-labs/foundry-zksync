@@ -343,7 +343,7 @@ impl fmt::Display for ZkSolcManager {
 /// # Returns
 ///
 /// ZkSolc's [`version`](semver::Version) if check is passed.
-/// 
+///
 /// # Note
 ///
 /// The check can be avoided if [`ZKSOLC_SKIP_MINIMAL_VERSION_CHECK_ENV`] env variable is set.
@@ -519,9 +519,7 @@ impl ZkSolcManager {
         // Using the GitHub releases URL pattern
         let full_download_url = format!(
             "https://github.com/matter-labs/zksolc-bin/releases/download/v{}/zksolc-{}-v{}",
-            self.version,
-            download_uri,
-            self.version,
+            self.version, download_uri, self.version,
         );
 
         Url::parse(&full_download_url)
