@@ -341,9 +341,12 @@ impl fmt::Display for ZkSolcManager {
 /// [ZkSolc's GitHub repo](ZKSOLC_VERSIONS_DOWNLOAD_URL).
 ///
 /// # Returns
+///
 /// ZkSolc's [`version`](semver::Version) if check is passed.
 /// 
-/// Note: the check can be avoided if [`ZKSOLC_SKIP_MINIMAL_VERSION_CHECK_ENV`] env variable is set.
+/// # Note
+///
+/// The check can be avoided if [`ZKSOLC_SKIP_MINIMAL_VERSION_CHECK_ENV`] env variable is set.
 async fn check_zksolc_minimal_version(
     zksolc_version: semver::Version,
 ) -> eyre::Result<semver::Version> {
@@ -372,6 +375,29 @@ async fn check_zksolc_minimal_version(
     Ok(zksolc_version)
 }
 
+/// Determins the version of the ZkSolc compiler. If the version is provided, it checks the minimal
+/// version with [`check_zksolc_minimal_version`], otherwise it retrieves the latest version from
+/// the [ZkSolc's GitHub repo](ZKSOLC_VERSIONS_DOWNLOAD_URL)..
+///
+/// # Returns
+///
+///  ZkSolc's [`version`](semver::Version).
+async fn determine_zksolc_version(
+    zksolc_version_opt: Option<semver::Version>,
+) -> eyre::Result<semver::Version> {
+    if let Some(zksolc_version) = zksolc_version_opt {
+        return check_zksolc_minimal_version(zksolc_version).await
+    }
+
+    let zksolc_metadata = fetch_solc_metadata()
+        .await
+        .map_err(|e| eyre::eyre!("Failed to get solc metadata: {:#}", e))?;
+
+    println!("No zksolc version specified; Using latest: {}", zksolc_metadata.latest);
+
+    Ok(zksolc_metadata.latest)
+}
+
 /// The `setup_zksolc_manager` function creates and prepares an instance of `ZkSolcManager`.
 ///
 /// It follows these steps:
@@ -389,10 +415,7 @@ async fn check_zksolc_minimal_version(
 pub async fn setup_zksolc_manager(
     zksolc_version_opt: Option<semver::Version>,
 ) -> eyre::Result<PathBuf> {
-    let zksolc_version = match zksolc_version_opt {
-        Some(zksolc_version) => check_zksolc_minimal_version(zksolc_version).await?,
-        None => semver::Version::parse("TODO")?,
-    };
+    let zksolc_version = determine_zksolc_version(zksolc_version_opt).await?;
 
     let zksolc_manager_opts = ZkSolcManagerOpts::new(zksolc_version.clone());
     let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
