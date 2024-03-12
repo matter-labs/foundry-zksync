@@ -18,7 +18,7 @@ pub mod gas_report;
 pub mod link;
 
 mod multi_runner;
-pub use multi_runner::{MultiContractRunner, MultiContractRunnerBuilder};
+pub use multi_runner::{MultiContractRunner, MultiContractRunnerBuilder, ProjectCompileDualOutput};
 
 mod runner;
 pub use runner::ContractRunner;

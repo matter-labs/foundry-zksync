@@ -99,7 +99,7 @@ impl<'a> ContractRunner<'a> {
     }
 
     fn _setup(&mut self, setup: bool) -> Result<TestSetup> {
-        trace!(?setup, "Setting test contract");
+        info!(?setup, "Setting test contract");
 
         // We max out their balance so that they can deploy and make calls.
         self.executor.set_balance(self.sender, U256::MAX)?;

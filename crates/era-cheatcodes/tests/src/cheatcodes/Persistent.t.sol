@@ -7,7 +7,7 @@ import {Constants} from "./Constants.sol";
 contract DummyContract {
     uint256 public val;
 
-    function hello() external view returns (string memory) {
+    function hello() external pure returns (string memory) {
         return "hello";
     }
 

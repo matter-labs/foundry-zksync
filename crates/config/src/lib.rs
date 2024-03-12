@@ -1049,6 +1049,7 @@ impl Config {
             mode: Some(mode),
             details,
             fallback_to_optimizing_for_size: Some(self.fallback_oz),
+            disable_system_request_memoization: false,
         }
     }
 
@@ -1298,6 +1299,22 @@ impl Config {
                 .collect();
             let libs = toml_edit::value(libs);
             doc[Config::PROFILE_SECTION][profile]["libs"] = libs;
+            true
+        })
+    }
+
+    /// Sets the `libraries` entry inside a `foundry.toml` file but only if it exists
+    ///
+    /// # Errors
+    ///
+    /// An error if the `foundry.toml` could not be parsed.
+    pub fn update_libraries(&self) -> eyre::Result<()> {
+        self.update(|doc| {
+            let profile = self.profile.as_str().as_str();
+            let libraries: toml_edit::Value =
+                self.libraries.iter().map(toml_edit::Value::from).collect();
+            let libraries = toml_edit::value(libraries);
+            doc[Config::PROFILE_SECTION][profile]["libraries"] = libraries;
             true
         })
     }

@@ -16,12 +16,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 use zksync_basic_types::{web3::signing::keccak256, L2ChainId, H160, H256, U256};
-use zksync_state::{ReadStorage, WriteStorage};
+use zksync_state::WriteStorage;
 use zksync_types::{
     fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
-    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
+    StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
+    KNOWN_CODES_STORAGE_ADDRESS,
 };
-use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
+use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
 use foundry_common::{
     fix_l2_gas_limit, fix_l2_gas_price,
@@ -170,6 +171,53 @@ where
         vec![tracer],
     );
 
+    let modifications: &StorageModifications = inspector.get_storage_modifications();
+    let mut known_codes = tx_result
+        .logs
+        .events
+        .iter()
+        .filter_map(|ev| {
+            if ev.address == KNOWN_CODES_STORAGE_ADDRESS {
+                let hash = ev.indexed_topics[1];
+                let bytecode = bytecodes
+                    .get(&h256_to_u256(hash))
+                    .map(|bytecode| be_words_to_bytes(bytecode))
+                    .expect("bytecode must exist");
+                Some((hash, bytecode))
+            } else {
+                None
+            }
+        })
+        .collect::<HashMap<_, _>>();
+
+    // We need to track requested known_codes for scripting purposes
+    // Any contracts deployed before will not be known, and thus
+    // need their bytecode to be fetched from storage.
+    // We exclude making the `load_factory_dep` when we already known the bytecide
+    // to ensure forks are not queried for bytecodes, which can lead to "code should already be
+    // loaded" errors.
+    let requested_known_codes = storage_ptr
+        .borrow()
+        .read_storage_keys
+        .iter()
+        .filter_map(|(key, value)| {
+            let hash = *key.key();
+            if key.address() == &KNOWN_CODES_STORAGE_ADDRESS &&
+                !value.is_zero() &&
+                !bytecodes.contains_key(&h256_to_u256(hash)) &&
+                !known_codes.contains_key(&hash) &&
+                !modifications.bytecodes.contains_key(&hash) &&
+                !modifications.known_codes.contains_key(&hash)
+            {
+                zksync_state::ReadStorage::load_factory_dep(&mut era_db, hash)
+                    .map(|bytecode| (hash, bytecode))
+            } else {
+                None
+            }
+        })
+        .collect::<HashMap<_, _>>();
+    known_codes.extend(requested_known_codes);
+
     // Record storage modifications in the inspector.
     // We record known_codes only if they aren't already in the bytecodes changeset.
     inspector.record_storage_modifications(StorageModifications {
@@ -186,17 +234,16 @@ where
                 (key, value)
             })
             .collect(),
-        known_codes: storage_ptr
-            .borrow()
-            .read_storage_keys
+        known_codes,
+        deployed_codes: tx_result
+            .logs
+            .events
             .iter()
-            .filter_map(|(key, value)| {
-                let hash = *key.key();
-                if key.address() == &KNOWN_CODES_STORAGE_ADDRESS &&
-                    !value.is_zero() &&
-                    !bytecodes.contains_key(&h256_to_u256(hash))
-                {
-                    era_db.load_factory_dep(hash).map(|bytecode| (hash, bytecode))
+            .filter_map(|ev| {
+                if ev.address == CONTRACT_DEPLOYER_ADDRESS {
+                    let address = h256_to_h160(&ev.indexed_topics[3]);
+                    let bytecode_hash = ev.indexed_topics[2];
+                    Some((address, bytecode_hash))
                 } else {
                     None
                 }

@@ -411,7 +411,7 @@ impl Executor {
             matches!(env.tx.transact_to, TransactTo::Create(_)),
             "Expect create transaction"
         );
-        trace!(sender=?env.tx.caller, "deploying contract");
+        info!(sender=?env.tx.caller, "deploying contract");
 
         let mut result = self.call_raw_with_env(env)?;
         self.commit(&mut result);
@@ -480,7 +480,7 @@ impl Executor {
         // persistent across fork swaps in forking mode
         self.backend.add_persistent_account(address);
 
-        trace!(address=?address, "deployed contract");
+        info!(address=?address, "deployed contract");
 
         Ok(DeployResult { address, gas_used, gas_refunded, logs, traces, debug, env, coverage })
     }
@@ -635,9 +635,10 @@ impl Executor {
     /// Adjust the gas parameters of an executor for ZKSync.
     /// zksync vm allows max gas limit to be u32, and additionally the account balance must be able
     /// to pay for the gas + value. Hence we cap the gas limit what the caller can actually pay.
-    pub fn adjust_zksync_gas_parameters(&mut self) {
+    pub fn adjust_zksync_gas_parameters(&mut self, override_caller: Option<Address>) {
         let tx_env = &self.env.tx;
-        let caller_balance = self.get_balance(tx_env.caller).unwrap_or_default();
+        let caller = override_caller.unwrap_or(tx_env.caller);
+        let caller_balance = self.get_balance(caller).unwrap_or_default();
         let min_gas_price =
             u256_to_revm_u256(fix_l2_gas_price(revm_u256_to_u256(tx_env.gas_price)));
         let max_allowed_gas_limit = caller_balance

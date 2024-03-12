@@ -32,7 +32,8 @@ use zkforge::{
         identifier::{EtherscanIdentifier, LocalTraceIdentifier, SignaturesIdentifier},
         CallTraceDecoderBuilder, TraceKind,
     },
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
+    MultiContractRunner, MultiContractRunnerBuilder, ProjectCompileDualOutput, TestOptions,
+    TestOptionsBuilder,
 };
 
 mod filter;
@@ -175,11 +176,18 @@ impl TestArgs {
         let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
+        // Disable system request memoization to allow modifying system contracts storage
+        zksolc_cfg.settings.optimizer.disable_system_request_memoization = true;
+
         let mut zksolc = ZkSolc::new(zksolc_cfg, project);
         let (output, contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
+
+        let solc_project = config.project()?;
+        let compiler = foundry_common::compile::ProjectCompiler::default();
+        let solc_output = compiler.compile(&solc_project)?;
 
         let project = config.project()?;
         let test_options: TestOptions = TestOptionsBuilder::default()
@@ -210,7 +218,7 @@ impl TestArgs {
 
         let mut runner = runner_builder.clone().build(
             project_root,
-            output.clone(),
+            ProjectCompileDualOutput { zk_output: output.clone(), solc_output: Some(solc_output) },
             env.clone(),
             evm_opts.clone(),
         )?;

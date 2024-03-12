@@ -58,4 +58,4 @@ command -v git &>/dev/null || {
 build_zkforge "${REPO_ROOT}"
 
 echo "Running tests..."
-RUST_LOG=debug "${BINARY_PATH}" test --use "./${SOLC}"
+RUST_LOG=warn "${BINARY_PATH}" test --use "./${SOLC}"

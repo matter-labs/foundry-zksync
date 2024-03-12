@@ -142,6 +142,7 @@ jobs:
 
         - name: Upload era_test_node log
           uses: actions/upload-artifact@v3
+          if: always()
           with:
             name: era_test_node.log
             path: era_test_node.log
