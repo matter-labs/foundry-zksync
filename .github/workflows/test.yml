@@ -104,10 +104,6 @@ jobs:
           with:
             toolchain: nightly-2024-02-06
 
-        - name: Test ZK VM
-          env:
-            ERA_TEST_NODE_RPC_URL: http://localhost:8011
-          run: cargo test --package forge --test it --jobs=2 -- zk
 
         - name: Get solc
           run: |
@@ -115,10 +111,8 @@ jobs:
             wget https://github.com/ethereum/solidity/releases/download/v0.8.24/solc-static-linux -qO /tmp/solc-bin/solc
             chmod +x /tmp/solc-bin/solc
             echo "/tmp/solc-bin" >> $GITHUB_PATH
-
-        - name: Upload era_test_node log
-          uses: actions/upload-artifact@v3
-          if: always()
-          with:
-            name: era_test_node.log
-            path: era_test_node.log
+            
+        - name: Test ZK VM
+          env:
+            ERA_TEST_NODE_RPC_URL: http://localhost:8011
+          run: cargo test --package forge --test it --jobs=2 -- zk
