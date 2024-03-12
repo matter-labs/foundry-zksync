@@ -36,6 +36,7 @@ use foundry_config::{
     get_available_profiles, Config,
 };
 use foundry_debugger::Debugger;
+use itertools::Itertools;
 use regex::Regex;
 use std::{collections::HashMap, sync::mpsc::channel, time::Instant};
 use watchexec::config::{InitConfig, RuntimeConfig};
@@ -176,8 +177,19 @@ impl TestArgs {
         // load the zkSolc config
 
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-        zksolc_cfg.contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
-        zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone();
+        zksolc_cfg.contracts_to_compile =
+            self.opts.compiler.contracts_to_compile.clone().map(|patterns| {
+                patterns
+                    .into_iter()
+                    .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+                    .collect_vec()
+            });
+        zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone().map(|patterns| {
+            patterns
+                .into_iter()
+                .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+                .collect_vec()
+        });
         let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
@@ -221,16 +233,18 @@ impl TestArgs {
         let mut dual_compiled_contracts = vec![];
         let mut solc_bytecodes = HashMap::new();
         for (contract_name, artifact) in output.artifacts() {
+            let contract_name =
+                contract_name.split('.').next().expect("name cannot be empty").to_string();
             let deployed_bytecode = artifact.get_deployed_bytecode();
             let deployed_bytecode = deployed_bytecode
                 .as_ref()
                 .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
-            let bytecode = artifact.get_bytecode();
-            let bytecode =
-                bytecode.as_ref().and_then(|b| b.object.as_bytes()).expect("bytecode was expected");
-            if let Some(deployed_bytecode) = deployed_bytecode {
-                solc_bytecodes
-                    .insert(contract_name.clone(), (bytecode.clone(), deployed_bytecode.clone()));
+            let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
+            if let Some(bytecode) = bytecode {
+                if let Some(deployed_bytecode) = deployed_bytecode {
+                    solc_bytecodes
+                        .insert(contract_name.clone(), (bytecode, deployed_bytecode.clone()));
+                }
             }
         }
         // TODO make zk optional and solc default

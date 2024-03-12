@@ -431,7 +431,7 @@ impl Cheatcodes {
         tracing::info!("switching to ZK-VM");
         self.use_zk_vm = true;
 
-        let env = new_env.unwrap_or_else(|| data.env);
+        let env = new_env.unwrap_or(data.env);
 
         let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
         let block_info_key: alloy_primitives::Uint<256, 4> =
@@ -533,29 +533,25 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
     fn step_end(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
         if self.use_zk_vm {
-            match interpreter.current_opcode() {
-                opcode::BALANCE => {
-                    if interpreter.stack.is_empty() {
-                        interpreter.instruction_result = InstructionResult::StackUnderflow;
-                        return;
-                    }
-                    // Safety: Length is checked above.
-                    let address =
-                        Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }));
-                    let balance = zk::balance(address, data.db, &mut data.journaled_state);
+            if interpreter.current_opcode() == opcode::BALANCE {
+                if interpreter.stack.is_empty() {
+                    interpreter.instruction_result = InstructionResult::StackUnderflow;
+                    return;
+                }
+                // Safety: Length is checked above.
+                let address =
+                    Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }));
+                let balance = zk::balance(address, data.db, &mut data.journaled_state);
 
-                    // Skip the current BALANCE instruction since we've already handled it
-                    match interpreter.stack.push(balance) {
-                        Ok(_) => unsafe {
-                            interpreter.instruction_pointer =
-                                interpreter.instruction_pointer.add(1);
-                        },
-                        Err(e) => {
-                            interpreter.instruction_result = e;
-                        }
+                // Skip the current BALANCE instruction since we've already handled it
+                match interpreter.stack.push(balance) {
+                    Ok(_) => unsafe {
+                        interpreter.instruction_pointer = interpreter.instruction_pointer.add(1);
+                    },
+                    Err(e) => {
+                        interpreter.instruction_result = e;
                     }
                 }
-                _ => (),
             }
         }
     }
@@ -1594,7 +1590,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 .dual_compiled_contracts
                 .iter()
                 .find(|contract| contract.evm_bytecode == call.init_code)
-                .expect("must exist");
+                .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
 
             if let Ok(result) = zk::create::<_, DatabaseError>(
                 call,

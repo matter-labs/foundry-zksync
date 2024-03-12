@@ -117,7 +117,7 @@ jobs:
         - name: Test ZK VM
           env:
             ERA_TEST_NODE_RPC_URL: http://localhost:8011
-          run: cd zk-tests && ./test.sh
+          run: cargo test --package forge --test it --jobs=10 -- zk
 
         - name: Upload era_test_node log
           uses: actions/upload-artifact@v3

@@ -595,6 +595,10 @@ interface Vm {
     #[cheatcode(group = Testing, safety = Safe)]
     function zkVm(bool enable) external pure;
 
+    /// Registers bytecodes for ZK-VM for transact/call and create instructions.
+    #[cheatcode(group = Testing, safety = Safe)]
+    function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;
+
     /// If the condition is false, discard this run's fuzz inputs and generate new ones.
     #[cheatcode(group = Testing, safety = Safe)]
     function assume(bool condition) external pure;

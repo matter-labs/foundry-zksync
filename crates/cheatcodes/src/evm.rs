@@ -352,6 +352,7 @@ impl Cheatcode for etchCall {
                 ccx.data.db,
                 &mut ccx.data.journaled_state,
             );
+
             return Ok(Default::default());
         }
 

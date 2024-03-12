@@ -54,6 +54,7 @@ use std::{
     path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
+
 /// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
 
@@ -311,12 +312,14 @@ impl ZkSolc {
                     .unwrap()
                     .to_string();
 
+                let relative_path = contract_path.strip_prefix(self.project.root())?;
+
                 // Step 5: Run Compiler (or use cached) and Handle Output
                 let mut should_compile = match self.config.contracts_to_compile {
                     Some(ref contracts_to_compile) => {
                         //compare if there is some member of the vector contracts_to_compile
                         // present in the filename
-                        contracts_to_compile.iter().any(|c| filename == *c)
+                        contracts_to_compile.iter().any(|c| c.is_match(relative_path))
                     }
                     None => true,
                 };
@@ -325,7 +328,7 @@ impl ZkSolc {
                     Some(ref avoid_contracts) => {
                         //compare if there is some member of the vector avoid_contracts
                         // present in the filename
-                        !avoid_contracts.iter().any(|c| filename == *c)
+                        !avoid_contracts.iter().any(|c| c.is_match(relative_path))
                     }
                     None => should_compile,
                 };

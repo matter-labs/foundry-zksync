@@ -7500,6 +7500,26 @@
     },
     {
       "func": {
+        "id": "zkRegisterContract",
+        "description": "Registers bytecodes for ZK-VM for transact/call and create instructions.",
+        "declaration": "function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkRegisterContract(string,bytes32,bytes,bytes,bytes32,bytes)",
+        "selector": "0x428cb039",
+        "selectorBytes": [
+          66,
+          140,
+          176,
+          57
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
         "id": "zkVm",
         "description": "Enables/Disables use ZK-VM usage for transact/call and create instructions.",
         "declaration": "function zkVm(bool enable) external pure;",

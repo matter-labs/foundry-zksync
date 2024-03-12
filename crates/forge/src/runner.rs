@@ -91,7 +91,7 @@ impl<'a> ContractRunner<'a> {
     }
 
     fn _setup(&mut self, setup: bool) -> Result<TestSetup> {
-        trace!(?setup, "Setting test contract");
+        info!(?setup, name = self.name, "Setting test contract");
 
         // We max out their balance so that they can deploy and make calls.
         self.executor.set_balance(self.sender, U256::MAX)?;
@@ -152,24 +152,28 @@ impl<'a> ContractRunner<'a> {
         // Optionally call the `setUp` function
         let setup = if setup {
             trace!("setting up");
-            let (setup_logs, setup_traces, labeled_addresses, reason, coverage) = match self
-                .executor
-                .setup(None, address)
-            {
-                Ok(CallResult { traces, labels, logs, coverage, .. }) => {
-                    trace!(contract=%address, "successfully setUp test");
-                    (logs, traces, labels, None, coverage)
-                }
-                Err(EvmError::Execution(err)) => {
-                    let ExecutionErr { traces, labels, logs, reason, .. } = *err;
-                    error!(reason=%reason, contract=%address, "setUp failed");
-                    (logs, traces, labels, Some(format!("setup failed: {reason}")), None)
-                }
-                Err(err) => {
-                    error!(reason=%err, contract=%address, "setUp failed");
-                    (Vec::new(), None, HashMap::new(), Some(format!("setup failed: {err}")), None)
-                }
-            };
+            let (setup_logs, setup_traces, labeled_addresses, reason, coverage) =
+                match self.executor.setup(None, address) {
+                    Ok(CallResult { traces, labels, logs, coverage, .. }) => {
+                        trace!(contract=%address, "successfully setUp test");
+                        (logs, traces, labels, None, coverage)
+                    }
+                    Err(EvmError::Execution(err)) => {
+                        let ExecutionErr { traces, labels, logs, reason, .. } = *err;
+                        error!(reason=%reason, contract=%address, "setUp failed {}", self.name);
+                        (logs, traces, labels, Some(format!("setup failed: {reason}")), None)
+                    }
+                    Err(err) => {
+                        error!(reason=%err, contract=%address, "setUp failed");
+                        (
+                            Vec::new(),
+                            None,
+                            HashMap::new(),
+                            Some(format!("setup failed {}: {err}", self.name)),
+                            None,
+                        )
+                    }
+                };
             traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
             logs.extend(setup_logs);
 
@@ -262,8 +266,10 @@ impl<'a> ContractRunner<'a> {
                 let res = if func.is_fuzz_test() {
                     let runner = test_options.fuzz_runner(self.name, &func.name);
                     let fuzz_config = test_options.fuzz_config(self.name, &func.name);
+                    info!(name = func.name, "run fuzz test");
                     self.run_fuzz_test(func, should_fail, runner, setup.clone(), *fuzz_config)
                 } else {
+                    info!(name = func.name, "run test");
                     self.run_test(func, should_fail, setup.clone())
                 };
                 (func.signature(), res)

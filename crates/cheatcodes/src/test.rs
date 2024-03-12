@@ -1,9 +1,11 @@
 //! Implementations of [`Testing`](crate::Group::Testing) cheatcodes.
 
 use crate::{Cheatcode, Cheatcodes, CheatsCtxt, DatabaseExt, Error, Result, Vm::*};
-use alloy_primitives::Address;
+use alloy_primitives::{Address, B256};
 use alloy_sol_types::SolValue;
+use foundry_common::DualCompiledContract;
 use foundry_evm_core::constants::{MAGIC_ASSUME, MAGIC_SKIP};
+use zksync_types::H256;
 
 pub(crate) mod assert;
 pub(crate) mod expect;
@@ -17,6 +19,40 @@ impl Cheatcode for zkVmCall {
         } else {
             ccx.state.select_evm(ccx.data);
         }
+
+        Ok(Default::default())
+    }
+}
+
+impl Cheatcode for zkRegisterContractCall {
+    fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self {
+            name,
+            evmBytecodeHash,
+            evmDeployedBytecode,
+            evmBytecode,
+            zkBytecodeHash,
+            zkDeployedBytecode,
+        } = self;
+
+        let new_contract = DualCompiledContract {
+            name: name.clone(),
+            zk_bytecode_hash: H256::from(zkBytecodeHash.0),
+            zk_deployed_bytecode: zkDeployedBytecode.clone(),
+            evm_bytecode_hash: B256::from(evmBytecodeHash.0),
+            evm_deployed_bytecode: evmDeployedBytecode.clone(),
+            evm_bytecode: evmBytecode.clone(),
+        };
+
+        if let Some(existing) = ccx.state.dual_compiled_contracts.iter().find(|contract| {
+            contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
+                contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
+        }) {
+            warn!(name = existing.name, "contract already exists with the given bytecode hashes");
+            return Ok(Default::default())
+        }
+
+        ccx.state.dual_compiled_contracts.push(new_contract);
 
         Ok(Default::default())
     }

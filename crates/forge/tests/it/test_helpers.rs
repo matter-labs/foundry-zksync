@@ -1,11 +1,18 @@
 //! Test helpers for Forge integration tests.
 
 use alloy_primitives::U256;
+use foundry_common::{
+    zk_compile::ZkSolc,
+    zksolc_manager::{self, DEFAULT_ZKSOLC_VERSION},
+};
 use foundry_compilers::{
     artifacts::{Libraries, Settings},
     Project, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
-use foundry_config::Config;
+use foundry_config::{
+    zksolc_config::{Optimizer, Settings as ZkSettings, ZkSolcConfigBuilder},
+    Config,
+};
 use foundry_evm::{
     constants::CALLER,
     executors::{Executor, FuzzedExecutor},
@@ -56,6 +63,81 @@ pub static COMPILED: Lazy<ProjectCompileOutput> = Lazy::new(|| {
     };
 
     let out = out.unwrap();
+    if out.has_compiler_errors() {
+        panic!("Compiled with errors:\n{out}");
+    }
+    out
+});
+
+/// Compile ZK project
+fn zk_compile(project: Project) -> ProjectCompileOutput {
+    let compiler_path = futures::executor::block_on(zksolc_manager::setup_zksolc_manager(
+        DEFAULT_ZKSOLC_VERSION.to_owned(),
+    ))
+    .expect("failed setting up zksolc");
+
+    let mut zksolc_config = ZkSolcConfigBuilder::new()
+        .compiler_path(compiler_path)
+        .settings(ZkSettings {
+            optimizer: Optimizer {
+                enabled: Some(true),
+                mode: Some(String::from("3")),
+                fallback_to_optimizing_for_size: Some(false),
+                disable_system_request_memoization: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .build()
+        .expect("failed building zksolc config");
+    zksolc_config.contracts_to_compile = Some(vec![
+        globset::Glob::new("zk/*").unwrap().compile_matcher(),
+        globset::Glob::new("lib/*").unwrap().compile_matcher(),
+        globset::Glob::new("cheats/Vm.sol").unwrap().compile_matcher(),
+    ]);
+
+    let mut zksolc = ZkSolc::new(zksolc_config, project);
+    let (zk_out, _) = zksolc.compile().unwrap();
+    zk_out
+}
+
+pub static COMPILED_ZK: Lazy<ProjectCompileOutput> = Lazy::new(|| {
+    const LOCK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata/.lock-zk");
+
+    // let project = &*PROJECT;
+    let paths = ProjectPathsConfig::builder()
+        .root(TESTDATA)
+        .sources(TESTDATA)
+        .artifacts(format!("{TESTDATA}/zkout"))
+        .build()
+        .unwrap();
+
+    let libs =
+        ["fork/Fork.t.sol:DssExecLib:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4".to_string()];
+    let settings = Settings { libraries: Libraries::parse(&libs).unwrap(), ..Default::default() };
+    let solc_config = SolcConfig::builder().settings(settings).build();
+
+    let project = Project::builder().paths(paths).solc_config(solc_config).build().unwrap();
+    assert!(project.cached);
+
+    // Compile only once per test run.
+    // We need to use a file lock because `cargo-nextest` runs tests in different processes.
+    // This is similar to [`foundry_test_utils::util::initialize`], see its comments for more
+    // details.
+    let mut lock = fd_lock::new_lock(LOCK);
+    let read = lock.read().unwrap();
+    let out;
+    if project.cache_path().exists() && std::fs::read(LOCK).unwrap() == b"1" {
+        out = zk_compile(project);
+        drop(read);
+    } else {
+        drop(read);
+        let mut write = lock.write().unwrap();
+        write.write_all(b"1").unwrap();
+        out = zk_compile(project);
+        drop(write);
+    };
+
     if out.has_compiler_errors() {
         panic!("Compiled with errors:\n{out}");
     }

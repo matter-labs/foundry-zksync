@@ -1,10 +1,13 @@
 //! Test config.
 
-use crate::test_helpers::{COMPILED, EVM_OPTS, PROJECT};
+use crate::test_helpers::{COMPILED, COMPILED_ZK, EVM_OPTS, PROJECT};
+use alloy_primitives::keccak256;
 use forge::{
     result::{SuiteResult, TestStatus},
     MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
 };
+use foundry_common::{factory_deps::PackedEraBytecode, DualCompiledContract};
+use foundry_compilers::Artifact;
 use foundry_config::{
     fs_permissions::PathPermission, Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig,
     InvariantConfig, RpcEndpoint, RpcEndpoints,
@@ -18,7 +21,10 @@ use foundry_evm::{
 use foundry_test_utils::{init_tracing, Filter};
 use futures::future::join_all;
 use itertools::Itertools;
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::Path,
+};
 
 /// How to execute a test run.
 pub struct TestConfig {
@@ -179,6 +185,66 @@ pub async fn runner_with_config(mut config: Config) -> MultiContractRunner {
     base_runner()
         .with_test_options(test_opts())
         .with_cheats_config(CheatsConfig::new(&config, opts.clone(), None, Default::default()))
+        .sender(config.sender)
+        .build(root, output, env, opts.clone())
+        .unwrap()
+}
+
+/// Builds a non-tracing zk runner
+pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunner {
+    config.rpc_endpoints = rpc_endpoints();
+    config.allow_paths.push(manifest_root().to_path_buf());
+
+    let root = &PROJECT.paths.root;
+    let opts = &*EVM_OPTS;
+    let env = opts.evm_env().await.expect("could not instantiate fork environment");
+    let output = COMPILED.clone();
+    let zk_output = COMPILED_ZK.clone();
+
+    // Dual compiled contracts
+    let mut dual_compiled_contracts = vec![];
+    let mut solc_bytecodes = HashMap::new();
+    for (contract_name, artifact) in output.artifacts() {
+        let contract_name =
+            contract_name.split('.').next().expect("name cannot be empty").to_string();
+        let deployed_bytecode = artifact.get_deployed_bytecode();
+        let deployed_bytecode = deployed_bytecode
+            .as_ref()
+            .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+        let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
+        if let Some(bytecode) = bytecode {
+            if let Some(deployed_bytecode) = deployed_bytecode {
+                solc_bytecodes.insert(contract_name.clone(), (bytecode, deployed_bytecode.clone()));
+            }
+        }
+    }
+
+    // TODO make zk optional and solc default
+    for (contract_name, artifact) in zk_output.artifacts() {
+        let deployed_bytecode = artifact.get_deployed_bytecode();
+        let deployed_bytecode = deployed_bytecode
+            .as_ref()
+            .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+        if let Some(deployed_bytecode) = deployed_bytecode {
+            let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
+            if let Some((solc_bytecode, solc_deployed_bytecode)) =
+                solc_bytecodes.get(&contract_name)
+            {
+                dual_compiled_contracts.push(DualCompiledContract {
+                    name: contract_name,
+                    zk_bytecode_hash: packed_bytecode.bytecode_hash(),
+                    zk_deployed_bytecode: packed_bytecode.bytecode(),
+                    evm_bytecode_hash: keccak256(solc_deployed_bytecode),
+                    evm_bytecode: solc_bytecode.to_vec(),
+                    evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
+                });
+            }
+        }
+    }
+
+    base_runner()
+        .with_test_options(test_opts())
+        .with_cheats_config(CheatsConfig::new(&config, opts.clone(), None, dual_compiled_contracts))
         .sender(config.sender)
         .build(root, output, env, opts.clone())
         .unwrap()

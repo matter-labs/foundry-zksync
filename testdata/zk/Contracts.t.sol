@@ -1,7 +1,9 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+pragma solidity ^0.8.18;
 
-import {Test, console2 as console} from "forge-std/Test.sol";
+import "ds-test/test.sol";
+import "../cheats/Vm.sol";
+
 import {ConstantNumber} from "./ConstantNumber.sol";
 
 contract Number {
@@ -23,7 +25,6 @@ contract PayableFixedNumber {
     constructor() payable {
         sender = msg.sender;
         value = msg.value;
-        console.log(msg.value);
     }
 
     function five() public pure returns (uint8) {
@@ -61,7 +62,9 @@ contract CustomStorage {
     }
 }
 
-contract ZkContractsTest is Test {
+contract ZkContractsTest is DSTest {
+    Vm constant vm = Vm(HEVM_ADDRESS);
+
     Number number;
     CustomNumber customNumber;
 
@@ -80,7 +83,7 @@ contract ZkContractsTest is Test {
         vm.makePersistent(address(number));
         vm.makePersistent(address(customNumber));
 
-        forkEra = vm.createFork("mainnet", ERA_FORK_BLOCK);
+        forkEra = vm.createFork("https://mainnet.era.zksync.io", ERA_FORK_BLOCK);
         forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
     }
 

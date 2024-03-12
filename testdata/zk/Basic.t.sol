@@ -1,9 +1,13 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+// SPDX-License-Identifier: MIT OR Apache-2.0
+pragma solidity ^0.8.18;
 
-import {Test} from "forge-std/Test.sol";
+import "ds-test/test.sol";
+import "../cheats/Vm.sol";
 
-contract ZkBasicTest is Test {
+
+contract ZkBasicTest is DSTest {
+    Vm constant vm = Vm(HEVM_ADDRESS);
+
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
 
@@ -16,7 +20,7 @@ contract ZkBasicTest is Test {
     uint256 forkEth;
 
     function setUp() public {
-        forkEra = vm.createFork("mainnet", ERA_FORK_BLOCK);
+        forkEra = vm.createFork("https://mainnet.era.zksync.io", ERA_FORK_BLOCK);
         forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
     }
 
