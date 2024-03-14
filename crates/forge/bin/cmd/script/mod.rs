@@ -422,6 +422,7 @@ impl ScriptArgs {
                     nonce: Some(U64::from(nonce + i as u64)),
                     ..Default::default()
                 },
+                zk_tx: None,
             })
             .collect()
     }

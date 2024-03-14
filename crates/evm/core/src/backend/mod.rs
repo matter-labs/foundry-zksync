@@ -801,6 +801,8 @@ impl Backend {
     {
         self.initialize(env);
 
+        // TODO run zk evm for simulation estimate gas
+
         match revm::evm_inner::<Self>(env, self, Some(&mut inspector)).transact() {
             Ok(res) => Ok(res),
             Err(e) => eyre::bail!("backend: failed while inspecting: {e}"),

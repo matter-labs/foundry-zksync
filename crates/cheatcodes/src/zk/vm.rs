@@ -33,7 +33,7 @@ use revm::{
     primitives::{
         Account, AccountInfo, Address, Bytecode, Bytes, CreateScheme, EVMResultGeneric, Env, Eval,
         ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, OutOfGasError,
-        Output, StorageSlot, B256, KECCAK_EMPTY, U256 as rU256,
+        Output, ResultAndState, StorageSlot, B256, KECCAK_EMPTY, U256 as rU256,
     },
     Database, JournaledState,
 };
@@ -59,6 +59,18 @@ use super::storage_view::StorageView;
 
 type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
 
+// pub(crate) fn transact<'a, DB, E>(
+//     mut tx: L2Tx,
+//     env: &'a mut Env,
+//     db: &'a mut DB,
+//     journaled_state: &'a mut JournaledState,
+// ) -> EVMResultGeneric<ResultAndState, E>
+// where
+//     DB: Database,
+//     <DB as Database>::Error: Debug,
+// {
+// }
+
 pub(crate) fn balance<'a, DB>(
     address: Address,
     db: &'a mut DB,
@@ -70,6 +82,18 @@ where
 {
     let balance = ZKVMData::new(db, journaled_state).get_balance(address);
     u256_to_revm_u256(balance)
+}
+
+pub(crate) fn nonce<'a, DB>(
+    address: Address,
+    db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
+) -> u32
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    ZKVMData::new(db, journaled_state).get_tx_nonce(address).0
 }
 
 pub(crate) fn create<'a, DB, E>(
@@ -451,7 +475,7 @@ impl ConsoleLogParser {
 }
 
 /// Prepares calldata to invoke deployer contract.
-fn encode_create_params(
+pub(crate) fn encode_create_params(
     scheme: &CreateScheme,
     contract_hash: H256,
     constructor_input: Vec<u8>,

@@ -57,8 +57,8 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
-    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS,
-    NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
+    L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
 use zksync_utils::address_to_h256;
 
@@ -93,6 +93,12 @@ impl Context {
     }
 }
 
+/// Helps collecting zk transactions from different forks.
+#[derive(Clone, Debug, Default)]
+pub struct ZkBroadcastableTransaction {
+    pub factory_deps: Vec<Vec<u8>>,
+}
+
 /// Helps collecting transactions from different forks.
 #[derive(Clone, Debug, Default)]
 pub struct BroadcastableTransaction {
@@ -100,6 +106,8 @@ pub struct BroadcastableTransaction {
     pub rpc: Option<RpcUrl>,
     /// The transaction to broadcast.
     pub transaction: TransactionRequest,
+    /// ZK-VM factory deps
+    pub zk_tx: Option<ZkBroadcastableTransaction>,
 }
 
 /// List of transactions that can be broadcasted.
@@ -225,8 +233,11 @@ pub struct Cheatcodes {
     /// `char -> (address, pc)`
     pub breakpoints: Breakpoints,
 
-    /// Use ZK-VM to execute CALLs.
+    /// Use ZK-VM to execute CALLs and CREATEs.
     pub use_zk_vm: bool,
+
+    /// Switch to ZK-VM on startup.
+    pub startup_zk_vm: bool,
 
     /// Dual compiled contracts
     pub dual_compiled_contracts: Vec<DualCompiledContract>,
@@ -286,7 +297,6 @@ impl Cheatcodes {
             .map(|acc| acc.info.nonce)
             .unwrap_or_default();
         let created_address = inputs.created_address(old_nonce);
-
         if data.journaled_state.depth > 1 && !data.db.has_cheatcode_access(&inputs.caller) {
             // we only grant cheat code access for new contracts if the caller also has
             // cheatcode access and the new contract is created in top most call
@@ -528,6 +538,9 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         }
         if let Some(gas_price) = self.gas_price.take() {
             data.env.tx.gas_price = gas_price;
+        }
+        if self.startup_zk_vm {
+            self.select_zk_vm(data, None);
         }
     }
 
@@ -1074,8 +1087,31 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(data, call.gas_limit);
 
+                    let nonce =
+                        zk::nonce(broadcast.new_origin, data.db, &mut data.journaled_state) as u64;
+
                     let account =
                         data.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
+
+                    let zk_tx = if self.use_zk_vm {
+                        // let code_hash = // TODO get hash from deployed_addresse;
+                        // let contract = self.dual_compiled_contracts.iter().find(|contract| {
+                        //     code_hash != KECCAK_EMPTY &&
+                        //         zksync_types::H256::from(code_hash.0) ==
+                        //             contract.zk_bytecode_hash
+                        // });
+                        // let factory_deps = if let Some(contract) = contract {
+                        //     vec![contract.zk_deployed_bytecode.clone()]
+                        // } else {
+                        //     error!("no zk contract was found for {code_hash:?}");
+                        //     Default::default()
+                        // };
+
+                        // We shouldn't need factory_deps for CALLs
+                        Some(ZkBroadcastableTransaction { factory_deps: Default::default() })
+                    } else {
+                        None
+                    };
 
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc: data.db.active_fork_url(),
@@ -1084,7 +1120,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                             to: Some(call.contract),
                             value: Some(call.transfer.value),
                             input: TransactionInput::new(call.input.clone()),
-                            nonce: Some(U64::from(account.info.nonce)),
+                            nonce: Some(U64::from(nonce)),
                             gas: if is_fixed_gas_limit {
                                 Some(U256::from(call.gas_limit))
                             } else {
@@ -1092,6 +1128,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         },
+                        zk_tx,
                     });
                     debug!(target: "cheatcodes", tx=?self.broadcastable_transactions.back().unwrap(), "broadcastable call");
 
@@ -1165,7 +1202,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                     zksync_types::H256::from(code_hash.0) == contract.zk_bytecode_hash
             });
             if contract.is_none() {
-                warn!("no zk contract was found for {code_hash:?}");
+                error!("no zk contract was found for {code_hash:?}");
             }
 
             if let Ok(result) = zk::call::<_, DatabaseError>(
@@ -1497,13 +1534,37 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 data.env.tx.caller = broadcast.new_origin;
 
                 if data.journaled_state.depth() == broadcast.depth {
-                    let (bytecode, to, nonce) = process_broadcast_create(
+                    let (mut bytecode, mut to, mut nonce) = process_broadcast_create(
                         broadcast.new_origin,
                         call.init_code.clone(),
                         data,
                         call,
                     );
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(data, call.gas_limit);
+
+                    let zk_tx = if self.use_zk_vm {
+                        to = Some(h160_to_address(CONTRACT_DEPLOYER_ADDRESS));
+                        nonce = zk::nonce(broadcast.new_origin, data.db, &mut data.journaled_state)
+                            as u64;
+                        let contract = self
+                            .dual_compiled_contracts
+                            .iter()
+                            .find(|contract| contract.evm_bytecode == call.init_code)
+                            .unwrap_or_else(|| {
+                                panic!("failed finding contract for {:?}", call.init_code)
+                            });
+                        let create_input = zk::encode_create_params(
+                            &call.scheme,
+                            contract.zk_bytecode_hash,
+                            Default::default(),
+                        );
+                        bytecode = Bytes::from(create_input);
+                        let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
+
+                        Some(ZkBroadcastableTransaction { factory_deps })
+                    } else {
+                        None
+                    };
 
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc: data.db.active_fork_url(),
@@ -1520,6 +1581,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         },
+                        zk_tx,
                     });
                     let kind = match call.scheme {
                         CreateScheme::Create => "create",

@@ -125,6 +125,7 @@ fn broadcast<DB: DatabaseExt>(
     );
     ensure!(ccx.state.broadcast.is_none(), "a broadcast is active already");
 
+    // TODO probably need to correct nonce in ZK scope
     correct_sender_nonce(ccx)?;
 
     let mut new_origin = new_origin.cloned();

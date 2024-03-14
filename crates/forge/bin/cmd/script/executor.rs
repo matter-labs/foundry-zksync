@@ -1,3 +1,5 @@
+use crate::cmd::script::transaction::ZkTransaction;
+
 use super::{
     artifacts::ArtifactInfo,
     runner::{ScriptRunner, SimulationStage},
@@ -13,7 +15,9 @@ use forge::{
     traces::{render_trace_arena, CallTraceDecoder},
 };
 use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
-use foundry_common::{get_contract_name, provider::ethers::RpcUrl, shell, ContractsByArtifact};
+use foundry_common::{
+    get_contract_name, provider::ethers::RpcUrl, shell, ContractsByArtifact, DualCompiledContract,
+};
 use foundry_compilers::artifacts::ContractBytecodeSome;
 use foundry_evm::inspectors::cheatcodes::ScriptWallets;
 use futures::future::join_all;
@@ -33,6 +37,7 @@ impl ScriptArgs {
         sender: Address,
         predeploy_libraries: &[Bytes],
         script_wallets: ScriptWallets,
+        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
     ) -> Result<ScriptResult> {
         trace!(target: "script", "start executing script");
 
@@ -45,7 +50,13 @@ impl ScriptArgs {
         ensure_clean_constructor(&abi)?;
 
         let mut runner = self
-            .prepare_runner(script_config, sender, SimulationStage::Local, Some(script_wallets))
+            .prepare_runner(
+                script_config,
+                sender,
+                SimulationStage::Local,
+                Some(script_wallets),
+                dual_compiled_contracts,
+            )
             .await?;
         let (address, mut result) = runner.setup(
             predeploy_libraries,
@@ -94,11 +105,12 @@ impl ScriptArgs {
         script_config: &ScriptConfig,
         decoder: &CallTraceDecoder,
         contracts: &ContractsByArtifact,
+        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
     ) -> Result<VecDeque<TransactionWithMetadata>> {
         trace!(target: "script", "executing onchain simulation");
 
         let runners = Arc::new(
-            self.build_runners(script_config)
+            self.build_runners(script_config, dual_compiled_contracts)
                 .await?
                 .into_iter()
                 .map(|(rpc, runner)| (rpc, Arc::new(RwLock::new(runner))))
@@ -147,6 +159,7 @@ impl ScriptArgs {
                         tx.to,
                         tx.input.clone().into_input(),
                         tx.value,
+                        transaction.zk_tx.is_some(),
                     )
                     .wrap_err("Internal EVM error during simulation")?;
 
@@ -189,7 +202,7 @@ impl ScriptArgs {
                     }
                 }
 
-                let tx = TransactionWithMetadata::new(
+                let tx = TransactionWithMetadata::new_with_zk(
                     tx,
                     transaction.rpc,
                     &result,
@@ -197,6 +210,9 @@ impl ScriptArgs {
                     decoder,
                     created_contracts,
                     is_fixed_gas_limit,
+                    transaction
+                        .zk_tx
+                        .map(|zk_tx| ZkTransaction { factory_deps: zk_tx.factory_deps }),
                 )?;
 
                 eyre::Ok((Some(tx), result.traces))
@@ -239,6 +255,7 @@ impl ScriptArgs {
     async fn build_runners(
         &self,
         script_config: &ScriptConfig,
+        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
     ) -> Result<HashMap<RpcUrl, ScriptRunner>> {
         let sender = script_config.evm_opts.sender;
 
@@ -255,7 +272,13 @@ impl ScriptArgs {
                 let mut script_config = script_config.clone();
                 script_config.evm_opts.fork_url = Some(rpc.clone());
                 let runner = self
-                    .prepare_runner(&mut script_config, sender, SimulationStage::OnChain, None)
+                    .prepare_runner(
+                        &mut script_config,
+                        sender,
+                        SimulationStage::OnChain,
+                        None,
+                        dual_compiled_contracts.clone(),
+                    )
                     .await?;
                 Ok((rpc.clone(), runner))
             })
@@ -271,6 +294,7 @@ impl ScriptArgs {
         sender: Address,
         stage: SimulationStage,
         script_wallets: Option<ScriptWallets>,
+        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
     ) -> Result<ScriptRunner> {
         trace!("preparing script runner");
         let env = script_config.evm_opts.evm_env().await?;
@@ -310,7 +334,7 @@ impl ScriptArgs {
                             &script_config.config,
                             script_config.evm_opts.clone(),
                             script_wallets,
-                            Default::default(),
+                            dual_compiled_contracts.unwrap_or_default(),
                         )
                         .into(),
                     )

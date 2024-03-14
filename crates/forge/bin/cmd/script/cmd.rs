@@ -11,6 +11,7 @@ use forge::{link::Linker, traces::CallTraceDecoder};
 use foundry_cli::utils::LoadConfig;
 use foundry_common::{
     contracts::flatten_contracts, provider::ethers::try_get_http_provider, types::ToAlloy,
+    DualCompiledContract,
 };
 use foundry_compilers::{
     artifacts::{ContractBytecodeSome, Libraries},
@@ -69,6 +70,7 @@ impl ScriptArgs {
             linker,
             sources,
             mut libraries,
+            dual_compiled_contracts,
             ..
         } = build_output;
 
@@ -87,6 +89,7 @@ impl ScriptArgs {
                 sender,
                 &predeploy_libraries,
                 script_wallets.clone(),
+                dual_compiled_contracts.clone(),
             )
             .await?;
 
@@ -115,6 +118,7 @@ impl ScriptArgs {
                 predeploy_libraries,
                 &mut result,
                 script_wallets.clone(),
+                dual_compiled_contracts.clone(),
             )
             .await?
         {
@@ -141,6 +145,7 @@ impl ScriptArgs {
             script_config,
             verify,
             &signers,
+            dual_compiled_contracts,
         )
         .await
     }
@@ -154,6 +159,7 @@ impl ScriptArgs {
         predeploy_libraries: Vec<Bytes>,
         result: &mut ScriptResult,
         script_wallets: ScriptWallets,
+        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
     ) -> Result<Option<NewSenderChanges>> {
         if let Some(new_sender) = self.maybe_new_sender(
             &script_config.evm_opts,
@@ -162,7 +168,14 @@ impl ScriptArgs {
         )? {
             // We have a new sender, so we need to relink all the predeployed libraries.
             let (libraries, highlevel_known_contracts) = self
-                .rerun_with_new_deployer(script_config, new_sender, result, linker, script_wallets)
+                .rerun_with_new_deployer(
+                    script_config,
+                    new_sender,
+                    result,
+                    linker,
+                    script_wallets,
+                    dual_compiled_contracts,
+                )
                 .await?;
 
             // redo traces for the new addresses
@@ -188,6 +201,7 @@ impl ScriptArgs {
                 lib_deploy.push_back(BroadcastableTransaction {
                     rpc: tx.rpc.clone(),
                     transaction: tx.transaction.clone(),
+                    zk_tx: tx.zk_tx.clone(),
                 });
             }
             *txs = lib_deploy;
@@ -318,6 +332,7 @@ impl ScriptArgs {
         first_run_result: &mut ScriptResult,
         linker: Linker,
         script_wallets: ScriptWallets,
+        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
     ) -> Result<(Libraries, ArtifactContracts<ContractBytecodeSome>)> {
         // if we had a new sender that requires relinking, we need to
         // get the nonce mainnet for accurate addresses for predeploy libs
@@ -350,7 +365,14 @@ impl ScriptArgs {
         );
 
         let result = self
-            .execute(script_config, contract, new_sender, &predeploy_libraries, script_wallets)
+            .execute(
+                script_config,
+                contract,
+                new_sender,
+                &predeploy_libraries,
+                script_wallets,
+                dual_compiled_contracts,
+            )
             .await?;
 
         if let Some(new_txs) = &result.transactions {
@@ -358,6 +380,7 @@ impl ScriptArgs {
                 txs.push_back(BroadcastableTransaction {
                     rpc: new_tx.rpc.clone(),
                     transaction: new_tx.transaction.clone(),
+                    zk_tx: new_tx.zk_tx.clone(),
                 });
             }
         }

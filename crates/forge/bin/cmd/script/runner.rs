@@ -39,7 +39,7 @@ impl ScriptRunner {
         is_broadcast: bool,
         need_create2_deployer: bool,
     ) -> Result<(Address, ScriptResult)> {
-        trace!(target: "script", "executing setUP()");
+        info!(target: "script", "executing setUP()");
 
         if !is_broadcast {
             if self.sender == Config::DEFAULT_SENDER {
@@ -195,10 +195,12 @@ impl ScriptRunner {
         to: Option<Address>,
         calldata: Option<Bytes>,
         value: Option<U256>,
+        use_zk: bool,
     ) -> Result<ScriptResult> {
         if let Some(to) = to {
             self.call(from, to, calldata.unwrap_or_default(), value.unwrap_or(U256::ZERO), true)
         } else if to.is_none() {
+            // TODO Simulate in ZKVM
             let (address, gas_used, logs, traces, debug) = match self.executor.deploy(
                 from,
                 calldata.expect("No data for create transaction"),

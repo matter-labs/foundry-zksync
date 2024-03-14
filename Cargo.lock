@@ -1687,14 +1687,14 @@ dependencies = [
 [[package]]
 name = "boojum"
 version = "0.2.0"
-source = "git+https://github.com/nbaztec/era-boojum?branch=foundry-fix#3acc934bee1484316dd652a8b3e097e931bb13aa"
+source = "git+https://github.com/nbaztec/era-boojum?branch=foundry-fix#3bc6e87455a504ebc7377c0b9735ebda613e10e0"
 dependencies = [
  "arrayvec 0.7.4",
  "bincode",
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "const_format",
  "convert_case",
- "crossbeam 0.8.4",
+ "crossbeam 0.7.3",
  "crypto-bigint 0.5.5",
  "cs_derive 0.1.0 (git+https://github.com/nbaztec/era-boojum?branch=foundry-fix)",
  "derivative",
@@ -2882,7 +2882,7 @@ dependencies = [
 [[package]]
 name = "cs_derive"
 version = "0.1.0"
-source = "git+https://github.com/nbaztec/era-boojum?branch=foundry-fix#3acc934bee1484316dd652a8b3e097e931bb13aa"
+source = "git+https://github.com/nbaztec/era-boojum?branch=foundry-fix#3bc6e87455a504ebc7377c0b9735ebda613e10e0"
 dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.78",
@@ -4403,6 +4403,7 @@ dependencies = [
  "vergen",
  "watchexec",
  "yansi 0.5.1",
+ "zksync-web3-rs",
 ]
 
 [[package]]
@@ -7850,7 +7851,7 @@ dependencies = [
 [[package]]
 name = "packed_simd"
 version = "0.3.9"
-source = "git+https://github.com/nbaztec/packed_simd?branch=foundry-fix#cb7e65f640b8964e4ffa721b626315646d78c819"
+source = "git+https://github.com/nbaztec/packed_simd?branch=foundry-fix#0d4aca41e2a7e5001017fd5eccbbea7821800d06"
 dependencies = [
  "cfg-if 1.0.0",
  "num-traits",

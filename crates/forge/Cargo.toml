@@ -85,6 +85,9 @@ hyper.workspace = true
 tower-http = { workspace = true, features = ["fs"] }
 opener = "0.6"
 
+# zk
+zksync-web3-rs = { workspace = true }
+
 [dev-dependencies]
 anvil.workspace = true
 foundry-test-utils.workspace = true

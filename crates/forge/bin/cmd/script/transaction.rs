@@ -31,6 +31,12 @@ pub struct AdditionalContract {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ZkTransaction {
+    pub factory_deps: Vec<Vec<u8>>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransactionWithMetadata {
     pub hash: Option<B256>,
     #[serde(rename = "transactionType")]
@@ -48,6 +54,8 @@ pub struct TransactionWithMetadata {
     pub transaction: TypedTransaction,
     pub additional_contracts: Vec<AdditionalContract>,
     pub is_fixed_gas_limit: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zk: Option<ZkTransaction>,
 }
 
 fn default_string() -> Option<String> {
@@ -78,6 +86,22 @@ impl TransactionWithMetadata {
         }
     }
 
+    pub fn from_zk_tx_request(transaction: TransactionRequest, zk: Option<ZkTransaction>) -> Self {
+        Self {
+            transaction: TypedTransaction::Legacy(EthersTransactionRequest {
+                from: transaction.from.map(ToEthers::to_ethers),
+                to: transaction.to.map(ToEthers::to_ethers).map(Into::into),
+                value: transaction.value.map(ToEthers::to_ethers),
+                data: transaction.input.into_input().map(ToEthers::to_ethers),
+                nonce: transaction.nonce.map(|n| n.to::<u64>().into()),
+                gas: transaction.gas.map(ToEthers::to_ethers),
+                ..Default::default()
+            }),
+            zk,
+            ..Default::default()
+        }
+    }
+
     pub fn new(
         transaction: TransactionRequest,
         rpc: Option<RpcUrl>,
@@ -87,9 +111,32 @@ impl TransactionWithMetadata {
         additional_contracts: Vec<AdditionalContract>,
         is_fixed_gas_limit: bool,
     ) -> Result<Self> {
+        Self::new_with_zk(
+            transaction,
+            rpc,
+            result,
+            local_contracts,
+            decoder,
+            additional_contracts,
+            is_fixed_gas_limit,
+            None,
+        )
+    }
+
+    pub fn new_with_zk(
+        transaction: TransactionRequest,
+        rpc: Option<RpcUrl>,
+        result: &ScriptResult,
+        local_contracts: &BTreeMap<Address, ArtifactInfo>,
+        decoder: &CallTraceDecoder,
+        additional_contracts: Vec<AdditionalContract>,
+        is_fixed_gas_limit: bool,
+        zk: Option<ZkTransaction>,
+    ) -> Result<Self> {
         let mut metadata = Self::from_tx_request(transaction);
         metadata.rpc = rpc;
         metadata.is_fixed_gas_limit = is_fixed_gas_limit;
+        metadata.zk = zk;
 
         // Specify if any contract was directly created with this transaction
         if let Some(NameOrAddress::Address(to)) = metadata.transaction.to().cloned() {
