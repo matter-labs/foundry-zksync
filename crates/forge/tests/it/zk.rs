@@ -10,7 +10,7 @@ use forge::revm::primitives::SpecId;
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_test_utils::Filter;
 
-/// Executes all zk tests
+/// Executes all zk basic tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_basic() {
     let mut config = Config::with_root(PROJECT.root());
@@ -21,7 +21,7 @@ async fn test_zk_basic() {
     TestConfig::with_filter(runner.await, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-/// Executes all zk tests
+/// Executes all zk contract tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contracts() {
     let mut config = Config::with_root(PROJECT.root());
@@ -32,7 +32,7 @@ async fn test_zk_contracts() {
     TestConfig::with_filter(runner.await, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-/// Executes all zk tests
+/// Executes all zk cheatcode tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheats() {
     let mut config = Config::with_root(PROJECT.root());
@@ -43,7 +43,7 @@ async fn test_zk_cheats() {
     TestConfig::with_filter(runner.await, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-/// Executes all zk tests
+/// Executes all zk console tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_logs() {
     let mut config = Config::with_root(PROJECT.root());
