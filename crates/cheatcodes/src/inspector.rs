@@ -1190,7 +1190,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         }
 
         if self.use_zk_vm {
-            info!("running call in zk vm");
+            info!("running call in zk vm {:#?}", call);
 
             let code_hash = data
                 .journaled_state

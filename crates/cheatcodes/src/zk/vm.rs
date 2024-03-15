@@ -31,9 +31,9 @@ use once_cell::sync::OnceCell;
 use revm::{
     interpreter::{CallInputs, CreateInputs},
     primitives::{
-        Account, AccountInfo, Address, Bytecode, Bytes, CreateScheme, EVMResultGeneric, Env, Eval,
-        ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, OutOfGasError,
-        Output, ResultAndState, StorageSlot, B256, KECCAK_EMPTY, U256 as rU256,
+        Account, AccountInfo, AccountStatus, Address, Bytecode, Bytes, CreateScheme,
+        EVMResultGeneric, Env, Eval, ExecutionResult as rExecutionResult, Halt as rHalt,
+        HashMap as rHashMap, OutOfGasError, Output, StorageSlot, B256, U256 as rU256,
     },
     Database, JournaledState,
 };
@@ -82,6 +82,19 @@ where
 {
     let balance = ZKVMData::new(db, journaled_state).get_balance(address);
     u256_to_revm_u256(balance)
+}
+
+#[allow(dead_code)]
+pub(crate) fn code_hash<'a, DB>(
+    address: Address,
+    db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
+) -> B256
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    B256::from(ZKVMData::new(db, journaled_state).get_code_hash(address).0)
 }
 
 pub(crate) fn nonce<'a, DB>(
@@ -275,7 +288,8 @@ where
     for (k, v) in &modified_storage {
         let address = h160_to_address(*k.address());
         let index = h256_to_revm_u256(*k.key());
-        let previous = era_db.db.storage(address, index).unwrap_or_default();
+        let account = era_db.load_account(address);
+        let previous = account.storage.get(&index).map(|v| v.present_value).unwrap_or_default();
         let entry = storage.entry(address).or_default();
         entry.insert(index, StorageSlot::new_changed(previous, h256_to_revm_u256(*v)));
 
@@ -291,37 +305,31 @@ where
     }
 
     for (address, storage) in storage {
-        let (info, status) = match era_db.db.basic(address).ok().flatten() {
-            Some(info) => (info, revm::primitives::AccountStatus::Touched),
-            None => (AccountInfo::default(), revm::primitives::AccountStatus::Created),
-        };
+        let account = era_db.load_account(address);
         let account = Account {
             info: AccountInfo {
-                balance: info.balance,
-                nonce: info.nonce,
-                code_hash: KECCAK_EMPTY,
-                code: None,
+                balance: account.info.balance,
+                nonce: account.info.nonce,
+                code_hash: account.info.code_hash,
+                code: account.info.code.clone(),
             },
             storage,
-            status,
+            status: AccountStatus::Touched,
         };
         state.insert(address, account);
     }
 
     for (address, (code_hash, code)) in codes {
-        let (info, status) = match era_db.db.basic(address).ok().flatten() {
-            Some(info) => (info, revm::primitives::AccountStatus::Touched),
-            None => (AccountInfo::default(), revm::primitives::AccountStatus::Created),
-        };
+        let account = era_db.load_account(address);
         let account = Account {
             info: AccountInfo {
-                balance: info.balance,
-                nonce: info.nonce,
+                balance: account.info.balance,
+                nonce: account.info.nonce,
                 code_hash,
                 code: Some(code),
             },
             storage: Default::default(),
-            status,
+            status: AccountStatus::Touched,
         };
         state.insert(address, account);
     }

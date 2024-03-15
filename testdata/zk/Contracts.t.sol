@@ -6,6 +6,28 @@ import "../cheats/Vm.sol";
 
 import {ConstantNumber} from "./ConstantNumber.sol";
 
+contract Greeter {
+    string name;
+    uint256 age;
+
+    event Greet(string greet);
+
+    function greeting(string memory _name) public returns (string memory) {
+        name = _name;
+        string memory greet = string(abi.encodePacked("Hello ", _name));
+        emit Greet(greet);
+        return greet;
+    }
+
+    function setAge(uint256 _age) public {
+        age = _age;
+    }
+
+    function getAge() public view returns (uint256) {
+        return age;
+    }
+}
+
 contract Number {
     function ten() public pure returns (uint8) {
         return 10;
@@ -157,6 +179,16 @@ contract ZkContractsTest is DSTest {
         address actualDeployedAddress = address(new ConstantNumber{salt: salt}());
 
         assertEq(expectedDeployedAddress, actualDeployedAddress);
+    }
+
+    function testZkContractsMultipleTransactions() external {
+        vm.zkVm(true);
+        Greeter greeter = new Greeter();
+        greeter.setAge(10);
+        string memory greeting = greeter.greeting("john");
+        assertEq("Hello john", greeting);
+        greeter.setAge(60);
+        assertEq(60, greeter.getAge());
     }
 
     function _computeCreate2Address(

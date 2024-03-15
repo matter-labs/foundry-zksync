@@ -13,7 +13,7 @@ use foundry_common::{
         h160_to_address, h256_to_b256, revm_u256_to_h256, u256_to_revm_u256,
     },
 };
-use revm::{Database, JournaledState};
+use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
@@ -114,6 +114,13 @@ where
     }
 
     /// Returns the nonce for a given account from NonceHolder storage.
+    pub fn get_code_hash(&mut self, address: Address) -> H256 {
+        let address = address_to_h160(address);
+        let code_key = get_code_key(&address);
+        self.read_db(*code_key.address(), h256_to_u256(*code_key.key()))
+    }
+
+    /// Returns the nonce for a given account from NonceHolder storage.
     pub fn get_tx_nonce(&mut self, address: Address) -> Nonce {
         let address = address_to_h160(address);
         let nonce_key = get_nonce_key(&address);
@@ -129,6 +136,14 @@ where
         let balance_storage =
             self.read_db(*balance_key.address(), h256_to_u256(*balance_key.key()));
         h256_to_u256(balance_storage)
+    }
+
+    pub fn load_account(&mut self, address: Address) -> &mut Account {
+        let (account, _) = self
+            .journaled_state
+            .load_account(address, self.db)
+            .expect("account could not be loaded");
+        account
     }
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
