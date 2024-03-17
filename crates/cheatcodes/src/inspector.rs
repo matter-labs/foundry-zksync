@@ -13,9 +13,11 @@ use crate::{
         self, ExpectedCallData, ExpectedCallTracker, ExpectedCallType, ExpectedEmit,
         ExpectedRevert, ExpectedRevertKind,
     },
-    zk, CheatsConfig, CheatsCtxt, Error, Result,
+    CheatsConfig, CheatsCtxt, Error, Result,
     Vm::{self, AccountAccess},
 };
+use foundry_zk as zk;
+
 use alloy_primitives::{Address, Bytes, Log, LogData, B256, U256, U64};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolInterface, SolValue};
@@ -33,7 +35,6 @@ use foundry_evm_core::{
     constants::{CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS},
 };
 use itertools::Itertools;
-use multivm::zkevm_test_harness_latest::helper::artifact_utils::ACCOUNT_CODE_STORAGE_ADDRESS;
 use revm::{
     interpreter::{
         opcode, CallInputs, CallScheme, CreateInputs, Gas, InstructionResult, Interpreter,
@@ -57,8 +58,9 @@ use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
-    CONTRACT_DEPLOYER_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
-    L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
+    KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS,
 };
 use zksync_utils::address_to_h256;
 
@@ -235,9 +237,6 @@ pub struct Cheatcodes {
 
     /// Use ZK-VM to execute CALLs and CREATEs.
     pub use_zk_vm: bool,
-
-    /// Switch to ZK-VM on startup.
-    pub startup_zk_vm: bool,
 
     /// Dual compiled contracts
     pub dual_compiled_contracts: Vec<DualCompiledContract>,
@@ -538,9 +537,6 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         }
         if let Some(gas_price) = self.gas_price.take() {
             data.env.tx.gas_price = gas_price;
-        }
-        if self.startup_zk_vm {
-            self.select_zk_vm(data, None);
         }
     }
 

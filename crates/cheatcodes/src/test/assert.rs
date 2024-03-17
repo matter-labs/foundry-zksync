@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 
 use alloy_primitives::{I256, U256};
-use foundry_evm_core::abi::{format_units_int, format_units_uint};
+use foundry_common::console::{format_units_int, format_units_uint};
 use itertools::Itertools;
 
 use crate::{Cheatcode, Cheatcodes, Result, Vm::*};

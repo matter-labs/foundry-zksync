@@ -151,6 +151,7 @@ impl ScriptArgs {
                 let rpc = transaction.rpc.as_ref().expect("missing broadcastable tx rpc url");
                 let mut runner = runners.get(rpc).expect("invalid rpc url").write();
 
+                let zk = transaction.zk_tx;
                 let mut tx = transaction.transaction;
                 let result = runner
                     .simulate(
@@ -159,7 +160,7 @@ impl ScriptArgs {
                         tx.to,
                         tx.input.clone().into_input(),
                         tx.value,
-                        transaction.zk_tx.is_some(),
+                        zk.clone().map(|tx| tx.factory_deps),
                     )
                     .wrap_err("Internal EVM error during simulation")?;
 
@@ -210,9 +211,7 @@ impl ScriptArgs {
                     decoder,
                     created_contracts,
                     is_fixed_gas_limit,
-                    transaction
-                        .zk_tx
-                        .map(|zk_tx| ZkTransaction { factory_deps: zk_tx.factory_deps }),
+                    zk.map(|zk_tx| ZkTransaction { factory_deps: zk_tx.factory_deps }),
                 )?;
 
                 eyre::Ok((Some(tx), result.traces))

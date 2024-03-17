@@ -18,6 +18,7 @@ foundry-compilers.workspace = true
 foundry-config.workspace = true
 foundry-evm-core.workspace = true
 foundry-wallets.workspace = true
+foundry-zk.workspace = true
 
 alloy-dyn-abi.workspace = true
 alloy-json-abi.workspace = true
@@ -44,11 +45,11 @@ p256 = "0.13.2"
 thiserror = "1"
 
 # zk
-multivm.workspace = true
-zksync_basic_types.workspace = true
+# multivm.workspace = true
+# zksync_basic_types.workspace = true
 zksync_types.workspace = true
-era_test_node.workspace = true
+# era_test_node.workspace = true
 zksync_utils.workspace = true
-zksync_contracts.workspace = true
-zksync_state.workspace = true
-once_cell = "1"
+# zksync_contracts.workspace = true
+# zksync_state.workspace = true
+# once_cell = "1"

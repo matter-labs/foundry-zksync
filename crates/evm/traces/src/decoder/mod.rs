@@ -7,9 +7,14 @@ use crate::{
 use alloy_dyn_abi::{DecodedEvent, DynSolValue, EventExt, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Error, Event, Function, JsonAbi};
 use alloy_primitives::{Address, LogData, Selector, B256};
-use foundry_common::{abi::get_indexed_event, fmt::format_token, SELECTOR_LEN};
+use foundry_cheatcodes_spec::Vm;
+use foundry_common::{
+    abi::get_indexed_event,
+    console::{Console, HardhatConsole, HARDHAT_CONSOLE_SELECTOR_PATCHES},
+    fmt::format_token,
+    SELECTOR_LEN,
+};
 use foundry_evm_core::{
-    abi::{Console, HardhatConsole, Vm, HARDHAT_CONSOLE_SELECTOR_PATCHES},
     constants::{
         CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS,
         TEST_CONTRACT_ADDRESS,

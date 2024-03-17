@@ -1,16 +1,13 @@
 use alloy_primitives::{address, hex, Address};
 
+pub use foundry_common::HARDHAT_CONSOLE_ADDRESS;
+
 /// The cheatcode handler address.
 ///
 /// This is the same address as the one used in DappTools's HEVM.
 /// It is calculated as:
 /// `address(bytes20(uint160(uint256(keccak256('hevm cheat code')))))`
 pub const CHEATCODE_ADDRESS: Address = address!("7109709ECfa91a80626fF3989D68f67F5b1DD12D");
-
-/// The Hardhat console address.
-///
-/// See: <https://github.com/nomiclabs/hardhat/blob/master/packages/hardhat-core/console.sol>
-pub const HARDHAT_CONSOLE_ADDRESS: Address = address!("000000000000000000636F6e736F6c652e6c6f67");
 
 /// Stores the caller address to be used as *sender* account for:
 /// - deploying Test contracts

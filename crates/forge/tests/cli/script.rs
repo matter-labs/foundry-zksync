@@ -7,7 +7,7 @@ use foundry_common::rpc;
 use foundry_test_utils::{util::OutputExt, ScriptOutcome, ScriptTester};
 use regex::Regex;
 use serde_json::Value;
-use std::{collections::HashMap, env, path::PathBuf, str::FromStr};
+use std::{env, path::PathBuf, str::FromStr};
 
 // Tests that fork cheat codes can be used in script
 forgetest_init!(
@@ -1136,23 +1136,26 @@ contract ScriptC {}
     tester.simulate(ScriptOutcome::OkNoEndpoint);
 });
 
-// ignoring test since it requires a local era-test-node to be running on port 8011
+// ignoring test as it requires a local era-test-node to be running on port 8011
 forgetest_async!(
     #[ignore]
     can_execute_zk_script_with_arguments,
     |prj, cmd| {
         #[derive(serde::Deserialize, Debug)]
+        #[allow(dead_code)]
         struct ZkTransactions {
             transactions: Vec<ZkTransaction>,
         }
 
         #[derive(serde::Deserialize, Debug)]
+        #[allow(dead_code)]
         struct ZkTransaction {
             zk: Zk,
         }
 
         #[derive(serde::Deserialize, Debug)]
         #[serde(rename_all = "camelCase")]
+        #[allow(dead_code)]
         struct Zk {
             factory_deps: Vec<Vec<u8>>,
         }

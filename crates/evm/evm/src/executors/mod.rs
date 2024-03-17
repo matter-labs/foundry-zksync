@@ -70,6 +70,8 @@ pub struct Executor {
     /// the passed in environment, as those limits are used by the EVM for certain opcodes like
     /// `gaslimit`.
     gas_limit: U256,
+
+    pub zk_factory_deps: Option<Vec<Vec<u8>>>,
 }
 
 impl Executor {
@@ -85,7 +87,7 @@ impl Executor {
             },
         );
 
-        Executor { backend, env, inspector, gas_limit }
+        Executor { backend, env, inspector, gas_limit, zk_factory_deps: None }
     }
 
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
@@ -300,7 +302,11 @@ impl Executor {
         // Build VM
         let mut env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
         let mut db = FuzzBackendWrapper::new(&self.backend);
-        let result = db.inspect_ref(&mut env, &mut inspector)?;
+
+        let result = match &self.zk_factory_deps {
+            Some(zk_factory_deps) => db.inspect_ref_zk(&mut env, Some(zk_factory_deps.clone()))?,
+            None => db.inspect_ref(&mut env, &mut inspector)?,
+        };
 
         // Persist the snapshot failure recorded on the fuzz backend wrapper.
         let has_snapshot_failure = db.has_snapshot_failure();
@@ -318,7 +324,14 @@ impl Executor {
     pub fn call_raw_with_env(&mut self, mut env: Env) -> eyre::Result<RawCallResult> {
         // execute the call
         let mut inspector = self.inspector.clone();
-        let result = self.backend.inspect_ref(&mut env, &mut inspector)?;
+
+        let result = match self.zk_factory_deps.take() {
+            Some(zk_factory_deps) => {
+                self.backend.inspect_ref_zk(&mut env, Some(zk_factory_deps))?
+            }
+            None => self.backend.inspect_ref(&mut env, &mut inspector)?,
+        };
+
         convert_executed_result(env, inspector, result, self.backend.has_snapshot_failure())
     }
 

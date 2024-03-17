@@ -775,7 +775,7 @@ impl Backend {
     /// We need to track these mainly to prevent issues when switching between different evms
     pub(crate) fn initialize(&mut self, env: &Env) {
         self.set_caller(env.tx.caller);
-        self.set_spec_id(SpecId::from_spec_id(env.cfg.spec_id));
+        self.set_spec_id(revm::precompile::SpecId::from_spec_id(env.cfg.spec_id));
 
         let test_contract = match env.tx.transact_to {
             TransactTo::Call(to) => to,
@@ -807,6 +807,17 @@ impl Backend {
             Ok(res) => Ok(res),
             Err(e) => eyre::bail!("backend: failed while inspecting: {e}"),
         }
+    }
+
+    /// Executes the configured test call of the `env` without committing state changes
+    pub fn inspect_ref_zk(
+        &mut self,
+        env: &mut Env,
+        factory_deps: Option<Vec<Vec<u8>>>,
+    ) -> eyre::Result<ResultAndState> {
+        self.initialize(env);
+
+        foundry_zk::transact(factory_deps, env, self)
     }
 
     /// Returns true if the address is a precompile

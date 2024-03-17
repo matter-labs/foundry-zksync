@@ -1,11 +1,11 @@
 //! Implementations of [`Testing`](crate::Group::Testing) cheatcodes.
 
 use crate::{Cheatcode, Cheatcodes, CheatsCtxt, DatabaseExt, Error, Result, Vm::*};
-use alloy_primitives::{Address, B256};
+use alloy_primitives::Address;
 use alloy_sol_types::SolValue;
 use foundry_common::DualCompiledContract;
 use foundry_evm_core::constants::{MAGIC_ASSUME, MAGIC_SKIP};
-use zksync_types::H256;
+// use zksync_types::H256;
 
 pub(crate) mod assert;
 pub(crate) mod expect;
@@ -37,9 +37,9 @@ impl Cheatcode for zkRegisterContractCall {
 
         let new_contract = DualCompiledContract {
             name: name.clone(),
-            zk_bytecode_hash: H256::from(zkBytecodeHash.0),
+            zk_bytecode_hash: zkBytecodeHash.0.into(),
             zk_deployed_bytecode: zkDeployedBytecode.clone(),
-            evm_bytecode_hash: B256::from(evmBytecodeHash.0),
+            evm_bytecode_hash: *evmBytecodeHash,
             evm_deployed_bytecode: evmDeployedBytecode.clone(),
             evm_bytecode: evmBytecode.clone(),
         };

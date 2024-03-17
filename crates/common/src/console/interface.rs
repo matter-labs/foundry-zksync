@@ -8,6 +8,7 @@ use itertools::Itertools;
 sol! {
 #[sol(abi)]
 #[derive(Display)]
+#[allow(missing_docs)]
 interface Console {
     #[display(fmt = "{val}")]
     event log(string val);
@@ -77,11 +78,13 @@ interface Console {
 }
 }
 
+#[allow(missing_docs)]
 pub fn format_units_int(x: &I256, decimals: &U256) -> String {
     let (sign, x) = x.into_sign_and_abs();
     format!("{sign}{}", format_units_uint(&x, decimals))
 }
 
+#[allow(missing_docs)]
 pub fn format_units_uint(x: &U256, decimals: &U256) -> String {
     match alloy_primitives::utils::Unit::new(decimals.saturating_to::<u8>()) {
         Some(units) => alloy_primitives::utils::ParseUnits::U256(*x).format_units(units),

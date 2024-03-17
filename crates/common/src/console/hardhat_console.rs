@@ -7,8 +7,9 @@ use revm::primitives::HashMap;
 sol!(
     #[sol(abi)]
     #[derive(ConsoleFmt)]
+    #[allow(missing_docs)]
     HardhatConsole,
-    "src/abi/HardhatConsole.json"
+    "src/console/HardhatConsole.json"
 );
 
 /// Patches the given Hardhat `console` function selector to its ABI-normalized form.

@@ -10,6 +10,7 @@ extern crate tracing;
 pub mod abi;
 pub mod calc;
 pub mod compile;
+pub mod console;
 pub mod constants;
 pub mod contracts;
 pub mod errors;
@@ -32,6 +33,7 @@ pub mod zk_compile;
 pub mod zk_utils;
 pub mod zksolc_manager;
 
+pub use console::*;
 pub use constants::*;
 pub use contracts::*;
 pub use traits::*;

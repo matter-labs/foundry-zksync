@@ -49,6 +49,19 @@ impl<'a> FuzzBackendWrapper<'a> {
         Self { backend: Cow::Borrowed(backend), is_initialized: false }
     }
 
+    /// Executes the configured zk transaction of the `env` without committing state changes
+    pub fn inspect_ref_zk(
+        &mut self,
+        env: &mut Env,
+        factory_deps: Option<Vec<Vec<u8>>>,
+    ) -> eyre::Result<ResultAndState> {
+        // this is a new call to inspect with a new env, so even if we've cloned the backend
+        // already, we reset the initialized state
+        self.is_initialized = false;
+
+        foundry_zk::transact(factory_deps, env, self)
+    }
+
     /// Executes the configured transaction of the `env` without committing state changes
     pub fn inspect_ref<INSP>(
         &mut self,

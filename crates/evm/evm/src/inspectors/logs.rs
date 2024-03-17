@@ -1,9 +1,9 @@
 use alloy_primitives::{Address, Bytes, Log, B256};
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
-use foundry_common::{fmt::ConsoleFmt, ErrorExt};
-use foundry_evm_core::{
-    abi::{patch_hh_console_selector, Console, HardhatConsole},
-    constants::HARDHAT_CONSOLE_ADDRESS,
+use foundry_common::{
+    console::{patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS},
+    fmt::ConsoleFmt,
+    ErrorExt,
 };
 use revm::{
     interpreter::{CallInputs, Gas, InstructionResult},

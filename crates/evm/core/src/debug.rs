@@ -238,7 +238,7 @@ impl Display for Instruction {
             Instruction::Cheatcode(cheat) => write!(
                 f,
                 "VM_{}",
-                crate::abi::Vm::CHEATCODES
+                foundry_cheatcodes_spec::Vm::CHEATCODES
                     .iter()
                     .map(|c| &c.func)
                     .find(|c| c.selector_bytes == *cheat)

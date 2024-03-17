@@ -195,12 +195,14 @@ impl ScriptRunner {
         to: Option<Address>,
         calldata: Option<Bytes>,
         value: Option<U256>,
-        use_zk: bool,
+        zk_factory_deps: Option<Vec<Vec<u8>>>,
     ) -> Result<ScriptResult> {
+        // Simulate in ZKVM
+        self.executor.zk_factory_deps = zk_factory_deps;
+
         if let Some(to) = to {
             self.call(from, to, calldata.unwrap_or_default(), value.unwrap_or(U256::ZERO), true)
         } else if to.is_none() {
-            // TODO Simulate in ZKVM
             let (address, gas_used, logs, traces, debug) = match self.executor.deploy(
                 from,
                 calldata.expect("No data for create transaction"),
