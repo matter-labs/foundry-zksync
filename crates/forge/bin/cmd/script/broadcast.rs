@@ -257,6 +257,7 @@ impl ScriptArgs {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn send_transaction(
         &self,
         provider: Arc<RetryProvider>,
@@ -306,6 +307,7 @@ impl ScriptArgs {
 
     /// Executes the created transactions, and if no error has occurred, broadcasts
     /// them.
+    #[allow(clippy::too_many_arguments)]
     pub async fn handle_broadcastable_transactions(
         &self,
         mut result: ScriptResult,
