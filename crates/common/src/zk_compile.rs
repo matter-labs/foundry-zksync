@@ -1053,8 +1053,8 @@ impl ZkSolc {
     /// The versioned sources can then be used for further processing or analysis.
     fn get_versioned_sources(&mut self) -> Result<BTreeMap<Solc, SolidityVersionSources>> {
         // Step 1: Retrieve Project Sources
-        let sources = self.project.paths.read_input_files()
-            .wrap_err("Could not read input files")?;
+        let sources =
+            self.project.paths.read_input_files().wrap_err("Could not read input files")?;
 
         // Step 2: Resolve Graph of Sources and Versions
         let graph = Graph::resolve_sources(&self.project.paths, sources)
