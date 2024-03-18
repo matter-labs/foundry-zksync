@@ -233,8 +233,9 @@ pub struct Cheatcodes {
     /// Dual compiled contracts
     pub dual_compiled_contracts: Vec<DualCompiledContract>,
 
-    /// Logs printed during ZK-VM execution, EVM logs have the value `None`
-    /// since they are recorded by [foundry_evm::inspectors::LogCollector] tracer.
+    /// Logs printed during ZK-VM execution.
+    /// EVM logs have the value `None` so they can be interpolated later, since
+    /// they are recorded by [foundry_evm::inspectors::LogCollector] tracer.
     pub combined_logs: Vec<Option<Log>>,
 }
 
