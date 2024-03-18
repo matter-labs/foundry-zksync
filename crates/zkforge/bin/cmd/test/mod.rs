@@ -19,6 +19,7 @@ use foundry_config::{
     get_available_profiles, Config,
 };
 use foundry_debugger::Debugger;
+use itertools::Itertools;
 use regex::Regex;
 use std::{collections::BTreeMap, fs, sync::mpsc::channel, time::Duration};
 use watchexec::config::{InitConfig, RuntimeConfig};
@@ -152,8 +153,19 @@ impl TestArgs {
         let mut project = config.project()?;
         // load the zkSolc config
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-        zksolc_cfg.contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
-        zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone();
+        zksolc_cfg.contracts_to_compile =
+            self.opts.compiler.contracts_to_compile.clone().map(|patterns| {
+                patterns
+                    .into_iter()
+                    .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+                    .collect_vec()
+            });
+        zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone().map(|patterns| {
+            patterns
+                .into_iter()
+                .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+                .collect_vec()
+        });
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
 
