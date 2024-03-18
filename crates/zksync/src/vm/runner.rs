@@ -1,10 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{
-    convert::{
-        address_to_h160, h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
-        u256_to_revm_u256,
-    },
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     DualCompiledContract,
 };
 use alloy_primitives::Log;
@@ -84,7 +81,7 @@ where
 
     let caller = env.tx.caller;
     let transact_to = match env.tx.transact_to {
-        TransactTo::Call(to) => address_to_h160(to),
+        TransactTo::Call(to) => to.to_h160(),
         TransactTo::Create(CreateScheme::Create) |
         TransactTo::Create(CreateScheme::Create2 { .. }) => CONTRACT_DEPLOYER_ADDRESS,
     };
@@ -95,14 +92,12 @@ where
         nonce,
         Fee {
             gas_limit: fix_l2_gas_limit(env.tx.gas_limit.into()),
-            max_fee_per_gas: fix_l2_gas_price(revm_u256_to_u256(env.tx.gas_price)),
-            max_priority_fee_per_gas: revm_u256_to_u256(
-                env.tx.gas_priority_fee.unwrap_or_default(),
-            ),
+            max_fee_per_gas: fix_l2_gas_price(env.tx.gas_price.to_u256()),
+            max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
             gas_per_pubdata_limit: U256::from(800),
         },
-        address_to_h160(caller),
-        revm_u256_to_u256(env.tx.value),
+        caller.to_h160(),
+        env.tx.value.to_u256(),
         factory_deps,
         PaymasterParams::default(),
     );
@@ -125,7 +120,7 @@ where
     <DB as Database>::Error: Debug,
 {
     let balance = ZKVMData::new(db, journaled_state).get_balance(address);
-    u256_to_revm_u256(balance)
+    balance.to_ru256()
 }
 
 /// Retrieves bytecode hash stored at a given address.
@@ -179,14 +174,13 @@ where
         nonce,
         Fee {
             gas_limit: fix_l2_gas_limit(env.tx.gas_limit.into()),
-            max_fee_per_gas: fix_l2_gas_price(revm_u256_to_u256(rU256::ZERO)),
-            max_priority_fee_per_gas: revm_u256_to_u256(
-                env.tx.gas_priority_fee.unwrap_or_default(),
-            ),
+            max_fee_per_gas: fix_l2_gas_price(U256::zero()),
+            max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
+
             gas_per_pubdata_limit: U256::from(800),
         },
-        address_to_h160(caller),
-        revm_u256_to_u256(call.value),
+        caller.to_h160(),
+        call.value.to_u256(),
         Some(factory_deps),
         PaymasterParams::default(),
     );
@@ -210,19 +204,17 @@ where
     let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
     let tx = L2Tx::new(
-        address_to_h160(call.contract),
+        call.contract.to_h160(),
         call.input.to_vec(),
         nonce,
         Fee {
             gas_limit: fix_l2_gas_limit(env.tx.gas_limit.into()),
-            max_fee_per_gas: fix_l2_gas_price(revm_u256_to_u256(env.tx.gas_price)),
-            max_priority_fee_per_gas: revm_u256_to_u256(
-                env.tx.gas_priority_fee.unwrap_or_default(),
-            ),
+            max_fee_per_gas: fix_l2_gas_price(env.tx.gas_price.to_u256()),
+            max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
             gas_per_pubdata_limit: U256::from(800),
         },
-        address_to_h160(caller),
-        revm_u256_to_u256(call.transfer.value),
+        caller.to_h160(),
+        call.transfer.value.to_u256(),
         factory_deps,
         PaymasterParams::default(),
     );
@@ -273,7 +265,7 @@ where
                 .clone()
                 .into_iter()
                 .map(|event| revm::primitives::Log {
-                    address: h160_to_address(event.address),
+                    address: event.address.to_address(),
                     topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
                     data: event.value.into(),
                 })
@@ -292,7 +284,7 @@ where
                 None
             };
             let output = if is_create {
-                Output::Create(Bytes::from(result), address.map(h160_to_address))
+                Output::Create(Bytes::from(result), address.map(ConvertH160::to_address))
             } else {
                 Output::Call(Bytes::from(result))
             };
@@ -334,12 +326,12 @@ where
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
     for (k, v) in &modified_storage {
-        let address = h160_to_address(*k.address());
-        let index = h256_to_revm_u256(*k.key());
+        let address = k.address().to_address();
+        let index = k.key().to_ru256();
         let account = era_db.load_account(address);
         let previous = account.storage.get(&index).map(|v| v.present_value).unwrap_or_default();
         let entry = storage.entry(address).or_default();
-        entry.insert(index, StorageSlot::new_changed(previous, h256_to_revm_u256(*v)));
+        entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
 
         if k.address() == &ACCOUNT_CODE_STORAGE_ADDRESS {
             if let Some(bytecode) = bytecodes.get(&h256_to_u256(*v)) {
@@ -347,7 +339,7 @@ where
                     bytecode.iter().flat_map(|x| u256_to_h256(*x).to_fixed_bytes()).collect_vec();
                 let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
                 let hash = B256::from_slice(v.as_bytes());
-                codes.insert(h160_to_address(h256_to_h160(k.key())), (hash, bytecode));
+                codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
             }
         }
     }
@@ -477,7 +469,7 @@ struct ConsoleLogParser {
 
 impl ConsoleLogParser {
     fn new() -> Self {
-        Self { hardhat_console_address: address_to_h160(HARDHAT_CONSOLE_ADDRESS) }
+        Self { hardhat_console_address: HARDHAT_CONSOLE_ADDRESS.to_h160() }
     }
 
     pub fn get_logs(&self, call_traces: &[Call], print: bool) -> Vec<Log> {
@@ -538,7 +530,7 @@ pub fn encode_create_params(
 ) -> Vec<u8> {
     let (name, salt) = match scheme {
         CreateScheme::Create => ("create", H256::zero()),
-        CreateScheme::Create2 { salt } => ("create2", u256_to_h256(revm_u256_to_u256(*salt))),
+        CreateScheme::Create2 { salt } => ("create2", salt.to_h256()),
     };
 
     // TODO (SMA-1608): We should not re-implement the ABI parts in different places, instead have

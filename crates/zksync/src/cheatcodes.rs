@@ -1,8 +1,5 @@
 use std::fmt::Debug;
 
-use crate::convert::{
-    address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_u256, u256_to_revm_u256,
-};
 use alloy_primitives::{Bytes, B256};
 use revm::{
     primitives::{Address, Bytecode, Env, U256 as rU256},
@@ -16,7 +13,9 @@ use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
     L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
-use zksync_utils::{address_to_h256, bytecode::hash_bytecode};
+use zksync_utils::bytecode::hash_bytecode;
+
+use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 
 /// Sets `block.timestamp`.
 pub fn warp<'a, DB>(
@@ -30,13 +29,13 @@ pub fn warp<'a, DB>(
 {
     info!(?timestamp, "cheatcode warp");
 
-    let system_account = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
+    let system_account = SYSTEM_CONTEXT_ADDRESS.to_address();
     journaled_state.load_account(system_account, db).expect("account could not be loaded");
-    let block_info_key = h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
+    let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
     let (block_info, _) =
         journaled_state.sload(system_account, block_info_key, db).unwrap_or_default();
-    let (block_number, _block_timestamp) = unpack_block_info(revm_u256_to_u256(block_info));
-    let new_block_info = u256_to_revm_u256(pack_block_info(block_number, timestamp.as_limbs()[0]));
+    let (block_number, _block_timestamp) = unpack_block_info(block_info.to_u256());
+    let new_block_info = pack_block_info(block_number, timestamp.as_limbs()[0]).to_ru256();
 
     journaled_state.touch(&system_account);
     journaled_state
@@ -57,13 +56,13 @@ pub fn roll<'a, DB>(
 {
     info!(?number, "cheatcode roll");
 
-    let system_account = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
+    let system_account = SYSTEM_CONTEXT_ADDRESS.to_address();
     journaled_state.load_account(system_account, db).expect("account could not be loaded");
-    let block_info_key = h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
+    let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
     let (block_info, _) =
         journaled_state.sload(system_account, block_info_key, db).unwrap_or_default();
-    let (_block_number, block_timestamp) = unpack_block_info(revm_u256_to_u256(block_info));
-    let new_block_info = u256_to_revm_u256(pack_block_info(number.as_limbs()[0], block_timestamp));
+    let (_block_number, block_timestamp) = unpack_block_info(block_info.to_u256());
+    let new_block_info = pack_block_info(number.as_limbs()[0], block_timestamp).to_ru256();
 
     journaled_state.touch(&system_account);
     journaled_state
@@ -85,10 +84,10 @@ where
 {
     info!(?address, ?balance, "cheatcode deal");
 
-    let balance_addr = h160_to_address(L2_ETH_TOKEN_ADDRESS);
+    let balance_addr = L2_ETH_TOKEN_ADDRESS.to_address();
     journaled_state.load_account(balance_addr, db).expect("account could not be loaded");
-    let zk_address = address_to_h160(address);
-    let balance_key = h256_to_revm_u256(*storage_key_for_eth_balance(&zk_address).key());
+    let zk_address = address.to_h160();
+    let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
     let (old_balance, _) = journaled_state.sload(balance_addr, balance_key, db).unwrap_or_default();
     journaled_state.touch(&balance_addr);
     journaled_state.sstore(balance_addr, balance_key, balance, db).expect("failed storing value");
@@ -108,10 +107,10 @@ pub fn set_nonce<'a, DB>(
 {
     info!(?address, ?nonce, "cheatcode setNonce");
 
-    let nonce_addr = h160_to_address(NONCE_HOLDER_ADDRESS);
+    let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
     journaled_state.load_account(nonce_addr, db).expect("account could not be loaded");
-    let zk_address = address_to_h160(address);
-    let nonce_key = h256_to_revm_u256(*get_nonce_key(&zk_address).key());
+    let zk_address = address.to_h160();
+    let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
     journaled_state.touch(&nonce_addr);
     journaled_state.sstore(nonce_addr, nonce_key, nonce, db).expect("failed storing value");
 }
@@ -128,10 +127,10 @@ where
 {
     info!(?address, "cheatcode getNonce");
 
-    let nonce_addr = h160_to_address(NONCE_HOLDER_ADDRESS);
+    let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
     journaled_state.load_account(nonce_addr, db).expect("account could not be loaded");
-    let zk_address = address_to_h160(address);
-    let nonce_key = h256_to_revm_u256(*get_nonce_key(&zk_address).key());
+    let zk_address = address.to_h160();
+    let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
     let (nonce, _) = journaled_state.sload(nonce_addr, nonce_key, db).unwrap_or_default();
 
     nonce
@@ -149,25 +148,20 @@ pub fn etch<'a, DB>(
 {
     info!(?address, bytecode = hex::encode(bytecode), "cheatcode etch");
 
-    let bytecode_hash = h256_to_revm_u256(hash_bytecode(bytecode));
+    let bytecode_hash = hash_bytecode(bytecode).to_ru256();
     let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(bytecode)).to_checked();
 
-    let account_code_addr = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
-    let known_codes_addr = h160_to_address(KNOWN_CODES_STORAGE_ADDRESS);
+    let account_code_addr = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
+    let known_codes_addr = KNOWN_CODES_STORAGE_ADDRESS.to_address();
     journaled_state.load_account(account_code_addr, db).expect("account could not be loaded");
     journaled_state.touch(&account_code_addr);
     journaled_state.load_account(known_codes_addr, db).expect("account could not be loaded");
     journaled_state.touch(&known_codes_addr);
 
-    let zk_address = address_to_h160(address);
+    let zk_address = address.to_h160();
 
     journaled_state
-        .sstore(
-            account_code_addr,
-            h256_to_revm_u256(address_to_h256(&zk_address)),
-            bytecode_hash,
-            db,
-        )
+        .sstore(account_code_addr, zk_address.to_h256().to_ru256(), bytecode_hash, db)
         .expect("failed storing value");
     journaled_state
         .sstore(known_codes_addr, bytecode_hash, rU256::ZERO, db)

@@ -26,10 +26,7 @@ use foundry_evm_core::{
     constants::{CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS},
 };
 use foundry_zksync::{
-    convert::{
-        address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_h256, revm_u256_to_u256,
-        u256_to_revm_u256,
-    },
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     DualCompiledContract, ZkTransactionMetadata,
 };
 use itertools::Itertools;
@@ -60,7 +57,6 @@ use zksync_types::{
     KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
 };
-use zksync_utils::address_to_h256;
 
 macro_rules! try_or_continue {
     ($e:expr) => {
@@ -356,29 +352,28 @@ impl Cheatcodes {
         tracing::info!("switching to EVM");
         self.use_zk_vm = false;
 
-        let system_account = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
+        let system_account = SYSTEM_CONTEXT_ADDRESS.to_address();
         journaled_account(data, system_account).expect("failed to load account");
-        let balance_account = h160_to_address(L2_ETH_TOKEN_ADDRESS);
+        let balance_account = L2_ETH_TOKEN_ADDRESS.to_address();
         journaled_account(data, balance_account).expect("failed to load account");
-        let nonce_account = h160_to_address(NONCE_HOLDER_ADDRESS);
+        let nonce_account = NONCE_HOLDER_ADDRESS.to_address();
         journaled_account(data, nonce_account).expect("failed to load account");
-        let account_code_account = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
+        let account_code_account = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
         journaled_account(data, account_code_account).expect("failed to load account");
 
-        let block_info_key: alloy_primitives::Uint<256, 4> =
-            h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
+        let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
         let (block_info, _) =
             data.journaled_state.sload(system_account, block_info_key, data.db).unwrap_or_default();
-        let (block_number, block_timestamp) = unpack_block_info(revm_u256_to_u256(block_info));
+        let (block_number, block_timestamp) = unpack_block_info(block_info.to_u256());
         data.env.block.number = U256::from(block_number);
         data.env.block.timestamp = U256::from(block_timestamp);
 
         for address in data.db.persistent_accounts() {
             info!(?address, "importing to evm state");
 
-            let zk_address = address_to_h160(address);
-            let balance_key = h256_to_revm_u256(*storage_key_for_eth_balance(&zk_address).key());
-            let nonce_key = h256_to_revm_u256(*get_nonce_key(&zk_address).key());
+            let zk_address = address.to_h160();
+            let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
+            let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
 
             let (balance, _) = data
                 .journaled_state
@@ -386,17 +381,17 @@ impl Cheatcodes {
                 .unwrap_or_default();
             let (full_nonce, _) =
                 data.journaled_state.sload(nonce_account, nonce_key, data.db).unwrap_or_default();
-            let (tx_nonce, _deployment_nonce) = decompose_full_nonce(revm_u256_to_u256(full_nonce));
+            let (tx_nonce, _deployment_nonce) = decompose_full_nonce(full_nonce.to_u256());
             let nonce = tx_nonce.as_u64();
 
-            let account_code_key = h256_to_revm_u256(*get_code_key(&zk_address).key());
+            let account_code_key = get_code_key(&zk_address).key().to_ru256();
             let (code_hash, code) = data
                 .journaled_state
                 .sload(account_code_account, account_code_key, data.db)
                 .map(|(value, _)| value)
                 .ok()
                 .and_then(|zk_bytecode_hash| {
-                    let zk_bytecode_hash = revm_u256_to_h256(zk_bytecode_hash);
+                    let zk_bytecode_hash = zk_bytecode_hash.to_h256();
                     self.dual_compiled_contracts
                         .iter()
                         .find(|c| c.zk_bytecode_hash == zk_bytecode_hash)
@@ -436,11 +431,10 @@ impl Cheatcodes {
         let env = new_env.unwrap_or(data.env);
 
         let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
-        let block_info_key: alloy_primitives::Uint<256, 4> =
-            h256_to_revm_u256(CURRENT_VIRTUAL_BLOCK_INFO_POSITION);
+        let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
         let block_info =
             pack_block_info(env.block.number.as_limbs()[0], env.block.timestamp.as_limbs()[0]);
-        system_storage.insert(block_info_key, StorageSlot::new(u256_to_revm_u256(block_info)));
+        system_storage.insert(block_info_key, StorageSlot::new(block_info.to_ru256()));
 
         let mut l2_eth_storage: rHashMap<U256, StorageSlot> = Default::default();
         let mut nonce_storage: rHashMap<U256, StorageSlot> = Default::default();
@@ -453,10 +447,10 @@ impl Cheatcodes {
 
             let account = journaled_account(data, address).expect("failed to load account");
             let info = &account.info;
-            let zk_address = address_to_h160(address);
+            let zk_address = address.to_h160();
 
-            let balance_key = h256_to_revm_u256(*storage_key_for_eth_balance(&zk_address).key());
-            let nonce_key = h256_to_revm_u256(*get_nonce_key(&zk_address).key());
+            let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
+            let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
             l2_eth_storage.insert(balance_key, StorageSlot::new(info.balance));
             nonce_storage.insert(nonce_key, StorageSlot::new(U256::from(info.nonce)));
 
@@ -464,13 +458,11 @@ impl Cheatcodes {
                 info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
             }) {
                 account_code_storage.insert(
-                    h256_to_revm_u256(address_to_h256(&zk_address)),
-                    StorageSlot::new(h256_to_revm_u256(contract.zk_bytecode_hash)),
+                    zk_address.to_h256().to_ru256(),
+                    StorageSlot::new(contract.zk_bytecode_hash.to_ru256()),
                 );
-                known_codes_storage.insert(
-                    h256_to_revm_u256(contract.zk_bytecode_hash),
-                    StorageSlot::new(U256::ZERO),
-                );
+                known_codes_storage
+                    .insert(contract.zk_bytecode_hash.to_ru256(), StorageSlot::new(U256::ZERO));
 
                 let code_hash = B256::from_slice(contract.zk_bytecode_hash.as_bytes());
                 deployed_codes.insert(
@@ -487,25 +479,25 @@ impl Cheatcodes {
             }
         }
 
-        let system_addr = h160_to_address(SYSTEM_CONTEXT_ADDRESS);
+        let system_addr = SYSTEM_CONTEXT_ADDRESS.to_address();
         let system_account = journaled_account(data, system_addr).expect("failed to load account");
         system_account.storage.extend(system_storage.clone());
 
-        let balance_addr = h160_to_address(L2_ETH_TOKEN_ADDRESS);
+        let balance_addr = L2_ETH_TOKEN_ADDRESS.to_address();
         let balance_account =
             journaled_account(data, balance_addr).expect("failed to load account");
         balance_account.storage.extend(l2_eth_storage.clone());
 
-        let nonce_addr = h160_to_address(NONCE_HOLDER_ADDRESS);
+        let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
         let nonce_account = journaled_account(data, nonce_addr).expect("failed to load account");
         nonce_account.storage.extend(nonce_storage.clone());
 
-        let account_code_addr = h160_to_address(ACCOUNT_CODE_STORAGE_ADDRESS);
+        let account_code_addr = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
         let account_code_account =
             journaled_account(data, account_code_addr).expect("failed to load account");
         account_code_account.storage.extend(account_code_storage.clone());
 
-        let known_codes_addr = h160_to_address(KNOWN_CODES_STORAGE_ADDRESS);
+        let known_codes_addr = KNOWN_CODES_STORAGE_ADDRESS.to_address();
         let known_codes_account =
             journaled_account(data, known_codes_addr).expect("failed to load account");
         known_codes_account.storage.extend(known_codes_storage.clone());
@@ -1522,7 +1514,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(data, call.gas_limit);
 
                     let zk_tx = if self.use_zk_vm {
-                        to = Some(h160_to_address(CONTRACT_DEPLOYER_ADDRESS));
+                        to = Some(CONTRACT_DEPLOYER_ADDRESS.to_address());
                         nonce = foundry_zksync::nonce(
                             broadcast.new_origin,
                             data.db,

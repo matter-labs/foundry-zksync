@@ -1200,8 +1200,9 @@ contract DeployScript is Script {
     string greeting;
 
     function run() external {
-        // vm.zkVm(true);
+        // test is using old Vm.sol interface, so we call manually
         address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
+        
         vm.startBroadcast();
         greeter = new Greeter();
         greeter.greeting("john");

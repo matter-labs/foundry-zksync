@@ -1,10 +1,6 @@
 //! Test helpers for Forge integration tests.
 
 use alloy_primitives::U256;
-use foundry_common::{
-    zk_compile::ZkSolc,
-    zksolc_manager::{self, DEFAULT_ZKSOLC_VERSION},
-};
 use foundry_compilers::{
     artifacts::{Libraries, Settings},
     Project, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
@@ -20,6 +16,7 @@ use foundry_evm::{
     revm::db::DatabaseRef,
 };
 use foundry_test_utils::fd_lock;
+use foundry_zksync::zksolc::{setup_zksolc_manager, ZkSolc, DEFAULT_ZKSOLC_VERSION};
 use once_cell::sync::Lazy;
 use std::{env, io::Write};
 
@@ -71,10 +68,9 @@ pub static COMPILED: Lazy<ProjectCompileOutput> = Lazy::new(|| {
 
 /// Compile ZK project
 fn zk_compile(project: Project) -> ProjectCompileOutput {
-    let compiler_path = futures::executor::block_on(zksolc_manager::setup_zksolc_manager(
-        DEFAULT_ZKSOLC_VERSION.to_owned(),
-    ))
-    .expect("failed setting up zksolc");
+    let compiler_path =
+        futures::executor::block_on(setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()))
+            .expect("failed setting up zksolc");
 
     let mut zksolc_config = ZkSolcConfigBuilder::new()
         .compiler_path(compiler_path)

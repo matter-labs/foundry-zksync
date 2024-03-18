@@ -46,4 +46,3 @@ thiserror = "1"
 
 # zk
 zksync_types.workspace = true
-zksync_utils.workspace = true

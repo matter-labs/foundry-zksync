@@ -1,64 +1,116 @@
 /// Conversion between REVM units and zkSync units.
-use revm::primitives::U256 as revmU256;
+use revm::primitives::U256 as rU256;
 use revm::primitives::{Address, B256};
 
 use zksync_basic_types::{H160, H256, U256};
-use zksync_utils::h256_to_u256;
+use zksync_utils::{address_to_h256, h256_to_u256};
 
-/// Convert address to h160
-pub fn address_to_h160(i: Address) -> H160 {
-    H160::from(i.0 .0)
+/// Conversions from [U256]
+pub trait ConvertU256 {
+    /// Convert to [rU256]
+    fn to_ru256(self) -> rU256;
+
+    /// Convert to [B256]
+    fn to_b256(self) -> B256;
 }
 
-/// Convert address to h256
-pub fn address_to_h256(i: &Address) -> H256 {
-    let mut buffer = [0u8; 32];
-    buffer[12..].copy_from_slice(i.as_slice());
-    H256(buffer)
+impl ConvertU256 for U256 {
+    fn to_ru256(self) -> rU256 {
+        let mut payload: [u8; 32] = [0; 32];
+        self.to_big_endian(&mut payload);
+        rU256::from_be_bytes(payload)
+    }
+
+    fn to_b256(self) -> B256 {
+        let mut payload: [u8; 32] = [0; 32];
+        self.to_big_endian(&mut payload);
+        B256::from_slice(&payload)
+    }
 }
 
-/// Convert h160 to address
-pub fn h160_to_address(i: H160) -> Address {
-    i.as_fixed_bytes().into()
+/// Conversions from [rU256]
+pub trait ConvertRU256 {
+    /// Convert to [U256]
+    fn to_u256(self) -> U256;
+
+    /// Convert to [H256]
+    fn to_h256(self) -> H256;
 }
 
-/// Convert u256 to b256
-pub fn u256_to_b256(i: U256) -> B256 {
-    let mut payload: [u8; 32] = [0; 32];
-    i.to_big_endian(&mut payload);
-    B256::from_slice(&payload)
+impl ConvertRU256 for rU256 {
+    fn to_u256(self) -> U256 {
+        U256::from_big_endian(self.to_be_bytes::<32>().as_slice())
+    }
+
+    fn to_h256(self) -> H256 {
+        self.to_be_bytes::<32>().into()
+    }
 }
 
-/// Convert u256 to revm u256
-pub fn u256_to_revm_u256(i: U256) -> revmU256 {
-    let mut payload: [u8; 32] = [0; 32];
-    i.to_big_endian(&mut payload);
-    revmU256::from_be_bytes(payload)
+/// Conversions from [H256]
+pub trait ConvertH256 {
+    /// Convert to [rU256]
+    fn to_ru256(self) -> rU256;
+
+    /// Convert to [B256]
+    fn to_b256(self) -> B256;
+
+    /// Convert to [H160]
+    fn to_h160(self) -> H160;
 }
 
-/// Convert revm u256 to u256
-pub fn revm_u256_to_u256(i: revmU256) -> U256 {
-    U256::from_big_endian(&i.to_be_bytes::<32>())
+impl ConvertH256 for H256 {
+    fn to_ru256(self) -> rU256 {
+        h256_to_u256(self).to_ru256()
+    }
+
+    fn to_b256(self) -> B256 {
+        self.to_fixed_bytes().into()
+    }
+
+    fn to_h160(self) -> H160 {
+        H160::from_slice(&self.0[12..32])
+    }
 }
 
-/// Convert revm u256 to h256
-pub fn revm_u256_to_h256(i: revmU256) -> H256 {
-    i.to_be_bytes::<32>().into()
+/// Conversions from [H160]
+pub trait ConvertH160 {
+    /// Convert to [Address]
+    fn to_address(self) -> Address;
+
+    /// Convert to [H256]
+    fn to_h256(self) -> H256;
 }
 
-/// Convert h256 to revm u256
-pub fn h256_to_revm_u256(i: H256) -> revmU256 {
-    u256_to_revm_u256(h256_to_u256(i))
+impl ConvertH160 for H160 {
+    fn to_address(self) -> Address {
+        self.as_fixed_bytes().into()
+    }
+
+    fn to_h256(self) -> H256 {
+        address_to_h256(&self)
+    }
 }
 
-/// Convert h256 to b256
-pub fn h256_to_b256(i: H256) -> B256 {
-    i.to_fixed_bytes().into()
+/// Conversions from [Address]
+pub trait ConvertAddress {
+    /// Convert to [H256]
+    fn to_h256(self) -> H256;
+
+    /// Convert to [H160]
+    fn to_h160(self) -> H160;
 }
 
-/// Convert h256 to h160
-pub fn h256_to_h160(i: &H256) -> H160 {
-    H160::from_slice(&i.0[12..32])
+impl ConvertAddress for Address {
+    fn to_h256(self) -> H256 {
+        let mut buffer = [0u8; 32];
+        buffer[12..].copy_from_slice(self.as_slice());
+        H256(buffer)
+    }
+
+    fn to_h160(self) -> H160 {
+        H160::from(self.0 .0)
+    }
 }
 
 #[cfg(test)]
@@ -72,9 +124,9 @@ mod test {
     #[test]
     fn test_160_conversion() {
         let b = Address::from_str("0x000000000000000000000000000000000000800b").unwrap();
-        let h = address_to_h160(b);
+        let h = b.to_h160();
         assert_eq!(h.to_string(), "0x0000…800b");
-        let b2 = h160_to_address(h);
+        let b2 = h.to_address();
         assert_eq!(b, b2);
     }
 
@@ -83,7 +135,7 @@ mod test {
         let h =
             H256::from_str("0xb99acb716b354b9be88d3eaba99ad36792ccdd4349404cbb812adf0b0b14d601")
                 .unwrap();
-        let b = h256_to_b256(h);
+        let b = h.to_b256();
         assert_eq!(
             b.to_string(),
             "0xb99acb716b354b9be88d3eaba99ad36792ccdd4349404cbb812adf0b0b14d601"
@@ -94,15 +146,15 @@ mod test {
             "83951375548152864551218308881540843734370423742152710934930688330188941743617"
         );
 
-        let revm_u = u256_to_revm_u256(u);
+        let revm_u = u.to_ru256();
         assert_eq!(
             revm_u.to_string(),
             "83951375548152864551218308881540843734370423742152710934930688330188941743617"
         );
-        assert_eq!(u, revm_u256_to_u256(revm_u));
+        assert_eq!(u, revm_u.to_u256());
 
-        assert_eq!(h, revm_u256_to_h256(revm_u));
+        assert_eq!(h, revm_u.to_h256());
 
-        assert_eq!(h, u256_to_h256(u));
+        assert_eq!(h, u.to_h256());
     }
 }

@@ -6,9 +6,6 @@
 /// is usually collecing all the diffs - and applies them to database itself.
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::convert::{
-    address_to_h160, h160_to_address, h256_to_b256, revm_u256_to_h256, u256_to_revm_u256,
-};
 use alloy_primitives::Address;
 use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
@@ -20,6 +17,8 @@ use zksync_types::{
 };
 
 use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
+
+use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
@@ -112,14 +111,14 @@ where
 
     /// Returns the nonce for a given account from NonceHolder storage.
     pub fn get_code_hash(&mut self, address: Address) -> H256 {
-        let address = address_to_h160(address);
+        let address = address.to_h160();
         let code_key = get_code_key(&address);
         self.read_db(*code_key.address(), h256_to_u256(*code_key.key()))
     }
 
     /// Returns the nonce for a given account from NonceHolder storage.
     pub fn get_tx_nonce(&mut self, address: Address) -> Nonce {
-        let address = address_to_h160(address);
+        let address = address.to_h160();
         let nonce_key = get_nonce_key(&address);
         let nonce_storage = self.read_db(*nonce_key.address(), h256_to_u256(*nonce_key.key()));
         let (tx_nonce, _deploy_nonce) = decompose_full_nonce(h256_to_u256(nonce_storage));
@@ -128,7 +127,7 @@ where
 
     /// Returns the nonce for a given account from NonceHolder storage.
     pub fn get_balance(&mut self, address: Address) -> U256 {
-        let address = address_to_h160(address);
+        let address = address.to_h160();
         let balance_key = storage_key_for_eth_balance(&address);
         let balance_storage =
             self.read_db(*balance_key.address(), h256_to_u256(*balance_key.key()));
@@ -144,13 +143,11 @@ where
     }
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
-        let addr = h160_to_address(address);
+        let addr = address.to_address();
         self.journaled_state.load_account(addr, self.db).expect("failed loading account");
-        let (value, _) = self
-            .journaled_state
-            .sload(addr, u256_to_revm_u256(idx), self.db)
-            .expect("failed sload");
-        revm_u256_to_h256(value)
+        let (value, _) =
+            self.journaled_state.sload(addr, idx.to_ru256(), self.db).expect("failed sload");
+        value.to_h256()
     }
 }
 
@@ -169,7 +166,7 @@ where
 
     fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
         self.factory_deps.get(&hash).cloned().or_else(|| {
-            let result = self.db.code_by_hash(h256_to_b256(hash));
+            let result = self.db.code_by_hash(hash.to_b256());
             let res = match result {
                 Ok(bytecode) => {
                     if bytecode.is_empty() {

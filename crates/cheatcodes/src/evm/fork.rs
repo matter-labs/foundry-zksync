@@ -304,7 +304,9 @@ fn create_select_fork<DB: DatabaseExt>(
     ccx.state.corrected_nonce = true;
 
     let fork = create_fork_request(ccx, url_or_alias, block)?;
-    let id = ccx.data.db.create_select_fork(fork, ccx.data.env, &mut ccx.data.journaled_state)?;
+    let id = ccx.data.db.create_fork(fork)?;
+    ccx.state.select_fork_vm(ccx.data, id);
+    ccx.data.db.select_fork(id, ccx.data.env, &mut ccx.data.journaled_state)?;
     Ok(id.abi_encode())
 }
 
