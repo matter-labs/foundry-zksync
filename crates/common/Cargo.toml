@@ -33,7 +33,7 @@ alloy-transport-ws.workspace = true
 alloy-transport-ipc.workspace = true
 alloy-json-rpc.workspace = true
 alloy-pubsub.workspace = true
-alloy-sol-types.workspace = true
+alloy-sol-types = { workspace = true, features = ["json"] }
 
 zksync-web3-rs.workspace = true
 zksync_basic_types.workspace = true

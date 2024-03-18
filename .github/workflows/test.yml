@@ -113,6 +113,4 @@ jobs:
             echo "/tmp/solc-bin" >> $GITHUB_PATH
             
         - name: Test ZK VM
-          env:
-            ERA_TEST_NODE_RPC_URL: http://localhost:8011
-          run: cargo test --package forge --test it --jobs=2 -- zk
+          run: RUST_LOG=1 cargo test --package forge --test it --jobs=1 -- zk
