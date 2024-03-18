@@ -793,7 +793,7 @@ impl TryFrom<SolcMetadataResponseBody> for SolcMetadata {
     fn try_from(value: SolcMetadataResponseBody) -> Result<Self, Self::Error> {
         Ok(SolcMetadata {
             // TODO: the `version.json` file has versions without `v` prefix,
-            // but `parse_version` requires it, so we add them with `format!`.
+            // but `parse_version` requires it, so we add it with `format!`.
             latest: parse_version(&format!("v{}", value.latest))?,
             min_version: parse_version(&format!("v{}", value.min_version))?,
         })
