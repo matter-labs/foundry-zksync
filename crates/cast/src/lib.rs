@@ -1130,7 +1130,7 @@ impl SimpleCast {
         Ok(format!("{sign}{value}"))
     }
 
-    /// Concatencates hex strings
+    /// Concatenates hex strings
     ///
     /// # Example
     ///
