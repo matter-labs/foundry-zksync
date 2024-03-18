@@ -132,7 +132,7 @@ foundry-evm-traces = { path = "crates/evm/traces" }
 foundry-macros = { path = "crates/macros" }
 foundry-test-utils = { path = "crates/test-utils" }
 foundry-wallets = { path = "crates/wallets" }
-foundry-zk = { path = "crates/zk" }
+foundry-zksync = { path = "crates/zksync" }
 
 # solc & compilation utilities
 foundry-block-explorers = { version = "0.2.3", default-features = false }

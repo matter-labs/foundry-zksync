@@ -20,7 +20,16 @@ alloy-sol-types.workspace = true
 alloy-json-abi.workspace = true
 hex.workspace = true
 itertools.workspace = true
-revm.workspace = true
+revm = { workspace = true, default-features = false, features = [
+    "std",
+    "serde",
+    "memory_limit",
+    "optional_eip3607",
+    "optional_block_gas_limit",
+    "optional_no_base_fee",
+    "arbitrary",
+    "optimism",
+] }
 tracing.workspace = true
 serde_json.workspace = true
 serde.workspace = true
