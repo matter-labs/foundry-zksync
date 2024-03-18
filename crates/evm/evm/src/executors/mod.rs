@@ -24,6 +24,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::CallTraceArena;
+use foundry_zksync::ZkTransactionMetadata;
 use itertools::Itertools;
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
@@ -71,7 +72,8 @@ pub struct Executor {
     /// `gaslimit`.
     gas_limit: U256,
 
-    pub zk_factory_deps: Option<Vec<Vec<u8>>>,
+    /// Sets up the next transaction to be executed as a ZK transaction.
+    zk_tx: Option<ZkTransactionMetadata>,
 }
 
 impl Executor {
@@ -87,7 +89,7 @@ impl Executor {
             },
         );
 
-        Executor { backend, env, inspector, gas_limit, zk_factory_deps: None }
+        Executor { backend, env, inspector, gas_limit, zk_tx: None }
     }
 
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
@@ -303,8 +305,8 @@ impl Executor {
         let mut env = self.build_test_env(from, TransactTo::Call(to), calldata, value);
         let mut db = FuzzBackendWrapper::new(&self.backend);
 
-        let result = match &self.zk_factory_deps {
-            Some(zk_factory_deps) => db.inspect_ref_zk(&mut env, Some(zk_factory_deps.clone()))?,
+        let result = match &self.zk_tx {
+            Some(zk_tx) => db.inspect_ref_zk(&mut env, Some(zk_tx.factory_deps.clone()))?,
             None => db.inspect_ref(&mut env, &mut inspector)?,
         };
 
@@ -325,10 +327,8 @@ impl Executor {
         // execute the call
         let mut inspector = self.inspector.clone();
 
-        let result = match self.zk_factory_deps.take() {
-            Some(zk_factory_deps) => {
-                self.backend.inspect_ref_zk(&mut env, Some(zk_factory_deps))?
-            }
+        let result = match self.zk_tx.take() {
+            Some(zk_tx) => self.backend.inspect_ref_zk(&mut env, Some(zk_tx.factory_deps))?,
             None => self.backend.inspect_ref(&mut env, &mut inspector)?,
         };
 
@@ -507,6 +507,10 @@ impl Executor {
             return should_fail
         }
         self.is_success(address, call_result.reverted, state_changeset, should_fail)
+    }
+
+    pub fn setup_zk_tx(&mut self, zk_tx: ZkTransactionMetadata) {
+        self.zk_tx = Some(zk_tx);
     }
 
     fn ensure_success(

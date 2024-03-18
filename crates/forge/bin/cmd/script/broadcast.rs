@@ -24,11 +24,12 @@ use foundry_common::{
     },
     shell,
     types::{ToAlloy, ToEthers},
-    ContractsByArtifact, DualCompiledContract,
+    ContractsByArtifact,
 };
 use foundry_compilers::{artifacts::Libraries, ArtifactId};
 use foundry_config::Config;
 use foundry_wallets::WalletSigner;
+use foundry_zksync::DualCompiledContract;
 use futures::StreamExt;
 use std::{
     cmp::min,

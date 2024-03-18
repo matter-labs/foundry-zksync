@@ -54,6 +54,9 @@ use std::{
     path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
+use tracing::{error, info, trace, warn};
+
+use crate::zksolc::PackedEraBytecode;
 
 /// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
@@ -595,7 +598,7 @@ impl ZkSolc {
                         .collect();
 
                     let packed_bytecode = Bytes::from(
-                        foundry_common::zk_utils::factory_deps::PackedEraBytecode::new(
+                        PackedEraBytecode::new(
                             contract.hash.as_ref().unwrap().clone(),
                             contract.evm.bytecode.as_ref().unwrap().object.clone(),
                             factory_deps,

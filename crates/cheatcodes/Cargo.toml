@@ -18,7 +18,7 @@ foundry-compilers.workspace = true
 foundry-config.workspace = true
 foundry-evm-core.workspace = true
 foundry-wallets.workspace = true
-foundry-zk.workspace = true
+foundry-zksync.workspace = true
 
 alloy-dyn-abi.workspace = true
 alloy-json-abi.workspace = true

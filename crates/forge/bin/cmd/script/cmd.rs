@@ -11,7 +11,6 @@ use forge::{link::Linker, traces::CallTraceDecoder};
 use foundry_cli::utils::LoadConfig;
 use foundry_common::{
     contracts::flatten_contracts, provider::ethers::try_get_http_provider, types::ToAlloy,
-    DualCompiledContract,
 };
 use foundry_compilers::{
     artifacts::{ContractBytecodeSome, Libraries},
@@ -20,6 +19,7 @@ use foundry_compilers::{
 use foundry_debugger::Debugger;
 use foundry_evm::inspectors::cheatcodes::{BroadcastableTransaction, ScriptWallets};
 use foundry_wallets::WalletSigner;
+use foundry_zksync::DualCompiledContract;
 use std::{collections::HashMap, sync::Arc};
 
 /// Helper alias type for the collection of data changed due to the new sender.

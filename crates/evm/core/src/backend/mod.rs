@@ -817,7 +817,7 @@ impl Backend {
     ) -> eyre::Result<ResultAndState> {
         self.initialize(env);
 
-        foundry_zk::transact(factory_deps, env, self)
+        foundry_zksync::vm::transact(factory_deps, env, self)
     }
 
     /// Returns true if the address is a precompile

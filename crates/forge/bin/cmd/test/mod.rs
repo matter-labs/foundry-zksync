@@ -20,11 +20,7 @@ use foundry_cli::{
 use foundry_common::{
     compile::{ContractSources, ProjectCompiler},
     evm::EvmArgs,
-    factory_deps::PackedEraBytecode,
     shell,
-    zk_compile::ZkSolc,
-    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
-    DualCompiledContract,
 };
 use foundry_compilers::Artifact;
 use foundry_config::{
@@ -36,6 +32,10 @@ use foundry_config::{
     get_available_profiles, Config,
 };
 use foundry_debugger::Debugger;
+use foundry_zksync::{
+    zksolc::{setup_zksolc_manager, PackedEraBytecode, ZkSolc, DEFAULT_ZKSOLC_VERSION},
+    DualCompiledContract,
+};
 use itertools::Itertools;
 use regex::Regex;
 use std::{collections::HashMap, sync::mpsc::channel, time::Instant};

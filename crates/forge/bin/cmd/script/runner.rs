@@ -8,6 +8,7 @@ use forge::{
     traces::{TraceKind, Traces},
 };
 use foundry_config::Config;
+use foundry_zksync::ZkTransactionMetadata;
 use yansi::Paint;
 
 /// Represents which simulation stage is the script execution at.
@@ -195,10 +196,11 @@ impl ScriptRunner {
         to: Option<Address>,
         calldata: Option<Bytes>,
         value: Option<U256>,
-        zk_factory_deps: Option<Vec<Vec<u8>>>,
+        zk_tx: Option<ZkTransactionMetadata>,
     ) -> Result<ScriptResult> {
-        // Simulate in ZKVM
-        self.executor.zk_factory_deps = zk_factory_deps;
+        if let Some(zk_tx) = zk_tx {
+            self.executor.setup_zk_tx(zk_tx);
+        }
 
         if let Some(to) = to {
             self.call(from, to, calldata.unwrap_or_default(), value.unwrap_or(U256::ZERO), true)

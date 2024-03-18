@@ -3,19 +3,17 @@ use alloy_primitives::{keccak256, Address, Bytes};
 use eyre::{Context, ContextCompat, Result};
 use forge::link::{LinkOutput, Linker};
 use foundry_cli::utils::get_cached_entry_by_name;
-use foundry_common::{
-    compile::{self, ContractSources, ProjectCompiler},
-    factory_deps::PackedEraBytecode,
-    zk_compile::ZkSolc,
-    zksolc_manager::{setup_zksolc_manager, DEFAULT_ZKSOLC_VERSION},
-    DualCompiledContract,
-};
+use foundry_common::compile::{self, ContractSources, ProjectCompiler};
 use foundry_compilers::{
     artifacts::{ContractBytecode, ContractBytecodeSome, Libraries},
     cache::SolFilesCache,
     contracts::ArtifactContracts,
     info::ContractInfo,
     Artifact, ArtifactId, Project, ProjectCompileOutput,
+};
+use foundry_zksync::{
+    zksolc::{setup_zksolc_manager, PackedEraBytecode, ZkSolc, DEFAULT_ZKSOLC_VERSION},
+    DualCompiledContract,
 };
 use std::{collections::HashMap, str::FromStr};
 

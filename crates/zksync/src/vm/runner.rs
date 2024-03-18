@@ -1,5 +1,12 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
+use crate::{
+    convert::{
+        address_to_h160, h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
+        u256_to_revm_u256,
+    },
+    DualCompiledContract,
+};
 use alloy_primitives::Log;
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
 use era_test_node::{
@@ -9,16 +16,11 @@ use era_test_node::{
     utils::bytecode_to_factory_dep,
 };
 use foundry_common::{
-    console::HARDHAT_CONSOLE_ADDRESS,
-    conversion_utils::{address_to_h160, u256_to_revm_u256},
-    fix_l2_gas_limit, fix_l2_gas_price,
-    fmt::ConsoleFmt,
-    patch_hh_console_selector,
-    zk_utils::conversion_utils::{
-        h160_to_address, h256_to_h160, h256_to_revm_u256, revm_u256_to_u256,
-    },
-    Console, DualCompiledContract, HardhatConsole,
+    console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
+    HardhatConsole,
 };
+
+use crate::{fix_l2_gas_limit, fix_l2_gas_price};
 use itertools::Itertools;
 use multivm::{
     interface::{Halt, VmExecutionResultAndLogs, VmInterface, VmRevertReason},
@@ -51,7 +53,7 @@ use zksync_types::{
 };
 use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 
-use crate::{
+use crate::vm::{
     db::{ZKVMData, DEFAULT_CHAIN_ID},
     env::{create_l1_batch_env, create_system_env},
 };
@@ -60,6 +62,7 @@ use super::storage_view::StorageView;
 
 type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
 
+/// Transacts
 pub fn transact<'a, DB>(
     factory_deps: Option<Vec<Vec<u8>>>,
     env: &'a mut Env,
@@ -69,7 +72,7 @@ where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    println!("zk transact");
+    tracing::debug!("zk transact");
     let mut journaled_state = JournaledState::new(
         env.cfg.spec_id,
         Precompiles::new(to_precompile_id(env.cfg.spec_id))
@@ -104,12 +107,14 @@ where
         PaymasterParams::default(),
     );
 
+    let (state, _) = journaled_state.finalize();
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state) {
-        Ok(result) => Ok(ResultAndState { result, state: Default::default() }),
+        Ok(result) => Ok(ResultAndState { result, state }),
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
 }
 
+/// Retrieves L2 ETH balance for a given address.
 pub fn balance<'a, DB>(
     address: Address,
     db: &'a mut DB,
@@ -123,6 +128,7 @@ where
     u256_to_revm_u256(balance)
 }
 
+/// Retrieves bytecode hash stored at a given address.
 #[allow(dead_code)]
 pub fn code_hash<'a, DB>(
     address: Address,
@@ -136,6 +142,7 @@ where
     B256::from(ZKVMData::new(db, journaled_state).get_code_hash(address).0)
 }
 
+/// Retrieves nonce for a given address.
 pub fn nonce<'a, DB>(
     address: Address,
     db: &'a mut DB,
@@ -148,6 +155,7 @@ where
     ZKVMData::new(db, journaled_state).get_tx_nonce(address).0
 }
 
+/// Executes a CREATE opcode on the ZK-VM.
 pub fn create<'a, DB, E>(
     call: &CreateInputs,
     contract: &DualCompiledContract,
@@ -185,6 +193,7 @@ where
     inspect(tx, env, db, journaled_state)
 }
 
+/// Executes a CALL opcode on the ZK-VM.
 pub fn call<'a, DB, E>(
     call: &CallInputs,
     contract: Option<&DualCompiledContract>,

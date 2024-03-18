@@ -15,11 +15,10 @@ use forge::{
     traces::{render_trace_arena, CallTraceDecoder},
 };
 use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
-use foundry_common::{
-    get_contract_name, provider::ethers::RpcUrl, shell, ContractsByArtifact, DualCompiledContract,
-};
+use foundry_common::{get_contract_name, provider::ethers::RpcUrl, shell, ContractsByArtifact};
 use foundry_compilers::artifacts::ContractBytecodeSome;
 use foundry_evm::inspectors::cheatcodes::ScriptWallets;
+use foundry_zksync::DualCompiledContract;
 use futures::future::join_all;
 use parking_lot::RwLock;
 use std::{
@@ -160,7 +159,8 @@ impl ScriptArgs {
                         tx.to,
                         tx.input.clone().into_input(),
                         tx.value,
-                        zk.clone().map(|tx| tx.factory_deps),
+                        // zk.clone().map(|tx| tx.factory_deps),
+                        zk.clone(),
                     )
                     .wrap_err("Internal EVM error during simulation")?;
 

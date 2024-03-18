@@ -35,7 +35,6 @@ mod script;
 mod string;
 mod test;
 mod utils;
-// mod zk;
 
 pub use script::ScriptWallets;
 pub use test::expect::ExpectedCallTracker;

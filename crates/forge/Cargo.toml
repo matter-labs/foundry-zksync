@@ -27,6 +27,7 @@ foundry-compilers = { workspace = true, features = ["full"] }
 foundry-config.workspace = true
 foundry-evm.workspace = true
 foundry-wallets.workspace = true
+foundry-zksync.workspace = true
 
 ethers-contract.workspace = true
 ethers-core.workspace = true

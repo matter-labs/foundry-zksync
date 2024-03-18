@@ -10,19 +10,26 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-foundry-block-explorers = { workspace = true, features = ["foundry-compilers"] }
+foundry-block-explorers = { workspace = true, features = [
+    "foundry-compilers",
+] }
 foundry-compilers.workspace = true
 foundry-config.workspace = true
 foundry-macros.workspace = true
 
 ethers-core.workspace = true
 ethers-middleware.workspace = true
-ethers-providers = { workspace = true, features = ["ws", "ipc"] }
+ethers-providers = { workspace = true, features = [ "ws", "ipc" ] }
 ethers-signers.workspace = true
 
-alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }
+alloy-dyn-abi = { workspace = true, features = [ "arbitrary", "eip712" ] }
 alloy-json-abi.workspace = true
-alloy-primitives = { workspace = true, features = ["serde", "getrandom", "arbitrary", "rlp"] }
+alloy-primitives = { workspace = true, features = [
+    "serde",
+    "getrandom",
+    "arbitrary",
+    "rlp",
+] }
 alloy-rpc-types.workspace = true
 alloy-rpc-client.workspace = true
 alloy-providers.workspace = true
@@ -33,25 +40,16 @@ alloy-transport-ws.workspace = true
 alloy-transport-ipc.workspace = true
 alloy-json-rpc.workspace = true
 alloy-pubsub.workspace = true
-alloy-sol-types = { workspace = true, features = ["json"] }
+alloy-sol-types = { workspace = true, features = [ "json" ] }
 
-zksync-web3-rs.workspace = true
-zksync_basic_types.workspace = true
-zksync_types.workspace = true
-zksync_utils.workspace = true
 revm.workspace = true
 
 tower.workspace = true
 derive_more.workspace = true
 itertools.workspace = true
 
-ansi_term = "0.12.1"
-anyhow = {version = "1.0.70"}
-dirs = {version = "5.0.0"}
-xxhash-rust = { version = "0.8.7", features = ["const_xxh3"] }
-
 async-trait = "0.1"
-clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+clap = { version = "4", features = [ "derive", "env", "unicode", "wrap_help" ] }
 comfy-table = "7"
 dunce = "1"
 eyre.workspace = true
@@ -75,4 +73,4 @@ yansi = "0.5"
 [dev-dependencies]
 foundry-macros.workspace = true
 pretty_assertions.workspace = true
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = [ "rt-multi-thread", "macros" ] }

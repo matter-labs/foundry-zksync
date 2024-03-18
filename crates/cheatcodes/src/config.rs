@@ -1,13 +1,14 @@
 use super::Result;
 use crate::{script::ScriptWallets, Vm::Rpc};
 use alloy_primitives::Address;
-use foundry_common::{fs::normalize_path, DualCompiledContract};
+use foundry_common::fs::normalize_path;
 use foundry_compilers::{utils::canonicalize, ProjectPathsConfig};
 use foundry_config::{
     cache::StorageCachingConfig, fs_permissions::FsAccessKind, Config, FsPermissions,
     ResolvedRpcEndpoints,
 };
 use foundry_evm_core::opts::EvmOpts;
+use foundry_zksync::DualCompiledContract;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},

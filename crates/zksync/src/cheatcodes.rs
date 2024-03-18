@@ -1,10 +1,9 @@
 use std::fmt::Debug;
 
-use alloy_primitives::{Bytes, B256};
-use foundry_common::{
-    conversion_utils::{address_to_h160, u256_to_revm_u256},
-    zk_utils::conversion_utils::{h160_to_address, h256_to_revm_u256, revm_u256_to_u256},
+use crate::convert::{
+    address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_u256, u256_to_revm_u256,
 };
+use alloy_primitives::{Bytes, B256};
 use revm::{
     primitives::{Address, Bytecode, Env, U256 as rU256},
     Database, JournaledState,
@@ -19,6 +18,7 @@ use zksync_types::{
 };
 use zksync_utils::{address_to_h256, bytecode::hash_bytecode};
 
+/// Sets `block.timestamp`.
 pub fn warp<'a, DB>(
     timestamp: rU256,
     env: &'a mut Env,
@@ -45,6 +45,7 @@ pub fn warp<'a, DB>(
     env.block.timestamp = timestamp;
 }
 
+/// Sets `block.number`.
 pub fn roll<'a, DB>(
     number: rU256,
     env: &'a mut Env,
@@ -71,6 +72,7 @@ pub fn roll<'a, DB>(
     env.block.number = number;
 }
 
+/// Sets balance for a specific address.
 pub fn deal<'a, DB>(
     address: Address,
     balance: rU256,
@@ -94,6 +96,7 @@ where
     old_balance
 }
 
+/// Sets nonce for a specific address.
 pub fn set_nonce<'a, DB>(
     address: Address,
     nonce: rU256,
@@ -113,6 +116,7 @@ pub fn set_nonce<'a, DB>(
     journaled_state.sstore(nonce_addr, nonce_key, nonce, db).expect("failed storing value");
 }
 
+/// Gets nonce for a specific address.
 pub fn get_nonce<'a, DB>(
     address: Address,
     db: &'a mut DB,
@@ -133,6 +137,7 @@ where
     nonce
 }
 
+/// Sets code for a specific address.
 pub fn etch<'a, DB>(
     address: Address,
     bytecode: &[u8],

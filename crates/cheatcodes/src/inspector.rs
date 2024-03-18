@@ -16,23 +16,21 @@ use crate::{
     CheatsConfig, CheatsCtxt, Error, Result,
     Vm::{self, AccountAccess},
 };
-use foundry_zk as zk;
 
 use alloy_primitives::{Address, Bytes, Log, LogData, B256, U256, U64};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolInterface, SolValue};
-use foundry_common::{
-    conversion_utils::{
-        address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_h256, revm_u256_to_u256,
-        u256_to_revm_u256,
-    },
-    evm::Breakpoints,
-    provider::alloy::RpcUrl,
-    DualCompiledContract,
-};
+use foundry_common::{evm::Breakpoints, provider::alloy::RpcUrl};
 use foundry_evm_core::{
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS},
+};
+use foundry_zksync::{
+    convert::{
+        address_to_h160, h160_to_address, h256_to_revm_u256, revm_u256_to_h256, revm_u256_to_u256,
+        u256_to_revm_u256,
+    },
+    DualCompiledContract, ZkTransactionMetadata,
 };
 use itertools::Itertools;
 use revm::{
@@ -95,12 +93,6 @@ impl Context {
     }
 }
 
-/// Helps collecting zk transactions from different forks.
-#[derive(Clone, Debug, Default)]
-pub struct ZkBroadcastableTransaction {
-    pub factory_deps: Vec<Vec<u8>>,
-}
-
 /// Helps collecting transactions from different forks.
 #[derive(Clone, Debug, Default)]
 pub struct BroadcastableTransaction {
@@ -109,7 +101,7 @@ pub struct BroadcastableTransaction {
     /// The transaction to broadcast.
     pub transaction: TransactionRequest,
     /// ZK-VM factory deps
-    pub zk_tx: Option<ZkBroadcastableTransaction>,
+    pub zk_tx: Option<ZkTransactionMetadata>,
 }
 
 /// List of transactions that can be broadcasted.
@@ -548,7 +540,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
             }
             // Safety: Length is checked above.
             let address = Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }));
-            let balance = zk::balance(address, data.db, &mut data.journaled_state);
+            let balance = foundry_zksync::balance(address, data.db, &mut data.journaled_state);
 
             // Skip the current BALANCE instruction since we've already handled it
             match interpreter.stack.push(balance) {
@@ -1083,28 +1075,18 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(data, call.gas_limit);
 
-                    let nonce =
-                        zk::nonce(broadcast.new_origin, data.db, &mut data.journaled_state) as u64;
+                    let nonce = foundry_zksync::nonce(
+                        broadcast.new_origin,
+                        data.db,
+                        &mut data.journaled_state,
+                    ) as u64;
 
                     let account =
                         data.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let zk_tx = if self.use_zk_vm {
-                        // let code_hash = // TODO get hash from deployed_addresse;
-                        // let contract = self.dual_compiled_contracts.iter().find(|contract| {
-                        //     code_hash != KECCAK_EMPTY &&
-                        //         zksync_types::H256::from(code_hash.0) ==
-                        //             contract.zk_bytecode_hash
-                        // });
-                        // let factory_deps = if let Some(contract) = contract {
-                        //     vec![contract.zk_deployed_bytecode.clone()]
-                        // } else {
-                        //     error!("no zk contract was found for {code_hash:?}");
-                        //     Default::default()
-                        // };
-
                         // We shouldn't need factory_deps for CALLs
-                        Some(ZkBroadcastableTransaction { factory_deps: Default::default() })
+                        Some(ZkTransactionMetadata { factory_deps: Default::default() })
                     } else {
                         None
                     };
@@ -1201,7 +1183,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 error!("no zk contract was found for {code_hash:?}");
             }
 
-            if let Ok(result) = zk::call::<_, DatabaseError>(
+            if let Ok(result) = foundry_zksync::vm::call::<_, DatabaseError>(
                 call,
                 contract,
                 data.env,
@@ -1540,8 +1522,11 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
                     let zk_tx = if self.use_zk_vm {
                         to = Some(h160_to_address(CONTRACT_DEPLOYER_ADDRESS));
-                        nonce = zk::nonce(broadcast.new_origin, data.db, &mut data.journaled_state)
-                            as u64;
+                        nonce = foundry_zksync::nonce(
+                            broadcast.new_origin,
+                            data.db,
+                            &mut data.journaled_state,
+                        ) as u64;
                         let contract = self
                             .dual_compiled_contracts
                             .iter()
@@ -1549,7 +1534,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                             .unwrap_or_else(|| {
                                 panic!("failed finding contract for {:?}", call.init_code)
                             });
-                        let create_input = zk::encode_create_params(
+                        let create_input = foundry_zksync::encode_create_params(
                             &call.scheme,
                             contract.zk_bytecode_hash,
                             Default::default(),
@@ -1557,7 +1542,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                         bytecode = Bytes::from(create_input);
                         let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
 
-                        Some(ZkBroadcastableTransaction { factory_deps })
+                        Some(ZkTransactionMetadata { factory_deps })
                     } else {
                         None
                     };
@@ -1647,7 +1632,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 .find(|contract| contract.evm_bytecode == call.init_code)
                 .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
 
-            if let Ok(result) = zk::create::<_, DatabaseError>(
+            if let Ok(result) = foundry_zksync::vm::create::<_, DatabaseError>(
                 call,
                 zk_contract,
                 data.env,

@@ -1,5 +1,5 @@
 //! The `zk_utils` module provides utility functions specifically designed for interacting with
-use alloy_primitives::B256;
+
 /// zkSync, an Ethereum layer 2 scaling solution.
 ///
 /// This module encapsulates various functionalities related to zkSync, including retrieving
@@ -33,11 +33,6 @@ use foundry_config::Chain;
 use url::Url;
 use zksync_basic_types::U256;
 use zksync_web3_rs::types::H256;
-
-/// Utils for conversion between zksync types and revm types
-pub mod conversion_utils;
-/// Tools for working with factory deps
-pub mod factory_deps;
 
 /// Gets the RPC URL for Ethereum.
 ///
@@ -140,21 +135,4 @@ pub fn fix_l2_gas_price(gas_price: U256) -> U256 {
 /// TODO: Remove this later to allow for dynamic gas prices that work in both tests and scripts.
 pub fn fix_l2_gas_limit(gas_limit: U256) -> U256 {
     U256::min(gas_limit, U256::from(u32::MAX >> 1))
-}
-
-/// Defines a contract that has been dual compiled with both zksolc and solc
-#[derive(Debug, Default, Clone)]
-pub struct DualCompiledContract {
-    /// Contract name
-    pub name: String,
-    /// Deployed bytecode with zksolc
-    pub zk_bytecode_hash: zksync_types::H256,
-    /// Deployed bytecode hash with zksolc
-    pub zk_deployed_bytecode: Vec<u8>,
-    /// Deployed bytecode hash with solc
-    pub evm_bytecode_hash: B256,
-    /// Deployed bytecode with solc
-    pub evm_deployed_bytecode: Vec<u8>,
-    /// Bytecode with solc
-    pub evm_bytecode: Vec<u8>,
 }

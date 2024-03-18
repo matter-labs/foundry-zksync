@@ -29,13 +29,9 @@ pub mod term;
 pub mod traits;
 pub mod transactions;
 pub mod types;
-pub mod zk_compile;
-pub mod zk_utils;
-pub mod zksolc_manager;
 
 pub use console::*;
 pub use constants::*;
 pub use contracts::*;
 pub use traits::*;
 pub use transactions::*;
-pub use zk_utils::*;

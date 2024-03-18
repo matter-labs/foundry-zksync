@@ -6,13 +6,10 @@
 /// is usually collecing all the diffs - and applies them to database itself.
 use std::{collections::HashMap, fmt::Debug};
 
-use alloy_primitives::Address;
-use foundry_common::{
-    conversion_utils::address_to_h160,
-    zk_utils::conversion_utils::{
-        h160_to_address, h256_to_b256, revm_u256_to_h256, u256_to_revm_u256,
-    },
+use crate::convert::{
+    address_to_h160, h160_to_address, h256_to_b256, revm_u256_to_h256, u256_to_revm_u256,
 };
+use alloy_primitives::Address;
 use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
