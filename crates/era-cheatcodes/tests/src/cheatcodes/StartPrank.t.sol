@@ -25,14 +25,6 @@ contract CheatcodeStartPrankTest is Test {
         // Start prank without tx.origin
         vm.startPrank(TEST_ADDRESS);
 
-        require(
-            msg.sender == TEST_ADDRESS,
-            "startPrank failed: msg.sender unchanged"
-        );
-        require(
-            tx.origin == original_tx_origin,
-            "startPrank failed tx.origin changed"
-        );
         victim.assertCallerAndOrigin(
             TEST_ADDRESS,
             "startPrank failed: victim.assertCallerAndOrigin failed",
@@ -43,21 +35,12 @@ contract CheatcodeStartPrankTest is Test {
         // Stop prank
         vm.stopPrank();
 
-        require(
-            msg.sender == original_msg_sender,
-            "stopPrank failed: msg.sender didn't return to original"
-        );
-        require(
-            tx.origin == original_tx_origin,
-            "stopPrank failed tx.origin changed"
-        );
         victim.assertCallerAndOrigin(
             address(this),
             "startPrank failed: victim.assertCallerAndOrigin failed",
             original_tx_origin,
             "startPrank failed: victim.assertCallerAndOrigin failed"
         );
-
     }
 
     function testStartPrankWithOrigin() external {
@@ -77,14 +60,6 @@ contract CheatcodeStartPrankTest is Test {
         // Start prank with tx.origin
         vm.startPrank(TEST_ADDRESS, TEST_ORIGIN);
 
-        require(
-            msg.sender == TEST_ADDRESS,
-            "startPrank failed: msg.sender unchanged"
-        );
-        require(
-            tx.origin == TEST_ORIGIN,
-            "startPrank failed: tx.origin unchanged"
-        );
         victim.assertCallerAndOrigin(
             TEST_ADDRESS,
             "startPrank failed: victim.assertCallerAndOrigin failed",
@@ -95,14 +70,6 @@ contract CheatcodeStartPrankTest is Test {
         // Stop prank
         vm.stopPrank();
 
-        require(
-            msg.sender == original_msg_sender,
-            "stopPrank failed: msg.sender didn't return to original"
-        );
-        require(
-            tx.origin == original_tx_origin,
-            "stopPrank failed: tx.origin didn't return to original"
-        );
         victim.assertCallerAndOrigin(
             address(this),
             "startPrank failed: victim.assertCallerAndOrigin failed",

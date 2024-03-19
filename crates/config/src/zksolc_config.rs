@@ -25,7 +25,7 @@ const SOLIDITY: &str = "Solidity";
 ///
 /// This struct holds the configuration settings used for the zkSolc compiler,
 /// including the path to the compiler binary and various compiler settings.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ZkSolcConfig {
     /// Path to zksolc binary. Can be a URL.
     pub compiler_path: PathBuf,
@@ -34,10 +34,10 @@ pub struct ZkSolcConfig {
     pub settings: Settings,
 
     /// contracts to compile
-    pub contracts_to_compile: Option<Vec<String>>,
+    pub contracts_to_compile: Option<Vec<globset::GlobMatcher>>,
 
     /// contracts to avoid compiling
-    pub avoid_contracts: Option<Vec<String>>,
+    pub avoid_contracts: Option<Vec<globset::GlobMatcher>>,
 }
 
 /// Compiler settings for zkSolc.
@@ -152,8 +152,18 @@ impl ZkSolcConfigBuilder {
         Ok(ZkSolcConfig {
             compiler_path: self.compiler_path,
             settings,
-            contracts_to_compile: self.contracts_to_compile,
-            avoid_contracts: self.avoid_contracts,
+            contracts_to_compile: self.contracts_to_compile.map(|patterns| {
+                patterns
+                    .into_iter()
+                    .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
+                    .collect::<Vec<_>>()
+            }),
+            avoid_contracts: self.avoid_contracts.map(|patterns| {
+                patterns
+                    .into_iter()
+                    .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
+                    .collect::<Vec<_>>()
+            }),
         })
     }
 }

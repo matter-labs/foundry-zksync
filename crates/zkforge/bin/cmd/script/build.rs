@@ -237,8 +237,20 @@ impl ScriptArgs {
     ) -> Result<(Project, ProjectCompileOutput)> {
         let mut project = script_config.config.project()?;
         let mut zksolc_cfg = script_config.config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-        zksolc_cfg.contracts_to_compile = self.opts.args.compiler.contracts_to_compile.clone();
-        zksolc_cfg.avoid_contracts = self.opts.args.compiler.avoid_contracts.clone();
+        zksolc_cfg.contracts_to_compile =
+            self.opts.args.compiler.contracts_to_compile.clone().map(|patterns| {
+                patterns
+                    .into_iter()
+                    .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+                    .collect_vec()
+            });
+        zksolc_cfg.avoid_contracts =
+            self.opts.args.compiler.avoid_contracts.clone().map(|patterns| {
+                patterns
+                    .into_iter()
+                    .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+                    .collect_vec()
+            });
         let mut config = script_config.config.clone();
         let contract = ContractInfo::from_str(&self.path)?;
         self.target_contract = Some(contract.name.clone());
