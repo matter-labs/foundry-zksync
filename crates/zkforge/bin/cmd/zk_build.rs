@@ -39,6 +39,7 @@ use foundry_config::{
     },
     Config,
 };
+use itertools::Itertools;
 use serde::Serialize;
 use std::fmt::Debug;
 use watchexec::config::{InitConfig, RuntimeConfig};
@@ -124,8 +125,19 @@ impl ZkBuildArgs {
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
         let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-        zksolc_cfg.contracts_to_compile = self.args.compiler.contracts_to_compile.clone();
-        zksolc_cfg.avoid_contracts = self.args.compiler.avoid_contracts.clone();
+        zksolc_cfg.contracts_to_compile =
+            self.args.compiler.contracts_to_compile.clone().map(|patterns| {
+                patterns
+                    .into_iter()
+                    .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+                    .collect_vec()
+            });
+        zksolc_cfg.avoid_contracts = self.args.compiler.avoid_contracts.clone().map(|patterns| {
+            patterns
+                .into_iter()
+                .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+                .collect_vec()
+        });
         //set zk out path
         let zk_out_path = project.paths.root.join("zkout");
         project.paths.artifacts = zk_out_path;
