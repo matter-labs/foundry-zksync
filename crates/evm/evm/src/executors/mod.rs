@@ -798,7 +798,16 @@ fn convert_executed_result(
         Some(combined_logs) => {
             let new_logs = combined_logs
                 .into_iter()
-                .map(|log| log.unwrap_or_else(|| logs.remove(0)))
+                // .map(|log| log.unwrap_or_else(|| logs.remove(0)))
+                .map(|log| {
+                    log.unwrap_or_else(|| {
+                        if !logs.is_empty() {
+                            logs.remove(0)
+                        } else {
+                            Default::default()
+                        }
+                    })
+                })
                 .collect_vec();
             assert!(logs.is_empty(), "logs were not fully combined");
             new_logs

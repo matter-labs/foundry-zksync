@@ -1,8 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{
-    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    DualCompiledContract,
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256}, vm::tracer::CheatcodeTracer, DualCompiledContract
 };
 use alloy_primitives::Log;
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
@@ -55,7 +54,7 @@ use crate::vm::{
     env::{create_l1_batch_env, create_system_env},
 };
 
-use super::storage_view::StorageView;
+use super::{storage_view::StorageView, tracer::CheatcodeTracerContext};
 
 type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
 
@@ -66,7 +65,7 @@ pub fn transact<'a, DB>(
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
 where
-    DB: Database,
+    DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
     tracing::debug!("zk transact");
@@ -103,7 +102,7 @@ where
     );
 
     let (state, _) = journaled_state.finalize();
-    match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state) {
+    match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default()) {
         Ok(result) => Ok(ResultAndState { result, state }),
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
@@ -157,9 +156,10 @@ pub fn create<'a, DB, E>(
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
+    ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database,
+    DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
     let caller = env.tx.caller;
@@ -184,7 +184,7 @@ where
         Some(factory_deps),
         PaymasterParams::default(),
     );
-    inspect(tx, env, db, journaled_state)
+    inspect(tx, env, db, journaled_state, ccx)
 }
 
 /// Executes a CALL opcode on the ZK-VM.
@@ -194,9 +194,10 @@ pub fn call<'a, DB, E>(
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
+    ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database,
+    DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx");
@@ -218,7 +219,7 @@ where
         factory_deps,
         PaymasterParams::default(),
     );
-    inspect(tx, env, db, journaled_state)
+    inspect(tx, env, db, journaled_state, ccx)
 }
 
 fn inspect<'a, DB, E>(
@@ -226,9 +227,10 @@ fn inspect<'a, DB, E>(
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
+    ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database,
+    DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
     let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state);
@@ -255,6 +257,7 @@ where
         storage_ptr,
         L2ChainId::from(chain_id_u32),
         u64::max(env.block.basefee.to::<u64>(), 1000),
+        ccx,
     );
 
     let execution_result = match tx_result.result {
@@ -394,11 +397,12 @@ where
     Ok(execution_result)
 }
 
-fn inspect_inner<S: ReadStorage>(
+fn inspect_inner<S: ReadStorage + Send>(
     l2_tx: L2Tx,
     storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,
     l1_gas_price: u64,
+    ccx: CheatcodeTracerContext,
 ) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price);
 
@@ -411,7 +415,10 @@ fn inspect_inner<S: ReadStorage>(
 
     vm.push_transaction(tx.clone());
     let call_tracer_result = Arc::new(OnceCell::default());
-    let tracers = vec![CallTracer::new(call_tracer_result.clone()).into_tracer_pointer()];
+    let tracers = vec![
+        CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
+        CheatcodeTracer { mocked_calls: ccx.mocked_calls, ..Default::default() }.into_tracer_pointer(),
+    ];
     let mut tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
     let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
     trace!(?tx_result.result, "zk vm result");

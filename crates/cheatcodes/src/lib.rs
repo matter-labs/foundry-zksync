@@ -37,7 +37,6 @@ mod test;
 mod utils;
 
 pub use script::ScriptWallets;
-pub use test::expect::ExpectedCallTracker;
 
 /// Cheatcode implementation.
 pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {

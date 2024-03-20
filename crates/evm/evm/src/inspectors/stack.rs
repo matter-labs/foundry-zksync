@@ -401,7 +401,7 @@ impl InspectorStack {
         }
     }
 
-    fn do_call_end<DB: DatabaseExt>(
+    fn do_call_end<DB: DatabaseExt + Send>(
         &mut self,
         data: &mut EVMData<'_, DB>,
         call: &CallInputs,
@@ -439,7 +439,7 @@ impl InspectorStack {
         (status, remaining_gas, retdata)
     }
 
-    fn transact_inner<DB: DatabaseExt + DatabaseCommit>(
+    fn transact_inner<DB: DatabaseExt + DatabaseCommit + Send>(
         &mut self,
         data: &mut EVMData<'_, DB>,
         transact_to: TransactTo,
@@ -554,7 +554,7 @@ impl InspectorStack {
     }
 }
 
-impl<DB: DatabaseExt + DatabaseCommit> Inspector<DB> for InspectorStack {
+impl<DB: DatabaseExt + DatabaseCommit + Send> Inspector<DB> for InspectorStack {
     fn initialize_interp(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
         let res = interpreter.instruction_result;
         call_inspectors_adjust_depth!(

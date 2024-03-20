@@ -3295,9 +3295,9 @@ checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 
 [[package]]
 name = "dyn-clone"
-version = "1.0.16"
+version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "545b22097d44f8a9581187cdf93de7a71e4722bf51200cfaba810865b49a495d"
+checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
 
 [[package]]
 name = "ecdsa"
@@ -3546,7 +3546,6 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 [[package]]
 name = "era_test_node"
 version = "0.1.0-alpha.17"
-source = "git+https://github.com/matter-labs/era-test-node.git?rev=2d5047237650a3249aeade484b0d2f4750615519#2d5047237650a3249aeade484b0d2f4750615519"
 dependencies = [
  "anyhow",
  "bigdecimal 0.2.2",
@@ -4490,6 +4489,7 @@ dependencies = [
  "base64 0.21.7",
  "const-hex",
  "eyre",
+ "foundry-cheatcodes-common",
  "foundry-cheatcodes-spec",
  "foundry-common",
  "foundry-compilers",
@@ -4508,6 +4508,14 @@ dependencies = [
  "tracing",
  "walkdir",
  "zksync_types",
+]
+
+[[package]]
+name = "foundry-cheatcodes-common"
+version = "0.2.0"
+dependencies = [
+ "alloy-primitives",
+ "revm",
 ]
 
 [[package]]
@@ -4898,6 +4906,7 @@ dependencies = [
  "dirs 5.0.1",
  "era_test_node",
  "eyre",
+ "foundry-cheatcodes-common",
  "foundry-common",
  "foundry-compilers",
  "foundry-config",

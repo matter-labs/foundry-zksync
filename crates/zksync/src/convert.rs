@@ -3,7 +3,7 @@ use revm::primitives::U256 as rU256;
 use revm::primitives::{Address, B256};
 
 use zksync_basic_types::{H160, H256, U256};
-use zksync_utils::{address_to_h256, h256_to_u256};
+use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
 
 /// Conversions from [U256]
 pub trait ConvertU256 {
@@ -12,6 +12,9 @@ pub trait ConvertU256 {
 
     /// Convert to [B256]
     fn to_b256(self) -> B256;
+
+    /// Convert to [H256]
+    fn to_h256(self) -> H256;
 }
 
 impl ConvertU256 for U256 {
@@ -25,6 +28,11 @@ impl ConvertU256 for U256 {
         let mut payload: [u8; 32] = [0; 32];
         self.to_big_endian(&mut payload);
         B256::from_slice(&payload)
+    }
+
+    /// Convert to [H256]
+    fn to_h256(self) -> H256 {
+        u256_to_h256(self)
     }
 }
 
