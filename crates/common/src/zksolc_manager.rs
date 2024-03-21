@@ -39,6 +39,12 @@ use url::Url;
 const ZKSOLC_DOWNLOAD_BASE_URL: &str =
     "https://github.com/matter-labs/zksolc-bin/releases/download/";
 
+const ZKSOLC_VERSIONS_DOWNLOAD_URL: &str =
+    "https://raw.githubusercontent.com/matter-labs/zksolc-bin/main/version.json";
+
+/// Skip the minimal recommended version check or not.
+const ZKSOLC_SKIP_MINIMAL_VERSION_CHECK_ENV: &str = "ZKSOLC_SKIP_MINIMAL_VERSION_CHECK";
+
 /// `ZkSolcVersion` is an enumeration of the supported versions of the `zksolc` compiler.
 ///
 /// Each variant in this enum represents a specific version of the `zksolc` compiler:
@@ -50,7 +56,7 @@ const ZKSOLC_DOWNLOAD_BASE_URL: &str =
 ///
 /// This enumeration is used in the `ZkSolcManager` to specify the `zksolc` compiler version to be
 /// used for contract compilation.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq, PartialOrd)]
 pub enum ZkSolcVersion {
     V135,
     V136,
@@ -432,19 +438,64 @@ impl fmt::Display for ZkSolcManager {
     }
 }
 
+/// Checks from the current environment if user wants to check the recomended
+/// minimal version of the zksolc.
+///
+/// This function checks if user provided a _"default"_ version, if so return
+/// false. If the value is non default, check
+///
+/// # Returns
+///
+/// `true` or `false`
+fn do_check_minimal_version(zksolc_version: &str) -> bool {
+    if zksolc_version == DEFAULT_ZKSOLC_VERSION {
+        return false
+    }
+
+    std::env::var(ZKSOLC_SKIP_MINIMAL_VERSION_CHECK_ENV).is_err()
+}
+
 /// The `setup_zksolc_manager` function creates and prepares an instance of `ZkSolcManager`.
 ///
 /// It follows these steps:
-/// 1. Instantiate `ZkSolcManagerOpts` and `ZkSolcManagerBuilder` with the specified zkSync Solidity
+/// 1. Check if zksolc version passes the requirements if it needs so (see
+///    [`do_check_minimal_version`]).
+/// 2. Instantiate `ZkSolcManagerOpts` and `ZkSolcManagerBuilder` with the specified zkSync Solidity
 ///    compiler.
-/// 2. Create a `ZkSolcManager` using the builder.
-/// 3. Check if the setup compilers directory is properly set up. If not, it raises an error.
-/// 4. If the zkSync Solidity compiler does not exist in the compilers directory, it triggers its
+/// 3. Create a `ZkSolcManager` using the builder.
+/// 4. Check if the setup compilers directory is properly set up. If not, it raises an error.
+/// 5. If the zkSync Solidity compiler does not exist in the compilers directory, it triggers its
 ///    download.
 ///
 /// The function returns the `ZkSolcManager` if all steps are successful, or an error if any
 /// step fails.
 pub async fn setup_zksolc_manager(zksolc_version: String) -> eyre::Result<PathBuf> {
+    if do_check_minimal_version(&zksolc_version) {
+        let solc_metadata = fetch_solc_metadata()
+            .await
+            .map_err(|e| eyre::eyre!("Failed to get solc metadata: {:#}", e))?;
+
+        let zksolc_version = parse_version(&zksolc_version)
+            .map_err(|e| eyre::eyre!("Failed to parse zksolc version: {:#}", e))?;
+
+        // As `PartialOrd` was added for `ZkSolcVersion`, we can now compare the
+        // versions, where the lowest value has the the first from above enum
+        // variant, and the highest value has the last from above enum variant.
+        eyre::ensure!(
+            solc_metadata.min_version <= zksolc_version,
+            r#"
+            The check of the minimal recommended version of the zksolc compiler wasn't passed
+
+            {min_version} > {provided_version}
+
+            If you want to skip this check, set env variable {env_var}
+            "#,
+            min_version = solc_metadata.min_version.get_version(),
+            provided_version = zksolc_version.get_version(),
+            env_var = ZKSOLC_SKIP_MINIMAL_VERSION_CHECK_ENV,
+        )
+    }
+
     let zksolc_manager_opts = ZkSolcManagerOpts::new(zksolc_version.clone());
     let zksolc_manager_builder = ZkSolcManagerBuilder::new(zksolc_manager_opts);
     let zksolc_manager = zksolc_manager_builder.build().map_err(|e| {
@@ -672,5 +723,79 @@ impl ZkSolcManager {
             )))
         }
         Ok(())
+    }
+}
+
+/// Get minimal requirements of the compiler version for the zksolc compiler.
+///
+/// This function downloads the JSON file from the zksolc-bin repository and
+/// returns the minimal requirements of the compiler version for the zksolc
+/// compiler.
+///
+/// # Returns
+///
+/// [`SolcMetadata`]
+///
+/// # Errors
+///
+/// The error may occure on failed connection establishing to repository
+/// provider. Also, if path or structure of `version.json` file changes,
+/// the error may occure too.
+pub async fn fetch_solc_metadata() -> Result<SolcMetadata> {
+    let client = Client::new();
+    let response = client
+        .get(ZKSOLC_VERSIONS_DOWNLOAD_URL)
+        .send()
+        .await
+        .map_err(|e| Error::msg(format!("Failed to get solc versions file: {e}")))?;
+
+    if !response.status().is_success() {
+        return Err(Error::msg(format!(
+            "Failed to get solc versions file: status code {}",
+            response.status()
+        )))
+    }
+
+    let solc_metadata: SolcMetadataResponseBody = response
+        .json()
+        .await
+        .map_err(|e| Error::msg(format!("Failed to parse solc versions file: {e}")))?;
+
+    solc_metadata.try_into()
+}
+
+/// Metadata of the solc-bin comiler.
+// TODO(Velnbur): handle invalid semver spec structure by using types from
+// `semver` crate or implement proper deserialize for `ZkSolcVersion`.
+#[derive(serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SolcMetadataResponseBody {
+    /// The latest supported version of solc compiler as a string in semver spec.
+    pub(crate) latest: String,
+
+    /// The minimal supported version of solc compiler as a string in semver spec.
+    pub(crate) min_version: String,
+}
+
+/// Metadata of the solc-bin comiler.
+#[derive(Clone, Debug)]
+pub struct SolcMetadata {
+    /// The latest supported version of solc compiler
+    pub latest: ZkSolcVersion,
+
+    /// The minimal supported version of solc compiler
+    pub min_version: ZkSolcVersion,
+}
+
+impl TryFrom<SolcMetadataResponseBody> for SolcMetadata {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SolcMetadataResponseBody) -> Result<Self, Self::Error> {
+        Ok(SolcMetadata {
+            // TODO: the `version.json` file has versions without `v` prefix,
+            // but `parse_version` requires it, so we add it with `format!`.
+            latest: parse_version(&format!("v{}", value.latest))?,
+            min_version: parse_version(&format!("v{}", value.min_version))?,
+        })
     }
 }
