@@ -15,6 +15,9 @@ pub mod utils;
 /// ZKSync Era VM implementation.
 pub mod vm;
 
+/// ZKSync Era State implementation.
+pub mod state;
+
 /// ZKSolc specific logic.
 pub mod zksolc;
 

@@ -19,12 +19,19 @@ pub struct ExecutorBuilder {
     gas_limit: Option<U256>,
     /// The spec ID.
     spec_id: SpecId,
+
+    use_zk: bool,
 }
 
 impl Default for ExecutorBuilder {
     #[inline]
     fn default() -> Self {
-        Self { stack: InspectorStackBuilder::new(), gas_limit: None, spec_id: SpecId::LATEST }
+        Self {
+            stack: InspectorStackBuilder::new(),
+            gas_limit: None,
+            spec_id: SpecId::LATEST,
+            use_zk: false,
+        }
     }
 }
 
@@ -61,14 +68,23 @@ impl ExecutorBuilder {
         self
     }
 
+    /// Sets the EVM spec to use
+    #[inline]
+    pub fn use_zk_vm(mut self, enable: bool) -> Self {
+        self.use_zk = enable;
+        self
+    }
+
     /// Builds the executor as configured.
     #[inline]
     pub fn build(self, mut env: Env, db: Backend) -> Executor {
-        let Self { mut stack, gas_limit, spec_id } = self;
+        let Self { mut stack, gas_limit, spec_id, use_zk } = self;
         env.cfg.spec_id = spec_id;
         stack.block = Some(env.block.clone());
         stack.gas_price = Some(env.tx.gas_price);
         let gas_limit = gas_limit.unwrap_or(env.block.gas_limit);
-        Executor::new(db, env, stack.build(), gas_limit)
+        let mut exec = Executor::new(db, env, stack.build(), gas_limit);
+        exec.use_zk = use_zk;
+        exec
     }
 }

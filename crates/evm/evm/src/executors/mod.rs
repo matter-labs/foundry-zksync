@@ -74,6 +74,8 @@ pub struct Executor {
 
     /// Sets up the next transaction to be executed as a ZK transaction.
     zk_tx: Option<ZkTransactionMetadata>,
+
+    pub use_zk: bool,
 }
 
 impl Executor {
@@ -89,7 +91,7 @@ impl Executor {
             },
         );
 
-        Executor { backend, env, inspector, gas_limit, zk_tx: None }
+        Executor { backend, env, inspector, gas_limit, zk_tx: None, use_zk: false }
     }
 
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
@@ -119,11 +121,15 @@ impl Executor {
 
     /// Set the balance of an account.
     pub fn set_balance(&mut self, address: Address, amount: U256) -> DatabaseResult<&mut Self> {
-        trace!(?address, ?amount, "setting account balance");
+        trace!(?address, ?amount, "setting account balance ZK={}", self.use_zk);
         let mut account = self.backend.basic_ref(address)?.unwrap_or_default();
         account.balance = amount;
-
         self.backend.insert_account_info(address, account);
+
+        if self.use_zk {
+            let (address, slot) = foundry_zksync::state::get_balance_storage(address);
+            self.backend.insert_account_storage(address, slot, amount)?;
+        }
         Ok(self)
     }
 
@@ -138,6 +144,12 @@ impl Executor {
         account.nonce = nonce;
 
         self.backend.insert_account_info(address, account);
+
+        if self.use_zk {
+            let (address, slot) = foundry_zksync::state::get_nonce_storage(address);
+            self.backend.insert_account_storage(address, slot, U256::from(nonce))?;
+        }
+
         Ok(self)
     }
 

@@ -65,6 +65,7 @@ pub struct MultiContractRunner {
     pub test_options: TestOptions,
     /// Whether to enable call isolation
     pub isolation: bool,
+    pub use_zk: bool,
 }
 
 impl MultiContractRunner {
@@ -188,6 +189,7 @@ impl MultiContractRunner {
                     })
                     .spec(self.evm_spec)
                     .gas_limit(self.evm_opts.gas_limit())
+                    .use_zk_vm(self.use_zk)
                     .build(self.env.clone(), db.clone());
                 let identifier = id.identifier();
                 trace!(contract=%identifier, "start executing all tests in contract");
@@ -410,6 +412,7 @@ impl MultiContractRunnerBuilder {
             debug: self.debug,
             test_options: self.test_options.unwrap_or_default(),
             isolation: self.isolation,
+            use_zk: false,
         })
     }
 }

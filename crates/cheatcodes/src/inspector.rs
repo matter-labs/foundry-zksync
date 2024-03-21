@@ -8,15 +8,8 @@ use crate::{
         DealRecord, RecordAccess,
     },
     script::{Broadcast, ScriptWallets},
-    // test::expect::{
-    //     self, ExpectedCallData, ExpectedCallTracker, ExpectedCallType, ExpectedEmit,
-    //     ExpectedRevert, ExpectedRevertKind,
-    // },
     test::expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
-    CheatsConfig,
-    CheatsCtxt,
-    Error,
-    Result,
+    CheatsConfig, CheatsCtxt, Error, Result,
     Vm::{self, AccountAccess},
 };
 
@@ -28,7 +21,6 @@ use foundry_cheatcodes_common::{
     mock::{MockCallDataContext, MockCallReturnData},
 };
 use foundry_common::{evm::Breakpoints, provider::alloy::RpcUrl};
-use foundry_compilers::artifacts::contract;
 use foundry_evm_core::{
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
@@ -38,7 +30,7 @@ use foundry_evm_core::{
 };
 use foundry_zksync::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    vm::{MockCall, MockedCalls},
+    zksolc::FindContract,
     DualCompiledContract, ZkTransactionMetadata,
 };
 use itertools::Itertools;
@@ -245,6 +237,9 @@ pub struct Cheatcodes {
     /// EVM logs have the value `None` so they can be interpolated later, since
     /// they are recorded by [foundry_evm::inspectors::LogCollector] tracer.
     pub combined_logs: Vec<Option<Log>>,
+
+    /// Starts the cheatcode inspector in ZK mode
+    pub startup_zk: bool,
 }
 
 impl Cheatcodes {
@@ -254,12 +249,14 @@ impl Cheatcodes {
         let labels = config.labels.clone();
         let script_wallets = config.script_wallets.clone();
         let dual_compiled_contracts = config.dual_compiled_contracts.clone();
+        let startup_zk = config.use_zk.clone();
         Self {
             config,
             fs_commit: true,
             labels,
             script_wallets,
             dual_compiled_contracts,
+            startup_zk,
             ..Default::default()
         }
     }
@@ -358,8 +355,10 @@ impl Cheatcodes {
     /// accounts
     pub fn select_evm<DB: DatabaseExt>(&mut self, data: &mut EVMData<'_, DB>) {
         if !self.use_zk_vm {
-            return Default::default()
+            tracing::info!("already in  EVM");
+            return
         }
+        // let switched = self.use_zk_vm;
 
         tracing::info!("switching to EVM");
         self.use_zk_vm = false;
@@ -372,6 +371,17 @@ impl Cheatcodes {
         journaled_account(data, nonce_account).expect("failed to load account");
         let account_code_account = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
         journaled_account(data, account_code_account).expect("failed to load account");
+
+        // if switched {
+        //     let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
+        //     let (block_info, _) = data
+        //         .journaled_state
+        //         .sload(system_account, block_info_key, data.db)
+        //         .unwrap_or_default();
+        //     let (block_number, block_timestamp) = unpack_block_info(block_info.to_u256());
+        //     data.env.block.number = U256::from(block_number);
+        //     data.env.block.timestamp = U256::from(block_timestamp);
+        // }
 
         let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
         let (block_info, _) =
@@ -434,13 +444,27 @@ impl Cheatcodes {
         new_env: Option<&Env>,
     ) {
         if self.use_zk_vm {
-            return Default::default()
+            tracing::info!("already in  ZK-VM");
+            return
         }
+        // let switched = !self.use_zk_vm;
 
         tracing::info!("switching to ZK-VM");
         self.use_zk_vm = true;
 
         let env = new_env.unwrap_or(data.env);
+
+        // if switched {
+        //     let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
+        //     let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
+        //     let block_info =
+        //         pack_block_info(env.block.number.as_limbs()[0],
+        // env.block.timestamp.as_limbs()[0]);     system_storage.insert(block_info_key,
+        // StorageSlot::new(block_info.to_ru256()));     let system_addr =
+        // SYSTEM_CONTEXT_ADDRESS.to_address();     let system_account =
+        //         journaled_account(data, system_addr).expect("failed to load account");
+        //     system_account.storage.extend(system_storage.clone());
+        // }
 
         let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
         let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
@@ -535,7 +559,9 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
         if let Some(gas_price) = self.gas_price.take() {
             data.env.tx.gas_price = gas_price;
         }
-        self.select_zk_vm(data, None);
+        if self.startup_zk && !self.use_zk_vm {
+            self.select_zk_vm(data, None);
+        }
     }
 
     fn step_end(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
@@ -1188,51 +1214,32 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 .load_account(call.contract, data.db)
                 .map(|(account, _)| account.info.code_hash)
                 .unwrap_or_default();
-            let contract = self.dual_compiled_contracts.iter().find(|contract| {
-                // println!(
-                //     "> {} {:?} {:?} | {:?}",
-                //     contract.name, contract.evm_bytecode_hash, contract.zk_bytecode_hash,
-                // code_hash );
-                code_hash != KECCAK_EMPTY &&
-                    zksync_types::H256::from(code_hash.0) == contract.zk_bytecode_hash
-            });
+            let contract = if code_hash != KECCAK_EMPTY {
+                self.dual_compiled_contracts
+                    .find_zk_bytecode_hash(zksync_types::H256::from(code_hash.0))
+            } else {
+                None
+            };
             if contract.is_none() {
                 error!("no zk contract was found for {code_hash:?}");
             }
 
-            if let Some(c) = &contract {
-                println!("FOUND: {}", c.name);
-                let (acc,_) = data.journaled_state.load_account(call.contract, data.db).unwrap();
-                println!("{:?}\n{:?}", acc.info.code, acc.info.code_hash);
-            }
-
-            // let mut mocked_calls = MockedCalls::default();
-            // for (k, v) in &self.mocked_calls {
-            //     for (a, b) in v {
-            //         if let Some(value) = a.value {
-            //             mocked_calls.with_value.insert(
-            //                 MockCall {
-            //                     address: k.to_h160(),
-            //                     value: Some(value.to_u256()),
-            //                     calldata: a.calldata.to_vec(),
-            //                 },
-            //                 b.data.to_vec(),
-            //             );
-            //         } else {
-            //             mocked_calls.without_value.insert(
-            //                 MockCall {
-            //                     address: k.to_h160(),
-            //                     value: None,
-            //                     calldata: a.calldata.to_vec(),
-            //                 },
-            //                 b.data.to_vec(),
-            //             );
-            //         }
-            //     }
-            // }
             let ccx = foundry_zksync::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
+                expected_calls: Some(&mut self.expected_calls),
             };
+            // foundry_zksync::state::sync_accounts(
+            //     data.db.persistent_accounts(),
+            //     data.db,
+            //     &mut data.journaled_state,
+            // );
+            // foundry_zksync::state::migrate_to_zk(
+            //     data.db.persistent_accounts(),
+            //     &self.dual_compiled_contracts,
+            //     &data.env,
+            //     data.db,
+            //     &mut data.journaled_state,
+            // );
             if let Ok(result) = foundry_zksync::vm::call::<_, DatabaseError>(
                 call,
                 contract,
@@ -1241,29 +1248,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 &mut data.journaled_state,
                 ccx,
             ) {
-                // if let Some(expected_calls_for_target) =
-                // self.expected_calls.get_mut(&(call.contract)) {     // Match
-                // every partial/full calldata     for (calldata, (expected,
-                // actual_count)) in expected_calls_for_target {         //
-                // Increment actual times seen if...         // The calldata is at
-                // most, as big as this call's input, and         if calldata.len()
-                // <= call.input.len() &&             // Both calldata match, taking
-                // the length of the assumed smaller one (which will have at least the selector),
-                // and             *calldata == call.input[..calldata.len()] &&
-                //             // The value matches, if provided
-                //             expected
-                //                 .value
-                //                 .map_or(true, |value| value == call.transfer.value) &&
-                //             // The gas matches, if provided
-                //             expected.gas.map_or(true, |gas| gas == call.gas_limit) &&
-                //             // The minimum gas matches, if provided
-                //             expected.min_gas.map_or(true, |min_gas| min_gas <= call.gas_limit)
-                //         {
-                //             *actual_count += 1;
-                //         }
-                //     }
-                // }
-
                 return match result {
                     ExecutionResult::Success { output, logs, .. } => match output {
                         Output::Call(bytes) => {
@@ -1287,6 +1271,8 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     ),
                 }
             }
+        } else {
+            info!("normal call evm {:#?}", call);
         }
 
         (InstructionResult::Continue, gas, Bytes::new())
@@ -1603,15 +1589,16 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                         ) as u64;
                         let contract = self
                             .dual_compiled_contracts
-                            .iter()
-                            .find(|contract| contract.evm_bytecode == call.init_code)
+                            .find_evm_bytecode(&call.init_code.0)
                             .unwrap_or_else(|| {
                                 panic!("failed finding contract for {:?}", call.init_code)
                             });
+                        let constructor_input =
+                            call.init_code[contract.evm_bytecode.len()..].to_vec();
                         let create_input = foundry_zksync::encode_create_params(
                             &call.scheme,
                             contract.zk_bytecode_hash,
-                            Default::default(),
+                            constructor_input,
                         );
                         bytecode = Bytes::from(create_input);
                         let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
@@ -1707,37 +1694,25 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
             let zk_contract = self
                 .dual_compiled_contracts
-                .iter()
-                .find(|contract| contract.evm_bytecode == call.init_code)
+                .find_evm_bytecode(&call.init_code.0)
                 .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
 
-            // let mut mocked_calls = MockedCalls::default();
-            // for (k, v) in &self.mocked_calls {
-            //     for (a, b) in v {
-            //         if let Some(value) = a.value {
-            //             mocked_calls.with_value.insert(
-            //                 MockCall {
-            //                     address: k.to_h160(),
-            //                     value: Some(value.to_u256()),
-            //                     calldata: a.calldata.to_vec(),
-            //                 },
-            //                 b.data.to_vec(),
-            //             );
-            //         } else {
-            //             mocked_calls.without_value.insert(
-            //                 MockCall {
-            //                     address: k.to_h160(),
-            //                     value: None,
-            //                     calldata: a.calldata.to_vec(),
-            //                 },
-            //                 b.data.to_vec(),
-            //             );
-            //         }
-            //     }
-            // }
             let ccx = foundry_zksync::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
+                expected_calls: Some(&mut self.expected_calls),
             };
+            // foundry_zksync::state::sync_accounts(
+            //     data.db.persistent_accounts(),
+            //     data.db,
+            //     &mut data.journaled_state,
+            // );
+            // foundry_zksync::state::migrate_to_zk(
+            //     data.db.persistent_accounts(),
+            //     &self.dual_compiled_contracts,
+            //     &data.env,
+            //     data.db,
+            //     &mut data.journaled_state,
+            // );
             if let Ok(result) = foundry_zksync::vm::create::<_, DatabaseError>(
                 call,
                 zk_contract,
@@ -1770,6 +1745,8 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     ),
                 }
             }
+        } else {
+            info!("normal create evm {:#?}", call);
         }
 
         (InstructionResult::Continue, None, gas, Bytes::new())

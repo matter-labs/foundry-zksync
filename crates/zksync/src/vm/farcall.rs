@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{collections::HashMap, fmt::Debug};
 
 use itertools::Itertools;
@@ -16,7 +18,7 @@ use multivm::{
 };
 use zksync_basic_types::{H160, U256};
 use zksync_state::{StoragePtr, WriteStorage};
-use zksync_types::{MSG_VALUE_SIMULATOR_ADDRESS};
+use zksync_types::MSG_VALUE_SIMULATOR_ADDRESS;
 
 use crate::convert::{ConvertH256, ConvertU256};
 
@@ -117,21 +119,21 @@ type MockCallReturn = Vec<u8>;
 
 /// Defines the match criteria of a mocked call.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct MockCall {
-    pub address: H160,
-    pub value: Option<U256>,
-    pub calldata: Vec<u8>,
+pub(crate) struct MockCall {
+    pub(crate) address: H160,
+    pub(crate) value: Option<U256>,
+    pub(crate) calldata: Vec<u8>,
 }
 
 /// Contains the list of mocked calls.
 /// Note that mocked calls with value take precedence of the ones without.
 #[derive(Default, Debug, Clone)]
-pub struct MockedCalls {
+pub(crate) struct MockedCalls {
     /// List of mocked calls with the value parameter.
-    pub with_value: HashMap<MockCall, MockCallReturn>,
+    pub(crate) with_value: HashMap<MockCall, MockCallReturn>,
 
     /// List of mocked calls without the value parameter.
-    pub without_value: HashMap<MockCall, MockCallReturn>,
+    pub(crate) without_value: HashMap<MockCall, MockCallReturn>,
 }
 
 impl MockedCalls {
@@ -216,7 +218,7 @@ pub enum ParsedFarCall {
 
 impl ParsedFarCall {
     /// Retrieves the `to` address for the call, if any
-    pub fn to(&self) -> &H160 {
+    pub(crate) fn to(&self) -> &H160 {
         match self {
             ParsedFarCall::ValueCall { to, .. } => to,
             ParsedFarCall::SimpleCall { to, .. } => to,
@@ -224,7 +226,7 @@ impl ParsedFarCall {
     }
 
     /// Retrieves the `value` for the call
-    pub fn value(&self) -> &U256 {
+    pub(crate) fn value(&self) -> &U256 {
         match self {
             ParsedFarCall::ValueCall { value, .. } => value,
             ParsedFarCall::SimpleCall { value, .. } => value,
@@ -232,7 +234,7 @@ impl ParsedFarCall {
     }
 
     /// Retrieves the selector for the call, or returns an empty string if none.
-    pub fn selector(&self) -> String {
+    pub(crate) fn selector(&self) -> String {
         let calldata = self.calldata();
 
         if calldata.len() < 4 {
@@ -243,7 +245,7 @@ impl ParsedFarCall {
     }
 
     /// Retrieves the calldata for the call, if any
-    pub fn calldata(&self) -> &[u8] {
+    pub(crate) fn calldata(&self) -> &[u8] {
         match self {
             ParsedFarCall::ValueCall { calldata, .. } => calldata,
             ParsedFarCall::SimpleCall { calldata, .. } => calldata,
@@ -251,7 +253,7 @@ impl ParsedFarCall {
     }
 
     /// Retrieves the parameters from calldata, if any
-    pub fn params(&self) -> Vec<[u8; 32]> {
+    pub(crate) fn params(&self) -> Vec<[u8; 32]> {
         let params = &match self {
             ParsedFarCall::ValueCall { calldata, .. } => calldata,
             ParsedFarCall::SimpleCall { calldata, .. } => calldata,
@@ -267,7 +269,7 @@ impl ParsedFarCall {
     }
 
     /// Retrieves all bytes after the `offset` number of 32byte words
-    pub fn param_bytes_after(&self, offset_words: usize) -> Vec<u8> {
+    pub(crate) fn param_bytes_after(&self, offset_words: usize) -> Vec<u8> {
         let params = &match self {
             ParsedFarCall::ValueCall { calldata, .. } => calldata,
             ParsedFarCall::SimpleCall { calldata, .. } => calldata,
@@ -312,7 +314,7 @@ const MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT: u8 = 1;
 /// Parses a FarCall into ZKSync's normal calls or MsgValue calls.
 /// For MsgValueSimulator call parsing, see https://github.com/matter-labs/era-system-contracts/blob/main/contracts/MsgValueSimulator.sol#L25
 /// For normal call parsing, see https://github.com/matter-labs/zksync-era/blob/main/core/lib/multivm/src/tracers/call_tracer/vm_latest/mod.rs#L115
-pub fn parse<H: HistoryMode>(
+pub(crate) fn parse<H: HistoryMode>(
     state: &VmLocalStateData<'_>,
     memory: &SimpleMemory<H>,
 ) -> ParsedFarCall {

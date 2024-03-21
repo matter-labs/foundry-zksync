@@ -1,5 +1,5 @@
-use alloy_primitives::{Address, Bytes, U256};
-use revm::{interpreter::InstructionResult, primitives::Bytecode};
+use alloy_primitives::{Bytes, U256};
+use revm::interpreter::InstructionResult;
 use std::cmp::Ordering;
 
 /// Mocked call data.

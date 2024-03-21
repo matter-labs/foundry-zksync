@@ -334,6 +334,7 @@ impl ScriptArgs {
                             script_config.evm_opts.clone(),
                             script_wallets,
                             dual_compiled_contracts.unwrap_or_default(),
+                            false,
                         )
                         .into(),
                     )

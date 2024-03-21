@@ -310,6 +310,7 @@ impl SessionSource {
                         self.config.evm_opts.clone(),
                         None,
                         Default::default(),
+                        false,
                     )
                     .into(),
                 )

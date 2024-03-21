@@ -127,6 +127,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         compiler_path: Default::default(),
         zk_optimizer: Default::default(),
         mode: Default::default(),
+        zksync: false,
         zk_optimizer_details: Default::default(),
         fallback_oz: Default::default(),
         is_system: Default::default(),

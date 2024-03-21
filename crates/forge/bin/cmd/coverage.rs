@@ -305,6 +305,7 @@ impl CoverageArgs {
                 evm_opts.clone(),
                 None,
                 Default::default(),
+                false,
             ))
             .with_test_options(TestOptions {
                 fuzz: config.fuzz,

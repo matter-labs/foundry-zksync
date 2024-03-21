@@ -3546,7 +3546,6 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 [[package]]
 name = "era_test_node"
 version = "0.1.0-alpha.17"
-source = "git+https://github.com/matter-labs/era-test-node.git?rev=2d5047237650a3249aeade484b0d2f4750615519#2d5047237650a3249aeade484b0d2f4750615519"
 dependencies = [
  "anyhow",
  "bigdecimal 0.2.2",

@@ -48,7 +48,7 @@ where
 {
     /// Create a new instance of [ZKEVMData].
     pub fn new(db: &'a mut DB, journaled_state: &'a mut JournaledState) -> Self {
-        let factory_deps =
+        let mut factory_deps =
             journaled_state
                 .state
                 .values()
@@ -63,6 +63,9 @@ where
                 })
                 .collect::<HashMap<_, _>>();
 
+        let empty_code = vec![0u8; 32];
+        let empty_code_hash = hash_bytecode(&empty_code);
+        factory_deps.insert(empty_code_hash, empty_code);
         Self { db, journaled_state, factory_deps, override_keys: Default::default() }
     }
 
@@ -105,6 +108,9 @@ where
                     .map(|code| (H256::from(account.info.code_hash.0), code.bytecode.to_vec()))
             }
         }));
+        let empty_code = vec![0u8; 32];
+        let empty_code_hash = hash_bytecode(&empty_code);
+        factory_deps.insert(empty_code_hash, empty_code);
 
         Self { db, journaled_state, factory_deps, override_keys }
     }

@@ -1,7 +1,9 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{
-    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256}, vm::tracer::CheatcodeTracer, DualCompiledContract
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    vm::tracer::CheatcodeTracer,
+    DualCompiledContract,
 };
 use alloy_primitives::Log;
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
@@ -162,9 +164,18 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
+    info!(?call, "create tx {}", hex::encode(&call.init_code));
+    let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
+    // let caller = call.caller;
     let caller = env.tx.caller;
-    let calldata =
-        encode_create_params(&call.scheme, contract.zk_bytecode_hash, Default::default());
+    // let (acc, _) = journaled_state.load_account(caller, db).unwrap();
+    // println!("BALANCE    {:?} {:?}", caller, acc.info.balance);
+    // println!("NONCE      {:?} {:?}", caller, acc.info.nonce);
+    // println!("ZK-BALANCE {:?} {:?}", caller, balance(caller, db, journaled_state));
+    // println!("ZK-NONCE   {:?} {:?}", caller, nonce(caller, db, journaled_state));
+    // let x= zksync_types::get_nonce_key(&caller.to_h160());
+    // println!("ZK-NONCE-KEY {:?} {:?}", x.address(), x.key());
+    let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
     let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
@@ -184,6 +195,7 @@ where
         Some(factory_deps),
         PaymasterParams::default(),
     );
+    // println!("ZK-TX {tx:?}");
     inspect(tx, env, db, journaled_state, ccx)
 }
 
@@ -200,8 +212,16 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    info!(?call, "call tx");
+    info!(?call, "call tx {}", hex::encode(&call.input));
+    // let caller = call.context.caller;
     let caller = env.tx.caller;
+    // let (acc, _) = journaled_state.load_account(caller, db).unwrap();
+    // println!("BALANCE    {:?} {:?}", caller, acc.info.balance);
+    // println!("NONCE      {:?} {:?}", caller, acc.info.nonce);
+    // println!("ZK-BALANCE {:?} {:?}", caller, balance(caller, db, journaled_state));
+    // println!("ZK-NONCE   {:?} {:?}", caller, nonce(caller, db, journaled_state));
+    // let x= zksync_types::get_nonce_key(&caller.to_h160());
+    // println!("ZK-NONCE-KEY {:?} {:?}", x.address(), x.key());
     let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
     let tx = L2Tx::new(
@@ -219,6 +239,7 @@ where
         factory_deps,
         PaymasterParams::default(),
     );
+    // println!("ZK-TX {tx:?}");
     inspect(tx, env, db, journaled_state, ccx)
 }
 
@@ -329,6 +350,7 @@ where
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
     for (k, v) in &modified_storage {
+        // println!("{:?} {:?} = {:?}", k.address(), k.key(), v);
         let address = k.address().to_address();
         let index = k.key().to_ru256();
         let account = era_db.load_account(address);
@@ -402,7 +424,7 @@ fn inspect_inner<S: ReadStorage + Send>(
     storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,
     l1_gas_price: u64,
-    ccx: CheatcodeTracerContext,
+    mut ccx: CheatcodeTracerContext,
 ) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price);
 
@@ -415,9 +437,22 @@ fn inspect_inner<S: ReadStorage + Send>(
 
     vm.push_transaction(tx.clone());
     let call_tracer_result = Arc::new(OnceCell::default());
+    let cheatcode_tracer_result = Arc::new(OnceCell::default());
+    let mut expected_calls = HashMap::<_, _>::new();
+    if let Some(ec) = &ccx.expected_calls {
+        for (addr, v) in ec.iter() {
+            expected_calls.insert(*addr, v.clone());
+        }
+    }
     let tracers = vec![
         CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
-        CheatcodeTracer { mocked_calls: ccx.mocked_calls, ..Default::default() }.into_tracer_pointer(),
+        CheatcodeTracer {
+            mocked_calls: ccx.mocked_calls,
+            expected_calls,
+            result: cheatcode_tracer_result.clone(),
+            ..Default::default()
+        }
+        .into_tracer_pointer(),
     ];
     let mut tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
     let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
@@ -435,6 +470,14 @@ fn inspect_inner<S: ReadStorage + Send>(
             tracing::debug!(?reason, "Call: Halted");
         }
     };
+
+    // update expected calls from cheatcode tracer's result
+    let cheatcode_result =
+        Arc::try_unwrap(cheatcode_tracer_result).unwrap().take().unwrap_or_default();
+    if let Some(expected_calls) = ccx.expected_calls.as_mut() {
+        expected_calls.extend(cheatcode_result.expected_calls);
+    }
+
     formatter::print_vm_details(&tx_result);
 
     tracing::info!("=== Console Logs: ");

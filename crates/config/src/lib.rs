@@ -412,6 +412,8 @@ pub struct Config {
 
     /// @zkSync zkSolc configuration and settings
     ///
+    /// Use zksync era
+    pub zksync: bool,
     /// Path to zksolc binary. Can be a URL.
     pub compiler_path: PathBuf,
     /// Optimizer settings for zkSync
@@ -2002,6 +2004,7 @@ impl Default for Config {
             compiler_path: Default::default(),
             zk_optimizer: true,
             mode: "3".to_string(),
+            zksync: false,
             zk_optimizer_details: None,
             fallback_oz: false,
             force_evmla: false,

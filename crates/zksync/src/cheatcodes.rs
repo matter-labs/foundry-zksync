@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use alloy_primitives::{Bytes, B256};
 use revm::{
-    primitives::{Address, Bytecode, Env, U256 as rU256},
+    primitives::{Address, Bytecode, Env, StorageSlot, U256 as rU256},
     Database, JournaledState,
 };
 use tracing::info;
@@ -172,4 +172,42 @@ pub fn etch<'a, DB>(
     let account = journaled_state.state.get_mut(&address).expect("failed loading account");
     account.info.code_hash = B256::from(bytecode_hash.to_be_bytes());
     account.info.code = Some(bytecode.clone());
+}
+
+/// Represents an empty code
+pub const EMPTY_CODE: [u8; 32] = [0; 32];
+
+/// Sets code for a mocked account. If not done, the mocked call will revert.
+pub fn set_mocked_account<'a, DB>(
+    address: Address,
+    db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
+) where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    let account_code_addr = zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
+    let known_code_addr = zksync_types::KNOWN_CODES_STORAGE_ADDRESS.to_address();
+    {
+        let (account_code_acc, _) = journaled_state
+            .load_account(account_code_addr, db)
+            .expect("account could not be loaded");
+
+        let key = address.to_h256().to_ru256();
+        let hash = zksync_utils::bytecode::hash_bytecode(&EMPTY_CODE);
+        let value = StorageSlot::new(hash.to_ru256());
+
+        if !account_code_acc.storage.contains_key(&key) {
+            account_code_acc.storage.insert(key, value);
+        }
+    }
+    {
+        let (known_codes_acc, _) =
+            journaled_state.load_account(known_code_addr, db).expect("account could not be loaded");
+        let hash = zksync_utils::bytecode::hash_bytecode(&EMPTY_CODE);
+        let key = hash.to_ru256();
+        if !known_codes_acc.storage.contains_key(&key) {
+            known_codes_acc.storage.insert(key, StorageSlot::new(rU256::from(1u32)));
+        }
+    }
 }

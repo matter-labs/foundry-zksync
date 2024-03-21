@@ -270,7 +270,7 @@ impl TestArgs {
             }
         }
 
-        let runner = MultiContractRunnerBuilder::default()
+        let mut runner = MultiContractRunnerBuilder::default()
             .set_debug(should_debug)
             .initial_balance(evm_opts.initial_balance)
             .evm_spec(config.evm_spec_id())
@@ -281,6 +281,7 @@ impl TestArgs {
                 evm_opts.clone(),
                 None,
                 dual_compiled_contracts,
+                config.zksync,
             ))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
@@ -296,6 +297,7 @@ impl TestArgs {
             }
             *test_pattern = Some(debug_test_pattern.clone());
         }
+        runner.use_zk = config.zksync;
 
         let outcome = self.run_tests(runner, config, verbosity, &filter, test_options).await?;
 

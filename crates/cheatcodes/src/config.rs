@@ -43,6 +43,8 @@ pub struct CheatsConfig {
     pub script_wallets: Option<ScriptWallets>,
     /// ZKSolc -> Solc Contract codes
     pub dual_compiled_contracts: Vec<DualCompiledContract>,
+    /// Use ZK-VM on startup
+    pub use_zk: bool,
 }
 
 impl CheatsConfig {
@@ -52,6 +54,7 @@ impl CheatsConfig {
         evm_opts: EvmOpts,
         script_wallets: Option<ScriptWallets>,
         dual_compiled_contracts: Vec<DualCompiledContract>,
+        use_zk: bool,
     ) -> Self {
         let mut allowed_paths = vec![config.__root.0.clone()];
         allowed_paths.extend(config.libs.clone());
@@ -73,6 +76,7 @@ impl CheatsConfig {
             labels: config.labels.clone(),
             script_wallets,
             dual_compiled_contracts,
+            use_zk,
         }
     }
 
@@ -190,6 +194,7 @@ impl Default for CheatsConfig {
             labels: Default::default(),
             script_wallets: None,
             dual_compiled_contracts: Default::default(),
+            use_zk: false,
         }
     }
 }

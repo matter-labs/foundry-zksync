@@ -52,6 +52,10 @@ pub struct CompilerArgs {
     pub extra_output_files: Vec<ContractOutputSelection>,
 
     // @zksync
+    /// Use ZKSync era vm.
+    #[clap(help_heading = "Use ZKSync era vm", long)]
+    pub zksync: bool,
+
     /// A flag indicating whether to enable the system contract compilation mode.
     #[clap(
         help_heading = "zkSync Compiler options",
