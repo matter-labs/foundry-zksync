@@ -159,8 +159,7 @@ impl ScriptArgs {
                         tx.to,
                         tx.input.clone().into_input(),
                         tx.value,
-                        // zk.clone().map(|tx| tx.factory_deps),
-                        zk.clone(),
+                        (script_config.config.zksync, zk.clone()),
                     )
                     .wrap_err("Internal EVM error during simulation")?;
 
@@ -334,7 +333,7 @@ impl ScriptArgs {
                             script_config.evm_opts.clone(),
                             script_wallets,
                             dual_compiled_contracts.unwrap_or_default(),
-                            false,
+                            script_config.config.zksync,
                         )
                         .into(),
                     )
@@ -342,10 +341,8 @@ impl ScriptArgs {
             });
         }
 
-        Ok(ScriptRunner::new(
-            builder.build(env, db),
-            script_config.evm_opts.initial_balance,
-            sender,
-        ))
+        let mut executor = builder.build(env, db);
+        executor.use_zk = script_config.config.zksync;
+        Ok(ScriptRunner::new(executor, script_config.evm_opts.initial_balance, sender))
     }
 }

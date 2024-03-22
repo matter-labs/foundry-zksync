@@ -196,8 +196,9 @@ impl ScriptRunner {
         to: Option<Address>,
         calldata: Option<Bytes>,
         value: Option<U256>,
-        zk_tx: Option<ZkTransactionMetadata>,
+        (use_zk, zk_tx): (bool, Option<ZkTransactionMetadata>),
     ) -> Result<ScriptResult> {
+        self.executor.use_zk = use_zk;
         if let Some(zk_tx) = zk_tx {
             self.executor.setup_zk_tx(zk_tx);
         }
