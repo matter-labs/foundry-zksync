@@ -183,8 +183,7 @@ alloy-rlp = "0.3.3"
 solang-parser = "=0.3.3"
 
 ## zksync
-# era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "2d5047237650a3249aeade484b0d2f4750615519" }
-era_test_node = { path = "../era-test-node"}
+era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "2d5047237650a3249aeade484b0d2f4750615519" }
 zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "70327ae5413c517bd4d27502507cdd96ee40cd22"}
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "d1e47744c773fa38aa22aaaa3dbb9dbffe7e9854" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "d1e47744c773fa38aa22aaaa3dbb9dbffe7e9854" }
