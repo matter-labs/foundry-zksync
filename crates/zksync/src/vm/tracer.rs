@@ -74,20 +74,6 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         memory: &SimpleMemory<H>,
         _storage: zksync_state::StoragePtr<S>,
     ) {
-        // 0xbb0fd610
-        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let calldata = get_calldata(&state, memory);
-            let selector = hex::decode("bb0fd610").unwrap();
-            if calldata.starts_with(&selector) {
-                println!("---> MATCH {}", hex::encode(calldata));
-                let mut bytes = [0u8; 32];
-                U256::one().to_big_endian(&mut bytes);
-                println!("RET {:?}", hex::encode(&bytes));
-                self.farcall_handler.set_immediate_return(bytes.to_vec());
-                return
-            }
-        }
-
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;

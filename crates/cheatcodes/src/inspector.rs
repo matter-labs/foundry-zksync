@@ -358,7 +358,6 @@ impl Cheatcodes {
             tracing::info!("already in  EVM");
             return
         }
-        // let switched = self.use_zk_vm;
 
         tracing::info!("switching to EVM");
         self.use_zk_vm = false;
@@ -371,17 +370,6 @@ impl Cheatcodes {
         journaled_account(data, nonce_account).expect("failed to load account");
         let account_code_account = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
         journaled_account(data, account_code_account).expect("failed to load account");
-
-        // if switched {
-        //     let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
-        //     let (block_info, _) = data
-        //         .journaled_state
-        //         .sload(system_account, block_info_key, data.db)
-        //         .unwrap_or_default();
-        //     let (block_number, block_timestamp) = unpack_block_info(block_info.to_u256());
-        //     data.env.block.number = U256::from(block_number);
-        //     data.env.block.timestamp = U256::from(block_timestamp);
-        // }
 
         let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
         let (block_info, _) =
@@ -447,24 +435,11 @@ impl Cheatcodes {
             tracing::info!("already in  ZK-VM");
             return
         }
-        // let switched = !self.use_zk_vm;
 
         tracing::info!("switching to ZK-VM");
         self.use_zk_vm = true;
 
         let env = new_env.unwrap_or(data.env);
-
-        // if switched {
-        //     let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
-        //     let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
-        //     let block_info =
-        //         pack_block_info(env.block.number.as_limbs()[0],
-        // env.block.timestamp.as_limbs()[0]);     system_storage.insert(block_info_key,
-        // StorageSlot::new(block_info.to_ru256()));     let system_addr =
-        // SYSTEM_CONTEXT_ADDRESS.to_address();     let system_account =
-        //         journaled_account(data, system_addr).expect("failed to load account");
-        //     system_account.storage.extend(system_storage.clone());
-        // }
 
         let mut system_storage: rHashMap<U256, StorageSlot> = Default::default();
         let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
@@ -1228,18 +1203,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
             };
-            // foundry_zksync::state::sync_accounts(
-            //     data.db.persistent_accounts(),
-            //     data.db,
-            //     &mut data.journaled_state,
-            // );
-            // foundry_zksync::state::migrate_to_zk(
-            //     data.db.persistent_accounts(),
-            //     &self.dual_compiled_contracts,
-            //     &data.env,
-            //     data.db,
-            //     &mut data.journaled_state,
-            // );
             if let Ok(result) = foundry_zksync::vm::call::<_, DatabaseError>(
                 call,
                 contract,
@@ -1271,8 +1234,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     ),
                 }
             }
-        } else {
-            info!("normal call evm {:#?}", call);
         }
 
         (InstructionResult::Continue, gas, Bytes::new())
@@ -1686,7 +1647,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
         }
 
         if self.use_zk_vm {
-            info!("running create in zk vm {call:#?}");
+            info!("running create in zk vm");
             if call.init_code.0 == DEFAULT_CREATE2_DEPLOYER_CODE {
                 info!("ignoring DEFAULT_CREATE2_DEPLOYER_CODE for zk");
                 return (InstructionResult::Continue, None, gas, Bytes::new())
@@ -1701,18 +1662,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
             };
-            // foundry_zksync::state::sync_accounts(
-            //     data.db.persistent_accounts(),
-            //     data.db,
-            //     &mut data.journaled_state,
-            // );
-            // foundry_zksync::state::migrate_to_zk(
-            //     data.db.persistent_accounts(),
-            //     &self.dual_compiled_contracts,
-            //     &data.env,
-            //     data.db,
-            //     &mut data.journaled_state,
-            // );
             if let Ok(result) = foundry_zksync::vm::create::<_, DatabaseError>(
                 call,
                 zk_contract,
@@ -1745,8 +1694,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     ),
                 }
             }
-        } else {
-            info!("normal create evm {:#?}", call);
         }
 
         (InstructionResult::Continue, None, gas, Bytes::new())

@@ -2,7 +2,6 @@ use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    state,
     vm::tracer::CheatcodeTracer,
     DualCompiledContract,
 };
@@ -167,15 +166,7 @@ where
 {
     info!(?call, "create tx {}", hex::encode(&call.init_code));
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
-    let caller = call.caller;
-    // let caller = env.tx.caller;
-    // let (acc, _) = journaled_state.load_account(caller, db).unwrap();
-    // println!("BALANCE    {:?} {:?}", caller, acc.info.balance);
-    // println!("NONCE      {:?} {:?}", caller, acc.info.nonce);
-    // println!("ZK-BALANCE {:?} {:?}", caller, balance(caller, db, journaled_state));
-    // println!("ZK-NONCE   {:?} {:?}", caller, nonce(caller, db, journaled_state));
-    // let x= zksync_types::get_nonce_key(&caller.to_h160());
-    // println!("ZK-NONCE-KEY {:?} {:?}", x.address(), x.key());
+    let caller = env.tx.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
     let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
@@ -196,7 +187,6 @@ where
         Some(factory_deps),
         PaymasterParams::default(),
     );
-    // println!("ZK-TX {tx:?}");
     inspect(tx, env, db, journaled_state, ccx)
 }
 
@@ -214,16 +204,7 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
-    let caller = call.context.caller;
-    state::mark_account_eoa(caller, db, journaled_state);
-    // let caller = env.tx.caller;
-    // let (acc, _) = journaled_state.load_account(caller, db).unwrap();
-    // println!("BALANCE    {:?} {:?}", caller, acc.info.balance);
-    // println!("NONCE      {:?} {:?}", caller, acc.info.nonce);
-    // println!("ZK-BALANCE {:?} {:?}", caller, balance(caller, db, journaled_state));
-    // println!("ZK-NONCE   {:?} {:?}", caller, nonce(caller, db, journaled_state));
-    // let x= zksync_types::get_nonce_key(&caller.to_h160());
-    // println!("ZK-NONCE-KEY {:?} {:?}", x.address(), x.key());
+    let caller = env.tx.caller;
     let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
     let tx = L2Tx::new(
