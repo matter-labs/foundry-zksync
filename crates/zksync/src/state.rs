@@ -10,7 +10,7 @@ use std::fmt::Debug;
 use tracing::info;
 use zksync_types::{
     block::pack_block_info,
-    get_nonce_key,
+    get_is_account_key, get_nonce_key,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
     ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
     L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
@@ -20,6 +20,25 @@ use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     DualCompiledContract,
 };
+
+/// Returns balance storage slot
+pub fn mark_account_eoa<'a, DB>(
+    address: rAddress,
+    db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
+) where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    let is_account_key = get_is_account_key(&address.to_h160());
+    if let Ok((value, _)) = journaled_state.sload(
+        is_account_key.address().to_address(),
+        is_account_key.key().to_ru256(),
+        db,
+    ) {
+        println!("IS ACCOUNT {:?}", value);
+    }
+}
 
 /// Returns balance storage slot
 pub fn get_balance_storage(address: rAddress) -> (rAddress, rU256) {

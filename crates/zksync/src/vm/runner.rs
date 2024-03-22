@@ -2,6 +2,7 @@ use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    state,
     vm::tracer::CheatcodeTracer,
     DualCompiledContract,
 };
@@ -166,8 +167,8 @@ where
 {
     info!(?call, "create tx {}", hex::encode(&call.init_code));
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
-    // let caller = call.caller;
-    let caller = env.tx.caller;
+    let caller = call.caller;
+    // let caller = env.tx.caller;
     // let (acc, _) = journaled_state.load_account(caller, db).unwrap();
     // println!("BALANCE    {:?} {:?}", caller, acc.info.balance);
     // println!("NONCE      {:?} {:?}", caller, acc.info.nonce);
@@ -213,8 +214,9 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
-    // let caller = call.context.caller;
-    let caller = env.tx.caller;
+    let caller = call.context.caller;
+    state::mark_account_eoa(caller, db, journaled_state);
+    // let caller = env.tx.caller;
     // let (acc, _) = journaled_state.load_account(caller, db).unwrap();
     // println!("BALANCE    {:?} {:?}", caller, acc.info.balance);
     // println!("NONCE      {:?} {:?}", caller, acc.info.nonce);
