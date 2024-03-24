@@ -58,7 +58,6 @@ use foundry_cli::{
 use foundry_common::{
     zk_compile::{get_missing_libraries_cache_path, ZkMissingLibrary},
     zk_utils::{get_chain, get_private_key, get_rpc_url},
-    zksolc_manager::DEFAULT_ZKSOLC_VERSION,
 };
 use foundry_compilers::{info::ContractInfo, ConfigurableArtifacts, Project};
 use foundry_config::{Chain, Config};
@@ -222,11 +221,7 @@ impl ZkCreateArgs {
 
             info!("All missing libraries deployed, compiling project...");
             let zkbuild_args = ZkBuildArgs {
-                args: CoreBuildArgs {
-                    compiler: CompilerArgs::default(),
-                    use_zksolc: DEFAULT_ZKSOLC_VERSION.to_string(),
-                    ..Default::default()
-                },
+                args: CoreBuildArgs { compiler: CompilerArgs::default(), ..Default::default() },
                 ..Default::default()
             };
             zkbuild_args.run().await?;
@@ -599,7 +594,6 @@ impl ZkCreateArgs {
                     contracts_to_compile: Some(vec![filename]),
                     ..Default::default()
                 },
-                use_zksolc: DEFAULT_ZKSOLC_VERSION.to_string(),
                 ..Default::default()
             },
             ..Default::default()

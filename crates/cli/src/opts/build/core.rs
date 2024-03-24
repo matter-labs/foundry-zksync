@@ -2,7 +2,6 @@ use super::ProjectPathsArgs;
 use crate::{opts::CompilerArgs, utils::LoadConfig};
 use clap::{Parser, ValueHint};
 use eyre::Result;
-use foundry_common::zksolc_manager::DEFAULT_ZKSOLC_VERSION;
 use foundry_compilers::{
     artifacts::RevertStrings, remappings::Remapping, utils::canonicalized, Project,
 };
@@ -63,13 +62,12 @@ pub struct CoreBuildArgs {
     ///
     /// Valid values are in the format `x.y.z`, `zksolc:x.y.z` or `path/to/zksolc`.
     #[clap(
-    help_heading = "zkSync Compiler options",
-    value_name = "ZK_SOLC_VERSION",
-    long = "use-zksolc",
-    default_value = DEFAULT_ZKSOLC_VERSION
+        help_heading = "zkSync Compiler options",
+        value_name = "ZK_SOLC_VERSION",
+        long = "use-zksolc"
     )]
     #[serde(skip)]
-    pub use_zksolc: String,
+    pub use_zksolc: Option<String>,
 
     /// Do not access the network.
     ///

@@ -151,8 +151,18 @@ impl ZkBuildArgs {
             zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
         }
 
+        let zksolc_version = self
+            .args
+            .use_zksolc
+            .as_ref()
+            .map(|zksolc_version_raw| {
+                semver::Version::parse(zksolc_version_raw)
+                    .map_err(|e| eyre::eyre!("Failed to parse zksolc version: {:#}", e))
+            })
+            .transpose()?;
+
         // TODO: revisit to remove zksolc_manager and move binary installation to zksolc_config
-        let compiler_path = setup_zksolc_manager(self.args.use_zksolc.clone()).await?;
+        let compiler_path = setup_zksolc_manager(zksolc_version).await?;
         zksolc_cfg.compiler_path = compiler_path;
 
         // TODO: add filter support
