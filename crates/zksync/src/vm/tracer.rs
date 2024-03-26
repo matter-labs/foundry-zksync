@@ -18,7 +18,7 @@ use multivm::{
 };
 use once_cell::sync::OnceCell;
 use zksync_state::WriteStorage;
-use zksync_types::{H256, U256};
+use zksync_types::{CONTRACT_DEPLOYER_ADDRESS, H256, U256};
 
 use crate::convert::{ConvertH160, ConvertH256, ConvertU256};
 
@@ -80,18 +80,16 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
     ) {
         // Mark the caller as EOA to avoid panic
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.get_current_stack();
             let calldata = get_calldata(&state, memory);
 
-            if calldata.starts_with(&SELECTOR_ACCOUNT_VERSION) {
+            if current.code_address == CONTRACT_DEPLOYER_ADDRESS &&
+                calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
+            {
                 let address = H256::from_slice(&calldata[4..36]).to_h160().to_address();
                 if self.caller == address {
-                    let mut bytes = [0u8; 32];
-                    U256::one().to_big_endian(&mut bytes);
-                    tracing::debug!(
-                        "overriding account version {:?} for caller {address:?}",
-                        hex::encode(&bytes)
-                    );
-                    self.farcall_handler.set_immediate_return(bytes.to_vec());
+                    tracing::debug!("overriding account version for caller {address:?}");
+                    self.farcall_handler.set_immediate_return(rU256::from(1u32).to_be_bytes_vec());
                     return
                 }
             }
@@ -175,6 +173,7 @@ impl<S: WriteStorage + Send, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer 
         cell.set(CheatcodeTracerResult { expected_calls: self.expected_calls.clone() }).unwrap();
     }
 }
+
 fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMemory<H>) -> Vec<u8> {
     let ptr = state.vm_local_state.registers[CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
     assert!(ptr.is_pointer);
