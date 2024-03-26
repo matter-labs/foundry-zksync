@@ -229,7 +229,7 @@ See our [contributing guidelines](./CONTRIBUTING.md).
 -   All the other [contributors](https://github.com/foundry-rs/foundry/graphs/contributors) to the [ethers-rs](https://github.com/gakonst/ethers-rs) & [foundry](https://github.com/foundry-rs/foundry) repositories and chatrooms.
 
 ### Acknowledgments - foundry-zksync
-- [Moonsong Labs](https://moonsonglabs.com/): Implemented [era-cheatcodes](./crates/era-cheatcodes/), and resolved a number of different challenges to enable zkSync support. 
+- [Moonsong Labs](https://moonsonglabs.com/): Implemented [zkSync support](./crates/zksync/), and resolved a number of different challenges to enable zkSync support. 
 
 [foundry-book]: https://book.getfoundry.sh
 [foundry-gha]: https://github.com/foundry-rs/foundry-toolchain
