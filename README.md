@@ -1,84 +1,184 @@
-<img src=".github/logo.png" alt="Foundry logo" align="right" width="120" />
+## Foundry with zkSync Era v0.1-alpha
 
-## Foundry
+This repository enhances Foundry to support zkSync Era, enabling Solidity-based compilation, deployment, testing, and interaction with smart contracts on zkSync Era.
 
-![Github Actions][gha-badge] [![Telegram Chat][tg-badge]][tg-url] [![Telegram Support][tg-support-badge]][tg-support-url]
+> 🔧 **Fork Notice:** This is a Foundry fork with added zkSync support.
+> 
+> ⚠️ **Alpha Stage:** The project is in alpha, so you might encounter issues.
+> 
+> 🐞 **Found an Issue?** Please report it to help us improve.
 
-[gha-badge]: https://img.shields.io/github/actions/workflow/status/foundry-rs/foundry/test.yml?branch=master
-[tg-badge]: https://img.shields.io/endpoint?color=neon&logo=telegram&label=chat&style=flat-square&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Ffoundry_rs
-[tg-url]: https://t.me/foundry_rs
-[tg-support-badge]: https://img.shields.io/endpoint?color=neon&logo=telegram&label=support&style=flat-square&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Ffoundry_support
-[tg-support-url]: https://t.me/foundry_support
+### Changes Made
 
-**[Install](https://book.getfoundry.sh/getting-started/installation)**
-| [User Book](https://book.getfoundry.sh)
-| [Developer Docs](./docs/dev/)
-| [Crate Docs](https://foundry-rs.github.io/foundry)
+To use for zkSync environments, include `--zksync` when running Foundry. The modifications include:
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+1. **Compilation:** `solc` and `zksolc` are used for compiling. The resulting bytecodes are combined into `DualCompiledContract` and managed through `Executor` to `CheatcodeTracer`.
+2. **EVM Interactions:**
+   - EVM calls are standard except for `address.balance` and `block.timestamp`/`block.number`, which pull data from zkSync (ZK-storage and ZK-specific context, respectively).
+3. **Transaction Handling:**
+   - `CALL` and `CREATE` operations are captured and converted to zkSync transactions. This process includes fetching zkSync-equivalent bytecode, managing account nonces, and marking EOA appropriately to comply with zkSync requirements.
+4. **Execution and State Management:**
+   - zkSync VM processes the transaction and returns state changes, which are applied to `journaled_state`. Results are relayed back.
+5. **Logging:**
+   - `console.log()` outputs within zkSync VM are captured and displayed in Foundry.
 
-Foundry consists of:
-
--   [**Forge**](./crates/forge): Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   [**Cast**](./crates/cast): Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   [**Anvil**](./crates/anvil): Local Ethereum node, akin to Ganache, Hardhat Network.
--   [**Chisel**](./crates/chisel): Fast, utilitarian, and verbose solidity REPL.
-
-**Need help getting started with Foundry? Read the [📖 Foundry Book][foundry-book] (WIP)!**
-
-![Demo](.github/demo.gif)
-
-## Installation
-
-See the [installation guide](https://book.getfoundry.sh/getting-started/installation) in the book.
-
-If you're experiencing any issues while installing, check out [Getting Help](#getting-help) and the [FAQ](https://book.getfoundry.sh/faq).
-
-## Forge
+## 📊 Features & Limitations
 
 ### Features
 
--   **Fast & flexible compilation pipeline**
-    -   Automatic Solidity compiler version detection & installation (under `~/.svm`)
-    -   **Incremental compilation & caching**: Only changed files are re-compiled
-    -   Parallel compilation
-    -   Non-standard directory structures support (e.g. [Hardhat repos](https://twitter.com/gakonst/status/1461289225337421829))
--   **Tests are written in Solidity** (like in DappTools)
--   **Fast fuzz testing** with shrinking of inputs & printing of counter-examples
--   **Fast remote RPC forking mode**, leveraging Rust's async infrastructure like tokio
--   **Flexible debug logging**
-    -   DappTools-style, using `DsTest`'s emitted logs
-    -   Hardhat-style, using the popular `console.sol` contract
--   **Portable (5-10MB) & easy to install** without requiring Nix or any other package manager
--   **Fast CI** with the [Foundry GitHub action][foundry-gha].
+`Foundry-zksync` offers a set of features designed to work with zkSync Era, providing a comprehensive toolkit for smart contract deployment and interaction:
 
-### How Fast?
+- **Smart Contract Deployment**: Easily deploy smart contracts to zkSync Era mainnet, testnet, or a local test node.
+- **Contract Interaction**: Call and send transactions to deployed contracts on zkSync Era testnet or local test node.
+- **Solidity Testing**: Write tests in Solidity, similar to DappTools, for a familiar testing environment.
+- **Fuzz Testing**: Benefit from fuzz testing, complete with shrinking of inputs and printing of counter-examples.
+- **Remote RPC Forking**: Utilize remote RPC forking mode, leveraging Rust's asynchronous infrastructure like tokio.
+- **Flexible Debug Logging**: Choose your debugging style:
+  - DappTools-style: Utilize DsTest's emitted logs for debugging.
+  - Hardhat-style: Leverage the popular console.sol contract.
+- **Configurable Compiler Options**: Tailor compiler settings to your needs, including LLVM optimization modes.
 
-Forge is quite fast at both compiling (leveraging [ethers-solc][ethers-solc]) and testing.
+### Limitations
 
-See the benchmarks below. More benchmarks can be found in the [v0.2.0 announcement post][benchmark-post] and in the [Convex Shutdown Simulation][convex] repository.
+While `foundry-zksync` is **alpha stage**, there are some limitations to be aware of:
 
-**Testing Benchmarks**
+- **Compile Time**: Some users may experience slower compile times.
+- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration. For more information please refer to [official docs](https://era.zksync.io/docs/tools/hardhat/compiling-libraries.html).
 
-| Project                            | Forge | DappTools | Speedup |
-| ---------------------------------- | ----- | --------- | ------- |
-| [transmissions11/solmate][solmate] | 2.8s  | 6m34s     | 140x    |
-| [reflexer-labs/geb][geb]           | 0.4s  | 23s       | 57.5x   |
-| [Rari-Capital/vaults][vaults]      | 0.28s | 6.5s      | 23x     |
+    ```
+    libraries = [
+        "src/MyLibrary.sol:MyLibrary:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4"
+    ]
+    ```
+- **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://era.zksync.io/docs/reference/architecture/differences-with-ethereum.html#create-create2).
+- **Contract Verification**: Currently contract verification via the `--verify` flag do not work as expected but will be added shortly.  
+- **Specific Foundry Features**: Currently features such as `--gas-report` may not work as intended. We are actively working on providing support for these feature types.
 
-_Note: In the above benchmarks, compilation was always skipped_
+For the most effective use of our library, we recommend familiarizing yourself with these features and limitations. 
 
-**Compilation Benchmarks**
+## 📝 Prerequisites
 
-<img alt="Compilation benchmarks" src=".github/compilation-benchmark.png" width="693px" />
+Ensure you have the necessary tools and environments set up for development:
 
-**Takeaway: Forge compilation is consistently faster by a factor of 1.7-11.3x, depending on the amount of caching involved.**
+1. **Install Rust:** Use the command below to install Rust. This will also install `cargo`, Rust's package manager and build system.
 
-## Cast
+   ```sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
 
-Cast is a swiss army knife for interacting with Ethereum applications from the command line.
+2. **Set Rust to Nightly Toolchain:** This project requires Rust's nightly version from September 30, 2023. Set your Rust toolchain to the appropriate nightly version using `rustup`:
 
-More documentation can be found in the [cast package](./crates/cast).
+   ```sh
+   # Replace `<YOUR-TARGET>` with your specific platform target, e.g., `x86_64-unknown-linux-gnu`
+   rustup install nightly-2023-09-30-<YOUR-TARGET>
+   
+   # Example for MacOS (Apple Silicon):
+   rustup install nightly-2023-09-30-aarch64-apple-darwin
+   ```
+
+3. **MacOS Prerequisite - Install `make`:** MacOS users need to ensure `make` is installed. If not, install it using Homebrew:
+
+   ```sh
+   brew install make
+   ```
+
+   Then, set the path to GNU `make`:
+
+   ```sh
+   export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
+   ```
+
+   Add this export line to your shell profile (`~/.bash_profile`, `~/.zshrc`, etc.) to make the change permanent.
+
+## 💾 Installation
+
+Each tool within our suite can be installed individually, or you can install the entire suite at once.
+
+### Installing `forge` 🛠️
+
+To install `forge`, execute the command below. This action will overwrite any previous `forge` installations, but the functionality remains consistent. Post-installation, `forge` will be accessible as an executable from `~/.cargo/bin`.
+
+Run the following command:
+
+```bash
+cargo install --path ./crates/forge --profile local --force --locked
+```
+
+### Installing `cast` 📡
+
+Similarly, to install `cast`, use the following command. Like `forge`, this will replace any existing `cast` installations without altering functionality. Once installed, `cast` becomes available as an executable in `~/.cargo/bin`.
+
+Run the following command:
+
+```bash
+cargo install --path ./crates/cast --profile local --force --locked
+```
+
+### Installing the Entire Suite 📦
+
+To install all the tools in the suite:
+
+```bash
+cargo build --release
+```
+
+## Quickstart 
+
+In an empty directory, run the following command:
+``` 
+forge init
+```
+
+Let's check out what forge generated for us:
+
+```
+$ cd hello_foundry
+$ tree . -d -L 1
+.
+├── cache
+├── lib
+├── out
+├── script
+├── src
+├── test
+└── zkout
+```
+
+#### Compiling contracts
+
+We can build the project with `forge build --zksync`:
+```
+$ forge build --zksync
+Compiling smart contracts...
+Compiled Successfully
+```
+
+#### Deploying missing libraries
+
+In case missing libraries are detected during the compilation, we can deploy them using the following command:
+
+```
+$ forge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync
+```
+
+After deployment is done, the configuration file will be updated and contracts will be automatically compiled again.
+
+#### Running Tests
+
+You can run the tests using `forge test --zksync`. 
+
+The command and its expected output are shown below:
+
+```bash
+$ forge test --zksync
+
+Ran 2 tests for test/Counter.t.sol:CounterTest
+[PASS] testFuzz_SetNumber(uint256) (runs: 256, μ: 8737, ~: 8737)
+[PASS] test_Increment() (gas: 8702)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 3.57s (3.56s CPU time)
+
+Ran 1 test suite in 3.57s (3.57s CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)
+```
 
 ## Configuration
 
@@ -90,15 +190,24 @@ Configuration can be arbitrarily namespaced by profiles. The default profile is 
 
 You can select another profile using the `FOUNDRY_PROFILE` environment variable. You can also override parts of your configuration using `FOUNDRY_` or `DAPP_` prefixed environment variables, like `FOUNDRY_SRC`.
 
-`forge init` creates a basic, extendable `foundry.toml` file.
+`zkforge init` creates a basic, extendable `foundry.toml` file.
 
 To see your current configuration, run `forge config`. To see only basic options (as set with `forge init`), run `forge config --basic`. This can be used to create a new `foundry.toml` file with `forge config --basic > foundry.toml`.
 
-By default `forge config` shows the currently selected foundry profile and its values. It also accepts the same arguments as `forge build`.
+By default `forge config` shows the currently selected foundry profile and its values. It also accepts the same arguments as `forge build`. An example `foundry.toml` for zkSync with zksolc configurations may look like:
 
-### DappTools Compatibility
+```
+[profile.default]
+src = 'src'
+out = 'out'
+libs = ['lib']
 
-You can re-use your `.dapprc` environment variables by running `source .dapprc` before using a Foundry tool.
+[profile.zksync]
+src = 'src'
+libs = ['lib']
+fallback_oz = true
+mode = "3"
+```
 
 ### Additional Configuration
 
@@ -111,18 +220,6 @@ You can find additional setup and configurations guides in the [Foundry Book][fo
 
 See our [contributing guidelines](./CONTRIBUTING.md).
 
-## Getting Help
-
-First, see if the answer to your question can be found in [book][foundry-book], or in the relevant crate.
-
-If the answer is not there:
-
--   Join the [support Telegram][tg-support-url] to get help, or
--   Open a [discussion](https://github.com/foundry-rs/foundry/discussions/new) with your question, or
--   Open an issue with [the bug](https://github.com/foundry-rs/foundry/issues/new)
-
-If you want to contribute, or follow along with contributor discussion, you can use our [main telegram](https://t.me/foundry_rs) to chat with us about the development of Foundry!
-
 ## Acknowledgements
 
 -   Foundry is a clean-room rewrite of the testing framework [DappTools](https://github.com/dapphub/dapptools). None of this would have been possible without the DappHub team's work over the years.
@@ -131,13 +228,11 @@ If you want to contribute, or follow along with contributor discussion, you can 
 -   [Brock Elmore](https://twitter.com/brockjelmore): For extending the VM's cheatcodes and implementing [structured call tracing](https://github.com/foundry-rs/foundry/pull/192), a critical feature for debugging smart contract calls.
 -   All the other [contributors](https://github.com/foundry-rs/foundry/graphs/contributors) to the [ethers-rs](https://github.com/gakonst/ethers-rs) & [foundry](https://github.com/foundry-rs/foundry) repositories and chatrooms.
 
+### Acknowledgments - foundry-zksync
+- [Moonsong Labs](https://moonsonglabs.com/): Implemented [era-cheatcodes](./crates/era-cheatcodes/), and resolved a number of different challenges to enable zkSync support. 
+
 [foundry-book]: https://book.getfoundry.sh
 [foundry-gha]: https://github.com/foundry-rs/foundry-toolchain
 [ethers-solc]: https://github.com/gakonst/ethers-rs/tree/master/ethers-solc/
-[solmate]: https://github.com/transmissions11/solmate/
-[geb]: https://github.com/reflexer-labs/geb
-[vaults]: https://github.com/rari-capital/vaults
-[benchmark-post]: https://www.paradigm.xyz/2022/03/foundry-02#blazing-fast-compilation--testing
-[convex]: https://github.com/mds1/convex-shutdown-simulation
 [vscode-setup]: https://book.getfoundry.sh/config/vscode.html
 [shell-setup]: https://book.getfoundry.sh/config/shell-autocompletion.html
