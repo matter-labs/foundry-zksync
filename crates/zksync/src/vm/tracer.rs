@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use alloy_primitives::{Address, Bytes, U256 as rU256};
+use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
@@ -18,11 +18,14 @@ use multivm::{
 };
 use once_cell::sync::OnceCell;
 use zksync_state::WriteStorage;
-use zksync_types::U256;
+use zksync_types::{H256, U256};
 
-use crate::convert::{ConvertH160, ConvertU256};
+use crate::convert::{ConvertH160, ConvertH256, ConvertU256};
 
 use super::farcall::FarCallHandler;
+
+/// extendedAccountVersion(address)
+const SELECTOR_ACCOUNT_VERSION: [u8; 4] = hex!("bb0fd610");
 
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
@@ -43,6 +46,7 @@ pub struct CheatcodeTracer {
     pub farcall_handler: FarCallHandler,
     pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
     pub expected_calls: ExpectedCallTracker,
+    pub caller: Address,
     pub result: Arc<OnceCell<CheatcodeTracerResult>>,
 }
 
@@ -74,6 +78,25 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         memory: &SimpleMemory<H>,
         _storage: zksync_state::StoragePtr<S>,
     ) {
+        // Mark the caller as EOA to avoid panic
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let calldata = get_calldata(&state, memory);
+
+            if calldata.starts_with(&SELECTOR_ACCOUNT_VERSION) {
+                let address = H256::from_slice(&calldata[4..36]).to_h160().to_address();
+                if self.caller == address {
+                    let mut bytes = [0u8; 32];
+                    U256::one().to_big_endian(&mut bytes);
+                    tracing::debug!(
+                        "overriding account version {:?} for caller {address:?}",
+                        hex::encode(&bytes)
+                    );
+                    self.farcall_handler.set_immediate_return(bytes.to_vec());
+                    return
+                }
+            }
+        }
+
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
@@ -121,6 +144,7 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                         .map(|(_, v)| v)
                 }) {
                     let return_data = return_data.data.clone().to_vec();
+                    tracing::debug!("returning mocked value {:?}", hex::encode(&return_data));
                     self.farcall_handler.set_immediate_return(return_data);
                 }
             }

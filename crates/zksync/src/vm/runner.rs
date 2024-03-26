@@ -1,5 +1,3 @@
-use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
-
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     vm::tracer::CheatcodeTracer,
@@ -7,6 +5,7 @@ use crate::{
 };
 use alloy_primitives::Log;
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
+use ansi_term::Color::Cyan;
 use era_test_node::{
     formatter,
     node::ShowCalls,
@@ -17,6 +16,7 @@ use foundry_common::{
     console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
     HardhatConsole,
 };
+use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{fix_l2_gas_limit, fix_l2_gas_price};
 use itertools::Itertools;
@@ -30,10 +30,9 @@ use revm::{
     interpreter::{CallInputs, CreateInputs},
     precompile::Precompiles,
     primitives::{
-        Account, AccountInfo, AccountStatus, Address, Bytecode, Bytes, CreateScheme,
-        EVMResultGeneric, Env, Eval, ExecutionResult as rExecutionResult, Halt as rHalt,
-        HashMap as rHashMap, OutOfGasError, Output, ResultAndState, SpecId, StorageSlot,
-        TransactTo, B256, U256 as rU256,
+        Address, Bytecode, Bytes, CreateScheme, EVMResultGeneric, Env, Eval,
+        ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, OutOfGasError,
+        Output, ResultAndState, SpecId, StorageSlot, TransactTo, B256, U256 as rU256,
     },
     Database, JournaledState,
 };
@@ -166,7 +165,7 @@ where
 {
     info!(?call, "create tx {}", hex::encode(&call.init_code));
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
-    let caller = env.tx.caller;
+    let caller = call.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
     let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
@@ -204,7 +203,7 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
-    let caller = env.tx.caller;
+    let caller = call.context.caller;
     let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
     let tx = L2Tx::new(
@@ -222,7 +221,6 @@ where
         factory_deps,
         PaymasterParams::default(),
     );
-    // println!("ZK-TX {tx:?}");
     inspect(tx, env, db, journaled_state, ccx)
 }
 
@@ -239,7 +237,7 @@ where
 {
     let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state);
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
-    tracing::trace!(caller = ?env.tx.caller, "executing transaction in zk vm");
+    tracing::trace!(caller = ?tx.common_data.initiator_address, "executing transaction in zk vm");
 
     let chain_id_u32 = if env.cfg.chain_id <= u32::MAX as u64 {
         env.cfg.chain_id as u32
@@ -329,11 +327,9 @@ where
         }
     };
 
-    let mut state: rHashMap<Address, Account> = Default::default();
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
     for (k, v) in &modified_storage {
-        // println!("{:?} {:?} = {:?}", k.address(), k.key(), v);
         let address = k.address().to_address();
         let index = k.key().to_ru256();
         let account = era_db.load_account(address);
@@ -353,50 +349,23 @@ where
     }
 
     for (address, storage) in storage {
-        let account = era_db.load_account(address);
-        let account = Account {
-            info: AccountInfo {
-                balance: account.info.balance,
-                nonce: account.info.nonce,
-                code_hash: account.info.code_hash,
-                code: account.info.code.clone(),
-            },
-            storage,
-            status: AccountStatus::Touched,
-        };
-        state.insert(address, account);
-    }
-
-    for (address, (code_hash, code)) in codes {
-        let account = era_db.load_account(address);
-        let account = Account {
-            info: AccountInfo {
-                balance: account.info.balance,
-                nonce: account.info.nonce,
-                code_hash,
-                code: Some(code),
-            },
-            storage: Default::default(),
-            status: AccountStatus::Touched,
-        };
-        state.insert(address, account);
-    }
-
-    // update journal
-    for (address, new_account) in state {
         journaled_state.load_account(address, db).expect("account could not be loaded");
         journaled_state.touch(&address);
-        let account = journaled_state.state.get_mut(&address).expect("account is loaded");
 
-        let _ = std::mem::replace(&mut account.info.balance, new_account.info.balance);
-        let _ = std::mem::replace(&mut account.info.nonce, new_account.info.nonce);
-        account.info.code_hash = new_account.info.code_hash;
-        account.info.code = new_account.info.code.clone();
-        for (key, value) in new_account.storage {
+        for (key, value) in storage {
             journaled_state
                 .sstore(address, key, value.present_value, db)
                 .expect("failed writing to slot");
         }
+    }
+
+    for (address, (code_hash, code)) in codes {
+        journaled_state.load_account(address, db).expect("account could not be loaded");
+        journaled_state.touch(&address);
+        let account = journaled_state.state.get_mut(&address).expect("account is loaded");
+
+        account.info.code_hash = code_hash;
+        account.info.code = Some(code);
     }
 
     Ok(execution_result)
@@ -430,10 +399,11 @@ fn inspect_inner<S: ReadStorage + Send>(
     let tracers = vec![
         CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
         CheatcodeTracer {
+            farcall_handler: Default::default(),
             mocked_calls: ccx.mocked_calls,
             expected_calls,
             result: cheatcode_tracer_result.clone(),
-            ..Default::default()
+            caller: l2_tx.common_data.initiator_address.to_address(),
         }
         .into_tracer_pointer(),
     ];
@@ -550,7 +520,7 @@ impl ConsoleLogParser {
         logs.push(log);
 
         if print {
-            tracing::info!("{}", message);
+            tracing::info!("{}", Cyan.paint(message));
         }
     }
 }
