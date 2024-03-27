@@ -59,7 +59,7 @@ impl<'a> FuzzBackendWrapper<'a> {
         // already, we reset the initialized state
         self.is_initialized = false;
 
-        foundry_zksync::vm::transact(factory_deps, env, self)
+        foundry_zksync_core::vm::transact(factory_deps, env, self)
     }
 
     /// Executes the configured transaction of the `env` without committing state changes

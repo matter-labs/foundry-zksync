@@ -16,7 +16,7 @@ use foundry_evm::{
     revm::db::DatabaseRef,
 };
 use foundry_test_utils::fd_lock;
-use foundry_zksync::zksolc::{setup_zksolc_manager, ZkSolc, DEFAULT_ZKSOLC_VERSION};
+use foundry_zksync_core::zksolc::{setup_zksolc_manager, ZkSolc, DEFAULT_ZKSOLC_VERSION};
 use once_cell::sync::Lazy;
 use std::{env, io::Write};
 

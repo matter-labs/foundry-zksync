@@ -28,10 +28,10 @@ use foundry_evm_core::{
         HARDHAT_CONSOLE_ADDRESS,
     },
 };
-use foundry_zksync::{
+use foundry_zksync_compiler::{DualCompiledContract, FindContract};
+use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    zksolc::FindContract,
-    DualCompiledContract, ZkTransactionMetadata,
+    ZkTransactionMetadata,
 };
 use itertools::Itertools;
 use revm::{
@@ -547,7 +547,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             }
             // Safety: Length is checked above.
             let address = Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }));
-            let balance = foundry_zksync::balance(address, data.db, &mut data.journaled_state);
+            let balance = foundry_zksync_core::balance(address, data.db, &mut data.journaled_state);
 
             // Skip the current BALANCE instruction since we've already handled it
             match interpreter.stack.push(balance) {
@@ -1082,7 +1082,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(data, call.gas_limit);
 
-                    let nonce = foundry_zksync::nonce(
+                    let nonce = foundry_zksync_core::nonce(
                         broadcast.new_origin,
                         data.db,
                         &mut data.journaled_state,
@@ -1199,11 +1199,11 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 error!("no zk contract was found for {code_hash:?}");
             }
 
-            let ccx = foundry_zksync::vm::CheatcodeTracerContext {
+            let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
             };
-            if let Ok(result) = foundry_zksync::vm::call::<_, DatabaseError>(
+            if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
                 call,
                 contract,
                 data.env,
@@ -1543,7 +1543,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
                     let zk_tx = if self.use_zk_vm {
                         to = Some(CONTRACT_DEPLOYER_ADDRESS.to_address());
-                        nonce = foundry_zksync::nonce(
+                        nonce = foundry_zksync_core::nonce(
                             broadcast.new_origin,
                             data.db,
                             &mut data.journaled_state,
@@ -1556,7 +1556,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             });
                         let constructor_input =
                             call.init_code[contract.evm_bytecode.len()..].to_vec();
-                        let create_input = foundry_zksync::encode_create_params(
+                        let create_input = foundry_zksync_core::encode_create_params(
                             &call.scheme,
                             contract.zk_bytecode_hash,
                             constructor_input,
@@ -1658,11 +1658,11 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 .find_evm_bytecode(&call.init_code.0)
                 .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
 
-            let ccx = foundry_zksync::vm::CheatcodeTracerContext {
+            let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
             };
-            if let Ok(result) = foundry_zksync::vm::create::<_, DatabaseError>(
+            if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
                 call,
                 zk_contract,
                 data.env,

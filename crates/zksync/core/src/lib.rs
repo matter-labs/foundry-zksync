@@ -18,12 +18,8 @@ pub mod vm;
 /// ZKSync Era State implementation.
 pub mod state;
 
-/// ZKSolc specific logic.
-pub mod zksolc;
-
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};
-pub use zksolc::DualCompiledContract;
 
 /// Represents additional data for ZK transactions.
 #[derive(Clone, Debug, Default)]

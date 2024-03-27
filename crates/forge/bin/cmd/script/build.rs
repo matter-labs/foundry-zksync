@@ -11,9 +11,8 @@ use foundry_compilers::{
     info::ContractInfo,
     Artifact, ArtifactId, Project, ProjectCompileOutput,
 };
-use foundry_zksync::{
-    zksolc::{setup_zksolc_manager, PackedEraBytecode, ZkSolc, DEFAULT_ZKSOLC_VERSION},
-    DualCompiledContract,
+use foundry_zksync_compiler::{
+    setup_zksolc_manager, DualCompiledContract, PackedEraBytecode, ZkSolc, DEFAULT_ZKSOLC_VERSION,
 };
 use std::{collections::HashMap, str::FromStr};
 

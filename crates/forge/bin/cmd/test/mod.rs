@@ -32,9 +32,8 @@ use foundry_config::{
     get_available_profiles, Config,
 };
 use foundry_debugger::Debugger;
-use foundry_zksync::{
-    zksolc::{setup_zksolc_manager, PackedEraBytecode, ZkSolc, DEFAULT_ZKSOLC_VERSION},
-    DualCompiledContract,
+use foundry_zksync_compiler::{
+    setup_zksolc_manager, DualCompiledContract, PackedEraBytecode, ZkSolc, DEFAULT_ZKSOLC_VERSION,
 };
 use itertools::Itertools;
 use regex::Regex;
@@ -176,33 +175,51 @@ impl TestArgs {
 
         // load the zkSolc config
 
-        let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-        zksolc_cfg.contracts_to_compile =
-            self.opts.compiler.contracts_to_compile.clone().map(|patterns| {
-                patterns
-                    .into_iter()
-                    .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
-                    .collect_vec()
-            });
-        zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone().map(|patterns| {
-            patterns
-                .into_iter()
-                .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
-                .collect_vec()
-        });
-        let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
-        zksolc_cfg.compiler_path = compiler_path;
-
-        // Disable system request memoization to allow modifying system contracts storage
-        zksolc_cfg.settings.optimizer.disable_system_request_memoization = true;
-
-        let mut zksolc_project = config.project()?;
-        zksolc_project.paths.artifacts = project.paths.root.join("zkout");
-        let mut zksolc = ZkSolc::new(zksolc_cfg, zksolc_project);
+        let mut zksolc = ZkSolc::new(
+            config
+                .new_zksolc_config_builder()
+                .and_then(|builder| {
+                    builder
+                        .compiler_version(DEFAULT_ZKSOLC_VERSION)
+                        .avoid_contracts(self.opts.compiler.avoid_contracts.clone())
+                        .contracts_to_compile(self.opts.compiler.contracts_to_compile.clone())
+                        .build()
+                })
+                .map_err(|e| eyre::eyre!(e))?,
+            config.zk_project()?,
+        );
         let (zk_output, _contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
+
+        // let mut zksolc_cfg = config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
+        // zksolc_cfg.contracts_to_compile =
+        //     self.opts.compiler.contracts_to_compile.clone().map(|patterns| {
+        //         patterns
+        //             .into_iter()
+        //             .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+        //             .collect_vec()
+        //     });
+        // zksolc_cfg.avoid_contracts = self.opts.compiler.avoid_contracts.clone().map(|patterns| {
+        //     patterns
+        //         .into_iter()
+        //         .map(|pat| globset::Glob::new(&pat).unwrap().compile_matcher())
+        //         .collect_vec()
+        // });
+        // let compiler_path = setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()).await?;
+        // zksolc_cfg.compiler_path = compiler_path;
+
+        // // Disable system request memoization to allow modifying system contracts storage
+        // zksolc_cfg.settings.optimizer.disable_system_request_memoization = true;
+
+        // let mut zksolc_project = config.project()?;
+        // zksolc_project.paths.artifacts = project.paths.root.join("zkout");
+        // let mut zksolc = ZkSolc::new(zksolc_cfg, zksolc_project);
+        // let (zk_output, _contract_bytecodes) = match zksolc.compile() {
+        //     Ok(compiled) => compiled,
+        //     Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
+        // };
 
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;
@@ -230,46 +247,47 @@ impl TestArgs {
         let output_clone = should_debug.then(|| output.clone());
 
         // Dual compiled contracts
-        let mut dual_compiled_contracts = vec![];
-        let mut solc_bytecodes = HashMap::new();
-        for (contract_name, artifact) in output.artifacts() {
-            let contract_name =
-                contract_name.split('.').next().expect("name cannot be empty").to_string();
-            let deployed_bytecode = artifact.get_deployed_bytecode();
-            let deployed_bytecode = deployed_bytecode
-                .as_ref()
-                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
-            let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
-            if let Some(bytecode) = bytecode {
-                if let Some(deployed_bytecode) = deployed_bytecode {
-                    solc_bytecodes
-                        .insert(contract_name.clone(), (bytecode, deployed_bytecode.clone()));
-                }
-            }
-        }
-        // TODO make zk optional and solc default
-        for (contract_name, artifact) in zk_output.artifacts() {
-            let deployed_bytecode = artifact.get_deployed_bytecode();
-            let deployed_bytecode = deployed_bytecode
-                .as_ref()
-                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
-            if let Some(deployed_bytecode) = deployed_bytecode {
-                let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
-                if let Some((solc_bytecode, solc_deployed_bytecode)) =
-                    solc_bytecodes.get(&contract_name)
-                {
-                    dual_compiled_contracts.push(DualCompiledContract {
-                        name: contract_name,
-                        zk_bytecode_hash: packed_bytecode.bytecode_hash(),
-                        zk_deployed_bytecode: packed_bytecode.bytecode(),
-                        evm_bytecode_hash: keccak256(solc_deployed_bytecode),
-                        evm_bytecode: solc_bytecode.to_vec(),
-                        evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
-                    });
-                }
-            }
-        }
+        // let mut dual_compiled_contracts = vec![];
+        // let mut solc_bytecodes = HashMap::new();
+        // for (contract_name, artifact) in output.artifacts() {
+        //     let contract_name =
+        //         contract_name.split('.').next().expect("name cannot be empty").to_string();
+        //     let deployed_bytecode = artifact.get_deployed_bytecode();
+        //     let deployed_bytecode = deployed_bytecode
+        //         .as_ref()
+        //         .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+        //     let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
+        //     if let Some(bytecode) = bytecode {
+        //         if let Some(deployed_bytecode) = deployed_bytecode {
+        //             solc_bytecodes
+        //                 .insert(contract_name.clone(), (bytecode, deployed_bytecode.clone()));
+        //         }
+        //     }
+        // }
+        // // TODO make zk optional and solc default
+        // for (contract_name, artifact) in zk_output.artifacts() {
+        //     let deployed_bytecode = artifact.get_deployed_bytecode();
+        //     let deployed_bytecode = deployed_bytecode
+        //         .as_ref()
+        //         .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+        //     if let Some(deployed_bytecode) = deployed_bytecode {
+        //         let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
+        //         if let Some((solc_bytecode, solc_deployed_bytecode)) =
+        //             solc_bytecodes.get(&contract_name)
+        //         {
+        //             dual_compiled_contracts.push(DualCompiledContract {
+        //                 name: contract_name,
+        //                 zk_bytecode_hash: packed_bytecode.bytecode_hash(),
+        //                 zk_deployed_bytecode: packed_bytecode.bytecode(),
+        //                 evm_bytecode_hash: keccak256(solc_deployed_bytecode),
+        //                 evm_bytecode: solc_bytecode.to_vec(),
+        //                 evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
+        //             });
+        //         }
+        //     }
+        // }
 
+        let dual_compiled_contracts = DualCompiledContract::compile_all(&output, &zk_output);
         let mut runner = MultiContractRunnerBuilder::default()
             .set_debug(should_debug)
             .initial_balance(evm_opts.initial_balance)

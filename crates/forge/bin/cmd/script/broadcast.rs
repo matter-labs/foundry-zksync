@@ -29,7 +29,7 @@ use foundry_common::{
 use foundry_compilers::{artifacts::Libraries, ArtifactId};
 use foundry_config::Config;
 use foundry_wallets::WalletSigner;
-use foundry_zksync::DualCompiledContract;
+use foundry_zksync_compiler::DualCompiledContract;
 use futures::StreamExt;
 use std::{
     cmp::min,

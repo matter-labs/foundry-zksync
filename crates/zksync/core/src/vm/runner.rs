@@ -1,8 +1,8 @@
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     vm::tracer::CheatcodeTracer,
-    DualCompiledContract,
 };
+use foundry_zksync_compiler::DualCompiledContract;
 use alloy_primitives::Log;
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
 use ansi_term::Color::Cyan;

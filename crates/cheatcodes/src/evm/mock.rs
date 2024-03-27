@@ -21,11 +21,11 @@ impl Cheatcode for mockCall_0Call {
         let empty_bytecode = acc.info.code.as_ref().map_or(true, Bytecode::is_empty);
         if empty_bytecode {
             let code =
-                Bytecode::new_raw(Bytes::copy_from_slice(&foundry_zksync::cheatcodes::EMPTY_CODE))
+                Bytecode::new_raw(Bytes::copy_from_slice(&foundry_zksync_core::cheatcodes::EMPTY_CODE))
                     .to_checked();
             ccx.data.journaled_state.set_code(*callee, code.clone());
 
-            foundry_zksync::cheatcodes::set_mocked_account(
+            foundry_zksync_core::cheatcodes::set_mocked_account(
                 *callee,
                 ccx.data.db,
                 &mut ccx.data.journaled_state,

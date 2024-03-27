@@ -29,7 +29,6 @@
 /// - `decode_hex`: Decodes a hexadecimal string into a byte vector. Returns `Result<Vec<u8>>`
 ///   with the decoded byte vector if successful, or a `ParseIntError` if the decoding fails.
 use eyre::Result;
-use foundry_config::Chain;
 use url::Url;
 use zksync_basic_types::U256;
 use zksync_web3_rs::types::H256;
@@ -97,24 +96,6 @@ pub fn get_private_key(private_key: &Option<String>) -> Result<H256> {
             Err(eyre::Report::msg("Private key was not provided. Try using --private-key flag"))
         }
     }
-}
-
-/// Gets the chain from the Ethereum options.
-///
-/// If the `eth.chain` is `None`, an error is returned.
-///
-/// # Returns
-///
-/// A `Result` which is:
-/// - Ok: Contains the chain as `Chain`.
-/// - Err: Contains an error message indicating that the chain was not provided.
-pub fn get_chain(chain: Option<Chain>) -> Result<Chain> {
-    match chain {
-            Some(chain) => Ok(chain),
-            None => Err(eyre::Report::msg(
-                "Chain was not provided. Use --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')",
-            )),
-        }
 }
 
 /// Fixes the gas price to be minimum of 0.26GWei which is above the block base fee on L2.
