@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 //! This module provides the implementation of the ZkSolc compiler for Solidity contracts.
+use crate::zksolc::config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput};
 /// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart
 /// contracts.
 ///
@@ -42,7 +43,6 @@ use foundry_compilers::{
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
 };
-use crate::zksolc::config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput};
 use semver::Version;
 use serde::Deserialize;
 use serde_json::Value;

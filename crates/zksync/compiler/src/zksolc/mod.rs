@@ -33,50 +33,50 @@ pub struct DualCompiledContract {
     pub evm_bytecode: Vec<u8>,
 }
 
-impl DualCompiledContract {
-    /// Creates a list of [DualCompiledContract]s from the provided solc and zksolc output.
-    pub fn compile_all(output: &ProjectCompileOutput, zk_output: &ProjectCompileOutput) -> Vec<Self> {
-        let mut dual_compiled_contracts = vec![];
-        let mut solc_bytecodes = HashMap::new();
-        for (contract_name, artifact) in output.artifacts() {
-            let contract_name =
-                contract_name.split('.').next().expect("name cannot be empty").to_string();
-            let deployed_bytecode = artifact.get_deployed_bytecode();
-            let deployed_bytecode = deployed_bytecode
-                .as_ref()
-                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
-            let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
-            if let Some(bytecode) = bytecode {
-                if let Some(deployed_bytecode) = deployed_bytecode {
-                    solc_bytecodes
-                        .insert(contract_name.clone(), (bytecode, deployed_bytecode.clone()));
-                }
-            }
-        }
-        for (contract_name, artifact) in zk_output.artifacts() {
-            let deployed_bytecode = artifact.get_deployed_bytecode();
-            let deployed_bytecode = deployed_bytecode
-                .as_ref()
-                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+/// Creates a list of [DualCompiledContract]s from the provided solc and zksolc output.
+pub fn new_dual_compiled_contracts(
+    output: &ProjectCompileOutput,
+    zk_output: &ProjectCompileOutput,
+) -> Vec<DualCompiledContract> {
+    let mut dual_compiled_contracts = vec![];
+    let mut solc_bytecodes = HashMap::new();
+    for (contract_name, artifact) in output.artifacts() {
+        let contract_name =
+            contract_name.split('.').next().expect("name cannot be empty").to_string();
+        let deployed_bytecode = artifact.get_deployed_bytecode();
+        let deployed_bytecode = deployed_bytecode
+            .as_ref()
+            .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+        let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
+        if let Some(bytecode) = bytecode {
             if let Some(deployed_bytecode) = deployed_bytecode {
-                let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
-                if let Some((solc_bytecode, solc_deployed_bytecode)) =
-                    solc_bytecodes.get(&contract_name)
-                {
-                    dual_compiled_contracts.push(DualCompiledContract {
-                        name: contract_name,
-                        zk_bytecode_hash: packed_bytecode.bytecode_hash(),
-                        zk_deployed_bytecode: packed_bytecode.bytecode(),
-                        evm_bytecode_hash: keccak256(solc_deployed_bytecode),
-                        evm_bytecode: solc_bytecode.to_vec(),
-                        evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
-                    });
-                }
+                solc_bytecodes.insert(contract_name.clone(), (bytecode, deployed_bytecode.clone()));
             }
         }
-
-        dual_compiled_contracts
     }
+    for (contract_name, artifact) in zk_output.artifacts() {
+        let deployed_bytecode = artifact.get_deployed_bytecode();
+        let deployed_bytecode = deployed_bytecode
+            .as_ref()
+            .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+        if let Some(deployed_bytecode) = deployed_bytecode {
+            let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
+            if let Some((solc_bytecode, solc_deployed_bytecode)) =
+                solc_bytecodes.get(&contract_name)
+            {
+                dual_compiled_contracts.push(DualCompiledContract {
+                    name: contract_name,
+                    zk_bytecode_hash: packed_bytecode.bytecode_hash(),
+                    zk_deployed_bytecode: packed_bytecode.bytecode(),
+                    evm_bytecode_hash: keccak256(solc_deployed_bytecode),
+                    evm_bytecode: solc_bytecode.to_vec(),
+                    evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
+                });
+            }
+        }
+    }
+
+    dual_compiled_contracts
 }
 
 /// Implements methods to look for contracts

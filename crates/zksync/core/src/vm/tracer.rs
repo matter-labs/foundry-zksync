@@ -78,7 +78,9 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         memory: &SimpleMemory<H>,
         _storage: zksync_state::StoragePtr<S>,
     ) {
-        // Mark the caller as EOA to avoid panic
+        // Mark the caller as EOA to avoid panic. This is probably not needed anymore
+        // since we manually override the ACCOUNT_CODE_STORAGE to return `0` for the caller.
+        // TODO remove this and verify once we are stable.
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.get_current_stack();
             let calldata = get_calldata(&state, memory);

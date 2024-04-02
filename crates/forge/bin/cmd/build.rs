@@ -1,12 +1,9 @@
-use std::collections::HashMap;
-
 use super::{install, watch::WatchArgs};
-use alloy_primitives::keccak256;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
 use foundry_common::compile::{ProjectCompiler, SkipBuildFilter, SkipBuildFilters};
-use foundry_compilers::{Artifact, Project, ProjectCompileOutput};
+use foundry_compilers::{Project, ProjectCompileOutput};
 use foundry_config::{
     figment::{
         self,
@@ -16,10 +13,7 @@ use foundry_config::{
     },
     Config,
 };
-use foundry_zksync_compiler::{
-    setup_zksolc_manager, DualCompiledContract, PackedEraBytecode, ZkSolc, DEFAULT_ZKSOLC_VERSION,
-};
-use itertools::Itertools;
+use foundry_zksync_compiler::{ZkSolc, DEFAULT_ZKSOLC_VERSION};
 use serde::Serialize;
 use watchexec::config::{InitConfig, RuntimeConfig};
 
@@ -106,26 +100,29 @@ impl BuildArgs {
         }
         let output = compiler.compile(&project)?;
 
-        let mut zksolc = ZkSolc::new(
-            config
-                .new_zksolc_config_builder()
-                .and_then(|builder| {
-                    builder
-                        .compiler_version(DEFAULT_ZKSOLC_VERSION)
-                        .avoid_contracts(self.args.compiler.avoid_contracts.clone())
-                        .contracts_to_compile(self.args.compiler.contracts_to_compile.clone())
-                        .build()
-                })
-                .map_err(|e| eyre::eyre!(e))?,
-            config.zk_project()?,
-        );
-        let (zk_output, _contract_bytecodes) = match zksolc.compile() {
-            Ok(compiled) => compiled,
-            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
-        };
+        let output = if config.zksync {
+            let mut zksolc = ZkSolc::new(
+                config
+                    .new_zksolc_config_builder()
+                    .and_then(|builder| {
+                        builder
+                            .compiler_version(DEFAULT_ZKSOLC_VERSION)
+                            .avoid_contracts(self.args.compiler.avoid_contracts.clone())
+                            .contracts_to_compile(self.args.compiler.contracts_to_compile.clone())
+                            .build()
+                    })
+                    .map_err(|e| eyre::eyre!(e))?,
+                config.zk_project()?,
+            );
+            let (zk_output, _contract_bytecodes) = match zksolc.compile() {
+                Ok(compiled) => compiled,
+                Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
+            };
 
-        // Dual compiled contracts
-        let dual_compiled_contracts = DualCompiledContract::compile_all(&output, &zk_output);
+            zk_output
+        } else {
+            output
+        };
 
         if self.format_json {
             println!("{}", serde_json::to_string_pretty(&output.clone().output())?);

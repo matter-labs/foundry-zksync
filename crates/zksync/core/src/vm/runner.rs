@@ -2,7 +2,6 @@ use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     vm::tracer::CheatcodeTracer,
 };
-use foundry_zksync_compiler::DualCompiledContract;
 use alloy_primitives::Log;
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
 use ansi_term::Color::Cyan;
@@ -16,6 +15,7 @@ use foundry_common::{
     console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
     HardhatConsole,
 };
+use foundry_zksync_compiler::DualCompiledContract;
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{fix_l2_gas_limit, fix_l2_gas_price};
@@ -94,7 +94,7 @@ where
             gas_limit: fix_l2_gas_limit(env.tx.gas_limit.into()),
             max_fee_per_gas: fix_l2_gas_price(env.tx.gas_price.to_u256()),
             max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-            gas_per_pubdata_limit: U256::from(800),
+            gas_per_pubdata_limit: U256::from(20000),
         },
         caller.to_h160(),
         env.tx.value.to_u256(),
@@ -179,7 +179,7 @@ where
             max_fee_per_gas: fix_l2_gas_price(U256::zero()),
             max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
 
-            gas_per_pubdata_limit: U256::from(800),
+            gas_per_pubdata_limit: U256::from(20000),
         },
         caller.to_h160(),
         call.value.to_u256(),
@@ -214,7 +214,7 @@ where
             gas_limit: fix_l2_gas_limit(env.tx.gas_limit.into()),
             max_fee_per_gas: fix_l2_gas_price(env.tx.gas_price.to_u256()),
             max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-            gas_per_pubdata_limit: U256::from(800),
+            gas_per_pubdata_limit: U256::from(20000),
         },
         caller.to_h160(),
         call.transfer.value.to_u256(),
@@ -253,7 +253,9 @@ where
     }
 
     let modified_storage_keys = era_db.override_keys.clone();
-    let storage_ptr = StorageView::new(&mut era_db, modified_storage_keys).into_rc_ptr();
+    let storage_ptr =
+        StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
+            .into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) = inspect_inner(
         tx,
         storage_ptr,

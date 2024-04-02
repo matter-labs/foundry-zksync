@@ -1175,14 +1175,14 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
         }
 
         if self.use_zk_vm {
-            info!("running call in zk vm {:#?}", call);
-
             if let TransactTo::Call(test_contract) = data.env.tx.transact_to {
-                if call.contract == test_contract && call.context.caller == CALLER {
-                    info!("ignoring zk call from deployer to test contract {:?}", data.env);
+                if call.contract == test_contract {
+                    info!("using evm for calls to test contract {:?}", data.env);
                     return (InstructionResult::Continue, gas, Bytes::new())
                 }
             }
+
+            info!("running call in zk vm {:#?}", call);
 
             let code_hash = data
                 .journaled_state
