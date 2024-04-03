@@ -5,10 +5,7 @@ use foundry_compilers::{
     artifacts::{Libraries, Settings},
     Project, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
-use foundry_config::{
-    zksolc_config::{Optimizer, Settings as ZkSettings, ZkSolcConfigBuilder},
-    Config,
-};
+use foundry_config::Config;
 use foundry_evm::{
     constants::CALLER,
     executors::{Executor, FuzzedExecutor},
@@ -16,7 +13,7 @@ use foundry_evm::{
     revm::db::DatabaseRef,
 };
 use foundry_test_utils::fd_lock;
-use foundry_zksync_core::zksolc::{setup_zksolc_manager, ZkSolc, DEFAULT_ZKSOLC_VERSION};
+use foundry_zksync_compiler::{ZkSolc, ZkSolcConfigBuilder, DEFAULT_ZKSOLC_VERSION};
 use once_cell::sync::Lazy;
 use std::{env, io::Write};
 
@@ -68,33 +65,55 @@ pub static COMPILED: Lazy<ProjectCompileOutput> = Lazy::new(|| {
 
 /// Compile ZK project
 fn zk_compile(project: Project) -> ProjectCompileOutput {
-    let compiler_path =
-        futures::executor::block_on(setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()))
-            .expect("failed setting up zksolc");
+    // let compiler_path =
+    //     futures::executor::block_on(setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()))
+    //         .expect("failed setting up zksolc");
 
-    let mut zksolc_config = ZkSolcConfigBuilder::new()
-        .compiler_path(compiler_path)
-        .settings(ZkSettings {
-            optimizer: Optimizer {
-                enabled: Some(true),
-                mode: Some(String::from("3")),
-                fallback_to_optimizing_for_size: Some(false),
-                disable_system_request_memoization: true,
-                ..Default::default()
-            },
-            ..Default::default()
+    // let mut zksolc_config = ZkSolcConfigBuilder::new()
+    //     .compiler_path(compiler_path)
+    //     .settings(ZkSettings {
+    //         optimizer: Optimizer {
+    //             enabled: Some(true),
+    //             mode: Some(String::from("3")),
+    //             fallback_to_optimizing_for_size: Some(false),
+    //             disable_system_request_memoization: true,
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     })
+    //     .build()
+    //     .expect("failed building zksolc config");
+    // zksolc_config.contracts_to_compile = Some(vec![
+    //     globset::Glob::new("zk/*").unwrap().compile_matcher(),
+    //     globset::Glob::new("lib/*").unwrap().compile_matcher(),
+    //     globset::Glob::new("cheats/Vm.sol").unwrap().compile_matcher(),
+    // ]);
+
+    // let mut zksolc = ZkSolc::new(zksolc_config, project);
+    // let (zk_out, _) = zksolc.compile().unwrap();
+    // zk_out
+
+    let config = ZkSolcConfigBuilder::new()
+        .compiler_version(DEFAULT_ZKSOLC_VERSION)
+        .contracts_to_compile(Some(vec![
+            String::from("zk/*"),
+            String::from("lib/*"),
+            String::from("cheats/Vm.sol"),
+        ]))
+        .settings(|builder| {
+            builder.optimizer(|builder| {
+                builder
+                    .enabled(true)
+                    .mode(String::from("3"))
+                    .optimize_for_size_fallback(false)
+                    .disable_system_request_memoization(true)
+            })
         })
         .build()
         .expect("failed building zksolc config");
-    zksolc_config.contracts_to_compile = Some(vec![
-        globset::Glob::new("zk/*").unwrap().compile_matcher(),
-        globset::Glob::new("lib/*").unwrap().compile_matcher(),
-        globset::Glob::new("cheats/Vm.sol").unwrap().compile_matcher(),
-    ]);
-
-    let mut zksolc = ZkSolc::new(zksolc_config, project);
-    let (zk_out, _) = zksolc.compile().unwrap();
-    zk_out
+    let mut zksolc = ZkSolc::new(config, project);
+    let (zk_output, _) = zksolc.compile().expect("failed compiling with zksolc");
+    zk_output
 }
 
 pub static COMPILED_ZK: Lazy<ProjectCompileOutput> = Lazy::new(|| {

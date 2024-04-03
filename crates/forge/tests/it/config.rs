@@ -6,7 +6,6 @@ use forge::{
     result::{SuiteResult, TestStatus},
     MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
 };
-use foundry_common::{factory_deps::PackedEraBytecode, DualCompiledContract};
 use foundry_compilers::Artifact;
 use foundry_config::{
     fs_permissions::PathPermission, Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig,
@@ -19,6 +18,7 @@ use foundry_evm::{
     traces::{render_trace_arena, CallTraceDecoderBuilder},
 };
 use foundry_test_utils::{init_tracing, Filter};
+use foundry_zksync_compiler::{DualCompiledContract, PackedEraBytecode};
 use futures::future::join_all;
 use itertools::Itertools;
 use std::{
@@ -184,7 +184,13 @@ pub async fn runner_with_config(mut config: Config) -> MultiContractRunner {
     let output = COMPILED.clone();
     base_runner()
         .with_test_options(test_opts())
-        .with_cheats_config(CheatsConfig::new(&config, opts.clone(), None, Default::default()))
+        .with_cheats_config(CheatsConfig::new(
+            &config,
+            opts.clone(),
+            None,
+            Default::default(),
+            false,
+        ))
         .sender(config.sender)
         .build(root, output, env, opts.clone())
         .unwrap()
@@ -244,7 +250,13 @@ pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunne
 
     base_runner()
         .with_test_options(test_opts())
-        .with_cheats_config(CheatsConfig::new(&config, opts.clone(), None, dual_compiled_contracts))
+        .with_cheats_config(CheatsConfig::new(
+            &config,
+            opts.clone(),
+            None,
+            dual_compiled_contracts,
+            false,
+        ))
         .sender(config.sender)
         .build(root, output, env, opts.clone())
         .unwrap()
