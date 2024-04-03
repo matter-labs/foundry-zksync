@@ -129,7 +129,7 @@ jobs:
         - name: Install Rust
           uses: actions-rust-lang/setup-rust-toolchain@v1
           with:
-            toolchain: nightly-2023-09-30
+            toolchain: nightly-nightly-2024-02-06
   
         - name: Run smoke-test
           env:

@@ -29,7 +29,6 @@
 /// downloading, setting up, and switching between versions. It is part of a larger framework
 /// for managing and interacting with zkSync contracts.
 use anyhow::{anyhow, Context, Error, Result};
-use dirs;
 use reqwest::Client;
 use serde::Serialize;
 use std::{fmt, fs, os::unix::prelude::PermissionsExt, path::PathBuf};
