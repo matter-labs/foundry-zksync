@@ -3,10 +3,10 @@ name: test
 on:
     push:
         branches:
-            - foundry/main
+            - foundry/dev
     pull_request:
         branches:
-            - foundry/main
+            - foundry/dev
 
 concurrency:
     cancel-in-progress: true
@@ -114,3 +114,24 @@ jobs:
             
         - name: Test ZK VM
           run: RUST_LOG=1 cargo test --package forge --test it --jobs=1 -- zk
+    
+    zk-smoke-test:
+        name: zk-smoke-test
+        runs-on: ubuntu-22.04-github-hosted-16core
+  
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            submodules: recursive
+            ref: ${{ github.event.pull_request.head.sha }}
+  
+        - name: Install Rust
+          uses: actions-rust-lang/setup-rust-toolchain@v1
+          with:
+            toolchain: nightly-2023-09-30
+  
+        - name: Run smoke-test
+          env:
+            RUST_BACKTRACE: full
+          run: cd zk-tests && ./test.sh
