@@ -1214,12 +1214,23 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 return match result {
                     ExecutionResult::Success { output, logs, .. } => match output {
                         Output::Call(bytes) => {
-                            self.combined_logs.extend(logs.into_iter().map(|log| {
+                            self.combined_logs.extend(logs.clone().into_iter().map(|log| {
                                 Some(Log {
                                     address: log.address,
                                     data: LogData::new_unchecked(log.topics, log.data),
                                 })
                             }));
+                            //for each log in cloned logs call handle_expect_emit
+                            if !self.expected_emits.is_empty() {
+                                for log in logs {
+                                    expect::handle_expect_emit(
+                                        self,
+                                        &log.address,
+                                        &log.topics,
+                                        &log.data,
+                                    );
+                                }
+                            }
                             (InstructionResult::Return, gas, bytes)
                         }
                         _ => (InstructionResult::Revert, gas, Bytes::new()),
