@@ -12,7 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-foundry-compilers.workspacefoundry-compilers = { workspace = true, features = ["svm-solc"] }
+foundry-compilers = { workspace = true, features = ["svm-solc"] }
 alloy-primitives.workspace = true
 alloy-json-abi.workspace = true
 hex.workspace = true

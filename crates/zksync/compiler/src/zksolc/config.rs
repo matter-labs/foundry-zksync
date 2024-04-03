@@ -140,12 +140,6 @@ impl SettingsBuilder {
         self
     }
 
-    /// Sets optimizer settings.
-    // pub fn optimizer(mut self, value: Optimizer) -> Self {
-    //     self.optimizer = value;
-    //     self
-    // }
-
     /// Sets metadata.
     pub fn metadata(mut self, value: Option<SettingsMetadata>) -> Self {
         self.metadata = value;
@@ -294,7 +288,6 @@ impl OptimizerBuilder {
 pub struct ZkSolcConfigBuilder {
     compiler_version: Option<String>,
     compiler_path: Option<PathBuf>,
-    // settings: Option<Settings>,
     contracts_to_compile: Option<Vec<String>>,
     avoid_contracts: Option<Vec<String>>,
     settings: SettingsBuilder,
@@ -305,11 +298,6 @@ impl ZkSolcConfigBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-
-    // pub fn settings(mut self, settings: SettingsBuilder) -> Self {
-    //     self.settings = settings;
-    //     self
-    // }
 
     /// Sets the path to the `zksolc` binary.
     pub fn compiler_version(mut self, version: &str) -> Self {
@@ -332,12 +320,6 @@ impl ZkSolcConfigBuilder {
         self
     }
 
-    /// Sets the `Settings` for the `ZkSolcConfig`.
-    // pub fn settings(mut self, settings: Settings) -> Self {
-    //     self.settings = Some(settings);
-    //     self
-    // }
-
     /// Sets contracts_to_compile.
     pub fn contracts_to_compile(mut self, value: Option<Vec<String>>) -> Self {
         self.contracts_to_compile = value;
@@ -352,7 +334,6 @@ impl ZkSolcConfigBuilder {
 
     /// Builds the `ZkSolcConfig`.
     pub fn build(self) -> Result<ZkSolcConfig, String> {
-        // let settings = self.settings.ok_or("settings must be provided".to_string())?;
         let settings = self.settings.build()?;
         let compiler_path = if let Some(compiler_path) = self.compiler_path {
             compiler_path

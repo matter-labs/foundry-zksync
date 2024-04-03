@@ -249,7 +249,7 @@ impl Cheatcodes {
         let labels = config.labels.clone();
         let script_wallets = config.script_wallets.clone();
         let dual_compiled_contracts = config.dual_compiled_contracts.clone();
-        let startup_zk = config.use_zk.clone();
+        let startup_zk = config.use_zk;
         Self {
             config,
             fs_commit: true,

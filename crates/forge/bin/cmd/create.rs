@@ -129,7 +129,6 @@ impl CreateArgs {
 
         let (abi, bin, _) = remove_contract(&mut output, &self.contract)?;
 
-        println!("ZK = {}", zksync);
         let (abi, bin, zk_contract) = if zksync {
             println!("{:?}", bin);
             let contract = bin
@@ -198,9 +197,9 @@ impl CreateArgs {
         } else {
             // Deploy with signer
             let signer = self.eth.wallet.signer().await?;
-            let signer2 = self.eth.wallet.signer().await?;
+            let zk_signer = self.eth.wallet.signer().await?;
             let provider = SignerMiddleware::new_with_provider_chain(provider, signer).await?;
-            self.deploy(abi, bin, params, provider, chain_id, zk_contract, Some(signer2)).await
+            self.deploy(abi, bin, params, provider, chain_id, zk_contract, Some(zk_signer)).await
         }
     }
 
@@ -254,6 +253,7 @@ impl CreateArgs {
     }
 
     /// Deploys the contract
+    #[allow(clippy::too_many_arguments)]
     async fn deploy<M: Middleware + 'static>(
         self,
         abi: JsonAbi,

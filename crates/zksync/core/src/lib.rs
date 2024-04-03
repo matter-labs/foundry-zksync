@@ -62,8 +62,7 @@ pub async fn new_eip712_transaction<M: Middleware, S: Signer>(
     let from = legacy_or_1559.from().cloned().ok_or_eyre("`from` cannot be empty")?;
     let to = legacy_or_1559
         .to()
-        .map(|to| to.as_address())
-        .flatten()
+        .and_then(|to| to.as_address())
         .cloned()
         .ok_or_eyre("`to` cannot be empty")?;
     let chain_id = legacy_or_1559.chain_id().ok_or_eyre("`chain_id` cannot be empty")?;
@@ -130,8 +129,7 @@ pub async fn estimate_gas<M: Middleware>(
 ) -> Result<EstimatedGas> {
     let to = legacy_or_1559
         .to()
-        .map(|to| to.as_address())
-        .flatten()
+        .and_then(|to| to.as_address())
         .cloned()
         .ok_or_eyre("`to` cannot be empty")?;
     let chain_id = legacy_or_1559.chain_id().ok_or_eyre("`chain_id` cannot be empty")?;

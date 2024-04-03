@@ -425,6 +425,12 @@ pub struct Backend {
     /// Keeps track of the fork type
     fork_url_type: CachedForkType,
 
+    /// TODO: Ensure this parameter is updated on `select_fork`.
+    ///
+    /// Keeps track if the backend is in ZK mode.
+    /// This is required to correctly merge storage when selecting another ZK fork.
+    /// The balance, nonce and code are stored under zkSync's respective system contract
+    /// storages. These need to be merged into the forked storage.
     pub is_zk: bool,
 }
 
