@@ -21,7 +21,10 @@ contract ZkConsoleTest is Test {
 
     // The test must be run with parameter `-vv` to print logs
     function testZkConsoleOutput() public {
-        vm.zkVm(true);
+        (bool success, ) = address(vm).call(
+            abi.encodeWithSignature("zkVm(bool)", true)
+        );
+        require(success, "zkVm() call failed");
         
         Printer printer = new Printer();
         printer.print();
