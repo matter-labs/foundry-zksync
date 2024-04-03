@@ -3,10 +3,10 @@ name: test
 on:
     push:
         branches:
-            - foundry/dev
+            - dev
     pull_request:
         branches:
-            - foundry/dev
+            - dev
 
 concurrency:
     cancel-in-progress: true
