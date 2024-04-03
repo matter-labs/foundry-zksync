@@ -24,7 +24,7 @@ use foundry_common::{evm::Breakpoints, provider::alloy::RpcUrl};
 use foundry_evm_core::{
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
-        CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE,
+        CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE,
         HARDHAT_CONSOLE_ADDRESS,
     },
 };
