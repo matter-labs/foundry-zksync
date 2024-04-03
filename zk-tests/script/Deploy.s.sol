@@ -18,14 +18,16 @@ contract Greeter {
         return greet;
     }
 
-    function greeting2(string memory _name, uint256 n) public returns (uint256) {
+    function greeting2(
+        string memory _name,
+        uint256 n
+    ) public returns (uint256) {
         name = _name;
         string memory greet = string(abi.encodePacked("Hello ", _name));
         console.log(name);
         emit Greet(greet);
         return n * 2;
     }
-
 
     function setAge(uint256 _age) public {
         age = _age;
@@ -43,7 +45,11 @@ contract DeployScript is Script {
     string greeting;
 
     function run() external {
-        vm.zkVm(true);
+        // test is using old Vm.sol interface, so we call manually
+        (bool success, ) = address(vm).call(
+            abi.encodeWithSignature("zkVm(bool)", true)
+        );
+        require(success, "zkVm() call failed");
         vm.startBroadcast();
         greeter = new Greeter();
         greeter.greeting("john");
