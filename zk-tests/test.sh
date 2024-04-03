@@ -6,7 +6,7 @@ set -o pipefail -e
 REPO_ROOT="../"
 SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
-BINARY_PATH="${REPO_ROOT}/target/debug/forge"
+BINARY_PATH="${REPO_ROOT}/target/release/forge"
 ERA_TEST_NODE_VERSION="v0.1.0-alpha.15"
 ERA_TEST_NODE_PID=0
 
@@ -119,7 +119,7 @@ command -v git &>/dev/null || {
   exit 1
 }
 
-# build_forge "${REPO_ROOT}"
+build_forge "${REPO_ROOT}"
 
 echo "Running tests..."
 RUST_LOG=warn "${BINARY_PATH}" test --use "./${SOLC}" -vvv  || fail "forge test failed"
