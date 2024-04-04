@@ -147,7 +147,6 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            println!("RET ZK");
             (abi, zk_bin, Some(contract))
         } else {
             (abi, bin, None)
