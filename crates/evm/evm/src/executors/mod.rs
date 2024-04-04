@@ -24,7 +24,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::CallTraceArena;
-use foundry_zksync::ZkTransactionMetadata;
+use foundry_zksync_core::ZkTransactionMetadata;
 use itertools::Itertools;
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
@@ -127,7 +127,7 @@ impl Executor {
         self.backend.insert_account_info(address, account);
 
         if self.use_zk {
-            let (address, slot) = foundry_zksync::state::get_balance_storage(address);
+            let (address, slot) = foundry_zksync_core::state::get_balance_storage(address);
             self.backend.insert_account_storage(address, slot, amount)?;
         }
         Ok(self)
@@ -146,8 +146,9 @@ impl Executor {
         self.backend.insert_account_info(address, account);
 
         if self.use_zk {
-            let (address, slot) = foundry_zksync::state::get_nonce_storage(address);
-            self.backend.insert_account_storage(address, slot, U256::from(nonce))?;
+            let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
+            let full_nonce = foundry_zksync_core::state::new_full_nonce(nonce, nonce);
+            self.backend.insert_account_storage(address, slot, full_nonce)?;
         }
 
         Ok(self)

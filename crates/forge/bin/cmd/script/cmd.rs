@@ -19,7 +19,7 @@ use foundry_compilers::{
 use foundry_debugger::Debugger;
 use foundry_evm::inspectors::cheatcodes::{BroadcastableTransaction, ScriptWallets};
 use foundry_wallets::WalletSigner;
-use foundry_zksync::DualCompiledContract;
+use foundry_zksync_compiler::DualCompiledContract;
 use std::{collections::HashMap, sync::Arc};
 
 /// Helper alias type for the collection of data changed due to the new sender.

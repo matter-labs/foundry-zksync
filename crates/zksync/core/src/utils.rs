@@ -29,7 +29,6 @@
 /// - `decode_hex`: Decodes a hexadecimal string into a byte vector. Returns `Result<Vec<u8>>`
 ///   with the decoded byte vector if successful, or a `ParseIntError` if the decoding fails.
 use eyre::Result;
-use foundry_config::Chain;
 use url::Url;
 use zksync_basic_types::U256;
 use zksync_web3_rs::types::H256;
@@ -99,24 +98,6 @@ pub fn get_private_key(private_key: &Option<String>) -> Result<H256> {
     }
 }
 
-/// Gets the chain from the Ethereum options.
-///
-/// If the `eth.chain` is `None`, an error is returned.
-///
-/// # Returns
-///
-/// A `Result` which is:
-/// - Ok: Contains the chain as `Chain`.
-/// - Err: Contains an error message indicating that the chain was not provided.
-pub fn get_chain(chain: Option<Chain>) -> Result<Chain> {
-    match chain {
-            Some(chain) => Ok(chain),
-            None => Err(eyre::Report::msg(
-                "Chain was not provided. Use --chain flag (ex. --chain 270 ) \nor environment variable 'CHAIN= ' (ex.'CHAIN=270')",
-            )),
-        }
-}
-
 /// Fixes the gas price to be minimum of 0.26GWei which is above the block base fee on L2.
 /// This is required so the bootloader does not throw an error if baseFee < gasPrice.
 ///
@@ -129,10 +110,24 @@ pub fn fix_l2_gas_price(gas_price: U256) -> U256 {
     U256::max(gas_price, U256::from(260_000_000))
 }
 
-/// Fixes the gas limit to be maxmium of 2^31, which is below the VM gas limit of 2^32.
-/// This is required so the bootloader does not throw an error for not having enough gas.
+/// Limits the gas_limit propotional to a user's available balance given the gas_price.
+/// Additionally, fixes the gas limit to be maxmium of 2^31, which is below the VM gas limit of
+/// 2^32. This is required so the bootloader does not throw an error for not having enough balance
+/// to pay for gas.
 ///
 /// TODO: Remove this later to allow for dynamic gas prices that work in both tests and scripts.
-pub fn fix_l2_gas_limit(gas_limit: U256) -> U256 {
+pub fn fix_l2_gas_limit(
+    proposed_gas_limit: U256,
+    gas_price: U256,
+    value: U256,
+    balance: U256,
+) -> U256 {
+    let gas_limit = if gas_price.is_zero() {
+        proposed_gas_limit
+    } else {
+        let max_gas_limit = balance.saturating_sub(value).div_mod(gas_price).0;
+        U256::min(proposed_gas_limit, max_gas_limit)
+    };
+
     U256::min(gas_limit, U256::from(u32::MAX >> 1))
 }

@@ -4,7 +4,7 @@ use crate::{Cheatcode, Cheatcodes, CheatsCtxt, DatabaseExt, Error, Result, Vm::*
 use alloy_primitives::Address;
 use alloy_sol_types::SolValue;
 use foundry_evm_core::constants::{MAGIC_ASSUME, MAGIC_SKIP};
-use foundry_zksync::DualCompiledContract;
+use foundry_zksync_compiler::DualCompiledContract;
 
 pub(crate) mod assert;
 pub(crate) mod expect;

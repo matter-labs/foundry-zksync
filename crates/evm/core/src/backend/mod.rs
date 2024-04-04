@@ -10,6 +10,7 @@ use alloy_genesis::GenesisAccount;
 use alloy_primitives::{b256, keccak256, Address, B256, U256, U64};
 use alloy_rpc_types::{Block, BlockNumberOrTag, BlockTransactions, Transaction};
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
+use foundry_zksync_core::{convert::ConvertH160, L2_ETH_TOKEN_ADDRESS};
 use itertools::Itertools;
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -423,6 +424,14 @@ pub struct Backend {
     inner: BackendInner,
     /// Keeps track of the fork type
     fork_url_type: CachedForkType,
+
+    /// TODO: Ensure this parameter is updated on `select_fork`.
+    ///
+    /// Keeps track if the backend is in ZK mode.
+    /// This is required to correctly merge storage when selecting another ZK fork.
+    /// The balance, nonce and code are stored under zkSync's respective system contract
+    /// storages. These need to be merged into the forked storage.
+    pub is_zk: bool,
 }
 
 // === impl Backend ===
@@ -452,6 +461,7 @@ impl Backend {
             active_fork_ids: None,
             inner,
             fork_url_type: Default::default(),
+            is_zk: false,
         };
 
         if let Some(fork) = fork {
@@ -496,6 +506,7 @@ impl Backend {
             active_fork_ids: None,
             inner: Default::default(),
             fork_url_type: Default::default(),
+            is_zk: false,
         }
     }
 
@@ -673,6 +684,7 @@ impl Backend {
         &self,
         active_journaled_state: &mut JournaledState,
         target_fork: &mut Fork,
+        merge_zk_db: bool,
     ) {
         debug_assert!(
             self.inner.test_contract_address.is_some(),
@@ -683,6 +695,7 @@ impl Backend {
             self.inner.persistent_accounts.iter().copied(),
             active_journaled_state,
             target_fork,
+            merge_zk_db,
         )
     }
 
@@ -692,12 +705,25 @@ impl Backend {
         accounts: impl IntoIterator<Item = Address>,
         active_journaled_state: &mut JournaledState,
         target_fork: &mut Fork,
+        merge_zk_db: bool,
     ) {
         if let Some((_, fork_idx)) = self.active_fork_ids.as_ref() {
             let active = self.inner.get_fork(*fork_idx);
-            merge_account_data(accounts, &active.db, active_journaled_state, target_fork)
+            merge_account_data(
+                accounts,
+                &active.db,
+                active_journaled_state,
+                target_fork,
+                merge_zk_db,
+            )
         } else {
-            merge_account_data(accounts, &self.mem_db, active_journaled_state, target_fork)
+            merge_account_data(
+                accounts,
+                &self.mem_db,
+                active_journaled_state,
+                target_fork,
+                merge_zk_db,
+            )
         }
     }
 
@@ -801,8 +827,6 @@ impl Backend {
     {
         self.initialize(env);
 
-        // TODO run zk evm for simulation estimate gas
-
         match revm::evm_inner::<Self>(env, self, Some(&mut inspector)).transact() {
             Ok(res) => Ok(res),
             Err(e) => eyre::bail!("backend: failed while inspecting: {e}"),
@@ -817,7 +841,7 @@ impl Backend {
     ) -> eyre::Result<ResultAndState> {
         self.initialize(env);
 
-        foundry_zksync::vm::transact(factory_deps, env, self)
+        foundry_zksync_core::vm::transact(factory_deps, env, self)
     }
 
     /// Returns true if the address is a precompile
@@ -1101,6 +1125,22 @@ impl DatabaseExt for Backend {
 
         let fork_id = self.ensure_fork_id(id).cloned()?;
         let idx = self.inner.ensure_fork_index(&fork_id)?;
+
+        let is_current_zk_fork = if let Some(active_fork_id) = self.active_fork_id() {
+            self.forks
+                .get_fork_url(self.ensure_fork_id(active_fork_id).cloned()?)?
+                .map(|url| self.fork_url_type.get(&url).is_zk())
+                .unwrap_or_default()
+        } else {
+            self.is_zk
+        };
+        let is_target_zk_fork = self
+            .forks
+            .get_fork_url(fork_id.clone())?
+            .map(|url| self.fork_url_type.get(&url).is_zk())
+            .unwrap_or_default();
+        let merge_zk_db = is_current_zk_fork && is_target_zk_fork;
+
         let fork_env = self
             .forks
             .get_env(fork_id)?
@@ -1168,7 +1208,7 @@ impl DatabaseExt for Backend {
                 fork.journaled_state.state.insert(caller, caller_account.into());
             }
 
-            self.update_fork_db(active_journaled_state, &mut fork);
+            self.update_fork_db(active_journaled_state, &mut fork, merge_zk_db);
 
             // insert the fork back
             self.inner.set_fork(idx, fork);
@@ -1842,9 +1882,13 @@ pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
     active: &CacheDB<ExtDB>,
     active_journaled_state: &mut JournaledState,
     target_fork: &mut Fork,
+    merge_zk_db: bool,
 ) {
     for addr in accounts.into_iter() {
         merge_db_account_data(addr, active, &mut target_fork.db);
+        if merge_zk_db {
+            merge_zk_account_data(addr, active, &mut target_fork.db);
+        }
         merge_journaled_state_data(addr, active_journaled_state, &mut target_fork.journaled_state);
     }
 
@@ -1902,6 +1946,41 @@ fn merge_db_account_data<ExtDB: DatabaseRef>(
     }
 
     fork_db.accounts.insert(addr, acc);
+}
+
+/// Clones the zk account data from the `active` db into the `ForkDB`
+fn merge_zk_account_data<ExtDB: DatabaseRef>(
+    addr: Address,
+    active: &CacheDB<ExtDB>,
+    fork_db: &mut ForkDB,
+) {
+    trace!(?addr, "merging zk database data");
+
+    // TODO: do the same for nonce and codes
+    let balance_addr = L2_ETH_TOKEN_ADDRESS.to_address();
+    let mut acc = if let Some(acc) = active.accounts.get(&balance_addr).cloned() {
+        acc
+    } else {
+        // Account does not exist
+        return;
+    };
+
+    let mut balances = Map::<U256, U256>::default();
+    let slot = foundry_zksync_core::get_balance_key(addr);
+    if let Some(value) = acc.storage.get(&slot) {
+        balances.insert(slot, *value);
+    }
+
+    if let Some(fork_account) = fork_db.accounts.get_mut(&balance_addr) {
+        // This will merge the fork's tracked storage with active storage and update values
+        fork_account.storage.extend(balances);
+        // swap them so we can insert the account as whole in the next step
+        std::mem::swap(&mut fork_account.storage, &mut acc.storage);
+    } else {
+        std::mem::swap(&mut balances, &mut acc.storage)
+    }
+
+    fork_db.accounts.insert(balance_addr, acc);
 }
 
 /// Returns true of the address is a contract

@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 //! This module provides the implementation of the ZkSolc compiler for Solidity contracts.
+use crate::zksolc::config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput};
 /// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart
 /// contracts.
 ///
@@ -42,7 +43,6 @@ use foundry_compilers::{
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
 };
-use foundry_config::zksolc_config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput};
 use semver::Version;
 use serde::Deserialize;
 use serde_json::Value;
@@ -1050,7 +1050,7 @@ mod tests {
     /// Basic test to analyze the single Counter.sol artifact.
     #[test]
     pub fn test_artifacts_extraction() {
-        let data = include_str!("../../../../testdata/artifacts-counter/artifacts.json")
+        let data = include_str!("../../../../../testdata/artifacts-counter/artifacts.json")
             .as_bytes()
             .to_vec();
         let mut displayed_warnings = HashSet::new();
@@ -1067,14 +1067,16 @@ mod tests {
     }
     #[test]
     pub fn test_json_parsing() {
-        let data = include_str!("../../../../testdata/artifacts-counter/artifacts.json")
+        let data = include_str!("../../../../../testdata/artifacts-counter/artifacts.json")
             .as_bytes()
             .to_vec();
         let _parsed: ZkSolcCompilerOutput = serde_json::from_slice(&data).unwrap();
 
         // Contract that has almost no data (and many fields missing).
         let almost_empty_data =
-            include_str!("../../../../testdata/artifacts-counter/empty.json").as_bytes().to_vec();
+            include_str!("../../../../../testdata/artifacts-counter/empty.json")
+                .as_bytes()
+                .to_vec();
         let _parsed_empty: ZkSolcCompilerOutput =
             serde_json::from_slice(&almost_empty_data).unwrap();
     }

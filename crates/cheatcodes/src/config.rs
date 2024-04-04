@@ -8,7 +8,7 @@ use foundry_config::{
     ResolvedRpcEndpoints,
 };
 use foundry_evm_core::opts::EvmOpts;
-use foundry_zksync::DualCompiledContract;
+use foundry_zksync_compiler::DualCompiledContract;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -210,6 +210,7 @@ mod tests {
             Default::default(),
             None,
             Default::default(),
+            false,
         )
     }
 
