@@ -1,7 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use zksync_state::{ReadStorage, WriteStorage};
-use zksync_types::{StorageKey, StorageValue, H256};
+use zksync_types::{StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256};
+
+use crate::convert::ConvertH160;
 
 /// `StorageView` is a buffer for `StorageLog`s between storage and transaction execution code.
 /// In order to commit transactions logs should be submitted to the underlying storage
@@ -23,6 +25,8 @@ pub(crate) struct StorageView<S> {
     pub(crate) read_storage_keys: HashMap<StorageKey, StorageValue>,
     // Cache for `contains_key()` checks. The cache is only valid within one L1 batch execution.
     initial_writes_cache: HashMap<StorageKey, bool>,
+
+    caller: H160,
 }
 
 impl<S: ReadStorage + fmt::Debug> StorageView<S> {
@@ -30,12 +34,14 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
     pub(crate) fn new(
         storage_handle: S,
         modified_storage_keys: HashMap<StorageKey, StorageValue>,
+        caller: H160,
     ) -> Self {
         Self {
             storage_handle,
             modified_storage_keys,
             read_storage_keys: HashMap::new(),
             initial_writes_cache: HashMap::new(),
+            caller,
         }
     }
 
@@ -65,6 +71,20 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
 impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     fn read_value(&mut self, key: &StorageKey) -> StorageValue {
         let value = self.get_value_no_log(key);
+
+        // We override the caller's account code storage to allow for calls
+        if key.address() == &ACCOUNT_CODE_STORAGE_ADDRESS && key.key() == &self.caller.to_h256() {
+            let value = StorageValue::zero();
+            tracing::trace!(
+                "override read value {:?} {:?} ({:?}/{:?})",
+                key.hashed_key(),
+                value,
+                key.address(),
+                key.key()
+            );
+
+            return value
+        }
 
         tracing::trace!(
             "read value {:?} {:?} ({:?}/{:?})",
@@ -138,7 +158,8 @@ mod test {
         let key = StorageKey::new(account, key);
 
         let mut raw_storage = InMemoryStorage::default();
-        let mut storage_view = StorageView::new(&raw_storage, Default::default());
+        let mut storage_view =
+            StorageView::new(&raw_storage, Default::default(), Default::default());
 
         let default_value = storage_view.read_value(&key);
         assert_eq!(default_value, H256::zero());
@@ -149,7 +170,8 @@ mod test {
         assert!(storage_view.is_write_initial(&key)); // key was inserted during the view lifetime
 
         raw_storage.set_value(key, value);
-        let mut storage_view = StorageView::new(&raw_storage, Default::default());
+        let mut storage_view =
+            StorageView::new(&raw_storage, Default::default(), Default::default());
 
         assert_eq!(storage_view.read_value(&key), value);
         assert!(!storage_view.is_write_initial(&key)); // `key` is present in `raw_storage`

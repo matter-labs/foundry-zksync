@@ -1,5 +1,5 @@
 use super::{ScriptArgs, ScriptConfig};
-use alloy_primitives::{keccak256, Address, Bytes};
+use alloy_primitives::{Address, Bytes};
 use eyre::{Context, ContextCompat, Result};
 use forge::link::{LinkOutput, Linker};
 use foundry_cli::utils::get_cached_entry_by_name;
@@ -9,13 +9,10 @@ use foundry_compilers::{
     cache::SolFilesCache,
     contracts::ArtifactContracts,
     info::ContractInfo,
-    Artifact, ArtifactId, Project, ProjectCompileOutput,
+    ArtifactId, Project, ProjectCompileOutput,
 };
-use foundry_zksync::{
-    zksolc::{setup_zksolc_manager, PackedEraBytecode, ZkSolc, DEFAULT_ZKSOLC_VERSION},
-    DualCompiledContract,
-};
-use std::{collections::HashMap, str::FromStr};
+use foundry_zksync_compiler::{new_dual_compiled_contracts, DualCompiledContract, ZkSolc};
+use std::str::FromStr;
 
 impl ScriptArgs {
     /// Compiles the file or project and the verify metadata.
@@ -32,60 +29,24 @@ impl ScriptArgs {
         let output = output.with_stripped_file_prefixes(root);
 
         // ZK
-        let mut zksolc_cfg = script_config.config.zk_solc_config().map_err(|e| eyre::eyre!(e))?;
-        let compiler_path =
-            futures::executor::block_on(setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()))
-                .expect("failed setting up zksolc");
-        zksolc_cfg.compiler_path = compiler_path;
-        // Disable system request memoization to allow modifying system contracts storage
-        zksolc_cfg.settings.optimizer.disable_system_request_memoization = true;
-
-        let mut zksolc_project = script_config.config.project()?;
-        zksolc_project.paths.artifacts = project.paths.root.join("zkout");
-        let mut zksolc = ZkSolc::new(zksolc_cfg, zksolc_project);
+        let config = &script_config.config;
+        let mut zksolc = ZkSolc::new(
+            config
+                .new_zksolc_config_builder()
+                .and_then(|builder| {
+                    builder
+                        .avoid_contracts(self.opts.args.compiler.avoid_contracts.clone())
+                        .contracts_to_compile(self.opts.args.compiler.contracts_to_compile.clone())
+                        .build()
+                })
+                .map_err(|e| eyre::eyre!(e))?,
+            config.zk_project()?,
+        );
         let (zk_output, _contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
-        // Dual compiled contracts
-        let mut dual_compiled_contracts = vec![];
-        let mut solc_bytecodes = HashMap::new();
-        for (contract_name, artifact) in output.artifacts() {
-            let contract_name =
-                contract_name.split('.').next().expect("name cannot be empty").to_string();
-            let deployed_bytecode = artifact.get_deployed_bytecode();
-            let deployed_bytecode = deployed_bytecode
-                .as_ref()
-                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
-            let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
-            if let Some(bytecode) = bytecode {
-                if let Some(deployed_bytecode) = deployed_bytecode {
-                    solc_bytecodes
-                        .insert(contract_name.clone(), (bytecode, deployed_bytecode.clone()));
-                }
-            }
-        }
-        for (contract_name, artifact) in zk_output.artifacts() {
-            let deployed_bytecode = artifact.get_deployed_bytecode();
-            let deployed_bytecode = deployed_bytecode
-                .as_ref()
-                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
-            if let Some(deployed_bytecode) = deployed_bytecode {
-                let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
-                if let Some((solc_bytecode, solc_deployed_bytecode)) =
-                    solc_bytecodes.get(&contract_name)
-                {
-                    dual_compiled_contracts.push(DualCompiledContract {
-                        name: contract_name,
-                        zk_bytecode_hash: packed_bytecode.bytecode_hash(),
-                        zk_deployed_bytecode: packed_bytecode.bytecode(),
-                        evm_bytecode_hash: keccak256(solc_deployed_bytecode),
-                        evm_bytecode: solc_bytecode.to_vec(),
-                        evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
-                    });
-                }
-            }
-        }
+        let dual_compiled_contracts = new_dual_compiled_contracts(&output, &zk_output);
 
         let sources = ContractSources::from_project_output(&output, root)?;
         let contracts = output.into_artifacts().collect();

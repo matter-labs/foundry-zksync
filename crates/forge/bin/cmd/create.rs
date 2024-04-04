@@ -8,7 +8,7 @@ use ethers_core::{
     abi::InvalidOutputType,
     types::{
         transaction::eip2718::TypedTransaction, BlockNumber, Chain, Eip1559TransactionRequest,
-        TransactionReceipt, TransactionRequest,
+        NameOrAddress, TransactionReceipt, TransactionRequest,
     },
 };
 use ethers_middleware::SignerMiddleware;
@@ -24,7 +24,15 @@ use foundry_common::{
     provider::ethers::estimate_eip1559_fees,
     types::{ToAlloy, ToEthers},
 };
-use foundry_compilers::{artifacts::BytecodeObject, info::ContractInfo, utils::canonicalized};
+use foundry_compilers::{
+    artifacts::{BytecodeObject, CompactBytecode},
+    info::ContractInfo,
+    utils::canonicalized,
+};
+use foundry_wallets::WalletSigner;
+use foundry_zksync_compiler::{
+    new_dual_compiled_contracts, DualCompiledContract, FindContract, ZkSolc,
+};
 use serde_json::json;
 use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
 
@@ -94,12 +102,56 @@ impl CreateArgs {
         let mut output =
             ProjectCompiler::new().quiet_if(self.json || self.opts.silent).compile(&project)?;
 
+        let config = self.eth.try_load_config_emit_warnings()?;
+        let zksync = self.opts.compiler.zksync;
+        let mut zksolc = ZkSolc::new(
+            config
+                .new_zksolc_config_builder()
+                .and_then(|builder| {
+                    builder
+                        .avoid_contracts(self.opts.compiler.avoid_contracts.clone())
+                        .contracts_to_compile(self.opts.compiler.contracts_to_compile.clone())
+                        .build()
+                })
+                .map_err(|e| eyre::eyre!(e))?,
+            config.zk_project()?,
+        );
+        let (zk_output, _contract_bytecodes) = match zksolc.compile() {
+            Ok(compiled) => compiled,
+            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
+        };
+        let dual_compiled_contracts = new_dual_compiled_contracts(&output, &zk_output);
+
         if let Some(ref mut path) = self.contract.path {
             // paths are absolute in the project's output
             *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
         }
 
         let (abi, bin, _) = remove_contract(&mut output, &self.contract)?;
+
+        let (abi, bin, zk_contract) = if zksync {
+            println!("{:?}", bin);
+            let contract = bin
+                .object
+                .as_bytes()
+                .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
+                .ok_or(eyre::eyre!(
+                    "Could not find zksolc contract for contract {}",
+                    self.contract.name
+                ))?;
+            let zk_bin = CompactBytecode {
+                object: BytecodeObject::Bytecode(Bytes::from(
+                    contract.zk_deployed_bytecode.clone(),
+                )),
+                link_references: Default::default(),
+                source_map: Default::default(),
+            };
+
+            println!("RET ZK");
+            (abi, zk_bin, Some(contract))
+        } else {
+            (abi, bin, None)
+        };
 
         let bin = match bin.object {
             BytecodeObject::Bytecode(_) => bin.object,
@@ -117,7 +169,6 @@ impl CreateArgs {
         };
 
         // Add arguments to constructor
-        let config = self.eth.try_load_config_emit_warnings()?;
         let provider = utils::get_provider(&config)?;
         let params = match abi.constructor {
             Some(ref v) => {
@@ -142,12 +193,13 @@ impl CreateArgs {
             // Deploy with unlocked account
             let sender = self.eth.wallet.from.expect("required");
             let provider = provider.with_sender(sender.to_ethers());
-            self.deploy(abi, bin, params, provider, chain_id).await
+            self.deploy(abi, bin, params, provider, chain_id, zk_contract, None).await
         } else {
             // Deploy with signer
             let signer = self.eth.wallet.signer().await?;
+            let zk_signer = self.eth.wallet.signer().await?;
             let provider = SignerMiddleware::new_with_provider_chain(provider, signer).await?;
-            self.deploy(abi, bin, params, provider, chain_id).await
+            self.deploy(abi, bin, params, provider, chain_id, zk_contract, Some(zk_signer)).await
         }
     }
 
@@ -201,6 +253,7 @@ impl CreateArgs {
     }
 
     /// Deploys the contract
+    #[allow(clippy::too_many_arguments)]
     async fn deploy<M: Middleware + 'static>(
         self,
         abi: JsonAbi,
@@ -208,6 +261,8 @@ impl CreateArgs {
         args: Vec<DynSolValue>,
         provider: M,
         chain: u64,
+        zk_contract: Option<&DualCompiledContract>,
+        signer: Option<WalletSigner>,
     ) -> Result<()> {
         let deployer_address =
             provider.default_sender().expect("no sender address set for provider");
@@ -218,14 +273,24 @@ impl CreateArgs {
         let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone());
 
         let is_args_empty = args.is_empty();
-        let deployer =
-            factory.deploy_tokens(args.clone()).context("failed to deploy contract").map_err(|e| {
-                if is_args_empty {
-                    e.wrap_err("no arguments provided for contract constructor; consider --constructor-args or --constructor-args-path")
-                } else {
-                    e
-                }
-            })?;
+        let deployer = if let Some(contract) = zk_contract {
+            factory.deploy_tokens_zk(args.clone(), contract).context("failed to deploy contract")
+        } else {
+            factory.deploy_tokens(args.clone()).context("failed to deploy contract")
+        }.map_err(|e| {
+            if is_args_empty {
+                e.wrap_err("no arguments provided for contract constructor; consider --constructor-args or --constructor-args-path")
+            } else {
+                e
+            }
+        })?;
+
+        let deployer = if let Some(contract) = zk_contract {
+            deployer.set_zk_factory_deps(vec![contract.zk_deployed_bytecode.clone()])
+        } else {
+            deployer
+        };
+
         let is_legacy = self.tx.legacy ||
             Chain::try_from(chain).map(|x| Chain::is_legacy(&x)).unwrap_or_default();
         let mut deployer = if is_legacy { deployer.legacy() } else { deployer };
@@ -235,9 +300,46 @@ impl CreateArgs {
             deployer.tx.set_value(value.to_ethers());
         }
 
-        // fill tx first because if you target a lower gas than current base, eth_estimateGas
-        // will fail and create will fail
-        provider.fill_transaction(&mut deployer.tx, None).await?;
+        match zk_contract {
+            None => provider.fill_transaction(&mut deployer.tx, None).await?,
+            Some(contract) => {
+                let chain_id = provider.get_chainid().await?.as_u64();
+                deployer.tx.set_chain_id(chain_id);
+
+                let gas_price = provider.get_gas_price().await?;
+                deployer.tx.set_gas_price(gas_price);
+
+                deployer.tx.set_from(deployer_address);
+
+                let nonce = provider.get_transaction_count(deployer_address, None).await?;
+                deployer.tx.set_nonce(nonce);
+
+                let constructor_args = match abi.constructor() {
+                    None => Default::default(),
+                    Some(constructor) => constructor.abi_encode_input(&args).unwrap_or_default(),
+                };
+                let data = foundry_zksync_core::encode_create_params(
+                    &forge::revm::primitives::CreateScheme::Create,
+                    contract.zk_bytecode_hash,
+                    constructor_args,
+                );
+                let data = Bytes::from(data);
+                deployer.tx.set_data(data.to_ethers());
+
+                deployer
+                    .tx
+                    .set_to(NameOrAddress::from(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS));
+
+                let estimated_gas = foundry_zksync_core::estimate_gas(
+                    &deployer.tx,
+                    vec![contract.zk_deployed_bytecode.clone()],
+                    &provider,
+                )
+                .await?;
+                deployer.tx.set_gas(estimated_gas.limit.to_ethers());
+                deployer.tx.set_gas_price(estimated_gas.price.to_ethers());
+            }
+        }
 
         // the max
         let mut priority_fee = self.tx.priority_gas_price;
@@ -294,7 +396,7 @@ impl CreateArgs {
         }
 
         // Deploy the actual contract
-        let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
+        let (deployed_contract, receipt) = deployer.send_with_receipt(signer).await?;
 
         let address = deployed_contract;
         if self.json {
@@ -412,6 +514,7 @@ pub struct Deployer<B, M> {
     client: B,
     confs: usize,
     block: BlockNumber,
+    zk_factory_deps: Option<Vec<Vec<u8>>>,
     _m: PhantomData<M>,
 }
 
@@ -426,6 +529,7 @@ where
             client: self.client.clone(),
             confs: self.confs,
             block: self.block,
+            zk_factory_deps: self.zk_factory_deps.clone(),
             _m: PhantomData,
         }
     }
@@ -436,6 +540,11 @@ where
     B: Borrow<M> + Clone,
     M: Middleware,
 {
+    pub fn set_zk_factory_deps(mut self, deps: Vec<Vec<u8>>) -> Self {
+        self.zk_factory_deps = Some(deps);
+        self
+    }
+
     /// Uses a Legacy transaction instead of an EIP-1559 one to do the deployment
     pub fn legacy(mut self) -> Self {
         self.tx = match self.tx {
@@ -454,13 +563,32 @@ where
     /// and the corresponding [`TransactionReceipt`].
     pub async fn send_with_receipt(
         self,
+        signer: Option<WalletSigner>,
     ) -> Result<(Address, TransactionReceipt), ContractError<M>> {
-        let pending_tx = self
-            .client
-            .borrow()
-            .send_transaction(self.tx, Some(self.block.into()))
-            .await
-            .map_err(ContractError::from_middleware_error)?;
+        let pending_tx = match self.zk_factory_deps {
+            None => self
+                .client
+                .borrow()
+                .send_transaction(self.tx, Some(self.block.into()))
+                .await
+                .map_err(ContractError::from_middleware_error)?,
+            Some(factory_deps) => {
+                let tx = foundry_zksync_core::new_eip712_transaction(
+                    self.tx,
+                    factory_deps,
+                    self.client.borrow().provider(),
+                    signer.expect("No signer was found"),
+                )
+                .await
+                .map_err(|_| ContractError::DecodingError(ethers_core::abi::Error::InvalidData))?;
+
+                self.client
+                    .borrow()
+                    .send_raw_transaction(tx.to_ethers())
+                    .await
+                    .map_err(ContractError::from_middleware_error)?
+            }
+        };
 
         // TODO: Should this be calculated "optimistically" by address/nonce?
         let receipt = pending_tx
@@ -584,6 +712,50 @@ where
             tx,
             confs: 1,
             block: BlockNumber::Latest,
+            zk_factory_deps: None,
+            _m: PhantomData,
+        })
+    }
+
+    /// Create a deployment tx using the provided tokens as constructor
+    /// arguments for zk networks
+    pub fn deploy_tokens_zk(
+        self,
+        params: Vec<DynSolValue>,
+        contract: &DualCompiledContract,
+    ) -> Result<Deployer<B, M>, ContractError<M>>
+    where
+        B: Clone,
+    {
+        if self.abi.constructor().is_none() && !params.is_empty() {
+            return Err(ContractError::ConstructorError)
+        }
+
+        // Encode the constructor args & concatenate with the bytecode if necessary
+        let constructor_args = match self.abi.constructor() {
+            None => Default::default(),
+            Some(constructor) => constructor.abi_encode_input(&params).unwrap_or_default(),
+        };
+        let data: Bytes = foundry_zksync_core::encode_create_params(
+            &forge::revm::primitives::CreateScheme::Create,
+            contract.zk_bytecode_hash,
+            constructor_args,
+        )
+        .into();
+
+        let tx = Eip1559TransactionRequest {
+            to: Some(NameOrAddress::from(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS)),
+            data: Some(data.to_ethers()),
+            ..Default::default()
+        };
+
+        Ok(Deployer {
+            client: self.client.clone(),
+            abi: self.abi,
+            tx: tx.into(),
+            confs: 1,
+            block: BlockNumber::Latest,
+            zk_factory_deps: Some(vec![contract.zk_deployed_bytecode.clone()]),
             _m: PhantomData,
         })
     }

@@ -97,11 +97,7 @@ mod inline;
 use crate::etherscan::EtherscanEnvProvider;
 pub use inline::{validate_profiles, InlineConfig, InlineConfigError, InlineConfigParser, NatSpec};
 
-// @zkSync - zksolc configuration and settings
-pub mod zksolc_config;
-use zksolc_config::{
-    Optimizer as OptimizerSettings, Settings as ZkSettings, ZkSolcConfig, ZkSolcConfigBuilder,
-};
+use foundry_zksync_compiler::{ZkSolcConfig, ZkSolcConfigBuilder, DEFAULT_ZKSOLC_VERSION};
 
 /// Foundry configuration
 ///
@@ -677,9 +673,68 @@ impl Config {
         self.create_project(self.cache, false)
     }
 
+    /// Serves as the entrypoint for obtaining the zk project.
+    ///
+    /// Returns the `Project` configured with all `solc` and path related values.
+    ///
+    /// *Note*: this also _cleans_ [`Project::cleanup`] the workspace if `force` is set to true.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use foundry_config::Config;
+    /// let config = Config::load_with_root(".").sanitized();
+    /// let project = config.project();
+    /// ```
+    pub fn zk_project(&self) -> Result<Project, SolcError> {
+        self.create_project(self.cache, false).map(|mut project| {
+            project.paths.artifacts = project.paths.root.join("zkout");
+            project
+        })
+    }
+
     /// Serves as the entrypoint for using zksolc for compilation on zkSync projects.
     ///
-    /// Returns the `ZkSolc` configured with all `zksolc` and path related values.
+    /// Returns the [ZkSolcConfigBuilder] configured with all `zksolc` and path related values.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use foundry_config::Config;
+    /// let config = Config::load_with_root(".").sanitized();
+    /// let zksolc = config.new_zksolc_config_builder().and_then(|builder| builder.build());
+    /// ```
+    pub fn new_zksolc_config_builder(&self) -> Result<ZkSolcConfigBuilder, String> {
+        let builder = ZkSolcConfigBuilder::new();
+
+        let libraries = match self.parsed_libraries() {
+            Ok(libs) => libs.with_applied_remappings(&self.project_paths()),
+            Err(e) => return Err(format!("Failed to parse libraries: {}", e)),
+        };
+        let optimizer_details =
+            if self.zk_optimizer { self.optimizer_details.clone() } else { None };
+
+        let builder = builder.compiler_version(DEFAULT_ZKSOLC_VERSION).settings(|builder| {
+            builder
+                .libraries(libraries)
+                .is_system(self.is_system)
+                .force_evmla(self.force_evmla)
+                .optimizer(|builder| {
+                    builder
+                        .enabled(self.zk_optimizer)
+                        .mode(self.mode.clone())
+                        .optimize_for_size_fallback(self.fallback_oz)
+                        .disable_system_request_memoization(true)
+                        .details(optimizer_details)
+                })
+        });
+
+        Ok(builder)
+    }
+
+    /// Serves as the entrypoint for using zksolc for compilation on zkSync projects.
+    ///
+    /// Returns the default [ZkSolcConfig] configured with all `zksolc` and path related values.
     ///
     /// # Example
     ///
@@ -689,54 +744,7 @@ impl Config {
     /// let zksolc = config.zk_solc_config();
     /// ```
     pub fn zk_solc_config(&self) -> Result<ZkSolcConfig, String> {
-        self.create_zksolc_config()
-    }
-
-    fn create_zksolc_config(&self) -> Result<ZkSolcConfig, String> {
-        let zksolc_config = ZkSolcConfigBuilder::new()
-            .compiler_path(self.compiler_path.clone())
-            .settings(self.zksolc_settings()?)
-            .build()?;
-
-        Ok(zksolc_config)
-    }
-
-    /// Returns the configured `zksolc` `Settings` that includes:
-    ///   - all libraries
-    ///   - the optimizer (including details, if configured)
-    ///   - is_system
-    ///   - force_evmla
-    fn zksolc_settings(&self) -> Result<ZkSettings, String> {
-        let libraries = match self.parsed_libraries() {
-            Ok(libs) => libs.with_applied_remappings(&self.project_paths()),
-            Err(e) => return Err(format!("Failed to parse libraries: {}", e)),
-        };
-        let optimizer = self.zk_optimizer();
-
-        let settings = ZkSettings {
-            optimizer,
-            libraries,
-            is_system: self.is_system,
-            force_evmla: self.force_evmla,
-            ..Default::default()
-        };
-
-        Ok(settings)
-    }
-
-    /// Returns the zksolc `OptimizerSettings` based on the configured settings
-    fn zk_optimizer(&self) -> OptimizerSettings {
-        let mode = self.mode.clone();
-        // only configure optimizer settings if optimizer is enabled
-        let details = if self.zk_optimizer { self.optimizer_details.clone() } else { None };
-
-        OptimizerSettings {
-            enabled: Some(self.zk_optimizer),
-            mode: Some(mode),
-            details,
-            fallback_to_optimizing_for_size: Some(self.fallback_oz),
-            disable_system_request_memoization: false,
-        }
+        self.new_zksolc_config_builder().and_then(|builder| builder.build())
     }
 
     /// Same as [`Self::project()`] but sets configures the project to not emit artifacts and ignore

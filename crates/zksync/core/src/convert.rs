@@ -125,8 +125,6 @@ impl ConvertAddress for Address {
 mod test {
     use std::str::FromStr;
 
-    use zksync_utils::u256_to_h256;
-
     use super::*;
 
     #[test]

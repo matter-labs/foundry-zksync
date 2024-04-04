@@ -171,7 +171,8 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // the db backend that serves all the data, each contract gets its own instance
-        let db = Backend::spawn(self.fork.take()).await;
+        let mut db = Backend::spawn(self.fork.take()).await;
+        db.is_zk = self.cheats_config.use_zk;
 
         self.contracts
             .par_iter()

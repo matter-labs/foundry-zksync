@@ -8,7 +8,7 @@ use forge::{
     traces::{TraceKind, Traces},
 };
 use foundry_config::Config;
-use foundry_zksync::ZkTransactionMetadata;
+use foundry_zksync_core::ZkTransactionMetadata;
 use yansi::Paint;
 
 /// Represents which simulation stage is the script execution at.
