@@ -79,14 +79,16 @@ where
             .collect(),
     );
 
-    let mut zk_data = ZKVMData::new(db, &mut journaled_state);
     let caller = env.tx.caller;
     let (transact_to, nonce) = match env.tx.transact_to {
-        TransactTo::Call(to) => (to.to_h160(), zk_data.get_tx_nonce(caller)),
-        TransactTo::Create(CreateScheme::Create) |
-        TransactTo::Create(CreateScheme::Create2 { .. }) => {
-            (CONTRACT_DEPLOYER_ADDRESS, zk_data.get_deploy_nonce(caller))
+        TransactTo::Call(to) => {
+            (to.to_h160(), ZKVMData::new(db, &mut journaled_state).get_tx_nonce(caller))
         }
+        TransactTo::Create(CreateScheme::Create) |
+        TransactTo::Create(CreateScheme::Create2 { .. }) => (
+            CONTRACT_DEPLOYER_ADDRESS,
+            ZKVMData::new(db, &mut journaled_state).get_deploy_nonce(caller),
+        ),
     };
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, &mut journaled_state, caller);
@@ -241,9 +243,8 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    let mut zk_data = ZKVMData::new(db, journaled_state);
     let value = env.tx.value.to_u256();
-    let balance = zk_data.get_balance(caller);
+    let balance = ZKVMData::new(db, journaled_state).get_balance(caller);
     let max_fee_per_gas = fix_l2_gas_price(env.tx.gas_price.to_u256());
     let gas_limit = fix_l2_gas_limit(env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
 
