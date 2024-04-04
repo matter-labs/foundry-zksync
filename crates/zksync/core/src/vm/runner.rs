@@ -80,12 +80,16 @@ where
     );
 
     let caller = env.tx.caller;
-    let transact_to = match env.tx.transact_to {
-        TransactTo::Call(to) => to.to_h160(),
+    let (transact_to, nonce) = match env.tx.transact_to {
+        TransactTo::Call(to) => {
+            (to.to_h160(), ZKVMData::new(db, &mut journaled_state).get_tx_nonce(caller))
+        }
         TransactTo::Create(CreateScheme::Create) |
-        TransactTo::Create(CreateScheme::Create2 { .. }) => CONTRACT_DEPLOYER_ADDRESS,
+        TransactTo::Create(CreateScheme::Create2 { .. }) => (
+            CONTRACT_DEPLOYER_ADDRESS,
+            ZKVMData::new(db, &mut journaled_state).get_deploy_nonce(caller),
+        ),
     };
-    let nonce: zksync_types::Nonce = ZKVMData::new(db, &mut journaled_state).get_tx_nonce(caller);
     let tx = L2Tx::new(
         transact_to,
         env.tx.data.to_vec(),
@@ -168,7 +172,7 @@ where
     let caller = call.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
-    let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
+    let nonce = ZKVMData::new(db, journaled_state).get_deploy_nonce(caller);
 
     let tx = L2Tx::new(
         CONTRACT_DEPLOYER_ADDRESS,

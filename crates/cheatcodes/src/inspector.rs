@@ -56,7 +56,7 @@ use std::{
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_code_key, get_nonce_key,
-    utils::{decompose_full_nonce, storage_key_for_eth_balance},
+    utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
     KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
@@ -432,7 +432,7 @@ impl Cheatcodes {
         new_env: Option<&Env>,
     ) {
         if self.use_zk_vm {
-            tracing::info!("already in  ZK-VM");
+            tracing::info!("already in ZK-VM");
             return
         }
 
@@ -463,7 +463,9 @@ impl Cheatcodes {
             let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
             let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
             l2_eth_storage.insert(balance_key, StorageSlot::new(info.balance));
-            nonce_storage.insert(nonce_key, StorageSlot::new(U256::from(info.nonce)));
+
+            let full_nonce = nonces_to_full_nonce(info.nonce.into(), info.nonce.into());
+            nonce_storage.insert(nonce_key, StorageSlot::new(full_nonce.to_ru256()));
 
             if let Some(contract) = self.dual_compiled_contracts.iter().find(|contract| {
                 info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash

@@ -131,6 +131,15 @@ where
         Nonce(tx_nonce.as_u32())
     }
 
+    /// Returns the deployment nonce for a given account from NonceHolder storage.
+    pub fn get_deploy_nonce(&mut self, address: Address) -> Nonce {
+        let address = address.to_h160();
+        let nonce_key = get_nonce_key(&address);
+        let nonce_storage = self.read_db(*nonce_key.address(), h256_to_u256(*nonce_key.key()));
+        let (_tx_nonce, deploy_nonce) = decompose_full_nonce(h256_to_u256(nonce_storage));
+        Nonce(deploy_nonce.as_u32())
+    }
+
     /// Returns the nonce for a given account from NonceHolder storage.
     pub fn get_balance(&mut self, address: Address) -> U256 {
         let address = address.to_h160();

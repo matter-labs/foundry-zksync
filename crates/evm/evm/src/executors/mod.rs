@@ -147,7 +147,8 @@ impl Executor {
 
         if self.use_zk {
             let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
-            self.backend.insert_account_storage(address, slot, U256::from(nonce))?;
+            let full_nonce = foundry_zksync_core::state::new_full_nonce(nonce, nonce);
+            self.backend.insert_account_storage(address, slot, full_nonce)?;
         }
 
         Ok(self)
