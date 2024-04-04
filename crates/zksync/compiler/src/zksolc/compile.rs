@@ -288,7 +288,7 @@ impl ZkSolc {
         let mut contract_bytecodes = BTreeMap::new();
 
         // Step 2: Compile Contracts for Each Source
-        for (_solc, version) in sources {
+        for (solc, version) in sources {
             info!("\nCompiling {} files...", version.1.len());
             //configure project solc for each solc version
             for (contract_path, _) in version.1 {
@@ -299,7 +299,7 @@ impl ZkSolc {
                 ))?;
 
                 // Step 4: Build Compiler Arguments
-                let comp_args = self.build_compiler_args(&contract_path, &self.project.solc);
+                let comp_args = self.build_compiler_args(&contract_path, &solc);
 
                 // Hash the input contract to allow caching
                 let mut contract_file = File::open(&contract_path)?;
