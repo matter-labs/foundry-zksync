@@ -79,24 +79,24 @@ where
             .collect(),
     );
 
+    let mut zk_data = ZKVMData::new(db, &mut journaled_state);
     let caller = env.tx.caller;
     let (transact_to, nonce) = match env.tx.transact_to {
-        TransactTo::Call(to) => {
-            (to.to_h160(), ZKVMData::new(db, &mut journaled_state).get_tx_nonce(caller))
-        }
+        TransactTo::Call(to) => (to.to_h160(), zk_data.get_tx_nonce(caller)),
         TransactTo::Create(CreateScheme::Create) |
-        TransactTo::Create(CreateScheme::Create2 { .. }) => (
-            CONTRACT_DEPLOYER_ADDRESS,
-            ZKVMData::new(db, &mut journaled_state).get_deploy_nonce(caller),
-        ),
+        TransactTo::Create(CreateScheme::Create2 { .. }) => {
+            (CONTRACT_DEPLOYER_ADDRESS, zk_data.get_deploy_nonce(caller))
+        }
     };
+
+    let (gas_limit, max_fee_per_gas) = gas_params(env, db, &mut journaled_state, caller);
     let tx = L2Tx::new(
         transact_to,
         env.tx.data.to_vec(),
         nonce,
         Fee {
-            gas_limit: fix_l2_gas_limit(env.tx.gas_limit.into()),
-            max_fee_per_gas: fix_l2_gas_price(env.tx.gas_price.to_u256()),
+            gas_limit,
+            max_fee_per_gas,
             max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
             gas_per_pubdata_limit: U256::from(20000),
         },
@@ -174,15 +174,15 @@ where
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
     let nonce = ZKVMData::new(db, journaled_state).get_deploy_nonce(caller);
 
+    let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
     let tx = L2Tx::new(
         CONTRACT_DEPLOYER_ADDRESS,
         calldata,
         nonce,
         Fee {
-            gas_limit: fix_l2_gas_limit(env.tx.gas_limit.into()),
-            max_fee_per_gas: fix_l2_gas_price(U256::zero()),
+            gas_limit,
+            max_fee_per_gas,
             max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-
             gas_per_pubdata_limit: U256::from(20000),
         },
         caller.to_h160(),
@@ -210,13 +210,15 @@ where
     let caller = call.context.caller;
     let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
+
+    let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
     let tx = L2Tx::new(
         call.contract.to_h160(),
         call.input.to_vec(),
         nonce,
         Fee {
-            gas_limit: fix_l2_gas_limit(env.tx.gas_limit.into()),
-            max_fee_per_gas: fix_l2_gas_price(env.tx.gas_price.to_u256()),
+            gas_limit,
+            max_fee_per_gas,
             max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
             gas_per_pubdata_limit: U256::from(20000),
         },
@@ -226,6 +228,26 @@ where
         PaymasterParams::default(),
     );
     inspect(tx, env, db, journaled_state, ccx)
+}
+
+/// Assign gas parameters that satisfy zkSync's fee model.
+fn gas_params<'a, DB>(
+    env: &'a mut Env,
+    db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
+    caller: Address,
+) -> (U256, U256)
+where
+    DB: Database + Send,
+    <DB as Database>::Error: Debug,
+{
+    let mut zk_data = ZKVMData::new(db, journaled_state);
+    let value = env.tx.value.to_u256();
+    let balance = zk_data.get_balance(caller);
+    let max_fee_per_gas = fix_l2_gas_price(env.tx.gas_price.to_u256());
+    let gas_limit = fix_l2_gas_limit(env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
+
+    (gas_limit, max_fee_per_gas)
 }
 
 fn inspect<'a, DB, E>(
