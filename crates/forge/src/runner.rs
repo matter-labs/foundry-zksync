@@ -270,7 +270,6 @@ impl<'a> ContractRunner<'a> {
                     self.run_fuzz_test(func, should_fail, runner, setup.clone(), *fuzz_config)
                 } else {
                     info!(name = func.name, "run test");
-                    println!("run test {}", func.name);
                     self.run_test(func, should_fail, setup.clone())
                 };
                 (func.signature(), res)
