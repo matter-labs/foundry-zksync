@@ -80,15 +80,11 @@ where
     );
 
     let caller = env.tx.caller;
-    let (transact_to, nonce) = match env.tx.transact_to {
-        TransactTo::Call(to) => {
-            (to.to_h160(), ZKVMData::new(db, &mut journaled_state).get_tx_nonce(caller))
-        }
+    let nonce = ZKVMData::new(db, &mut journaled_state).get_tx_nonce(caller);
+    let transact_to = match env.tx.transact_to {
+        TransactTo::Call(to) => to.to_h160(),
         TransactTo::Create(CreateScheme::Create) |
-        TransactTo::Create(CreateScheme::Create2 { .. }) => (
-            CONTRACT_DEPLOYER_ADDRESS,
-            ZKVMData::new(db, &mut journaled_state).get_deploy_nonce(caller),
-        ),
+        TransactTo::Create(CreateScheme::Create2 { .. }) => CONTRACT_DEPLOYER_ADDRESS,
     };
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, &mut journaled_state, caller);
@@ -174,7 +170,7 @@ where
     let caller = call.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
-    let nonce = ZKVMData::new(db, journaled_state).get_deploy_nonce(caller);
+    let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
     let tx = L2Tx::new(
@@ -373,6 +369,22 @@ where
                 let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
                 let hash = B256::from_slice(v.as_bytes());
                 codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
+            } else {
+                // We populate bytecodes for all non-system addresses
+                let contract_address = k.key().to_ru256();
+                if !contract_address.lt(&rU256::from(2u128.pow(16))) {
+                    if let Some(bytecode) = (&mut era_db).load_factory_dep(*v) {
+                        let hash = B256::from_slice(v.as_bytes());
+                        let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
+                        codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
+                    } else {
+                        tracing::warn!(
+                            "no bytecode was found for {:?} requested by account {:?}",
+                            *v,
+                            k.key().to_h160()
+                        );
+                    }
+                }
             }
         }
     }
