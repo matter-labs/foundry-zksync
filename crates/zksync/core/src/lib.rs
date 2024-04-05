@@ -159,3 +159,9 @@ pub async fn estimate_gas<M: Middleware>(
 
     Ok(EstimatedGas { price: gas_price.to_ru256(), limit: fee.gas_limit.to_ru256() })
 }
+
+/// Returns true if the provided address is a reserved zkSync system address
+/// All addresses less than 2^16 are considered reserved addresses.
+pub fn is_system_address(address: Address) -> bool {
+    address.to_h256().to_ru256().lt(&rU256::from(2u128.pow(16)))
+}

@@ -371,6 +371,9 @@ impl Cheatcodes {
         let account_code_account = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
         journaled_account(data, account_code_account).expect("failed to load account");
 
+        // TODO we might need to store the deployment nonce under the contract storage
+        // to not lose it across VMs.
+
         let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
         let (block_info, _) =
             data.journaled_state.sload(system_account, block_info_key, data.db).unwrap_or_default();
@@ -464,6 +467,7 @@ impl Cheatcodes {
             let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
             l2_eth_storage.insert(balance_key, StorageSlot::new(info.balance));
 
+            // TODO we need to find a proper way to handle deploy nonces instead of replicating
             let full_nonce = nonces_to_full_nonce(info.nonce.into(), info.nonce.into());
             nonce_storage.insert(nonce_key, StorageSlot::new(full_nonce.to_ru256()));
 

@@ -48,7 +48,6 @@ function success() {
 
 function fail() {
   echo "Displaying run.log..."
-  cat run.log
   echo ''
   echo '=================================='
   printf "\e[31m> [FAILURE]\e[0m %s\n" "$1"
@@ -152,6 +151,7 @@ RUST_LOG=warn "${BINARY_PATH}" test --use "./${SOLC}" -vvv --zksync  || fail "fo
 echo "Running script..."
 start_era_test_node
 RUST_LOG=warn "${BINARY_PATH}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --chain 260 --gas-estimate-multiplier 310 --rpc-url http://localhost:8011 --use "./${SOLC}" --slow  -vvv  || fail "forge script failed"
+RUST_LOG=warn "${BINARY_PATH}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --chain 260 --gas-estimate-multiplier 310 --rpc-url http://localhost:8011 --use "./${SOLC}" --slow  -vvv  || fail "forge script failed on 2nd deploy"
 echo "Running NFT script"
 RUST_LOG=warn "${BINARY_PATH}" script script/NFT.s.sol:MyScript --broadcast --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --rpc-url http://localhost:8011 --use 0.8.20 --zksync  || fail "forge script failed"
 stop_era_test_node
