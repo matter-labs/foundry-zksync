@@ -9,6 +9,8 @@ SOLC="solc-${SOLC_VERSION}"
 BINARY_PATH="${REPO_ROOT}/target/release/forge"
 ERA_TEST_NODE_VERSION="v0.1.0-alpha.15"
 ERA_TEST_NODE_PID=0
+RPC_URL="http://localhost:8011"
+PRIVATE_KEY="0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e"
 
 function cleanup() {
   echo "Cleaning up..."
@@ -153,7 +155,33 @@ start_era_test_node
 RUST_LOG=warn "${BINARY_PATH}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --chain 260 --gas-estimate-multiplier 310 --rpc-url http://localhost:8011 --use "./${SOLC}" --slow  -vvv  || fail "forge script failed"
 RUST_LOG=warn "${BINARY_PATH}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --chain 260 --gas-estimate-multiplier 310 --rpc-url http://localhost:8011 --use "./${SOLC}" --slow  -vvv  || fail "forge script failed on 2nd deploy"
 echo "Running NFT script"
-RUST_LOG=warn "${BINARY_PATH}" script script/NFT.s.sol:MyScript --broadcast --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --rpc-url http://localhost:8011 --use 0.8.20 --zksync  || fail "forge script failed"
+RUST_LOG=warn "${BINARY_PATH}" script ./script/NFT.s.sol:MyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.20 --zksync  || fail "forge script failed"
+
+# Deploy ERC20
+echo "Deploying MyToken..."
+MYTOKEN_DEPLOYMENT=$(RUST_LOG=warn "${BINARY_PATH}" create ./src/ERC20.sol:MyToken --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use 0.8.20 --zksync) || fail "forge script failed"
+MYTOKEN_ADDRESS=$(echo $MYTOKEN_DEPLOYMENT | grep -oE '0x[a-fA-F0-9]{40}')
+echo "MyToken deployed at: $MYTOKEN_ADDRESS"
+
+# Deploy TokenReceiver
+echo "Deploying TokenReceiver..."
+TOKENRECEIVER_DEPLOYMENT=$(RUST_LOG=warn "${BINARY_PATH}" create ./src/TokenReceiver.sol:TokenReceiver --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use "./${SOLC}" --zksync) || fail "forge script failed"
+TOKENRECEIVER_ADDRESS=$(echo $TOKENRECEIVER_DEPLOYMENT | grep -oE '0x[a-fA-F0-9]{40}')
+echo "TokenReceiver deployed at: $TOKENRECEIVER_ADDRESS"
+
+# Wait for deployments to be mined
+sleep 10
+
+# Interact: Transfer tokens from MyToken to TokenReceiver
+echo "Transferring tokens from MyToken to TokenReceiver..."
+AMOUNT="1" # 1 token, for example
+TRANSACTION=$("${REPO_ROOT}"/target/release/cast send --rpc-url $RPC_URL --private-key $PRIVATE_KEY $MYTOKEN_ADDRESS "transfer(address,uint256)" $TOKENRECEIVER_ADDRESS $AMOUNT)
+
+# Assert that the transaction was committed looking for the transaction hash "transactionHash" keyword
+echo "Transaction: $TRANSACTION"
+echo "Checking transaction status..."
+echo $TRANSACTION | grep -q "transactionHash" || fail "Transaction failed"
+
 stop_era_test_node
 
 success
