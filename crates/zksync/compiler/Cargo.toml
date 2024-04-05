@@ -29,7 +29,6 @@ ansi_term = "0.12.1"
 globset = "0.4"
 eyre = "0.6"
 semver = "1"
-futures = "0.3"
 url = "2"
 anyhow = { version = "1.0.70" }
 dirs = { version = "5.0.0" }
