@@ -341,7 +341,7 @@ impl ZkSolcConfigBuilder {
             // TODO: we are forcibly converting this method to sync since it can be called either
             // within a sync (tests) or async (binary) context. We should fix that and stick to
             // a single context
-            let compiler_path = match tokio::runtime::Handle::try_current() {
+            match tokio::runtime::Handle::try_current() {
                 Ok(handle) => std::thread::spawn(move || {
                     handle
                         .block_on(setup_zksolc_manager(compiler_version))
@@ -354,9 +354,7 @@ impl ZkSolcConfigBuilder {
                     .block_on(setup_zksolc_manager(compiler_version))
                     .map_err(|err| err.to_string()),
             }
-            .map_err(|err| format!("failed setting up zksolc: {err:?}"))?;
-
-            compiler_path
+            .map_err(|err| format!("failed setting up zksolc: {err:?}"))?
         } else {
             return Err("must specify either the compiler_version or compiler_path".to_string());
         };
