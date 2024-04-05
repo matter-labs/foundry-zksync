@@ -32,6 +32,7 @@ use revm::{
     primitives::{
         BlockEnv, Bytecode, Env, ExecutionResult, Output, ResultAndState, SpecId, TransactTo, TxEnv,
     },
+    Database,
 };
 use std::collections::HashMap;
 
@@ -147,8 +148,12 @@ impl Executor {
 
         if self.use_zk {
             let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
-            let full_nonce = foundry_zksync_core::state::new_full_nonce(nonce, nonce);
-            self.backend.insert_account_storage(address, slot, full_nonce)?;
+            // fetch the full nonce to preserve account's deployment nonce
+            let full_nonce = self.backend.storage(address, slot)?;
+            let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
+            let new_full_nonce =
+                foundry_zksync_core::state::new_full_nonce(nonce, full_nonce.deploy_nonce);
+            self.backend.insert_account_storage(address, slot, new_full_nonce)?;
         }
 
         Ok(self)

@@ -115,7 +115,7 @@ where
         Self { db, journaled_state, factory_deps, override_keys }
     }
 
-    /// Returns the nonce for a given account from NonceHolder storage.
+    /// Returns the code hash for a given account from AccountCode storage.
     pub fn get_code_hash(&mut self, address: Address) -> H256 {
         let address = address.to_h160();
         let code_key = get_code_key(&address);
