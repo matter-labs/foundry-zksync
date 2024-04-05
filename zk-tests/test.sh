@@ -15,27 +15,7 @@ PRIVATE_KEY="0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e"
 function cleanup() {
   echo "Cleaning up..."
   stop_era_test_node
-  cleanup() {
-
-  # Force stop era test node
-  # era-test-node port
-  PORT=8011
-
-  # Using lsof to find the PID of the process using the specified port
-  PID=$(lsof -ti:$PORT)
-
-  # If a PID is found, kill the process
-  if [ ! -z "$PID" ]; then
-    echo "Killing process on port $PORT with PID $PID"
-    kill -9 $PID
-  else
-    echo "No process found on port $PORT"
-  fi
-}
-
   rm -f "./${SOLC}"
-  rm -rf "./lib/solmate"
-  rm -rf "./lib/openzeppelin-contracts"
 }
 
 function success() {
@@ -130,8 +110,6 @@ download_solc "${SOLC_VERSION}"
 # Download era test node
 download_era_test_node "${ERA_TEST_NODE_VERSION}"
 
-forge install transmissions11/solmate Openzeppelin/openzeppelin-contracts --no-commit
-
 # Check for necessary tools
 command -v cargo &>/dev/null || {
   echo "cargo not found, exiting"
@@ -143,6 +121,8 @@ command -v git &>/dev/null || {
 }
 
 build_forge "${REPO_ROOT}"
+
+"${BINARY_PATH}" install transmissions11/solmate Openzeppelin/openzeppelin-contracts --no-commit
 
 echo "Running tests..."
 RUST_LOG=warn "${BINARY_PATH}" test --use "./${SOLC}" -vvv  || fail "forge test failed"
@@ -161,13 +141,13 @@ RUST_LOG=warn "${BINARY_PATH}" script ./script/NFT.s.sol:MyScript --broadcast --
 # Deploy ERC20
 echo "Deploying MyToken..."
 MYTOKEN_DEPLOYMENT=$(RUST_LOG=warn "${BINARY_PATH}" create ./src/ERC20.sol:MyToken --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use 0.8.20 --zksync) || fail "forge script failed"
-MYTOKEN_ADDRESS=$(echo $MYTOKEN_DEPLOYMENT | grep -oE '0x[a-fA-F0-9]{40}')
+MYTOKEN_ADDRESS=$(echo $MYTOKEN_DEPLOYMENT | grep -oP '(?<=Deployed to: )0x\w{40}')
 echo "MyToken deployed at: $MYTOKEN_ADDRESS"
 
 # Deploy TokenReceiver
 echo "Deploying TokenReceiver..."
 TOKENRECEIVER_DEPLOYMENT=$(RUST_LOG=warn "${BINARY_PATH}" create ./src/TokenReceiver.sol:TokenReceiver --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use "./${SOLC}" --zksync) || fail "forge script failed"
-TOKENRECEIVER_ADDRESS=$(echo $TOKENRECEIVER_DEPLOYMENT | grep -oE '0x[a-fA-F0-9]{40}')
+TOKENRECEIVER_ADDRESS=$(echo $TOKENRECEIVER_DEPLOYMENT | grep -oP '(?<=Deployed to: )0x\w{40}')
 echo "TokenReceiver deployed at: $TOKENRECEIVER_ADDRESS"
 
 # Wait for deployments to be mined
