@@ -343,6 +343,7 @@ impl ZkSolcConfigBuilder {
         } else {
             return Err("must specify either the compiler_version or compiler_path".to_string());
         };
+        println!("DBG compiler_path {compiler_path:?} ");
 
         Ok(ZkSolcConfig {
             compiler_path,
