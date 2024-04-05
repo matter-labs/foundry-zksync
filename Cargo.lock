@@ -4909,7 +4909,6 @@ dependencies = [
  "dirs 5.0.1",
  "eyre",
  "foundry-compilers",
- "futures 0.3.30",
  "globset",
  "reqwest",
  "semver 1.0.22",
