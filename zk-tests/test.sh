@@ -121,7 +121,7 @@ command -v git &>/dev/null || {
 build_forge "${REPO_ROOT}"
 
 echo "Running tests..."
-RUST_LOG=trace "${BINARY_PATH}" test --use "./${SOLC}" -vvv  || fail "forge test failed"
+RUST_LOG=warn "${BINARY_PATH}" test --use "./${SOLC}" -vvv  || fail "forge test failed"
 
 echo "Running tests with '--zksync'..."
 RUST_LOG=warn "${BINARY_PATH}" test --use "./${SOLC}" -vvv --zksync  || fail "forge test --zksync failed"
