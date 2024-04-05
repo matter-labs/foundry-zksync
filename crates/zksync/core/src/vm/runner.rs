@@ -1,5 +1,6 @@
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    is_system_address,
     vm::tracer::CheatcodeTracer,
 };
 use alloy_primitives::Log;
@@ -371,15 +372,14 @@ where
                 codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
             } else {
                 // We populate bytecodes for all non-system addresses
-                let contract_address = k.key().to_ru256();
-                if !contract_address.lt(&rU256::from(2u128.pow(16))) {
+                if !is_system_address(k.key().to_h160().to_address()) {
                     if let Some(bytecode) = (&mut era_db).load_factory_dep(*v) {
                         let hash = B256::from_slice(v.as_bytes());
                         let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
                         codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
                     } else {
                         tracing::warn!(
-                            "no bytecode was found for {:?} requested by account {:?}",
+                            "no bytecode was found for {:?}, requested by account {:?}",
                             *v,
                             k.key().to_h160()
                         );
