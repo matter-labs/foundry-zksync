@@ -141,13 +141,13 @@ RUST_LOG=warn "${BINARY_PATH}" script ./script/NFT.s.sol:MyScript --broadcast --
 # Deploy ERC20
 echo "Deploying MyToken..."
 MYTOKEN_DEPLOYMENT=$(RUST_LOG=warn "${BINARY_PATH}" create ./src/ERC20.sol:MyToken --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use 0.8.20 --zksync) || fail "forge script failed"
-MYTOKEN_ADDRESS=$(echo $MYTOKEN_DEPLOYMENT | grep -oP '(?<=Deployed to: )0x\w{40}')
+MYTOKEN_ADDRESS=$(echo $MYTOKEN_DEPLOYMENT | awk '/Deployed to:/ {for (i=1; i<=NF; i++) if ($i == "to:") print $(i+1)}')
 echo "MyToken deployed at: $MYTOKEN_ADDRESS"
 
 # Deploy TokenReceiver
 echo "Deploying TokenReceiver..."
 TOKENRECEIVER_DEPLOYMENT=$(RUST_LOG=warn "${BINARY_PATH}" create ./src/TokenReceiver.sol:TokenReceiver --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use "./${SOLC}" --zksync) || fail "forge script failed"
-TOKENRECEIVER_ADDRESS=$(echo $TOKENRECEIVER_DEPLOYMENT | grep -oP '(?<=Deployed to: )0x\w{40}')
+TOKENRECEIVER_ADDRESS=$(echo $TOKENRECEIVER_DEPLOYMENT | awk '/Deployed to:/ {for (i=1; i<=NF; i++) if ($i == "to:") print $(i+1)}')
 echo "TokenReceiver deployed at: $TOKENRECEIVER_ADDRESS"
 
 # Wait for deployments to be mined
