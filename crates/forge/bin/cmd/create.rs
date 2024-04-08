@@ -92,6 +92,8 @@ pub struct CreateArgs {
 
     #[clap(flatten)]
     retry: RetryArgs,
+
+    manual_factory_deps: Vec<ContractInfo>,
 }
 
 impl CreateArgs {
