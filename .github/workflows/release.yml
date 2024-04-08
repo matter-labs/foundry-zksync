@@ -93,7 +93,7 @@ jobs:
             RUST_BACKTRACE: full
         shell: bash
         run: |
-          cargo build --release --bin zkforge --bin zkcast --target ${{ matrix.target }}
+          cargo build --release --bin forge --bin cast --target ${{ matrix.target }}
 
       - name: List files in artifacts directory
         run: |
