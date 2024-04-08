@@ -152,7 +152,11 @@ impl CreateArgs {
 
             let mut factory_deps = Vec::with_capacity(self.extra_factory_deps.len());
 
-            for contract in std::mem::take(&mut self.extra_factory_deps) {
+            for mut contract in std::mem::take(&mut self.extra_factory_deps) {
+                if let Some(path) = contract.path.as_mut() {
+                    *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
+                }
+
                 let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| {
                     format!("Unable to find specified factory deps ({}) in project", contract.name)
                 })?;
