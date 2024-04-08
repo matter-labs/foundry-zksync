@@ -10,7 +10,7 @@ This repository enhances Foundry to support zkSync Era, enabling Solidity-based 
 
 ### Changes Made
 
-To use for zkSync environments, include `--zksync` when running Foundry. The modifications include:
+To use for zkSync environments, include `--zksync` when running Foundry or `vm.zkVm(true)` in tests. The modifications include:
 
 1. **Compilation:** `solc` and `zksolc` are used for compiling. The resulting bytecodes are combined into `DualCompiledContract` and managed through `Executor` to `CheatcodeTracer`.
 2. **EVM Interactions:**
@@ -52,7 +52,7 @@ While `foundry-zksync` is **alpha stage**, there are some limitations to be awar
     ```
 - **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://era.zksync.io/docs/reference/architecture/differences-with-ethereum.html#create-create2).
 - **Contract Verification**: Currently contract verification via the `--verify` flag do not work as expected but will be added shortly.  
-- **Specific Foundry Features**: Currently features such as `--gas-report` may not work as intended. We are actively working on providing support for these feature types.
+- **Specific Foundry Features**: Currently features such as `--gas-report`, `--coverage` may not work as intended. We are actively working on providing support for these feature types.
 
 For the most effective use of our library, we recommend familiarizing yourself with these features and limitations. 
 
@@ -190,7 +190,7 @@ Configuration can be arbitrarily namespaced by profiles. The default profile is 
 
 You can select another profile using the `FOUNDRY_PROFILE` environment variable. You can also override parts of your configuration using `FOUNDRY_` or `DAPP_` prefixed environment variables, like `FOUNDRY_SRC`.
 
-`zkforge init` creates a basic, extendable `foundry.toml` file.
+`forge init` creates a basic, extendable `foundry.toml` file.
 
 To see your current configuration, run `forge config`. To see only basic options (as set with `forge init`), run `forge config --basic`. This can be used to create a new `foundry.toml` file with `forge config --basic > foundry.toml`.
 
