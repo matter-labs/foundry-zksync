@@ -132,16 +132,12 @@ forge init
 Let's check out what forge generated for us:
 
 ```
-$ cd hello_foundry
 $ tree . -d -L 1
 .
-├── cache
 ├── lib
-├── out
 ├── script
 ├── src
-├── test
-└── zkout
+└── test
 ```
 
 #### Compiling contracts
