@@ -6,7 +6,7 @@ set -o pipefail -e
 REPO_ROOT="../"
 SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
-BINARY_PATH="${REPO_ROOT}/target/debug/forge"
+BINARY_PATH="${REPO_ROOT}/target/release/forge"
 ERA_TEST_NODE_VERSION="v0.1.0-alpha.15"
 ERA_TEST_NODE_PID=0
 
@@ -76,7 +76,7 @@ function wait_for_build() {
 # See https://unix.stackexchange.com/questions/312631/bash-script-with-set-e-doesnt-stop-on-command
 function build_forge() {
   echo "Building ${1}..."
-  cargo build --manifest-path="${1}/Cargo.toml"
+  cargo build --release --manifest-path="${1}/Cargo.toml"
   wait_for_build 30
 }
 

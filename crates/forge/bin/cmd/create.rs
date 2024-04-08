@@ -94,7 +94,7 @@ pub struct CreateArgs {
     retry: RetryArgs,
 
     #[clap(long)]
-    extra_factory_deps: Vec<ContractInfo>,
+    factory_deps: Vec<ContractInfo>,
 }
 
 impl CreateArgs {
@@ -149,9 +149,9 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            let mut factory_deps = Vec::with_capacity(self.extra_factory_deps.len());
+            let mut factory_deps = Vec::with_capacity(self.factory_deps.len());
 
-            for mut contract in std::mem::take(&mut self.extra_factory_deps) {
+            for mut contract in std::mem::take(&mut self.factory_deps) {
                 if let Some(path) = contract.path.as_mut() {
                     *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
                 }
@@ -298,10 +298,10 @@ impl CreateArgs {
 
         let is_args_empty = args.is_empty();
         let (zk_contract, factory_deps) = match zk_data {
-            Some((zk_contract, mut extra_factory_deps)) => {
+            Some((zk_contract, mut factory_deps)) => {
                 //add this contract to the list of factory deps
-                extra_factory_deps.push(zk_contract.zk_deployed_bytecode.clone());
-                (Some(zk_contract), extra_factory_deps)
+                factory_deps.push(zk_contract.zk_deployed_bytecode.clone());
+                (Some(zk_contract), factory_deps)
             }
             None => (None, vec![]),
         };
