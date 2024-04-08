@@ -10,7 +10,7 @@ This repository enhances Foundry to support zkSync Era, enabling Solidity-based 
 
 ### Changes Made
 
-To use for zkSync environments, include `--zksync` when running Foundry or `vm.zkVm(true)` in tests. The modifications include:
+To use for zkSync environments, include `--zksync` when running `forge` or `vm.zkVm(true)` in tests. The modifications include:
 
 1. **Compilation:** `solc` and `zksolc` are used for compiling. The resulting bytecodes are combined into `DualCompiledContract` and managed through `Executor` to `CheatcodeTracer`.
 2. **EVM Interactions:**
