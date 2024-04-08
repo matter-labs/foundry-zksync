@@ -93,7 +93,8 @@ pub struct CreateArgs {
     #[clap(flatten)]
     retry: RetryArgs,
 
-    manual_factory_deps: Vec<ContractInfo>,
+    #[clap(long)]
+    extra_factory_deps: Vec<ContractInfo>,
 }
 
 impl CreateArgs {
@@ -131,7 +132,7 @@ impl CreateArgs {
 
         let (abi, bin, _) = remove_contract(&mut output, &self.contract)?;
 
-        let (abi, bin, zk_contract) = if zksync {
+        let (abi, bin, zk_data) = if zksync {
             println!("{:?}", bin);
             let contract = bin
                 .object
@@ -149,7 +150,24 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            (abi, zk_bin, Some(contract))
+            let mut factory_deps = Vec::with_capacity(self.extra_factory_deps.len());
+
+            for contract in std::mem::take(&mut self.extra_factory_deps) {
+                let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| format!("Unable to find specified factory deps ({}) in project", contract.name))?;
+
+                let zk = bin
+                .object
+                .as_bytes()
+                .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
+                .ok_or(eyre::eyre!(
+                    "Could not find zksolc contract for contract {}",
+                    contract.name
+                ))?;
+
+                factory_deps.push(zk.zk_deployed_bytecode.clone());
+            }
+
+            (abi, zk_bin, Some((contract, factory_deps)))
         } else {
             (abi, bin, None)
         };
@@ -194,13 +212,13 @@ impl CreateArgs {
             // Deploy with unlocked account
             let sender = self.eth.wallet.from.expect("required");
             let provider = provider.with_sender(sender.to_ethers());
-            self.deploy(abi, bin, params, provider, chain_id, zk_contract, None).await
+            self.deploy(abi, bin, params, provider, chain_id, zk_data, None).await
         } else {
             // Deploy with signer
             let signer = self.eth.wallet.signer().await?;
             let zk_signer = self.eth.wallet.signer().await?;
             let provider = SignerMiddleware::new_with_provider_chain(provider, signer).await?;
-            self.deploy(abi, bin, params, provider, chain_id, zk_contract, Some(zk_signer)).await
+            self.deploy(abi, bin, params, provider, chain_id, zk_data, Some(zk_signer)).await
         }
     }
 
@@ -262,7 +280,7 @@ impl CreateArgs {
         args: Vec<DynSolValue>,
         provider: M,
         chain: u64,
-        zk_contract: Option<&DualCompiledContract>,
+        zk_data: Option<(&DualCompiledContract, Vec<Vec<u8>>)>,
         signer: Option<WalletSigner>,
     ) -> Result<()> {
         let deployer_address =
@@ -274,8 +292,18 @@ impl CreateArgs {
         let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone());
 
         let is_args_empty = args.is_empty();
+        let (zk_contract, factory_deps) = match zk_data {
+            Some((zk_contract, mut extra_factory_deps)) => {
+                //add this contract to the list of factory deps
+                extra_factory_deps.push(zk_contract.zk_deployed_bytecode.clone());
+                (Some(zk_contract), extra_factory_deps)
+            }
+            None => (None, vec![])
+        };
+
         let deployer = if let Some(contract) = zk_contract {
             factory.deploy_tokens_zk(args.clone(), contract).context("failed to deploy contract")
+                .map(|deployer| deployer.set_zk_factory_deps(factory_deps.clone()))
         } else {
             factory.deploy_tokens(args.clone()).context("failed to deploy contract")
         }.map_err(|e| {
@@ -285,12 +313,6 @@ impl CreateArgs {
                 e
             }
         })?;
-
-        let deployer = if let Some(contract) = zk_contract {
-            deployer.set_zk_factory_deps(vec![contract.zk_deployed_bytecode.clone()])
-        } else {
-            deployer
-        };
 
         let is_legacy = self.tx.legacy ||
             Chain::try_from(chain).map(|x| Chain::is_legacy(&x)).unwrap_or_default();
@@ -333,7 +355,7 @@ impl CreateArgs {
 
                 let estimated_gas = foundry_zksync_core::estimate_gas(
                     &deployer.tx,
-                    vec![contract.zk_deployed_bytecode.clone()],
+                    factory_deps,
                     &provider,
                 )
                 .await?;
