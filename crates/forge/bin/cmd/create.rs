@@ -133,7 +133,6 @@ impl CreateArgs {
         let (abi, bin, _) = remove_contract(&mut output, &self.contract)?;
 
         let (abi, bin, zk_data) = if zksync {
-            println!("{:?}", bin);
             let contract = bin
                 .object
                 .as_bytes()
