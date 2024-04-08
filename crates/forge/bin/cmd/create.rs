@@ -153,16 +153,18 @@ impl CreateArgs {
             let mut factory_deps = Vec::with_capacity(self.extra_factory_deps.len());
 
             for contract in std::mem::take(&mut self.extra_factory_deps) {
-                let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| format!("Unable to find specified factory deps ({}) in project", contract.name))?;
+                let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| {
+                    format!("Unable to find specified factory deps ({}) in project", contract.name)
+                })?;
 
                 let zk = bin
-                .object
-                .as_bytes()
-                .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
-                .ok_or(eyre::eyre!(
-                    "Could not find zksolc contract for contract {}",
-                    contract.name
-                ))?;
+                    .object
+                    .as_bytes()
+                    .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
+                    .ok_or(eyre::eyre!(
+                        "Could not find zksolc contract for contract {}",
+                        contract.name
+                    ))?;
 
                 factory_deps.push(zk.zk_deployed_bytecode.clone());
             }
@@ -298,7 +300,7 @@ impl CreateArgs {
                 extra_factory_deps.push(zk_contract.zk_deployed_bytecode.clone());
                 (Some(zk_contract), extra_factory_deps)
             }
-            None => (None, vec![])
+            None => (None, vec![]),
         };
 
         let deployer = if let Some(contract) = zk_contract {
@@ -353,12 +355,9 @@ impl CreateArgs {
                     .tx
                     .set_to(NameOrAddress::from(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS));
 
-                let estimated_gas = foundry_zksync_core::estimate_gas(
-                    &deployer.tx,
-                    factory_deps,
-                    &provider,
-                )
-                .await?;
+                let estimated_gas =
+                    foundry_zksync_core::estimate_gas(&deployer.tx, factory_deps, &provider)
+                        .await?;
                 deployer.tx.set_gas(estimated_gas.limit.to_ethers());
                 deployer.tx.set_gas_price(estimated_gas.price.to_ethers());
             }
