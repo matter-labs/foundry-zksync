@@ -141,6 +141,7 @@ impl CreateArgs {
                     "Could not find zksolc contract for contract {}",
                     self.contract.name
                 ))?;
+
             let zk_bin = CompactBytecode {
                 object: BytecodeObject::Bytecode(Bytes::from(
                     contract.zk_deployed_bytecode.clone(),
@@ -149,30 +150,31 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            let mut factory_deps = Vec::with_capacity(self.factory_deps.len());
+            info!(len = contract.zk_factory_deps.len(), extra = self.factory_deps.len(), "autodetected factory deps");
+            // let mut factory_deps = vec![];
 
-            for mut contract in std::mem::take(&mut self.factory_deps) {
-                if let Some(path) = contract.path.as_mut() {
-                    *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
-                }
+            // for mut contract in std::mem::take(&mut self.factory_deps) {
+            //     if let Some(path) = contract.path.as_mut() {
+            //         *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
+            //     }
 
-                let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| {
-                    format!("Unable to find specified factory deps ({}) in project", contract.name)
-                })?;
+            //     let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| {
+            //         format!("Unable to find specified factory deps ({}) in project", contract.name)
+            //     })?;
 
-                let zk = bin
-                    .object
-                    .as_bytes()
-                    .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
-                    .ok_or(eyre::eyre!(
-                        "Could not find zksolc contract for contract {}",
-                        contract.name
-                    ))?;
+            //     let zk = bin
+            //         .object
+            //         .as_bytes()
+            //         .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
+            //         .ok_or(eyre::eyre!(
+            //             "Could not find zksolc contract for contract {}",
+            //             contract.name
+            //         ))?;
 
-                factory_deps.push(zk.zk_deployed_bytecode.clone());
-            }
+            //     factory_deps.push(zk.zk_deployed_bytecode.clone());
+            // }
 
-            (abi, zk_bin, Some((contract, factory_deps)))
+            (abi, zk_bin, Some((contract, vec![])))
         } else {
             (abi, bin, None)
         };
@@ -297,7 +299,7 @@ impl CreateArgs {
         let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone());
 
         let is_args_empty = args.is_empty();
-        let (zk_contract, factory_deps) = match zk_data {
+        let (zk_contract, _factory_deps) = match zk_data {
             Some((zk_contract, mut factory_deps)) => {
                 //add this contract to the list of factory deps
                 factory_deps.push(zk_contract.zk_deployed_bytecode.clone());
@@ -308,7 +310,7 @@ impl CreateArgs {
 
         let deployer = if let Some(contract) = zk_contract {
             factory.deploy_tokens_zk(args.clone(), contract).context("failed to deploy contract")
-                .map(|deployer| deployer.set_zk_factory_deps(factory_deps.clone()))
+                .map(|deployer| deployer.set_zk_factory_deps(contract.zk_factory_deps.clone()))
         } else {
             factory.deploy_tokens(args.clone()).context("failed to deploy contract")
         }.map_err(|e| {
@@ -359,7 +361,7 @@ impl CreateArgs {
                     .set_to(NameOrAddress::from(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS));
 
                 let estimated_gas =
-                    foundry_zksync_core::estimate_gas(&deployer.tx, factory_deps, &provider)
+                    foundry_zksync_core::estimate_gas(&deployer.tx, contract.zk_factory_deps.clone(), &provider)
                         .await?;
                 deployer.tx.set_gas(estimated_gas.limit.to_ethers());
                 deployer.tx.set_gas_price(estimated_gas.price.to_ethers());

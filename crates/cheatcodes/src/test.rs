@@ -38,6 +38,7 @@ impl Cheatcode for zkRegisterContractCall {
             name: name.clone(),
             zk_bytecode_hash: zkBytecodeHash.0.into(),
             zk_deployed_bytecode: zkDeployedBytecode.clone(),
+            zk_factory_deps: vec![],
             evm_bytecode_hash: *evmBytecodeHash,
             evm_deployed_bytecode: evmDeployedBytecode.clone(),
             evm_bytecode: evmBytecode.clone(),

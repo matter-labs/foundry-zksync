@@ -25,6 +25,8 @@ pub struct DualCompiledContract {
     pub zk_bytecode_hash: H256,
     /// Deployed bytecode hash with zksolc
     pub zk_deployed_bytecode: Vec<u8>,
+    /// Deployed bytecode factory deps
+    pub zk_factory_deps: Vec<Vec<u8>>,
     /// Deployed bytecode hash with solc
     pub evm_bytecode_hash: B256,
     /// Deployed bytecode with solc
@@ -68,6 +70,7 @@ pub fn new_dual_compiled_contracts(
                     name: contract_name,
                     zk_bytecode_hash: packed_bytecode.bytecode_hash(),
                     zk_deployed_bytecode: packed_bytecode.bytecode(),
+                    zk_factory_deps: packed_bytecode.factory_deps(),
                     evm_bytecode_hash: keccak256(solc_deployed_bytecode),
                     evm_bytecode: solc_bytecode.to_vec(),
                     evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
