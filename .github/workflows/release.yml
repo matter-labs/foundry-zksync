@@ -1,9 +1,13 @@
 name: release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  # Testing
+  pull_request:
+    branches:
+      - dev
+  # push:
+  #   tags:
+  #     - "v*.*.*"
   workflow_dispatch:
 
 env:
