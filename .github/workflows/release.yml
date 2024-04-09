@@ -13,7 +13,8 @@ env:
 jobs:
   prepare:
     name: Prepare release
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-22.04-github-hosted-16core
+    timeout-minutes: 60
     outputs:
         tag_name: ${{ steps.extract_version.outputs.VERSION }} 
         release_name: ${{ steps.compute_release_name.outputs.release_name }}
@@ -41,7 +42,7 @@ jobs:
                 # `target`: Rust build target triple
                 # `platform` and `arch`: Used in tarball names
                 # `svm`: target platform to use for the Solc binary: https://github.com/roynalnaruto/svm-rs/blob/84cbe0ac705becabdc13168bae28a45ad2299749/svm-builds/build.rs#L4-L24
-                - os: ubuntu-20.04
+                - os: ubuntu-22.04-github-hosted-16core
                   target: x86_64-unknown-linux-gnu
                   svm_target_platform: linux-amd64
                   platform: linux
@@ -51,14 +52,15 @@ jobs:
                 #   svm_target_platform: linux-aarch64
                 #   platform: linux
                 #   arch: arm64
-                - os: macos-latest
-                  target: x86_64-apple-darwin
-                  svm_target_platform: macosx-amd64
-                  platform: darwin
-                - os: macos-latest
-                  target: aarch64-apple-darwin
-                  svm_target_platform: macosx-aarch64
-                  platform: darwin
+                # TODO: Test other runners
+                # - os: macos-latest
+                #   target: x86_64-apple-darwin
+                #   svm_target_platform: macosx-amd64
+                #   platform: darwin
+                # - os: macos-latest
+                #   target: aarch64-apple-darwin
+                #   svm_target_platform: macosx-aarch64
+                #   platform: darwin
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
