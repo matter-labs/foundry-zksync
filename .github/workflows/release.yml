@@ -1,19 +1,14 @@
 name: release
 
-on:
-  # Testing
-  pull_request:
-    branches:
-      - dev
-  # push:
-  #   tags:
-  #     - "v*.*.*"
+on:  
+  push:
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   REPO_NAME: ${{ github.repository_owner }}/foundry-zksync
-  TAG_NAME: "v0.0.2-alpha.3"
 
 jobs:
   prepare:
@@ -103,30 +98,31 @@ jobs:
         run: |
           cargo build --release --bin forge --bin cast --target ${{ matrix.target }}
 
-      - name: List files in artifacts directory
+      - name: Move forge and cast binaries to artifacts directory
         run: |
           mkdir -p artifacts
-          mv target/${{ matrix.target }}/release/* ./artifacts
+          mv target/${{ matrix.target }}/release/forge target/${{ matrix.target }}/release/cast ./artifacts
+        
 
       - name: Create artifacts
         run: |
           cd artifacts
-          tar -czf foundry-zksync-${{ env.TAG_NAME }}-${{ matrix.target }}.tar.gz *  
-          mv foundry-zksync-${{ env.TAG_NAME }}-${{ matrix.target }}.tar.gz ../  
-          echo "ARTIFACT=foundry-zksync-${{ env.TAG_NAME }}-${{ matrix.target }}.tar.gz" >> $GITHUB_OUTPUT 
+          tar -czf foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz *  
+          mv foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz ../  
+          echo "ARTIFACT=foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz" >> $GITHUB_OUTPUT 
   
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: foundry-zksync-${{ env.TAG_NAME }}-${{ matrix.target }}.tar.gz 
-          path: foundry-zksync-${{ env.TAG_NAME }}-${{ matrix.target }}.tar.gz
+          name: foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz 
+          path: foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz
 
   create-draft-release:
     name: Create draft release
     runs-on: ubuntu-latest
     needs: [prepare, build]
     env:
-      VERSION:  "v0.0.2-alpha.3"
+      VERSION:  ${{ needs.prepare.outputs.tag_name }}
     permissions:
       # Required to post the release
       contents: write
@@ -138,19 +134,19 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v3
 
-      # - name: Generate full changelog
-      #   id: changelog
-      #   run: |
-      #     echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
-      #     echo "$(git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 ${{ env.VERSION }}^)..${{ env.VERSION }})" >> $GITHUB_OUTPUT
-      #     echo "EOF" >> $GITHUB_OUTPUT
+      - name: Generate full changelog
+        id: changelog
+        run: |
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$(git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 ${{ env.VERSION }}^)..${{ env.VERSION }})" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
         
-      # - name: Generate list of contributors
-      #   id: contributors
-      #   run: |
-      #     echo "CONTRIBUTORS<<EOF" >> $GITHUB_OUTPUT
-      #     echo "$(git log --pretty=format:"- %aN (%aE)" $(git describe --tags --abbrev=0 ${{ env.VERSION }}^)..${{ env.VERSION }} | sort | uniq)" >> $GITHUB_OUTPUT
-      #     echo "EOF" >> $GITHUB_OUTPUT
+      - name: Generate list of contributors
+        id: contributors
+        run: |
+          echo "CONTRIBUTORS<<EOF" >> $GITHUB_OUTPUT
+          echo "$(git log --pretty=format:"- %aN (%aE)" $(git describe --tags --abbrev=0 ${{ env.VERSION }}^)..${{ env.VERSION }} | sort | uniq)" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create release draft
         env:
@@ -173,18 +169,20 @@ jobs:
           - TBD
           
           ## 📜 All Changes
-          
+
+          ${{ steps.changelog.outputs.CHANGELOG }}
           
           ## ⭐ Contributors
           
+          ${{ steps.contributors.outputs.CONTRIBUTORS }}
           
           ## 📥 Binaries
           
           | System | Architecture | Binary |
           |:---:|:---:|:---:|
-          | <img src="https://simpleicons.org/icons/linux.svg" style="width: 32px;"/> | x86_64 | [foundry-zksync-${{ env.TAG_NAME }}-x86_64-unknown-linux-gnu.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.TAG_NAME }}/${{ env.TAG_NAME }}-x86_64-unknown-linux-gnu.tar.gz) | 
-          | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | x86_64 | [foundry-zksync-${{ env.TAG_NAME }}-x86_64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.TAG_NAME }}/${{ env.TAG_NAME }}-x86_64-apple-darwin.tar.gz) | 
-          | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | aarch64 | [foundry-zksync-${{ env.TAG_NAME }}-aarch64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.TAG_NAME }}/${{ env.TAG_NAME }}-aarch64-apple-darwin.tar.gz) |
+          | <img src="https://simpleicons.org/icons/linux.svg" style="width: 32px;"/> | x86_64 | [foundry-zksync-${{ needs.prepare.outputs.tag_name }}-x86_64-unknown-linux-gnu.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ needs.prepare.outputs.tag_name }}/${{ needs.prepare.outputs.tag_name }}-x86_64-unknown-linux-gnu.tar.gz) | 
+          | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | x86_64 | [foundry-zksync-${{ needs.prepare.outputs.tag_name }}-x86_64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ needs.prepare.outputs.tag_name }}/${{ needs.prepare.outputs.tag_name }}-x86_64-apple-darwin.tar.gz) | 
+          | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | aarch64 | [foundry-zksync-${{ needs.prepare.outputs.tag_name }}-aarch64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ needs.prepare.outputs.tag_name }}/${{ needs.prepare.outputs.tag_name }}-aarch64-apple-darwin.tar.gz) |
           | | | | 
           ENDBODY
           )
@@ -192,5 +190,5 @@ jobs:
           for asset in ./foundry-zksync-*.tar.gz; do
               assets+=("$asset/$asset")
           done
-          tag_name="${{ env.TAG_NAME }}"
+          tag_name="${{ needs.prepare.outputs.tag_name }}"
           echo "$body" | gh release create "$tag_name" "${assets[@]}" --draft -F "-" -t "foundry-zksync@$tag_name"
