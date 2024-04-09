@@ -157,37 +157,10 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            let found_factory_deps =
-                fetch_all_factory_deps(dual_compiled_contracts.clone(), &contract.zk_factory_deps);
+            let factory_deps =
+                fetch_all_factory_deps(&dual_compiled_contracts, &contract).into_iter().collect::<Vec<_>>();
 
-            println!("Factory Deps: {:?}", found_factory_deps.len());
-            let mut factory_deps = vec![];
-
-            for mut contract in std::mem::take(&mut self.factory_deps) {
-                if let Some(path) = contract.path.as_mut() {
-                    *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
-                }
-
-                let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| {
-                    format!("Unable to find specified factory deps ({}) in project", contract.name)
-                })?;
-
-                let zk = bin
-                    .object
-                    .as_bytes()
-                    .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
-                    .ok_or(eyre::eyre!(
-                        "Could not find zksolc contract for contract {}",
-                        contract.name
-                    ))?;
-
-                println!("factory dep bytecode {:?}", zk.zk_deployed_bytecode.clone());
-
-                factory_deps.push(zk.zk_deployed_bytecode.clone());
-            }
-
-            factory_deps.extend(found_factory_deps);
-
+            println!("Total Factory Deps: {:?}", factory_deps.len());
             (abi, zk_bin, Some((contract, factory_deps)))
         } else {
             (abi, bin, None)
@@ -313,18 +286,9 @@ impl CreateArgs {
         let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone());
 
         let is_args_empty = args.is_empty();
-        let (zk_contract, _factory_deps) = match zk_data {
-            Some((zk_contract, mut factory_deps)) => {
-                //add this contract to the list of factory deps
-                factory_deps.push(zk_contract.zk_deployed_bytecode.clone());
-                (Some(zk_contract), factory_deps)
-            }
-            None => (None, vec![]),
-        };
-
-        let deployer = if let Some(contract) = zk_contract {
+        let deployer = if let Some((contract, factory_deps)) = &zk_data {
             factory.deploy_tokens_zk(args.clone(), contract).context("failed to deploy contract")
-                .map(|deployer| deployer.set_zk_factory_deps(contract.zk_factory_deps.clone()))
+                .map(|deployer| deployer.set_zk_factory_deps(factory_deps.clone()))
         } else {
             factory.deploy_tokens(args.clone()).context("failed to deploy contract")
         }.map_err(|e| {
@@ -344,9 +308,9 @@ impl CreateArgs {
             deployer.tx.set_value(value.to_ethers());
         }
 
-        match zk_contract {
+        match zk_data {
             None => provider.fill_transaction(&mut deployer.tx, None).await?,
-            Some(contract) => {
+            Some((contract, factory_deps)) => {
                 let chain_id = provider.get_chainid().await?.as_u64();
                 deployer.tx.set_chain_id(chain_id);
 
@@ -376,7 +340,7 @@ impl CreateArgs {
 
                 let estimated_gas = foundry_zksync_core::estimate_gas(
                     &deployer.tx,
-                    contract.zk_factory_deps.clone(),
+                    factory_deps.clone(),
                     &provider,
                 )
                 .await?;
@@ -866,35 +830,32 @@ mod tests {
 }
 
 fn fetch_all_factory_deps(
-    dual_compiled_contracts: Vec<DualCompiledContract>,
-    initial_deps: &[Vec<u8>],
-) -> Vec<Vec<u8>> {
+    dual_compiled_contracts: &[DualCompiledContract],
+    root: &DualCompiledContract,
+) -> HashSet<Vec<u8>> {
     let mut visited = HashSet::new();
     let mut queue = VecDeque::new();
-    let mut all_factory_deps = Vec::new();
 
-    for dep in initial_deps.iter().cloned() {
+    for dep in root.zk_factory_deps.iter().cloned() {
         queue.push_back(dep);
     }
 
     while let Some(dep) = queue.pop_front() {
+        //try to insert in the list of visited, if it's already present, skip
         if visited.insert(dep.clone()) {
             if let Some(contract) = dual_compiled_contracts.find_zk_deployed_bytecode(&dep) {
+                debug!(name = contract.name, deps = contract.zk_factory_deps.len(), "new factory depdendency");
 
-
-                println!("Processing contract: {:?}", contract.name);
-                println!("Factory Deps: {:?}", contract.zk_factory_deps.len());
                 for nested_dep in &contract.zk_factory_deps {
-                    println!("Nested Dep: {:?}", nested_dep);
-                    if visited.insert(nested_dep.clone()) {
+                    //check that the nested dependency is inserted
+                    if !visited.contains(nested_dep) {
+                        //if not, add it to queue for processing
                         queue.push_back(nested_dep.clone());
                     }
                 }
-
-                all_factory_deps.push(dep);
             }
         }
     }
 
-    all_factory_deps
+    visited
 }

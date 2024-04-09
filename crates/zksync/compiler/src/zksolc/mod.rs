@@ -107,3 +107,17 @@ impl FindContract for Vec<DualCompiledContract> {
         self.iter().find(|contract| code_hash == contract.zk_bytecode_hash)
     }
 }
+
+impl FindContract for &[DualCompiledContract] {
+    fn find_zk_deployed_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
+        self.iter().find(|contract| bytecode.starts_with(&contract.zk_deployed_bytecode))
+    }
+
+    fn find_evm_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
+        self.iter().find(|contract| bytecode.starts_with(&contract.evm_bytecode))
+    }
+
+    fn find_zk_bytecode_hash(&self, code_hash: H256) -> Option<&DualCompiledContract> {
+        self.iter().find(|contract| code_hash == contract.zk_bytecode_hash)
+    }
+}
