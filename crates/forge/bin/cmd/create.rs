@@ -14,6 +14,7 @@ use ethers_core::{
 use ethers_middleware::SignerMiddleware;
 use ethers_providers::Middleware;
 use eyre::{Context, Result};
+use forge::revm::primitives::bitvec::vec;
 use foundry_cli::{
     opts::{CoreBuildArgs, EthereumOpts, EtherscanOpts, TransactionOpts},
     utils::{self, read_constructor_args_file, remove_contract, LoadConfig},
@@ -25,7 +26,7 @@ use foundry_common::{
     types::{ToAlloy, ToEthers},
 };
 use foundry_compilers::{
-    artifacts::{BytecodeObject, CompactBytecode},
+    artifacts::{contract, BytecodeObject, CompactBytecode},
     info::ContractInfo,
     utils::canonicalized,
 };
@@ -34,7 +35,13 @@ use foundry_zksync_compiler::{
     new_dual_compiled_contracts, DualCompiledContract, FindContract, ZkSolc,
 };
 use serde_json::json;
-use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::{
+    borrow::Borrow,
+    collections::{HashSet, VecDeque},
+    marker::PhantomData,
+    path::PathBuf,
+    sync::Arc,
+};
 
 /// CLI arguments for `forge create`.
 #[derive(Clone, Debug, Parser)]
@@ -150,31 +157,38 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            info!(len = contract.zk_factory_deps.len(), extra = self.factory_deps.len(), "autodetected factory deps");
-            // let mut factory_deps = vec![];
+            let found_factory_deps =
+                fetch_all_factory_deps(dual_compiled_contracts.clone(), &contract.zk_factory_deps);
 
-            // for mut contract in std::mem::take(&mut self.factory_deps) {
-            //     if let Some(path) = contract.path.as_mut() {
-            //         *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
-            //     }
+            println!("Factory Deps: {:?}", found_factory_deps.len());
+            let mut factory_deps = vec![];
 
-            //     let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| {
-            //         format!("Unable to find specified factory deps ({}) in project", contract.name)
-            //     })?;
+            for mut contract in std::mem::take(&mut self.factory_deps) {
+                if let Some(path) = contract.path.as_mut() {
+                    *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
+                }
 
-            //     let zk = bin
-            //         .object
-            //         .as_bytes()
-            //         .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
-            //         .ok_or(eyre::eyre!(
-            //             "Could not find zksolc contract for contract {}",
-            //             contract.name
-            //         ))?;
+                let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| {
+                    format!("Unable to find specified factory deps ({}) in project", contract.name)
+                })?;
 
-            //     factory_deps.push(zk.zk_deployed_bytecode.clone());
-            // }
+                let zk = bin
+                    .object
+                    .as_bytes()
+                    .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
+                    .ok_or(eyre::eyre!(
+                        "Could not find zksolc contract for contract {}",
+                        contract.name
+                    ))?;
 
-            (abi, zk_bin, Some((contract, vec![])))
+                println!("factory dep bytecode {:?}", zk.zk_deployed_bytecode.clone());
+
+                factory_deps.push(zk.zk_deployed_bytecode.clone());
+            }
+
+            factory_deps.extend(found_factory_deps);
+
+            (abi, zk_bin, Some((contract, factory_deps)))
         } else {
             (abi, bin, None)
         };
@@ -360,9 +374,12 @@ impl CreateArgs {
                     .tx
                     .set_to(NameOrAddress::from(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS));
 
-                let estimated_gas =
-                    foundry_zksync_core::estimate_gas(&deployer.tx, contract.zk_factory_deps.clone(), &provider)
-                        .await?;
+                let estimated_gas = foundry_zksync_core::estimate_gas(
+                    &deployer.tx,
+                    contract.zk_factory_deps.clone(),
+                    &provider,
+                )
+                .await?;
                 deployer.tx.set_gas(estimated_gas.limit.to_ethers());
                 deployer.tx.set_gas_price(estimated_gas.price.to_ethers());
             }
@@ -846,4 +863,38 @@ mod tests {
         let constructor: Constructor = serde_json::from_str(r#"{"type":"constructor","inputs":[{"name":"_points","type":"tuple[]","internalType":"struct Point[]","components":[{"name":"x","type":"uint256","internalType":"uint256"},{"name":"y","type":"uint256","internalType":"uint256"}]}],"stateMutability":"nonpayable"}"#).unwrap();
         let _params = args.parse_constructor_args(&constructor, &args.constructor_args).unwrap();
     }
+}
+
+fn fetch_all_factory_deps(
+    dual_compiled_contracts: Vec<DualCompiledContract>,
+    initial_deps: &[Vec<u8>],
+) -> Vec<Vec<u8>> {
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    let mut all_factory_deps = Vec::new();
+
+    for dep in initial_deps.iter().cloned() {
+        queue.push_back(dep);
+    }
+
+    while let Some(dep) = queue.pop_front() {
+        if visited.insert(dep.clone()) {
+            if let Some(contract) = dual_compiled_contracts.find_zk_deployed_bytecode(&dep) {
+
+
+                println!("Processing contract: {:?}", contract.name);
+                println!("Factory Deps: {:?}", contract.zk_factory_deps.len());
+                for nested_dep in &contract.zk_factory_deps {
+                    println!("Nested Dep: {:?}", nested_dep);
+                    if visited.insert(nested_dep.clone()) {
+                        queue.push_back(nested_dep.clone());
+                    }
+                }
+
+                all_factory_deps.push(dep);
+            }
+        }
+    }
+
+    all_factory_deps
 }

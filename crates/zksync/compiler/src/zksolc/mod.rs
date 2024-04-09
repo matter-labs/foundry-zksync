@@ -89,9 +89,16 @@ pub trait FindContract {
 
     /// Finds a contract matching the ZK bytecode hash
     fn find_zk_bytecode_hash(&self, code_hash: H256) -> Option<&DualCompiledContract>;
+
+    /// Finds a contract matching the ZK deployed bytecode
+    fn find_zk_deployed_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract>;
 }
 
 impl FindContract for Vec<DualCompiledContract> {
+    fn find_zk_deployed_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
+        self.iter().find(|contract| bytecode.starts_with(&contract.zk_deployed_bytecode))
+    }
+
     fn find_evm_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
         self.iter().find(|contract| bytecode.starts_with(&contract.evm_bytecode))
     }
