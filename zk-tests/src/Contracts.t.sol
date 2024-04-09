@@ -158,7 +158,7 @@ contract ZkContractsTest is Test {
         vm.selectFork(forkEra);
 
         // ConstantNumber zksolc hash obtained from zkout/ConstantNumber.sol/artifacts.json
-        bytes32 bytecodeHash = 0x0100000f6d092b2cd44547a312320ad99c9587b40e0d03b0c17f09afd286d660;
+        bytes32 bytecodeHash = 0x0100000f900f1675725f656f10e5876b0cf6d9e334ac6f042973282d4f699aa8;
         address sender = address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496);
         bytes32 salt = "12345";
         bytes32 constructorInputHash = keccak256(abi.encode());
