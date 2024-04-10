@@ -58,6 +58,7 @@ pub struct CheatcodeTracer {
 }
 
 impl CheatcodeTracer {
+    /// Create an instance of [CheatcodeTracer].
     pub fn new(
         mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
         expected_calls: ExpectedCallTracker,
@@ -207,7 +208,6 @@ impl<S: WriteStorage + Send, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer 
                     tracing::info!("set msg.sender {sender:?}");
                     state.local_state.callstack.current.msg_sender = sender.to_h160();
                 }
-                CallAction::None => (),
             }
         }
         self.farcall_handler.maybe_return_early(state, bootloader_state);

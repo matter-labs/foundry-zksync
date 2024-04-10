@@ -66,11 +66,8 @@ impl CallDepth {
 }
 
 /// The call action.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum CallAction {
-    /// No action.
-    #[default]
-    None,
     /// Assign msg.sender.
     SetMessageSender(Address),
 }

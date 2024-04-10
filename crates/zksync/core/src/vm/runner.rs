@@ -175,7 +175,6 @@ where
 {
     info!(?call, "create tx {}", hex::encode(&call.init_code));
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
-    // let caller = call.caller;
     let caller = env.tx.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
