@@ -1,6 +1,6 @@
 name: release
 
-on:
+on:  
   push:
     tags:
       - "v*.*.*"
@@ -13,7 +13,8 @@ env:
 jobs:
   prepare:
     name: Prepare release
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-22.04-github-hosted-16core
+    timeout-minutes: 60
     outputs:
         tag_name: ${{ steps.extract_version.outputs.VERSION }} 
         release_name: ${{ steps.compute_release_name.outputs.release_name }}
@@ -41,7 +42,7 @@ jobs:
                 # `target`: Rust build target triple
                 # `platform` and `arch`: Used in tarball names
                 # `svm`: target platform to use for the Solc binary: https://github.com/roynalnaruto/svm-rs/blob/84cbe0ac705becabdc13168bae28a45ad2299749/svm-builds/build.rs#L4-L24
-                - os: ubuntu-20.04
+                - os: ubuntu-22.04-github-hosted-16core
                   target: x86_64-unknown-linux-gnu
                   svm_target_platform: linux-amd64
                   platform: linux
@@ -76,6 +77,8 @@ jobs:
       - name: Apple M1 setup
         if: matrix.target == 'aarch64-apple-darwin'
         run: |
+            brew install make
+            echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
             echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
             echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
       - name: Linux ARM setup
@@ -93,24 +96,25 @@ jobs:
             RUST_BACKTRACE: full
         shell: bash
         run: |
-          cargo build --release --bin zkforge --bin zkcast --target ${{ matrix.target }}
+          cargo build --release --bin forge --bin cast --target ${{ matrix.target }}
 
-      - name: List files in artifacts directory
+      - name: Move forge and cast binaries to artifacts directory
         run: |
           mkdir -p artifacts
-          mv target/${{ matrix.target }}/release/* ./artifacts
+          mv target/${{ matrix.target }}/release/forge target/${{ matrix.target }}/release/cast ./artifacts
+        
 
       - name: Create artifacts
         run: |
           cd artifacts
-          tar -czf foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz *
-          mv foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz ../
-          echo "ARTIFACT=foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz" >> $GITHUB_OUTPUT
+          tar -czf foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz *  
+          mv foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz ../  
+          echo "ARTIFACT=foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz" >> $GITHUB_OUTPUT 
   
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz
+          name: foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz 
           path: foundry-zksync-${{ needs.prepare.outputs.tag_name }}-${{ matrix.target }}.tar.gz
 
   create-draft-release:
@@ -165,7 +169,7 @@ jobs:
           - TBD
           
           ## 📜 All Changes
-          
+
           ${{ steps.changelog.outputs.CHANGELOG }}
           
           ## ⭐ Contributors
