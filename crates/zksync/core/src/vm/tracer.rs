@@ -18,14 +18,20 @@ use multivm::{
 };
 use once_cell::sync::OnceCell;
 use zksync_state::WriteStorage;
-use zksync_types::{CONTRACT_DEPLOYER_ADDRESS, H256, U256};
+use zksync_types::{BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, U256};
 
-use crate::convert::{ConvertH160, ConvertH256, ConvertU256};
+use crate::{
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
+    vm::farcall::{CallAction, CallDepth},
+};
 
 use super::farcall::FarCallHandler;
 
 /// extendedAccountVersion(address)
 const SELECTOR_ACCOUNT_VERSION: [u8; 4] = hex!("bb0fd610");
+
+/// executeTransaction(bytes32, bytes32, tuple)
+const SELECTOR_EXECUTE_TRANSACTION: [u8; 4] = hex!("df9c1589");
 
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
@@ -43,11 +49,31 @@ pub struct CheatcodeTracerResult {
 
 #[derive(Debug, Default)]
 pub struct CheatcodeTracer {
-    pub farcall_handler: FarCallHandler,
     pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
     pub expected_calls: ExpectedCallTracker,
-    pub caller: Address,
+    pub tx_caller: Address,
+    pub msg_sender: Address,
     pub result: Arc<OnceCell<CheatcodeTracerResult>>,
+    farcall_handler: FarCallHandler,
+}
+
+impl CheatcodeTracer {
+    pub fn new(
+        mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
+        expected_calls: ExpectedCallTracker,
+        result: Arc<OnceCell<CheatcodeTracerResult>>,
+        tx_caller: Address,
+        msg_sender: Address,
+    ) -> Self {
+        CheatcodeTracer {
+            mocked_calls,
+            expected_calls,
+            tx_caller,
+            msg_sender,
+            result,
+            ..Default::default()
+        }
+    }
 }
 
 impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
@@ -76,8 +102,10 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         state: VmLocalStateData<'_>,
         data: AfterExecutionData,
         memory: &SimpleMemory<H>,
-        _storage: zksync_state::StoragePtr<S>,
+        storage: zksync_state::StoragePtr<S>,
     ) {
+        self.farcall_handler.track_call_actions(state, data, memory, storage);
+
         // Mark the caller as EOA to avoid panic. This is probably not needed anymore
         // since we manually override the ACCOUNT_CODE_STORAGE to return `0` for the caller.
         // TODO remove this and verify once we are stable.
@@ -89,11 +117,24 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                 calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
             {
                 let address = H256::from_slice(&calldata[4..36]).to_h160().to_address();
-                if self.caller == address {
+                if self.tx_caller == address {
                     tracing::debug!("overriding account version for caller {address:?}");
                     self.farcall_handler.set_immediate_return(rU256::from(1u32).to_be_bytes_vec());
                     return
                 }
+            }
+        }
+
+        // Override msg.sender for the transaction
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let calldata = get_calldata(&state, memory);
+            let current = state.vm_local_state.callstack.current;
+
+            if current.msg_sender == BOOTLOADER_ADDRESS &&
+                calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION)
+            {
+                self.farcall_handler
+                    .set_action(CallDepth::next(), CallAction::SetMessageSender(self.msg_sender));
             }
         }
 
@@ -160,6 +201,15 @@ impl<S: WriteStorage + Send, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer 
         state: &mut ZkSyncVmState<S, H>,
         bootloader_state: &mut BootloaderState,
     ) -> TracerExecutionStatus {
+        for action in self.farcall_handler.take_immediate_actions(state, bootloader_state) {
+            match action {
+                CallAction::SetMessageSender(sender) => {
+                    tracing::info!("set msg.sender {sender:?}");
+                    state.local_state.callstack.current.msg_sender = sender.to_h160();
+                }
+                CallAction::None => (),
+            }
+        }
         self.farcall_handler.maybe_return_early(state, bootloader_state);
 
         TracerExecutionStatus::Continue
