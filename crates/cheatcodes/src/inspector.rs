@@ -1573,6 +1573,12 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             .unwrap_or_else(|| {
                                 panic!("failed finding contract for {:?}", call.init_code)
                             });
+                        let factory_deps = self
+                            .dual_compiled_contracts
+                            .fetch_all_factory_deps(contract)
+                            .into_iter()
+                            .collect();
+
                         let constructor_input =
                             call.init_code[contract.evm_bytecode.len()..].to_vec();
                         let create_input = foundry_zksync_core::encode_create_params(
@@ -1581,7 +1587,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             constructor_input,
                         );
                         bytecode = Bytes::from(create_input);
-                        let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
 
                         Some(ZkTransactionMetadata { factory_deps })
                     } else {
