@@ -5,7 +5,7 @@ mod config;
 mod factory_deps;
 mod manager;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub use compile::*;
 pub use config::*;
@@ -14,6 +14,7 @@ use foundry_compilers::{Artifact, ProjectCompileOutput};
 pub use manager::*;
 
 use alloy_primitives::{keccak256, B256};
+use tracing::debug;
 use zksync_types::H256;
 
 /// Defines a contract that has been dual compiled with both zksolc and solc
@@ -92,6 +93,9 @@ pub trait FindContract {
 
     /// Finds a contract matching the ZK deployed bytecode
     fn find_zk_deployed_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract>;
+
+    /// Finds a contract own and nested factory deps
+    fn fetch_all_factory_deps(&self, root: &DualCompiledContract) -> HashSet<Vec<u8>>;
 }
 
 impl FindContract for Vec<DualCompiledContract> {
@@ -106,6 +110,38 @@ impl FindContract for Vec<DualCompiledContract> {
     fn find_zk_bytecode_hash(&self, code_hash: H256) -> Option<&DualCompiledContract> {
         self.iter().find(|contract| code_hash == contract.zk_bytecode_hash)
     }
+
+    fn fetch_all_factory_deps(&self, root: &DualCompiledContract) -> HashSet<Vec<u8>> {
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        for dep in root.zk_factory_deps.iter().cloned() {
+            queue.push_back(dep);
+        }
+
+        while let Some(dep) = queue.pop_front() {
+            //try to insert in the list of visited, if it's already present, skip
+            if visited.insert(dep.clone()) {
+                if let Some(contract) = self.find_zk_deployed_bytecode(&dep) {
+                    debug!(
+                        name = contract.name,
+                        deps = contract.zk_factory_deps.len(),
+                        "new factory depdendency"
+                    );
+
+                    for nested_dep in &contract.zk_factory_deps {
+                        //check that the nested dependency is inserted
+                        if !visited.contains(nested_dep) {
+                            //if not, add it to queue for processing
+                            queue.push_back(nested_dep.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        visited
+    }
 }
 
 impl FindContract for &[DualCompiledContract] {
@@ -119,5 +155,37 @@ impl FindContract for &[DualCompiledContract] {
 
     fn find_zk_bytecode_hash(&self, code_hash: H256) -> Option<&DualCompiledContract> {
         self.iter().find(|contract| code_hash == contract.zk_bytecode_hash)
+    }
+
+    fn fetch_all_factory_deps(&self, root: &DualCompiledContract) -> HashSet<Vec<u8>> {
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        for dep in root.zk_factory_deps.iter().cloned() {
+            queue.push_back(dep);
+        }
+
+        while let Some(dep) = queue.pop_front() {
+            //try to insert in the list of visited, if it's already present, skip
+            if visited.insert(dep.clone()) {
+                if let Some(contract) = self.find_zk_deployed_bytecode(&dep) {
+                    debug!(
+                        name = contract.name,
+                        deps = contract.zk_factory_deps.len(),
+                        "new factory depdendency"
+                    );
+
+                    for nested_dep in &contract.zk_factory_deps {
+                        //check that the nested dependency is inserted
+                        if !visited.contains(nested_dep) {
+                            //if not, add it to queue for processing
+                            queue.push_back(nested_dep.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        visited
     }
 }

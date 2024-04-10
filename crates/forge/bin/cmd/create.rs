@@ -157,8 +157,10 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            let factory_deps =
-                fetch_all_factory_deps(&dual_compiled_contracts, &contract).into_iter().collect::<Vec<_>>();
+            let factory_deps = dual_compiled_contracts
+                .fetch_all_factory_deps(&contract)
+                .into_iter()
+                .collect::<Vec<_>>();
 
             println!("Total Factory Deps: {:?}", factory_deps.len());
             (abi, zk_bin, Some((contract, factory_deps)))
@@ -827,35 +829,4 @@ mod tests {
         let constructor: Constructor = serde_json::from_str(r#"{"type":"constructor","inputs":[{"name":"_points","type":"tuple[]","internalType":"struct Point[]","components":[{"name":"x","type":"uint256","internalType":"uint256"},{"name":"y","type":"uint256","internalType":"uint256"}]}],"stateMutability":"nonpayable"}"#).unwrap();
         let _params = args.parse_constructor_args(&constructor, &args.constructor_args).unwrap();
     }
-}
-
-fn fetch_all_factory_deps(
-    dual_compiled_contracts: &[DualCompiledContract],
-    root: &DualCompiledContract,
-) -> HashSet<Vec<u8>> {
-    let mut visited = HashSet::new();
-    let mut queue = VecDeque::new();
-
-    for dep in root.zk_factory_deps.iter().cloned() {
-        queue.push_back(dep);
-    }
-
-    while let Some(dep) = queue.pop_front() {
-        //try to insert in the list of visited, if it's already present, skip
-        if visited.insert(dep.clone()) {
-            if let Some(contract) = dual_compiled_contracts.find_zk_deployed_bytecode(&dep) {
-                debug!(name = contract.name, deps = contract.zk_factory_deps.len(), "new factory depdendency");
-
-                for nested_dep in &contract.zk_factory_deps {
-                    //check that the nested dependency is inserted
-                    if !visited.contains(nested_dep) {
-                        //if not, add it to queue for processing
-                        queue.push_back(nested_dep.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    visited
 }
