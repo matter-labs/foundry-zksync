@@ -1690,6 +1690,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
                 call,
                 zk_contract,
+                &self.dual_compiled_contracts,
                 data.env,
                 data.db,
                 &mut data.journaled_state,
