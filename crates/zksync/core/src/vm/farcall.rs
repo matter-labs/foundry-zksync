@@ -110,7 +110,7 @@ impl CallActions {
 
     /// Consume the immediate actions.
     pub(crate) fn take_immediate(&mut self) -> Vec<CallAction> {
-        std::mem::replace(&mut self.immediate, vec![])
+        std::mem::take(&mut self.immediate)
     }
 }
 
