@@ -1201,7 +1201,9 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             } else {
                 None
             };
-            if contract.is_none() {
+            if let Some(contract) = contract {
+                tracing::debug!(contract = contract.name, "using dual compiled contract");
+            } else {
                 error!("no zk contract was found for {code_hash:?}");
             }
 
@@ -1675,6 +1677,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 .find_evm_bytecode(&call.init_code.0)
                 .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
 
+            tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
