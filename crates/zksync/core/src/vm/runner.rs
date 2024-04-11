@@ -179,7 +179,7 @@ where
     let caller = env.tx.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let factory_deps =
-        dual_compiled_contracts.fetch_all_factory_deps(&contract).into_iter().collect();
+        dual_compiled_contracts.fetch_all_factory_deps(contract).into_iter().collect();
     let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);

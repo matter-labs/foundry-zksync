@@ -14,7 +14,6 @@ use ethers_core::{
 use ethers_middleware::SignerMiddleware;
 use ethers_providers::Middleware;
 use eyre::{Context, Result};
-use forge::revm::primitives::bitvec::vec;
 use foundry_cli::{
     opts::{CoreBuildArgs, EthereumOpts, EtherscanOpts, TransactionOpts},
     utils::{self, read_constructor_args_file, remove_contract, LoadConfig},
@@ -26,7 +25,7 @@ use foundry_common::{
     types::{ToAlloy, ToEthers},
 };
 use foundry_compilers::{
-    artifacts::{contract, BytecodeObject, CompactBytecode},
+    artifacts::{BytecodeObject, CompactBytecode},
     info::ContractInfo,
     utils::canonicalized,
 };
@@ -37,7 +36,6 @@ use foundry_zksync_compiler::{
 use serde_json::json;
 use std::{
     borrow::Borrow,
-    collections::{HashSet, VecDeque},
     marker::PhantomData,
     path::PathBuf,
     sync::Arc,
@@ -157,12 +155,13 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
+            //TODO: restore `--factory-deps` handling? (+ lookup)
+            // or remove flag entirely?
             let factory_deps = dual_compiled_contracts
-                .fetch_all_factory_deps(&contract)
+                .fetch_all_factory_deps(contract)
                 .into_iter()
                 .collect::<Vec<_>>();
 
-            println!("Total Factory Deps: {:?}", factory_deps.len());
             (abi, zk_bin, Some((contract, factory_deps)))
         } else {
             (abi, bin, None)
