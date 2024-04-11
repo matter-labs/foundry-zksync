@@ -106,7 +106,14 @@ where
     );
 
     let (state, _) = journaled_state.finalize();
-    match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default()) {
+    match inspect::<_, DB::Error>(
+        tx,
+        env,
+        db,
+        &mut journaled_state,
+        Default::default(),
+        env.tx.caller,
+    ) {
         Ok(result) => Ok(ResultAndState { result, state }),
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
@@ -168,7 +175,7 @@ where
 {
     info!(?call, "create tx {}", hex::encode(&call.init_code));
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
-    let caller = call.caller;
+    let caller = env.tx.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
     let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
@@ -189,7 +196,7 @@ where
         Some(factory_deps),
         PaymasterParams::default(),
     );
-    inspect(tx, env, db, journaled_state, ccx)
+    inspect(tx, env, db, journaled_state, ccx, call.caller)
 }
 
 /// Executes a CALL opcode on the ZK-VM.
@@ -206,7 +213,8 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
-    let caller = call.context.caller;
+    let msg_sender = call.context.caller;
+    let caller = env.tx.caller;
     let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
@@ -226,7 +234,7 @@ where
         factory_deps,
         PaymasterParams::default(),
     );
-    inspect(tx, env, db, journaled_state, ccx)
+    inspect(tx, env, db, journaled_state, ccx, msg_sender)
 }
 
 /// Assign gas parameters that satisfy zkSync's fee model.
@@ -242,6 +250,9 @@ where
 {
     let value = env.tx.value.to_u256();
     let balance = ZKVMData::new(db, journaled_state).get_balance(caller);
+    if balance.is_zero() {
+        tracing::error!("balance is 0 for {caller:?}, transaction will fail");
+    }
     let max_fee_per_gas = fix_l2_gas_price(env.tx.gas_price.to_u256());
     let gas_limit = fix_l2_gas_limit(env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
 
@@ -254,6 +265,7 @@ fn inspect<'a, DB, E>(
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
     ccx: CheatcodeTracerContext,
+    msg_sender: Address,
 ) -> ZKVMResult<E>
 where
     DB: Database + Send,
@@ -261,7 +273,7 @@ where
 {
     let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state);
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
-    tracing::trace!(caller = ?tx.common_data.initiator_address, "executing transaction in zk vm");
+    tracing::trace!(tx_caller = ?tx.common_data.initiator_address, ?msg_sender, "executing transaction in zk vm");
 
     let chain_id_u32 = if env.cfg.chain_id <= u32::MAX as u64 {
         env.cfg.chain_id as u32
@@ -286,6 +298,7 @@ where
         L2ChainId::from(chain_id_u32),
         u64::max(env.block.basefee.to::<u64>(), 1000),
         ccx,
+        msg_sender,
     );
 
     let execution_result = match tx_result.result {
@@ -418,6 +431,7 @@ fn inspect_inner<S: ReadStorage + Send>(
     chain_id: L2ChainId,
     l1_gas_price: u64,
     mut ccx: CheatcodeTracerContext,
+    msg_sender: Address,
 ) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price);
 
@@ -439,13 +453,13 @@ fn inspect_inner<S: ReadStorage + Send>(
     }
     let tracers = vec![
         CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
-        CheatcodeTracer {
-            farcall_handler: Default::default(),
-            mocked_calls: ccx.mocked_calls,
+        CheatcodeTracer::new(
+            ccx.mocked_calls,
             expected_calls,
-            result: cheatcode_tracer_result.clone(),
-            caller: l2_tx.common_data.initiator_address.to_address(),
-        }
+            cheatcode_tracer_result.clone(),
+            l2_tx.common_data.initiator_address.to_address(),
+            msg_sender,
+        )
         .into_tracer_pointer(),
     ];
     let mut tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);

@@ -1,7 +1,8 @@
 #![allow(unused)]
 
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, default, fmt::Debug};
 
+use alloy_primitives::Address;
 use itertools::Itertools;
 use multivm::{
     vm_latest::{BootloaderState, HistoryMode, SimpleMemory, ZkSyncVmState},
@@ -34,14 +35,92 @@ pub(crate) struct ImmediateReturn {
     pub(crate) code_page: u32,
 }
 
+/// The call depth
+#[derive(Debug, Default, Clone, PartialEq)]
+pub(crate) struct CallDepth(u8);
+
+impl CallDepth {
+    /// Create a new [CallDepth] instance.
+    #[inline]
+    pub(crate) const fn new(depth: u8) -> CallDepth {
+        CallDepth(depth)
+    }
+
+    /// Create a [CallDepth] with depth `0`.
+    #[inline]
+    pub(crate) const fn current() -> CallDepth {
+        CallDepth(0)
+    }
+
+    /// Create a [CallDepth] with depth `1`.
+    #[inline]
+    pub(crate) const fn next() -> CallDepth {
+        CallDepth(1)
+    }
+
+    /// Decrement [CallDepth] until the value of `0`.
+    #[inline]
+    pub(crate) fn decrement(self) -> CallDepth {
+        CallDepth(self.0.saturating_sub(1))
+    }
+}
+
+/// The call action.
+#[derive(Debug, Clone)]
+pub(crate) enum CallAction {
+    /// Assign msg.sender.
+    SetMessageSender(Address),
+}
+
+/// The call action.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct CallActions {
+    // The [CallAction]s for the current call depth of `0`.
+    // These are immediately executed in the current `finish_cycle`.
+    immediate: Vec<CallAction>,
+
+    /// The specified [CallAction]s for the next `CallDepth`.
+    /// A depth of `0` indicates an immediate action, and as such the action
+    /// will be moved to `[CallActions::immediate] on the next call to [CallActions::track].
+    pending: Vec<(CallDepth, CallAction)>,
+}
+
+impl CallActions {
+    /// Insert a call action.
+    pub(crate) fn push(&mut self, depth: CallDepth, action: CallAction) {
+        if depth == CallDepth::current() {
+            self.immediate.push(action);
+        } else {
+            self.pending.push((depth.decrement(), action));
+        }
+    }
+
+    /// Track pending [CallAction]s, decrementing the depth if it's not ready.
+    pub(crate) fn track(&mut self) {
+        let mut pending_actions = vec![];
+        for (depth, action) in self.pending.iter().cloned() {
+            if depth == CallDepth::current() {
+                self.immediate.push(action);
+            } else {
+                pending_actions.push((depth.decrement(), action));
+            }
+        }
+        self.pending = pending_actions;
+    }
+
+    /// Consume the immediate actions.
+    pub(crate) fn take_immediate(&mut self) -> Vec<CallAction> {
+        std::mem::take(&mut self.immediate)
+    }
+}
+
 /// Tracks state of FarCalls to be able to return from them earlier.
 /// This effectively short-circuits the execution and ignores following opcodes.
-///
-/// TODO: Add other FarCall functionality from the cheatcode implementation here.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct FarCallHandler {
     pub(crate) active_far_call_stack: Option<CallStackEntry>,
     pub(crate) immediate_return: Option<ImmediateReturn>,
+    call_actions: CallActions,
 }
 
 impl FarCallHandler {
@@ -60,6 +139,12 @@ impl FarCallHandler {
         }
     }
 
+    /// Sets a [CallAction] for the current or subsequent FarCalls during `finish_cycle`.
+    /// Must be called during either `before_execution` or `after_execution`.
+    pub(crate) fn set_action(&mut self, depth: CallDepth, action: CallAction) {
+        self.call_actions.push(depth, action)
+    }
+
     /// Tracks the call stack for the currently active FarCall.
     /// Must be called during `before_execution`.
     pub(crate) fn track_active_far_calls<S, H: HistoryMode>(
@@ -71,6 +156,20 @@ impl FarCallHandler {
     ) {
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             self.active_far_call_stack.replace(state.vm_local_state.callstack.current);
+        }
+    }
+
+    /// Tracks the call stack for the currently executable [CallAction]s.
+    /// Must be called during `after_execution`.
+    pub(crate) fn track_call_actions<S, H: HistoryMode>(
+        &mut self,
+        state: VmLocalStateData<'_>,
+        data: multivm::zk_evm_latest::tracing::AfterExecutionData,
+        _memory: &SimpleMemory<H>,
+        _storage: StoragePtr<S>,
+    ) {
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            self.call_actions.track();
         }
     }
 
@@ -111,6 +210,16 @@ impl FarCallHandler {
             current.base_memory_page = MemoryPage(immediate_return.base_memory_page);
             current.code_page = MemoryPage(immediate_return.code_page);
         }
+    }
+
+    /// Returns immediate [CallAction]s for the currently active FarCall.
+    /// Must be called during `finish_cycle`.
+    pub(crate) fn take_immediate_actions<S: WriteStorage + Send, H: HistoryMode>(
+        &mut self,
+        state: &mut ZkSyncVmState<S, H>,
+        _bootloader_state: &mut BootloaderState,
+    ) -> Vec<CallAction> {
+        self.call_actions.take_immediate()
     }
 }
 
