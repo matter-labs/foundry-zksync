@@ -2,6 +2,7 @@
 src = 'src'
 out = 'out'
 libs = ['lib']
+fs_permissions = [{ access = "read", path = "./zkout/ConstantNumber.sol/artifacts.json"}]
 
 [rpc_endpoints]
 local = "${ERA_TEST_NODE_RPC_URL}"

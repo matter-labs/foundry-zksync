@@ -65,7 +65,7 @@ contract MyScript is Script {
             0x7becc4a46e0c3b512d380ca73a4c868f790d1055a7698f38fb3ca2b2ac97efbb
         );
 
-        NFT nft = new NFT("NFT_tutorial", "TUT", "baseUri");
+        new NFT("NFT_tutorial", "TUT", "baseUri");
 
         vm.stopBroadcast();
     }
