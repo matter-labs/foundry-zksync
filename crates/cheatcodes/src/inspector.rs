@@ -1193,17 +1193,27 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 .load_account(call.contract, data.db)
                 .map(|(account, _)| account.info.code_hash)
                 .unwrap_or_default();
+
             let contract = if code_hash != KECCAK_EMPTY {
                 self.dual_compiled_contracts
                     .find_by_zk_bytecode_hash(zksync_types::H256::from(code_hash.0))
             } else {
                 None
             };
+
             if let Some(contract) = contract {
                 tracing::debug!(contract = contract.name, "using dual compiled contract");
             } else {
                 error!("no zk contract was found for {code_hash:?}");
             }
+
+            let factory_deps = contract.map(|contract| {
+                self.dual_compiled_contracts
+                    .fetch_all_factory_deps(contract)
+                    .into_iter()
+                    .map(|bc| bc.to_vec())
+                    .collect()
+            });
 
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
@@ -1211,7 +1221,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
                 call,
-                contract,
+                factory_deps,
                 data.env,
                 data.db,
                 &mut data.journaled_state,

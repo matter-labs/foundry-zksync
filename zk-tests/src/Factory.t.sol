@@ -77,16 +77,6 @@ contract MyUserFactory {
     }
 }
 
-contract MyUserConstructorFactory {
-    constructor(address classicFactory, uint256 _number) {
-        MyClassicFactory(classicFactory).create(_number);
-    }
-
-    function getNumber(address classicFactory) public view returns (uint256) {
-        return MyClassicFactory(classicFactory).getNumber();
-    }
-}
-
 contract ZkFactory is Test {
     function testClassicFactory() public {
         MyClassicFactory factory = new MyClassicFactory();
@@ -123,8 +113,8 @@ contract ZkFactory is Test {
     }
 
     function testUserConstructorFactory() public {
-        MyClassicFactory factory = new MyClassicFactory();
-        MyUserConstructorFactory user = new MyUserConstructorFactory(address(factory), 42);
+        MyConstructorFactory factory = new MyConstructorFactory(42);
+        MyUserFactory user = new MyUserFactory();
 
         assert(user.getNumber(address(factory)) == 42);
     }

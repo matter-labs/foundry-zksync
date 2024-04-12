@@ -202,7 +202,7 @@ where
 /// Executes a CALL opcode on the ZK-VM.
 pub fn call<'a, DB, E>(
     call: &CallInputs,
-    contract: Option<&DualCompiledContract>,
+    factory_deps: Option<Vec<Vec<u8>>>,
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
@@ -215,7 +215,6 @@ where
     info!(?call, "call tx {}", hex::encode(&call.input));
     let msg_sender = call.context.caller;
     let caller = env.tx.caller;
-    let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
