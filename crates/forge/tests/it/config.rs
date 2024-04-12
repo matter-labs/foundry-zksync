@@ -18,7 +18,7 @@ use foundry_evm::{
     traces::{render_trace_arena, CallTraceDecoderBuilder},
 };
 use foundry_test_utils::{init_tracing, Filter};
-use foundry_zksync_compiler::{DualCompiledContract, PackedEraBytecode};
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts, PackedEraBytecode};
 use futures::future::join_all;
 use itertools::Itertools;
 use std::{
@@ -208,7 +208,7 @@ pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunne
     let zk_output = COMPILED_ZK.clone();
 
     // Dual compiled contracts
-    let mut dual_compiled_contracts = vec![];
+    let mut dual_compiled_contracts = DualCompiledContracts::default();
     let mut solc_bytecodes = HashMap::new();
     for (contract_name, artifact) in output.artifacts() {
         let contract_name =

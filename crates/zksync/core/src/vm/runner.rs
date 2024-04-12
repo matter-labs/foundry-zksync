@@ -16,7 +16,7 @@ use foundry_common::{
     console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
     HardhatConsole,
 };
-use foundry_zksync_compiler::{DualCompiledContract, FindContract};
+use foundry_zksync_compiler::DualCompiledContract;
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{fix_l2_gas_limit, fix_l2_gas_price};
@@ -164,7 +164,7 @@ where
 pub fn create<'a, DB, E>(
     call: &CreateInputs,
     contract: &DualCompiledContract,
-    dual_compiled_contracts: &[DualCompiledContract],
+    factory_deps: Vec<Vec<u8>>,
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
@@ -178,8 +178,6 @@ where
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
     let caller = env.tx.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
-    let factory_deps =
-        dual_compiled_contracts.fetch_all_factory_deps(contract).into_iter().collect();
     let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);

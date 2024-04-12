@@ -30,16 +30,9 @@ use foundry_compilers::{
     utils::canonicalized,
 };
 use foundry_wallets::WalletSigner;
-use foundry_zksync_compiler::{
-    new_dual_compiled_contracts, DualCompiledContract, FindContract, ZkSolc,
-};
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts, ZkSolc};
 use serde_json::json;
-use std::{
-    borrow::Borrow,
-    marker::PhantomData,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
 
 /// CLI arguments for `forge create`.
 #[derive(Clone, Debug, Parser)]
@@ -128,7 +121,7 @@ impl CreateArgs {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
-        let dual_compiled_contracts = new_dual_compiled_contracts(&output, &zk_output);
+        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
 
         if let Some(ref mut path) = self.contract.path {
             // paths are absolute in the project's output
@@ -141,7 +134,7 @@ impl CreateArgs {
             let contract = bin
                 .object
                 .as_bytes()
-                .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
+                .and_then(|bytes| dual_compiled_contracts.find_by_evm_bytecode(&bytes.0))
                 .ok_or(eyre::eyre!(
                     "Could not find zksolc contract for contract {}",
                     self.contract.name
@@ -160,7 +153,8 @@ impl CreateArgs {
             let factory_deps = dual_compiled_contracts
                 .fetch_all_factory_deps(contract)
                 .into_iter()
-                .collect::<Vec<_>>();
+                .map(|bc| bc.to_vec())
+                .collect();
 
             (abi, zk_bin, Some((contract, factory_deps)))
         } else {

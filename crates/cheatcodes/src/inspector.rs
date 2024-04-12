@@ -28,7 +28,7 @@ use foundry_evm_core::{
         HARDHAT_CONSOLE_ADDRESS,
     },
 };
-use foundry_zksync_compiler::{DualCompiledContract, FindContract};
+use foundry_zksync_compiler::DualCompiledContracts;
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     ZkTransactionMetadata,
@@ -231,7 +231,7 @@ pub struct Cheatcodes {
     pub use_zk_vm: bool,
 
     /// Dual compiled contracts
-    pub dual_compiled_contracts: Vec<DualCompiledContract>,
+    pub dual_compiled_contracts: DualCompiledContracts,
 
     /// Logs printed during ZK-VM execution.
     /// EVM logs have the value `None` so they can be interpolated later, since
@@ -404,10 +404,8 @@ impl Cheatcodes {
                 .map(|(value, _)| value)
                 .ok()
                 .and_then(|zk_bytecode_hash| {
-                    let zk_bytecode_hash = zk_bytecode_hash.to_h256();
                     self.dual_compiled_contracts
-                        .iter()
-                        .find(|c| c.zk_bytecode_hash == zk_bytecode_hash)
+                        .find_by_zk_bytecode_hash(zk_bytecode_hash.to_h256())
                         .map(|contract| {
                             (
                                 contract.evm_bytecode_hash,
@@ -1197,7 +1195,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 .unwrap_or_default();
             let contract = if code_hash != KECCAK_EMPTY {
                 self.dual_compiled_contracts
-                    .find_zk_bytecode_hash(zksync_types::H256::from(code_hash.0))
+                    .find_by_zk_bytecode_hash(zksync_types::H256::from(code_hash.0))
             } else {
                 None
             };
@@ -1569,7 +1567,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                         ) as u64;
                         let contract = self
                             .dual_compiled_contracts
-                            .find_evm_bytecode(&call.init_code.0)
+                            .find_by_evm_bytecode(&call.init_code.0)
                             .unwrap_or_else(|| {
                                 panic!("failed finding contract for {:?}", call.init_code)
                             });
@@ -1577,6 +1575,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             .dual_compiled_contracts
                             .fetch_all_factory_deps(contract)
                             .into_iter()
+                            .map(|bc| bc.to_vec())
                             .collect();
 
                         let constructor_input =
@@ -1679,8 +1678,15 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
             let zk_contract = self
                 .dual_compiled_contracts
-                .find_evm_bytecode(&call.init_code.0)
+                .find_by_evm_bytecode(&call.init_code.0)
                 .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
+
+            let factory_deps = self
+                .dual_compiled_contracts
+                .fetch_all_factory_deps(zk_contract)
+                .into_iter()
+                .map(|bc| bc.to_vec())
+                .collect();
 
             tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
@@ -1690,7 +1696,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
                 call,
                 zk_contract,
-                &self.dual_compiled_contracts,
+                factory_deps,
                 data.env,
                 data.db,
                 &mut data.journaled_state,

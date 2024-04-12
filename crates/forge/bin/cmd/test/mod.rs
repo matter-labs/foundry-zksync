@@ -31,7 +31,7 @@ use foundry_config::{
     get_available_profiles, Config,
 };
 use foundry_debugger::Debugger;
-use foundry_zksync_compiler::{new_dual_compiled_contracts, ZkSolc};
+use foundry_zksync_compiler::{DualCompiledContracts, ZkSolc};
 use regex::Regex;
 use std::{sync::mpsc::channel, time::Instant};
 use watchexec::config::{InitConfig, RuntimeConfig};
@@ -185,7 +185,7 @@ impl TestArgs {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
-        let dual_compiled_contracts = new_dual_compiled_contracts(&output, &zk_output);
+        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
 
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;
