@@ -18,7 +18,7 @@ use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
 use foundry_common::{get_contract_name, provider::ethers::RpcUrl, shell, ContractsByArtifact};
 use foundry_compilers::artifacts::ContractBytecodeSome;
 use foundry_evm::inspectors::cheatcodes::ScriptWallets;
-use foundry_zksync_compiler::{DualCompiledContracts};
+use foundry_zksync_compiler::DualCompiledContracts;
 use futures::future::join_all;
 use parking_lot::RwLock;
 use std::{
