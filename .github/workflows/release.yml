@@ -96,7 +96,7 @@ jobs:
             RUST_BACKTRACE: full
         shell: bash
         run: |
-          cargo build --release --bin forge --bin cast --target ${{ matrix.target }}
+          cargo build --release --bin forge --bin cast --target ${{ matrix.target }} -C opt-level=s
 
       - name: Move forge and cast binaries to artifacts directory
         run: |
