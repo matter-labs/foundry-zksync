@@ -42,7 +42,7 @@ contract MyConstructorFactory {
 contract MyNestedFactory {
     MyClassicFactory nested;
 
-    function create(uint256 _number) {
+    function create(uint256 _number) public {
         nested = new MyClassicFactory();
 
         nested.create(_number);
@@ -72,7 +72,7 @@ contract MyUserFactory {
         MyClassicFactory(classicFactory).create(_number);
     }
 
-    function getNumber(address classicFactory) public returns (uint256) {
+    function getNumber(address classicFactory) public view returns (uint256) {
         return MyClassicFactory(classicFactory).getNumber();
     }
 }
@@ -82,7 +82,7 @@ contract MyUserConstructorFactory {
         MyClassicFactory(classicFactory).create(_number);
     }
 
-    function getNumber(address classicFactory) public returns (uint256) {
+    function getNumber(address classicFactory) public view returns (uint256) {
         return MyClassicFactory(classicFactory).getNumber();
     }
 }
@@ -116,16 +116,16 @@ contract ZkFactory is Test {
 
     function testUserFactory() public {
         MyClassicFactory factory = new MyClassicFactory();
-        MyUserFactory user = new MyUserFactory(address(factory));
-        user.create(42);
+        MyUserFactory user = new MyUserFactory();
+        user.create(address(factory), 42);
 
-        assert(user.getNumber() == 42);
+        assert(user.getNumber(address(factory)) == 42);
     }
 
     function testUserConstructorFactory() public {
         MyClassicFactory factory = new MyClassicFactory();
-        MyUserConstructorFactory factory = new MyUserConstructorFactory(address(factory), 42);
+        MyUserConstructorFactory user = new MyUserConstructorFactory(address(factory), 42);
 
-        assert(factory.getNumber() == 42);
+        assert(user.getNumber(address(factory)) == 42);
     }
 }
