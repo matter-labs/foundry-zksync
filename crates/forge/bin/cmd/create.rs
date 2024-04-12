@@ -148,15 +148,41 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            //TODO: restore `--factory-deps` handling? (+ lookup)
-            // or remove flag entirely?
-            let factory_deps = dual_compiled_contracts
-                .fetch_all_factory_deps(contract)
-                .into_iter()
-                .map(|bc| bc.to_vec())
-                .collect();
+            let mut factory_deps = dual_compiled_contracts.fetch_all_factory_deps(contract);
 
-            (abi, zk_bin, Some((contract, factory_deps)))
+            //for manual specified factory deps
+            for mut contract in std::mem::take(&mut self.factory_deps) {
+                if let Some(path) = contract.path.as_mut() {
+                    *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
+                }
+
+                let (_, bin, _) = remove_contract(&mut output, &contract).with_context(|| {
+                    format!("Unable to find specified factory deps ({}) in project", contract.name)
+                })?;
+
+                let zk = bin
+                    .object
+                    .as_bytes()
+                    .and_then(|bytes| dual_compiled_contracts.find_by_evm_bytecode(&bytes.0))
+                    .ok_or(eyre::eyre!(
+                        "Could not find zksolc contract for contract {}",
+                        contract.name
+                    ))?;
+
+                //if the dep isn't already present,
+                // fetch all deps and add them to the final list
+                if !factory_deps.contains(zk.zk_deployed_bytecode.as_slice()) {
+                    let additional_factory_deps =
+                        dual_compiled_contracts.fetch_all_factory_deps(zk);
+                    factory_deps.extend(additional_factory_deps);
+                }
+            }
+
+            (
+                abi,
+                zk_bin,
+                Some((contract, factory_deps.into_iter().map(|bc| bc.to_vec()).collect())),
+            )
         } else {
             (abi, bin, None)
         };
