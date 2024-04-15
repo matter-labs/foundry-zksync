@@ -1,11 +1,13 @@
-# `foundryup`
+# `foundryup-zksync`
 
-Update or revert to a specific Foundry branch with ease.
+Update or revert to a specific Foundry-zksync branch with ease.
 
 ## Installing
 
+<!-- TODO: update to reference curl link once available -->
+
 ```sh
-curl -L https://foundry.paradigm.xyz | bash
+./install.sh
 ```
 
 ## Usage
@@ -13,43 +15,43 @@ curl -L https://foundry.paradigm.xyz | bash
 To install the **nightly** version:
 
 ```sh
-foundryup
+foundryup-zksync
 ```
 
 To install a specific **version** (in this case the `nightly` version):
 
 ```sh
-foundryup --version nightly
+foundryup-zksync --version nightly
 ```
 
-To install a specific **branch** (in this case the `release/0.1.0` branch's latest commit):
+To install a specific **branch** (in this case the `release/0.0.2-alpha.3` branch's latest commit):
 
 ```sh
-foundryup --branch release/0.1.0
+foundryup-zksync --branch release/0.0.2-alpha.3
 ```
 
 To install a **fork's main branch** (in this case `transmissions11/foundry`'s main branch):
 
 ```sh
-foundryup --repo transmissions11/foundry
+foundryup-zksync --repo transmissions11/foundry
 ```
 
 To install a **specific branch in a fork** (in this case the `patch-10` branch's latest commit in `transmissions11/foundry`):
 
 ```sh
-foundryup --repo transmissions11/foundry --branch patch-10
+foundryup-zksync --repo transmissions11/foundry --branch patch-10
 ```
 
 To install from a **specific Pull Request**:
 
 ```sh
-foundryup --pr 1071
+foundryup-zksync --pr 1071
 ```
 
 To install from a **specific commit**:
 
 ```sh
-foundryup -C 94bfdb2
+foundryup-zksync -C 94bfdb2
 ```
 
 To install a local directory or repository (e.g. one located at `~/git/foundry`, assuming you're in the home directory)
@@ -57,7 +59,7 @@ To install a local directory or repository (e.g. one located at `~/git/foundry`,
 ##### Note: --branch, --repo, and --version flags are ignored during local installations.
 
 ```sh
-foundryup --path ./git/foundry
+foundryup-zksync --path ./git/foundry
 ```
 
 ---
