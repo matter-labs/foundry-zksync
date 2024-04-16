@@ -169,7 +169,7 @@ impl CreateArgs {
                         contract.name
                     ))?;
 
-                //if the dep isn't already present,
+                // if the dep isn't already present,
                 // fetch all deps and add them to the final list
                 if !factory_deps.contains(zk.zk_deployed_bytecode.as_slice()) {
                     let additional_factory_deps =

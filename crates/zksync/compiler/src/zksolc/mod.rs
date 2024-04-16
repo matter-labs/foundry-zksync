@@ -113,7 +113,7 @@ impl DualCompiledContracts {
         }
 
         while let Some(dep) = queue.pop_front() {
-            //try to insert in the list of visited, if it's already present, skip
+            // try to insert in the list of visited, if it's already present, skip
             if visited.insert(dep) {
                 if let Some(contract) = self.find_by_zk_deployed_bytecode(dep) {
                     debug!(
@@ -123,9 +123,9 @@ impl DualCompiledContracts {
                     );
 
                     for nested_dep in &contract.zk_factory_deps {
-                        //check that the nested dependency is inserted
+                        // check that the nested dependency is inserted
                         if !visited.contains(nested_dep.as_slice()) {
-                            //if not, add it to queue for processing
+                            // if not, add it to queue for processing
                             queue.push_back(nested_dep.as_slice());
                         }
                     }
