@@ -16,10 +16,19 @@ contract MyOwnable {
     }
 }
 
+contract Delegator {
+    /// Retuns the current `address(this), msg.sender` as a tuple.
+    function transact() public view returns (address, address) {
+        address thisAddress = address(this);
+        address msgSender = msg.sender;
+        return (thisAddress, msgSender);
+    }
+}
+
 contract ZkOwnershipTest is Test {
     address OWNER_ADDRESS = address(0x11abcd);
     address TX_ADDRESS = address(0x22abcd);
-    
+
     function testOwnership() public {
         // set owner balance to 0 to make sure deployment fails
         // if it's used for payment
@@ -31,8 +40,22 @@ contract ZkOwnershipTest is Test {
         vm.prank(TX_ADDRESS);
         ownable.transact();
 
-        
         assertEq(OWNER_ADDRESS, ownable.createOwner());
         assertEq(TX_ADDRESS, ownable.txOwner());
+    }
+
+    function testOwnershipDelegateCall() public {
+        Delegator target = new Delegator();
+        address thisAddress = address(this);
+        address msgSender = msg.sender;
+        
+        (bool success, bytes memory data) = address(target).delegatecall(
+            abi.encodeWithSelector(target.transact.selector)
+        );
+        (address thisAddressTx, address msgSenderTx) = abi.decode(data, (address, address));
+        
+        assert(success);
+        assertEq(thisAddressTx, thisAddress);
+        assertEq(msgSenderTx, msgSender);
     }
 }

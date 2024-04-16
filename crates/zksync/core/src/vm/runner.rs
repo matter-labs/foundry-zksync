@@ -1,7 +1,7 @@
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     is_system_address,
-    vm::tracer::CheatcodeTracer,
+    vm::tracer::{CallContext, CheatcodeTracer},
 };
 use alloy_primitives::Log;
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
@@ -28,7 +28,7 @@ use multivm::{
 };
 use once_cell::sync::OnceCell;
 use revm::{
-    interpreter::{CallInputs, CreateInputs},
+    interpreter::{CallInputs, CallScheme, CreateInputs},
     precompile::Precompiles,
     primitives::{
         Address, Bytecode, Bytes, CreateScheme, EVMResultGeneric, Env, Eval,
@@ -106,14 +106,14 @@ where
     );
 
     let (state, _) = journaled_state.finalize();
-    match inspect::<_, DB::Error>(
-        tx,
-        env,
-        db,
-        &mut journaled_state,
-        Default::default(),
-        env.tx.caller,
-    ) {
+    let call_ctx = CallContext {
+        tx_caller: env.tx.caller,
+        msg_sender: env.tx.caller,
+        contract: transact_to.to_address(),
+        delegate_as: None,
+    };
+
+    match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
         Ok(result) => Ok(ResultAndState { result, state }),
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
@@ -196,7 +196,15 @@ where
         Some(factory_deps),
         PaymasterParams::default(),
     );
-    inspect(tx, env, db, journaled_state, ccx, call.caller)
+
+    let call_ctx = CallContext {
+        tx_caller: env.tx.caller,
+        msg_sender: call.caller,
+        contract: CONTRACT_DEPLOYER_ADDRESS.to_address(),
+        delegate_as: None,
+    };
+
+    inspect(tx, env, db, journaled_state, ccx, call_ctx)
 }
 
 /// Executes a CALL opcode on the ZK-VM.
@@ -213,7 +221,6 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
-    let msg_sender = call.context.caller;
     let caller = env.tx.caller;
     let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
@@ -234,7 +241,22 @@ where
         factory_deps,
         PaymasterParams::default(),
     );
-    inspect(tx, env, db, journaled_state, ccx, msg_sender)
+
+    // address and caller are specific to the type of call:
+    // Call | StaticCall => { address: to, caller: contract.address }
+    // CallCode          => { address: contract.address, caller: contract.address }
+    // DelegateCall      => { address: contract.address, caller: contract.caller }
+    let call_ctx = CallContext {
+        tx_caller: env.tx.caller,
+        msg_sender: call.context.caller,
+        contract: call.contract,
+        delegate_as: match call.context.scheme {
+            CallScheme::DelegateCall => Some(call.context.address),
+            _ => None,
+        },
+    };
+
+    inspect(tx, env, db, journaled_state, ccx, call_ctx)
 }
 
 /// Assign gas parameters that satisfy zkSync's fee model.
@@ -265,7 +287,7 @@ fn inspect<'a, DB, E>(
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
     ccx: CheatcodeTracerContext,
-    msg_sender: Address,
+    call_ctx: CallContext,
 ) -> ZKVMResult<E>
 where
     DB: Database + Send,
@@ -273,7 +295,7 @@ where
 {
     let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state);
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
-    tracing::trace!(tx_caller = ?tx.common_data.initiator_address, ?msg_sender, "executing transaction in zk vm");
+    tracing::info!(?call_ctx, "executing transaction in zk vm");
 
     let chain_id_u32 = if env.cfg.chain_id <= u32::MAX as u64 {
         env.cfg.chain_id as u32
@@ -298,7 +320,7 @@ where
         L2ChainId::from(chain_id_u32),
         u64::max(env.block.basefee.to::<u64>(), 1000),
         ccx,
-        msg_sender,
+        call_ctx,
     );
 
     let execution_result = match tx_result.result {
@@ -431,7 +453,7 @@ fn inspect_inner<S: ReadStorage + Send>(
     chain_id: L2ChainId,
     l1_gas_price: u64,
     mut ccx: CheatcodeTracerContext,
-    msg_sender: Address,
+    call_ctx: CallContext,
 ) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price);
 
@@ -457,8 +479,7 @@ fn inspect_inner<S: ReadStorage + Send>(
             ccx.mocked_calls,
             expected_calls,
             cheatcode_tracer_result.clone(),
-            l2_tx.common_data.initiator_address.to_address(),
-            msg_sender,
+            call_ctx,
         )
         .into_tracer_pointer(),
     ];
