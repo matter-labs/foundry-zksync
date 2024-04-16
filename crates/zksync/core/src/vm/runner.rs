@@ -45,7 +45,7 @@ use zksync_types::{
     PackedEthSignature, StorageKey, Transaction, VmEvent, ACCOUNT_CODE_STORAGE_ADDRESS,
     CONTRACT_DEPLOYER_ADDRESS, H160, U256,
 };
-use zksync_utils::{bytecode::hash_bytecode, h256_to_account_address, h256_to_u256, u256_to_h256};
+use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 
 use crate::vm::{
     db::{ZKVMData, DEFAULT_CHAIN_ID},
