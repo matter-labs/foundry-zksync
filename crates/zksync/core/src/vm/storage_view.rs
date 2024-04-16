@@ -19,15 +19,18 @@ use crate::convert::ConvertH160;
 #[derive(Debug)]
 pub(crate) struct StorageView<S> {
     pub(crate) storage_handle: S,
-    // Used for caching and to get the list/count of modified keys
+    /// Used for caching and to get the list/count of modified keys
     pub(crate) modified_storage_keys: HashMap<StorageKey, StorageValue>,
-    // Used purely for caching
+    /// Used purely for caching
     pub(crate) read_storage_keys: HashMap<StorageKey, StorageValue>,
-    // Cache for `contains_key()` checks. The cache is only valid within one L1 batch execution.
+    /// Cache for `contains_key()` checks. The cache is only valid within one L1 batch execution.
     initial_writes_cache: HashMap<StorageKey, bool>,
-
-    // Simulates factory deps being persisted across tx by era
+    /// Simulates factory deps being persisted across transactions.
+    /// Since the [revm::JournaledState] storage lacks the necessary provisions
+    /// for storing factory_deps, we maintain them separately and pass it
+    /// when creating a [StorageView].
     persisted_factory_deps: HashMap<H256, Vec<u8>>,
+    /// The tx caller.
     caller: H160,
 }
 

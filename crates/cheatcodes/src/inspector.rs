@@ -232,7 +232,6 @@ pub struct Cheatcodes {
 
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
-    persisted_factory_deps: HashMap<H256, Vec<u8>>,
 
     /// Logs printed during ZK-VM execution.
     /// EVM logs have the value `None` so they can be interpolated later, since
@@ -241,6 +240,13 @@ pub struct Cheatcodes {
 
     /// Starts the cheatcode inspector in ZK mode
     pub startup_zk: bool,
+
+    /// The list of factory_deps seen so far during a test or script execution.
+    /// Ideally these would be persisted in the storage, but since modifying [revm::JournaledState]
+    /// would be a significant refactor, we maintain the factory_dep part in the [Cheatcodes].
+    /// This can be done as each test runs with its own [Cheatcodes] instance, thereby
+    /// providing the necessary level of isolation.
+    persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 impl Cheatcodes {
