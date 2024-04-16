@@ -171,10 +171,11 @@ impl CreateArgs {
 
                 // if the dep isn't already present,
                 // fetch all deps and add them to the final list
-                if !factory_deps.contains(zk.zk_deployed_bytecode.as_slice()) {
+                if !factory_deps.contains(&zk.zk_deployed_bytecode) {
                     let additional_factory_deps =
                         dual_compiled_contracts.fetch_all_factory_deps(zk);
                     factory_deps.extend(additional_factory_deps);
+                    factory_deps.dedup();
                 }
             }
 

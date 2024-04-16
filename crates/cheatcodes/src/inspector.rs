@@ -31,7 +31,7 @@ use foundry_evm_core::{
 use foundry_zksync_compiler::DualCompiledContracts;
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    ZkTransactionMetadata,
+    hash_bytecode, ZkTransactionMetadata,
 };
 use itertools::Itertools;
 use revm::{
@@ -58,7 +58,7 @@ use zksync_types::{
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    H256, KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
 };
 
@@ -232,6 +232,7 @@ pub struct Cheatcodes {
 
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
+    persisted_factory_deps: HashMap<H256, Vec<u8>>,
 
     /// Logs printed during ZK-VM execution.
     /// EVM logs have the value `None` so they can be interpolated later, since
@@ -1207,21 +1208,15 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 error!("no zk contract was found for {code_hash:?}");
             }
 
-            let factory_deps = contract.map(|contract| {
-                self.dual_compiled_contracts
-                    .fetch_all_factory_deps(contract)
-                    .into_iter()
-                    .map(|bc| bc.to_vec())
-                    .collect()
-            });
+            let persisted_factory_deps = self.persisted_factory_deps.clone();
 
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
+                persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
                 call,
-                factory_deps,
                 data.env,
                 data.db,
                 &mut data.journaled_state,
@@ -1691,17 +1686,19 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 .find_by_evm_bytecode(&call.init_code.0)
                 .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
 
-            let factory_deps = self
-                .dual_compiled_contracts
-                .fetch_all_factory_deps(zk_contract)
-                .into_iter()
-                .map(|bc| bc.to_vec())
-                .collect();
+            let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
+
+            // get the current persisted factory deps to pass to zk create
+            let persisted_factory_deps = self.persisted_factory_deps.clone();
+            // and extend it for future calls
+            self.persisted_factory_deps
+                .extend(factory_deps.iter().map(|dep| (hash_bytecode(dep), dep.clone())));
 
             tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
+                persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
                 call,

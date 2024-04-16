@@ -104,12 +104,12 @@ impl DualCompiledContracts {
     }
 
     /// Finds a contract own and nested factory deps
-    pub fn fetch_all_factory_deps<'s>(&'s self, root: &'s DualCompiledContract) -> HashSet<&[u8]> {
+    pub fn fetch_all_factory_deps(&self, root: &DualCompiledContract) -> Vec<Vec<u8>> {
         let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
 
         for dep in &root.zk_factory_deps {
-            queue.push_back(dep.as_slice());
+            queue.push_back(dep);
         }
 
         while let Some(dep) = queue.pop_front() {
@@ -124,16 +124,16 @@ impl DualCompiledContracts {
 
                     for nested_dep in &contract.zk_factory_deps {
                         // check that the nested dependency is inserted
-                        if !visited.contains(nested_dep.as_slice()) {
+                        if !visited.contains(nested_dep) {
                             // if not, add it to queue for processing
-                            queue.push_back(nested_dep.as_slice());
+                            queue.push_back(nested_dep);
                         }
                     }
                 }
             }
         }
 
-        visited
+        visited.into_iter().cloned().collect()
     }
 
     /// Returns an iterator over all `[DualCompiledContract]`s in the collection

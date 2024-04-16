@@ -32,14 +32,13 @@ contract ZkFactoryTest is Test {
         assert(factory.getNumber() == 42);
     }
 
-    // //FIXME: fails with 'trying to decode unexisting hash'
-    // function testUserFactory() public {
-    //     MyClassicFactory factory = new MyClassicFactory();
-    //     MyUserFactory user = new MyUserFactory();
-    //     user.create(address(factory), 42);
+    function testUserFactory() public {
+        MyClassicFactory factory = new MyClassicFactory();
+        MyUserFactory user = new MyUserFactory();
+        user.create(address(factory), 42);
 
-    //     assert(user.getNumber(address(factory)) == 42);
-    // }
+        assert(user.getNumber(address(factory)) == 42);
+    }
 
     function testUserConstructorFactory() public {
         MyConstructorFactory factory = new MyConstructorFactory(42);

@@ -41,15 +41,11 @@ use tracing::{info, trace};
 use zksync_basic_types::{L2ChainId, H256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    ethabi::{self},
-    fee::Fee,
-    l2::L2Tx,
-    transaction_request::PaymasterParams,
-    vm_trace::Call,
+    ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, vm_trace::Call,
     PackedEthSignature, StorageKey, Transaction, VmEvent, ACCOUNT_CODE_STORAGE_ADDRESS,
     CONTRACT_DEPLOYER_ADDRESS, H160, U256,
 };
-use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
+use zksync_utils::{bytecode::hash_bytecode, h256_to_account_address, h256_to_u256, u256_to_h256};
 
 use crate::vm::{
     db::{ZKVMData, DEFAULT_CHAIN_ID},
@@ -202,7 +198,6 @@ where
 /// Executes a CALL opcode on the ZK-VM.
 pub fn call<'a, DB, E>(
     call: &CallInputs,
-    factory_deps: Option<Vec<Vec<u8>>>,
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
@@ -230,7 +225,7 @@ where
         },
         caller.to_h160(),
         call.transfer.value.to_u256(),
-        factory_deps,
+        None,
         PaymasterParams::default(),
     );
     inspect(tx, env, db, journaled_state, ccx, msg_sender)
@@ -263,7 +258,7 @@ fn inspect<'a, DB, E>(
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
-    ccx: CheatcodeTracerContext,
+    mut ccx: CheatcodeTracerContext,
     msg_sender: Address,
 ) -> ZKVMResult<E>
 where
@@ -288,9 +283,13 @@ where
     }
 
     let modified_storage_keys = era_db.override_keys.clone();
-    let storage_ptr =
-        StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
-            .into_rc_ptr();
+    let storage_ptr = StorageView::new(
+        &mut era_db,
+        modified_storage_keys,
+        tx.common_data.initiator_address,
+        std::mem::take(&mut ccx.persisted_factory_deps),
+    )
+    .into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) = inspect_inner(
         tx,
         storage_ptr,

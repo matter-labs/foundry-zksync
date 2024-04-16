@@ -40,6 +40,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
+    /// Factory deps that were persisted across calls
+    pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 #[derive(Debug, Default)]
