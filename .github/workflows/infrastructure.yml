@@ -1,4 +1,4 @@
-name: Run Aave Delivery Infrastructure tests
+name: Infrastructure tests
 
 on:
     push:
@@ -26,8 +26,8 @@ jobs:
         with:
             toolchain: nightly-2024-02-06
 
-      - name: Build
-        run: cargo build --release
+      - name: Build forge binary
+        run: cargo build --release --bin forge
 
       - name: Clone Aave Delivery Infrastructure
         run: git clone https://github.com/Moonsong-Labs/aave-delivery-infrastructure.git
