@@ -70,6 +70,8 @@ impl CallDepth {
 pub(crate) enum CallAction {
     /// Assign msg.sender.
     SetMessageSender(Address),
+    /// Assign address(this).
+    SetThisAddress(Address),
 }
 
 /// The call action.

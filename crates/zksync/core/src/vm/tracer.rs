@@ -44,18 +44,38 @@ pub struct CheatcodeTracerContext<'a> {
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
 
+/// Tracer result to return back to foundry.
 #[derive(Debug, Default)]
 pub struct CheatcodeTracerResult {
     pub expected_calls: ExpectedCallTracker,
 }
 
+/// Defines the context for a Vm call.
+#[derive(Debug, Default)]
+pub struct CallContext {
+    /// The transaction caller.
+    pub tx_caller: Address,
+    /// Value for `msg.sender`.
+    pub msg_sender: Address,
+    /// Target contract's address.
+    pub contract: Address,
+    /// Delegated contract's address. This is used
+    /// to override `address(this)` for delegate calls.
+    pub delegate_as: Option<Address>,
+}
+
+/// A tracer to allow for foundry-specific functionality.
 #[derive(Debug, Default)]
 pub struct CheatcodeTracer {
+    /// List of mocked calls.
     pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
+    /// Tracked for foundry's expected calls.
     pub expected_calls: ExpectedCallTracker,
-    pub tx_caller: Address,
-    pub msg_sender: Address,
+    /// Defines the current call context.
+    pub call_context: CallContext,
+    /// Result to send back.
     pub result: Arc<OnceCell<CheatcodeTracerResult>>,
+    /// Handle farcall state.
     farcall_handler: FarCallHandler,
 }
 
@@ -65,17 +85,9 @@ impl CheatcodeTracer {
         mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
         expected_calls: ExpectedCallTracker,
         result: Arc<OnceCell<CheatcodeTracerResult>>,
-        tx_caller: Address,
-        msg_sender: Address,
+        call_context: CallContext,
     ) -> Self {
-        CheatcodeTracer {
-            mocked_calls,
-            expected_calls,
-            tx_caller,
-            msg_sender,
-            result,
-            ..Default::default()
-        }
+        CheatcodeTracer { mocked_calls, expected_calls, call_context, result, ..Default::default() }
     }
 }
 
@@ -109,38 +121,6 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
     ) {
         self.farcall_handler.track_call_actions(state, data, memory, storage);
 
-        // Mark the caller as EOA to avoid panic. This is probably not needed anymore
-        // since we manually override the ACCOUNT_CODE_STORAGE to return `0` for the caller.
-        // TODO remove this and verify once we are stable.
-        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let current = state.vm_local_state.callstack.get_current_stack();
-            let calldata = get_calldata(&state, memory);
-
-            if current.code_address == CONTRACT_DEPLOYER_ADDRESS &&
-                calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
-            {
-                let address = H256::from_slice(&calldata[4..36]).to_h160().to_address();
-                if self.tx_caller == address {
-                    tracing::debug!("overriding account version for caller {address:?}");
-                    self.farcall_handler.set_immediate_return(rU256::from(1u32).to_be_bytes_vec());
-                    return
-                }
-            }
-        }
-
-        // Override msg.sender for the transaction
-        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let calldata = get_calldata(&state, memory);
-            let current = state.vm_local_state.callstack.current;
-
-            if current.msg_sender == BOOTLOADER_ADDRESS &&
-                calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION)
-            {
-                self.farcall_handler
-                    .set_action(CallDepth::next(), CallAction::SetMessageSender(self.msg_sender));
-            }
-        }
-
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
@@ -167,12 +147,13 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             }
         }
 
+        // Handle mocked calls
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
             let call_input = get_calldata(&state, memory);
             let call_contract = current.code_address.to_address();
             let call_value = U256::from(current.context_u128_value).to_ru256();
-            // Handle mocked calls
+
             if let Some(mocks) = self.mocked_calls.get(&call_contract) {
                 let ctx = MockCallDataContext {
                     calldata: Bytes::from(call_input.clone()),
@@ -188,8 +169,53 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                         .map(|(_, v)| v)
                 }) {
                     let return_data = return_data.data.clone().to_vec();
-                    tracing::debug!("returning mocked value {:?}", hex::encode(&return_data));
+                    tracing::info!("returning mocked value {:?}", hex::encode(&return_data));
                     self.farcall_handler.set_immediate_return(return_data);
+                    return;
+                }
+            }
+        }
+
+        // Mark the caller as EOA to avoid panic. This is probably not needed anymore
+        // since we manually override the ACCOUNT_CODE_STORAGE to return `0` for the caller.
+        // TODO remove this and verify once we are stable.
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.get_current_stack();
+            let calldata = get_calldata(&state, memory);
+
+            if current.code_address == CONTRACT_DEPLOYER_ADDRESS &&
+                calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
+            {
+                let address = H256::from_slice(&calldata[4..36]).to_h160().to_address();
+                if self.call_context.tx_caller == address {
+                    tracing::debug!("overriding account version for caller {address:?}");
+                    self.farcall_handler.set_immediate_return(rU256::from(1u32).to_be_bytes_vec());
+                    return
+                }
+            }
+        }
+
+        // Override msg.sender for the transaction
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let calldata = get_calldata(&state, memory);
+            let current = state.vm_local_state.callstack.current;
+
+            if current.msg_sender == BOOTLOADER_ADDRESS &&
+                calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION)
+            {
+                self.farcall_handler.set_action(
+                    CallDepth::next(),
+                    CallAction::SetMessageSender(self.call_context.msg_sender),
+                );
+            }
+        }
+
+        if let Some(delegate_as) = self.call_context.delegate_as {
+            if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+                let current = state.vm_local_state.callstack.current;
+                if current.code_address.to_address() == self.call_context.contract {
+                    self.farcall_handler
+                        .set_action(CallDepth::current(), CallAction::SetThisAddress(delegate_as));
                 }
             }
         }
@@ -207,8 +233,12 @@ impl<S: WriteStorage + Send, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer 
         for action in self.farcall_handler.take_immediate_actions(state, bootloader_state) {
             match action {
                 CallAction::SetMessageSender(sender) => {
-                    tracing::info!("set msg.sender {sender:?}");
+                    tracing::info!(old=?state.local_state.callstack.current.msg_sender, new=?sender, "set msg.sender");
                     state.local_state.callstack.current.msg_sender = sender.to_h160();
+                }
+                CallAction::SetThisAddress(addr) => {
+                    tracing::info!(old=?state.local_state.callstack.current.this_address, new=?addr, "set address(this)");
+                    state.local_state.callstack.current.this_address = addr.to_h160();
                 }
             }
         }
