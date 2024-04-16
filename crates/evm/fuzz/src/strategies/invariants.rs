@@ -105,7 +105,13 @@ fn select_random_sender(
         ),
     ])
     // Too many exclusions can slow down testing.
-    .prop_filter("senders not allowed", move |addr| !senders_ref.excluded.contains(addr))
+    .prop_filter("senders not allowed", move |addr| {
+        // TODO: Make this depended on the --zksync flag
+        // As of now this will exclude address < 2^16 also for evm fuzz tests
+        !senders_ref.excluded.contains(addr) &&
+            !foundry_zksync_core::is_system_address(*addr) &&
+            addr != &foundry_evm_core::constants::CHEATCODE_ADDRESS
+    })
     .boxed();
     if !senders.targeted.is_empty() {
         any::<prop::sample::Selector>()
