@@ -150,7 +150,7 @@ impl CreateArgs {
 
             let mut factory_deps = dual_compiled_contracts.fetch_all_factory_deps(contract);
 
-            //for manual specified factory deps
+            // for manual specified factory deps
             for mut contract in std::mem::take(&mut self.factory_deps) {
                 if let Some(path) = contract.path.as_mut() {
                     *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();

@@ -117,10 +117,9 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     }
 
     fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
-        self.persisted_factory_deps
-            .get(&hash)
-            .cloned()
-            .or_else(|| self.storage_handle.load_factory_dep(hash))
+        self.storage_handle
+            .load_factory_dep(hash)
+            .or_else(|| self.persisted_factory_deps.get(&hash).cloned())
     }
 
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {

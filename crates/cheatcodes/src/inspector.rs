@@ -1582,12 +1582,8 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             .unwrap_or_else(|| {
                                 panic!("failed finding contract for {:?}", call.init_code)
                             });
-                        let factory_deps = self
-                            .dual_compiled_contracts
-                            .fetch_all_factory_deps(contract)
-                            .into_iter()
-                            .map(|bc| bc.to_vec())
-                            .collect();
+                        let factory_deps =
+                            self.dual_compiled_contracts.fetch_all_factory_deps(contract);
 
                         let constructor_input =
                             call.init_code[contract.evm_bytecode.len()..].to_vec();
