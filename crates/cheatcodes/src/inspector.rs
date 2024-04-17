@@ -246,7 +246,7 @@ pub struct Cheatcodes {
     /// would be a significant refactor, we maintain the factory_dep part in the [Cheatcodes].
     /// This can be done as each test runs with its own [Cheatcodes] instance, thereby
     /// providing the necessary level of isolation.
-    persisted_factory_deps: HashMap<H256, Vec<u8>>,
+    pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 impl Cheatcodes {
