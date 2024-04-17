@@ -103,8 +103,7 @@ pub fn build_initial_state<DB: DatabaseRef>(
     config: &FuzzDictionaryConfig,
     no_zksync_reserved_addresses: bool,
 ) -> EvmFuzzState {
-    let mut state = FuzzDictionary::default();
-    state.no_zksync_reserved_addresses = no_zksync_reserved_addresses;
+    let mut state = FuzzDictionary { no_zksync_reserved_addresses, ..Default::default() };
 
     for (address, account) in db.accounts.iter() {
         let address: Address = *address;
