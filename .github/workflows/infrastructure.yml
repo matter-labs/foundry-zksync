@@ -1,4 +1,4 @@
-name: Run Aave Delivery Infrastructure tests
+name: Infrastructure tests
 
 on:
     push:
@@ -26,14 +26,13 @@ jobs:
         with:
             toolchain: nightly-2024-02-06
 
-      - name: Build
-        run: cargo build --release
+      - name: Build forge binary
+        run: cargo build --release --bin forge
 
       - name: Clone Aave Delivery Infrastructure
-        run: git clone https://github.com/Moonsong-Labs/aave-delivery-infrastructure.git
+        run: git clone https://github.com/Moonsong-Labs/aave-delivery-infrastructure.git --depth=1 -b feat/zksync
 
       - name: Run tests using built binary
         run: |
           cd aave-delivery-infrastructure
-          git checkout feat/zksync
           ../target/release/forge test --zksync --avoid-contracts "*/PayloadScripts.t.sol"
