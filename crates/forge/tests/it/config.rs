@@ -130,6 +130,7 @@ pub fn test_opts() -> TestOptions {
                 max_fuzz_dictionary_addresses: 10_000,
                 max_fuzz_dictionary_values: 10_000,
             },
+            no_zksync_reserved_addresses: false,
         })
         .invariant(InvariantConfig {
             runs: 256,

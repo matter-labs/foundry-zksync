@@ -10,11 +10,21 @@ const MAX_ARRAY_LEN: usize = 256;
 /// Given a parameter type, returns a strategy for generating values for that type.
 ///
 /// Works with ABI Encoder v2 tuples.
-pub fn fuzz_param(param: &DynSolType) -> BoxedStrategy<DynSolValue> {
+pub fn fuzz_param(
+    param: &DynSolType,
+    no_zksync_reserved_addresses: bool,
+) -> BoxedStrategy<DynSolValue> {
     let param = param.to_owned();
     match param {
         DynSolType::Address => any::<[u8; 32]>()
-            .prop_map(|x| DynSolValue::Address(Address::from_word(x.into())))
+            .prop_map(move |x| {
+                let addr = Address::from_word(x.into());
+                if no_zksync_reserved_addresses {
+                    DynSolValue::Address(foundry_zksync_core::to_safe_address(addr))
+                } else {
+                    DynSolValue::Address(addr)
+                }
+            })
             .boxed(),
         DynSolType::Int(n) => {
             let strat = super::IntStrategy::new(n, vec![]);
@@ -48,15 +58,23 @@ pub fn fuzz_param(param: &DynSolType) -> BoxedStrategy<DynSolValue> {
                 )
             })
             .boxed(),
-        DynSolType::Tuple(params) => {
-            params.iter().map(fuzz_param).collect::<Vec<_>>().prop_map(DynSolValue::Tuple).boxed()
+        DynSolType::Tuple(params) => params
+            .iter()
+            .map(|p| fuzz_param(p, no_zksync_reserved_addresses))
+            .collect::<Vec<_>>()
+            .prop_map(DynSolValue::Tuple)
+            .boxed(),
+        DynSolType::FixedArray(param, size) => {
+            proptest::collection::vec(fuzz_param(&param, no_zksync_reserved_addresses), size)
+                .prop_map(DynSolValue::FixedArray)
+                .boxed()
         }
-        DynSolType::FixedArray(param, size) => proptest::collection::vec(fuzz_param(&param), size)
-            .prop_map(DynSolValue::FixedArray)
-            .boxed(),
-        DynSolType::Array(param) => proptest::collection::vec(fuzz_param(&param), 0..MAX_ARRAY_LEN)
-            .prop_map(DynSolValue::Array)
-            .boxed(),
+        DynSolType::Array(param) => proptest::collection::vec(
+            fuzz_param(&param, no_zksync_reserved_addresses),
+            0..MAX_ARRAY_LEN,
+        )
+        .prop_map(DynSolValue::Array)
+        .boxed(),
         DynSolType::CustomStruct { .. } => panic!("unsupported type"),
     }
 }
@@ -74,6 +92,8 @@ pub fn fuzz_param_from_state(
 
     // Select a value from the state
     let st = arc_state.clone();
+    let no_zksync_reserved_addresses = st.read().no_zksync_reserved_addresses();
+
     let value = any::<prop::sample::Index>()
         .prop_map(move |index| index.index(state_len))
         .prop_map(move |index| *st.read().values().iter().nth(index).unwrap());
@@ -82,7 +102,14 @@ pub fn fuzz_param_from_state(
     // Convert the value based on the parameter type
     match param {
         DynSolType::Address => value
-            .prop_map(move |value| DynSolValue::Address(Address::from_word(value.into())))
+            .prop_map(move |value| {
+                let addr = Address::from_word(value.into());
+                if no_zksync_reserved_addresses {
+                    DynSolValue::Address(foundry_zksync_core::to_safe_address(addr))
+                } else {
+                    DynSolValue::Address(addr)
+                }
+            })
             .boxed(),
         DynSolType::FixedBytes(size) => value
             .prop_map(move |v| {

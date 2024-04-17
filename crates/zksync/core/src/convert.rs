@@ -102,6 +102,9 @@ impl ConvertH160 for H160 {
 
 /// Conversions from [Address]
 pub trait ConvertAddress {
+    /// Convert to [rU256]
+    fn to_ru256(self) -> rU256;
+
     /// Convert to [H256]
     fn to_h256(self) -> H256;
 
@@ -110,6 +113,12 @@ pub trait ConvertAddress {
 }
 
 impl ConvertAddress for Address {
+    fn to_ru256(self) -> rU256 {
+        let mut buffer = [0u8; 32];
+        buffer[12..].copy_from_slice(self.as_slice());
+        rU256::from_be_bytes(buffer)
+    }
+
     fn to_h256(self) -> H256 {
         let mut buffer = [0u8; 32];
         buffer[12..].copy_from_slice(self.as_slice());
