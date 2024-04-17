@@ -90,10 +90,11 @@ fn select_random_sender(
     dictionary_weight: u32,
 ) -> BoxedStrategy<Address> {
     let senders_ref = senders.clone();
+    let no_zksync_reserved_addresses = fuzz_state.read().no_zksync_reserved_addresses();
     let fuzz_strategy = proptest::strategy::Union::new_weighted(vec![
         (
             100 - dictionary_weight,
-            fuzz_param(&alloy_dyn_abi::DynSolType::Address)
+            fuzz_param(&alloy_dyn_abi::DynSolType::Address, no_zksync_reserved_addresses)
                 .prop_map(move |addr| addr.as_address().unwrap())
                 .boxed(),
         ),
@@ -168,12 +169,13 @@ pub fn fuzz_contract_with_calldata(
     contract: Address,
     func: Function,
 ) -> impl Strategy<Value = (Address, Bytes)> {
+    let no_zksync_reserved_addresses = fuzz_state.read().no_zksync_reserved_addresses();
     // We need to compose all the strategies generated for each parameter in all
     // possible combinations
     // `prop_oneof!` / `TupleUnion` `Arc`s for cheap cloning
     #[allow(clippy::arc_with_non_send_sync)]
     let strats = prop_oneof![
-        60 => fuzz_calldata(func.clone()),
+        60 => fuzz_calldata(func.clone(), no_zksync_reserved_addresses),
         40 => fuzz_calldata_from_state(func, fuzz_state),
     ];
     strats.prop_map(move |calldata| {

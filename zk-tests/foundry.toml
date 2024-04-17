@@ -4,6 +4,9 @@ out = 'out'
 libs = ['lib']
 fs_permissions = [{ access = "read", path = "./zkout/ConstantNumber.sol/artifacts.json"}]
 
+[fuzz]
+no_zksync_reserved_addresses = true
+
 [rpc_endpoints]
 local = "${ERA_TEST_NODE_RPC_URL}"
 mainnet = "https://mainnet.era.zksync.io:443"

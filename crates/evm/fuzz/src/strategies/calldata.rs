@@ -6,13 +6,15 @@ use proptest::prelude::{BoxedStrategy, Strategy};
 
 /// Given a function, it returns a strategy which generates valid calldata
 /// for that function's input types.
-pub fn fuzz_calldata(func: Function) -> BoxedStrategy<Bytes> {
+pub fn fuzz_calldata(func: Function, no_zksync_reserved_addresses: bool) -> BoxedStrategy<Bytes> {
     // We need to compose all the strategies generated for each parameter in all
     // possible combinations
     let strats = func
         .inputs
         .iter()
-        .map(|input| fuzz_param(&input.selector_type().parse().unwrap()))
+        .map(|input| {
+            fuzz_param(&input.selector_type().parse().unwrap(), no_zksync_reserved_addresses)
+        })
         .collect::<Vec<_>>();
 
     strats

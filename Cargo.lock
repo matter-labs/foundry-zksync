@@ -4801,6 +4801,7 @@ dependencies = [
  "foundry-evm-core",
  "foundry-evm-coverage",
  "foundry-evm-traces",
+ "foundry-zksync-core",
  "hashbrown 0.14.3",
  "itertools 0.11.0",
  "parking_lot 0.12.1",

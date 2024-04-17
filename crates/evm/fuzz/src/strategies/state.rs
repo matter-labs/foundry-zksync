@@ -27,6 +27,8 @@ pub struct FuzzDictionary {
     state_values: HashSet<[u8; 32]>,
     /// Addresses that already had their PUSH bytes collected.
     addresses: HashSet<Address>,
+    /// Avoid addresses less than 2^16 as they are reserved in zkSync space.
+    no_zksync_reserved_addresses: bool,
 }
 
 impl fmt::Debug for FuzzDictionary {
@@ -34,6 +36,7 @@ impl fmt::Debug for FuzzDictionary {
         f.debug_struct("FuzzDictionary")
             .field("state_values", &self.state_values.len())
             .field("addresses", &self.addresses)
+            .field("no_zksync_reserved_addresses", &self.no_zksync_reserved_addresses)
             .finish()
     }
 }
@@ -57,6 +60,11 @@ impl FuzzDictionary {
     #[inline]
     pub fn addresses_mut(&mut self) -> &mut HashSet<Address> {
         &mut self.addresses
+    }
+
+    #[inline]
+    pub fn no_zksync_reserved_addresses(&self) -> bool {
+        self.no_zksync_reserved_addresses
     }
 }
 
@@ -93,13 +101,16 @@ pub fn fuzz_calldata_from_state(func: Function, state: EvmFuzzState) -> BoxedStr
 pub fn build_initial_state<DB: DatabaseRef>(
     db: &CacheDB<DB>,
     config: &FuzzDictionaryConfig,
+    no_zksync_reserved_addresses: bool,
 ) -> EvmFuzzState {
-    let mut state = FuzzDictionary::default();
+    let mut state = FuzzDictionary { no_zksync_reserved_addresses, ..Default::default() };
 
     for (address, account) in db.accounts.iter() {
         let address: Address = *address;
+        let val = address.into_word().into();
         // Insert basic account information
-        state.values_mut().insert(address.into_word().into());
+        // state.values_mut().insert(address.into_word().into());
+        state.values_mut().insert(val);
 
         // Insert push bytes
         if config.include_push_bytes {

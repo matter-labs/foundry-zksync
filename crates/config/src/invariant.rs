@@ -28,6 +28,8 @@ pub struct InvariantConfig {
     pub shrink_sequence: bool,
     /// The maximum number of attempts to shrink the sequence
     pub shrink_run_limit: usize,
+    /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
+    pub no_zksync_reserved_addresses: bool,
 }
 
 impl Default for InvariantConfig {
@@ -40,6 +42,7 @@ impl Default for InvariantConfig {
             dictionary: FuzzDictionaryConfig { dictionary_weight: 80, ..Default::default() },
             shrink_sequence: true,
             shrink_run_limit: 2usize.pow(18_u32),
+            no_zksync_reserved_addresses: false,
         }
     }
 }
@@ -68,6 +71,9 @@ impl InlineConfigParser for InvariantConfig {
                 "fail-on-revert" => conf_clone.fail_on_revert = parse_config_bool(key, value)?,
                 "call-override" => conf_clone.call_override = parse_config_bool(key, value)?,
                 "shrink-sequence" => conf_clone.shrink_sequence = parse_config_bool(key, value)?,
+                "no-zksync-reserved-addresses" => {
+                    conf_clone.no_zksync_reserved_addresses = parse_config_bool(key, value)?
+                }
                 _ => Err(InlineConfigParserError::InvalidConfigProperty(key.to_string()))?,
             }
         }
