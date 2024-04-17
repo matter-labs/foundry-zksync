@@ -85,6 +85,8 @@ Ensure you have the necessary tools and environments set up for development:
    Then, set the path to GNU `make`:
 
    ```sh
+   # For x86_64 MacOs users:
+   # export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
    export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
    ```
 
