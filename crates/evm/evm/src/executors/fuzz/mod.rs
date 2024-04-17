@@ -82,7 +82,10 @@ impl FuzzedExecutor {
         let mut weights = vec![];
         let dictionary_weight = self.config.dictionary.dictionary_weight.min(100);
         if self.config.dictionary.dictionary_weight < 100 {
-            weights.push((100 - dictionary_weight, fuzz_calldata(func.clone())));
+            weights.push((
+                100 - dictionary_weight,
+                fuzz_calldata(func.clone(), state.read().no_zksync_reserved_addresses()),
+            ));
         }
         if dictionary_weight > 0 {
             weights.push((
@@ -247,9 +250,17 @@ impl FuzzedExecutor {
     /// Stores fuzz state for use with [fuzz_calldata_from_state]
     pub fn build_fuzz_state(&self) -> EvmFuzzState {
         if let Some(fork_db) = self.executor.backend.active_fork_db() {
-            build_initial_state(fork_db, &self.config.dictionary)
+            build_initial_state(
+                fork_db,
+                &self.config.dictionary,
+                self.config.no_zksync_reserved_addresses,
+            )
         } else {
-            build_initial_state(self.executor.backend.mem_db(), &self.config.dictionary)
+            build_initial_state(
+                self.executor.backend.mem_db(),
+                &self.config.dictionary,
+                self.config.no_zksync_reserved_addresses,
+            )
         }
     }
 }

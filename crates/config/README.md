@@ -185,6 +185,7 @@ seed = '0x3e8'
 dictionary_weight = 40
 include_storage = true
 include_push_bytes = true
+no_zksync_reserved_addresses = true
 
 [invariant]
 runs = 256
@@ -195,6 +196,7 @@ dictionary_weight = 80
 include_storage = true
 include_push_bytes = true
 shrink_sequence = true
+no_zksync_reserved_addresses = true
 
 [fmt]
 line_length = 100
