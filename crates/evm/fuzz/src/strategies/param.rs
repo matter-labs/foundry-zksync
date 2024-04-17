@@ -202,9 +202,9 @@ mod tests {
         let f = "testArray(uint64[2] calldata values)";
         let func = get_func(f).unwrap();
         let db = CacheDB::new(EmptyDB::default());
-        let state = build_initial_state(&db, &FuzzDictionaryConfig::default());
+        let state = build_initial_state(&db, &FuzzDictionaryConfig::default(), false);
         let strat = proptest::strategy::Union::new_weighted(vec![
-            (60, fuzz_calldata(func.clone())),
+            (60, fuzz_calldata(func.clone(), false)),
             (40, fuzz_calldata_from_state(func, state)),
         ]);
         let cfg = proptest::test_runner::Config { failure_persistence: None, ..Default::default() };
