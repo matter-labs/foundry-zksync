@@ -1194,26 +1194,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             }
 
             info!("running call in zk vm {:#?}", call);
-
-            let code_hash = data
-                .journaled_state
-                .load_account(call.contract, data.db)
-                .map(|(account, _)| account.info.code_hash)
-                .unwrap_or_default();
-
-            let contract = if code_hash != KECCAK_EMPTY {
-                self.dual_compiled_contracts
-                    .find_by_zk_bytecode_hash(zksync_types::H256::from(code_hash.0))
-            } else {
-                None
-            };
-
-            if let Some(contract) = contract {
-                tracing::debug!(contract = contract.name, "using dual compiled contract");
-            } else {
-                error!("no zk contract was found for {code_hash:?}");
-            }
-
             let persisted_factory_deps = self.persisted_factory_deps.clone();
 
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {

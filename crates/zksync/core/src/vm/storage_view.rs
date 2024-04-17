@@ -25,11 +25,6 @@ pub(crate) struct StorageView<S> {
     pub(crate) read_storage_keys: HashMap<StorageKey, StorageValue>,
     /// Cache for `contains_key()` checks. The cache is only valid within one L1 batch execution.
     initial_writes_cache: HashMap<StorageKey, bool>,
-    /// Simulates factory deps being persisted across transactions.
-    /// Since the [revm::JournaledState] storage lacks the necessary provisions
-    /// for storing factory_deps, we maintain them separately and pass it
-    /// when creating a [StorageView].
-    persisted_factory_deps: HashMap<H256, Vec<u8>>,
     /// The tx caller.
     caller: H160,
 }
@@ -40,14 +35,12 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
         storage_handle: S,
         modified_storage_keys: HashMap<StorageKey, StorageValue>,
         caller: H160,
-        persisted_factory_deps: HashMap<H256, Vec<u8>>,
     ) -> Self {
         Self {
             storage_handle,
             modified_storage_keys,
             read_storage_keys: HashMap::new(),
             initial_writes_cache: HashMap::new(),
-            persisted_factory_deps,
             caller,
         }
     }
@@ -117,10 +110,7 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     }
 
     fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
-        self.persisted_factory_deps
-            .get(&hash)
-            .cloned()
-            .or_else(|| self.storage_handle.load_factory_dep(hash))
+        self.storage_handle.load_factory_dep(hash)
     }
 
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
@@ -168,12 +158,8 @@ mod test {
         let key = StorageKey::new(account, key);
 
         let mut raw_storage = InMemoryStorage::default();
-        let mut storage_view = StorageView::new(
-            &raw_storage,
-            Default::default(),
-            Default::default(),
-            Default::default(),
-        );
+        let mut storage_view =
+            StorageView::new(&raw_storage, Default::default(), Default::default());
 
         let default_value = storage_view.read_value(&key);
         assert_eq!(default_value, H256::zero());
@@ -184,12 +170,8 @@ mod test {
         assert!(storage_view.is_write_initial(&key)); // key was inserted during the view lifetime
 
         raw_storage.set_value(key, value);
-        let mut storage_view = StorageView::new(
-            &raw_storage,
-            Default::default(),
-            Default::default(),
-            Default::default(),
-        );
+        let mut storage_view =
+            StorageView::new(&raw_storage, Default::default(), Default::default());
 
         assert_eq!(storage_view.read_value(&key), value);
         assert!(!storage_view.is_write_initial(&key)); // `key` is present in `raw_storage`

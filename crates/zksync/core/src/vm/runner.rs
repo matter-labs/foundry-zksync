@@ -287,7 +287,9 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state);
+    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state)
+        .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps));
+
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
     tracing::info!(?call_ctx, "executing transaction in zk vm");
 
@@ -305,13 +307,9 @@ where
     }
 
     let modified_storage_keys = era_db.override_keys.clone();
-    let storage_ptr = StorageView::new(
-        &mut era_db,
-        modified_storage_keys,
-        tx.common_data.initiator_address,
-        std::mem::take(&mut ccx.persisted_factory_deps),
-    )
-    .into_rc_ptr();
+    let storage_ptr =
+        StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
+            .into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) = inspect_inner(
         tx,
         storage_ptr,

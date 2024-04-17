@@ -48,6 +48,7 @@ where
 {
     /// Create a new instance of [ZKEVMData].
     pub fn new(db: &'a mut DB, journaled_state: &'a mut JournaledState) -> Self {
+        // this will load all modified contracts and their bytecodes
         let mut factory_deps =
             journaled_state
                 .state
@@ -155,6 +156,12 @@ where
             .load_account(address, self.db)
             .expect("account could not be loaded");
         account
+    }
+
+    /// Adds the given factory deps to the internal collection
+    pub fn with_extra_factory_deps(mut self, extra_factory_deps: HashMap<H256, Vec<u8>>) -> Self {
+        self.factory_deps.extend(extra_factory_deps);
+        self
     }
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
