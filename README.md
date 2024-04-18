@@ -62,6 +62,8 @@ For the most effective use of our library, we recommend familiarizing yourself w
 
 Follow these steps to quickly install the binaries for `foundry-zksync`:
 
+**Note:** This installation overrides any existing forge and cast binaries in ~/.foundry. You can use forge without the --zksync flag for standard EVM chains. To revert to a previous installation, follow the instructions [here](https://book.getfoundry.sh/getting-started/installation#using-foundryup).
+
 1. **Clone the Repository**:
    Begin by cloning the `foundry-zksync` repository from GitHub. This will download the latest version of the source code to your local machine.
 
