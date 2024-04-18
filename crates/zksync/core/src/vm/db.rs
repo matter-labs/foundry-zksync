@@ -11,7 +11,7 @@ use std::{
 };
 
 use alloy_primitives::Address;
-use foundry_common::{types::ToAlloy};
+use foundry_common::types::ToAlloy;
 use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
