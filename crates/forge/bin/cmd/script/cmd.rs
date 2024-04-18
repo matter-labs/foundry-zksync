@@ -19,7 +19,7 @@ use foundry_compilers::{
 use foundry_debugger::Debugger;
 use foundry_evm::inspectors::cheatcodes::{BroadcastableTransaction, ScriptWallets};
 use foundry_wallets::WalletSigner;
-use foundry_zksync_compiler::DualCompiledContract;
+use foundry_zksync_compiler::DualCompiledContracts;
 use std::{collections::HashMap, sync::Arc};
 
 /// Helper alias type for the collection of data changed due to the new sender.
@@ -159,7 +159,7 @@ impl ScriptArgs {
         predeploy_libraries: Vec<Bytes>,
         result: &mut ScriptResult,
         script_wallets: ScriptWallets,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<Option<NewSenderChanges>> {
         if let Some(new_sender) = self.maybe_new_sender(
             &script_config.evm_opts,
@@ -332,7 +332,7 @@ impl ScriptArgs {
         first_run_result: &mut ScriptResult,
         linker: Linker,
         script_wallets: ScriptWallets,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<(Libraries, ArtifactContracts<ContractBytecodeSome>)> {
         // if we had a new sender that requires relinking, we need to
         // get the nonce mainnet for accurate addresses for predeploy libs

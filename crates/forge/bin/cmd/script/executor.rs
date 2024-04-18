@@ -18,7 +18,7 @@ use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
 use foundry_common::{get_contract_name, provider::ethers::RpcUrl, shell, ContractsByArtifact};
 use foundry_compilers::artifacts::ContractBytecodeSome;
 use foundry_evm::inspectors::cheatcodes::ScriptWallets;
-use foundry_zksync_compiler::DualCompiledContract;
+use foundry_zksync_compiler::DualCompiledContracts;
 use futures::future::join_all;
 use parking_lot::RwLock;
 use std::{
@@ -36,7 +36,7 @@ impl ScriptArgs {
         sender: Address,
         predeploy_libraries: &[Bytes],
         script_wallets: ScriptWallets,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<ScriptResult> {
         trace!(target: "script", "start executing script");
 
@@ -104,7 +104,7 @@ impl ScriptArgs {
         script_config: &ScriptConfig,
         decoder: &CallTraceDecoder,
         contracts: &ContractsByArtifact,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<VecDeque<TransactionWithMetadata>> {
         trace!(target: "script", "executing onchain simulation");
 
@@ -253,7 +253,7 @@ impl ScriptArgs {
     async fn build_runners(
         &self,
         script_config: &ScriptConfig,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<HashMap<RpcUrl, ScriptRunner>> {
         let sender = script_config.evm_opts.sender;
 
@@ -292,7 +292,7 @@ impl ScriptArgs {
         sender: Address,
         stage: SimulationStage,
         script_wallets: Option<ScriptWallets>,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<ScriptRunner> {
         trace!("preparing script runner");
         let env = script_config.evm_opts.evm_env().await?;

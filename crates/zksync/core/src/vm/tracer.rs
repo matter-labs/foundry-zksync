@@ -44,6 +44,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub recorded_reads: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
     /// Recorded writes
     pub recorded_writes: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
+    /// Factory deps that were persisted across calls
+    pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 /// Tracer result to return back to foundry.

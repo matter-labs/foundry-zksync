@@ -18,7 +18,7 @@ use foundry_evm::{
     traces::{render_trace_arena, CallTraceDecoderBuilder},
 };
 use foundry_test_utils::{init_tracing, Filter};
-use foundry_zksync_compiler::{DualCompiledContract, PackedEraBytecode};
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts, PackedEraBytecode};
 use futures::future::join_all;
 use itertools::Itertools;
 use std::{
@@ -130,6 +130,7 @@ pub fn test_opts() -> TestOptions {
                 max_fuzz_dictionary_addresses: 10_000,
                 max_fuzz_dictionary_values: 10_000,
             },
+            no_zksync_reserved_addresses: false,
         })
         .invariant(InvariantConfig {
             runs: 256,
@@ -145,6 +146,7 @@ pub fn test_opts() -> TestOptions {
             },
             shrink_sequence: true,
             shrink_run_limit: 2usize.pow(18u32),
+            no_zksync_reserved_addresses: false,
         })
         .build(&COMPILED, &PROJECT.paths.root)
         .expect("Config loaded")
@@ -208,7 +210,7 @@ pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunne
     let zk_output = COMPILED_ZK.clone();
 
     // Dual compiled contracts
-    let mut dual_compiled_contracts = vec![];
+    let mut dual_compiled_contracts = DualCompiledContracts::default();
     let mut solc_bytecodes = HashMap::new();
     for (contract_name, artifact) in output.artifacts() {
         let contract_name =
@@ -240,6 +242,7 @@ pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunne
                     name: contract_name,
                     zk_bytecode_hash: packed_bytecode.bytecode_hash(),
                     zk_deployed_bytecode: packed_bytecode.bytecode(),
+                    zk_factory_deps: packed_bytecode.factory_deps(),
                     evm_bytecode_hash: keccak256(solc_deployed_bytecode),
                     evm_bytecode: solc_bytecode.to_vec(),
                     evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),

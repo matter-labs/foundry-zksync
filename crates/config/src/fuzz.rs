@@ -1,7 +1,8 @@
 //! Configuration for fuzz testing.
 
 use crate::inline::{
-    parse_config_u32, InlineConfigParser, InlineConfigParserError, INLINE_CONFIG_FUZZ_KEY,
+    parse_config_bool, parse_config_u32, InlineConfigParser, InlineConfigParserError,
+    INLINE_CONFIG_FUZZ_KEY,
 };
 use alloy_primitives::U256;
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,8 @@ pub struct FuzzConfig {
     /// The fuzz dictionary configuration
     #[serde(flatten)]
     pub dictionary: FuzzDictionaryConfig,
+    /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
+    pub no_zksync_reserved_addresses: bool,
 }
 
 impl Default for FuzzConfig {
@@ -31,6 +34,7 @@ impl Default for FuzzConfig {
             max_test_rejects: 65536,
             seed: None,
             dictionary: FuzzDictionaryConfig::default(),
+            no_zksync_reserved_addresses: false,
         }
     }
 }
@@ -58,6 +62,9 @@ impl InlineConfigParser for FuzzConfig {
                 "max-test-rejects" => conf_clone.max_test_rejects = parse_config_u32(key, value)?,
                 "dictionary-weight" => {
                     conf_clone.dictionary.dictionary_weight = parse_config_u32(key, value)?
+                }
+                "no-zksync-reserved-addresses" => {
+                    conf_clone.no_zksync_reserved_addresses = parse_config_bool(key, value)?
                 }
                 _ => Err(InlineConfigParserError::InvalidConfigProperty(key))?,
             }
