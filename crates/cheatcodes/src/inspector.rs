@@ -46,7 +46,6 @@ use revm::{
 };
 use serde_json::Value;
 use std::{
-    borrow::BorrowMut,
     collections::{BTreeMap, HashMap, VecDeque},
     fs::File,
     io::BufReader,
@@ -1285,7 +1284,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 }
             }
         }
-        println!("accesses {:?}", self.accesses);
 
         (InstructionResult::Continue, gas, Bytes::new())
     }
