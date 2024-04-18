@@ -30,9 +30,7 @@ use foundry_compilers::{
     utils::canonicalized,
 };
 use foundry_wallets::WalletSigner;
-use foundry_zksync_compiler::{
-    new_dual_compiled_contracts, DualCompiledContract, FindContract, ZkSolc,
-};
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts, ZkSolc};
 use serde_json::json;
 use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
 
@@ -123,7 +121,7 @@ impl CreateArgs {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
-        let dual_compiled_contracts = new_dual_compiled_contracts(&output, &zk_output);
+        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
 
         if let Some(ref mut path) = self.contract.path {
             // paths are absolute in the project's output
@@ -136,11 +134,12 @@ impl CreateArgs {
             let contract = bin
                 .object
                 .as_bytes()
-                .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
+                .and_then(|bytes| dual_compiled_contracts.find_by_evm_bytecode(&bytes.0))
                 .ok_or(eyre::eyre!(
                     "Could not find zksolc contract for contract {}",
                     self.contract.name
                 ))?;
+
             let zk_bin = CompactBytecode {
                 object: BytecodeObject::Bytecode(Bytes::from(
                     contract.zk_deployed_bytecode.clone(),
@@ -149,8 +148,9 @@ impl CreateArgs {
                 source_map: Default::default(),
             };
 
-            let mut factory_deps = Vec::with_capacity(self.factory_deps.len());
+            let mut factory_deps = dual_compiled_contracts.fetch_all_factory_deps(contract);
 
+            // for manual specified factory deps
             for mut contract in std::mem::take(&mut self.factory_deps) {
                 if let Some(path) = contract.path.as_mut() {
                     *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
@@ -163,16 +163,27 @@ impl CreateArgs {
                 let zk = bin
                     .object
                     .as_bytes()
-                    .and_then(|bytes| dual_compiled_contracts.find_evm_bytecode(&bytes.0))
+                    .and_then(|bytes| dual_compiled_contracts.find_by_evm_bytecode(&bytes.0))
                     .ok_or(eyre::eyre!(
                         "Could not find zksolc contract for contract {}",
                         contract.name
                     ))?;
 
-                factory_deps.push(zk.zk_deployed_bytecode.clone());
+                // if the dep isn't already present,
+                // fetch all deps and add them to the final list
+                if !factory_deps.contains(&zk.zk_deployed_bytecode) {
+                    let additional_factory_deps =
+                        dual_compiled_contracts.fetch_all_factory_deps(zk);
+                    factory_deps.extend(additional_factory_deps);
+                    factory_deps.dedup();
+                }
             }
 
-            (abi, zk_bin, Some((contract, factory_deps)))
+            (
+                abi,
+                zk_bin,
+                Some((contract, factory_deps.into_iter().map(|bc| bc.to_vec()).collect())),
+            )
         } else {
             (abi, bin, None)
         };
@@ -297,16 +308,7 @@ impl CreateArgs {
         let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone());
 
         let is_args_empty = args.is_empty();
-        let (zk_contract, factory_deps) = match zk_data {
-            Some((zk_contract, mut factory_deps)) => {
-                //add this contract to the list of factory deps
-                factory_deps.push(zk_contract.zk_deployed_bytecode.clone());
-                (Some(zk_contract), factory_deps)
-            }
-            None => (None, vec![]),
-        };
-
-        let deployer = if let Some(contract) = zk_contract {
+        let deployer = if let Some((contract, factory_deps)) = &zk_data {
             factory.deploy_tokens_zk(args.clone(), contract).context("failed to deploy contract")
                 .map(|deployer| deployer.set_zk_factory_deps(factory_deps.clone()))
         } else {
@@ -328,9 +330,9 @@ impl CreateArgs {
             deployer.tx.set_value(value.to_ethers());
         }
 
-        match zk_contract {
+        match zk_data {
             None => provider.fill_transaction(&mut deployer.tx, None).await?,
-            Some(contract) => {
+            Some((contract, factory_deps)) => {
                 let chain_id = provider.get_chainid().await?.as_u64();
                 deployer.tx.set_chain_id(chain_id);
 
@@ -358,9 +360,12 @@ impl CreateArgs {
                     .tx
                     .set_to(NameOrAddress::from(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS));
 
-                let estimated_gas =
-                    foundry_zksync_core::estimate_gas(&deployer.tx, factory_deps, &provider)
-                        .await?;
+                let estimated_gas = foundry_zksync_core::estimate_gas(
+                    &deployer.tx,
+                    factory_deps.clone(),
+                    &provider,
+                )
+                .await?;
                 deployer.tx.set_gas(estimated_gas.limit.to_ethers());
                 deployer.tx.set_gas_price(estimated_gas.price.to_ethers());
             }

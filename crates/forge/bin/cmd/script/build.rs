@@ -11,7 +11,7 @@ use foundry_compilers::{
     info::ContractInfo,
     ArtifactId, Project, ProjectCompileOutput,
 };
-use foundry_zksync_compiler::{new_dual_compiled_contracts, DualCompiledContract, ZkSolc};
+use foundry_zksync_compiler::{DualCompiledContracts, ZkSolc};
 use std::str::FromStr;
 
 impl ScriptArgs {
@@ -46,7 +46,7 @@ impl ScriptArgs {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
-        let dual_compiled_contracts = new_dual_compiled_contracts(&output, &zk_output);
+        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
 
         let sources = ContractSources::from_project_output(&output, root)?;
         let contracts = output.into_artifacts().collect();
@@ -228,5 +228,5 @@ pub struct BuildOutput {
     pub libraries: Libraries,
     pub predeploy_libraries: Vec<Bytes>,
     pub sources: ContractSources,
-    pub dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+    pub dual_compiled_contracts: Option<DualCompiledContracts>,
 }

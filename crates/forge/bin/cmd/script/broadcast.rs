@@ -29,7 +29,7 @@ use foundry_common::{
 use foundry_compilers::{artifacts::Libraries, ArtifactId};
 use foundry_config::Config;
 use foundry_wallets::WalletSigner;
-use foundry_zksync_compiler::DualCompiledContract;
+use foundry_zksync_compiler::DualCompiledContracts;
 use futures::StreamExt;
 use std::{
     cmp::min,
@@ -317,7 +317,7 @@ impl ScriptArgs {
         mut script_config: ScriptConfig,
         verify: VerifyBundle,
         signers: &HashMap<Address, WalletSigner>,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<()> {
         if let Some(txs) = result.transactions.take() {
             script_config.collect_rpcs(&txs);
@@ -419,7 +419,7 @@ impl ScriptArgs {
         script_config: &mut ScriptConfig,
         decoder: &CallTraceDecoder,
         known_contracts: &ContractsByArtifact,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<Vec<ScriptSequence>> {
         if !txs.is_empty() {
             let gas_filled_txs = self
@@ -458,7 +458,7 @@ impl ScriptArgs {
         script_config: &ScriptConfig,
         decoder: &CallTraceDecoder,
         known_contracts: &ContractsByArtifact,
-        dual_compiled_contracts: Option<Vec<DualCompiledContract>>,
+        dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<VecDeque<TransactionWithMetadata>> {
         let gas_filled_txs = if self.skip_simulation {
             shell::println("\nSKIPPING ON CHAIN SIMULATION.")?;

@@ -8,7 +8,7 @@ use foundry_config::{
     ResolvedRpcEndpoints,
 };
 use foundry_evm_core::opts::EvmOpts;
-use foundry_zksync_compiler::DualCompiledContract;
+use foundry_zksync_compiler::DualCompiledContracts;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -42,7 +42,7 @@ pub struct CheatsConfig {
     /// Script wallets
     pub script_wallets: Option<ScriptWallets>,
     /// ZKSolc -> Solc Contract codes
-    pub dual_compiled_contracts: Vec<DualCompiledContract>,
+    pub dual_compiled_contracts: DualCompiledContracts,
     /// Use ZK-VM on startup
     pub use_zk: bool,
 }
@@ -53,7 +53,7 @@ impl CheatsConfig {
         config: &Config,
         evm_opts: EvmOpts,
         script_wallets: Option<ScriptWallets>,
-        dual_compiled_contracts: Vec<DualCompiledContract>,
+        dual_compiled_contracts: DualCompiledContracts,
         use_zk: bool,
     ) -> Self {
         let mut allowed_paths = vec![config.__root.0.clone()];
