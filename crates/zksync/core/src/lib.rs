@@ -19,7 +19,7 @@ pub mod vm;
 pub mod state;
 
 use alloy_primitives::{Address, Bytes, U256 as rU256};
-use convert::{ConvertAddress, ConvertH256, ConvertU256};
+use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 use eyre::{eyre, OptionExt};
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};
@@ -40,6 +40,9 @@ use zksync_web3_rs::{
 };
 
 type Result<T> = std::result::Result<T, eyre::Report>;
+
+/// The minimum possible address that is not reserved in the zkSync space.
+const MIN_VALID_ADDRESS: u32 = 2u32.pow(16);
 
 /// Returns the balance key for a provided account address.
 pub fn get_balance_key(address: Address) -> rU256 {
@@ -164,5 +167,20 @@ pub async fn estimate_gas<M: Middleware>(
 /// Returns true if the provided address is a reserved zkSync system address
 /// All addresses less than 2^16 are considered reserved addresses.
 pub fn is_system_address(address: Address) -> bool {
-    address.to_h256().to_ru256().lt(&rU256::from(2u128.pow(16)))
+    address.to_h256().to_ru256().lt(&rU256::from(MIN_VALID_ADDRESS))
+}
+
+/// Creates a safe address from the input address, by offsetting a reserved address
+/// byt [MIN_VALID_ADDRESS] so it is above the system reserved address space of 2^16.
+pub fn to_safe_address(address: Address) -> Address {
+    if is_system_address(address) {
+        address
+            .to_ru256()
+            .saturating_add(rU256::from(MIN_VALID_ADDRESS))
+            .to_h256()
+            .to_h160()
+            .to_address()
+    } else {
+        address
+    }
 }

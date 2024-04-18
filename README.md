@@ -21,6 +21,8 @@ To use for zkSync environments, include `--zksync` when running `forge` or `vm.z
    - zkSync VM processes the transaction and returns state changes, which are applied to `journaled_state`. Results are relayed back.
 5. **Logging:**
    - `console.log()` outputs within zkSync VM are captured and displayed in Foundry.
+6. **Fuzzing**
+   - Adds config option `no_zksync_reserved_addresses`. Since zkSync reserves addresses below 2^16 as system addresses, a fuzz test would've required a broad `vm.assume` and many `vm.excludeSender` calls to exclude these. This is not only cumbersome but could also trigger `proptest`'s global `max_global_rejects` failure. When this option is set to `true` the `proptest` generation itself ensures that no invalid addresses are generated, and thus need not be filtered adding up to the `max_test_rejects` count.
 
 ## 📊 Features & Limitations
 
@@ -54,9 +56,50 @@ While `foundry-zksync` is **alpha stage**, there are some limitations to be awar
 - **Contract Verification**: Currently contract verification via the `--verify` flag do not work as expected but will be added shortly.  
 - **Specific Foundry Features**: Currently features such as `--gas-report`, `--coverage` may not work as intended. We are actively working on providing support for these feature types.
 
-For the most effective use of our library, we recommend familiarizing yourself with these features and limitations. 
+For the most effective use of our library, we recommend familiarizing yourself with these features and limitations.
 
-## 📝 Prerequisites
+## Quick Install
+
+Follow these steps to quickly install the binaries for `foundry-zksync`:
+
+1. **Clone the Repository**:
+   Begin by cloning the `foundry-zksync` repository from GitHub. This will download the latest version of the source code to your local machine.
+
+   ```bash
+   git clone git@github.com:matter-labs/foundry-zksync.git
+   ```
+
+2. **Change Directory**:
+   Navigate into the directory where the repository has been cloned. This is where you will run the installation commands.
+
+   ```bash
+   cd foundry-zksync
+   ```
+
+3. **Make the Installer Executable**:
+   Before running the installation script, ensure it is executable. This step is crucial for allowing the script to run without permission issues.
+
+   ```bash
+   chmod +x ./install-foundry-zksync
+   ```
+
+4. **Run the Installer**:
+   Now, you're ready to execute the installation script. This command initializes the setup and installs `foundry-zksync` binaries `forge` and `cast`.
+
+   ```bash
+   ./install-foundry-zksync
+   ```
+
+5. **Verify the Installation** (Recommended):
+   After installation, it's good practice to verify that the binaries have been installed correctly. Run the following command to check the installed version:
+
+   ```bash
+   forge --version
+   ```
+
+This should return the installed version of `forge`, confirming that `foundry-zksync` is installed properly on your system.
+
+## 📝 Development Prerequisites
 
 Ensure you have the necessary tools and environments set up for development:
 
@@ -85,6 +128,8 @@ Ensure you have the necessary tools and environments set up for development:
    Then, set the path to GNU `make`:
 
    ```sh
+   # For x86_64 MacOs users:
+   # export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
    export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
    ```
 
