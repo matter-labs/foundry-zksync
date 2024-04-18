@@ -11,7 +11,7 @@ use std::{
 };
 
 use alloy_primitives::Address;
-use foundry_common::{provider::alloy, types::ToAlloy};
+use foundry_common::{types::ToAlloy};
 use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
@@ -199,7 +199,7 @@ where
     <DB as Database>::Error: Debug,
 {
     fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
-=       let address = key.address().to_address();
+        let address = key.address().to_address();
         let slot = h256_to_u256(*key.key());
         self.read_accesses.lock().unwrap().as_mut().map(|read_accesses| {
             read_accesses.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
