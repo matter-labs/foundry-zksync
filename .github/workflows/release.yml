@@ -4,6 +4,8 @@ on:
     push:
         tags:
             - "v*.*.*"
+    schedule:
+        - cron: "0 0 * * *" # Daily at midnight
     workflow_dispatch:
 
 env:
@@ -211,7 +213,7 @@ jobs:
               if: ${{ env.IS_NIGHTLY }}
               uses: softprops/action-gh-release@v1
               with:
-                  name: "Nightly"
+                  name: "Nightly foundry-zksync"
                   tag_name: "nightly"
                   prerelease: true
                   body: ${{ needs.prepare.outputs.changelog }}
