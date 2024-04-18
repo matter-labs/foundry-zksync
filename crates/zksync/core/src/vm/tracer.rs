@@ -41,9 +41,9 @@ pub struct CheatcodeTracerContext<'a> {
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
     /// Recorded reads
-    pub recorded_reads: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
+    pub recorded_reads: Arc<Mutex<Option<Access>>>,
     /// Recorded writes
-    pub recorded_writes: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
+    pub recorded_writes: Arc<Mutex<Option<Access>>>,
     /// Factory deps that were persisted across calls
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
@@ -53,6 +53,8 @@ pub struct CheatcodeTracerContext<'a> {
 pub struct CheatcodeTracerResult {
     pub expected_calls: ExpectedCallTracker,
 }
+
+pub type Access = HashMap<Address, Vec<rU256>>;
 
 /// Defines the context for a Vm call.
 #[derive(Debug, Default)]

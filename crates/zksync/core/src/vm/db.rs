@@ -25,6 +25,8 @@ use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
 
 use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 
+use super::tracer::Access;
+
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
 
@@ -33,7 +35,7 @@ pub struct ZKVMData<'a, DB> {
     pub journaled_state: &'a mut JournaledState,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: HashMap<StorageKey, StorageValue>,
-    pub read_accesses: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
+    pub read_accesses: Arc<Mutex<Option<Access>>>,
 }
 
 impl<'a, DB> Debug for ZKVMData<'a, DB> {
@@ -128,10 +130,7 @@ where
         Self { db, journaled_state, factory_deps, override_keys, read_accesses: Default::default() }
     }
 
-    pub fn with_read_accesses(
-        mut self,
-        read_accesses: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
-    ) -> Self {
+    pub fn with_read_accesses(mut self, read_accesses: Arc<Mutex<Option<Access>>>) -> Self {
         self.read_accesses = read_accesses;
         self
     }
@@ -201,9 +200,9 @@ where
     fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
         let address = key.address().to_address();
         let slot = h256_to_u256(*key.key());
-        self.read_accesses.lock().unwrap().as_mut().map(|read_accesses| {
+        if let Some(read_accesses) = self.read_accesses.lock().unwrap().as_mut() {
             read_accesses.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
-        });
+        }
         self.read_db(*key.address(), h256_to_u256(*key.key()))
     }
 
