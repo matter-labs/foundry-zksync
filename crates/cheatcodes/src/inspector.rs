@@ -46,12 +46,13 @@ use revm::{
 };
 use serde_json::Value;
 use std::{
+    borrow::BorrowMut,
     collections::{BTreeMap, HashMap, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
@@ -1207,9 +1208,14 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 error!("no zk contract was found for {code_hash:?}");
             }
 
+            let arc_recorded_reads = Arc::new(Mutex::new(Some(HashMap::new())));
+            let arc_recorded_writes = Arc::new(Mutex::new(Some(HashMap::new())));
+
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
+                recorded_reads: Arc::clone(&arc_recorded_reads),
+                recorded_writes: Arc::clone(&arc_recorded_writes),
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
                 call,
@@ -1222,6 +1228,42 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 return match result {
                     ExecutionResult::Success { output, logs, .. } => match output {
                         Output::Call(bytes) => {
+                            //populate self.accesses with the recorded reads
+                            if arc_recorded_reads.lock().unwrap().is_some() {
+                                if let Some(storage_accesses) = &mut self.accesses {
+                                    let mut recorded_reads = arc_recorded_reads.lock().unwrap();
+                                    if let Some(recorded_reads) = recorded_reads.take() {
+                                        for (address, keys) in recorded_reads {
+                                            for key in keys {
+                                                storage_accesses
+                                                    .reads
+                                                    .entry(address)
+                                                    .or_default()
+                                                    .push(key);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            //populate self.accesses with the recorded writes
+                            if arc_recorded_writes.lock().unwrap().is_some() {
+                                if let Some(storage_accesses) = &mut self.accesses {
+                                    let mut recorded_writes = arc_recorded_writes.lock().unwrap();
+                                    if let Some(recorded_writes) = recorded_writes.take() {
+                                        for (address, keys) in recorded_writes {
+                                            for key in keys {
+                                                storage_accesses
+                                                    .writes
+                                                    .entry(address)
+                                                    .or_default()
+                                                    .push(key);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             self.combined_logs.extend(logs.clone().into_iter().map(|log| {
                                 Some(Log {
                                     address: log.address,
@@ -1254,6 +1296,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 }
             }
         }
+        println!("accesses {:?}", self.accesses);
 
         (InstructionResult::Continue, gas, Bytes::new())
     }
@@ -1681,6 +1724,8 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
+                recorded_reads: Default::default(),
+                recorded_writes: Default::default(),
             };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
                 call,

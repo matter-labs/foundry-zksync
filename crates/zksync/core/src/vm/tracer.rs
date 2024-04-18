@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
@@ -40,6 +40,10 @@ pub struct CheatcodeTracerContext<'a> {
     pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
+    /// Recorded reads
+    pub recorded_reads: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
+    /// Recorded writes
+    pub recorded_writes: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
 }
 
 /// Tracer result to return back to foundry.

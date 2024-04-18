@@ -13,8 +13,8 @@ use era_test_node::{
     utils::bytecode_to_factory_dep,
 };
 use foundry_common::{
-    console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
-    HardhatConsole,
+    console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, types::ToAlloy,
+    Console, HardhatConsole,
 };
 use foundry_zksync_compiler::DualCompiledContract;
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
@@ -293,7 +293,8 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state);
+    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state)
+        .with_read_accesses(Arc::clone(&ccx.recorded_reads));
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
     tracing::info!(?call_ctx, "executing transaction in zk vm");
 
@@ -455,6 +456,7 @@ fn inspect_inner<S: ReadStorage + Send>(
     mut ccx: CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
+    let recorded_writes = Arc::clone(&ccx.recorded_writes);
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price);
 
     let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity);
@@ -539,6 +541,14 @@ fn inspect_inner<S: ReadStorage + Send>(
         .map(|b| bytecode_to_factory_dep(b.original.clone()))
         .collect();
     let modified_keys = storage.borrow().modified_storage_keys().clone();
+    for key in modified_keys.iter() {
+        let mut data = recorded_writes.lock().unwrap();
+        let address = key.0.address().to_address();
+        let slot = h256_to_u256(*key.1);
+        if let Some(map) = data.as_mut() {
+            map.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
+        }
+    }
     (tx_result, bytecodes, modified_keys)
 }
 

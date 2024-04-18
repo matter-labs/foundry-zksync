@@ -4,9 +4,14 @@
 /// in the Database object.
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
 /// is usually collecing all the diffs - and applies them to database itself.
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 
 use alloy_primitives::Address;
+use foundry_common::{provider::alloy, types::ToAlloy};
 use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
@@ -28,6 +33,7 @@ pub struct ZKVMData<'a, DB> {
     pub journaled_state: &'a mut JournaledState,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: HashMap<StorageKey, StorageValue>,
+    pub read_accesses: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
 }
 
 impl<'a, DB> Debug for ZKVMData<'a, DB> {
@@ -66,7 +72,13 @@ where
         let empty_code = vec![0u8; 32];
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
-        Self { db, journaled_state, factory_deps, override_keys: Default::default() }
+        Self {
+            db,
+            journaled_state,
+            factory_deps,
+            override_keys: Default::default(),
+            read_accesses: Default::default(),
+        }
     }
 
     /// Create a new instance of [ZKEVMData] with system contracts.
@@ -112,7 +124,15 @@ where
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
 
-        Self { db, journaled_state, factory_deps, override_keys }
+        Self { db, journaled_state, factory_deps, override_keys, read_accesses: Default::default() }
+    }
+
+    pub fn with_read_accesses(
+        mut self,
+        read_accesses: Arc<Mutex<Option<HashMap<Address, Vec<alloy_primitives::U256>>>>>,
+    ) -> Self {
+        self.read_accesses = read_accesses;
+        self
     }
 
     /// Returns the code hash for a given account from AccountCode storage.
@@ -172,6 +192,11 @@ where
     <DB as Database>::Error: Debug,
 {
     fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
+=       let address = key.address().to_address();
+        let slot = h256_to_u256(*key.key());
+        self.read_accesses.lock().unwrap().as_mut().map(|read_accesses| {
+            read_accesses.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
+        });
         self.read_db(*key.address(), h256_to_u256(*key.key()))
     }
 
