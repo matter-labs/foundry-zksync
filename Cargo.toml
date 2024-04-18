@@ -26,7 +26,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.0.2"
 edition = "2021"
 rust-version = "1.75" # Remember to update clippy.toml as well
 authors = ["Foundry Contributors"]

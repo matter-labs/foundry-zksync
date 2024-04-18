@@ -1,0 +1,34 @@
+#!/bin/bash
+
+set -e
+
+echo "Navigating to the foundryup-zksync script..."
+cd foundryup-zksync
+
+echo "Making install script executable..."
+chmod +x ./install
+
+echo "Running the installation script..."
+./install | tee install.log  # Capture the output to both stdout and a log file
+
+# Extract the exact path from the install.log
+# Use sed to precisely capture the path after 'source' and before the next apostrophe
+SHELL_CONFIG_FILE=$(sed -n "s/.*Run 'source \(.*\)'.*/\1/p" install.log)
+
+if [ -n "$SHELL_CONFIG_FILE" ]; then
+    echo "Sourcing the shell configuration file: $SHELL_CONFIG_FILE"
+    # Use dot (.) to source the file, which is more universally compatible
+    . "$SHELL_CONFIG_FILE"
+else
+    echo "No shell configuration file detected. Please source your shell manually or start a new terminal session."
+fi
+
+echo "Running foundryup-zksync setup..."
+./foundryup-zksync
+
+echo "Verifying installation..."
+if forge --version | grep -q "0.0.2"; then
+    echo "Forge version 0.0.2 is successfully installed."
+else
+    echo "Installation verification failed. Forge is not properly installed."
+fi
