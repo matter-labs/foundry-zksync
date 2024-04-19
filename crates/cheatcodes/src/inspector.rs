@@ -5,7 +5,7 @@ use crate::{
         journaled_account,
         mapping::{self, MappingSlots},
         prank::Prank,
-        DealRecord, RecordAccess,
+        DealRecord,
     },
     script::{Broadcast, ScriptWallets},
     test::expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
@@ -19,6 +19,7 @@ use alloy_sol_types::{SolInterface, SolValue};
 use foundry_cheatcodes_common::{
     expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
     mock::{MockCallDataContext, MockCallReturnData},
+    record::RecordAccess,
 };
 use foundry_common::{evm::Breakpoints, provider::alloy::RpcUrl};
 use foundry_evm_core::{
@@ -51,7 +52,7 @@ use std::{
     io::BufReader,
     ops::Range,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
@@ -1196,14 +1197,10 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             info!("running call in zk vm {:#?}", call);
             let persisted_factory_deps = self.persisted_factory_deps.clone();
 
-            let arc_recorded_reads = Arc::new(Mutex::new(Some(HashMap::new())));
-            let arc_recorded_writes = Arc::new(Mutex::new(Some(HashMap::new())));
-
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
-                recorded_reads: Arc::clone(&arc_recorded_reads),
-                recorded_writes: Arc::clone(&arc_recorded_writes),
+                recorded_accesses: self.accesses.as_mut(),
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
@@ -1216,42 +1213,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 return match result {
                     ExecutionResult::Success { output, logs, .. } => match output {
                         Output::Call(bytes) => {
-                            //populate self.accesses with the recorded reads
-                            if arc_recorded_reads.lock().unwrap().is_some() {
-                                if let Some(storage_accesses) = &mut self.accesses {
-                                    let mut recorded_reads = arc_recorded_reads.lock().unwrap();
-                                    if let Some(recorded_reads) = recorded_reads.take() {
-                                        for (address, keys) in recorded_reads {
-                                            for key in keys {
-                                                storage_accesses
-                                                    .reads
-                                                    .entry(address)
-                                                    .or_default()
-                                                    .push(key);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            //populate self.accesses with the recorded writes
-                            if arc_recorded_writes.lock().unwrap().is_some() {
-                                if let Some(storage_accesses) = &mut self.accesses {
-                                    let mut recorded_writes = arc_recorded_writes.lock().unwrap();
-                                    if let Some(recorded_writes) = recorded_writes.take() {
-                                        for (address, keys) in recorded_writes {
-                                            for key in keys {
-                                                storage_accesses
-                                                    .writes
-                                                    .entry(address)
-                                                    .or_default()
-                                                    .push(key);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
                             self.combined_logs.extend(logs.clone().into_iter().map(|log| {
                                 Some(Log {
                                     address: log.address,
@@ -1721,8 +1682,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
-                recorded_reads: Default::default(),
-                recorded_writes: Default::default(),
+                recorded_accesses: None,
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(

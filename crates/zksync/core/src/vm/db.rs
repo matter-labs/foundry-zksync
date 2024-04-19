@@ -7,10 +7,10 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
-    sync::{Arc, Mutex},
 };
 
 use alloy_primitives::Address;
+use foundry_cheatcodes_common::record::RecordAccess;
 use foundry_common::types::ToAlloy;
 use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
@@ -25,8 +25,6 @@ use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
 
 use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 
-use super::tracer::Access;
-
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
 
@@ -35,7 +33,7 @@ pub struct ZKVMData<'a, DB> {
     pub journaled_state: &'a mut JournaledState,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: HashMap<StorageKey, StorageValue>,
-    pub read_accesses: Arc<Mutex<Option<Access>>>,
+    pub accesses: Option<&'a mut RecordAccess>,
 }
 
 impl<'a, DB> Debug for ZKVMData<'a, DB> {
@@ -80,7 +78,7 @@ where
             journaled_state,
             factory_deps,
             override_keys: Default::default(),
-            read_accesses: Default::default(),
+            accesses: None,
         }
     }
 
@@ -127,12 +125,7 @@ where
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
 
-        Self { db, journaled_state, factory_deps, override_keys, read_accesses: Default::default() }
-    }
-
-    pub fn with_read_accesses(mut self, read_accesses: Arc<Mutex<Option<Access>>>) -> Self {
-        self.read_accesses = read_accesses;
-        self
+        Self { db, journaled_state, factory_deps, override_keys, accesses: None }
     }
 
     /// Returns the code hash for a given account from AccountCode storage.
@@ -200,8 +193,8 @@ where
     fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
         let address = key.address().to_address();
         let slot = h256_to_u256(*key.key());
-        if let Some(read_accesses) = self.read_accesses.lock().unwrap().as_mut() {
-            read_accesses.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
+        if let Some(accesses) = &mut self.accesses {
+            accesses.reads.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
         }
         self.read_db(*key.address(), h256_to_u256(*key.key()))
     }

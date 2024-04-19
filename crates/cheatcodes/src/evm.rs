@@ -21,15 +21,6 @@ pub(crate) mod mapping;
 pub(crate) mod mock;
 pub(crate) mod prank;
 
-/// Records storage slots reads and writes.
-#[derive(Clone, Debug, Default)]
-pub struct RecordAccess {
-    /// Storage slots reads.
-    pub reads: HashMap<Address, Vec<U256>>,
-    /// Storage slots writes.
-    pub writes: HashMap<Address, Vec<U256>>,
-}
-
 /// Records `deal` cheatcodes
 #[derive(Clone, Debug)]
 pub struct DealRecord {

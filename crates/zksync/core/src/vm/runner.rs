@@ -288,7 +288,6 @@ where
     <DB as Database>::Error: Debug,
 {
     let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state)
-        .with_read_accesses(Arc::clone(&ccx.recorded_reads))
         .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps));
 
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
@@ -319,6 +318,15 @@ where
         ccx,
         call_ctx,
     );
+
+    if let Some(accesses) = ccx.recorded_accesses.as_mut() {
+        //merge era_db accesses.reads with this
+        if let Some(era_db_accesses) = era_db.accesses.as_ref() {
+            for (address, slots) in &era_db_accesses.reads {
+                accesses.reads.entry(*address).or_insert_with(Vec::new).extend(slots);
+            }
+        }
+    }
 
     let execution_result = match tx_result.result {
         ExecutionResult::Success { output, .. } => {
@@ -452,7 +460,6 @@ fn inspect_inner<S: ReadStorage + Send>(
     mut ccx: CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
-    let recorded_writes = Arc::clone(&ccx.recorded_writes);
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price);
 
     let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity);
@@ -537,12 +544,11 @@ fn inspect_inner<S: ReadStorage + Send>(
         .map(|b| bytecode_to_factory_dep(b.original.clone()))
         .collect();
     let modified_keys = storage.borrow().modified_storage_keys().clone();
-    for key in modified_keys.iter() {
-        let mut data = recorded_writes.lock().unwrap();
-        let address = key.0.address().to_address();
-        let slot = h256_to_u256(*key.1);
-        if let Some(map) = data.as_mut() {
-            map.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
+    if let Some(accesses) = ccx.recorded_accesses.as_mut() {
+        for key in modified_keys.iter() {
+            let address = key.0.address().to_address();
+            let slot = h256_to_u256(*key.0.key());
+            accesses.writes.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
         }
     }
     (tx_result, bytecodes, modified_keys)

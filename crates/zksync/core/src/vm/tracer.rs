@@ -6,7 +6,7 @@ use std::{
 use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
-    mock::{MockCallDataContext, MockCallReturnData},
+    mock::{MockCallDataContext, MockCallReturnData}, record::RecordAccess,
 };
 use multivm::{
     interface::{dyn_tracers::vm_1_4_1::DynTracer, tracer::TracerExecutionStatus},
@@ -41,9 +41,7 @@ pub struct CheatcodeTracerContext<'a> {
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
     /// Recorded reads
-    pub recorded_reads: Arc<Mutex<Option<Access>>>,
-    /// Recorded writes
-    pub recorded_writes: Arc<Mutex<Option<Access>>>,
+    pub recorded_accesses: Option<&'a mut RecordAccess>,
     /// Factory deps that were persisted across calls
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
@@ -52,9 +50,8 @@ pub struct CheatcodeTracerContext<'a> {
 #[derive(Debug, Default)]
 pub struct CheatcodeTracerResult {
     pub expected_calls: ExpectedCallTracker,
+    pub recorded_accesses: RecordAccess,
 }
-
-pub type Access = HashMap<Address, Vec<rU256>>;
 
 /// Defines the context for a Vm call.
 #[derive(Debug, Default)]
@@ -260,7 +257,7 @@ impl<S: WriteStorage + Send, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer 
         _stop_reason: multivm::interface::tracer::VmExecutionStopReason,
     ) {
         let cell = self.result.as_ref();
-        cell.set(CheatcodeTracerResult { expected_calls: self.expected_calls.clone() }).unwrap();
+        cell.set(CheatcodeTracerResult { expected_calls: self.expected_calls.clone() , recorded_accesses: Default::default()}).unwrap();
     }
 }
 
