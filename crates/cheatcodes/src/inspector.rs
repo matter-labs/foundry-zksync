@@ -47,7 +47,6 @@ use revm::{
 };
 use serde_json::Value;
 use std::{
-    cell::RefCell,
     collections::{BTreeMap, HashMap, VecDeque},
     fs::File,
     io::BufReader,
@@ -1202,8 +1201,8 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
-                recorded_accesses,
                 persisted_factory_deps,
+                recorded_accesses: Arc::clone(&recorded_accesses),
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
                 call,
@@ -1691,7 +1690,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
-                recorded_accesses,
+                recorded_accesses: Arc::clone(&recorded_accesses),
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(

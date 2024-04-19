@@ -7,8 +7,10 @@ use std::{
 };
 
 use foundry_cheatcodes_common::record::RecordAccess;
+use foundry_common::types::ToAlloy;
 use zksync_state::{ReadStorage, WriteStorage};
 use zksync_types::{StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256};
+use zksync_utils::h256_to_u256;
 
 use crate::convert::ConvertH160;
 
@@ -84,7 +86,9 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
         if let Some(record) =
             &mut *self.recorded_accesses.write().expect("record accesses not poisoned")
         {
-            //TODO: record.reads.insert(...)
+            let address = key.address().to_address();
+            let slot = h256_to_u256(*key.key());
+            record.reads.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
         }
 
         let value = self.get_value_no_log(key);
@@ -140,7 +144,9 @@ impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
         if let Some(record) =
             &mut *self.recorded_accesses.write().expect("record accesses not poisoned")
         {
-            //TODO: record.writes.insert(...)
+            let address = key.address().to_address();
+            let slot = h256_to_u256(*key.key());
+            record.writes.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
         }
 
         let original = self.get_value_no_log(&key);
