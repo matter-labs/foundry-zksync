@@ -47,12 +47,13 @@ use revm::{
 };
 use serde_json::Value;
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, HashMap, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
@@ -1196,11 +1197,12 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
             info!("running call in zk vm {:#?}", call);
             let persisted_factory_deps = self.persisted_factory_deps.clone();
+            let recorded_accesses = Arc::new(RwLock::new(self.accesses.clone()));
 
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
-                recorded_accesses: self.accesses.as_mut(),
+                recorded_accesses,
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
@@ -1213,6 +1215,12 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 return match result {
                     ExecutionResult::Success { output, logs, .. } => match output {
                         Output::Call(bytes) => {
+                            let recorded_accesses = Arc::try_unwrap(recorded_accesses)
+                                .expect("recorded accesses single arc")
+                                .into_inner()
+                                .expect("record accesses not poisoned");
+                            self.accesses = recorded_accesses;
+
                             self.combined_logs.extend(logs.clone().into_iter().map(|log| {
                                 Some(Log {
                                     address: log.address,
@@ -1677,12 +1685,13 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             // and extend it for future calls
             self.persisted_factory_deps
                 .extend(factory_deps.iter().map(|dep| (hash_bytecode(dep), dep.clone())));
+            let recorded_accesses = Arc::new(RwLock::new(self.accesses.clone()));
 
             tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
-                recorded_accesses: None,
+                recorded_accesses,
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
@@ -1697,6 +1706,12 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 return match result {
                     ExecutionResult::Success { output, logs, .. } => match output {
                         Output::Create(bytes, address) => {
+                            let recorded_accesses = Arc::try_unwrap(recorded_accesses)
+                                .expect("recorded accesses single arc")
+                                .into_inner()
+                                .expect("record accesses not poisoned");
+                            self.accesses = recorded_accesses;
+
                             self.combined_logs.extend(logs.into_iter().map(|log| {
                                 Some(Log {
                                     address: log.address,

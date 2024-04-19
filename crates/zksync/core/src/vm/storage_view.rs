@@ -1,5 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt,
+    rc::Rc,
+    sync::{Arc, RwLock},
+};
 
+use foundry_cheatcodes_common::record::RecordAccess;
 use zksync_state::{ReadStorage, WriteStorage};
 use zksync_types::{StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256};
 
@@ -27,6 +34,8 @@ pub(crate) struct StorageView<S> {
     initial_writes_cache: HashMap<StorageKey, bool>,
     /// The tx caller.
     caller: H160,
+    /// The recorded accesses
+    recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
 }
 
 impl<S: ReadStorage + fmt::Debug> StorageView<S> {
@@ -35,6 +44,7 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
         storage_handle: S,
         modified_storage_keys: HashMap<StorageKey, StorageValue>,
         caller: H160,
+        recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
     ) -> Self {
         Self {
             storage_handle,
@@ -42,6 +52,7 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
             read_storage_keys: HashMap::new(),
             initial_writes_cache: HashMap::new(),
             caller,
+            recorded_accesses,
         }
     }
 
@@ -70,6 +81,12 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
 
 impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     fn read_value(&mut self, key: &StorageKey) -> StorageValue {
+        if let Some(record) =
+            &mut *self.recorded_accesses.write().expect("record accesses not poisoned")
+        {
+            //TODO: record.reads.insert(...)
+        }
+
         let value = self.get_value_no_log(key);
 
         // We override the caller's account code storage to allow for calls
@@ -120,6 +137,12 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
 
 impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
     fn set_value(&mut self, key: StorageKey, value: StorageValue) -> StorageValue {
+        if let Some(record) =
+            &mut *self.recorded_accesses.write().expect("record accesses not poisoned")
+        {
+            //TODO: record.writes.insert(...)
+        }
+
         let original = self.get_value_no_log(&key);
 
         tracing::trace!(
@@ -158,8 +181,12 @@ mod test {
         let key = StorageKey::new(account, key);
 
         let mut raw_storage = InMemoryStorage::default();
-        let mut storage_view =
-            StorageView::new(&raw_storage, Default::default(), Default::default());
+        let mut storage_view = StorageView::new(
+            &raw_storage,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        );
 
         let default_value = storage_view.read_value(&key);
         assert_eq!(default_value, H256::zero());
@@ -170,8 +197,12 @@ mod test {
         assert!(storage_view.is_write_initial(&key)); // key was inserted during the view lifetime
 
         raw_storage.set_value(key, value);
-        let mut storage_view =
-            StorageView::new(&raw_storage, Default::default(), Default::default());
+        let mut storage_view = StorageView::new(
+            &raw_storage,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        );
 
         assert_eq!(storage_view.read_value(&key), value);
         assert!(!storage_view.is_write_initial(&key)); // `key` is present in `raw_storage`

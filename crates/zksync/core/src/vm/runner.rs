@@ -307,9 +307,13 @@ where
     }
 
     let modified_storage_keys = era_db.override_keys.clone();
-    let storage_ptr =
-        StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
-            .into_rc_ptr();
+    let storage_ptr = StorageView::new(
+        &mut era_db,
+        modified_storage_keys,
+        tx.common_data.initiator_address,
+        ccx.recorded_accesses.clone(),
+    )
+    .into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) = inspect_inner(
         tx,
         storage_ptr,
@@ -318,15 +322,6 @@ where
         ccx,
         call_ctx,
     );
-
-    if let Some(accesses) = ccx.recorded_accesses.as_mut() {
-        //merge era_db accesses.reads with this
-        if let Some(era_db_accesses) = era_db.accesses.as_ref() {
-            for (address, slots) in &era_db_accesses.reads {
-                accesses.reads.entry(*address).or_insert_with(Vec::new).extend(slots);
-            }
-        }
-    }
 
     let execution_result = match tx_result.result {
         ExecutionResult::Success { output, .. } => {
@@ -484,6 +479,7 @@ fn inspect_inner<S: ReadStorage + Send>(
             ccx.mocked_calls,
             expected_calls,
             cheatcode_tracer_result.clone(),
+            std::mem::take(&mut ccx.recorded_accesses),
             call_ctx,
         )
         .into_tracer_pointer(),
@@ -544,13 +540,6 @@ fn inspect_inner<S: ReadStorage + Send>(
         .map(|b| bytecode_to_factory_dep(b.original.clone()))
         .collect();
     let modified_keys = storage.borrow().modified_storage_keys().clone();
-    if let Some(accesses) = ccx.recorded_accesses.as_mut() {
-        for key in modified_keys.iter() {
-            let address = key.0.address().to_address();
-            let slot = h256_to_u256(*key.0.key());
-            accesses.writes.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
-        }
-    }
     (tx_result, bytecodes, modified_keys)
 }
 
