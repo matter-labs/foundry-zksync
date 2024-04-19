@@ -231,10 +231,12 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             if current.code_address == SYSTEM_CONTEXT_ADDRESS {
                 if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER) {
                     self.farcall_handler
-                        .set_immediate_return(self.call_context.block_number.to_be_bytes_vec())
+                        .set_immediate_return(self.call_context.block_number.to_be_bytes_vec());
+                    return
                 } else if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP) {
                     self.farcall_handler
-                        .set_immediate_return(self.call_context.block_timestamp.to_be_bytes_vec())
+                        .set_immediate_return(self.call_context.block_timestamp.to_be_bytes_vec());
+                    return
                 }
             }
         }
