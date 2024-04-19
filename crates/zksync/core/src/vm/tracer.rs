@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
@@ -34,12 +34,6 @@ const SELECTOR_ACCOUNT_VERSION: [u8; 4] = hex!("bb0fd610");
 /// executeTransaction(bytes32, bytes32, tuple)
 const SELECTOR_EXECUTE_TRANSACTION: [u8; 4] = hex!("df9c1589");
 
-/// record()
-const SELECTOR_CHEATCODE_RECORD: [u8; 4] = hex!("266cf109");
-
-/// accesses(address)
-const SELECTOR_CHEATCODE_ACCESSES: [u8; 4] = hex!("65bc9481");
-
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
 pub struct CheatcodeTracerContext<'a> {
@@ -48,7 +42,7 @@ pub struct CheatcodeTracerContext<'a> {
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
     /// Recorded reads
-    pub recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
+    pub recorded_accesses: Option<&'a mut Option<RecordAccess>>,
     /// Factory deps that were persisted across calls
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
@@ -84,8 +78,6 @@ pub struct CheatcodeTracer {
     pub call_context: CallContext,
     /// Result to send back.
     pub result: Arc<OnceCell<CheatcodeTracerResult>>,
-    /// Recorded accesses
-    pub recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
     /// Handle farcall state.
     farcall_handler: FarCallHandler,
 }
@@ -96,17 +88,9 @@ impl CheatcodeTracer {
         mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
         expected_calls: ExpectedCallTracker,
         result: Arc<OnceCell<CheatcodeTracerResult>>,
-        recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
         call_context: CallContext,
     ) -> Self {
-        CheatcodeTracer {
-            mocked_calls,
-            expected_calls,
-            call_context,
-            recorded_accesses,
-            result,
-            ..Default::default()
-        }
+        CheatcodeTracer { mocked_calls, expected_calls, call_context, result, ..Default::default() }
     }
 }
 
@@ -210,39 +194,6 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                     tracing::debug!("overriding account version for caller {address:?}");
                     self.farcall_handler.set_immediate_return(rU256::from(1u32).to_be_bytes_vec());
                     return
-                }
-            }
-        }
-
-        // Hook vm.record and vm.accesses
-        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let current = state.vm_local_state.callstack.get_current_stack();
-            let calldata = get_calldata(&state, memory);
-
-            if current.code_address == CHEATCODE_ADDRESS {
-                if calldata.starts_with(&SELECTOR_CHEATCODE_RECORD) {
-                    self.recorded_accesses
-                        .write()
-                        .expect("recorded accesses not poisoned")
-                        .replace(Default::default());
-                } else if calldata.starts_with(&SELECTOR_CHEATCODE_ACCESSES) {
-                    //TODO: get target argument
-                    let (reads, writes) = self
-                        .recorded_accesses
-                        .read()
-                        .expect("recorded accesses not poisoned")
-                        .as_ref()
-                        .map(|recorded_accesses| {
-                            let reads =
-                                recorded_accesses.reads.get(target).cloned().unwrap_or_default();
-                            let writes =
-                                recorded_accesses.writes.get(target).cloned().unwrap_or_default();
-                            (reads, writes)
-                        })
-                        .unwrap_or_default();
-
-                    //TODO: encode (reads, writes)
-                    self.farcall_handler.set_immediate_return(encoded);
                 }
             }
         }

@@ -12,9 +12,10 @@ use era_test_node::{
     system_contracts::{Options, SystemContracts},
     utils::bytecode_to_factory_dep,
 };
+use foundry_cheatcodes_common::record::RecordAccesses;
 use foundry_common::{
-    console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, types::ToAlloy,
-    Console, HardhatConsole,
+    console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
+    HardhatConsole,
 };
 use foundry_zksync_compiler::DualCompiledContract;
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
@@ -311,7 +312,7 @@ where
         &mut era_db,
         modified_storage_keys,
         tx.common_data.initiator_address,
-        ccx.recorded_accesses.clone(),
+        ccx.recorded_accesses.take().unwrap(),
     )
     .into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) = inspect_inner(
@@ -447,9 +448,9 @@ where
     Ok(execution_result)
 }
 
-fn inspect_inner<S: ReadStorage + Send>(
+fn inspect_inner<S: ReadStorage + Send, R: RecordAccesses + Send>(
     l2_tx: L2Tx,
-    storage: StoragePtr<StorageView<S>>,
+    storage: StoragePtr<StorageView<S, R>>,
     chain_id: L2ChainId,
     l1_gas_price: u64,
     mut ccx: CheatcodeTracerContext,
@@ -479,7 +480,6 @@ fn inspect_inner<S: ReadStorage + Send>(
             ccx.mocked_calls,
             expected_calls,
             cheatcode_tracer_result.clone(),
-            std::mem::take(&mut ccx.recorded_accesses),
             call_ctx,
         )
         .into_tracer_pointer(),
