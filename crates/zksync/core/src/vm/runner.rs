@@ -13,8 +13,8 @@ use era_test_node::{
     utils::bytecode_to_factory_dep,
 };
 use foundry_common::{
-    console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector,
-    Console, HardhatConsole,
+    console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
+    HardhatConsole,
 };
 use foundry_zksync_compiler::DualCompiledContract;
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};

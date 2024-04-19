@@ -1,5 +1,6 @@
 use std::{
-    collections::{BTreeMap, HashMap}, sync::{Arc, RwLock}
+    collections::{BTreeMap, HashMap},
+    sync::{Arc, RwLock},
 };
 
 use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
