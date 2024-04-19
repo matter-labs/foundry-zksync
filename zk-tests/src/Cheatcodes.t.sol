@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import {Test, console2 as console} from "forge-std/Test.sol";
 
 contract ZkCheatcodesTest is Test {
+    uint256 testSlot = 0; //0x000000000000000000000000000000000000000000000000000000000000001e slot
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
 
@@ -89,15 +90,11 @@ contract ZkCheatcodesTest is Test {
     }
 
     function testRecord() public {
-        Greeter greeter = new Greeter();
 
         vm.record();
-        greeter.name();
-        (bytes32[] memory reads, ) = vm.accesses(address(greeter));
-        assertEq(reads[0], bytes32(uint256(0)));
+        testSlot = 1;
+        (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(address(this));
+        assertEq(reads[0], bytes32(uint256(30)));
+        assertEq(writes[0], bytes32(uint256(30)));
     }
-}
-
-contract Greeter {
-    string public name = "Greeter";
 }
