@@ -3,6 +3,25 @@ pragma solidity ^0.8.13;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
 
+contract Mock {
+    function getBytes() public payable returns (bytes memory) {
+        bytes memory r = bytes(hex"abcd");
+        return r;
+    }
+}
+
+contract NestedMock {
+    Mock private inner;
+
+    constructor(Mock _inner) payable {
+        inner = _inner;
+    }
+
+    function getBytes() public returns (bytes memory) {
+        return inner.getBytes{value: 10}();
+    }
+}
+
 contract ZkCheatcodesTest is Test {
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
@@ -17,7 +36,10 @@ contract ZkCheatcodesTest is Test {
 
     function setUp() public {
         forkEra = vm.createFork("mainnet", ERA_FORK_BLOCK);
-        forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
+        forkEth = vm.createFork(
+            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf",
+            ETH_FORK_BLOCK
+        );
     }
 
     function testZkCheatcodesRoll() public {
@@ -25,15 +47,24 @@ contract ZkCheatcodesTest is Test {
         require(block.number == ERA_FORK_BLOCK, "era block number mismatch");
 
         vm.roll(ERA_FORK_BLOCK + 1);
-        require(block.number == ERA_FORK_BLOCK + 1, "era block number mismatch");
+        require(
+            block.number == ERA_FORK_BLOCK + 1,
+            "era block number mismatch"
+        );
     }
 
     function testZkCheatcodesWarp() public {
         vm.selectFork(forkEra);
-        require(block.timestamp == ERA_FORK_BLOCK_TS, "era block timestamp mismatch");
+        require(
+            block.timestamp == ERA_FORK_BLOCK_TS,
+            "era block timestamp mismatch"
+        );
 
         vm.warp(ERA_FORK_BLOCK_TS + 1);
-        require(block.timestamp == ERA_FORK_BLOCK_TS + 1, "era block timestamp mismatch");
+        require(
+            block.timestamp == ERA_FORK_BLOCK_TS + 1,
+            "era block timestamp mismatch"
+        );
     }
 
     function testZkCheatcodesDeal() public {
@@ -47,7 +78,7 @@ contract ZkCheatcodesTest is Test {
     function testZkCheatcodesSetNonce() public {
         vm.selectFork(forkEra);
         require(vm.getNonce(TEST_ADDRESS) == 0, "era nonce mismatch");
-        
+
         vm.setNonce(TEST_ADDRESS, 10);
         require(vm.getNonce(TEST_ADDRESS) == 10, "era nonce mismatch");
 
@@ -55,7 +86,7 @@ contract ZkCheatcodesTest is Test {
         require(vm.getNonce(TEST_ADDRESS) == 0, "era nonce mismatch");
     }
 
-     function testZkCheatcodesEtch() public {
+    function testZkCheatcodesEtch() public {
         vm.selectFork(forkEra);
 
         string memory artifact = vm.readFile(
@@ -68,13 +99,29 @@ contract ZkCheatcodesTest is Test {
         vm.etch(TEST_ADDRESS, constantNumberCode);
 
         (bool success, bytes memory output) = TEST_ADDRESS.call(
-            abi.encodeWithSignature(
-                "ten()"
-            )
+            abi.encodeWithSignature("ten()")
         );
         require(success, "ten() call failed");
 
-        (uint8 number) = abi.decode(output, (uint8));
+        uint8 number = abi.decode(output, (uint8));
         require(number == 10, "era etched code incorrect");
+    }
+
+    function testZkCheatcodesMockMemoryReturn() public {
+        Mock inner = new Mock();
+        // Allocate some funds to NestedMock so it can pay for the inner call
+        NestedMock target = new NestedMock{value: 50}(inner);
+        
+        bytes memory dataBefore = target.getBytes();
+        assertEq(dataBefore, bytes(hex"abcd"));
+
+        vm.mockCall(
+            address(inner),
+            abi.encodeWithSelector(inner.getBytes.selector),
+            abi.encode(bytes(hex"a1b1"))
+        );
+
+        bytes memory dataAfter = target.getBytes();
+        assertEq(dataAfter, bytes(hex"a1b1"));
     }
 }
