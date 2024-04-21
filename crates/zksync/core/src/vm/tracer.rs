@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    str::FromStr,
     sync::Arc,
 };
 
@@ -18,7 +19,7 @@ use multivm::{
 };
 use once_cell::sync::OnceCell;
 use zksync_state::WriteStorage;
-use zksync_types::{BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, U256};
+use zksync_types::{BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256, U256};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
@@ -75,6 +76,9 @@ pub struct CheatcodeTracer {
     pub result: Arc<OnceCell<CheatcodeTracerResult>>,
     /// Handle farcall state.
     farcall_handler: FarCallHandler,
+    debug: bool,
+    next_ret: u16,
+    tabs: u16,
 }
 
 impl CheatcodeTracer {
@@ -105,9 +109,100 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         state: VmLocalStateData<'_>,
         data: BeforeExecutionData,
         memory: &SimpleMemory<H>,
-        storage: zksync_state::StoragePtr<S>,
+        _storage: zksync_state::StoragePtr<S>,
     ) {
-        self.farcall_handler.track_active_far_calls(state, data, memory, storage);
+        self.farcall_handler.track_before_far_calls(&state, &data);
+
+        let current = state.vm_local_state.callstack.current;
+
+        if (self.debug && self.next_ret > 0) ||
+            matches!(data.opcode.variant.opcode, Opcode::FarCall(_))
+        {
+            match data.opcode.variant.opcode {
+                Opcode::FarCall(_call) => {
+                    self.tabs += 1;
+                }
+                Opcode::Ret(_) => {
+                    self.tabs = self.tabs.saturating_sub(1);
+                    if self.next_ret > 0 {
+                        self.next_ret -= 1;
+                    }
+                }
+                _ => (),
+            }
+
+            // println!(
+            //     "{}-pc={:<4?} [{}] bm={:<5?} sp={:<4?} mpc={:<4?} | {:30} {:?} cp={:<5?} axh={:<4} v={:<3?} ex={:?}",
+            //     "\t".repeat(self.tabs as usize),
+            //     current.pc,
+            //     current.is_local_frame,
+            //     current.base_memory_page.0,
+            //     current.sp,
+            //     state.vm_local_state.memory_page_counter,
+            //     format!("{:?}", data.opcode.variant.opcode),
+            //     current.this_address,
+            //     current.code_page.0,
+            //     current.aux_heap_bound,
+            //     current.context_u128_value,
+            //     current.exception_handler_location,
+            // );
+        }
+
+        // match data.opcode.variant.opcode {
+        //     Opcode::FarCall(_) => {
+        //         let current = state.vm_local_state.callstack.current;
+        //         let ptr= state.vm_local_state.registers[multivm::zk_evm_latest::zkevm_opcode_defs::RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+        //         let ptr = FatPointer::from_u256(ptr.value);
+        //         let b = memory.read_unaligned_bytes(
+        //             ptr.memory_page as usize,
+        //             ptr.start as usize,
+        //             ptr.length as usize,
+        //         );
+        //         println!(
+        //             "\tBEFORE:FARCALL pc={:?} [{}] bm={:?} {:?} | {}",
+        //             current.pc,
+        //             current.is_local_frame,
+        //             current.base_memory_page.0,
+        //             ptr,
+        //             hex::encode(b)
+        //         );
+        //     }
+        //     Opcode::Ret(_) => {
+        //         let current = state.vm_local_state.callstack.current;
+        //         if self.next_ret > 0 {
+        //             let ptr= state.vm_local_state.registers[multivm::zk_evm_latest::zkevm_opcode_defs::RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+        //             let ptr = FatPointer::from_u256(ptr.value);
+        //             let b = memory.read_unaligned_bytes(
+        //                 ptr.memory_page as usize,
+        //                 ptr.start as usize,
+        //                 ptr.length as usize,
+        //             );
+        //             let ret_abi = multivm::zk_evm_latest::zkevm_opcode_defs::RetABI::from_u256(data.src0_value.value);
+        //             // we want to mark with one that was will become a new current (taken from
+        //             // stack)
+        //             let multivm::zk_evm_latest::zkevm_opcode_defs::RetABI { mut memory_quasi_fat_pointer, page_forwarding_mode } = ret_abi;
+
+        //             println!(
+        //                 "\tBEFORE:RET pc={:?} [{}] bm={:?} {:?} {:?} {:?} | {}",
+        //                 current.pc,
+        //                 current.is_local_frame,
+        //                 current.base_memory_page.0,
+        //                 ptr,
+        //                 memory_quasi_fat_pointer,
+        //                 page_forwarding_mode,
+        //                 hex::encode(b)
+        //             );
+
+
+        //             // state.memory.populate_page(
+        //             //     ptr.memory_page as usize,
+        //             //     data,
+        //             //     Timestamp(state.local_state.timestamp),
+        //             // );
+        //         }
+        //     }
+        //     _ => (),
+        // }
     }
 
     fn after_execution(
@@ -115,9 +210,99 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         state: VmLocalStateData<'_>,
         data: AfterExecutionData,
         memory: &SimpleMemory<H>,
-        storage: zksync_state::StoragePtr<S>,
+        _storage: zksync_state::StoragePtr<S>,
     ) {
-        self.farcall_handler.track_call_actions(state, data, memory, storage);
+        self.farcall_handler.track_after_far_calls(&state, &data);
+        self.farcall_handler.track_call_actions(&state, &data);
+
+        // self.debug = true;
+        // let current = state.vm_local_state.callstack.current;
+        // let maybe_calldata = if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+        //     let calldata = get_calldata(&state, memory);
+        //     if !self.debug && hex::encode(&calldata) == "0bcd3b33" {
+        //         println!("FOUND");
+        //         self.debug = true;
+        //     }
+
+        //     if self.debug && hex::encode(&calldata) == "a851ae78" {
+        //         println!("STOP");
+        //         println!("STOP");
+        //         self.debug = false
+        //     }
+        //     if self.debug &&
+        //         current.this_address ==
+        //             H160::from_str("b5c1df089600415b21fb76bf89900adb575947c8").unwrap()
+        //     {
+        //         println!("-----> {}", "-".repeat(400));
+        //         self.next_ret = 4;
+        //     }
+        //     let x = hex::encode(&calldata);
+        //     if x.len() > 8 {
+        //         x[..8].to_string()
+        //     } else {
+        //         x
+        //     }
+        // } else {
+        //     String::from(" ")
+        // };
+
+        // if self.debug {
+        //     println!(
+        //         "{}+pc={:<4?} [{}] bm={:<5?} sp={:<4?} mpc={:4<} | {:30} {:?}cp={:<5?} axh={:<4} v={:<3?} ex={:?}",
+        //         "\t".repeat(self.tabs as usize),
+        //         current.pc,
+        //         current.is_local_frame,
+        //         current.base_memory_page.0,
+        //         current.sp,
+        //         state.vm_local_state.memory_page_counter,
+        //         format!("{:?} {}", data.opcode.variant.opcode, maybe_calldata),
+        //         current.this_address,
+        //         current.code_page.0,
+        //         current.aux_heap_bound,
+        //         current.context_u128_value,
+        //         current.exception_handler_location,
+        //     );
+        //     match data.opcode.variant.opcode {
+        //         Opcode::FarCall(_call) => {
+        //             let ptr= state.vm_local_state.registers[multivm::zk_evm_latest::zkevm_opcode_defs::RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+        //             let ptr = FatPointer::from_u256(ptr.value);
+        //             let b = memory.read_unaligned_bytes(
+        //                 ptr.memory_page as usize,
+        //                 ptr.start as usize,
+        //                 ptr.length as usize,
+        //             );
+        //             println!(
+        //                 "\tAFTER:FARCALL pc={:?} [{}] bm={:?} {:?} | {}",
+        //                 current.pc,
+        //                 current.is_local_frame,
+        //                 current.base_memory_page.0,
+        //                 ptr,
+        //                 hex::encode(b)
+        //             );
+        //         }
+        //         Opcode::Ret(_) => {
+        //             self.tabs = self.tabs.saturating_sub(1);
+        //             if self.next_ret > 0 {
+        //                 let ptr= state.vm_local_state.registers[multivm::zk_evm_latest::zkevm_opcode_defs::RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+        //                 let ptr = FatPointer::from_u256(ptr.value);
+        //                 let b = memory.read_unaligned_bytes(
+        //                     ptr.memory_page as usize,
+        //                     ptr.start as usize,
+        //                     ptr.length as usize,
+        //                 );
+        //                 println!(
+        //                     "\tAFTER:RET pc={:?} [{}] bm={:?} {:?} | {}",
+        //                     current.pc,
+        //                     current.is_local_frame,
+        //                     current.base_memory_page.0,
+        //                     ptr,
+        //                     hex::encode(b)
+        //                 );
+        //             }
+        //         }
+        //         _ => (),
+        //     }
+        // }
 
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
@@ -168,6 +353,11 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                 }) {
                     let return_data = return_data.data.clone().to_vec();
                     tracing::info!("returning mocked value {:?}", hex::encode(&return_data));
+                    self.tabs = self.tabs.saturating_sub(1);
+                    for (i, cs) in state.vm_local_state.callstack.inner.iter().rev().enumerate().take(3) {
+                        
+                        println!("> CS [{i}] pc={} bm={}", cs.pc, cs.base_memory_page.0);
+                    }
                     self.farcall_handler.set_immediate_return(return_data);
                     return;
                 }
