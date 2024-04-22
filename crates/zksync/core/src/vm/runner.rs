@@ -41,11 +41,7 @@ use tracing::{info, trace};
 use zksync_basic_types::{L2ChainId, H256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    ethabi::{self},
-    fee::Fee,
-    l2::L2Tx,
-    transaction_request::PaymasterParams,
-    vm_trace::Call,
+    ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, vm_trace::Call,
     PackedEthSignature, StorageKey, Transaction, VmEvent, ACCOUNT_CODE_STORAGE_ADDRESS,
     CONTRACT_DEPLOYER_ADDRESS, H160, U256,
 };
@@ -111,6 +107,8 @@ where
         msg_sender: env.tx.caller,
         contract: transact_to.to_address(),
         delegate_as: None,
+        block_number: env.block.number,
+        block_timestamp: env.block.timestamp,
     };
 
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
@@ -164,6 +162,7 @@ where
 pub fn create<'a, DB, E>(
     call: &CreateInputs,
     contract: &DualCompiledContract,
+    factory_deps: Vec<Vec<u8>>,
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
@@ -177,7 +176,6 @@ where
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
     let caller = env.tx.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
-    let factory_deps = vec![contract.zk_deployed_bytecode.clone()];
     let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
@@ -202,6 +200,8 @@ where
         msg_sender: call.caller,
         contract: CONTRACT_DEPLOYER_ADDRESS.to_address(),
         delegate_as: None,
+        block_number: env.block.number,
+        block_timestamp: env.block.timestamp,
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
@@ -210,7 +210,6 @@ where
 /// Executes a CALL opcode on the ZK-VM.
 pub fn call<'a, DB, E>(
     call: &CallInputs,
-    contract: Option<&DualCompiledContract>,
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
@@ -222,7 +221,6 @@ where
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
     let caller = env.tx.caller;
-    let factory_deps = contract.map(|contract| vec![contract.zk_deployed_bytecode.clone()]);
     let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
@@ -238,7 +236,7 @@ where
         },
         caller.to_h160(),
         call.transfer.value.to_u256(),
-        factory_deps,
+        None,
         PaymasterParams::default(),
     );
 
@@ -254,6 +252,8 @@ where
             CallScheme::DelegateCall => Some(call.context.address),
             _ => None,
         },
+        block_number: env.block.number,
+        block_timestamp: env.block.timestamp,
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
@@ -286,14 +286,16 @@ fn inspect<'a, DB, E>(
     env: &'a mut Env,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
-    ccx: CheatcodeTracerContext,
+    mut ccx: CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
 where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state);
+    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state)
+        .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps));
+
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
     tracing::info!(?call_ctx, "executing transaction in zk vm");
 

@@ -19,13 +19,13 @@ use crate::convert::ConvertH160;
 #[derive(Debug)]
 pub(crate) struct StorageView<S> {
     pub(crate) storage_handle: S,
-    // Used for caching and to get the list/count of modified keys
+    /// Used for caching and to get the list/count of modified keys
     pub(crate) modified_storage_keys: HashMap<StorageKey, StorageValue>,
-    // Used purely for caching
+    /// Used purely for caching
     pub(crate) read_storage_keys: HashMap<StorageKey, StorageValue>,
-    // Cache for `contains_key()` checks. The cache is only valid within one L1 batch execution.
+    /// Cache for `contains_key()` checks. The cache is only valid within one L1 batch execution.
     initial_writes_cache: HashMap<StorageKey, bool>,
-
+    /// The tx caller.
     caller: H160,
 }
 

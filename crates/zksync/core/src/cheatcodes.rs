@@ -149,7 +149,7 @@ pub fn etch<'a, DB>(
     info!(?address, bytecode = hex::encode(bytecode), "cheatcode etch");
 
     let bytecode_hash = hash_bytecode(bytecode).to_ru256();
-    let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(bytecode)).to_checked();
+    let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(bytecode));
 
     let account_code_addr = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
     let known_codes_addr = KNOWN_CODES_STORAGE_ADDRESS.to_address();

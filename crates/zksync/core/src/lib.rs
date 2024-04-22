@@ -29,6 +29,7 @@ pub use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, L2_ETH_TOKEN_ADDRESS,
     NONCE_HOLDER_ADDRESS,
 };
+pub use zksync_utils::bytecode::hash_bytecode;
 use zksync_web3_rs::{
     eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest},
     providers::Middleware,
