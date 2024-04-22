@@ -30,22 +30,28 @@ use crate::{
 use super::farcall::FarCallHandler;
 
 /// Selector for retrieving account version.
-/// We use this to override the caller's account version when deploying a contract
+/// This is used to override the caller's account version when deploying a contract
 /// So non-EOA addresses can also deploy within the VM.
 ///
 /// extendedAccountVersion(address)
 const SELECTOR_ACCOUNT_VERSION: [u8; 4] = hex!("bb0fd610");
 
 /// Selector for  executing a VM transaction.
-/// We use this to override the `msg.sender` for the call context
+/// This is used to override the `msg.sender` for the call context
 /// to account for transitive calls.
 ///
 /// executeTransaction(bytes32, bytes32, tuple)
 const SELECTOR_EXECUTE_TRANSACTION: [u8; 4] = hex!("df9c1589");
 
+/// Selector for retrieving the current block number.
+/// This is used to override the current `block.number` to foundry test's context.
+///
 /// Selector for `getBlockNumber()`
 const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: [u8; 4] = hex!("42cbb15c");
 
+/// Selector for retrieving the current block timestamp.
+/// This is used to override the current `block.timestamp` to foundry test's context.
+///
 /// Selector for `getBlockTimestamp()`
 const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: [u8; 4] = hex!("796b89b9");
 
