@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use zksync_state::{ReadStorage, WriteStorage};
 use zksync_types::{StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256};
@@ -29,7 +29,7 @@ pub(crate) struct StorageView<S> {
     caller: H160,
 }
 
-impl<S: ReadStorage> StorageView<S> {
+impl<S: ReadStorage + fmt::Debug> StorageView<S> {
     /// Creates a new storage view based on the underlying storage.
     pub(crate) fn new(
         storage_handle: S,
@@ -68,7 +68,7 @@ impl<S: ReadStorage> StorageView<S> {
     }
 }
 
-impl<S: ReadStorage> ReadStorage for StorageView<S> {
+impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     fn read_value(&mut self, key: &StorageKey) -> StorageValue {
         let value = self.get_value_no_log(key);
 
@@ -118,7 +118,7 @@ impl<S: ReadStorage> ReadStorage for StorageView<S> {
     }
 }
 
-impl<S: ReadStorage> WriteStorage for StorageView<S> {
+impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
     fn set_value(&mut self, key: StorageKey, value: StorageValue) -> StorageValue {
         let original = self.get_value_no_log(&key);
 
