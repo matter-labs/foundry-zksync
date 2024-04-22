@@ -42,7 +42,7 @@ pub struct CheatcodeTracerContext<'a> {
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
     /// Recorded reads
-    pub recorded_accesses: Option<&'a mut Option<RecordAccess>>,
+    pub accesses: Option<&'a mut RecordAccess>,
     /// Factory deps that were persisted across calls
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }

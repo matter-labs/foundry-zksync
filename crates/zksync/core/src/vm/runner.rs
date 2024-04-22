@@ -12,7 +12,6 @@ use era_test_node::{
     system_contracts::{Options, SystemContracts},
     utils::bytecode_to_factory_dep,
 };
-use foundry_cheatcodes_common::record::RecordAccesses;
 use foundry_common::{
     console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
     HardhatConsole,
@@ -109,11 +108,8 @@ where
         contract: transact_to.to_address(),
         delegate_as: None,
     };
-    let recorded_accesses = &mut None;
-    let ccx =
-        CheatcodeTracerContext { recorded_accesses: Some(recorded_accesses), ..Default::default() };
 
-    match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, ccx, call_ctx) {
+    match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
         Ok(result) => Ok(ResultAndState { result, state }),
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
@@ -292,7 +288,8 @@ where
     <DB as Database>::Error: Debug,
 {
     let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state)
-        .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps));
+        .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps))
+        .with_storage_accesses(ccx.accesses.take());
 
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
     tracing::info!(?call_ctx, "executing transaction in zk vm");
@@ -311,13 +308,9 @@ where
     }
 
     let modified_storage_keys = era_db.override_keys.clone();
-    let storage_ptr = StorageView::new(
-        &mut era_db,
-        modified_storage_keys,
-        tx.common_data.initiator_address,
-        ccx.recorded_accesses.take().unwrap(),
-    )
-    .into_rc_ptr();
+    let storage_ptr =
+        StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
+            .into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) = inspect_inner(
         tx,
         storage_ptr,
@@ -326,6 +319,12 @@ where
         ccx,
         call_ctx,
     );
+
+    if let Some(record) = &mut era_db.accesses {
+        for k in modified_storage.keys() {
+            record.writes.entry(k.address().to_address()).or_default().push(k.key().to_ru256());
+        }
+    }
 
     let execution_result = match tx_result.result {
         ExecutionResult::Success { output, .. } => {
@@ -451,9 +450,9 @@ where
     Ok(execution_result)
 }
 
-fn inspect_inner<S: ReadStorage + Send, R: RecordAccesses + Send>(
+fn inspect_inner<S: ReadStorage + Send>(
     l2_tx: L2Tx,
-    storage: StoragePtr<StorageView<S, R>>,
+    storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,
     l1_gas_price: u64,
     mut ccx: CheatcodeTracerContext,

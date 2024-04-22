@@ -1,10 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use foundry_cheatcodes_common::record::RecordAccesses;
 use zksync_state::{ReadStorage, WriteStorage};
 use zksync_types::{StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256};
 
-use crate::convert::{ConvertH160, ConvertH256};
+use crate::convert::ConvertH160;
 
 /// `StorageView` is a buffer for `StorageLog`s between storage and transaction execution code.
 /// In order to commit transactions logs should be submitted to the underlying storage
@@ -18,7 +17,7 @@ use crate::convert::{ConvertH160, ConvertH256};
 /// When executing transactions in the API sandbox, a dedicated view is used for each transaction;
 /// the only shared part is the read storage keys cache.
 #[derive(Debug)]
-pub(crate) struct StorageView<S, R> {
+pub(crate) struct StorageView<S> {
     pub(crate) storage_handle: S,
     /// Used for caching and to get the list/count of modified keys
     pub(crate) modified_storage_keys: HashMap<StorageKey, StorageValue>,
@@ -28,17 +27,14 @@ pub(crate) struct StorageView<S, R> {
     initial_writes_cache: HashMap<StorageKey, bool>,
     /// The tx caller.
     caller: H160,
-    /// The recorded accesses
-    recorded_accesses: R,
 }
 
-impl<S: ReadStorage, R: RecordAccesses> StorageView<S, R> {
+impl<S: ReadStorage> StorageView<S> {
     /// Creates a new storage view based on the underlying storage.
     pub(crate) fn new(
         storage_handle: S,
         modified_storage_keys: HashMap<StorageKey, StorageValue>,
         caller: H160,
-        recorded_accesses: R,
     ) -> Self {
         Self {
             storage_handle,
@@ -46,7 +42,6 @@ impl<S: ReadStorage, R: RecordAccesses> StorageView<S, R> {
             read_storage_keys: HashMap::new(),
             initial_writes_cache: HashMap::new(),
             caller,
-            recorded_accesses,
         }
     }
 
@@ -73,10 +68,8 @@ impl<S: ReadStorage, R: RecordAccesses> StorageView<S, R> {
     }
 }
 
-impl<S: ReadStorage, R: RecordAccesses> ReadStorage for StorageView<S, R> {
+impl<S: ReadStorage> ReadStorage for StorageView<S> {
     fn read_value(&mut self, key: &StorageKey) -> StorageValue {
-        self.recorded_accesses.push_read(key.address().to_address(), key.key().to_ru256());
-
         let value = self.get_value_no_log(key);
 
         // We override the caller's account code storage to allow for calls
@@ -125,10 +118,8 @@ impl<S: ReadStorage, R: RecordAccesses> ReadStorage for StorageView<S, R> {
     }
 }
 
-impl<S: ReadStorage, R: RecordAccesses> WriteStorage for StorageView<S, R> {
+impl<S: ReadStorage> WriteStorage for StorageView<S> {
     fn set_value(&mut self, key: StorageKey, value: StorageValue) -> StorageValue {
-        self.recorded_accesses.push_write(key.address().to_address(), key.key().to_ru256());
-
         let original = self.get_value_no_log(&key);
 
         tracing::trace!(
@@ -168,7 +159,7 @@ mod test {
 
         let mut raw_storage = InMemoryStorage::default();
         let mut storage_view =
-            StorageView::new(&raw_storage, Default::default(), Default::default(), None);
+            StorageView::new(&raw_storage, Default::default(), Default::default());
 
         let default_value = storage_view.read_value(&key);
         assert_eq!(default_value, H256::zero());
@@ -180,7 +171,7 @@ mod test {
 
         raw_storage.set_value(key, value);
         let mut storage_view =
-            StorageView::new(&raw_storage, Default::default(), Default::default(), None);
+            StorageView::new(&raw_storage, Default::default(), Default::default());
 
         assert_eq!(storage_view.read_value(&key), value);
         assert!(!storage_view.is_write_initial(&key)); // `key` is present in `raw_storage`

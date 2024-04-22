@@ -1200,7 +1200,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
-                recorded_accesses: Some(&mut self.accesses),
+                accesses: self.accesses.as_mut(),
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
@@ -1682,7 +1682,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
-                recorded_accesses: Some(&mut self.accesses),
+                accesses: self.accesses.as_mut(),
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
