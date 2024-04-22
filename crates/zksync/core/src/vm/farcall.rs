@@ -155,11 +155,13 @@ impl FarCallHandler {
                     next_context_u128_value: 0,
                 })
             }
-            // Mimic calls must use the active base_memory_page to populate return data
+            // Mimic calls case is used to handle the case when a value is sent to a function.
+            // These calls go through a call to MsgValue simulator contract and then do a mimic call
+            // to the actual contract.
             FarCallOpcode::Mimic => self.before_far_call_stack.map(|before| ImmediateReturn {
                 return_data,
-                // base_memory_page for returndata must be set to current base_memory_page
-                // and not of the caller for mimic calls. Reasons unknown, but required in zk vm.
+                // base_memory_page for returndata must be set to current base_memory_page and not
+                // of the caller for calls with value. Reasons unknown, but required in zk vm.
                 return_base_memory_page: self
                     .after_far_call_stack
                     .map(|after| after.base_memory_page.0)
@@ -170,8 +172,8 @@ impl FarCallHandler {
                 next_sp: before.sp,
                 next_exception_handler_location: before.exception_handler_location,
                 next_this_address: before.this_address,
-                // `is_local_frame` needs to tbe set to `true` when doing mimic calls.
-                // Reasons unknown, but required in zk vm.
+                // `is_local_frame` for return satck needs to be set to same as before state when
+                // returning from calls with value. Reasons unknown, but required in zk vm.
                 next_is_local_frame: before.is_local_frame,
                 next_context_u128_value: 0,
             }),
