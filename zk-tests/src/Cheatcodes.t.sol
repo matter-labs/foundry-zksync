@@ -90,7 +90,6 @@ contract ZkCheatcodesTest is Test {
     }
 
     function testRecord() public {
-
         vm.record();
         testSlot = 1;
         (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(address(this));

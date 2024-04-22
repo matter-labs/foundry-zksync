@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
@@ -42,7 +42,7 @@ pub struct CheatcodeTracerContext<'a> {
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
     /// Recorded reads
-    pub recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
+    pub recorded_accesses: Option<&'a mut Option<RecordAccess>>,
     /// Factory deps that were persisted across calls
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
@@ -78,8 +78,6 @@ pub struct CheatcodeTracer {
     pub call_context: CallContext,
     /// Result to send back.
     pub result: Arc<OnceCell<CheatcodeTracerResult>>,
-    /// Recorded accesses
-    pub recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
     /// Handle farcall state.
     farcall_handler: FarCallHandler,
 }
@@ -90,17 +88,9 @@ impl CheatcodeTracer {
         mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
         expected_calls: ExpectedCallTracker,
         result: Arc<OnceCell<CheatcodeTracerResult>>,
-        recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
         call_context: CallContext,
     ) -> Self {
-        CheatcodeTracer {
-            mocked_calls,
-            expected_calls,
-            call_context,
-            recorded_accesses,
-            result,
-            ..Default::default()
-        }
+        CheatcodeTracer { mocked_calls, expected_calls, call_context, result, ..Default::default() }
     }
 }
 

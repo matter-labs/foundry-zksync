@@ -1,18 +1,10 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    fmt,
-    rc::Rc,
-    sync::{Arc, RwLock},
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use foundry_cheatcodes_common::record::RecordAccess;
-use foundry_common::types::ToAlloy;
+use foundry_cheatcodes_common::record::RecordAccesses;
 use zksync_state::{ReadStorage, WriteStorage};
 use zksync_types::{StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256};
-use zksync_utils::h256_to_u256;
 
-use crate::convert::ConvertH160;
+use crate::convert::{ConvertH160, ConvertH256};
 
 /// `StorageView` is a buffer for `StorageLog`s between storage and transaction execution code.
 /// In order to commit transactions logs should be submitted to the underlying storage
@@ -26,7 +18,7 @@ use crate::convert::ConvertH160;
 /// When executing transactions in the API sandbox, a dedicated view is used for each transaction;
 /// the only shared part is the read storage keys cache.
 #[derive(Debug)]
-pub(crate) struct StorageView<S> {
+pub(crate) struct StorageView<S, R> {
     pub(crate) storage_handle: S,
     /// Used for caching and to get the list/count of modified keys
     pub(crate) modified_storage_keys: HashMap<StorageKey, StorageValue>,
@@ -37,16 +29,16 @@ pub(crate) struct StorageView<S> {
     /// The tx caller.
     caller: H160,
     /// The recorded accesses
-    recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
+    recorded_accesses: R,
 }
 
-impl<S: ReadStorage + fmt::Debug> StorageView<S> {
+impl<S: ReadStorage, R: RecordAccesses> StorageView<S, R> {
     /// Creates a new storage view based on the underlying storage.
     pub(crate) fn new(
         storage_handle: S,
         modified_storage_keys: HashMap<StorageKey, StorageValue>,
         caller: H160,
-        recorded_accesses: Arc<RwLock<Option<RecordAccess>>>,
+        recorded_accesses: R,
     ) -> Self {
         Self {
             storage_handle,
@@ -81,15 +73,9 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
     }
 }
 
-impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
+impl<S: ReadStorage, R: RecordAccesses> ReadStorage for StorageView<S, R> {
     fn read_value(&mut self, key: &StorageKey) -> StorageValue {
-        if let Some(record) =
-            &mut *self.recorded_accesses.write().expect("record accesses not poisoned")
-        {
-            let address = key.address().to_address();
-            let slot = h256_to_u256(*key.key());
-            record.reads.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
-        }
+        self.recorded_accesses.push_read(key.address().to_address(), key.key().to_ru256());
 
         let value = self.get_value_no_log(key);
 
@@ -139,15 +125,9 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     }
 }
 
-impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
+impl<S: ReadStorage, R: RecordAccesses> WriteStorage for StorageView<S, R> {
     fn set_value(&mut self, key: StorageKey, value: StorageValue) -> StorageValue {
-        if let Some(record) =
-            &mut *self.recorded_accesses.write().expect("record accesses not poisoned")
-        {
-            let address = key.address().to_address();
-            let slot = h256_to_u256(*key.key());
-            record.writes.entry(address).or_insert_with(Vec::new).push(slot.to_alloy());
-        }
+        self.recorded_accesses.push_write(key.address().to_address(), key.key().to_ru256());
 
         let original = self.get_value_no_log(&key);
 
@@ -187,12 +167,8 @@ mod test {
         let key = StorageKey::new(account, key);
 
         let mut raw_storage = InMemoryStorage::default();
-        let mut storage_view = StorageView::new(
-            &raw_storage,
-            Default::default(),
-            Default::default(),
-            Default::default(),
-        );
+        let mut storage_view =
+            StorageView::new(&raw_storage, Default::default(), Default::default(), None);
 
         let default_value = storage_view.read_value(&key);
         assert_eq!(default_value, H256::zero());
@@ -203,12 +179,8 @@ mod test {
         assert!(storage_view.is_write_initial(&key)); // key was inserted during the view lifetime
 
         raw_storage.set_value(key, value);
-        let mut storage_view = StorageView::new(
-            &raw_storage,
-            Default::default(),
-            Default::default(),
-            Default::default(),
-        );
+        let mut storage_view =
+            StorageView::new(&raw_storage, Default::default(), Default::default(), None);
 
         assert_eq!(storage_view.read_value(&key), value);
         assert!(!storage_view.is_write_initial(&key)); // `key` is present in `raw_storage`
