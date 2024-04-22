@@ -109,8 +109,11 @@ where
         contract: transact_to.to_address(),
         delegate_as: None,
     };
+    let recorded_accesses = &mut None;
+    let ccx =
+        CheatcodeTracerContext { recorded_accesses: Some(recorded_accesses), ..Default::default() };
 
-    match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
+    match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, ccx, call_ctx) {
         Ok(result) => Ok(ResultAndState { result, state }),
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }

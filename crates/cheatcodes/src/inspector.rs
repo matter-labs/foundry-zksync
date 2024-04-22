@@ -52,7 +52,7 @@ use std::{
     io::BufReader,
     ops::Range,
     path::PathBuf,
-    sync::{Arc},
+    sync::Arc,
 };
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
