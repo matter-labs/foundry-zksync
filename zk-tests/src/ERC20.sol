@@ -2,6 +2,7 @@
 pragma solidity >=0.8.0;
 
 contract MyToken {
+    string public owner;
     string public constant name = "MyToken";
     string public constant symbol = "MTK";
     uint8 public constant decimals = 18;
@@ -15,11 +16,19 @@ contract MyToken {
         balanceOf[msg.sender] = totalSupply;
     }
 
+    function setTotalSupply(uint256 amount) public {
+        totalSupply = amount;
+    }
+
     function transfer(address to, uint256 amount) public returns (bool) {
         require(balanceOf[msg.sender] >= amount, "Not enough tokens");
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
         emit Transfer(msg.sender, to, amount);
         return true;
+    }
+
+    function setOwner(string memory _owner) public {
+        owner = _owner;
     }
 }
