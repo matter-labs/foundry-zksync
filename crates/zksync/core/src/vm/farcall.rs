@@ -33,7 +33,6 @@ type DecodedOpcode = ZkDecodedOpcode<8, EncodingModeProduction>;
 pub(crate) struct ImmediateReturn {
     pub(crate) return_data: Vec<u8>,
     pub(crate) return_base_memory_page: u32,
-
     pub(crate) next_pc: PcOrImm,
     pub(crate) next_code_page: u32,
     pub(crate) next_base_memory_page: u32,
