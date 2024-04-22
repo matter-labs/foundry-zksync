@@ -3,17 +3,17 @@ pragma solidity ^0.8.13;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
 
-contract Mock {
+contract InnerMock {
     function getBytes() public payable returns (bytes memory) {
         bytes memory r = bytes(hex"abcd");
         return r;
     }
 }
 
-contract NestedMock {
-    Mock private inner;
+contract Mock {
+    InnerMock private inner;
 
-    constructor(Mock _inner) payable {
+    constructor(InnerMock _inner) payable {
         inner = _inner;
     }
 
@@ -107,11 +107,11 @@ contract ZkCheatcodesTest is Test {
         require(number == 10, "era etched code incorrect");
     }
 
-    function testZkCheatcodesMockMemoryReturn() public {
-        Mock inner = new Mock();
-        // Allocate some funds to NestedMock so it can pay for the inner call
-        NestedMock target = new NestedMock{value: 50}(inner);
-        
+    function testZkCheatcodesValueFunctionMockReturn() public {
+        InnerMock inner = new InnerMock();
+        // Send some funds to so it can pay for the inner call
+        Mock target = new Mock{value: 50}(inner);
+
         bytes memory dataBefore = target.getBytes();
         assertEq(dataBefore, bytes(hex"abcd"));
 
