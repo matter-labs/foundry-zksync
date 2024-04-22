@@ -18,7 +18,9 @@ use multivm::{
 };
 use once_cell::sync::OnceCell;
 use zksync_state::WriteStorage;
-use zksync_types::{BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, U256};
+use zksync_types::{
+    BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, SYSTEM_CONTEXT_ADDRESS, U256,
+};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
@@ -32,6 +34,12 @@ const SELECTOR_ACCOUNT_VERSION: [u8; 4] = hex!("bb0fd610");
 
 /// executeTransaction(bytes32, bytes32, tuple)
 const SELECTOR_EXECUTE_TRANSACTION: [u8; 4] = hex!("df9c1589");
+
+/// Selector for `getBlockNumber()`
+const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: [u8; 4] = hex!("42cbb15c");
+
+/// Selector for `getBlockTimestamp()`
+const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: [u8; 4] = hex!("796b89b9");
 
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
@@ -62,6 +70,11 @@ pub struct CallContext {
     /// Delegated contract's address. This is used
     /// to override `address(this)` for delegate calls.
     pub delegate_as: Option<Address>,
+
+    /// The current block number
+    pub block_number: rU256,
+    /// The current block timestamp
+    pub block_timestamp: rU256,
 }
 
 /// A tracer to allow for foundry-specific functionality.
@@ -207,6 +220,24 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                     CallDepth::next(),
                     CallAction::SetMessageSender(self.call_context.msg_sender),
                 );
+            }
+        }
+
+        // Override block number and timestamp for the transaction
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let calldata = get_calldata(&state, memory);
+            let current = state.vm_local_state.callstack.current;
+
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS {
+                if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER) {
+                    self.farcall_handler
+                        .set_immediate_return(self.call_context.block_number.to_be_bytes_vec());
+                    return
+                } else if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP) {
+                    self.farcall_handler
+                        .set_immediate_return(self.call_context.block_timestamp.to_be_bytes_vec());
+                    return
+                }
             }
         }
 

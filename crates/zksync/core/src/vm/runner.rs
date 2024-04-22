@@ -107,6 +107,8 @@ where
         msg_sender: env.tx.caller,
         contract: transact_to.to_address(),
         delegate_as: None,
+        block_number: env.block.number,
+        block_timestamp: env.block.timestamp,
     };
 
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
@@ -198,6 +200,8 @@ where
         msg_sender: call.caller,
         contract: CONTRACT_DEPLOYER_ADDRESS.to_address(),
         delegate_as: None,
+        block_number: env.block.number,
+        block_timestamp: env.block.timestamp,
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
@@ -248,6 +252,8 @@ where
             CallScheme::DelegateCall => Some(call.context.address),
             _ => None,
         },
+        block_number: env.block.number,
+        block_timestamp: env.block.timestamp,
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)

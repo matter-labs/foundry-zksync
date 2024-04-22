@@ -3,6 +3,16 @@ pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
 
+contract BlockEnv {
+    uint256 public number;
+    uint256 public timestamp;
+
+    constructor() {
+        number = block.number;
+        timestamp = block.timestamp;
+    }
+}
+
 contract ZkBasicTest is Test {
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
@@ -45,5 +55,22 @@ contract ZkBasicTest is Test {
 
         vm.selectFork(forkEth);
         require(TEST_ADDRESS.balance == 100, "eth balance mismatch");
+    }
+
+    function testZkPropagatedBlockEnv() public {
+        BlockEnv be = new BlockEnv();
+        require(be.number() == block.number, "propagated block number is the same as current");
+        require(be.timestamp() == block.timestamp, "propagated block timestamp is the same as current");
+
+        be = new BlockEnv();
+        require(be.number() == block.number, "propagated block number stays constant");
+        require(be.timestamp() == block.timestamp, "propagated block timestamp stays constant");
+
+        vm.roll(42);
+        vm.warp(42);
+
+        be = new BlockEnv();
+        require(be.number() == block.number, "propagated block number rolls");
+        require(be.timestamp() == block.timestamp, "propagated block timestamp warps");
     }
 }
