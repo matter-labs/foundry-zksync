@@ -101,7 +101,6 @@ where
         PaymasterParams::default(),
     );
 
-    let (state, _) = journaled_state.finalize();
     let call_ctx = CallContext {
         tx_caller: env.tx.caller,
         msg_sender: env.tx.caller,
@@ -112,7 +111,7 @@ where
     };
 
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
-        Ok(result) => Ok(ResultAndState { result, state }),
+        Ok(result) => Ok(ResultAndState { result, state: journaled_state.finalize().0 }),
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
 }
