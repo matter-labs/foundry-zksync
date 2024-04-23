@@ -11,6 +11,25 @@ contract FixedSlot {
     }
 }
 
+contract InnerMock {
+    function getBytes() public payable returns (bytes memory) {
+        bytes memory r = bytes(hex"abcd");
+        return r;
+    }
+}
+
+contract Mock {
+    InnerMock private inner;
+
+    constructor(InnerMock _inner) payable {
+        inner = _inner;
+    }
+
+    function getBytes() public returns (bytes memory) {
+        return inner.getBytes{value: 10}();
+    }
+}
+
 contract ZkCheatcodesTest is Test {
     uint256 testSlot = 0; //0x000000000000000000000000000000000000000000000000000000000000001e slot
     uint256 constant ERA_FORK_BLOCK = 19579636;
@@ -107,5 +126,22 @@ contract ZkCheatcodesTest is Test {
         bytes32 keySlot0 = bytes32(uint256(0));
         assertEq(reads[0], keySlot0);
         assertEq(writes[0], keySlot0);
+    }
+    function testZkCheatcodesValueFunctionMockReturn() public {
+        InnerMock inner = new InnerMock();
+        // Send some funds to so it can pay for the inner call
+        Mock target = new Mock{value: 50}(inner);
+
+        bytes memory dataBefore = target.getBytes();
+        assertEq(dataBefore, bytes(hex"abcd"));
+
+        vm.mockCall(
+            address(inner),
+            abi.encodeWithSelector(inner.getBytes.selector),
+            abi.encode(bytes(hex"a1b1"))
+        );
+
+        bytes memory dataAfter = target.getBytes();
+        assertEq(dataAfter, bytes(hex"a1b1"));
     }
 }

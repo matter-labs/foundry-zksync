@@ -534,7 +534,7 @@ fn inspect_inner<S: ReadStorage + Send>(
     let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
     tracing::info!("=== Calls: ");
     for call in call_traces.iter() {
-        formatter::print_call(call, 0, &ShowCalls::All, resolve_hashes);
+        formatter::print_call(call, 0, &ShowCalls::All, resolve_hashes, true);
     }
 
     tracing::info!("==== {}", format!("{} events", tx_result.logs.events.len()));
