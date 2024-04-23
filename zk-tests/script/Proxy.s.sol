@@ -4,29 +4,13 @@ pragma solidity >=0.8.7 <0.9.0;
 import 'forge-std/Script.sol';
 import '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 
-abstract contract BaseScript is Script {
-    address public deployer;
-
-    modifier broadcaster() {
-        vm.startBroadcast(deployer);
-        _;
-        vm.stopBroadcast();
-    }
-
-    function setUp() public virtual {
-        deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
-    }
-}
-
-contract ProxyScript is BaseScript {
-     function run() public broadcaster {
-        console.log(address(deployer));
-
+contract ProxyScript {
+     function run() public {
         //deploy Foo
         ERC1967Proxy proxy = new ERC1967Proxy(address(new Foo()), "");
 
         Foo foo = Foo(payable(proxy));
-        foo.initialize(deployer);
+        foo.initialize(msg.sender);
 
         console.log("Foo deployed at: ", address(foo));
         console.log("Bar: ", foo.getAddress());

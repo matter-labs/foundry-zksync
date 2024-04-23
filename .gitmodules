@@ -9,4 +9,4 @@
 	url = https://github.com/transmissions11/solmate
 [submodule "zk-tests/lib/openzeppelin-contracts"]
 	path = zk-tests/lib/openzeppelin-contracts
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+	url = https://github.com/Openzeppelin/openzeppelin-contracts
