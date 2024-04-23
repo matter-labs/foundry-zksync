@@ -27,8 +27,4 @@ contract MyToken {
         emit Transfer(msg.sender, to, amount);
         return true;
     }
-
-    function setOwner(string memory _owner) public {
-        owner = _owner;
-    }
 }
