@@ -2,7 +2,14 @@
 pragma solidity ^0.8.13;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
-import {MyToken} from "./ERC20.sol";
+
+contract FixedSlot {
+    uint8 num; // slot index: 0
+
+    function setSlot0(uint8 _num) public {
+        num = _num;
+    }
+}
 
 contract ZkCheatcodesTest is Test {
     uint256 testSlot = 0; //0x000000000000000000000000000000000000000000000000000000000000001e slot
@@ -91,11 +98,14 @@ contract ZkCheatcodesTest is Test {
     }
 
     function testRecord() public {
-        MyToken eth = new MyToken();
+        FixedSlot fs = new FixedSlot();
         vm.record();
-        eth.setOwner("test");
-        (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(address(eth));
-        assertEq(reads[0], bytes32(uint256(0)));
-        assertEq(writes[0], bytes32(uint256(0)));
+        fs.setSlot0(10);
+        (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(
+            address(fs)
+        );
+        bytes32 keySlot0 = bytes32(uint256(0));
+        assertEq(reads[0], keySlot0);
+        assertEq(writes[0], keySlot0);
     }
-} 
+}
