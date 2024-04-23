@@ -188,7 +188,9 @@ pub fn has_batch_support(chain_id: u64) -> bool {
             NamedChain::Arbitrum |
                 NamedChain::ArbitrumTestnet |
                 NamedChain::ArbitrumGoerli |
-                NamedChain::ArbitrumSepolia
+                NamedChain::ArbitrumSepolia |
+                NamedChain::ZkSync |
+                NamedChain::ZkSyncTestnet
         );
     }
     true
