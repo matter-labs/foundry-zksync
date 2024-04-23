@@ -29,15 +29,29 @@ use crate::{
 
 use super::farcall::FarCallHandler;
 
+/// Selector for retrieving account version.
+/// This is used to override the caller's account version when deploying a contract
+/// So non-EOA addresses can also deploy within the VM.
+///
 /// extendedAccountVersion(address)
 const SELECTOR_ACCOUNT_VERSION: [u8; 4] = hex!("bb0fd610");
 
+/// Selector for  executing a VM transaction.
+/// This is used to override the `msg.sender` for the call context
+/// to account for transitive calls.
+///
 /// executeTransaction(bytes32, bytes32, tuple)
 const SELECTOR_EXECUTE_TRANSACTION: [u8; 4] = hex!("df9c1589");
 
+/// Selector for retrieving the current block number.
+/// This is used to override the current `block.number` to foundry test's context.
+///
 /// Selector for `getBlockNumber()`
 const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: [u8; 4] = hex!("42cbb15c");
 
+/// Selector for retrieving the current block timestamp.
+/// This is used to override the current `block.timestamp` to foundry test's context.
+///
 /// Selector for `getBlockTimestamp()`
 const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: [u8; 4] = hex!("796b89b9");
 
@@ -119,10 +133,10 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         &mut self,
         state: VmLocalStateData<'_>,
         data: BeforeExecutionData,
-        memory: &SimpleMemory<H>,
-        storage: zksync_state::StoragePtr<S>,
+        _memory: &SimpleMemory<H>,
+        _storage: zksync_state::StoragePtr<S>,
     ) {
-        self.farcall_handler.track_active_far_calls(state, data, memory, storage);
+        self.farcall_handler.track_before_far_calls(&state, &data);
     }
 
     fn after_execution(
@@ -130,9 +144,10 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         state: VmLocalStateData<'_>,
         data: AfterExecutionData,
         memory: &SimpleMemory<H>,
-        storage: zksync_state::StoragePtr<S>,
+        _storage: zksync_state::StoragePtr<S>,
     ) {
-        self.farcall_handler.track_call_actions(state, data, memory, storage);
+        self.farcall_handler.track_after_far_calls(&state, &data);
+        self.farcall_handler.track_call_actions(&state, &data);
 
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
