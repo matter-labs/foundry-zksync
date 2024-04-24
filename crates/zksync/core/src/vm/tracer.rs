@@ -1,5 +1,4 @@
 use std::{
-    cmp::min,
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
