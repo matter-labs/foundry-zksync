@@ -98,10 +98,9 @@ pub struct CallContext {
     pub block_number: rU256,
     /// The current block timestamp
     pub block_timestamp: rU256,
-    /// block base fee
+    /// block base fee (if base fee is higher than max fee per gas, it will be overridden to max
+    /// fee per gas)
     pub block_basefee: rU256,
-    /// max fee per gas
-    pub max_fee_per_gas: rU256,
 }
 
 /// A tracer to allow for foundry-specific functionality.
@@ -277,11 +276,7 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
                 calldata.starts_with(&SELECTOR_BASE_FEE)
             {
-                let mut ret = self.call_context.block_basefee;
-                if self.call_context.block_basefee > self.call_context.max_fee_per_gas {
-                    ret = self.call_context.max_fee_per_gas;
-                }
-                self.farcall_handler.set_immediate_return(ret.to_be_bytes_vec());
+                self.farcall_handler.set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
                 return
             }
         }
