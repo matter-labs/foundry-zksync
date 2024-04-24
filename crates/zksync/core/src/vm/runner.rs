@@ -293,7 +293,8 @@ where
     <DB as Database>::Error: Debug,
 {
     let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state)
-        .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps));
+        .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps))
+        .with_storage_accesses(ccx.accesses.take());
 
     let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
     tracing::info!(?call_ctx, "executing transaction in zk vm");
@@ -323,6 +324,12 @@ where
         ccx,
         call_ctx,
     );
+
+    if let Some(record) = &mut era_db.accesses {
+        for k in modified_storage.keys() {
+            record.writes.entry(k.address().to_address()).or_default().push(k.key().to_ru256());
+        }
+    }
 
     let execution_result = match tx_result.result {
         ExecutionResult::Success { output, .. } => {
