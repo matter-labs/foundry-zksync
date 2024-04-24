@@ -269,12 +269,12 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
 
-            if current.code_address == SYSTEM_CONTEXT_ADDRESS {
-                if calldata.starts_with(&SELECTOR_BLOCK_BASE_FEE) {
-                    self.farcall_handler
-                        .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
-                    return
-                }
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
+                calldata.starts_with(&SELECTOR_BLOCK_BASE_FEE)
+            {
+                self.farcall_handler
+                    .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
+                return
             }
         }
 
