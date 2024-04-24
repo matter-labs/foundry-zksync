@@ -56,8 +56,8 @@ const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: [u8; 4] = hex!("42cbb15c");
 /// Selector for `getBlockTimestamp()`
 const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: [u8; 4] = hex!("796b89b9");
 
-/// Selector for `block.baseFee`
-const SELECTOR_BLOCK_BASE_FEE: [u8; 4] = hex!("6ef25c3a");
+/// Selector for `baseFee()`
+const SELECTOR_BASE_FEE: [u8; 4] = hex!("6ef25c3a");
 
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
