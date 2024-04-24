@@ -56,6 +56,9 @@ const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: [u8; 4] = hex!("42cbb15c");
 /// Selector for `getBlockTimestamp()`
 const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: [u8; 4] = hex!("796b89b9");
 
+/// Selector for `block.baseFee`
+const SELECTOR_BLOCK_BASE_FEE: [u8; 4] = hex!("6ef25c3a");
+
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
 pub struct CheatcodeTracerContext<'a> {
@@ -92,6 +95,8 @@ pub struct CallContext {
     pub block_number: rU256,
     /// The current block timestamp
     pub block_timestamp: rU256,
+    /// block base fee
+    pub block_basefee: rU256,
 }
 
 /// A tracer to allow for foundry-specific functionality.
@@ -254,6 +259,20 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                 } else if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP) {
                     self.farcall_handler
                         .set_immediate_return(self.call_context.block_timestamp.to_be_bytes_vec());
+                    return
+                }
+            }
+        }
+
+        // Override block base fee for the transaction
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let calldata = get_calldata(&state, memory);
+            let current = state.vm_local_state.callstack.current;
+
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS {
+                if calldata.starts_with(&SELECTOR_BLOCK_BASE_FEE) {
+                    self.farcall_handler
+                        .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
                     return
                 }
             }
