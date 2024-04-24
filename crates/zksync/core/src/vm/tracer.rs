@@ -56,6 +56,9 @@ const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: [u8; 4] = hex!("42cbb15c");
 /// Selector for `getBlockTimestamp()`
 const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: [u8; 4] = hex!("796b89b9");
 
+/// Selector for retrieving the current base fee.
+/// This is used to override the current `block.basefee` to foundry test's context.
+/// 
 /// Selector for `baseFee()`
 const SELECTOR_BASE_FEE: [u8; 4] = hex!("6ef25c3a");
 
