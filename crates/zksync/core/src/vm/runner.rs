@@ -110,6 +110,7 @@ where
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
         block_basefee: env.block.basefee,
+        max_fee_per_gas: max_fee_per_gas.to_ru256(),
     };
 
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
@@ -204,6 +205,7 @@ where
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
         block_basefee: env.block.basefee,
+        max_fee_per_gas: max_fee_per_gas.to_ru256(),
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
@@ -257,6 +259,7 @@ where
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
         block_basefee: env.block.basefee,
+        max_fee_per_gas: max_fee_per_gas.to_ru256(),
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
