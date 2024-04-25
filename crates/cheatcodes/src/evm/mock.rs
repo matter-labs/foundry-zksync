@@ -25,7 +25,9 @@ impl Cheatcode for mockCall_0Call {
             ))
             .to_checked();
             ccx.data.journaled_state.set_code(*callee, code.clone());
+        }
 
+        if ccx.state.use_zk_vm {
             foundry_zksync_core::cheatcodes::set_mocked_account(
                 *callee,
                 ccx.data.db,

@@ -5,7 +5,7 @@ use crate::{
         journaled_account,
         mapping::{self, MappingSlots},
         prank::Prank,
-        DealRecord, RecordAccess,
+        DealRecord,
     },
     script::{Broadcast, ScriptWallets},
     test::expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
@@ -19,6 +19,7 @@ use alloy_sol_types::{SolInterface, SolValue};
 use foundry_cheatcodes_common::{
     expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
     mock::{MockCallDataContext, MockCallReturnData},
+    record::RecordAccess,
 };
 use foundry_common::{evm::Breakpoints, provider::alloy::RpcUrl};
 use foundry_evm_core::{
@@ -1201,6 +1202,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
+                accesses: self.accesses.as_mut(),
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
@@ -1682,6 +1684,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
+                accesses: self.accesses.as_mut(),
                 persisted_factory_deps,
             };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(

@@ -68,9 +68,10 @@ pub enum ZkSolcVersion {
     V1322,
     V1323,
     V140,
+    V1401,
 }
 
-pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.4.0";
+pub const DEFAULT_ZKSOLC_VERSION: &str = "v1.4.1";
 
 /// `parse_version` parses a string representation of a `zksolc` compiler version
 /// and returns the `ZkSolcVersion` enum variant if it matches a supported version.
@@ -102,6 +103,7 @@ fn parse_version(version: &str) -> Result<ZkSolcVersion> {
         "v1.3.22" => Ok(ZkSolcVersion::V1322),
         "v1.3.23" => Ok(ZkSolcVersion::V1323),
         "v1.4.0" => Ok(ZkSolcVersion::V140),
+        "v1.4.1" => Ok(ZkSolcVersion::V1401),
         _ => Err(Error::msg(
             "ZkSolc compiler version not supported. Proper version format: 'v1.3.x'",
         )),
@@ -133,6 +135,7 @@ impl ZkSolcVersion {
             ZkSolcVersion::V1322 => "v1.3.22",
             ZkSolcVersion::V1323 => "v1.3.23",
             ZkSolcVersion::V140 => "v1.4.0",
+            ZkSolcVersion::V1401 => "v1.4.1",
         }
     }
 }
