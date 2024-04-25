@@ -178,6 +178,7 @@ pub fn etch<'a, DB>(
 pub const EMPTY_CODE: [u8; 32] = [0; 32];
 
 /// Sets code for a mocked account. If not done, the mocked call will revert.
+/// The call has no effect if the mocked account already has a bytecode entry.
 pub fn set_mocked_account<'a, DB>(
     address: Address,
     db: &'a mut DB,
@@ -194,8 +195,19 @@ pub fn set_mocked_account<'a, DB>(
             .expect("account could not be loaded");
 
         let key = address.to_h256().to_ru256();
+
+        // Apply only if the address doesn't have any associated bytecode entry
+        let has_code = account_code_acc
+            .storage
+            .get(&key)
+            .map(|v| !v.present_value.is_zero())
+            .unwrap_or_default();
+        if has_code {
+            return;
+        }
+
         let hash = zksync_utils::bytecode::hash_bytecode(&EMPTY_CODE);
-        let value = StorageSlot::new(hash.to_ru256());
+        let value: StorageSlot = StorageSlot::new(hash.to_ru256());
 
         if !account_code_acc.storage.contains_key(&key) {
             account_code_acc.storage.insert(key, value);

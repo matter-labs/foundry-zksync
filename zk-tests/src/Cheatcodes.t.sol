@@ -30,6 +30,16 @@ contract Mock {
     }
 }
 
+interface IMyProxyCaller {
+    function transact(uint8 _data) external;
+}
+
+contract MyProxyCaller {
+    function transact(address inner) public {
+        IMyProxyCaller(inner).transact(10);
+    }
+}
+
 contract ZkCheatcodesTest is Test {
     uint256 testSlot = 0; //0x000000000000000000000000000000000000000000000000000000000000001e slot
     uint256 constant ERA_FORK_BLOCK = 19579636;
@@ -143,5 +153,18 @@ contract ZkCheatcodesTest is Test {
 
         bytes memory dataAfter = target.getBytes();
         assertEq(dataAfter, bytes(hex"a1b1"));
+    }
+
+     function testZkCheatcodesCanMockCallTestContract() public {
+        address thisAddress = address(this);
+
+        vm.mockCall(
+            thisAddress,
+            abi.encodeWithSelector(IMyProxyCaller.transact.selector),
+            abi.encode()
+        );
+
+        MyProxyCaller transactor = new MyProxyCaller();
+        transactor.transact(thisAddress);
     }
 }
