@@ -17,7 +17,7 @@ use foundry_common::{
     HardhatConsole,
 };
 use foundry_zksync_compiler::DualCompiledContract;
-use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
+use std::{cmp::min, collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use crate::{fix_l2_gas_limit, fix_l2_gas_price};
 use itertools::Itertools;
@@ -108,6 +108,7 @@ where
         delegate_as: None,
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
+        block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
     };
 
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
@@ -201,6 +202,7 @@ where
         delegate_as: None,
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
+        block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
@@ -253,6 +255,7 @@ where
         },
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
+        block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
