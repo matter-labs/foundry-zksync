@@ -137,7 +137,6 @@ contract ZkCheatcodesTest is Test {
 
      function testZkCheatcodesCanMockCallTestContract() public {
         address thisAddress = address(this);
-        console.log("this", thisAddress);
 
         vm.mockCall(
             thisAddress,
