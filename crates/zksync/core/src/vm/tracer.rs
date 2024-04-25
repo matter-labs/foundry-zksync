@@ -276,7 +276,8 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
                 calldata.starts_with(&SELECTOR_BASE_FEE)
             {
-                self.farcall_handler.set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
+                self.farcall_handler
+                    .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
                 return
             }
         }
