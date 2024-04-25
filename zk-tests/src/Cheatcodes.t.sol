@@ -3,6 +3,14 @@ pragma solidity ^0.8.13;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
 
+contract FixedSlot {
+    uint8 num; // slot index: 0
+
+    function setSlot0(uint8 _num) public {
+        num = _num;
+    }
+}
+
 contract InnerMock {
     function getBytes() public payable returns (bytes memory) {
         bytes memory r = bytes(hex"abcd");
@@ -33,6 +41,7 @@ contract MyProxyCaller {
 }
 
 contract ZkCheatcodesTest is Test {
+    uint256 testSlot = 0; //0x000000000000000000000000000000000000000000000000000000000000001e slot
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
 
@@ -117,6 +126,17 @@ contract ZkCheatcodesTest is Test {
         require(number == 10, "era etched code incorrect");
     }
 
+    function testRecord() public {
+        FixedSlot fs = new FixedSlot();
+        vm.record();
+        fs.setSlot0(10);
+        (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(
+            address(fs)
+        );
+        bytes32 keySlot0 = bytes32(uint256(0));
+        assertEq(reads[0], keySlot0);
+        assertEq(writes[0], keySlot0);
+    }
     function testZkCheatcodesValueFunctionMockReturn() public {
         InnerMock inner = new InnerMock();
         // Send some funds to so it can pay for the inner call
