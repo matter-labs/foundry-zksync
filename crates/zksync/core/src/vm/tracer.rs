@@ -98,8 +98,7 @@ pub struct CallContext {
     pub block_number: rU256,
     /// The current block timestamp
     pub block_timestamp: rU256,
-    /// block base fee (if base fee is higher than max fee per gas, it will be overridden to max
-    /// fee per gas)
+    /// The current block basefee
     pub block_basefee: rU256,
 }
 
