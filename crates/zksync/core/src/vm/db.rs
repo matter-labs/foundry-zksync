@@ -7,6 +7,7 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use alloy_primitives::Address;
+use foundry_cheatcodes_common::record::RecordAccess;
 use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
@@ -28,6 +29,7 @@ pub struct ZKVMData<'a, DB> {
     pub journaled_state: &'a mut JournaledState,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: HashMap<StorageKey, StorageValue>,
+    pub accesses: Option<&'a mut RecordAccess>,
 }
 
 impl<'a, DB> Debug for ZKVMData<'a, DB> {
@@ -67,7 +69,13 @@ where
         let empty_code = vec![0u8; 32];
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
-        Self { db, journaled_state, factory_deps, override_keys: Default::default() }
+        Self {
+            db,
+            journaled_state,
+            factory_deps,
+            override_keys: Default::default(),
+            accesses: None,
+        }
     }
 
     /// Create a new instance of [ZKEVMData] with system contracts.
@@ -113,7 +121,19 @@ where
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
 
-        Self { db, journaled_state, factory_deps, override_keys }
+        Self { db, journaled_state, factory_deps, override_keys, accesses: None }
+    }
+
+    /// Extends the currently known factory deps with the provided input
+    pub fn with_extra_factory_deps(mut self, extra_factory_deps: HashMap<H256, Vec<u8>>) -> Self {
+        self.factory_deps.extend(extra_factory_deps);
+        self
+    }
+
+    /// Assigns the accesses coming from Foundry
+    pub fn with_storage_accesses(mut self, accesses: Option<&'a mut RecordAccess>) -> Self {
+        self.accesses = accesses;
+        self
     }
 
     /// Returns the code hash for a given account from AccountCode storage.
@@ -158,12 +178,6 @@ where
         account
     }
 
-    /// Extends the currently known factory deps with the provided input
-    pub fn with_extra_factory_deps(mut self, extra_factory_deps: HashMap<H256, Vec<u8>>) -> Self {
-        self.factory_deps.extend(extra_factory_deps);
-        self
-    }
-
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
         let addr = address.to_address();
         self.journaled_state.load_account(addr, self.db).expect("failed loading account");
@@ -179,6 +193,9 @@ where
     <DB as Database>::Error: Debug,
 {
     fn read_value(&mut self, key: &StorageKey) -> zksync_types::StorageValue {
+        if let Some(access) = &mut self.accesses {
+            access.reads.entry(key.address().to_address()).or_default().push(key.key().to_ru256());
+        }
         self.read_db(*key.address(), h256_to_u256(*key.key()))
     }
 

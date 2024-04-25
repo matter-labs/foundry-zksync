@@ -7,6 +7,7 @@ use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
+    record::RecordAccess,
 };
 use multivm::{
     interface::{dyn_tracers::vm_1_4_1::DynTracer, tracer::TracerExecutionStatus},
@@ -62,6 +63,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
+    /// Recorded storage accesses
+    pub accesses: Option<&'a mut RecordAccess>,
     /// Factory deps that were persisted across calls
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }

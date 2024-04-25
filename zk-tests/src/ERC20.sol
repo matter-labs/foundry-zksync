@@ -2,6 +2,7 @@
 pragma solidity >=0.8.0;
 
 contract MyToken {
+    string public owner;
     string public constant name = "MyToken";
     string public constant symbol = "MTK";
     uint8 public constant decimals = 18;
@@ -13,6 +14,10 @@ contract MyToken {
 
     constructor() {
         balanceOf[msg.sender] = totalSupply;
+    }
+
+    function setTotalSupply(uint256 amount) public {
+        totalSupply = amount;
     }
 
     function transfer(address to, uint256 amount) public returns (bool) {
