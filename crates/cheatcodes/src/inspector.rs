@@ -239,7 +239,8 @@ pub struct Cheatcodes {
     /// they are recorded by [foundry_evm::inspectors::LogCollector] tracer.
     pub combined_logs: Vec<Option<Log>>,
 
-    /// Starts the cheatcode inspector in ZK mode
+    /// Starts the cheatcode inspector in ZK mode.
+    /// This is set to `false`, once the startup migration is completed.
     pub startup_zk: bool,
 
     /// The list of factory_deps seen so far during a test or script execution.
@@ -547,6 +548,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             data.env.tx.gas_price = gas_price;
         }
         if self.startup_zk && !self.use_zk_vm {
+            self.startup_zk = false; // We only do this once.
             self.select_zk_vm(data, None);
         }
     }
