@@ -93,13 +93,14 @@ pub struct CallContext {
     /// Delegated contract's address. This is used
     /// to override `address(this)` for delegate calls.
     pub delegate_as: Option<Address>,
-
     /// The current block number
     pub block_number: rU256,
     /// The current block timestamp
     pub block_timestamp: rU256,
     /// The current block basefee
     pub block_basefee: rU256,
+    /// Whether the current call is a create.
+    pub is_create: bool,
 }
 
 /// A tracer to allow for foundry-specific functionality.
