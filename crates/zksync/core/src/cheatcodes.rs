@@ -15,7 +15,10 @@ use zksync_types::{
 };
 use zksync_utils::bytecode::hash_bytecode;
 
-use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
+use crate::{
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    EMPTY_CODE,
+};
 
 /// Sets `block.timestamp`.
 pub fn warp<'a, DB>(
@@ -173,9 +176,6 @@ pub fn etch<'a, DB>(
     account.info.code_hash = B256::from(bytecode_hash.to_be_bytes());
     account.info.code = Some(bytecode.clone());
 }
-
-/// Represents an empty code
-pub const EMPTY_CODE: [u8; 32] = [0; 32];
 
 /// Sets code for a mocked account. If not done, the mocked call will revert.
 /// The call has no effect if the mocked account already has a bytecode entry.

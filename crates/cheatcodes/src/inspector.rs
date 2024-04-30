@@ -31,7 +31,6 @@ use foundry_evm_core::{
 };
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
-    cheatcodes::EMPTY_CODE,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     ZkTransactionMetadata,
 };
@@ -263,10 +262,13 @@ impl Cheatcodes {
         // We add the empty bytecode manually so it is correctly translated in zk mode.
         // This is used in many places in foundry, e.g. in cheatcode contract's account code.
         let empty_bytes = Bytes::from_static(&[0]);
+        let zk_bytecode_hash = foundry_zksync_core::hash_bytecode(&foundry_zksync_core::EMPTY_CODE);
+        let zk_deployed_bytecode = foundry_zksync_core::EMPTY_CODE.to_vec();
+
         dual_compiled_contracts.push(DualCompiledContract {
             name: String::from("EmptyEVMBytecode"),
-            zk_bytecode_hash: foundry_zksync_core::hash_bytecode(&EMPTY_CODE),
-            zk_deployed_bytecode: EMPTY_CODE.to_vec(),
+            zk_bytecode_hash,
+            zk_deployed_bytecode: zk_deployed_bytecode.clone(),
             zk_factory_deps: Default::default(),
             evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
             evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone())
@@ -275,6 +277,9 @@ impl Cheatcodes {
                 .to_vec(),
             evm_bytecode: Bytecode::new_raw(empty_bytes).to_checked().bytecode.to_vec(),
         });
+
+        let mut persisted_factory_deps = HashMap::new();
+        persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
 
         let startup_zk = config.use_zk;
         Self {
