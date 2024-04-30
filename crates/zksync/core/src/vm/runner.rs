@@ -78,10 +78,10 @@ where
 
     let caller = env.tx.caller;
     let nonce = ZKVMData::new(db, &mut journaled_state).get_tx_nonce(caller);
-    let transact_to = match env.tx.transact_to {
-        TransactTo::Call(to) => to.to_h160(),
+    let (transact_to, is_create) = match env.tx.transact_to {
+        TransactTo::Call(to) => (to.to_h160(), false),
         TransactTo::Create(CreateScheme::Create) |
-        TransactTo::Create(CreateScheme::Create2 { .. }) => CONTRACT_DEPLOYER_ADDRESS,
+        TransactTo::Create(CreateScheme::Create2 { .. }) => (CONTRACT_DEPLOYER_ADDRESS, true),
     };
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, &mut journaled_state, caller);
@@ -109,6 +109,7 @@ where
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
+        is_create,
     };
 
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
@@ -203,6 +204,7 @@ where
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
+        is_create: true,
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
@@ -256,6 +258,7 @@ where
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
+        is_create: false,
     };
 
     inspect(tx, env, db, journaled_state, ccx, call_ctx)
@@ -299,7 +302,7 @@ where
         .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps))
         .with_storage_accesses(ccx.accesses.take());
 
-    let is_create = tx.execute.contract_address == zksync_types::CONTRACT_DEPLOYER_ADDRESS;
+    let is_create = call_ctx.is_create;
     tracing::info!(?call_ctx, "executing transaction in zk vm");
 
     let chain_id_u32 = if env.cfg.chain_id <= u32::MAX as u64 {

@@ -4,6 +4,15 @@ pragma solidity ^0.8.13;
 import {Test, console2 as console} from "forge-std/Test.sol";
 import {ConstantNumber} from "./ConstantNumber.sol";
 
+interface ISystemContractDeployer {
+    function getNewAddressCreate2(
+        address _sender,
+        bytes32 _bytecodeHash,
+        bytes32 _salt,
+        bytes calldata _input
+    ) external view returns (address newAddress);
+}
+
 contract Number {
     function ten() public pure returns (uint8) {
         return 10;
@@ -229,5 +238,25 @@ contract ZkContractsTest is Test {
         );
 
         return address(uint160(uint256(address_hash)));
+    }
+
+    function testZkContractsCallSystemContract() public {
+        (bool success, ) = address(vm).call(
+            abi.encodeWithSignature("zkVm(bool)", true)
+        );
+        require(success, "zkVm() call failed");
+
+        ISystemContractDeployer deployer = ISystemContractDeployer(
+            address(0x0000000000000000000000000000000000008006)
+        );
+
+        address addr = deployer.getNewAddressCreate2(
+            address(this),
+            0x0100000781e55a60f3f14fd7dd67e3c8caab896b7b0fca4a662583959299eede,
+            0x0100000781e55a60f3f14fd7dd67e3c8caab896b7b0fca4a662583959299eede,
+            ""
+        );
+
+        assertEq(address(0x46efB6258A2A539f7C8b44e2EF659D778fb5BAAd), addr);
     }
 }
