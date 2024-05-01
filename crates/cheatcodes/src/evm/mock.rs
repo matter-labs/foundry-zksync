@@ -20,10 +20,8 @@ impl Cheatcode for mockCall_0Call {
         // check Solidity might perform.
         let empty_bytecode = acc.info.code.as_ref().map_or(true, Bytecode::is_empty);
         if empty_bytecode {
-            let code = Bytecode::new_raw(Bytes::copy_from_slice(
-                &foundry_zksync_core::cheatcodes::EMPTY_CODE,
-            ))
-            .to_checked();
+            let code = Bytecode::new_raw(Bytes::copy_from_slice(&foundry_zksync_core::EMPTY_CODE))
+                .to_checked();
             ccx.data.journaled_state.set_code(*callee, code.clone());
         }
 

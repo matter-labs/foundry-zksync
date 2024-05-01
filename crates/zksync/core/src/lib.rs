@@ -41,6 +41,9 @@ use zksync_web3_rs::{
 
 type Result<T> = std::result::Result<T, eyre::Report>;
 
+/// Represents an empty code
+pub const EMPTY_CODE: [u8; 32] = [0; 32];
+
 /// The minimum possible address that is not reserved in the zkSync space.
 const MIN_VALID_ADDRESS: u32 = 2u32.pow(16);
 
