@@ -30,7 +30,7 @@ jobs:
         run: cargo build --release --bin forge
 
       - name: Clone Aave Delivery Infrastructure
-        run: git clone https://github.com/Moonsong-Labs/aave-delivery-infrastructure.git --depth=1 -b feat/zksync
+        run: git clone https://github.com/Moonsong-Labs/aave-delivery-infrastructure.git --depth=1 -b ci
 
       - name: Run tests using built binary
         run: |
