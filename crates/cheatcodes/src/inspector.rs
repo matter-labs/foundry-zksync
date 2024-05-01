@@ -13,7 +13,7 @@ use crate::{
     Vm::{self, AccountAccess},
 };
 
-use alloy_primitives::{Address, Bytes, Log, LogData, B256, U256, U64};
+use alloy_primitives::{keccak256, Address, Bytes, Log, LogData, B256, U256, U64};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolInterface, SolValue};
 use foundry_cheatcodes_common::{
@@ -29,10 +29,10 @@ use foundry_evm_core::{
         HARDHAT_CONSOLE_ADDRESS,
     },
 };
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    hash_bytecode, ZkTransactionMetadata,
+    ZkTransactionMetadata,
 };
 use itertools::Itertools;
 use revm::{
@@ -257,7 +257,30 @@ impl Cheatcodes {
     pub fn new(config: Arc<CheatsConfig>) -> Self {
         let labels = config.labels.clone();
         let script_wallets = config.script_wallets.clone();
-        let dual_compiled_contracts = config.dual_compiled_contracts.clone();
+        let mut dual_compiled_contracts = config.dual_compiled_contracts.clone();
+
+        // We add the empty bytecode manually so it is correctly translated in zk mode.
+        // This is used in many places in foundry, e.g. in cheatcode contract's account code.
+        let empty_bytes = Bytes::from_static(&[0]);
+        let zk_bytecode_hash = foundry_zksync_core::hash_bytecode(&foundry_zksync_core::EMPTY_CODE);
+        let zk_deployed_bytecode = foundry_zksync_core::EMPTY_CODE.to_vec();
+
+        dual_compiled_contracts.push(DualCompiledContract {
+            name: String::from("EmptyEVMBytecode"),
+            zk_bytecode_hash,
+            zk_deployed_bytecode: zk_deployed_bytecode.clone(),
+            zk_factory_deps: Default::default(),
+            evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
+            evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone())
+                .to_checked()
+                .bytecode
+                .to_vec(),
+            evm_bytecode: Bytecode::new_raw(empty_bytes).to_checked().bytecode.to_vec(),
+        });
+
+        let mut persisted_factory_deps = HashMap::new();
+        persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
+
         let startup_zk = config.use_zk;
         Self {
             config,
@@ -364,7 +387,7 @@ impl Cheatcodes {
     /// accounts
     pub fn select_evm<DB: DatabaseExt>(&mut self, data: &mut EVMData<'_, DB>) {
         if !self.use_zk_vm {
-            tracing::info!("already in  EVM");
+            tracing::info!("already in EVM");
             return
         }
 
@@ -1677,8 +1700,11 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             // get the current persisted factory deps to pass to zk create
             let persisted_factory_deps = self.persisted_factory_deps.clone();
             // and extend it for future calls
-            self.persisted_factory_deps
-                .extend(factory_deps.iter().map(|dep| (hash_bytecode(dep), dep.clone())));
+            self.persisted_factory_deps.extend(
+                factory_deps
+                    .iter()
+                    .map(|dep| (foundry_zksync_core::hash_bytecode(dep), dep.clone())),
+            );
 
             tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
