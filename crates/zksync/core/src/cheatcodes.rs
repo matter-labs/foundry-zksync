@@ -183,10 +183,15 @@ pub fn set_mocked_account<'a, DB>(
     address: Address,
     db: &'a mut DB,
     journaled_state: &'a mut JournaledState,
+    caller: Address,
 ) where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
+    if address == caller {
+        tracing::error!("using `mockCall` cheatcode on caller isn't supported in zkVM");
+    }
+
     let account_code_addr = zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
     let known_code_addr = zksync_types::KNOWN_CODES_STORAGE_ADDRESS.to_address();
     {
