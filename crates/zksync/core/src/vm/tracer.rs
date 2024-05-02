@@ -270,7 +270,9 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             }
         }
 
-        // Override block base fee for the transaction
+        // Override block base fee for the transaction. This is properly setup when creating
+        // `L1BatchEnv` but a value of `0` is auto-translated to `1`, so we ensure that it will
+        // always be `0`.
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;

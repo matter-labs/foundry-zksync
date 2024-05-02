@@ -116,7 +116,6 @@ pub(crate) struct FarCallHandler {
     pub(crate) before_far_call_stack: Option<CallStackEntry>,
     pub(crate) after_far_call_stack: Option<CallStackEntry>,
     pub(crate) current_far_call: Option<FarCallOpcode>,
-    // pub(crate) immediate_return: Option<ImmediateReturn>,
     pub(crate) immediate_return: Option<Vec<u8>>,
     call_actions: CallActions,
 }
