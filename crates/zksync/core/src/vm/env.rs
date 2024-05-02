@@ -1,4 +1,3 @@
-use era_test_node::node::L2_GAS_PRICE;
 use multivm::{
     interface::{L1BatchEnv, L2BlockEnv, SystemEnv},
     vm_latest::{
@@ -18,6 +17,7 @@ use zksync_utils::h256_to_u256;
 pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
     storage: StoragePtr<ST>,
     l1_gas_price: u64,
+    fair_l2_gas_price: u64,
 ) -> L1BatchEnv {
     let mut first_l2_block = if let Some(last_l2_block) = load_last_l2_block(storage.clone()) {
         L2BlockEnv {
@@ -42,6 +42,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
 
     first_l2_block.timestamp = std::cmp::max(batch_timestamp + 1, first_l2_block.timestamp);
     batch_timestamp = first_l2_block.timestamp;
+    tracing::info!(fair_l2_gas_price, l1_gas_price, "batch env");
     L1BatchEnv {
         // TODO: set the previous batch hash properly (take from fork, when forking, and from local
         // storage, when this is not the first block).
@@ -53,7 +54,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
         enforced_base_fee: None,
         first_l2_block,
         fee_input: zksync_types::fee_model::BatchFeeInput::L1Pegged(L1PeggedBatchFeeModelInput {
-            fair_l2_gas_price: L2_GAS_PRICE,
+            fair_l2_gas_price,
             l1_gas_price,
         }),
     }

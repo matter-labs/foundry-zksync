@@ -6,10 +6,12 @@ import {Test} from "forge-std/Test.sol";
 contract BlockEnv {
     uint256 public number;
     uint256 public timestamp;
+    uint256 public basefee;
 
     constructor() {
         number = block.number;
         timestamp = block.timestamp;
+        basefee = block.basefee;
     }
 }
 
@@ -27,7 +29,10 @@ contract ZkBasicTest is Test {
 
     function setUp() public {
         forkEra = vm.createFork("mainnet", ERA_FORK_BLOCK);
-        forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
+        forkEth = vm.createFork(
+            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf",
+            ETH_FORK_BLOCK
+        );
     }
 
     function testZkBasicBlockNumber() public {
@@ -40,10 +45,16 @@ contract ZkBasicTest is Test {
 
     function testZkBasicBlockTimestamp() public {
         vm.selectFork(forkEra);
-        require(block.timestamp == ERA_FORK_BLOCK_TS, "era block timestamp mismatch");
+        require(
+            block.timestamp == ERA_FORK_BLOCK_TS,
+            "era block timestamp mismatch"
+        );
 
         vm.selectFork(forkEth);
-        require(block.timestamp == ETH_FORK_BLOCK_TS, "eth block timestamp mismatch");
+        require(
+            block.timestamp == ETH_FORK_BLOCK_TS,
+            "eth block timestamp mismatch"
+        );
     }
 
     function testZkBasicAddressBalance() public {
@@ -59,18 +70,64 @@ contract ZkBasicTest is Test {
 
     function testZkPropagatedBlockEnv() public {
         BlockEnv be = new BlockEnv();
-        require(be.number() == block.number, "propagated block number is the same as current");
-        require(be.timestamp() == block.timestamp, "propagated block timestamp is the same as current");
+        require(
+            be.number() == block.number,
+            "propagated block number is the same as current"
+        );
+        require(
+            be.timestamp() == block.timestamp,
+            "propagated block timestamp is the same as current"
+        );
+        require(
+            be.basefee() == block.basefee,
+            "propagated block basefee is the same as current"
+        );
 
         be = new BlockEnv();
-        require(be.number() == block.number, "propagated block number stays constant");
-        require(be.timestamp() == block.timestamp, "propagated block timestamp stays constant");
+        require(
+            be.number() == block.number,
+            "propagated block number stays constant"
+        );
+        require(
+            be.timestamp() == block.timestamp,
+            "propagated block timestamp stays constant"
+        );
+        require(
+            be.basefee() == block.basefee,
+            "propagated block basefee stays constant"
+        );
 
         vm.roll(42);
         vm.warp(42);
 
         be = new BlockEnv();
         require(be.number() == block.number, "propagated block number rolls");
-        require(be.timestamp() == block.timestamp, "propagated block timestamp warps");
+        require(
+            be.timestamp() == block.timestamp,
+            "propagated block timestamp warps"
+        );
+        require(
+            be.basefee() == block.basefee,
+            "propagated block basefee warps"
+        );
+    }
+
+    function testZkBasicBlockBaseFee() public {
+        BlockEnv beBefore = new BlockEnv();
+        require(
+            beBefore.basefee() == block.basefee,
+            "propagated block basefee is the same as current"
+        );
+
+        vm.selectFork(forkEra);
+        BlockEnv beAfter = new BlockEnv();
+        require(
+            beAfter.basefee() == block.basefee,
+            "propagated block basefee is the same as before"
+        );
+        require(
+            beAfter.basefee() == block.basefee,
+            "propagated block basefee is the same as before"
+        );
     }
 }
