@@ -155,7 +155,13 @@ contract ZkCheatcodesTest is Test {
         assertEq(dataAfter, bytes(hex"a1b1"));
     }
 
+    function testZkCheatcodesCanMockTestContract() public {
+        testZkCheatcodesCanMockCall(address(this));
+    }
+
     function testZkCheatcodesCanMockCall(address mockMe) public {
+        vm.assume(mockMe != address(vm));
+
         //zkVM currently doesn't support mocking the transaction sender
         vm.assume(mockMe != tx.origin);
 
