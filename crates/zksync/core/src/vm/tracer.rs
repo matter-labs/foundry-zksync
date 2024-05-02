@@ -143,12 +143,11 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
 
     fn before_execution(
         &mut self,
-        state: VmLocalStateData<'_>,
-        data: BeforeExecutionData,
+        _state: VmLocalStateData<'_>,
+        _data: BeforeExecutionData,
         _memory: &SimpleMemory<H>,
         _storage: zksync_state::StoragePtr<S>,
     ) {
-        self.farcall_handler.track_before_far_calls(&state, &data);
     }
 
     fn after_execution(
@@ -158,7 +157,6 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         memory: &SimpleMemory<H>,
         _storage: zksync_state::StoragePtr<S>,
     ) {
-        self.farcall_handler.track_after_far_calls(&state, &data);
         self.farcall_handler.track_call_actions(&state, &data);
 
         // Checks contract calls for expectCall cheatcode
@@ -209,7 +207,11 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                         .map(|(_, v)| v)
                 }) {
                     let return_data = return_data.data.clone().to_vec();
-                    tracing::info!("returning mocked value {:?}", hex::encode(&return_data));
+                    tracing::info!(
+                        "returning mocked value {:?} for {:?}",
+                        hex::encode(&call_input),
+                        hex::encode(&return_data)
+                    );
                     self.farcall_handler.set_immediate_return(return_data);
                     return;
                 }
@@ -268,7 +270,9 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             }
         }
 
-        // Override block base fee for the transaction
+        // Override block base fee for the transaction. This is properly setup when creating
+        // `L1BatchEnv` but a value of `0` is auto-translated to `1`, so we ensure that it will
+        // always be `0`.
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
