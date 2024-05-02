@@ -4264,6 +4264,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rpc-types",
  "anvil",
+ "async-recursion",
  "async-trait",
  "axum",
  "clap",
