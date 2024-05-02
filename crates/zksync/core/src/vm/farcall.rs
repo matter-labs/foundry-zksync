@@ -156,7 +156,6 @@ impl FarCallHandler {
         if let Some(return_data) = self.immediate_return.take() {
             // set return data
             let current = state.local_state.callstack.get_current_stack();
-            let current_ergs_remaining = current.ergs_remaining;
             let return_memory_page = CallStackEntry::heap_page_from_base(current.base_memory_page);
 
             let data_chunks = return_data.chunks(32);
@@ -181,15 +180,15 @@ impl FarCallHandler {
             );
 
             // pop the current stack to simulate return
-            let new_cs = state.local_state.callstack.pop_entry();
+            let previous_cs = state.local_state.callstack.pop_entry();
 
             // Set gas consumption. A significant amount of gas is set aside for the
-            // active far call, which needs to be "refunded back".
+            // active far call, which needs to be "refunded" back.
             //
-            // We consume no gas for setting immediate returns. This can cause gas related
+            // We consume no gas for setting immediate returns. This may cause gas related
             // discrepancies. E.g. returning from a `baseFee()` can ignore up to
             // 67_000_000 gas
-            state.local_state.callstack.current.ergs_remaining = new_cs.ergs_remaining;
+            state.local_state.callstack.current.ergs_remaining = previous_cs.ergs_remaining;
         }
     }
 
