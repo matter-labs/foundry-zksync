@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Test, console2 as console} from "forge-std/Test.sol";
 
 contract MockInner {
-    // failure happens when returning >=5 items
+    // this covers an edge case that mainfests when returning >=5 items
     function mockedMethod()
         external
         pure
