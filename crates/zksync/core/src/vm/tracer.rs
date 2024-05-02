@@ -116,6 +116,8 @@ pub struct CheatcodeTracer {
     pub result: Arc<OnceCell<CheatcodeTracerResult>>,
     /// Handle farcall state.
     farcall_handler: FarCallHandler,
+    tabs: usize,
+    record_ret: bool,
 }
 
 impl CheatcodeTracer {
@@ -148,7 +150,7 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         _memory: &SimpleMemory<H>,
         _storage: zksync_state::StoragePtr<S>,
     ) {
-        self.farcall_handler.track_before_far_calls(&state, &data);
+        // self.farcall_handler.track_before_far_calls(&state, &data);
     }
 
     fn after_execution(
@@ -158,7 +160,7 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         memory: &SimpleMemory<H>,
         _storage: zksync_state::StoragePtr<S>,
     ) {
-        self.farcall_handler.track_after_far_calls(&state, &data);
+        // self.farcall_handler.track_after_far_calls(&state, &data);
         self.farcall_handler.track_call_actions(&state, &data);
 
         // Checks contract calls for expectCall cheatcode
@@ -209,7 +211,11 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                         .map(|(_, v)| v)
                 }) {
                     let return_data = return_data.data.clone().to_vec();
-                    tracing::info!("returning mocked value {:?}", hex::encode(&return_data));
+                    tracing::info!(
+                        "returning mocked value {:?} for {:?}",
+                        hex::encode(&call_input),
+                        hex::encode(&return_data)
+                    );
                     self.farcall_handler.set_immediate_return(return_data);
                     return;
                 }

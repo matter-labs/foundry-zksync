@@ -54,6 +54,9 @@ use crate::vm::{
 
 use super::{storage_view::StorageView, tracer::CheatcodeTracerContext};
 
+/// Maximum gas price allowed for L1.
+const MAX_L1_GAS_PRICE: u64 = 1000;
+
 type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
 
 /// Transacts
@@ -322,14 +325,8 @@ where
     let storage_ptr =
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
-    let (tx_result, bytecodes, modified_storage) = inspect_inner(
-        tx,
-        storage_ptr,
-        L2ChainId::from(chain_id_u32),
-        u64::max(env.block.basefee.to::<u64>(), 1000),
-        ccx,
-        call_ctx,
-    );
+    let (tx_result, bytecodes, modified_storage) =
+        inspect_inner(tx, storage_ptr, L2ChainId::from(chain_id_u32), ccx, call_ctx);
 
     if let Some(record) = &mut era_db.accesses {
         for k in modified_storage.keys() {
@@ -465,11 +462,12 @@ fn inspect_inner<S: ReadStorage + Send>(
     l2_tx: L2Tx,
     storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,
-    l1_gas_price: u64,
     mut ccx: CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
-    let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price);
+    let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MAX_L1_GAS_PRICE);
+    let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
+    let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price, fair_l2_gas_price);
 
     let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity);
     let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);

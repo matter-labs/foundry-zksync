@@ -32,15 +32,15 @@ type DecodedOpcode = ZkDecodedOpcode<8, EncodingModeProduction>;
 #[derive(Debug, Clone)]
 pub(crate) struct ImmediateReturn {
     pub(crate) return_data: Vec<u8>,
-    pub(crate) return_base_memory_page: u32,
-    pub(crate) next_pc: PcOrImm,
-    pub(crate) next_code_page: u32,
-    pub(crate) next_base_memory_page: u32,
-    pub(crate) next_sp: PcOrImm,
-    pub(crate) next_exception_handler_location: PcOrImm,
-    pub(crate) next_this_address: H160,
-    pub(crate) next_is_local_frame: bool,
-    pub(crate) next_context_u128_value: u128,
+    // pub(crate) return_base_memory_page: u32,
+    // pub(crate) next_pc: PcOrImm,
+    // pub(crate) next_code_page: u32,
+    // pub(crate) next_base_memory_page: u32,
+    // pub(crate) next_sp: PcOrImm,
+    // pub(crate) next_exception_handler_location: PcOrImm,
+    // pub(crate) next_this_address: H160,
+    // pub(crate) next_is_local_frame: bool,
+    // pub(crate) next_context_u128_value: u128,
 }
 
 /// The call depth
@@ -131,58 +131,72 @@ pub(crate) struct FarCallHandler {
     pub(crate) before_far_call_stack: Option<CallStackEntry>,
     pub(crate) after_far_call_stack: Option<CallStackEntry>,
     pub(crate) current_far_call: Option<FarCallOpcode>,
-    pub(crate) immediate_return: Option<ImmediateReturn>,
+    // pub(crate) immediate_return: Option<ImmediateReturn>,
+    pub(crate) immediate_return: Option<Vec<u8>>,
     call_actions: CallActions,
 }
 
 impl FarCallHandler {
     /// Marks the current FarCall opcode to return immediately during `finish_cycle`.
     /// Must be called during either `before_execution` or `after_execution`.
+    /// Must _always_ be called always within a `Farcall` opcode.
     pub(crate) fn set_immediate_return(&mut self, return_data: Vec<u8>) {
-        let immediate_return = self.current_far_call.and_then(|call| match call {
-            FarCallOpcode::Normal | FarCallOpcode::Delegate => {
-                self.before_far_call_stack.map(|before| ImmediateReturn {
-                    return_data,
-                    return_base_memory_page: before.base_memory_page.0,
-                    next_pc: before.pc.saturating_add(1),
-                    next_code_page: before.code_page.0,
-                    next_base_memory_page: before.base_memory_page.0,
-                    next_sp: before.sp,
-                    next_exception_handler_location: before.exception_handler_location,
-                    next_this_address: before.this_address,
-                    next_is_local_frame: false,
-                    next_context_u128_value: 0,
-                })
-            }
-            // Mimic calls case is used to handle the case when a value is sent to a function.
-            // These calls go through a call to MsgValue simulator contract and then do a mimic call
-            // to the actual contract.
-            FarCallOpcode::Mimic => self.before_far_call_stack.map(|before| ImmediateReturn {
-                return_data,
-                // base_memory_page for returndata must be set to current base_memory_page and not
-                // of the caller for calls with value. Reasons unknown, but required in zk vm.
-                return_base_memory_page: self
-                    .after_far_call_stack
-                    .map(|after| after.base_memory_page.0)
-                    .unwrap_or(before.base_memory_page.0),
-                next_pc: before.pc.saturating_add(1),
-                next_code_page: before.code_page.0,
-                next_base_memory_page: before.base_memory_page.0,
-                next_sp: before.sp,
-                next_exception_handler_location: before.exception_handler_location,
-                next_this_address: before.this_address,
-                // `is_local_frame` for return satck needs to be set to same as before state when
-                // returning from calls with value. Reasons unknown, but required in zk vm.
-                next_is_local_frame: before.is_local_frame,
-                next_context_u128_value: 0,
-            }),
-        });
+        // let return_before =
+        // std::env::var("RETURN_BEFORE").unwrap_or("false".to_string()).parse::<bool>().
+        // unwrap_or_default(); println!("immediate {:?}, return_before={}",
+        // hex::encode(&return_data), return_before); let immediate_return =
+        // self.current_far_call.and_then(|call| match call {     FarCallOpcode::Normal |
+        // FarCallOpcode::Delegate => {         self.before_far_call_stack.map(|before|
+        // ImmediateReturn {             return_data,
+        //             // return_base_memory_page: before.base_memory_page.0,
+        //             return_base_memory_page: if return_before {
+        //                 before.base_memory_page.0
+        //             } else {
+        //                 self
+        //                         .after_far_call_stack
+        //                         .map(|after| after.base_memory_page.0)
+        //                         .unwrap_or(before.base_memory_page.0)
+        //             },
+        //             next_pc: before.pc.saturating_add(1),
+        //             next_code_page: before.code_page.0,
+        //             next_base_memory_page: before.base_memory_page.0,
+        //             next_sp: before.sp,
+        //             next_exception_handler_location: before.exception_handler_location,
+        //             next_this_address: before.this_address,
+        //             next_is_local_frame: false,
+        //             next_context_u128_value: 0,
+        //         })
+        //     }
+        //     // Mimic calls case is used to handle the case when a value is sent to a function.
+        //     // These calls go through a call to MsgValue simulator contract and then do a mimic
+        // call     // to the actual contract.
+        //     FarCallOpcode::Mimic => self.before_far_call_stack.map(|before| ImmediateReturn {
+        //         return_data,
+        //         // base_memory_page for returndata must be set to current base_memory_page and
+        // not         // of the caller for calls with value. Reasons unknown, but required
+        // in zk vm.         return_base_memory_page: self
+        //             .after_far_call_stack
+        //             .map(|after| after.base_memory_page.0)
+        //             .unwrap_or(before.base_memory_page.0),
+        //         next_pc: before.pc.saturating_add(1),
+        //         next_code_page: before.code_page.0,
+        //         next_base_memory_page: before.base_memory_page.0,
+        //         next_sp: before.sp,
+        //         next_exception_handler_location: before.exception_handler_location,
+        //         next_this_address: before.this_address,
+        //         // `is_local_frame` for return satck needs to be set to same as before state when
+        //         // returning from calls with value. Reasons unknown, but required in zk vm.
+        //         next_is_local_frame: before.is_local_frame,
+        //         next_context_u128_value: 0,
+        //     }),
+        // });
 
-        if let Some(immediate_return) = immediate_return {
-            self.immediate_return.replace(immediate_return);
-        } else {
-            tracing::warn!("No active far call stack, ignoring immediate return");
-        }
+        self.immediate_return.replace(return_data);
+        // if let Some(immediate_return) = immediate_return {
+        //     self.immediate_return.replace(immediate_return);
+        // } else {
+        //     tracing::warn!("No active far call stack, ignoring immediate return");
+        // }
     }
 
     /// Sets a [CallAction] for the current or subsequent FarCalls during `finish_cycle`.
@@ -191,32 +205,32 @@ impl FarCallHandler {
         self.call_actions.push(depth, action)
     }
 
-    /// Tracks the call stack for the currently active FarCall.
-    /// Must be called during `before_execution`.
-    pub(crate) fn track_before_far_calls(
-        &mut self,
-        state: &VmLocalStateData<'_>,
-        data: &BeforeExecutionData,
-    ) {
-        if let Opcode::FarCall(call) = data.opcode.variant.opcode {
-            self.before_far_call_stack.replace(state.vm_local_state.callstack.current);
-            let _ = self.after_far_call_stack.take();
-            self.current_far_call.replace(call);
-        }
-    }
+    // /// Tracks the call stack for the currently active FarCall.
+    // /// Must be called during `before_execution`.
+    // pub(crate) fn track_before_far_calls(
+    //     &mut self,
+    //     state: &VmLocalStateData<'_>,
+    //     data: &BeforeExecutionData,
+    // ) {
+    //     if let Opcode::FarCall(call) = data.opcode.variant.opcode {
+    //         self.before_far_call_stack.replace(state.vm_local_state.callstack.current);
+    //         let _ = self.after_far_call_stack.take();
+    //         self.current_far_call.replace(call);
+    //     }
+    // }
 
-    /// Tracks the call stack for the currently active FarCall.
-    /// Must be called during `after_execution`.
-    pub(crate) fn track_after_far_calls(
-        &mut self,
-        state: &VmLocalStateData<'_>,
-        data: &AfterExecutionData,
-    ) {
-        if let Opcode::FarCall(call) = data.opcode.variant.opcode {
-            self.after_far_call_stack.replace(state.vm_local_state.callstack.current);
-            self.current_far_call.replace(call);
-        }
-    }
+    // /// Tracks the call stack for the currently active FarCall.
+    // /// Must be called during `after_execution`.
+    // pub(crate) fn track_after_far_calls(
+    //     &mut self,
+    //     state: &VmLocalStateData<'_>,
+    //     data: &AfterExecutionData,
+    // ) {
+    //     if let Opcode::FarCall(call) = data.opcode.variant.opcode {
+    //         self.after_far_call_stack.replace(state.vm_local_state.callstack.current);
+    //         self.current_far_call.replace(call);
+    //     }
+    // }
 
     /// Tracks the call stack for the currently executable [CallAction]s.
     /// Must be called during `after_execution`.
@@ -237,15 +251,33 @@ impl FarCallHandler {
         state: &mut ZkSyncVmState<S, H>,
         _bootloader_state: &mut BootloaderState,
     ) {
-        if let Some(immediate_return) = self.immediate_return.take() {
+        if let Some(return_data) = self.immediate_return.take() {
             // set return data
-            let data_chunks = immediate_return.return_data.chunks(32);
-            let return_memory_page = CallStackEntry::heap_page_from_base(MemoryPage(
-                immediate_return.return_base_memory_page,
-            ));
+            let current = state.local_state.callstack.get_current_stack();
+            let current_ergs_remaining = current.ergs_remaining;
+            let return_memory_page = CallStackEntry::heap_page_from_base(current.base_memory_page);
+
+            // let return_memory_page = CallStackEntry::heap_page_from_base(MemoryPage(
+            //     immediate_return.return_base_memory_page,
+            // ));
+
+            // let original_return_data =
+            //     state.local_state.registers[RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize];
+            // assert!(original_return_data.is_pointer);
+            // let original_return_data_ptr = FatPointer::from_u256(original_return_data.value);
+
+            // let start = std::env::var("START")
+            //     .unwrap_or("0".to_string())
+            //     .parse::<u32>()
+            //     .unwrap_or_default();
+
+            let data_chunks = return_data.chunks(32);
             let return_fat_ptr = FatPointer {
                 memory_page: return_memory_page.0,
+                // memory_page: original_return_data_ptr.memory_page,
                 offset: 0,
+                // start: 0,
+                // start: 128,
                 start: 0,
                 length: (data_chunks.len() as u32) * 32,
             };
@@ -254,6 +286,7 @@ impl FarCallHandler {
                 .enumerate()
                 .map(|(index, value)| (start_slot + index, U256::from_big_endian(value)))
                 .collect_vec();
+
             state.local_state.registers[RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize] =
                 PrimitiveValue { value: return_fat_ptr.to_u256(), is_pointer: true };
             state.memory.populate_page(
@@ -263,15 +296,80 @@ impl FarCallHandler {
             );
 
             // change current stack to simulate return
-            let current = state.local_state.callstack.get_current_stack_mut();
-            current.pc = immediate_return.next_pc;
-            current.base_memory_page = MemoryPage(immediate_return.next_base_memory_page);
-            current.code_page = MemoryPage(immediate_return.next_code_page);
-            current.context_u128_value = immediate_return.next_context_u128_value;
-            current.sp = immediate_return.next_sp;
-            current.exception_handler_location = immediate_return.next_exception_handler_location;
-            current.this_address = immediate_return.next_this_address;
-            current.is_local_frame = immediate_return.next_is_local_frame;
+            // for (i, cs) in state.local_state.callstack.inner.iter().enumerate().rev() {
+            //     println!(
+            //         "---> [*]={:?} pc={:<4?} sp={:<4?} bm={:<5?} cp={:<5?} local={:?} ergs={:?} | {} {:?} hp={:<4} axh={:<4} v={:<3?} ex={:?}",
+            //         i,
+            //         cs.pc,
+            //         cs.sp,
+            //         cs.base_memory_page.0,
+            //         cs.code_page.0,
+            //         cs.is_local_frame,
+            //         cs.ergs_remaining,
+            //         format!("[R]* {:?}", return_fat_ptr),
+            //         cs.this_address,
+            //         cs.heap_bound,
+            //         cs.aux_heap_bound,
+            //         cs.context_u128_value,
+            //         cs.exception_handler_location,
+            //     );
+            // }
+
+            let new_cs = state.local_state.callstack.pop_entry();
+            // we consume no gas for setting immediate returns. This can cause gas related
+            // discrepancies. For example, returning a `baseFee()` call ignores upto 67104434ergs
+            state.local_state.callstack.current.ergs_remaining = new_cs.ergs_remaining;
+
+            // let current = state.local_state.callstack.get_current_stack_mut();
+            // current.pc = immediate_return.next_pc;
+            // current.base_memory_page = MemoryPage(immediate_return.next_base_memory_page);
+            // current.code_page = MemoryPage(immediate_return.next_code_page);
+            // current.context_u128_value = immediate_return.next_context_u128_value;
+            // current.sp = immediate_return.next_sp;
+            // current.exception_handler_location =
+            // immediate_return.next_exception_handler_location; current.this_address =
+            // immediate_return.next_this_address; current.is_local_frame =
+            // immediate_return.next_is_local_frame;
+
+            // current.pc = immediate_return.next_pc;
+            // current.base_memory_page = MemoryPage(immediate_return.next_base_memory_page);
+            // current.code_page = MemoryPage(immediate_return.next_code_page);
+            // current.context_u128_value = immediate_return.next_context_u128_value;
+            // current.sp = immediate_return.next_sp;
+            // current.exception_handler_location =
+            // immediate_return.next_exception_handler_location; current.this_address =
+            // immediate_return.next_this_address; current.is_local_frame =
+            // immediate_return.next_is_local_frame;
+
+            // if hex::encode(&immediate_return.return_data) ==
+            // "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            // .to_string() {     let is_local_frame =
+            // std::env::var("LOCAL_FRAME").unwrap_or("false".to_string()).parse::<bool>().
+            // unwrap_or_default();     println!("LOCAL_FRAME = {:?}", is_local_frame);
+
+            //     current.is_local_frame = is_local_frame;
+            // }
+
+            // let current = state.local_state.callstack.get_current_stack();
+            // println!(
+            //     "---> [RET]={:?} {} pc={:<4?} sp={:<4?} bm={:<5?} cp={:<5?} local={:?} {} {} | {:?} hp={:<4} axh={:<4} v={:<3?} ex={:?}",
+            //     return_fat_ptr.memory_page,
+            //     hex::encode(&return_data),
+            //     current.pc,
+            //     current.sp,
+            //     current.base_memory_page.0,
+            //     current.code_page.0,
+            //     current.is_local_frame,
+            //     format!("[R-]* {:?}", original_return_data_ptr),
+            //     format!("[R+]* {:?}", return_fat_ptr),
+            //     current.this_address,
+            //     current.heap_bound,
+            //     current.aux_heap_bound,
+            //     current.context_u128_value,
+            //     current.exception_handler_location,
+            // );
+            // -pc=738  sp=4    bm=2480  cp=2480  local=true | Add(Add)
+            // 0xf9e9ba9ed9b96ab918c74b21dd0f1d5f2ac38a30 axh=1024 v=0   ex=747
         }
     }
 
