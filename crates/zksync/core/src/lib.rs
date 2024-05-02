@@ -22,7 +22,7 @@ use alloy_primitives::{Address, Bytes, U256 as rU256};
 use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 use eyre::{eyre, OptionExt};
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
-pub use vm::{balance, encode_create_params, nonce, BASE_L2_GAS_PRICE};
+pub use vm::{balance, encode_create_params, nonce};
 
 use zksync_types::utils::storage_key_for_eth_balance;
 pub use zksync_types::{
