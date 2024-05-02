@@ -155,8 +155,17 @@ contract ZkCheatcodesTest is Test {
         assertEq(dataAfter, bytes(hex"a1b1"));
     }
 
-    function testZkCheatcodesCanMockTestContract() public {
-        testZkCheatcodesCanMockCall(address(this));
+    function testZkCheatcodesCanMockCallTestContract() public {
+        address thisAddress = address(this);
+
+        vm.mockCall(
+            thisAddress,
+            abi.encodeWithSelector(IMyProxyCaller.transact.selector),
+            abi.encode()
+        );
+
+        MyProxyCaller transactor = new MyProxyCaller();
+        transactor.transact(thisAddress);
     }
 
     function testZkCheatcodesCanMockCall(address mockMe) public {
