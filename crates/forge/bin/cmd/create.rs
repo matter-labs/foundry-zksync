@@ -121,15 +121,29 @@ impl CreateArgs {
     pub async fn run(mut self) -> Result<()> {
         let private_key = get_private_key(&self.eth.wallet.raw.private_key)?;
         let rpc_url = get_rpc_url(&self.eth.rpc.url)?;
-        let mut config = Config::from(&self.eth);
+        let mut config = self.eth.try_load_config_emit_warnings()?;
         let provider = utils::get_provider(&config)?;
-        // Find Project & Compile
         let chain = get_chain(config.chain, provider.clone()).await?;
+        // Find Project & Compile
         let project = self.opts.project()?;
         let mut output =
             ProjectCompiler::new().quiet_if(self.json || self.opts.silent).compile(&project)?;
 
-        if self.deploy_missing_libraries {
+        let zksync = self.opts.compiler.zksync;
+        let mut zksolc = ZkSolc::new(
+            config
+                .new_zksolc_config_builder()
+                .and_then(|builder| {
+                    builder
+                        .avoid_contracts(self.opts.compiler.avoid_contracts.clone())
+                        .contracts_to_compile(self.opts.compiler.contracts_to_compile.clone())
+                        .build()
+                })
+                .map_err(|e| eyre::eyre!(e))?,
+            config.zk_project()?,
+        );
+
+        if zksync && self.deploy_missing_libraries {
             let library_paths = ZkSolc::get_missing_libraries_cache_path(project.root());
             if !library_paths.exists() {
                 eyre::bail!("No missing libraries found");
@@ -155,7 +169,6 @@ impl CreateArgs {
             for library in missing_libraries.clone() {
                 self.deploy_library(
                     &mut config,
-                    &project,
                     rpc_url.clone(),
                     private_key,
                     chain,
@@ -178,21 +191,6 @@ impl CreateArgs {
 
             return Ok(())
         }
-
-        let config = self.eth.try_load_config_emit_warnings()?;
-        let zksync = self.opts.compiler.zksync;
-        let mut zksolc = ZkSolc::new(
-            config
-                .new_zksolc_config_builder()
-                .and_then(|builder| {
-                    builder
-                        .avoid_contracts(self.opts.compiler.avoid_contracts.clone())
-                        .contracts_to_compile(self.opts.compiler.contracts_to_compile.clone())
-                        .build()
-                })
-                .map_err(|e| eyre::eyre!(e))?,
-            config.zk_project()?,
-        );
         let (zk_output, _contract_bytecodes) = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
@@ -372,7 +370,6 @@ impl CreateArgs {
     async fn deploy_library(
         &self,
         config: &mut Config,
-        project: &Project<ConfigurableArtifacts>,
         rpc_url: String,
         private_key: H256,
         chain: foundry_config::Chain,
@@ -381,6 +378,9 @@ impl CreateArgs {
         missing_libraries: &mut Vec<ZkMissingLibrary>,
     ) -> eyre::Result<DeployedContractInfo> {
         info!("Deploying missing library: {}:{}", library.contract_path, library.contract_name);
+
+        //set the location to zk project
+        let zk_project = config.zk_project()?;
 
         let deployed_library = all_deployed_libraries
             .iter()
@@ -398,9 +398,9 @@ impl CreateArgs {
         if library.missing_libraries.is_empty() {
             trace!("Library has no dependencies, deploying: {:?}", library);
 
-            Self::build_library(project, &library_info).await?;
+            Self::build_library(&zk_project, &library_info).await?;
             let receipt = self
-                .deploy_contract(project, &library_info, &rpc_url, &chain, &private_key)
+                .deploy_contract(&zk_project, &library_info, &rpc_url, &chain, &private_key)
                 .await?;
 
             info!("Writing deployed library data to foundry.toml");
@@ -410,7 +410,7 @@ impl CreateArgs {
                 "{}:{}:{:#02x}",
                 library.contract_path, library.contract_name, deployed_address
             ));
-            config.update_libs()?;
+            config.update_libraries()?;
             all_deployed_libraries.push(DeployedContractInfo {
                 name: library.contract_name.clone(),
                 path: library.contract_path.clone(),
@@ -446,7 +446,6 @@ impl CreateArgs {
         for library in dependent_libraries {
             self.deploy_library(
                 config,
-                project,
                 rpc_url.clone(),
                 private_key,
                 chain,
@@ -457,9 +456,10 @@ impl CreateArgs {
             .await?;
         }
 
-        Self::build_library(project, &library_info).await?;
-        let receipt =
-            self.deploy_contract(project, &library_info, &rpc_url, &chain, &private_key).await?;
+        Self::build_library(&zk_project, &library_info).await?;
+        let receipt = self
+            .deploy_contract(&zk_project, &library_info, &rpc_url, &chain, &private_key)
+            .await?;
         let deployed_address = receipt.contract_address.expect("Error retrieving deployed address");
 
         trace!("Writing deployed library data to foundry.toml");
@@ -586,8 +586,8 @@ impl CreateArgs {
             }
         })?;
 
-        let is_legacy = self.tx.legacy ||
-            Chain::try_from(chain).map(|x| Chain::is_legacy(x)).unwrap_or_default();
+        let is_legacy = self.tx.legacy || Chain::from(chain).is_legacy();
+
         let mut deployer = if is_legacy { deployer.legacy() } else { deployer };
 
         // set tx value if specified
@@ -777,6 +777,7 @@ impl CreateArgs {
             args: CoreBuildArgs {
                 compiler: CompilerArgs {
                     contracts_to_compile: Some(vec![filename]),
+                    zksync: true,
                     ..Default::default()
                 },
                 ..Default::default()

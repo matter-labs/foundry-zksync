@@ -281,6 +281,8 @@ impl ZkSolc {
     /// versioned sources. These modified values can be accessed after the compilation process
     /// for further processing or analysis.
     pub fn compile(&mut self) -> Result<(ProjectCompileOutput, ContractBytecodes)> {
+        //TODO: understand how to set are_libaries_missing flag or if it should be set always
+        self.config.settings.are_libraries_missing = true;
         let mut displayed_warnings = HashSet::new();
         let mut data = BTreeMap::new();
         // Step 1: Collect Source Files
@@ -298,18 +300,19 @@ impl ZkSolc {
         for version in sources.values() {
             info!("\nCompiling {} files...", version.1.len());
             //configure project solc for each solc version
-            for (contract_path, _) in &version.1 {
-                if self.is_contract_ignored_in_config(&contract_path) {
+            for contract_path in version.1.keys() {
+                let relative_path = contract_path.strip_prefix(self.project.root())?;
+                if self.is_contract_ignored_in_config(relative_path) {
                     continue
                 }
                 // Step 3: Parse JSON Input for each Source
-                self.prepare_compiler_input(&contract_path).wrap_err(format!(
+                self.prepare_compiler_input(contract_path).wrap_err(format!(
                     "Failed to prepare inputs when compiling {:?}",
                     contract_path
                 ))?;
 
                 // Hash the input contract to allow caching
-                let mut contract_file = File::open(&contract_path)?;
+                let mut contract_file = File::open(contract_path)?;
                 let mut buffer = Vec::new();
                 contract_file.read_to_end(&mut buffer)?;
 
@@ -323,7 +326,7 @@ impl ZkSolc {
                 info!("\nCompiling {:?}...", contract_path);
 
                 info!("Checking for missing libraries {:?}...", contract_path);
-                let (output, contract_hash) = self.check_contract_is_cached(&contract_path)?;
+                let (output, contract_hash) = self.check_contract_is_cached(contract_path)?;
                 cached_contracts.insert(contract_path.clone(), (output.clone(), contract_hash));
 
                 match output {
@@ -331,7 +334,7 @@ impl ZkSolc {
                         info!("Using cached artifact for {:?}", filename);
                     }
                     None => {
-                        let Some(output) = self.run_compiler(&contract_path, true)? else {
+                        let Some(output) = self.run_compiler(contract_path, true)? else {
                             continue
                         };
 
@@ -369,8 +372,6 @@ impl ZkSolc {
             }
         }
 
-        println!("ASD");
-
         // Step 4: If missing library dependencies, save them to a file and return an error
         if !all_missing_libraries.is_empty() {
             println!("asd");
@@ -395,7 +396,9 @@ impl ZkSolc {
             // Configure project solc for each solc version
             for (contract_path, _) in version.1 {
                 // Check if contract has been ignored by user
-                if self.is_contract_ignored_in_config(&contract_path) {
+                let relative_path = contract_path.strip_prefix(self.project.root())?;
+
+                if self.is_contract_ignored_in_config(relative_path) {
                     continue
                 }
 
@@ -1084,11 +1087,13 @@ impl ZkSolc {
 
     /// Checks if the contract has been ignored by the user in the configuration file.
     fn is_contract_ignored_in_config(&self, relative_path: &Path) -> bool {
+        let filename =
+            relative_path.file_name().expect("Failed to get Contract filename.").to_str().unwrap();
         let mut should_compile = match self.config.contracts_to_compile {
             Some(ref contracts_to_compile) => {
                 //compare if there is some member of the vector contracts_to_compile
                 // present in the filename
-                contracts_to_compile.iter().any(|c| c.is_match(relative_path))
+                contracts_to_compile.iter().any(|c| c.is_match(filename))
             }
             None => true,
         };
@@ -1097,7 +1102,7 @@ impl ZkSolc {
             Some(ref avoid_contracts) => {
                 //compare if there is some member of the vector avoid_contracts
                 // present in the filename
-                !avoid_contracts.iter().any(|c| c.is_match(relative_path))
+                !avoid_contracts.iter().any(|c| c.is_match(filename))
             }
             None => should_compile,
         };
@@ -1234,6 +1239,7 @@ pub struct ZkSolcCompilerOutput {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ZkContract {
     pub hash: Option<String>,
     // Hashmap from hash to filename:contract_name string.
