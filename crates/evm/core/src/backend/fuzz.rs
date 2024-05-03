@@ -261,6 +261,10 @@ impl<'a> DatabaseExt for FuzzBackendWrapper<'a> {
     fn has_cheatcode_access(&self, account: &Address) -> bool {
         self.backend.has_cheatcode_access(account)
     }
+
+    fn get_test_contract_address(&self) -> Option<Address> {
+        self.backend.get_test_contract_address()
+    }
 }
 
 impl<'a> DatabaseRef for FuzzBackendWrapper<'a> {
