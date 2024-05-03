@@ -338,12 +338,8 @@ impl ZkSolc {
                             continue
                         };
 
-                        println!("Here");
-
                         let missing_libraries =
                             Self::get_missing_libraries_from_output(&output.stdout)?;
-
-                        println!("Missing Libraries: {:?}", missing_libraries);
 
                         for missing_library in missing_libraries {
                             match all_missing_libraries.get_mut(&(
@@ -374,7 +370,6 @@ impl ZkSolc {
 
         // Step 4: If missing library dependencies, save them to a file and return an error
         if !all_missing_libraries.is_empty() {
-            println!("asd");
             let dependencies: Vec<ZkMissingLibrary> = all_missing_libraries
                 .iter()
                 .map(|((contract_path, contract_name), missing_libraries)| ZkMissingLibrary {
@@ -1141,7 +1136,6 @@ impl ZkSolc {
         // First get all the missing libraries
         output.contracts.iter().for_each(|(_path, inner_contracts)| {
             inner_contracts.iter().for_each(|(_contract_name, contract)| {
-                println!("Contract: {:?}", contract.missing_libraries);
                 if let Some(missing_libs) = &contract.missing_libraries {
                     missing_libs.iter().for_each(|lib| {
                         missing_libraries.insert(lib.clone());
