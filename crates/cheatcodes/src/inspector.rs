@@ -25,7 +25,7 @@ use foundry_common::{evm::Breakpoints, provider::alloy::RpcUrl};
 use foundry_evm_core::{
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
-        CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE,
+        CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE,
         HARDHAT_CONSOLE_ADDRESS,
     },
 };
@@ -1684,11 +1684,17 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
         }
 
         if self.use_zk_vm {
-            info!("running create in zk vm");
             if call.init_code.0 == DEFAULT_CREATE2_DEPLOYER_CODE {
                 info!("ignoring DEFAULT_CREATE2_DEPLOYER_CODE for zk");
                 return (InstructionResult::Continue, None, gas, Bytes::new())
             }
+
+            if call.caller == CALLER {
+                info!(caller=?call.caller, "ignoring create from default caller for zk");
+                return (InstructionResult::Continue, None, gas, Bytes::new())
+            }
+
+            info!(caller=?call.caller, "running create in zk vm");
 
             let zk_contract = self
                 .dual_compiled_contracts
