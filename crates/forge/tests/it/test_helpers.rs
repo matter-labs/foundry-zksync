@@ -13,7 +13,7 @@ use foundry_evm::{
     revm::db::DatabaseRef,
 };
 use foundry_test_utils::fd_lock;
-use foundry_zksync_compiler::{ZkSolc, ZkSolcConfigBuilder, DEFAULT_ZKSOLC_VERSION};
+use foundry_zksync_compiler::{ZkSolc, ZkSolcConfigBuilder};
 use once_cell::sync::Lazy;
 use std::{env, io::Write};
 
@@ -94,7 +94,6 @@ fn zk_compile(project: Project) -> ProjectCompileOutput {
     // zk_out
 
     let config = ZkSolcConfigBuilder::new()
-        .compiler_version(DEFAULT_ZKSOLC_VERSION)
         .contracts_to_compile(Some(vec![
             String::from("zk/*"),
             String::from("lib/*"),

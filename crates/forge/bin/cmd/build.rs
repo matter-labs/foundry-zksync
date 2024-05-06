@@ -13,7 +13,7 @@ use foundry_config::{
     },
     Config,
 };
-use foundry_zksync_compiler::{ZkSolc, DEFAULT_ZKSOLC_VERSION};
+use foundry_zksync_compiler::ZkSolc;
 use serde::Serialize;
 use watchexec::config::{InitConfig, RuntimeConfig};
 
@@ -106,7 +106,6 @@ impl BuildArgs {
                     .new_zksolc_config_builder()
                     .and_then(|builder| {
                         builder
-                            .compiler_version(DEFAULT_ZKSOLC_VERSION)
                             .avoid_contracts(self.args.compiler.avoid_contracts.clone())
                             .contracts_to_compile(self.args.compiler.contracts_to_compile.clone())
                             .build()

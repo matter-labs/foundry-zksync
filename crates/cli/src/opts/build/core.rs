@@ -58,6 +58,16 @@ pub struct CoreBuildArgs {
     #[serde(skip)]
     pub use_solc: Option<String>,
 
+    /// Specify the solc version, or a path to a local solc, to build with.
+    ///
+    /// Valid values are in the format `x.y.z` or `path/to/solc`.
+    #[clap(
+        help_heading = "zkSync Compiler options",
+        value_name = "ZK_SOLC_VERSION",
+        long = "use-zksolc"
+    )]
+    pub use_zksolc: Option<String>,
+
     /// Do not access the network.
     ///
     /// Missing solc versions will not be installed.
@@ -190,6 +200,10 @@ impl Provider for CoreBuildArgs {
 
         if let Some(ref solc) = self.use_solc {
             dict.insert("solc".to_string(), solc.trim_start_matches("solc:").into());
+        }
+
+        if let Some(ref zksolc) = self.use_zksolc {
+            dict.insert("zksolc".to_string(), zksolc.trim_start_matches("zksolc:").into());
         }
 
         if self.offline {

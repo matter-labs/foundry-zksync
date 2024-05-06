@@ -286,7 +286,7 @@ impl OptimizerBuilder {
 /// A builder for `ZkSolcConfig`.
 #[derive(Default)]
 pub struct ZkSolcConfigBuilder {
-    compiler_version: Option<String>,
+    compiler_version: Option<semver::Version>,
     compiler_path: Option<PathBuf>,
     contracts_to_compile: Option<Vec<String>>,
     avoid_contracts: Option<Vec<String>>,
@@ -299,9 +299,9 @@ impl ZkSolcConfigBuilder {
         Self::default()
     }
 
-    /// Sets the path to the `zksolc` binary.
-    pub fn compiler_version(mut self, version: &str) -> Self {
-        self.compiler_version = Some(version.to_owned());
+    /// Sets the `zksolc` version.
+    pub fn compiler_version(mut self, version: semver::Version) -> Self {
+        self.compiler_version = Some(version);
         self
     }
 
@@ -337,26 +337,24 @@ impl ZkSolcConfigBuilder {
         let settings = self.settings.build()?;
         let compiler_path = if let Some(compiler_path) = self.compiler_path {
             compiler_path
-        } else if let Some(compiler_version) = self.compiler_version {
+        } else {
             // TODO: we are forcibly converting this method to sync since it can be called either
             // within a sync (tests) or async (binary) context. We should fix that and stick to
             // a single context
             match tokio::runtime::Handle::try_current() {
                 Ok(handle) => std::thread::spawn(move || {
                     handle
-                        .block_on(setup_zksolc_manager(compiler_version))
+                        .block_on(setup_zksolc_manager(self.compiler_version))
                         .map_err(|err| err.to_string())
                 })
                 .join()
                 .map_err(|err| format!("{err:?}"))?,
                 Err(_) => tokio::runtime::Runtime::new()
                     .expect("failed starting runtime")
-                    .block_on(setup_zksolc_manager(compiler_version))
+                    .block_on(setup_zksolc_manager(self.compiler_version))
                     .map_err(|err| err.to_string()),
             }
-            .map_err(|err| format!("failed setting up zksolc: {err:?}"))?
-        } else {
-            return Err("must specify either the compiler_version or compiler_path".to_string());
+            .map_err(|err| format!("failed setting up zksolc: {err}"))?
         };
 
         Ok(ZkSolcConfig {

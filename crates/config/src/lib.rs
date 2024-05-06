@@ -97,7 +97,7 @@ mod inline;
 use crate::etherscan::EtherscanEnvProvider;
 pub use inline::{validate_profiles, InlineConfig, InlineConfigError, InlineConfigParser, NatSpec};
 
-use foundry_zksync_compiler::{ZkSolcConfig, ZkSolcConfigBuilder, DEFAULT_ZKSOLC_VERSION};
+use foundry_zksync_compiler::{ZkSolcConfig, ZkSolcConfigBuilder};
 
 /// Foundry configuration
 ///
@@ -410,8 +410,8 @@ pub struct Config {
     ///
     /// Use zksync era
     pub zksync: bool,
-    /// Path to zksolc binary. Can be a URL.
-    pub compiler_path: PathBuf,
+    /// The zksolc version or path to the zksolc binary. Can be a URL.
+    pub zksolc: Option<SolcReq>,
     /// Optimizer settings for zkSync
     pub zk_optimizer: bool,
     /// The optimization mode string.
@@ -714,7 +714,13 @@ impl Config {
         let optimizer_details =
             if self.zk_optimizer { self.optimizer_details.clone() } else { None };
 
-        let builder = builder.compiler_version(DEFAULT_ZKSOLC_VERSION).settings(|builder| {
+        let builder = match self.zksolc.clone() {
+            Some(SolcReq::Version(version)) => builder.compiler_version(version),
+            Some(SolcReq::Local(path)) => builder.compiler_path(path),
+            _ => builder,
+        };
+
+        let builder = builder.settings(|builder| {
             builder
                 .libraries(libraries)
                 .is_system(self.is_system)
@@ -2009,7 +2015,7 @@ impl Default for Config {
             __non_exhaustive: (),
             __warnings: vec![],
             // @zkSync
-            compiler_path: Default::default(),
+            zksolc: Default::default(),
             zk_optimizer: true,
             mode: "3".to_string(),
             zksync: false,
