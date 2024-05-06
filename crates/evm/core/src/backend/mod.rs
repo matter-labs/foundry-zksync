@@ -339,6 +339,9 @@ pub trait DatabaseExt: Database<Error = DatabaseError> {
         }
         Ok(())
     }
+
+    /// Retrieves test contract's address
+    fn get_test_contract_address(&self) -> Option<Address>;
 }
 
 /// Provides the underlying `revm::Database` implementation.
@@ -1487,6 +1490,10 @@ impl DatabaseExt for Backend {
 
     fn has_cheatcode_access(&self, account: &Address) -> bool {
         self.inner.cheatcode_access_accounts.contains(account)
+    }
+
+    fn get_test_contract_address(&self) -> Option<Address> {
+        self.test_contract_address()
     }
 }
 

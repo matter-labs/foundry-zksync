@@ -155,7 +155,7 @@ contract ZkCheatcodesTest is Test {
         assertEq(dataAfter, bytes(hex"a1b1"));
     }
 
-     function testZkCheatcodesCanMockCallTestContract() public {
+    function testZkCheatcodesCanMockCallTestContract() public {
         address thisAddress = address(this);
 
         vm.mockCall(
@@ -166,5 +166,21 @@ contract ZkCheatcodesTest is Test {
 
         MyProxyCaller transactor = new MyProxyCaller();
         transactor.transact(thisAddress);
+    }
+
+    function testZkCheatcodesCanMockCall(address mockMe) public {
+        vm.assume(mockMe != address(vm));
+
+        //zkVM currently doesn't support mocking the transaction sender
+        vm.assume(mockMe != tx.origin);
+
+        vm.mockCall(
+            mockMe,
+            abi.encodeWithSelector(IMyProxyCaller.transact.selector),
+            abi.encode()
+        );
+
+        MyProxyCaller transactor = new MyProxyCaller();
+        transactor.transact(mockMe);
     }
 }
