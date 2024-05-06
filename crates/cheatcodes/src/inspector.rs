@@ -413,6 +413,7 @@ impl Cheatcodes {
         data.env.block.number = U256::from(block_number);
         data.env.block.timestamp = U256::from(block_timestamp);
 
+        let test_contract = data.db.get_test_contract_address();
         for address in data.db.persistent_accounts() {
             info!(?address, "importing to evm state");
 
@@ -452,8 +453,13 @@ impl Cheatcodes {
             let account = journaled_account(data, address).expect("failed to load account");
             let _ = std::mem::replace(&mut account.info.balance, balance);
             let _ = std::mem::replace(&mut account.info.nonce, nonce);
-            account.info.code_hash = code_hash;
-            account.info.code = code.clone();
+
+            if test_contract.map(|addr| addr == address).unwrap_or_default() {
+                tracing::trace!(?address, "ignoring code translation for test contract");
+            } else {
+                account.info.code_hash = code_hash;
+                account.info.code = code.clone();
+            }
         }
     }
 
@@ -523,6 +529,8 @@ impl Cheatcodes {
                         ))),
                     },
                 );
+            } else {
+                tracing::debug!("no zk contract found for {:?}", info.code_hash)
             }
         }
 
@@ -549,12 +557,17 @@ impl Cheatcodes {
             journaled_account(data, known_codes_addr).expect("failed to load account");
         known_codes_account.storage.extend(known_codes_storage.clone());
 
+        let test_contract = data.db.get_test_contract_address();
         for (address, info) in deployed_codes {
             let account = journaled_account(data, address).expect("failed to load account");
             let _ = std::mem::replace(&mut account.info.balance, info.balance);
             let _ = std::mem::replace(&mut account.info.nonce, info.nonce);
-            account.info.code_hash = info.code_hash;
-            account.info.code = info.code.clone();
+            if test_contract.map(|addr| addr == address).unwrap_or_default() {
+                tracing::trace!(?address, "ignoring code translation for test contract");
+            } else {
+                account.info.code_hash = info.code_hash;
+                account.info.code = info.code.clone();
+            }
         }
     }
 }
