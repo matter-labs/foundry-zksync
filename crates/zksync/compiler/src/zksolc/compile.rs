@@ -382,7 +382,7 @@ impl ZkSolc {
             std::fs::create_dir_all(file_path.parent().unwrap()).unwrap();
             File::create(file_path)?
                 .write_all(serde_json::to_string_pretty(&dependencies).unwrap().as_bytes())?;
-            eyre::bail!("Missing libraries detected {:?}\n\nRun the following comand in order to deploy the missing libraries:\nzkforge zkcreate --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID>", dependencies);
+            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID>", dependencies);
         }
 
         // Step 5: Proceed with contract compilation
