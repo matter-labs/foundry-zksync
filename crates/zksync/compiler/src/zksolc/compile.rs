@@ -1,6 +1,9 @@
 #![allow(missing_docs)]
 //! This module provides the implementation of the ZkSolc compiler for Solidity contracts.
-use crate::zksolc::config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput};
+use crate::{
+    zksolc::config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput},
+    ZkLibrariesManager,
+};
 /// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart
 /// contracts.
 ///
@@ -378,10 +381,10 @@ impl ZkSolc {
                     missing_libraries: missing_libraries.iter().cloned().collect(),
                 })
                 .collect();
-            let file_path = Self::get_missing_libraries_cache_path(&self.project.paths.root);
-            std::fs::create_dir_all(file_path.parent().unwrap()).unwrap();
-            File::create(file_path)?
-                .write_all(serde_json::to_string_pretty(&dependencies).unwrap().as_bytes())?;
+            ZkLibrariesManager::add_dependencies_to_missing_libraries_cache(
+                &self.project.paths.root,
+                dependencies.as_slice(),
+            )?;
             eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID>", dependencies);
         }
 
@@ -1167,10 +1170,6 @@ impl ZkSolc {
         }
 
         Ok(missing_library_dependencies)
-    }
-
-    pub fn get_missing_libraries_cache_path(project_root: &Path) -> PathBuf {
-        project_root.join(".zksolc-libraries-cache/missing_library_dependencies.json")
     }
 
     fn run_compiler(
