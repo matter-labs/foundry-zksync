@@ -900,13 +900,6 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DeployedContractInfo {
-    pub name: String,
-    pub path: String,
-    pub address: String,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

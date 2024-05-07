@@ -292,104 +292,12 @@ impl ZkSolc {
         let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
         let mut contract_bytecodes = BTreeMap::new();
 
-        // Step 2: Prepare cache for contracts
-        let mut cached_contracts: HashMap<PathBuf, (Option<Vec<u8>>, String)> = HashMap::new();
-
-        // Step 3: Check missing libraries
+        // Step 2: Check missing libraries
         // Map from (contract_path, contract_name) -> missing_libraries
         let mut all_missing_libraries: HashMap<(String, String), HashSet<String>> = HashMap::new();
 
-        // Step 2: Compile Contracts for Each Source
-        for version in sources.values() {
-            info!("\nCompiling {} files...", version.1.len());
-            //configure project solc for each solc version
-            for contract_path in version.1.keys() {
-                let relative_path = contract_path.strip_prefix(self.project.root())?;
-                if self.is_contract_ignored_in_config(relative_path) {
-                    continue
-                }
-                // Step 3: Parse JSON Input for each Source
-                self.prepare_compiler_input(contract_path).wrap_err(format!(
-                    "Failed to prepare inputs when compiling {:?}",
-                    contract_path
-                ))?;
-
-                // Hash the input contract to allow caching
-                let mut contract_file = File::open(contract_path)?;
-                let mut buffer = Vec::new();
-                contract_file.read_to_end(&mut buffer)?;
-
-                let filename = contract_path
-                    .file_name()
-                    .wrap_err(format!("Could not get filename from {:?}", contract_path))?
-                    .to_str()
-                    .unwrap()
-                    .to_string();
-
-                info!("\nCompiling {:?}...", contract_path);
-
-                trace!("Checking for missing libraries {:?}...", contract_path);
-                let (output, contract_hash) = self.check_contract_is_cached(contract_path)?;
-                cached_contracts.insert(contract_path.clone(), (output.clone(), contract_hash));
-
-                match output {
-                    Some(_) => {
-                        info!("Using cached artifact for {:?}", filename);
-                    }
-                    None => {
-                        let Some(output) = self.run_compiler(contract_path, true)? else {
-                            continue
-                        };
-
-                        let missing_libraries =
-                            Self::get_missing_libraries_from_output(&output.stdout)?;
-
-                        for missing_library in missing_libraries {
-                            match all_missing_libraries.get_mut(&(
-                                missing_library.contract_path.clone(),
-                                missing_library.contract_name.clone(),
-                            )) {
-                                Some(missing_dependencies) => {
-                                    missing_dependencies
-                                        .extend(missing_library.missing_libraries.clone());
-                                }
-                                None => {
-                                    all_missing_libraries.insert(
-                                        (
-                                            missing_library.contract_path.clone(),
-                                            missing_library.contract_name.clone(),
-                                        ),
-                                        HashSet::from_iter(
-                                            missing_library.missing_libraries.clone(),
-                                        ),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Step 4: If missing library dependencies, save them to a file and return an error
-        if !all_missing_libraries.is_empty() {
-            let dependencies: Vec<ZkMissingLibrary> = all_missing_libraries
-                .iter()
-                .map(|((contract_path, contract_name), missing_libraries)| ZkMissingLibrary {
-                    contract_path: contract_path.clone(),
-                    contract_name: contract_name.clone(),
-                    missing_libraries: missing_libraries.iter().cloned().collect(),
-                })
-                .collect();
-            ZkLibrariesManager::add_dependencies_to_missing_libraries_cache(
-                &self.project.paths.root,
-                dependencies.as_slice(),
-            )?;
-            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", dependencies);
-        }
-
-        // Step 5: Proceed with contract compilation
-        for (_solc, version) in sources {
+        // Step 3: Proceed with contract compilation
+        for (solc, version) in sources {
             info!("\nCompiling {} files...", version.1.len());
             // Configure project solc for each solc version
             for (contract_path, _) in version.1 {
@@ -412,9 +320,7 @@ impl ZkSolc {
                     ZkSolcArtifactPaths::new(self.project.paths.artifacts.join(&filename));
 
                 info!("Compiling {:?}...", contract_path);
-                let (output, contract_hash) = cached_contracts
-                    .get(&contract_path)
-                    .wrap_err("Could not get cached contract")?;
+                let (output, contract_hash) = self.check_contract_is_cached(&contract_path)?;
                 let (output, maybe_artifact_paths) = match output {
                     Some(output) => {
                         info!("Using hashed artifact for {:?}", filename);
@@ -425,9 +331,47 @@ impl ZkSolc {
                             "Failed to prepare inputs when compiling {:?}",
                             contract_path
                         ))?;
-                        let Some(output) = self.run_compiler(&contract_path, false)? else {
+
+                        // do a first run to detect if there are missing libraries
+                        if self.config.settings.are_libraries_missing {
+                            let Some(output) = self.run_compiler(&contract_path, true, &solc)?
+                            else {
+                                continue
+                            };
+
+                            let missing_libraries =
+                                Self::get_missing_libraries_from_output(&output.stdout)?;
+                            tracing::trace!(path = ?contract_path, ?missing_libraries);
+                            let has_missing_libraries = !missing_libraries.is_empty();
+
+                            // collect missing libraries
+                            for missing_library in missing_libraries {
+                                all_missing_libraries
+                                    .entry((
+                                        missing_library.contract_path.clone(),
+                                        missing_library.contract_name.clone(),
+                                    ))
+                                    .and_modify(|missing_dependencies| {
+                                        missing_dependencies
+                                            .extend(missing_library.missing_libraries.clone())
+                                    })
+                                    .or_insert_with(|| {
+                                        HashSet::from_iter(
+                                            missing_library.missing_libraries.clone(),
+                                        )
+                                    });
+                            }
+
+                            if has_missing_libraries {
+                                //skip current contract output from processing
+                                continue;
+                            }
+                        }
+
+                        let Some(output) = self.run_compiler(&contract_path, false, &solc)? else {
                             continue
                         };
+
                         (output.stdout, Some(artifact_paths))
                     }
                 };
@@ -437,13 +381,31 @@ impl ZkSolc {
                     output,
                     &filename,
                     &mut displayed_warnings,
-                    contract_hash,
+                    &contract_hash,
                     maybe_artifact_paths,
                 );
                 data.insert(filename.clone(), artifacts);
                 contract_bytecodes.extend(bytecodes);
             }
         }
+
+        // Step 4: If missing library dependencies, save them to a file and return an error
+        if !all_missing_libraries.is_empty() {
+            let dependencies: Vec<ZkMissingLibrary> = all_missing_libraries
+                .iter()
+                .map(|((contract_path, contract_name), missing_libraries)| ZkMissingLibrary {
+                    contract_path: contract_path.clone(),
+                    contract_name: contract_name.clone(),
+                    missing_libraries: missing_libraries.iter().cloned().collect(),
+                })
+                .collect();
+            ZkLibrariesManager::add_dependencies_to_missing_libraries_cache(
+                &self.project.paths.root,
+                dependencies.as_slice(),
+            )?;
+            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", dependencies);
+        }
+
         let mut result = ProjectCompileOutput::default();
         result.set_compiled_artifacts(Artifacts(data));
         Ok((result, contract_bytecodes))
@@ -1109,7 +1071,11 @@ impl ZkSolc {
     }
 
     /// Checks if the contract has already been compiled for the given contract path.
-    fn check_contract_is_cached(&self, contract_path: &Path) -> Result<(Option<Vec<u8>>, String)> {
+    fn check_contract_is_cached(
+        &self,
+        contract_path: impl AsRef<Path>,
+    ) -> Result<(Option<Vec<u8>>, String)> {
+        let contract_path = contract_path.as_ref();
         let contract_hash = Self::hash_contract(contract_path)?;
         let artifact_paths = ZkSolcArtifactPaths::new(
             self.project.paths.artifacts.join(
@@ -1176,9 +1142,9 @@ impl ZkSolc {
         &self,
         contract_path: &Path,
         detect_missing_libraries: bool,
+        solc: &Solc,
     ) -> Result<Option<std::process::Output>> {
-        let comp_args =
-            self.build_compiler_args(contract_path, &self.project.solc, detect_missing_libraries);
+        let comp_args = self.build_compiler_args(contract_path, solc, detect_missing_libraries);
 
         let mut command = Command::new(&self.config.compiler_path);
         command
