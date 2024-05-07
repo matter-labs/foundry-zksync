@@ -411,17 +411,14 @@ impl CreateArgs {
                 library.contract_path, library.contract_name, deployed_address
             ));
             config.update_libraries()?;
-            all_deployed_libraries.push(DeployedContractInfo {
+            let deployed_contract_info = DeployedContractInfo {
                 name: library.contract_name.clone(),
                 path: library.contract_path.clone(),
                 address: deployed_address.to_string(),
-            });
+            };
+            all_deployed_libraries.push(deployed_contract_info.clone());
 
-            return Ok(DeployedContractInfo {
-                name: library.contract_name.clone(),
-                path: library.contract_path.clone(),
-                address: deployed_address.to_string(),
-            })
+            return Ok(deployed_contract_info)
         }
 
         info!(
