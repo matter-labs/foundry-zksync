@@ -551,7 +551,7 @@ impl CreateArgs {
     /// Deploys the contract
     #[allow(clippy::too_many_arguments)]
     async fn deploy<M: Middleware + 'static>(
-        self,
+        &self,
         abi: JsonAbi,
         bin: BytecodeObject,
         args: Vec<DynSolValue>,
@@ -559,7 +559,7 @@ impl CreateArgs {
         chain: u64,
         zk_data: Option<(&DualCompiledContract, Vec<Vec<u8>>)>,
         signer: Option<WalletSigner>,
-    ) -> Result<()> {
+    ) -> Result<Address> {
         let contract = self.contract.clone().unwrap();
         let deployer_address =
             provider.default_sender().expect("no sender address set for provider");
@@ -705,7 +705,7 @@ impl CreateArgs {
         };
 
         if !self.verify {
-            return Ok(());
+            return Ok(address);
         }
 
         println!("Starting contract verification...");
@@ -727,13 +727,13 @@ impl CreateArgs {
             retry: self.retry,
             libraries: vec![],
             root: None,
-            verifier: self.verifier,
+            verifier: self.verifier.clone(),
             via_ir: self.opts.via_ir,
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
         };
         println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
-        verify.run().await
+        verify.run().await.map(|_| address)
     }
 
     /// Parses the given constructor arguments into a vector of `DynSolValue`s, by matching them
