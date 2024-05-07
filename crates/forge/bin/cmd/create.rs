@@ -540,7 +540,7 @@ impl CreateArgs {
                 constructor_args = Some(hex::encode(encoded_args));
             }
 
-            self.verify_preflight_check(&contract, constructor_args.clone(), chain).await?;
+            self.verify_preflight_check(contract, constructor_args.clone(), chain).await?;
         }
 
         // Deploy the actual contract

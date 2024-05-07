@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use tracing::{debug, trace, warn};
+use tracing::{trace, warn};
 
 use foundry_compilers::info::ContractInfo;
 
