@@ -308,7 +308,17 @@ impl CreateArgs {
                 let signer = self.eth.wallet.signer().await?;
                 let zk_signer = self.eth.wallet.signer().await?;
                 let provider = SignerMiddleware::new_with_provider_chain(provider, signer).await?;
-                self.deploy(&contract, abi, bin, params, provider, chain_id, zk_data, Some(zk_signer)).await?
+                self.deploy(
+                    &contract,
+                    abi,
+                    bin,
+                    params,
+                    provider,
+                    chain_id,
+                    zk_data,
+                    Some(zk_signer),
+                )
+                .await?
             };
 
             if deploying_libraries {
