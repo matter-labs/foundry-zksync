@@ -328,7 +328,7 @@ impl ZkSolc {
 
                 info!("\nCompiling {:?}...", contract_path);
 
-                info!("Checking for missing libraries {:?}...", contract_path);
+                trace!("Checking for missing libraries {:?}...", contract_path);
                 let (output, contract_hash) = self.check_contract_is_cached(contract_path)?;
                 cached_contracts.insert(contract_path.clone(), (output.clone(), contract_hash));
 
@@ -385,7 +385,7 @@ impl ZkSolc {
                 &self.project.paths.root,
                 dependencies.as_slice(),
             )?;
-            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID>", dependencies);
+            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", dependencies);
         }
 
         // Step 5: Proceed with contract compilation

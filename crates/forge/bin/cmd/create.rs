@@ -39,7 +39,6 @@ use foundry_zksync_compiler::{
 
 use serde_json::json;
 use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
-use zksync_web3_rs::signers::Signer;
 
 /// CLI arguments for `forge create`.
 #[derive(Clone, Debug, Parser)]
@@ -142,9 +141,9 @@ impl CreateArgs {
         } else {
             vec![]
         };
-        let deploying_libraries = libraries_to_deploy.is_empty();
+        let deploying_libraries = !libraries_to_deploy.is_empty();
 
-        let (avoid_contracts, contracts_to_compile) = if deploying_libraries {
+        let (avoid_contracts, contracts_to_compile) = if !deploying_libraries {
             (
                 self.opts.compiler.avoid_contracts.clone(),
                 self.opts.compiler.contracts_to_compile.clone(),
@@ -156,6 +155,13 @@ impl CreateArgs {
                     libraries_to_deploy
                         .iter()
                         .map(|lib| lib.path.clone().expect("libraries must specify path"))
+                        .map(|path| {
+                            PathBuf::from(path)
+                                .file_name()
+                                .expect("contract path to have filename")
+                                .to_string_lossy()
+                                .to_string()
+                        })
                         .collect(),
                 ),
             )
@@ -179,7 +185,7 @@ impl CreateArgs {
         };
         let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
 
-        let contracts_to_deploy = if deploying_libraries {
+        let contracts_to_deploy = if !deploying_libraries {
             vec![self
                 .contract
                 .clone()
@@ -296,18 +302,18 @@ impl CreateArgs {
                 // Deploy with unlocked account
                 let sender = self.eth.wallet.from.expect("required");
                 let provider = provider.with_sender(sender.to_ethers());
-                self.deploy(abi, bin, params, provider, chain_id, zk_data, None).await?
+                self.deploy(&contract, abi, bin, params, provider, chain_id, zk_data, None).await?
             } else {
                 // Deploy with signer
                 let signer = self.eth.wallet.signer().await?;
                 let zk_signer = self.eth.wallet.signer().await?;
                 let provider = SignerMiddleware::new_with_provider_chain(provider, signer).await?;
-                self.deploy(abi, bin, params, provider, chain_id, zk_data, Some(zk_signer)).await?
+                self.deploy(&contract, abi, bin, params, provider, chain_id, zk_data, Some(zk_signer)).await?
             };
 
             if deploying_libraries {
                 config.libraries.push(format!(
-                    "{}:{}:{:02x}",
+                    "{}:{}:{:#02x}",
                     contract.path.expect("library must have path"),
                     contract.name,
                     address
@@ -393,6 +399,7 @@ impl CreateArgs {
     #[allow(clippy::too_many_arguments)]
     async fn deploy<M: Middleware + 'static>(
         &self,
+        contract: &ContractInfo,
         abi: JsonAbi,
         bin: BytecodeObject,
         args: Vec<DynSolValue>,
@@ -401,7 +408,6 @@ impl CreateArgs {
         zk_data: Option<(&DualCompiledContract, Vec<Vec<u8>>)>,
         signer: Option<WalletSigner>,
     ) -> Result<Address> {
-        let contract = self.contract.clone().unwrap();
         let deployer_address =
             provider.default_sender().expect("no sender address set for provider");
         let bin = bin
@@ -555,7 +561,7 @@ impl CreateArgs {
             if self.opts.compiler.optimize { self.opts.compiler.optimizer_runs } else { None };
         let verify = verify::VerifyArgs {
             address,
-            contract,
+            contract: contract.clone(),
             compiler_version: None,
             constructor_args,
             constructor_args_path: None,
