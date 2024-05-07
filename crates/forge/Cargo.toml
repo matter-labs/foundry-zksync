@@ -57,7 +57,6 @@ alloy-json-abi.workspace = true
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-rpc-types.workspace = true
 
-async-recursion = "1.0.5"
 async-trait = "0.1"
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
 clap_complete = "4"
