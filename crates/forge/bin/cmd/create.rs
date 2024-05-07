@@ -112,13 +112,12 @@ pub struct CreateArgs {
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> Result<()> {
-        let mut config = self.eth.try_load_config_emit_warnings()?;
-        let provider = utils::get_provider(&config)?;
         // Find Project & Compile
         let project = self.opts.project()?;
         let mut output =
             ProjectCompiler::new().quiet_if(self.json || self.opts.silent).compile(&project)?;
 
+        let mut config = self.eth.try_load_config_emit_warnings()?;
         let zksync = self.opts.compiler.zksync;
         let libraries_to_deploy = if zksync && self.deploy_missing_libraries {
             let missing_libraries =
@@ -195,8 +194,6 @@ impl CreateArgs {
         };
 
         for mut contract in contracts_to_deploy {
-            let provider = provider.clone();
-
             if let Some(ref mut path) = contract.path {
                 // paths are absolute in the project's output
                 *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
@@ -279,6 +276,7 @@ impl CreateArgs {
             };
 
             // Add arguments to constructor
+            let provider = utils::get_provider(&config)?;
             let params = match abi.constructor {
                 Some(ref v) => {
                     let constructor_args =
@@ -369,6 +367,7 @@ impl CreateArgs {
     /// verification.
     async fn verify_preflight_check(
         &self,
+        contract: &ContractInfo,
         constructor_args: Option<String>,
         chain: u64,
     ) -> Result<()> {
@@ -376,7 +375,7 @@ impl CreateArgs {
         // since we don't know the address yet.
         let mut verify = verify::VerifyArgs {
             address: Default::default(),
-            contract: self.contract.clone().unwrap(),
+            contract: contract.clone(),
             compiler_version: None,
             constructor_args,
             constructor_args_path: None,
@@ -541,7 +540,7 @@ impl CreateArgs {
                 constructor_args = Some(hex::encode(encoded_args));
             }
 
-            self.verify_preflight_check(constructor_args.clone(), chain).await?;
+            self.verify_preflight_check(&contract, constructor_args.clone(), chain).await?;
         }
 
         // Deploy the actual contract

@@ -76,6 +76,7 @@ impl ZkLibrariesManager {
                 .map(|i| missing_libraries.remove(i))
             else {
                 warn!(?missing_libraries, "unable to find library ready to be deployed");
+                //TODO: determine if this error message is accurate
                 eyre::bail!("Library dependency cycle detected");
             };
 
@@ -86,16 +87,7 @@ impl ZkLibrariesManager {
                     let lib_path = split.next().unwrap();
                     let lib_name = split.next().unwrap();
 
-                    let r =
-                        !(next_lib.contract_path == lib_path && next_lib.contract_name == lib_name);
-                    if !r {
-                        debug!(
-                            name = lib.contract_name,
-                            dependency = lib_name,
-                            "deployed library dependency"
-                        )
-                    }
-                    r
+                    !(next_lib.contract_path == lib_path && next_lib.contract_name == lib_name)
                 })
             }
 
