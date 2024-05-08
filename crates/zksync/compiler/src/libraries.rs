@@ -50,10 +50,14 @@ impl ZkLibrariesManager {
     }
 
     /// Retrieve ordered list of libraries to deploy
+    ///
+    /// Libraries are grouped in batches, where the next batch
+    /// may have dependencies on the previous one, thus
+    /// it's recommended to build & deploy one batch before moving onto the next
     pub fn resolve_libraries(
         mut missing_libraries: Vec<ZkMissingLibrary>,
         already_deployed_libraries: &[ContractInfo],
-    ) -> eyre::Result<Vec<ContractInfo>> {
+    ) -> eyre::Result<Vec<Vec<ContractInfo>>> {
         trace!(?missing_libraries, ?already_deployed_libraries, "filtering out missing libraries");
         missing_libraries.retain(|lib| {
             !already_deployed_libraries.iter().any(|dep| {
@@ -62,38 +66,59 @@ impl ZkLibrariesManager {
             })
         });
 
-        let mut output_contracts = Vec::with_capacity(missing_libraries.len());
+        let mut batches = Vec::new();
         loop {
             if missing_libraries.is_empty() {
-                break Ok(output_contracts);
+                break Ok(batches);
             }
 
-            let Some(next_lib) = missing_libraries
-                .iter()
-                .enumerate()
-                .find(|(_, lib)| lib.missing_libraries.is_empty())
-                .map(|(i, _)| i)
-                .map(|i| missing_libraries.remove(i))
-            else {
-                warn!(?missing_libraries, "unable to find library ready to be deployed");
-                //TODO: determine if this error message is accurate
-                eyre::bail!("Library dependency cycle detected");
-            };
+            let mut batch = Vec::new();
+            loop {
+                // find library with no further dependencies
+                let Some(next_lib) = missing_libraries
+                    .iter()
+                    .enumerate()
+                    .find(|(_, lib)| lib.missing_libraries.is_empty())
+                    .map(|(i, _)| i)
+                    .map(|i| missing_libraries.remove(i))
+                else {
+                    // no such library, and we didn't collect any library already
+                    if batch.is_empty() {
+                        warn!(
+                            ?missing_libraries,
+                            ?batches,
+                            "unable to find library ready to be deployed"
+                        );
+                        //TODO: determine if this error message is accurate
+                        eyre::bail!("Library dependency cycle detected");
+                    }
 
-            //remove this lib from each missing_library if listed as dependency
+                    break;
+                };
+
+                let info = ContractInfo {
+                    path: Some(next_lib.contract_path),
+                    name: next_lib.contract_name,
+                };
+                batch.push(info);
+            }
+
+            // remove this batch from each library's missing_library if listed as dependency
+            // this potentailly allows more libraries to be included in the next batch
             for lib in &mut missing_libraries {
                 lib.missing_libraries.retain(|maybe_missing_lib| {
                     let mut split = maybe_missing_lib.split(':');
                     let lib_path = split.next().unwrap();
                     let lib_name = split.next().unwrap();
 
-                    !(next_lib.contract_path == lib_path && next_lib.contract_name == lib_name)
+                    !batch.iter().any(|lib| {
+                        lib.path.as_ref().map(|s| s.as_str()) == Some(lib_path) &&
+                            lib.name.as_str() == lib_name
+                    })
                 })
             }
 
-            let info =
-                ContractInfo { path: Some(next_lib.contract_path), name: next_lib.contract_name };
-            output_contracts.push(info);
+            batches.push(batch);
         }
     }
 }

@@ -136,7 +136,8 @@ impl CreateArgs {
 
             info!("Resolving missing libraries");
 
-            ZkLibrariesManager::resolve_libraries(missing_libraries, &all_deployed_libraries)?
+            ZkLibrariesManager::resolve_libraries(missing_libraries, &all_deployed_libraries)
+                .map(|batches| batches.into_iter().flatten().collect::<Vec<ContractInfo>>())?
         } else {
             vec![]
         };
