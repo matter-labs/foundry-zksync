@@ -353,6 +353,7 @@ impl CreateArgs {
                     compiler: CompilerArgs {
                         avoid_contracts: self.opts.compiler.avoid_contracts.take(),
                         contracts_to_compile: self.opts.compiler.contracts_to_compile.take(),
+                        zksync: self.opts.compiler.zksync,
                         ..Default::default()
                     },
                     ..Default::default()
