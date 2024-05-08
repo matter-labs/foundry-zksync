@@ -112,7 +112,7 @@ impl ZkLibrariesManager {
                     let lib_name = split.next().unwrap();
 
                     !batch.iter().any(|lib| {
-                        lib.path.as_ref().map(|s| s.as_str()) == Some(lib_path) &&
+                        lib.path.as_deref() == Some(lib_path) &&
                             lib.name.as_str() == lib_name
                     })
                 })
