@@ -1412,6 +1412,23 @@ impl Config {
         self.__root.0.join(Config::FILE_NAME)
     }
 
+    /// Sets the non-inlinable libraries inside a `foundry.toml` file but only if it exists the
+    /// 'libraries' entry
+    ///
+    /// # Errors
+    ///
+    /// An error if the `foundry.toml` could not be parsed.
+    pub fn update_libraries(&self) -> eyre::Result<()> {
+        self.update(|doc| {
+            let profile = self.profile.as_str().as_str();
+            let libraries: toml_edit::Value =
+                self.libraries.iter().map(toml_edit::Value::from).collect();
+            let libraries = toml_edit::value(libraries);
+            doc[Config::PROFILE_SECTION][profile]["libraries"] = libraries;
+            true
+        })
+    }
+
     /// Returns the selected profile
     ///
     /// If the `FOUNDRY_PROFILE` env variable is not set, this returns the `DEFAULT_PROFILE`
