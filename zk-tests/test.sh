@@ -125,6 +125,17 @@ build_forge "${REPO_ROOT}"
 
 "${FORGE}" install transmissions11/solmate Openzeppelin/openzeppelin-contracts --no-commit
 
+start_era_test_node
+
+# Test missing libraries detection and deploy
+output=$(RUST_LOG=warn "${FORGE}" build --zksync 2>&1 || true)
+
+if echo "$output" | grep -q "Missing libraries detected"; then
+    RUST_LOG=warn "${FORGE}" create --deploy-missing-libraries --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync
+else
+    echo "No missing libraries detected."
+fi
+
 echo "Running tests..."
 RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" -vvv  || fail "forge test failed"
 
@@ -132,7 +143,6 @@ echo "Running tests with '--zksync'..."
 RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" -vvv --zksync  || fail "forge test --zksync failed"
 
 echo "Running script..."
-start_era_test_node
 
 RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  || fail "forge script failed"
 RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  || fail "forge script failed on 2nd deploy"
@@ -167,6 +177,7 @@ TRANSACTION=$("${CAST}" send --rpc-url $RPC_URL --private-key $PRIVATE_KEY $MYTO
 echo "Transaction: ${TRANSACTION}"
 echo "Checking transaction status..."
 echo "${TRANSACTION}" | grep -q "transactionHash" || fail "Transaction failed"
+
 stop_era_test_node
 
 success
