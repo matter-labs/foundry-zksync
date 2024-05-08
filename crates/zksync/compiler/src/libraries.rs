@@ -15,13 +15,13 @@ pub struct ZkLibrariesManager;
 
 impl ZkLibrariesManager {
     /// Return the missing libraries cache path
-    pub(crate) fn get_missing_libraries_cache_path(project_root: &Path) -> PathBuf {
-        project_root.join(".zksolc-libraries-cache/missing_library_dependencies.json")
+    pub(crate) fn get_missing_libraries_cache_path(project_root: impl AsRef<Path>) -> PathBuf {
+        project_root.as_ref().join(".zksolc-libraries-cache/missing_library_dependencies.json")
     }
 
     /// Add libraries to missing libraries cache
     pub(crate) fn add_dependencies_to_missing_libraries_cache(
-        project_root: &Path,
+        project_root: impl AsRef<Path>,
         libraries: &[ZkMissingLibrary],
     ) -> eyre::Result<()> {
         let file_path = Self::get_missing_libraries_cache_path(project_root);
@@ -33,7 +33,7 @@ impl ZkLibrariesManager {
 
     /// Returns the detected missing libraries from previous compilation
     pub fn get_detected_missing_libraries(
-        project_root: &Path,
+        project_root: impl AsRef<Path>,
     ) -> eyre::Result<Vec<ZkMissingLibrary>> {
         let library_paths = Self::get_missing_libraries_cache_path(project_root);
         if !library_paths.exists() {
@@ -44,7 +44,7 @@ impl ZkLibrariesManager {
     }
 
     /// Performs cleanup of cached missing libraries
-    pub fn cleanup_detected_missing_libraries(project_root: &Path) -> eyre::Result<()> {
+    pub fn cleanup_detected_missing_libraries(project_root: impl AsRef<Path>) -> eyre::Result<()> {
         fs::remove_file(Self::get_missing_libraries_cache_path(project_root))?;
         Ok(())
     }

@@ -112,16 +112,14 @@ pub struct CreateArgs {
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> Result<()> {
-        // Find Project & Compile
-        let project = self.opts.project()?;
-        let mut output =
-            ProjectCompiler::new().quiet_if(self.json || self.opts.silent).compile(&project)?;
-
         let mut config = self.eth.try_load_config_emit_warnings()?;
+        let project_root = config.project_paths().root;
         let zksync = self.opts.compiler.zksync;
+
+        // Resolve missing libraries
         let libs_batches = if zksync && self.deploy_missing_libraries {
             let missing_libraries =
-                ZkLibrariesManager::get_detected_missing_libraries(project.root())?;
+                ZkLibrariesManager::get_detected_missing_libraries(&project_root)?;
 
             let mut all_deployed_libraries = Vec::with_capacity(config.libraries.len());
             for library in &config.libraries {
@@ -152,6 +150,11 @@ impl CreateArgs {
         };
 
         for contracts_batch in contracts_to_deploy {
+            // Find Project & Compile
+            let project = self.opts.project()?;
+            let mut output =
+                ProjectCompiler::new().quiet_if(self.json || self.opts.silent).compile(&project)?;
+
             let (avoid_contracts, contracts_to_compile) = if !deploying_libraries {
                 (
                     self.opts.compiler.avoid_contracts.clone(),
@@ -341,7 +344,7 @@ impl CreateArgs {
         }
 
         if deploying_libraries {
-            ZkLibrariesManager::cleanup_detected_missing_libraries(project.root())?;
+            ZkLibrariesManager::cleanup_detected_missing_libraries(&project_root)?;
 
             //TODO: determine if we want to build the project automatically after we deploy
             // libraries like we already do here
