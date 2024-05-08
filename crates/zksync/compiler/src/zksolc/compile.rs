@@ -860,14 +860,15 @@ impl ZkSolc {
 
         // Patch the libraries to be relative to the project root
         // NOTE: This is a temporary fix until zksolc supports relative paths
-        let mut patched_libraries: BTreeMap<PathBuf, BTreeMap<String, String>> = BTreeMap::new();
-        for (path, details) in std_zk_json.settings.libraries.libs.iter() {
-            patched_libraries.insert(
-                path.strip_prefix(&self.project.paths.root).unwrap().into(),
-                details.clone(),
-            );
+        for (mut path, details) in
+            std::mem::take(&mut std_zk_json.settings.libraries.libs).into_iter()
+        {
+            if let Ok(patched) = path.strip_prefix(&self.project.paths.root) {
+                path = patched.to_owned();
+            }
+
+            std_zk_json.settings.libraries.libs.insert(path, details);
         }
-        std_zk_json.settings.libraries.libs = patched_libraries;
 
         // Store the generated standard JSON input in the ZkSolc instance
         self.standard_json = Some(std_zk_json.to_owned());
