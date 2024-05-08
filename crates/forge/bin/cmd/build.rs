@@ -13,7 +13,6 @@ use foundry_config::{
     },
     Config,
 };
-use foundry_zksync_compiler::{ZkSolc, DEFAULT_ZKSOLC_VERSION};
 use serde::Serialize;
 use watchexec::config::{InitConfig, RuntimeConfig};
 
@@ -100,32 +99,20 @@ impl BuildArgs {
         }
         let output = compiler.compile(&project)?;
 
-        let output = if config.zksync {
-            let mut zksolc = ZkSolc::new(
-                config
-                    .new_zksolc_config_builder()
-                    .and_then(|builder| {
-                        builder
-                            .compiler_version(DEFAULT_ZKSOLC_VERSION)
-                            .avoid_contracts(self.args.compiler.avoid_contracts.clone())
-                            .contracts_to_compile(self.args.compiler.contracts_to_compile.clone())
-                            .build()
-                    })
-                    .map_err(|e| eyre::eyre!(e))?,
-                config.zk_project()?,
-            );
-            let (zk_output, _contract_bytecodes) = match zksolc.compile() {
-                Ok(compiled) => compiled,
-                Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
-            };
-
-            zk_output
-        } else {
-            output
-        };
-
         if self.format_json {
             println!("{}", serde_json::to_string_pretty(&output.clone().output())?);
+        }
+
+        if config.zksync {
+            let zk_compiler = ProjectCompiler::new()
+                .print_names(self.names)
+                .print_sizes(self.sizes)
+                .quiet(self.format_json)
+                .bail(!self.format_json);
+            let zk_output = zk_compiler.zksync_compile(&project)?;
+            if self.format_json {
+                println!("{}", serde_json::to_string_pretty(&zk_output.clone().output())?);
+            }
         }
 
         Ok(output)

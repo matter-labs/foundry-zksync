@@ -8,6 +8,10 @@ use foundry_compilers::{
     artifacts::{BytecodeObject, CompactContractBytecode, ContractBytecodeSome},
     remappings::Remapping,
     report::{BasicStdoutReporter, NoReporter, Report},
+    zksync::{
+        artifact_output::Artifact as ZkArtifact,
+        compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
+    },
     Artifact, ArtifactId, FileFilter, Graph, Project, ProjectCompileOutput, ProjectPathsConfig,
     Solc, SolcConfig,
 };
@@ -246,6 +250,145 @@ impl ProjectCompiler {
             let artifacts: BTreeMap<_, _> = output.artifacts().collect();
             for (name, artifact) in artifacts {
                 let size = deployed_contract_size(artifact).unwrap_or_default();
+
+                let dev_functions =
+                    artifact.abi.as_ref().map(|abi| abi.functions()).into_iter().flatten().filter(
+                        |func| {
+                            func.name.is_test() ||
+                                func.name.eq("IS_TEST") ||
+                                func.name.eq("IS_SCRIPT")
+                        },
+                    );
+
+                let is_dev_contract = dev_functions.count() > 0;
+                size_report.contracts.insert(name, ContractInfo { size, is_dev_contract });
+            }
+
+            println!("{size_report}");
+
+            // TODO: avoid process::exit
+            // exit with error if any contract exceeds the size limit, excluding test contracts.
+            if size_report.exceeds_size_limit() {
+                std::process::exit(1);
+            }
+        }
+    }
+
+    /// Compiles the project.
+    pub fn zksync_compile(mut self, project: &Project) -> Result<ZkProjectCompileOutput> {
+        // TODO: Avoid process::exit
+        if !project.paths.has_input_files() && self.files.is_empty() {
+            println!("Nothing to compile");
+            // nothing to do here
+            std::process::exit(0);
+        }
+
+        // Taking is fine since we don't need these in `compile_with`.
+        //let filter = std::mem::take(&mut self.filter);
+        let files = std::mem::take(&mut self.files);
+        self.zksync_compile_with(|| {
+            if !files.is_empty() {
+                project.zksync_compile_files(files)
+            /* TODO: evualuate supporting compiling with filters
+            } else if let Some(filter) = filter {
+                project.compile_sparse(filter)
+            */
+            } else {
+                project.zksync_compile()
+            }
+            .map_err(Into::into)
+        })
+    }
+
+    #[instrument(target = "forge::compile", skip_all)]
+    fn zksync_compile_with<F>(self, f: F) -> Result<ZkProjectCompileOutput>
+    where
+        F: FnOnce() -> Result<ZkProjectCompileOutput>,
+    {
+        let quiet = self.quiet.unwrap_or(false);
+        let bail = self.bail.unwrap_or(true);
+        #[allow(clippy::collapsible_else_if)]
+        let reporter = if quiet {
+            Report::new(NoReporter::default())
+        } else {
+            if std::io::stdout().is_terminal() {
+                Report::new(SpinnerReporter::spawn())
+            } else {
+                Report::new(BasicStdoutReporter::default())
+            }
+        };
+
+        let output = foundry_compilers::report::with_scoped(&reporter, || {
+            tracing::debug!("compiling project");
+
+            let timer = std::time::Instant::now();
+            let r = f();
+            let elapsed = timer.elapsed();
+
+            tracing::debug!("finished compiling in {:.3}s", elapsed.as_secs_f64());
+            r
+        })?;
+
+        // need to drop the reporter here, so that the spinner terminates
+        drop(reporter);
+
+        if bail && output.has_compiler_errors() {
+            eyre::bail!("{output}")
+        }
+
+        if !quiet {
+            if output.is_unchanged() {
+                println!("No files changed, compilation skipped");
+            } else {
+                // print the compiler output / warnings
+                println!("{output}");
+            }
+
+            self.zksync_handle_output(&output);
+        }
+
+        Ok(output)
+    }
+
+    /// If configured, this will print sizes or names
+    fn zksync_handle_output(&self, output: &ZkProjectCompileOutput) {
+        let print_names = self.print_names.unwrap_or(false);
+        let print_sizes = self.print_sizes.unwrap_or(false);
+
+        // print any sizes or names
+        if print_names {
+            let mut artifacts: BTreeMap<_, Vec<_>> = BTreeMap::new();
+            for (name, (_, version)) in output.versioned_artifacts() {
+                artifacts.entry(version).or_default().push(name);
+            }
+            for (version, names) in artifacts {
+                println!(
+                    "  compiler version: {}.{}.{}",
+                    version.major, version.minor, version.patch
+                );
+                for name in names {
+                    println!("    - {name}");
+                }
+            }
+        }
+
+        if print_sizes {
+            // add extra newline if names were already printed
+            if print_names {
+                println!();
+            }
+
+            let mut size_report = SizeReport { contracts: BTreeMap::new() };
+            let artifacts: BTreeMap<_, _> = output.artifacts().collect();
+            for (name, artifact) in artifacts {
+                let bytecode = artifact.get_bytecode_object().unwrap_or_default();
+                let size = match bytecode.as_ref() {
+                    BytecodeObject::Bytecode(bytes) => bytes.len(),
+                    BytecodeObject::Unlinked(_) => {
+                        // TODO: This should never happen on zksolc, maybe error somehow
+                        0
+                    }
+                };
 
                 let dev_functions =
                     artifact.abi.as_ref().map(|abi| abi.functions()).into_iter().flatten().filter(
