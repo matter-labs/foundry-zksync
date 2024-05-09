@@ -59,6 +59,8 @@ use std::{
 };
 use tracing::{error, info, trace, warn};
 
+type ArtifactsMap<T> = <Artifacts<T> as core::ops::Deref>::Target;
+
 use crate::zksolc::PackedEraBytecode;
 
 /// It is observed that when there's a missing library without
@@ -71,16 +73,26 @@ pub type ContractBytecodes = BTreeMap<String, String>;
 
 #[derive(Debug, Default, Clone)]
 pub struct ZkSolcArtifactPaths {
-    artifact: PathBuf,
-    contract_hash: PathBuf,
+    base: PathBuf,
 }
 
 impl ZkSolcArtifactPaths {
     pub fn new(filename: PathBuf) -> Self {
-        Self {
-            artifact: filename.join("artifacts.json"),
-            contract_hash: filename.join("contract_hash"),
-        }
+        Self { base: filename }
+    }
+
+    pub fn artifact(&self) -> PathBuf {
+        self.base.join("artifacts.json")
+    }
+    pub fn hash(&self) -> PathBuf {
+        self.base.join("contract_hash")
+    }
+    pub fn input(&self) -> PathBuf {
+        self.base.join("json_input.json")
+    }
+
+    pub fn create(&self) -> Result<()> {
+        fs::create_dir_all(&self.base).wrap_err("Failed creating artifacts dir")
     }
 }
 
@@ -290,7 +302,7 @@ impl ZkSolc {
     /// for further processing or analysis.
     pub fn compile(&mut self) -> Result<(ProjectCompileOutput, ContractBytecodes)> {
         let mut displayed_warnings = HashSet::new();
-        let mut data = BTreeMap::new();
+        let mut data = ArtifactsMap::new();
         // Step 1: Collect Source Files
         let mut sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
         sources.retain(|_, (_, sources)| {
@@ -325,18 +337,17 @@ impl ZkSolc {
                 info!("Compiling {:?}...", contract_path);
                 let output = Self::check_contract_is_cached(&artifact_paths, &contract_path)?.0;
 
-                let output = match output {
+                let (output, maybe_input) = match output {
                     Some(output) => {
                         info!("Using hashed artifact for {:?}", filename);
-                        output
+                        (output, None)
                     }
                     None => {
-                        self.prepare_compiler_input(&contract_path).wrap_err(format!(
-                            "Failed to prepare inputs when compiling {:?}",
-                            contract_path
-                        ))?;
+                        let input = self.prepare_compiler_input(&contract_path).wrap_err(
+                            format!("Failed to prepare inputs when compiling {:?}", contract_path),
+                        )?;
 
-                        let Some(output) = self.run_compiler(&contract_path, &solc)? else {
+                        let Some(output) = self.run_compiler(&input, &contract_path, &solc)? else {
                             continue
                         };
 
@@ -366,14 +377,25 @@ impl ZkSolc {
                             continue;
                         }
 
-                        output.stdout
+                        (output.stdout, Some(input))
                     }
                 };
 
                 // Step 6: Handle Output (Errors and Warnings)
-                let (artifacts, bytecodes) =
-                    ZkSolc::handle_output(output, &mut displayed_warnings, &artifact_paths);
-                data.insert(filename.to_string(), artifacts);
+                let (artifacts, bytecodes) = Self::handle_output(
+                    output,
+                    &mut displayed_warnings,
+                    &artifact_paths,
+                    maybe_input.as_deref(),
+                );
+                for (filename, contracts) in artifacts {
+                    let cs = data.entry(filename).or_default();
+                    for (name, arts) in contracts {
+                        // each contract is only supposed to have 1 artifact
+                        // keep the newest one
+                        *cs.entry(name).or_default() = arts;
+                    }
+                }
                 contract_bytecodes.extend(bytecodes);
             }
         }
@@ -403,8 +425,11 @@ impl ZkSolc {
     /// Checks if the contract has already been compiled for the given input contract hash.
     /// If yes, returns the pre-compiled data.
     fn check_cache(artifact_paths: &ZkSolcArtifactPaths, contract_hash: &str) -> Option<Vec<u8>> {
-        if artifact_paths.contract_hash.exists() && artifact_paths.artifact.exists() {
-            File::open(&artifact_paths.contract_hash)
+        let hash = artifact_paths.hash();
+        let artifact = artifact_paths.artifact();
+
+        if hash.exists() && artifact.exists() {
+            File::open(hash)
                 .and_then(|mut file| {
                     let mut cached_contract_hash = String::new();
                     file.read_to_string(&mut cached_contract_hash).map(|_| cached_contract_hash)
@@ -417,7 +442,7 @@ impl ZkSolc {
                     }
                 })
                 .and_then(|_| {
-                    File::open(&artifact_paths.artifact).and_then(|mut file| {
+                    File::open(artifact).and_then(|mut file| {
                         let mut buffer = Vec::new();
                         file.read_to_end(&mut buffer).map(|_| Some(buffer))
                     })
@@ -524,8 +549,8 @@ impl ZkSolc {
         output: Vec<u8>,
         displayed_warnings: &mut HashSet<String>,
         artifact_paths: impl AsRef<Path>,
-    ) -> (BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>>, ContractBytecodes)
-    {
+        input: Option<&str>,
+    ) -> (ArtifactsMap<ConfigurableContractArtifact>, ContractBytecodes) {
         let artifact_paths = artifact_paths.as_ref();
 
         // Deserialize the compiler output into a serde_json::Value object
@@ -555,7 +580,7 @@ impl ZkSolc {
         };
 
         // Handle warnings in the output
-        ZkSolc::handle_output_warnings(&compiler_output, displayed_warnings);
+        Self::handle_output_warnings(&compiler_output, displayed_warnings);
 
         let write_artifact = |hash: &str, filename| {
             let artifacts = artifact_paths.join(filename);
@@ -564,9 +589,22 @@ impl ZkSolc {
                 return;
             }
 
-            let write_artifacts = ZkSolcArtifactPaths::new(artifacts);
+            tracing::debug!(filename = ?filename, ?hash, "writing artifacts");
 
-            let mut artifacts_file = File::create(write_artifacts.artifact)
+            let artifacts = ZkSolcArtifactPaths::new(artifacts);
+            artifacts.create().unwrap();
+
+            if let Some(input) = input {
+                let mut json_input_file = File::create(artifacts.input())
+                    .wrap_err("Could not create json_input file")
+                    .unwrap();
+
+                json_input_file
+                    .write_all(input.as_bytes())
+                    .unwrap_or_else(|e| panic!("Could not write input file: {}", e));
+            }
+
+            let mut artifacts_file = File::create(artifacts.artifact())
                 .wrap_err("Could not create artifacts file")
                 .unwrap();
 
@@ -575,7 +613,7 @@ impl ZkSolc {
                 .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
 
             // Create the contract_hash file for saving the input contract hash
-            let mut contract_hash_file = File::create(write_artifacts.contract_hash)
+            let mut contract_hash_file = File::create(artifacts.hash())
                 .wrap_err("Could not create contract_hash file")
                 .unwrap();
 
@@ -606,7 +644,7 @@ impl ZkSolc {
             }
         }
 
-        let mut result = BTreeMap::new();
+        let mut result = ArtifactsMap::new();
         let mut contract_bytecodes = BTreeMap::new();
 
         // Get the bytecode hashes for each contract in the output
@@ -621,6 +659,13 @@ impl ZkSolc {
                     .unwrap_or_default()
             })
         {
+            let filename = <String as AsRef<Path>>::as_ref(source_path)
+                .file_name()
+                .wrap_err(format!("Could not get filename from {:?}", source_path))
+                .unwrap()
+                .to_str()
+                .expect("Invalid Contract filename");
+
             for (name, contract) in contracts {
                 // if contract hash is empty, skip
                 if contract.hash.is_none() {
@@ -677,11 +722,11 @@ impl ZkSolc {
                     file: format!("{}.sol", name).into(),
                     version: Version::parse(&compiler_output.version).unwrap(),
                 };
-                result.insert(name.clone(), vec![artifact]);
+                // each contract is only supposed to have 1 artifact
+                *result.entry(filename.to_string()).or_default().entry(name.clone()).or_default() =
+                    vec![artifact];
 
-                if let Some(filename) = <String as AsRef<Path>>::as_ref(source_path).file_name() {
-                    write_artifact(contract.hash.as_ref().unwrap(), filename);
-                }
+                write_artifact(contract.hash.as_ref().unwrap(), filename);
             }
         }
 
@@ -804,26 +849,17 @@ impl ZkSolc {
     ///    - The standard JSON input includes the contract's source code, compiler options, and file
     ///      output selection.
     ///
-    /// 5. Build Artifacts Path:
-    ///    - It builds the path for saving the compiler artifacts based on the contract source file.
-    ///    - The artifacts will be saved in a directory named after the contract's filename within
-    ///      the project's artifacts directory.
-    ///
-    /// 6. Save JSON Input:
-    ///    - It saves the standard JSON input as a file named "json_input.json" within the
-    ///      contract's artifacts directory.
-    ///
     /// # Example
     ///
     /// ```ignore
     /// let contract_path = PathBuf::from("/path/to/contract.sol");
-    /// self.prepare_compiler_input(contract_path)?;
+    /// let json_input = self.prepare_compiler_input(contract_path)?;
     /// ```
     ///
     /// In this example, the `prepare_compiler_input` function is called with the contract source
     /// path. It generates the JSON input for the contract, configures the Solidity compiler,
-    /// and saves the input to the artifacts directory.
-    fn prepare_compiler_input(&mut self, contract_path: &PathBuf) -> Result<()> {
+    /// and returns the input to pass to the compiler.
+    fn prepare_compiler_input(&mut self, contract_path: &PathBuf) -> Result<String> {
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
         file_output_selection
@@ -863,23 +899,13 @@ impl ZkSolc {
             std_zk_json.settings.libraries.libs.insert(path, details);
         }
 
+        let serialized_input =
+            serde_json::to_string(&std_zk_json).wrap_err("Could not serialize JSON input")?;
+
         // Store the generated standard JSON input in the ZkSolc instance
-        self.standard_json = Some(std_zk_json.to_owned());
+        self.standard_json = Some(std_zk_json);
 
-        // Step 5: Build Artifacts Path
-        let artifact_path = &self.build_artifacts_path(contract_path)?;
-
-        // Step 6: Save JSON Input
-        let json_input_path = artifact_path.join("json_input.json");
-
-        std::fs::write(
-            json_input_path,
-            serde_json::to_string_pretty(&std_zk_json)
-                .wrap_err("Could not serialize JSON input")?,
-        )
-        .wrap_err("Could not write JSON input file")?;
-
-        Ok(())
+        Ok(serialized_input)
     }
 
     fn convert_to_zk_standard_json(
@@ -992,49 +1018,6 @@ impl ZkSolc {
         versions.get(&self.project).wrap_err("Could not get solc")
     }
 
-    /// Builds the path for saving the artifacts (compiler output) of a contract based on the
-    /// contract's source file. The function performs the following steps to construct the
-    /// artifacts path:
-    ///
-    /// # Workflow:
-    /// 1. Extract Filename:
-    ///    - The function extracts the filename from the provided contract source path using the
-    ///      `file_name` method.
-    ///    - If the extraction of the filename fails, an error is returned.
-    ///
-    /// 2. Build Artifacts Path:
-    ///    - The function constructs the artifacts path by joining the extracted filename with the
-    ///      project's artifacts directory path.
-    ///    - The `join` method is used on the `artifacts` directory path, passing the extracted
-    ///      filename.
-    ///
-    /// 3. Create Artifacts Directory:
-    ///    - The function creates the artifacts directory and all its parent directories using the
-    ///      `create_dir_all` method from the `fs` module.
-    ///    - If the creation of the artifacts directory fails, an error is returned.
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - A reference to the `ZkSolc` instance.
-    /// * `source` - The contract source path represented as a `PathBuf`.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing the constructed artifacts path (`PathBuf`) on success, or an
-    /// `anyhow::Error` on failure.
-    ///
-    /// # Errors
-    ///
-    /// This function can return an error if any of the following occurs:
-    /// - The extraction of the filename from the contract source path fails.
-    /// - The creation of the artifacts directory fails.
-    fn build_artifacts_path(&self, source: &Path) -> Result<PathBuf> {
-        let filename = source.file_name().expect("Failed to get Contract filename.");
-        let path = self.project.paths.artifacts.join(filename);
-        fs::create_dir_all(&path).wrap_err("Could not create artifacts directory")?;
-        Ok(path)
-    }
-
     /// Checks if the contract has been ignored by the user in the configuration file.
     fn is_contract_ignored_in_config(&self, relative_path: &Path) -> bool {
         let filename = relative_path
@@ -1134,6 +1117,7 @@ impl ZkSolc {
 
     fn run_compiler(
         &self,
+        json_input: &str,
         contract_path: &Path,
         solc: &Solc,
     ) -> Result<Option<std::process::Output>> {
@@ -1148,8 +1132,9 @@ impl ZkSolc {
 
         let exec_compiler = |command: &mut Command| -> Result<std::process::Output> {
             let mut child = command.spawn().wrap_err("Failed to start the compiler")?;
-            let stdin = child.stdin.take().expect("Stdin exists.");
-            serde_json::to_writer(stdin, self.standard_json.as_ref().unwrap())
+            let mut stdin = child.stdin.take().expect("Stdin exists.");
+            stdin
+                .write_all(json_input.as_bytes())
                 .wrap_err("Could not assign standard_json to writer")?;
             child.wait_with_output().wrap_err("Could not run compiler cmd")
         };
@@ -1247,9 +1232,9 @@ mod tests {
             .as_bytes()
             .to_vec();
         let mut displayed_warnings = HashSet::new();
-        let (result, _) = ZkSolc::handle_output(data, &mut displayed_warnings, "/tmp");
+        let (result, _) = ZkSolc::handle_output(data, &mut displayed_warnings, "/tmp", None);
 
-        let artifacts = result.get("Counter").unwrap();
+        let artifacts = result.get("src/Counter.sol").unwrap().get("Counter").unwrap();
         assert_eq!(artifacts.len(), 1);
         let first = &artifacts[0];
         assert_eq!(first.file.to_str(), Some("Counter.sol"));
