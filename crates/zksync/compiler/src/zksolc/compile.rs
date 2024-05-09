@@ -307,6 +307,7 @@ impl ZkSolc {
         // Step 2: Check missing libraries
         // Map from (contract_path, contract_name) -> missing_libraries
         let mut all_missing_libraries: HashMap<(String, String), HashSet<String>> = HashMap::new();
+        let artifact_paths = self.project.paths.artifacts.clone();
 
         // Step 3: Proceed with contract compilation
         for (solc, version) in sources {
@@ -320,15 +321,14 @@ impl ZkSolc {
                     .expect("Invalid Contract filename");
 
                 // Run Compiler (or use cached) and Handle Output
-                let artifact_paths =
-                    ZkSolcArtifactPaths::new(self.project.paths.artifacts.join(filename));
 
                 info!("Compiling {:?}...", contract_path);
-                let (output, contract_hash) = self.check_contract_is_cached(&contract_path)?;
-                let (output, maybe_artifact_paths) = match output {
+                let output = Self::check_contract_is_cached(&artifact_paths, &contract_path)?.0;
+
+                let output = match output {
                     Some(output) => {
                         info!("Using hashed artifact for {:?}", filename);
-                        (output, None)
+                        output
                     }
                     None => {
                         self.prepare_compiler_input(&contract_path).wrap_err(format!(
@@ -366,18 +366,13 @@ impl ZkSolc {
                             continue;
                         }
 
-                        (output.stdout, Some(artifact_paths))
+                        output.stdout
                     }
                 };
 
                 // Step 6: Handle Output (Errors and Warnings)
-                let (artifacts, bytecodes) = ZkSolc::handle_output(
-                    output,
-                    filename,
-                    &mut displayed_warnings,
-                    &contract_hash,
-                    maybe_artifact_paths,
-                );
+                let (artifacts, bytecodes) =
+                    ZkSolc::handle_output(output, &mut displayed_warnings, &artifact_paths);
                 data.insert(filename.to_string(), artifacts);
                 contract_bytecodes.extend(bytecodes);
             }
@@ -407,11 +402,7 @@ impl ZkSolc {
 
     /// Checks if the contract has already been compiled for the given input contract hash.
     /// If yes, returns the pre-compiled data.
-    fn check_cache(
-        &self,
-        artifact_paths: &ZkSolcArtifactPaths,
-        contract_hash: &str,
-    ) -> Option<Vec<u8>> {
+    fn check_cache(artifact_paths: &ZkSolcArtifactPaths, contract_hash: &str) -> Option<Vec<u8>> {
         if artifact_paths.contract_hash.exists() && artifact_paths.artifact.exists() {
             File::open(&artifact_paths.contract_hash)
                 .and_then(|mut file| {
@@ -531,12 +522,12 @@ impl ZkSolc {
     /// errors and warnings, and saves the artifacts.
     pub fn handle_output(
         output: Vec<u8>,
-        source: &str,
         displayed_warnings: &mut HashSet<String>,
-        contract_hash: &str,
-        write_artifacts: Option<ZkSolcArtifactPaths>,
+        artifact_paths: impl AsRef<Path>,
     ) -> (BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>>, ContractBytecodes)
     {
+        let artifact_paths = artifact_paths.as_ref();
+
         // Deserialize the compiler output into a serde_json::Value object
         let compiler_output: ZkSolcCompilerOutput = match serde_json::from_slice(&output) {
             Ok(output) => output,
@@ -566,6 +557,34 @@ impl ZkSolc {
         // Handle warnings in the output
         ZkSolc::handle_output_warnings(&compiler_output, displayed_warnings);
 
+        let write_artifact = |hash: &str, filename| {
+            let artifacts = artifact_paths.join(filename);
+            // if artifact already exists don't overwrite it
+            if artifacts.exists() {
+                return;
+            }
+
+            let write_artifacts = ZkSolcArtifactPaths::new(artifacts);
+
+            let mut artifacts_file = File::create(write_artifacts.artifact)
+                .wrap_err("Could not create artifacts file")
+                .unwrap();
+
+            artifacts_file
+                .write_all(output.as_slice())
+                .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+
+            // Create the contract_hash file for saving the input contract hash
+            let mut contract_hash_file = File::create(write_artifacts.contract_hash)
+                .wrap_err("Could not create contract_hash file")
+                .unwrap();
+
+            // Write the contract's file hash to the contract_hash file
+            contract_hash_file
+                .write_all(hash.as_bytes())
+                .unwrap_or_else(|e| panic!("Could not write contract_hash file: {}", e));
+        };
+
         // First - let's get all the bytecodes.
         let mut all_bytecodes: HashMap<&str, &str> = Default::default();
         for source_file_results in compiler_output.contracts.values() {
@@ -591,91 +610,79 @@ impl ZkSolc {
         let mut contract_bytecodes = BTreeMap::new();
 
         // Get the bytecode hashes for each contract in the output
-        for (contract_name, contract) in compiler_output
+        for (source_path, contracts) in compiler_output
             .contracts
             .iter()
-            .filter(|(key, _)| key.contains(source))
-            .map(|(_, values)| values)
-            .flatten()
+            // filter out any cached contract
+            .filter(|(key, _)| {
+                !Self::check_contract_is_cached(artifact_paths, key)
+                    .ok()
+                    .map(|(out, _)| out.is_some())
+                    .unwrap_or_default()
+            })
         {
-            // if contract hash is empty, skip
-            if contract.hash.is_none() {
-                trace!("{} -> empty contract.hash", contract_name);
-                continue
-            }
+            for (name, contract) in contracts {
+                // if contract hash is empty, skip
+                if contract.hash.is_none() {
+                    trace!("{} -> empty contract.hash", name);
+                    continue
+                }
 
-            info!("{} -> Bytecode Hash: {} ", contract_name, contract.hash.as_ref().unwrap());
-            contract_bytecodes.insert(contract.hash.clone().unwrap(), contract_name.clone());
+                info!("{} -> Bytecode Hash: {} ", name, contract.hash.as_ref().unwrap());
+                contract_bytecodes.insert(contract.hash.clone().unwrap(), name.clone());
 
-            let factory_deps: Vec<&str> = contract
-                .factory_dependencies
-                .as_ref()
-                .unwrap()
-                .keys()
-                .map(|factory_hash| *all_bytecodes.get(factory_hash.as_str()).unwrap())
-                .collect();
+                let factory_deps: Vec<&str> = contract
+                    .factory_dependencies
+                    .as_ref()
+                    .unwrap()
+                    .keys()
+                    .map(|factory_hash| *all_bytecodes.get(factory_hash.as_str()).unwrap())
+                    .collect();
 
-            let packed_bytecode = Bytes::from(
-                PackedEraBytecode::new(
-                    contract.hash.as_ref().unwrap(),
-                    contract.evm.as_ref().unwrap().bytecode.as_ref().unwrap().object.as_str(),
-                    &factory_deps,
-                )
-                .to_vec(),
-            );
+                let packed_bytecode = Bytes::from(
+                    PackedEraBytecode::new(
+                        contract.hash.as_ref().unwrap(),
+                        contract.evm.as_ref().unwrap().bytecode.as_ref().unwrap().object.as_str(),
+                        &factory_deps,
+                    )
+                    .to_vec(),
+                );
 
-            let mut art = ConfigurableContractArtifact {
-                bytecode: Some(CompactBytecode {
-                    object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
-                        packed_bytecode.clone(),
-                    ),
-                    source_map: None,
-                    link_references: Default::default(),
-                }),
-                deployed_bytecode: Some(CompactDeployedBytecode {
+                let mut art = ConfigurableContractArtifact {
                     bytecode: Some(CompactBytecode {
                         object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
-                            packed_bytecode,
+                            packed_bytecode.clone(),
                         ),
                         source_map: None,
                         link_references: Default::default(),
                     }),
-                    immutable_references: Default::default(),
-                }),
-                // Initialize other fields with their default values if they exist
-                ..ConfigurableContractArtifact::default()
-            };
+                    deployed_bytecode: Some(CompactDeployedBytecode {
+                        bytecode: Some(CompactBytecode {
+                            object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
+                                packed_bytecode,
+                            ),
+                            source_map: None,
+                            link_references: Default::default(),
+                        }),
+                        immutable_references: Default::default(),
+                    }),
+                    // Initialize other fields with their default values if they exist
+                    ..ConfigurableContractArtifact::default()
+                };
 
-            art.abi = contract.abi.clone();
+                art.abi = contract.abi.clone();
 
-            let artifact = ArtifactFile {
-                artifact: art,
-                file: format!("{}.sol", contract_name).into(),
-                version: Version::parse(&compiler_output.version).unwrap(),
-            };
-            result.insert(contract_name.clone(), vec![artifact]);
-        }
+                let artifact = ArtifactFile {
+                    artifact: art,
+                    file: format!("{}.sol", name).into(),
+                    version: Version::parse(&compiler_output.version).unwrap(),
+                };
+                result.insert(name.clone(), vec![artifact]);
 
-        if let Some(write_artifacts) = write_artifacts {
-            // Create the artifacts file for saving the compiler output
-            let mut artifacts_file = File::create(write_artifacts.artifact)
-                .wrap_err("Could not create artifacts file")
-                .unwrap();
-
-            // Write the beautified output JSON to the artifacts file
-            artifacts_file
-                .write_all(output.as_slice())
-                .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
-
-            // Create the contract_hash file for saving the input contract hash
-            let mut contract_hash_file = File::create(write_artifacts.contract_hash)
-                .wrap_err("Could not create contract_hash file")
-                .unwrap();
-
-            // Write the contract's file hash to the contract_hash file
-            contract_hash_file
-                .write_all(contract_hash.as_bytes())
-                .unwrap_or_else(|e| panic!("Could not write contract_hash file: {}", e));
+                if let Some(filename) = <String as AsRef<Path>>::as_ref(source_path).file_name() {
+                    write_artifact(contract.hash.as_ref().unwrap(), filename);
+                }
+            }
         }
 
         (result, contract_bytecodes)
@@ -1058,20 +1065,20 @@ impl ZkSolc {
 
     /// Checks if the contract has already been compiled for the given contract path.
     fn check_contract_is_cached(
-        &self,
+        artifacts_path: impl AsRef<Path>,
         contract_path: impl AsRef<Path>,
     ) -> Result<(Option<Vec<u8>>, String)> {
         let contract_path = contract_path.as_ref();
         let contract_hash =
             Self::hash_contract(contract_path).wrap_err("Trying to hash contract contents")?;
         let artifact_paths = ZkSolcArtifactPaths::new(
-            self.project.paths.artifacts.join(
+            artifacts_path.as_ref().join(
                 contract_path
                     .file_name()
                     .wrap_err(format!("Could not get filename from {:?}", contract_path))?,
             ),
         );
-        Ok((self.check_cache(&artifact_paths, &contract_hash), contract_hash))
+        Ok((Self::check_cache(&artifact_paths, &contract_hash), contract_hash))
     }
 
     /// Returns the hash of the contract at the given path.
@@ -1240,8 +1247,7 @@ mod tests {
             .as_bytes()
             .to_vec();
         let mut displayed_warnings = HashSet::new();
-        let source = "src/Counter.sol".to_owned();
-        let (result, _) = ZkSolc::handle_output(data, &source, &mut displayed_warnings, "", None);
+        let (result, _) = ZkSolc::handle_output(data, &mut displayed_warnings, "/tmp");
 
         let artifacts = result.get("Counter").unwrap();
         assert_eq!(artifacts.len(), 1);
