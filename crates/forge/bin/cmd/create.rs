@@ -33,9 +33,7 @@ use foundry_compilers::{
 };
 use foundry_config::Chain;
 use foundry_wallets::WalletSigner;
-use foundry_zksync_compiler::{
-    DualCompiledContract, DualCompiledContracts, ZkLibrariesManager, ZkSolc,
-};
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts, ZkLibrariesManager};
 
 use serde_json::json;
 use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
@@ -142,6 +140,7 @@ impl CreateArgs {
         };
         let deploying_libraries = !libraries_to_deploy.is_empty();
 
+        /* TODO: see how we support these two options with foundry-compilers
         let (avoid_contracts, contracts_to_compile) = if !deploying_libraries {
             (
                 self.opts.compiler.avoid_contracts.clone(),
@@ -165,23 +164,10 @@ impl CreateArgs {
                 ),
             )
         };
+        */
 
-        let mut zksolc = ZkSolc::new(
-            config
-                .new_zksolc_config_builder()
-                .and_then(|builder| {
-                    builder
-                        .avoid_contracts(avoid_contracts)
-                        .contracts_to_compile(contracts_to_compile)
-                        .build()
-                })
-                .map_err(|e| eyre::eyre!(e))?,
-            config.zk_project()?,
-        );
-        let (zk_output, _contract_bytecodes) = match zksolc.compile() {
-            Ok(compiled) => compiled,
-            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
-        };
+        let zk_compiler = ProjectCompiler::new().quiet_if(self.json || self.opts.silent);
+        let zk_output = zk_compiler.zksync_compile(&project)?;
         let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
 
         let contracts_to_deploy = if !deploying_libraries {

@@ -14,11 +14,8 @@ pub use compile::*;
 pub use config::*;
 pub use factory_deps::*;
 use foundry_compilers::{
-    zksync::{
-        artifact_output::Artifact as ZkArtifact,
-        compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
-    },
-    Artifact, ProjectCompileOutput,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact,
+    ProjectCompileOutput,
 };
 pub use manager::*;
 
