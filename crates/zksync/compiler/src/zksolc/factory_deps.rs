@@ -13,16 +13,17 @@ use zksync_utils::bytecode::hash_bytecode;
 
 /// Struct with the contract bytecode, and all the other factory deps.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub struct PackedEraBytecode {
-    hash: String,
-    bytecode: String,
-    factory_deps: Vec<String>,
+pub struct PackedEraBytecode<'s> {
+    hash: &'s str,
+    bytecode: &'s str,
+    #[serde(borrow)]
+    factory_deps: Vec<&'s str>,
 }
 
-impl PackedEraBytecode {
+impl<'s> PackedEraBytecode<'s> {
     /// Create a new instance of the `PackedEraBytecode`.
-    pub fn new(hash: String, bytecode: String, factory_deps: Vec<String>) -> Self {
-        Self { hash, bytecode, factory_deps }
+    pub fn new(hash: &'s str, bytecode: &'s str, factory_deps: &[&'s str]) -> Self {
+        Self { hash, bytecode, factory_deps: factory_deps.to_vec() }
     }
 
     /// Convert the `PackedEraBytecode` into a `Vec<u8>`.
@@ -31,19 +32,19 @@ impl PackedEraBytecode {
     }
 
     /// Convert a `Vec<u8>` into a `PackedEraBytecode`.
-    pub fn from_vec(input: &[u8]) -> Self {
+    pub fn from_vec(input: &'s [u8]) -> Self {
         serde_json::from_slice(input).unwrap()
     }
 
     /// Convert the `PackedEraBytecode` into a `Vec<u8>`.
     pub fn bytecode(&self) -> Vec<u8> {
-        hex::decode(self.bytecode.clone()).unwrap()
+        hex::decode(self.bytecode).unwrap()
     }
 
     /// Get the bytecode hash.
     pub fn bytecode_hash(&self) -> H256 {
         let h = hash_bytecode(&self.bytecode());
-        assert_eq!(h, H256::from_str(&self.hash).unwrap());
+        assert_eq!(h, H256::from_str(self.hash).unwrap());
         h
     }
 

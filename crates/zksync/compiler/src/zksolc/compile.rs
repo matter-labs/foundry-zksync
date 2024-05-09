@@ -567,12 +567,12 @@ impl ZkSolc {
         ZkSolc::handle_output_warnings(&compiler_output, displayed_warnings);
 
         // First - let's get all the bytecodes.
-        let mut all_bytecodes: HashMap<String, String> = Default::default();
+        let mut all_bytecodes: HashMap<&str, &str> = Default::default();
         for source_file_results in compiler_output.contracts.values() {
             for contract_results in source_file_results.values() {
                 if let Some(hash) = &contract_results.hash {
                     all_bytecodes.insert(
-                        hash.clone(),
+                        hash.as_str(),
                         contract_results
                             .evm
                             .as_ref()
@@ -581,7 +581,7 @@ impl ZkSolc {
                             .as_ref()
                             .unwrap()
                             .object
-                            .clone(),
+                            .as_str(),
                     );
                 }
             }
@@ -591,91 +591,72 @@ impl ZkSolc {
         let mut contract_bytecodes = BTreeMap::new();
 
         // Get the bytecode hashes for each contract in the output
-        for key in compiler_output.contracts.keys() {
-            if key.contains(source) {
-                let contracts_in_file = compiler_output.contracts.get(key).unwrap();
-                for (contract_name, contract) in contracts_in_file {
-                    // if contract hash is empty, skip
-                    if contract.hash.is_none() {
-                        trace!("{} -> empty contract.hash", contract_name);
-                        continue
-                    }
-
-                    info!(
-                        "{} -> Bytecode Hash: {} ",
-                        contract_name,
-                        contract.hash.as_ref().unwrap()
-                    );
-                    contract_bytecodes
-                        .insert(contract.hash.clone().unwrap(), contract_name.clone());
-
-                    let factory_deps: Vec<String> = contract
-                        .factory_dependencies
-                        .as_ref()
-                        .unwrap()
-                        .keys()
-                        .map(|factory_hash| all_bytecodes.get(factory_hash).unwrap())
-                        .cloned()
-                        .collect();
-
-                    let packed_bytecode = Bytes::from(
-                        PackedEraBytecode::new(
-                            contract.hash.as_ref().unwrap().clone(),
-                            contract
-                                .evm
-                                .as_ref()
-                                .unwrap()
-                                .bytecode
-                                .as_ref()
-                                .unwrap()
-                                .object
-                                .clone(),
-                            factory_deps,
-                        )
-                        .to_vec(),
-                    );
-
-                    let mut art = ConfigurableContractArtifact {
-                        bytecode: Some(CompactBytecode {
-                            object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
-                                packed_bytecode.clone(),
-                            ),
-                            source_map: None,
-                            link_references: Default::default(),
-                        }),
-                        deployed_bytecode: Some(CompactDeployedBytecode {
-                            bytecode: Some(CompactBytecode {
-                                object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
-                                    packed_bytecode,
-                                ),
-                                source_map: None,
-                                link_references: Default::default(),
-                            }),
-                            immutable_references: Default::default(),
-                        }),
-                        // Initialize other fields with their default values if they exist
-                        ..ConfigurableContractArtifact::default()
-                    };
-
-                    art.abi = contract.abi.clone();
-
-                    let artifact = ArtifactFile {
-                        artifact: art,
-                        file: format!("{}.sol", contract_name).into(),
-                        version: Version::parse(&compiler_output.version).unwrap(),
-                    };
-                    result.insert(contract_name.clone(), vec![artifact]);
-                }
+        for (contract_name, contract) in compiler_output
+            .contracts
+            .iter()
+            .filter(|(key, _)| key.contains(source))
+            .map(|(_, values)| values)
+            .flatten()
+        {
+            // if contract hash is empty, skip
+            if contract.hash.is_none() {
+                trace!("{} -> empty contract.hash", contract_name);
+                continue
             }
+
+            info!("{} -> Bytecode Hash: {} ", contract_name, contract.hash.as_ref().unwrap());
+            contract_bytecodes.insert(contract.hash.clone().unwrap(), contract_name.clone());
+
+            let factory_deps: Vec<&str> = contract
+                .factory_dependencies
+                .as_ref()
+                .unwrap()
+                .keys()
+                .map(|factory_hash| *all_bytecodes.get(factory_hash.as_str()).unwrap())
+                .collect();
+
+            let packed_bytecode = Bytes::from(
+                PackedEraBytecode::new(
+                    contract.hash.as_ref().unwrap(),
+                    contract.evm.as_ref().unwrap().bytecode.as_ref().unwrap().object.as_str(),
+                    &factory_deps,
+                )
+                .to_vec(),
+            );
+
+            let mut art = ConfigurableContractArtifact {
+                bytecode: Some(CompactBytecode {
+                    object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
+                        packed_bytecode.clone(),
+                    ),
+                    source_map: None,
+                    link_references: Default::default(),
+                }),
+                deployed_bytecode: Some(CompactDeployedBytecode {
+                    bytecode: Some(CompactBytecode {
+                        object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
+                            packed_bytecode,
+                        ),
+                        source_map: None,
+                        link_references: Default::default(),
+                    }),
+                    immutable_references: Default::default(),
+                }),
+                // Initialize other fields with their default values if they exist
+                ..ConfigurableContractArtifact::default()
+            };
+
+            art.abi = contract.abi.clone();
+
+            let artifact = ArtifactFile {
+                artifact: art,
+                file: format!("{}.sol", contract_name).into(),
+                version: Version::parse(&compiler_output.version).unwrap(),
+            };
+            result.insert(contract_name.clone(), vec![artifact]);
         }
+
         if let Some(write_artifacts) = write_artifacts {
-            let output_json: Value = serde_json::from_slice(&output)
-                .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
-
-            // Beautify the output JSON
-            let output_json_pretty = serde_json::to_string_pretty(&output_json)
-                .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
-
             // Create the artifacts file for saving the compiler output
             let mut artifacts_file = File::create(write_artifacts.artifact)
                 .wrap_err("Could not create artifacts file")
@@ -683,7 +664,7 @@ impl ZkSolc {
 
             // Write the beautified output JSON to the artifacts file
             artifacts_file
-                .write_all(output_json_pretty.as_bytes())
+                .write_all(output.as_slice())
                 .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
 
             // Create the contract_hash file for saving the input contract hash
