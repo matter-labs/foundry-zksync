@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 //! This module provides the implementation of the ZkSolc compiler for Solidity contracts.
 use crate::{
+    libraries,
     zksolc::config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput},
-    ZkLibrariesManager,
 };
 /// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart
 /// contracts.
@@ -61,6 +61,11 @@ use tracing::{error, info, trace, warn};
 
 use crate::zksolc::PackedEraBytecode;
 
+/// It is observed that when there's a missing library without
+/// `--detect-missing-libraries` an error is thrown that contains
+/// this message fragment
+const MISSING_LIBS_ERROR: &[u8] = b"not found in the project".as_slice();
+
 /// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
 
@@ -73,7 +78,7 @@ pub struct ZkSolcArtifactPaths {
 impl ZkSolcArtifactPaths {
     pub fn new(filename: PathBuf) -> Self {
         Self {
-            artifact: filename.clone().join("artifacts.json"),
+            artifact: filename.join("artifacts.json"),
             contract_hash: filename.join("contract_hash"),
         }
     }
@@ -284,12 +289,19 @@ impl ZkSolc {
     /// versioned sources. These modified values can be accessed after the compilation process
     /// for further processing or analysis.
     pub fn compile(&mut self) -> Result<(ProjectCompileOutput, ContractBytecodes)> {
-        //TODO: understand how to set are_libaries_missing flag or if it should be set always
-        self.config.settings.are_libraries_missing = true;
         let mut displayed_warnings = HashSet::new();
         let mut data = BTreeMap::new();
         // Step 1: Collect Source Files
-        let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
+        let mut sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
+        sources.retain(|_, (_, sources)| {
+            sources.retain(|path, _| {
+                let relative_path = path.strip_prefix(self.project.root()).unwrap_or(path.as_ref());
+                // prune ignored contracts
+                !self.is_contract_ignored_in_config(relative_path)
+            });
+            // and prune any group that is now empty
+            !sources.is_empty()
+        });
         let mut contract_bytecodes = BTreeMap::new();
 
         // Step 2: Check missing libraries
@@ -298,33 +310,25 @@ impl ZkSolc {
 
         // Step 3: Proceed with contract compilation
         for (solc, version) in sources {
-            info!("\nCompiling {} files...", version.1.len());
+            info!(solc = ?solc.solc, "\nCompiling {} files...", version.1.len());
             // Configure project solc for each solc version
             for (contract_path, _) in version.1 {
-                // Check if contract has been ignored by user
-                let relative_path = contract_path.strip_prefix(self.project.root())?;
-
-                if self.is_contract_ignored_in_config(relative_path) {
-                    continue
-                }
-
                 let filename = contract_path
                     .file_name()
                     .wrap_err(format!("Could not get filename from {:?}", contract_path))?
                     .to_str()
-                    .unwrap()
-                    .to_string();
+                    .expect("Invalid Contract filename");
 
                 // Run Compiler (or use cached) and Handle Output
                 let artifact_paths =
-                    ZkSolcArtifactPaths::new(self.project.paths.artifacts.join(&filename));
+                    ZkSolcArtifactPaths::new(self.project.paths.artifacts.join(filename));
 
                 info!("Compiling {:?}...", contract_path);
                 let (output, contract_hash) = self.check_contract_is_cached(&contract_path)?;
                 let (output, maybe_artifact_paths) = match output {
                     Some(output) => {
                         info!("Using hashed artifact for {:?}", filename);
-                        (output.to_owned(), None)
+                        (output, None)
                     }
                     None => {
                         self.prepare_compiler_input(&contract_path).wrap_err(format!(
@@ -332,45 +336,35 @@ impl ZkSolc {
                             contract_path
                         ))?;
 
-                        // do a first run to detect if there are missing libraries
-                        if self.config.settings.are_libraries_missing {
-                            let Some(output) = self.run_compiler(&contract_path, true, &solc)?
-                            else {
-                                continue
-                            };
-
-                            let missing_libraries =
-                                Self::get_missing_libraries_from_output(&output.stdout)?;
-                            tracing::trace!(path = ?contract_path, ?missing_libraries);
-                            let has_missing_libraries = !missing_libraries.is_empty();
-
-                            // collect missing libraries
-                            for missing_library in missing_libraries {
-                                all_missing_libraries
-                                    .entry((
-                                        missing_library.contract_path.clone(),
-                                        missing_library.contract_name.clone(),
-                                    ))
-                                    .and_modify(|missing_dependencies| {
-                                        missing_dependencies
-                                            .extend(missing_library.missing_libraries.clone())
-                                    })
-                                    .or_insert_with(|| {
-                                        HashSet::from_iter(
-                                            missing_library.missing_libraries.clone(),
-                                        )
-                                    });
-                            }
-
-                            if has_missing_libraries {
-                                //skip current contract output from processing
-                                continue;
-                            }
-                        }
-
-                        let Some(output) = self.run_compiler(&contract_path, false, &solc)? else {
+                        let Some(output) = self.run_compiler(&contract_path, &solc)? else {
                             continue
                         };
+
+                        let missing_libraries =
+                            Self::get_missing_libraries_from_output(&output.stdout)?;
+                        tracing::trace!(path = ?contract_path, ?missing_libraries);
+                        let has_missing_libraries = !missing_libraries.is_empty();
+
+                        // collect missing libraries
+                        for missing_library in missing_libraries {
+                            all_missing_libraries
+                                .entry((
+                                    missing_library.contract_path.clone(),
+                                    missing_library.contract_name.clone(),
+                                ))
+                                .and_modify(|missing_dependencies| {
+                                    missing_dependencies
+                                        .extend(missing_library.missing_libraries.clone())
+                                })
+                                .or_insert_with(|| {
+                                    HashSet::from_iter(missing_library.missing_libraries.clone())
+                                });
+                        }
+
+                        if has_missing_libraries {
+                            //skip current contract output from processing
+                            continue;
+                        }
 
                         (output.stdout, Some(artifact_paths))
                     }
@@ -379,12 +373,12 @@ impl ZkSolc {
                 // Step 6: Handle Output (Errors and Warnings)
                 let (artifacts, bytecodes) = ZkSolc::handle_output(
                     output,
-                    &filename,
+                    filename,
                     &mut displayed_warnings,
                     &contract_hash,
                     maybe_artifact_paths,
                 );
-                data.insert(filename.clone(), artifacts);
+                data.insert(filename.to_string(), artifacts);
                 contract_bytecodes.extend(bytecodes);
             }
         }
@@ -392,14 +386,14 @@ impl ZkSolc {
         // Step 4: If missing library dependencies, save them to a file and return an error
         if !all_missing_libraries.is_empty() {
             let dependencies: Vec<ZkMissingLibrary> = all_missing_libraries
-                .iter()
+                .into_iter()
                 .map(|((contract_path, contract_name), missing_libraries)| ZkMissingLibrary {
-                    contract_path: contract_path.clone(),
-                    contract_name: contract_name.clone(),
-                    missing_libraries: missing_libraries.iter().cloned().collect(),
+                    contract_path,
+                    contract_name,
+                    missing_libraries: missing_libraries.into_iter().collect(),
                 })
                 .collect();
-            ZkLibrariesManager::add_dependencies_to_missing_libraries_cache(
+            libraries::add_dependencies_to_missing_libraries_cache(
                 &self.project.paths.root,
                 dependencies.as_slice(),
             )?;
@@ -457,31 +451,36 @@ impl ZkSolc {
     /// # Returns
     ///
     /// A vector of strings representing the compiler arguments.
-    fn build_compiler_args(
-        &self,
-        contract_path: &Path,
-        solc: &Solc,
+    fn build_compiler_args<'s>(
+        &'s self,
+        contract_path: &'s Path,
+        solc: &'s Solc,
         detect_missing_libraries: bool,
-    ) -> Vec<String> {
+    ) -> Vec<&'s str> {
         // Get the solc compiler path as a string
-        let solc_path = solc.solc.to_str().expect("Error configuring solc compiler.").to_string();
+        let solc_path = solc.solc.to_str().expect("Given solc compiler path wasn't valid.");
 
         // Build compiler arguments
-        let mut comp_args = vec!["--standard-json".to_string(), "--solc".to_string(), solc_path];
+        let mut comp_args = vec!["--standard-json", "--solc", solc_path];
 
         // Check if system mode is enabled or if the source path contains "is-system"
-        if self.config.settings.is_system || contract_path.to_str().unwrap().contains("is-system") {
-            comp_args.push("--system-mode".to_string());
+        if self.config.settings.is_system ||
+            contract_path
+                .to_str()
+                .expect("Given contract path wasn't valid.")
+                .contains("is-system")
+        {
+            comp_args.push("--system-mode");
         }
 
         // Check if force-evmla is enabled
         if self.config.settings.force_evmla {
-            comp_args.push("--force-evmla".to_string());
+            comp_args.push("--force-evmla");
         }
 
         // Check if should detect missing libraries
         if detect_missing_libraries {
-            comp_args.push("--detect-missing-libraries".to_string());
+            comp_args.push("--detect-missing-libraries");
         }
 
         comp_args
@@ -866,14 +865,15 @@ impl ZkSolc {
 
         // Patch the libraries to be relative to the project root
         // NOTE: This is a temporary fix until zksolc supports relative paths
-        let mut patched_libraries: BTreeMap<PathBuf, BTreeMap<String, String>> = BTreeMap::new();
-        for (path, details) in std_zk_json.settings.libraries.libs.iter() {
-            patched_libraries.insert(
-                path.strip_prefix(&self.project.paths.root).unwrap().into(),
-                details.clone(),
-            );
+        for (mut path, details) in
+            std::mem::take(&mut std_zk_json.settings.libraries.libs).into_iter()
+        {
+            if let Ok(patched) = path.strip_prefix(&self.project.paths.root) {
+                path = patched.to_owned();
+            }
+
+            std_zk_json.settings.libraries.libs.insert(path, details);
         }
-        std_zk_json.settings.libraries.libs = patched_libraries;
 
         // Store the generated standard JSON input in the ZkSolc instance
         self.standard_json = Some(std_zk_json.to_owned());
@@ -883,11 +883,13 @@ impl ZkSolc {
 
         // Step 6: Save JSON Input
         let json_input_path = artifact_path.join("json_input.json");
-        let stdjson =
-            serde_json::to_value(&std_zk_json).wrap_err("Could not serialize JSON input")?;
 
-        std::fs::write(json_input_path, serde_json::to_string_pretty(&stdjson)?)
-            .wrap_err("Could not write JSON input file")?;
+        std::fs::write(
+            json_input_path,
+            serde_json::to_string_pretty(&std_zk_json)
+                .wrap_err("Could not serialize JSON input")?,
+        )
+        .wrap_err("Could not write JSON input file")?;
 
         Ok(())
     }
@@ -1047,8 +1049,11 @@ impl ZkSolc {
 
     /// Checks if the contract has been ignored by the user in the configuration file.
     fn is_contract_ignored_in_config(&self, relative_path: &Path) -> bool {
-        let filename =
-            relative_path.file_name().expect("Failed to get Contract filename.").to_str().unwrap();
+        let filename = relative_path
+            .file_name()
+            .expect("Failed to get Contract filename.")
+            .to_str()
+            .expect("Invalid Contract filename.");
         let mut should_compile = match self.config.contracts_to_compile {
             Some(ref contracts_to_compile) => {
                 //compare if there is some member of the vector contracts_to_compile
@@ -1076,7 +1081,8 @@ impl ZkSolc {
         contract_path: impl AsRef<Path>,
     ) -> Result<(Option<Vec<u8>>, String)> {
         let contract_path = contract_path.as_ref();
-        let contract_hash = Self::hash_contract(contract_path)?;
+        let contract_hash =
+            Self::hash_contract(contract_path).wrap_err("Trying to hash contract contents")?;
         let artifact_paths = ZkSolcArtifactPaths::new(
             self.project.paths.artifacts.join(
                 contract_path
@@ -1141,27 +1147,32 @@ impl ZkSolc {
     fn run_compiler(
         &self,
         contract_path: &Path,
-        detect_missing_libraries: bool,
         solc: &Solc,
     ) -> Result<Option<std::process::Output>> {
-        let comp_args = self.build_compiler_args(contract_path, solc, detect_missing_libraries);
+        let get_compiler = |args| {
+            let mut command = Command::new(&self.config.compiler_path);
+            command.args(&args).stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
+            command
+        };
 
-        let mut command = Command::new(&self.config.compiler_path);
-        command
-            .args(&comp_args)
-            .stdin(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdout(Stdio::piped());
-
+        let mut command = get_compiler(self.build_compiler_args(contract_path, solc, false));
         trace!(compiler_path = ?command.get_program(), args = ?command.get_args(), "Running compiler");
 
-        let mut child = command.spawn().wrap_err("Failed to start the compiler")?;
-        let stdin = child.stdin.take().expect("Stdin exists.");
-        let stdjson = serde_json::to_value(&self.standard_json.clone().unwrap())
-            .wrap_err("Could not serialize JSON input")?;
-        serde_json::to_writer(stdin, &stdjson)
-            .wrap_err("Could not assign standard_json to writer")?;
-        let output = child.wait_with_output().wrap_err("Could not run compiler cmd")?;
+        let exec_compiler = |command: &mut Command| -> Result<std::process::Output> {
+            let mut child = command.spawn().wrap_err("Failed to start the compiler")?;
+            let stdin = child.stdin.take().expect("Stdin exists.");
+            serde_json::to_writer(stdin, self.standard_json.as_ref().unwrap())
+                .wrap_err("Could not assign standard_json to writer")?;
+            child.wait_with_output().wrap_err("Could not run compiler cmd")
+        };
+        let mut output = exec_compiler(&mut command)?;
+
+        // retry but detect missing libraries this time
+        if !output.status.success() && Self::maybe_missing_libraries(&output.stderr) {
+            command = get_compiler(self.build_compiler_args(contract_path, solc, true));
+            trace!("Running compiler with missing libraries detection");
+            output = exec_compiler(&mut command)?;
+        }
 
         // Skip this file if the compiler output is empty
         // currently zksolc returns false for success if output is empty
@@ -1183,6 +1194,10 @@ impl ZkSolc {
         }
 
         Ok(Some(output))
+    }
+
+    fn maybe_missing_libraries(stderr: &[u8]) -> bool {
+        stderr.windows(MISSING_LIBS_ERROR.len()).any(|window| window == MISSING_LIBS_ERROR)
     }
 }
 
