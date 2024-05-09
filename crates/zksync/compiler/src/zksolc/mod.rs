@@ -5,12 +5,21 @@ mod config;
 mod factory_deps;
 mod manager;
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    str::FromStr,
+};
 
 pub use compile::*;
 pub use config::*;
 pub use factory_deps::*;
-use foundry_compilers::{Artifact, ProjectCompileOutput};
+use foundry_compilers::{
+    zksync::{
+        artifact_output::Artifact as ZkArtifact,
+        compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
+    },
+    Artifact, ProjectCompileOutput,
+};
 pub use manager::*;
 
 use alloy_primitives::{keccak256, B256};
@@ -44,7 +53,7 @@ pub struct DualCompiledContracts {
 
 impl DualCompiledContracts {
     /// Creates a collection of `[DualCompiledContract]`s from the provided solc and zksolc output.
-    pub fn new(output: &ProjectCompileOutput, zk_output: &ProjectCompileOutput) -> Self {
+    pub fn new(output: &ProjectCompileOutput, zk_output: &ZkProjectCompileOutput) -> Self {
         let mut dual_compiled_contracts = vec![];
         let mut solc_bytecodes = HashMap::new();
         for (contract_name, artifact) in output.artifacts() {
@@ -62,21 +71,51 @@ impl DualCompiledContracts {
                 }
             }
         }
+
+        // DualCompiledContracts uses a vec of bytecodes as factory deps field vs
+        // the <hash, name> map zksolc outputs, hence we need all bytecodes upfront to
+        // then do the conversion
+        let mut zksolc_all_bytecodes: HashMap<String, Vec<u8>> = Default::default();
+        for (_, zk_artifact) in zk_output.artifacts() {
+            if let (Some(hash), Some(bytecode)) = (&zk_artifact.hash, &zk_artifact.bytecode) {
+                // TODO: we can do this because no bytecode object could be unlinked
+                // at this stage for zksolc, and BytecodeObject as ref will get the bytecode bytes.
+                // We should be careful however we should check and handle errors in
+                // case an Unlinked BytecodeObject gets here somehow
+                let bytes = bytecode.object.clone().into_bytes().unwrap();
+                zksolc_all_bytecodes.insert(hash.clone(), bytes.to_vec());
+            }
+        }
+
         for (contract_name, artifact) in zk_output.artifacts() {
-            let deployed_bytecode = artifact.get_deployed_bytecode();
-            let deployed_bytecode = deployed_bytecode
-                .as_ref()
-                .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
-            if let Some(deployed_bytecode) = deployed_bytecode {
-                let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
+            let maybe_bytecode = &artifact.bytecode;
+            let maybe_hash = &artifact.hash;
+            let maybe_factory_deps = &artifact.factory_dependencies;
+            if let (Some(bytecode), Some(hash), Some(factory_deps_map)) =
+                (maybe_bytecode, maybe_hash, maybe_factory_deps)
+            {
                 if let Some((solc_bytecode, solc_deployed_bytecode)) =
                     solc_bytecodes.get(&contract_name)
                 {
+                    // TODO: we can do this because no bytecode object could be unlinked
+                    // at this stage for zksolc, and BytecodeObject as ref will get the bytecode
+                    // bytes. We should be careful however we should check and
+                    // handle errors in case an Unlinked BytecodeObject gets
+                    // here somehow
+                    let bytecode_vec = bytecode.object.clone().into_bytes().unwrap().to_vec();
+                    let mut factory_deps_vec: Vec<Vec<u8>> = factory_deps_map
+                        .keys()
+                        .map(|factory_hash| zksolc_all_bytecodes.get(factory_hash).unwrap())
+                        .cloned()
+                        .collect();
+
+                    factory_deps_vec.push(bytecode_vec.clone());
+
                     dual_compiled_contracts.push(DualCompiledContract {
                         name: contract_name,
-                        zk_bytecode_hash: packed_bytecode.bytecode_hash(),
-                        zk_deployed_bytecode: packed_bytecode.bytecode(),
-                        zk_factory_deps: packed_bytecode.factory_deps(),
+                        zk_bytecode_hash: H256::from_str(hash).unwrap(),
+                        zk_deployed_bytecode: bytecode_vec,
+                        zk_factory_deps: factory_deps_vec,
                         evm_bytecode_hash: keccak256(solc_deployed_bytecode),
                         evm_bytecode: solc_bytecode.to_vec(),
                         evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
