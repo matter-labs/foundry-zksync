@@ -334,7 +334,7 @@ impl ZkSolc {
 
                 // Run Compiler (or use cached) and Handle Output
 
-                info!("Compiling {:?}...", contract_path);
+                tracing::debug!("Compiling {:?}...", contract_path);
                 let output = Self::check_contract_is_cached(&artifact_paths, &contract_path)?.0;
 
                 let (output, maybe_input) = match output {
@@ -382,21 +382,14 @@ impl ZkSolc {
                 };
 
                 // Step 6: Handle Output (Errors and Warnings)
-                let (artifacts, bytecodes) = Self::handle_output(
+                Self::handle_output(
                     output,
                     &mut displayed_warnings,
                     &artifact_paths,
                     maybe_input.as_deref(),
+                    &mut data,
+                    &mut contract_bytecodes,
                 );
-                for (filename, contracts) in artifacts {
-                    let cs = data.entry(filename).or_default();
-                    for (name, arts) in contracts {
-                        // each contract is only supposed to have 1 artifact
-                        // keep the newest one
-                        *cs.entry(name).or_default() = arts;
-                    }
-                }
-                contract_bytecodes.extend(bytecodes);
             }
         }
 
@@ -550,7 +543,9 @@ impl ZkSolc {
         displayed_warnings: &mut HashSet<String>,
         artifact_paths: impl AsRef<Path>,
         input: Option<&str>,
-    ) -> (ArtifactsMap<ConfigurableContractArtifact>, ContractBytecodes) {
+        result: &mut ArtifactsMap<ConfigurableContractArtifact>,
+        contract_bytecodes: &mut BTreeMap<String, String>,
+    ) {
         let artifact_paths = artifact_paths.as_ref();
 
         // Deserialize the compiler output into a serde_json::Value object
@@ -582,14 +577,14 @@ impl ZkSolc {
         // Handle warnings in the output
         Self::handle_output_warnings(&compiler_output, displayed_warnings);
 
-        let write_artifact = |hash: &str, filename| {
+        let write_artifact = |hash: &str, name: &str, filename| {
             let artifacts = artifact_paths.join(filename);
             // if artifact already exists don't overwrite it
             if artifacts.exists() {
                 return;
             }
 
-            tracing::debug!(filename = ?filename, ?hash, "writing artifacts");
+            info!(?filename, "{name} -> Bytecode Hash: {hash}");
 
             let artifacts = ZkSolcArtifactPaths::new(artifacts);
             artifacts.create().unwrap();
@@ -644,21 +639,14 @@ impl ZkSolc {
             }
         }
 
-        let mut result = ArtifactsMap::new();
-        let mut contract_bytecodes = BTreeMap::new();
-
         // Get the bytecode hashes for each contract in the output
-        for (source_path, contracts) in compiler_output
-            .contracts
-            .iter()
-            // filter out any cached contract
-            .filter(|(key, _)| {
-                !Self::check_contract_is_cached(artifact_paths, key)
-                    .ok()
-                    .map(|(out, _)| out.is_some())
-                    .unwrap_or_default()
-            })
-        {
+        for (source_path, contracts) in compiler_output.contracts.iter() {
+            // filter out contract already compiled
+            if result.get(source_path.as_str()).is_some() {
+                trace!(source = ?source_path, "in results already");
+                continue
+            }
+
             let filename = <String as AsRef<Path>>::as_ref(source_path)
                 .file_name()
                 .wrap_err(format!("Could not get filename from {:?}", source_path))
@@ -669,13 +657,18 @@ impl ZkSolc {
             for (name, contract) in contracts {
                 // if contract hash is empty, skip
                 if contract.hash.is_none() {
-                    trace!("{} -> empty contract.hash", name);
+                    trace!("{name} -> empty contract.hash");
+                    continue
+                }
+                if contract_bytecodes.get(contract.hash.as_ref().unwrap()).is_some() {
+                    // if contract hash is already known, skip
+                    trace!("{name} -> already known");
                     continue
                 }
 
-                info!("{} -> Bytecode Hash: {} ", name, contract.hash.as_ref().unwrap());
                 contract_bytecodes.insert(contract.hash.clone().unwrap(), name.clone());
 
+                // map factory dependencies by hash to name
                 let factory_deps: Vec<&str> = contract
                     .factory_dependencies
                     .as_ref()
@@ -726,11 +719,9 @@ impl ZkSolc {
                 *result.entry(filename.to_string()).or_default().entry(name.clone()).or_default() =
                     vec![artifact];
 
-                write_artifact(contract.hash.as_ref().unwrap(), filename);
+                write_artifact(contract.hash.as_ref().unwrap(), &name, filename);
             }
         }
-
-        (result, contract_bytecodes)
     }
 
     /// Handles the errors and warnings present in the output JSON from the compiler.
@@ -1052,6 +1043,7 @@ impl ZkSolc {
         contract_path: impl AsRef<Path>,
     ) -> Result<(Option<Vec<u8>>, String)> {
         let contract_path = contract_path.as_ref();
+        trace!(?contract_path, "checking cache");
         let contract_hash =
             Self::hash_contract(contract_path).wrap_err("Trying to hash contract contents")?;
         let artifact_paths = ZkSolcArtifactPaths::new(
@@ -1061,7 +1053,12 @@ impl ZkSolc {
                     .wrap_err(format!("Could not get filename from {:?}", contract_path))?,
             ),
         );
-        Ok((Self::check_cache(&artifact_paths, &contract_hash), contract_hash))
+        let entry = Self::check_cache(&artifact_paths, &contract_hash);
+        if entry.is_some() {
+            trace!(?contract_path, "cache hit!");
+        }
+
+        Ok((entry, contract_hash))
     }
 
     /// Returns the hash of the contract at the given path.
@@ -1136,6 +1133,8 @@ impl ZkSolc {
             stdin
                 .write_all(json_input.as_bytes())
                 .wrap_err("Could not assign standard_json to writer")?;
+            std::mem::drop(stdin);
+
             child.wait_with_output().wrap_err("Could not run compiler cmd")
         };
         let mut output = exec_compiler(&mut command)?;
@@ -1232,7 +1231,15 @@ mod tests {
             .as_bytes()
             .to_vec();
         let mut displayed_warnings = HashSet::new();
-        let (result, _) = ZkSolc::handle_output(data, &mut displayed_warnings, "/tmp", None);
+        let mut result = Default::default();
+        ZkSolc::handle_output(
+            data,
+            &mut displayed_warnings,
+            "/tmp",
+            None,
+            &mut result,
+            &mut Default::default(),
+        );
 
         let artifacts = result.get("src/Counter.sol").unwrap().get("Counter").unwrap();
         assert_eq!(artifacts.len(), 1);
