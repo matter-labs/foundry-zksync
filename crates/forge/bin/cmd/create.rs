@@ -1,5 +1,5 @@
 use super::{retry::RetryArgs, verify};
-use crate::cmd::build::BuildArgs;
+
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, ResolveSolType};
 use alloy_json_abi::{Constructor, JsonAbi};
 use alloy_primitives::{Address, Bytes};
@@ -17,7 +17,7 @@ use ethers_middleware::SignerMiddleware;
 use ethers_providers::Middleware;
 use eyre::{Context, Result};
 use foundry_cli::{
-    opts::{CompilerArgs, CoreBuildArgs, EthereumOpts, EtherscanOpts, TransactionOpts},
+    opts::{CoreBuildArgs, EthereumOpts, EtherscanOpts, TransactionOpts},
     utils::{self, read_constructor_args_file, remove_contract, LoadConfig},
 };
 use foundry_common::{
@@ -34,7 +34,7 @@ use foundry_compilers::{
 use foundry_config::Chain;
 use foundry_wallets::WalletSigner;
 use foundry_zksync_compiler::{
-    DualCompiledContract, DualCompiledContracts, libraries as zklibs, ZkSolc,
+    libraries as zklibs, DualCompiledContract, DualCompiledContracts, ZkSolc,
 };
 
 use serde_json::json;
@@ -118,8 +118,7 @@ impl CreateArgs {
 
         // Resolve missing libraries
         let libs_batches = if zksync && self.deploy_missing_libraries {
-            let missing_libraries =
-                zklibs::get_detected_missing_libraries(&project_root)?;
+            let missing_libraries = zklibs::get_detected_missing_libraries(&project_root)?;
 
             let mut all_deployed_libraries = Vec::with_capacity(config.libraries.len());
             for library in &config.libraries {
