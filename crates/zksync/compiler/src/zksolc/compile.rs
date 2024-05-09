@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 //! This module provides the implementation of the ZkSolc compiler for Solidity contracts.
 use crate::{
+    libraries,
     zksolc::config::{Settings, ZkSolcConfig, ZkStandardJsonCompilerInput},
-    ZkLibrariesManager,
 };
 /// ZkSolc is a specialized compiler that supports zero-knowledge (ZK) proofs for smart
 /// contracts.
@@ -60,6 +60,11 @@ use std::{
 use tracing::{error, info, trace, warn};
 
 use crate::zksolc::PackedEraBytecode;
+
+/// It is observed that when there's a missing library without
+/// `--detect-missing-libraries` an error is thrown that contains
+/// this message fragment
+const MISSING_LIBS_ERROR: &[u8] = b"not found in the project".as_slice();
 
 /// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
@@ -381,14 +386,14 @@ impl ZkSolc {
         // Step 4: If missing library dependencies, save them to a file and return an error
         if !all_missing_libraries.is_empty() {
             let dependencies: Vec<ZkMissingLibrary> = all_missing_libraries
-                .iter()
+                .into_iter()
                 .map(|((contract_path, contract_name), missing_libraries)| ZkMissingLibrary {
-                    contract_path: contract_path.clone(),
-                    contract_name: contract_name.clone(),
-                    missing_libraries: missing_libraries.iter().cloned().collect(),
+                    contract_path,
+                    contract_name,
+                    missing_libraries: missing_libraries.into_iter().collect(),
                 })
                 .collect();
-            ZkLibrariesManager::add_dependencies_to_missing_libraries_cache(
+            libraries::add_dependencies_to_missing_libraries_cache(
                 &self.project.paths.root,
                 dependencies.as_slice(),
             )?;
@@ -1153,20 +1158,20 @@ impl ZkSolc {
         let mut command = get_compiler(self.build_compiler_args(contract_path, solc, false));
         trace!(compiler_path = ?command.get_program(), args = ?command.get_args(), "Running compiler");
 
-        let invoke = |command: &mut Command| -> Result<std::process::Output> {
+        let exec_compiler = |command: &mut Command| -> Result<std::process::Output> {
             let mut child = command.spawn().wrap_err("Failed to start the compiler")?;
             let stdin = child.stdin.take().expect("Stdin exists.");
             serde_json::to_writer(stdin, self.standard_json.as_ref().unwrap())
                 .wrap_err("Could not assign standard_json to writer")?;
             child.wait_with_output().wrap_err("Could not run compiler cmd")
         };
-        let mut output = invoke(&mut command)?;
+        let mut output = exec_compiler(&mut command)?;
 
         // retry but detect missing libraries this time
         if !output.status.success() && Self::maybe_missing_libraries(&output.stderr) {
             command = get_compiler(self.build_compiler_args(contract_path, solc, true));
             trace!("Running compiler with missing libraries detection");
-            output = invoke(&mut command)?;
+            output = exec_compiler(&mut command)?;
         }
 
         // Skip this file if the compiler output is empty
@@ -1192,8 +1197,7 @@ impl ZkSolc {
     }
 
     fn maybe_missing_libraries(stderr: &[u8]) -> bool {
-        let needle = b"not found in the project".as_slice();
-        stderr.windows(needle.len()).any(|window| window == needle)
+        stderr.windows(MISSING_LIBS_ERROR.len()).any(|window| window == MISSING_LIBS_ERROR)
     }
 }
 

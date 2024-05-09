@@ -34,7 +34,7 @@ use foundry_compilers::{
 use foundry_config::Chain;
 use foundry_wallets::WalletSigner;
 use foundry_zksync_compiler::{
-    DualCompiledContract, DualCompiledContracts, ZkLibrariesManager, ZkSolc,
+    DualCompiledContract, DualCompiledContracts, libraries as zklibs, ZkSolc,
 };
 
 use serde_json::json;
@@ -119,7 +119,7 @@ impl CreateArgs {
         // Resolve missing libraries
         let libs_batches = if zksync && self.deploy_missing_libraries {
             let missing_libraries =
-                ZkLibrariesManager::get_detected_missing_libraries(&project_root)?;
+                zklibs::get_detected_missing_libraries(&project_root)?;
 
             let mut all_deployed_libraries = Vec::with_capacity(config.libraries.len());
             for library in &config.libraries {
@@ -134,7 +134,7 @@ impl CreateArgs {
 
             info!("Resolving missing libraries");
 
-            ZkLibrariesManager::resolve_libraries(missing_libraries, &all_deployed_libraries)?
+            zklibs::resolve_libraries(missing_libraries, &all_deployed_libraries)?
         } else {
             vec![]
         };
@@ -149,33 +149,30 @@ impl CreateArgs {
             libs_batches
         };
 
+        let mut input_contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
         for contracts_batch in contracts_to_deploy {
             // Find Project & Compile
             let project = self.opts.project()?;
             let mut output =
                 ProjectCompiler::new().quiet_if(self.json || self.opts.silent).compile(&project)?;
 
-            let (avoid_contracts, contracts_to_compile) = if !deploying_libraries {
-                (
-                    self.opts.compiler.avoid_contracts.clone(),
-                    self.opts.compiler.contracts_to_compile.clone(),
-                )
+            let contracts_to_compile = if !deploying_libraries {
+                self.opts.compiler.contracts_to_compile.clone()
             } else {
-                (
-                    None,
-                    Some(
-                        contracts_batch
-                            .iter()
-                            .map(|lib| lib.path.clone().expect("libraries must specify path"))
-                            .map(|path| {
-                                PathBuf::from(path)
-                                    .file_name()
-                                    .expect("contract path to have filename")
-                                    .to_string_lossy()
-                                    .to_string()
-                            })
-                            .collect(),
-                    ),
+                Some(
+                    contracts_batch
+                        .iter()
+                        .map(|lib| lib.path.clone().expect("libraries must specify path"))
+                        .map(|path| {
+                            PathBuf::from(path)
+                                .file_name()
+                                .expect("contract path to have filename")
+                                .to_string_lossy()
+                                .to_string()
+                        })
+                        // respect passed in --contracts-to-compile but don't deploy them
+                        .chain(input_contracts_to_compile.take().into_iter().flatten())
+                        .collect(),
                 )
             };
 
@@ -184,7 +181,7 @@ impl CreateArgs {
                     .new_zksolc_config_builder()
                     .and_then(|builder| {
                         builder
-                            .avoid_contracts(avoid_contracts)
+                            .avoid_contracts(self.opts.compiler.avoid_contracts.clone())
                             .contracts_to_compile(contracts_to_compile)
                             .build()
                     })
@@ -344,25 +341,7 @@ impl CreateArgs {
         }
 
         if deploying_libraries {
-            ZkLibrariesManager::cleanup_detected_missing_libraries(&project_root)?;
-
-            //TODO: determine if we want to build the project automatically after we deploy
-            // libraries like we already do here
-            let zkbuild_args = BuildArgs {
-                args: CoreBuildArgs {
-                    compiler: CompilerArgs {
-                        avoid_contracts: self.opts.compiler.avoid_contracts.take(),
-                        contracts_to_compile: self.opts.compiler.contracts_to_compile.take(),
-                        zksync: self.opts.compiler.zksync,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-            zkbuild_args.run()?;
-
-            return Ok(())
+            zklibs::cleanup_detected_missing_libraries(&project_root)?;
         }
 
         Ok(())

@@ -8,5 +8,4 @@ mod zksolc;
 
 pub use zksolc::*;
 
-mod libraries;
-pub use libraries::*;
+pub mod libraries;
