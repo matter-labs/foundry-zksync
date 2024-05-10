@@ -147,7 +147,4 @@ jobs:
             chmod +x ./install-foundry-zksync
             ./install-foundry-zksync
         - name: verify
-          run: |
-            echo "$PATH"
-            echo "$GITHUB_PATH"
-            forge --version
+          run: forge --version
