@@ -137,8 +137,8 @@ foundry-zksync-core = { path = "crates/zksync/core" }
 foundry-zksync-compiler = { path = "crates/zksync/compiler" }
 
 # solc & compilation utilities
-foundry-block-explorers = { path = "../block-explorers", default-features = false }
-foundry-compilers = { path = "../compilers" }
+foundry-block-explorers = { git = "https://github.com/Moonsong-Labs/block-explorers", branch = "zksync-v0.2.3", default-features = false }
+foundry-compilers = { git = "https://github.com/Moonsong-Labs/compilers", branch = "elfedy-zksolc" }
 
 ## revm
 # no default features to avoid c-kzg

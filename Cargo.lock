@@ -4382,6 +4382,7 @@ dependencies = [
 [[package]]
 name = "foundry-block-explorers"
 version = "0.2.3"
+source = "git+https://github.com/Moonsong-Labs/block-explorers?branch=zksync-v0.2.3#a9b7be765477bc8adfa26f4c286546acb1f3d688"
 dependencies = [
  "alloy-chains",
  "alloy-json-abi",
@@ -4542,6 +4543,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.3.9"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#900c9c8b287710d4af3002ede2bf6c93150d8931"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
