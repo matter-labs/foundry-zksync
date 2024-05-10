@@ -174,6 +174,15 @@ contract ZkCheatcodesTest is Test {
         //zkVM currently doesn't support mocking the transaction sender
         vm.assume(mockMe != tx.origin);
 
+        // Exclude next create address in EVM (to deploy MyProxyCaller)
+        vm.assume(
+            mockMe != address(0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f)
+        );
+        // Exclude next create address in zkVM (to deploy MyProxyCaller)
+        vm.assume(
+            mockMe != address(0xB5c1DF089600415B21FB76bf89900Adb575947c8)
+        );
+
         vm.mockCall(
             mockMe,
             abi.encodeWithSelector(IMyProxyCaller.transact.selector),
