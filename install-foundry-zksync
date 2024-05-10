@@ -19,8 +19,9 @@ if [ -n "$SHELL_CONFIG_FILE" ]; then
     if [ -n "${CI}" ]; then
         # Add manually to $PATH in CI mode as GHA does not work with `.`
         FOUNDRY_BIN_DIR="${XDG_CONFIG_HOME:-$HOME}/.foundry/bin"
-        echo "adding '${FOUNDRY_BIN_DIR}' to path in CI mode"
+        echo "adding '${FOUNDRY_BIN_DIR}' to PATH and GITHUB_PATH"
         export PATH="$PATH:$FOUNDRY_BIN_DIR"
+        export GITHUB_PATH="$GITHUB_PATH:$FOUNDRY_BIN_DIR"
     else
         echo "Sourcing the shell configuration file: '$SHELL_CONFIG_FILE'"
         # Use dot (.) to source the file, which is more universally compatible
