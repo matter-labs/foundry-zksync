@@ -35,3 +35,4 @@ dirs = { version = "5.0.0" }
 tokio = "1"
 reqwest = { version = "0.11", default-features = false }
 xxhash-rust = { version = "0.8.7", features = ["const_xxh3"] }
+spinoff = { version = "0.8", features = ["dots8bit"] }

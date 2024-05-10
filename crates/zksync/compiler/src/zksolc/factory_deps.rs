@@ -16,14 +16,13 @@ use zksync_utils::bytecode::hash_bytecode;
 pub struct PackedEraBytecode<'s> {
     hash: &'s str,
     bytecode: &'s str,
-    #[serde(borrow)]
-    factory_deps: Vec<&'s str>,
+    factory_deps: Vec<H256>,
 }
 
 impl<'s> PackedEraBytecode<'s> {
     /// Create a new instance of the `PackedEraBytecode`.
-    pub fn new(hash: &'s str, bytecode: &'s str, factory_deps: &[&'s str]) -> Self {
-        Self { hash, bytecode, factory_deps: factory_deps.to_vec() }
+    pub fn new(hash: &'s str, bytecode: &'s str, factory_deps: Vec<H256>) -> Self {
+        Self { hash, bytecode, factory_deps }
     }
 
     /// Convert the `PackedEraBytecode` into a `Vec<u8>`.
@@ -49,12 +48,8 @@ impl<'s> PackedEraBytecode<'s> {
     }
 
     /// Get the factory deps.
-    pub fn factory_deps(&self) -> Vec<Vec<u8>> {
-        self.factory_deps
-            .iter()
-            .chain([&self.bytecode])
-            .map(|entry| hex::decode(entry).unwrap())
-            .collect()
+    pub fn factory_deps(&self) -> &[H256] {
+        &self.factory_deps
     }
 }
 

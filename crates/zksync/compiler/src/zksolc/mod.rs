@@ -27,7 +27,7 @@ pub struct DualCompiledContract {
     /// Deployed bytecode hash with zksolc
     pub zk_deployed_bytecode: Vec<u8>,
     /// Deployed bytecode factory deps
-    pub zk_factory_deps: Vec<Vec<u8>>,
+    pub zk_factory_deps: Vec<H256>,
     /// Deployed bytecode hash with solc
     pub evm_bytecode_hash: B256,
     /// Deployed bytecode with solc
@@ -76,7 +76,7 @@ impl DualCompiledContracts {
                         name: contract_name,
                         zk_bytecode_hash: packed_bytecode.bytecode_hash(),
                         zk_deployed_bytecode: packed_bytecode.bytecode(),
-                        zk_factory_deps: packed_bytecode.factory_deps(),
+                        zk_factory_deps: packed_bytecode.factory_deps().to_vec(),
                         evm_bytecode_hash: keccak256(solc_deployed_bytecode),
                         evm_bytecode: solc_bytecode.to_vec(),
                         evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
@@ -105,7 +105,8 @@ impl DualCompiledContracts {
 
     /// Finds a contract own and nested factory deps
     pub fn fetch_all_factory_deps(&self, root: &DualCompiledContract) -> Vec<Vec<u8>> {
-        let mut visited = HashSet::new();
+        let mut visited_hashes = HashSet::new();
+        let mut visited_bytecodes = Vec::new();
         let mut queue = VecDeque::new();
 
         for dep in &root.zk_factory_deps {
@@ -114,17 +115,18 @@ impl DualCompiledContracts {
 
         while let Some(dep) = queue.pop_front() {
             // try to insert in the list of visited, if it's already present, skip
-            if visited.insert(dep) {
-                if let Some(contract) = self.find_by_zk_deployed_bytecode(dep) {
+            if visited_hashes.insert(dep) {
+                if let Some(contract) = self.find_by_zk_bytecode_hash(*dep) {
                     debug!(
                         name = contract.name,
                         deps = contract.zk_factory_deps.len(),
                         "new factory depdendency"
                     );
+                    visited_bytecodes.push(contract.zk_deployed_bytecode.clone());
 
                     for nested_dep in &contract.zk_factory_deps {
                         // check that the nested dependency is inserted
-                        if !visited.contains(nested_dep) {
+                        if !visited_hashes.contains(nested_dep) {
                             // if not, add it to queue for processing
                             queue.push_back(nested_dep);
                         }
@@ -133,7 +135,7 @@ impl DualCompiledContracts {
             }
         }
 
-        visited.into_iter().cloned().collect()
+        visited_bytecodes
     }
 
     /// Returns an iterator over all `[DualCompiledContract]`s in the collection
