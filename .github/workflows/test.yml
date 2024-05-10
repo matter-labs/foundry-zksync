@@ -16,21 +16,135 @@ env:
     CARGO_TERM_COLOR: always
 
 jobs:
-    check:
-      strategy:
-        fail-fast: true
+    doctests:
+        name: doc tests
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                toolchain: nightly-2024-02-06
+            - uses: Swatinem/rust-cache@v2
+              with:
+                cache-on-failure: true
+            - name: cargo test
+              run: cargo test --doc -p forge -p cast@0.0.2
+              env:
+                RUST_TEST_THREADS: 2
 
-      name: zkSync Foundry Tests
+    clippy:
+        name: clippy
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@clippy
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - run: cargo clippy --workspace --all-targets --all-features
+              env:
+                  RUSTFLAGS: -Dwarnings
+
+    fmt:
+        name: fmt
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                  toolchain: nightly-2024-02-06
+                  components: rustfmt
+            - run: cargo fmt --all --check
+
+    forge-fmt:
+        name: forge fmt
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                  toolchain: nightly-2024-02-06
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - name: forge fmt
+              run: cargo run --bin forge -- fmt --check testdata/
+
+    feature-checks:
+        name: feature checks
+        runs-on: ubuntu-22.04-github-hosted-16core
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                toolchain: nightly-2024-02-06
+            - uses: taiki-e/install-action@cargo-hack
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - name: cargo hack
+              run: cargo hack check
+
+    # TODO: This test currently hangs in the CI
+    # zk-test:
+    #   name: zk-test
+    #   runs-on: ubuntu-22.04-github-hosted-16core
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #       with:
+    #         submodules: recursive
+    #         ref: ${{ github.event.pull_request.head.sha }}
+
+    #     - name: Install Rust
+    #       uses: actions-rust-lang/setup-rust-toolchain@v1
+    #       with:
+    #         toolchain: nightly-2024-02-06
+
+
+    #     - name: Get solc
+    #       run: |
+    #         mkdir /tmp/solc-bin
+    #         wget https://github.com/ethereum/solidity/releases/download/v0.8.24/solc-static-linux -qO /tmp/solc-bin/solc
+    #         chmod +x /tmp/solc-bin/solc
+    #         echo "/tmp/solc-bin" >> $GITHUB_PATH
+            
+    #     - name: Test ZK VM
+    #       run: RUST_LOG=1 cargo test --package forge --test it --jobs=1 -- zk
+    
+    zk-smoke-test:
+        name: zk-smoke-test
+        runs-on: ubuntu-22.04-github-hosted-16core
+  
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            submodules: recursive
+            ref: ${{ github.event.pull_request.head.sha }}
+  
+        - name: Install Rust
+          uses: actions-rust-lang/setup-rust-toolchain@v1
+          with:
+            toolchain: nightly-2024-02-06
+  
+        - name: Run smoke-test
+          env:
+            RUST_BACKTRACE: full
+          run: cd zk-tests && ./test.sh
+    
+    check-ci-install:
+      name: CI install
       runs-on: ubuntu-latest
       steps:
         - uses: actions/checkout@v4
-        - name: install zksync fork
+        - name: install foundry-zksync
           run: |
             chmod +x ./install-foundry-zksync
             ./install-foundry-zksync
-        - name: Verify Foundry installation
-          run: |
-            ~/.config/.foundry/bin/forge --version
-        - name: Run Forge tests with zksync
-          run: |
-            ~/.config/.foundry/bin/forge test --zksync -vvv
+        - name: verify
+          run: forge --version
