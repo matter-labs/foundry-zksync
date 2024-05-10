@@ -143,8 +143,6 @@ jobs:
       steps:
         - uses: actions/checkout@v4
         - name: install foundry-zksync
-          run: |
-            chmod +x ./install-foundry-zksync
-            ./install-foundry-zksync
+          run: ./install-foundry-zksync
         - name: verify
           run: forge --version
