@@ -35,7 +35,12 @@ interface IMyProxyCaller {
 }
 
 contract MyProxyCaller {
-    function transact(address inner) public {
+    address inner;
+    constructor(address _inner) {
+        inner = _inner;
+    }
+
+    function transact() public {
         IMyProxyCaller(inner).transact(10);
     }
 }
@@ -157,6 +162,7 @@ contract ZkCheatcodesTest is Test {
 
     function testZkCheatcodesCanMockCallTestContract() public {
         address thisAddress = address(this);
+        MyProxyCaller transactor = new MyProxyCaller(thisAddress);
 
         vm.mockCall(
             thisAddress,
@@ -164,8 +170,7 @@ contract ZkCheatcodesTest is Test {
             abi.encode()
         );
 
-        MyProxyCaller transactor = new MyProxyCaller();
-        transactor.transact(thisAddress);
+        transactor.transact();
     }
 
     function testZkCheatcodesCanMockCall(address mockMe) public {
@@ -174,13 +179,14 @@ contract ZkCheatcodesTest is Test {
         //zkVM currently doesn't support mocking the transaction sender
         vm.assume(mockMe != tx.origin);
 
+        MyProxyCaller transactor = new MyProxyCaller(mockMe);
+
         vm.mockCall(
             mockMe,
             abi.encodeWithSelector(IMyProxyCaller.transact.selector),
             abi.encode()
         );
 
-        MyProxyCaller transactor = new MyProxyCaller();
-        transactor.transact(mockMe);
+        transactor.transact();
     }
 }
