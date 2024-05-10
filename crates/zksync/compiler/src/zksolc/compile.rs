@@ -335,7 +335,7 @@ impl ZkSolc {
 
             sources.retain(|path, _| {
                 //TODO: add cached output to result?
-                !Self::check_contract_is_cached(&artifacts_path, &path)
+                !Self::check_contract_is_cached(&artifacts_path, path)
                     .map(|(out, _)| out.is_some())
                     .unwrap_or_default()
             });
@@ -581,8 +581,8 @@ impl ZkSolc {
         /// Args:
         /// * raw_compiler_input: stored in `input.json` - represents the standard json input to the
         ///   compiler
-        /// * raw_compiler_output: stored in `artifact.json` - represents the json output of the
-        ///   compiler (TODO: refine to be specific to the given contract)
+        /// * artifact_output: stored in `artifact.json` - represents the json output of the
+        ///   compiler for this specific artifact
         /// * artifacts_paths: artifact output folder
         /// * filename: source contract filename
         /// * source_hash: hash of the contents of the source file
@@ -590,12 +590,10 @@ impl ZkSolc {
         /// * contract_name: name of the contract with the given bytecode hash
         fn write_artifact(
             raw_compiler_input: Option<&str>,
-            raw_compiler_output: &[u8],
+            artifact_output: ZkSolcCompilerOutput,
             artifacts_paths: impl AsRef<Path>,
             filename: &str,
             source_hash: &str,
-            bytecode_hash: &str,
-            contract_name: &str,
         ) {
             let artifacts = artifacts_paths.as_ref().join(filename);
             // if artifact already exists don't overwrite it
@@ -603,7 +601,15 @@ impl ZkSolc {
                 return;
             }
 
-            info!(?filename, "{contract_name} -> Bytecode Hash: {bytecode_hash}");
+            artifact_output
+                .contracts
+                .iter()
+                .map(|(_, ccs)| ccs.iter())
+                .flatten()
+                .flat_map(|(name, c)| c.hash.as_ref().map(|h| (name, h)))
+                .for_each(|(contract_name, bytecode_hash)| {
+                    info!(?filename, "{contract_name} -> Bytecode Hash: {bytecode_hash}")
+                });
 
             let artifacts = ZkSolcArtifactPaths::new(artifacts);
             artifacts.create().unwrap();
@@ -618,12 +624,10 @@ impl ZkSolc {
                     .unwrap_or_else(|e| panic!("Could not write input file: {}", e));
             }
 
-            let mut artifacts_file = File::create(artifacts.artifact())
+            let artifacts_file = File::create(artifacts.artifact())
                 .wrap_err("Could not create artifacts file")
                 .unwrap();
-
-            artifacts_file
-                .write_all(raw_compiler_output)
+            serde_json::to_writer(artifacts_file, &artifact_output)
                 .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
 
             // Create the contract_hash file for saving the input contract hash
@@ -637,26 +641,22 @@ impl ZkSolc {
                 .unwrap_or_else(|e| panic!("Could not write contract_hash file: {}", e));
         }
 
-        // Get the bytecode hashes for each contract in the output
+        let mut sources = compiler_output.sources;
+        // Process each contract in the output
         for (source_path, contracts) in compiler_output.contracts.into_iter() {
-            // filter out contract already compiled
-            if result.get(source_path.as_str()).is_some() {
-                trace!(source = ?source_path, "in results already");
-                continue
-            }
-
             let source_hash = Self::hash_contract(source_path.as_ref())
                 .wrap_err(format!("Unable to obtain contract hash for {source_path:?}"))
                 .unwrap();
 
-            let filename = <String as AsRef<Path>>::as_ref(&source_path)
+            let path = PathBuf::from(source_path.clone());
+            let filename = path
                 .file_name()
                 .wrap_err(format!("Could not get filename from {:?}", source_path))
                 .unwrap()
                 .to_str()
                 .expect("Invalid Contract filename");
 
-            for (name, contract) in contracts {
+            for (name, contract) in &contracts {
                 // if contract hash is empty, skip
                 if contract.hash.is_none() {
                     trace!("{name} -> empty contract.hash");
@@ -718,23 +718,23 @@ impl ZkSolc {
 
                 let artifact = ArtifactFile {
                     artifact: art,
-                    file: format!("{}.sol", name).into(),
+                    file: filename.into(),
                     version: Version::parse(&compiler_output.version).unwrap(),
                 };
                 // each contract is only supposed to have 1 artifact
                 *result.entry(filename.to_string()).or_default().entry(name.clone()).or_default() =
                     vec![artifact];
-
-                write_artifact(
-                    input,
-                    &output,
-                    &artifact_paths,
-                    filename,
-                    &source_hash,
-                    contract.hash.as_ref().unwrap(),
-                    &name,
-                );
             }
+
+            let artifact = ZkSolcCompilerOutput {
+                sources: sources.remove_entry(&source_path).into_iter().collect(),
+                contracts: [(source_path, contracts)].into_iter().collect(),
+                version: compiler_output.version.clone(),
+                long_version: compiler_output.long_version.clone(),
+                zk_version: compiler_output.zk_version.clone(),
+                errors: Default::default(),
+            };
+            write_artifact(input, artifact, artifact_paths, filename, &source_hash);
         }
     }
 
@@ -1233,7 +1233,7 @@ impl ZkSolc {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ZkSolcCompilerOutput {
     // Map from file name -> (Contract name -> Contract)
     #[serde(default)]
@@ -1250,7 +1250,7 @@ pub struct ZkSolcCompilerOutput {
     pub errors: Vec<Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ZkContract {
     pub hash: Option<String>,
@@ -1261,18 +1261,18 @@ pub struct ZkContract {
     pub abi: Option<JsonAbi>,
     pub missing_libraries: Option<Vec<String>>,
 }
-#[derive(Debug, Deserialize)]
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Evm {
     pub bytecode: Option<ZkSolcBytecode>,
 }
-#[derive(Debug, Deserialize)]
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ZkSolcBytecode {
     object: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ZkSourceFile {
     pub id: u64,
 }
