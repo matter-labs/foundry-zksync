@@ -312,11 +312,24 @@ impl ZkSolc {
         let mut displayed_warnings = HashSet::new();
         let mut data = ArtifactsMap::new();
         // Step 1: Collect Source Files
-        let sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
+        let (cached, sources) = self.get_versioned_sources().wrap_err("Cannot get source files")?;
         let mut contract_bytecodes = BTreeMap::new();
 
         let mut all_missing_libraries: HashSet<ZkMissingLibrary> = HashSet::new();
         let artifacts_path = self.project.paths.artifacts.clone();
+
+        // Step 2: populate from cache
+        cached.into_iter().for_each(|entry| {
+            let output = Self::parse_compiler_output(entry);
+            Self::handle_output(
+                output,
+                &mut displayed_warnings,
+                &artifacts_path,
+                None,
+                &mut data,
+                &mut contract_bytecodes,
+            );
+        });
 
         // Step 3: Proceed with contract compilation
         for (solc, (_, sources)) in sources {
@@ -1008,20 +1021,34 @@ impl ZkSolc {
     /// The `get_versioned_sources` function is typically called internally within the `ZkSolc`
     /// struct to obtain the necessary versioned sources for contract compilation.
     /// The versioned sources can then be used for further processing or analysis.
-    fn get_versioned_sources(&mut self) -> Result<BTreeMap<Solc, SolidityVersionSources>> {
+    fn get_versioned_sources(
+        &mut self,
+    ) -> Result<(Vec<Vec<u8>>, BTreeMap<Solc, SolidityVersionSources>)> {
+        let artifacts_paths = &self.project.paths.artifacts;
+
         // Step 1: Retrieve Project Sources
         let mut sources = self.project.paths.read_input_files()?;
+        let mut cache = Vec::with_capacity(sources.len());
         sources.retain(|path, _| {
             let relative_path = path.strip_prefix(self.project.root()).unwrap_or(path.as_ref());
             let is_ignored = self.is_contract_ignored_in_config(relative_path);
 
             //TODO: feed cached artifacts to compiler?
-            let is_cached = Self::check_contract_is_cached(&self.project.paths.artifacts, path)
-                .map(|r| r.0.is_some())
-                .unwrap_or_default();
+            //TODO: retrieve cached artifacts for dependencies too?
+            // that would also mean we need to first resolve, then filter
+            // and resolve again with new sources
+            let cached =
+                Self::check_contract_is_cached(artifacts_paths, path).ok().and_then(|r| r.0);
 
             // prune ignored or cached contractacs
-            !(is_ignored || is_cached)
+            match (is_ignored, cached) {
+                (false, None) => true,
+                (true, _) => false,
+                (false, Some(cached)) => {
+                    cache.push(cached);
+                    false
+                }
+            }
         });
 
         // Step 2: Resolve Graph of Sources and Versions
@@ -1034,7 +1061,7 @@ impl ZkSolc {
             .wrap_err("Could not match solc versions to files")?;
 
         // Step 4: Retrieve Solc Version
-        versions.get(&self.project).wrap_err("Could not get solc")
+        versions.get(&self.project).wrap_err("Could not get solc").map(|s| (cache, s))
     }
 
     /// Checks if the contract has been ignored by the user in the configuration file.
