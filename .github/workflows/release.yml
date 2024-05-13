@@ -200,7 +200,6 @@ jobs:
               with:
                   name: ${{ needs.prepare.outputs.release_name }}
                   tag_name: ${{ needs.prepare.outputs.tag_name }}
-                  draft: true
                   prerelease: true
                   body: ${{ needs.prepare.outputs.changelog }}
                   files: |
