@@ -621,7 +621,7 @@ impl ZkSolc {
 
                 let artifact = ArtifactFile {
                     artifact: art,
-                    file: filename.into(),
+                    file: format!("{name}.sol").into(),
                     version: Version::parse(&compiler_output.version).unwrap(),
                 };
                 // each contract is only supposed to have 1 artifact
