@@ -61,10 +61,10 @@ use std::{
 use tracing::{error, info, trace, warn};
 use zksync_basic_types::H256;
 
+use crate::zksolc::PackedEraBytecode;
+
 type ArtifactsMap<T> = <Artifacts<T> as core::ops::Deref>::Target;
 type VersionedSources = BTreeMap<Solc, SolidityVersionSources>;
-
-use crate::zksolc::PackedEraBytecode;
 
 /// It is observed that when there's a missing library without
 /// `--detect-missing-libraries` an error is thrown that contains
@@ -73,6 +73,53 @@ const MISSING_LIBS_ERROR: &[u8] = b"not found in the project".as_slice();
 
 /// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
+
+#[derive(Debug, Clone)]
+struct CompilationOutput {
+    pub artifacts_path: PathBuf,
+    pub artifact_map: ArtifactsMap<ConfigurableContractArtifact>,
+    pub displayed_warnings: HashSet<String>,
+    pub contract_bytecodes: ContractBytecodes,
+    pub missing_libraries: HashSet<ZkMissingLibrary>,
+    pub contracts_with_libraries: HashSet<String>,
+}
+
+impl CompilationOutput {
+    pub fn new(artifacts_path: PathBuf) -> Self {
+        Self {
+            artifacts_path,
+            artifact_map: ArtifactsMap::new(),
+            displayed_warnings: HashSet::new(),
+            contract_bytecodes: ContractBytecodes::new(),
+            missing_libraries: HashSet::new(),
+            contracts_with_libraries: HashSet::new(),
+        }
+    }
+
+    pub fn process_missing_libraries(
+        &mut self,
+        contracts: impl IntoIterator<Item = String>,
+        libs: impl IntoIterator<Item = ZkMissingLibrary>,
+    ) {
+        self.contracts_with_libraries.extend(contracts.into_iter());
+        self.missing_libraries.extend(libs);
+    }
+
+    pub fn handle_output(
+        &mut self,
+        compiler_out: ZkSolcCompilerOutput,
+        compiler_input: Option<&str>,
+    ) {
+        ZkSolc::handle_output(
+            compiler_out,
+            &mut self.displayed_warnings,
+            &self.artifacts_path,
+            compiler_input,
+            &mut self.artifact_map,
+            &mut self.contract_bytecodes,
+        );
+    }
+}
 
 #[derive(Debug, Default, Clone)]
 pub struct ZkSolcArtifactPaths {
@@ -236,6 +283,54 @@ impl ZkSolc {
         Self { config, project, standard_json: None }
     }
 
+    fn _compile(
+        &mut self,
+        cache: Vec<ZkSolcCompilerOutput>,
+        sources: VersionedSources,
+    ) -> Result<CompilationOutput> {
+        let mut result = CompilationOutput::new(self.project.paths.artifacts.clone());
+        cache.into_iter().for_each(|entry| result.handle_output(entry, None));
+
+        for (solc, (_, sources)) in sources {
+            let total = sources.len();
+            info!(solc = ?solc.solc, "\nCompiling {total} files...");
+
+            let mut sp = spinoff::Spinner::new(
+                spinoff::spinners::Dots8bit,
+                format!("Compiling {total} files..."),
+                None,
+            );
+            let ci = std::env::var_os("CI").map(|ci| ci == "true").unwrap_or_default();
+            if ci {
+                sp.stop_with_message("Spinner hidden in CI");
+            }
+
+            let input = self
+                .prepare_compiler_input(sources)
+                .wrap_err("Failed to prepare compiler inputs")?;
+
+            // TODO: split compilation between is-system and non-system
+            let Some(output) = self.run_compiler(&input, &solc)? else { continue };
+
+            let output = Self::parse_compiler_output(output.stdout);
+
+            let (has_missing_libs, contracts, libs) = Self::missing_libraries_iter(&output);
+
+            result.process_missing_libraries(contracts.map(|(path, _)| path.clone()), libs);
+
+            // Step 6: Handle Output (Errors and Warnings)
+            if !has_missing_libs {
+                result.handle_output(output, Some(&input));
+            }
+
+            if !ci {
+                sp.success(&format!("Compiled {total} files!"));
+            }
+        }
+
+        Ok(result)
+    }
+
     /// Compiles the Solidity contracts in the project's 'sources' directory and its subdirectories
     /// using the ZkSolc compiler.
     ///
@@ -310,83 +405,43 @@ impl ZkSolc {
     /// versioned sources. These modified values can be accessed after the compilation process
     /// for further processing or analysis.
     pub fn compile(&mut self) -> Result<(ProjectCompileOutput, ContractBytecodes)> {
-        let mut displayed_warnings = HashSet::new();
-        let mut data = ArtifactsMap::new();
         // Step 1: Collect Source Files
-        let (cached, sources) = self.get_versioned_sources().wrap_err("Cannot get source files")?;
-        let mut contract_bytecodes = BTreeMap::new();
+        let project_sources = self.project.paths.read_input_files()?;
 
-        let mut all_missing_libraries: HashSet<ZkMissingLibrary> = HashSet::new();
-        let artifacts_path = self.project.paths.artifacts.clone();
+        // Step 2: Filter Sources and read from cache
+        let (cached, sources) = self
+            .filter_sources(project_sources.clone(), |_| false)
+            .wrap_err("Cannot get source files")?;
 
-        // Step 2: populate from cache
-        cached.into_iter().for_each(|entry| {
-            let output = Self::parse_compiler_output(entry);
-            Self::handle_output(
-                output,
-                &mut displayed_warnings,
-                &artifacts_path,
-                None,
-                &mut data,
-                &mut contract_bytecodes,
-            );
-        });
+        // Step 3: Compile
+        let output = self._compile(cached, sources)?;
 
-        // Step 3: Proceed with contract compilation
-        for (solc, (_, sources)) in sources {
-            let total = sources.len();
-            info!(solc = ?solc.solc, "\nCompiling {total} files...");
-            let mut sp = spinoff::Spinner::new(
-                spinoff::spinners::Dots8bit,
-                format!("Compiling {total} files..."),
-                None,
-            );
-            let ci = std::env::var_os("CI").map(|ci| ci == "true").unwrap_or_default();
+        // Step 4: Compile again without missing libraries to populate cache
+        if !output.missing_libraries.is_empty() {
+            let CompilationOutput { missing_libraries, contracts_with_libraries, .. } = output;
 
-            if ci {
-                sp.stop_with_message("Spinner hidden in CI");
-            }
-
-            let input = self
-                .prepare_compiler_input(sources)
-                .wrap_err("Failed to prepare compiler inputs")?;
-
-            // TODO: split compilation between is-system and non-system
-            let Some(output) = self.run_compiler(&input, &solc)? else { continue };
-
-            let output = Self::parse_compiler_output(output.stdout);
-
-            // TODO: recompile without contracts with missing libraries?
-            all_missing_libraries.extend(Self::missing_libraries_iter(&output).1);
-
-            // Step 6: Handle Output (Errors and Warnings)
-            Self::handle_output(
-                output,
-                &mut displayed_warnings,
-                &artifacts_path,
-                Some(&input),
-                &mut data,
-                &mut contract_bytecodes,
-            );
-
-            if !ci {
-                sp.success(&format!("Compiled {total} files!"));
-            }
-        }
-
-        // Step 4: If missing library dependencies, save them to a file and return an error
-        if !all_missing_libraries.is_empty() {
-            let dependencies: Vec<ZkMissingLibrary> = all_missing_libraries.into_iter().collect();
+            // Step 4a: Save missing libraries to file
+            let dependencies: Vec<ZkMissingLibrary> = missing_libraries.into_iter().collect();
             libraries::add_dependencies_to_missing_libraries_cache(
                 &self.project.paths.root,
                 dependencies.as_slice(),
             )?;
-            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", dependencies);
-        }
 
-        let mut result = ProjectCompileOutput::default();
-        result.set_compiled_artifacts(Artifacts(data));
-        Ok((result, contract_bytecodes))
+            // Step 5: Filter Sources (removing missing libs)
+            let (cached, sources) = self
+                .filter_sources(project_sources.clone(), move |path| {
+                    contracts_with_libraries.contains(&format!("{}", path.display()))
+                })
+                .wrap_err("Cannot get source files")?;
+
+            let _ = self._compile(cached, sources)?;
+
+            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", dependencies);
+        } else {
+            let mut result = ProjectCompileOutput::default();
+            result.set_compiled_artifacts(Artifacts(output.artifact_map));
+            Ok((result, output.contract_bytecodes))
+        }
     }
 
     /// Checks if the contract has already been compiled for the given input contract hash.
@@ -975,6 +1030,7 @@ impl ZkSolc {
     /// 2. Filter out cached Sources:
     ///    - The function filters out any sources that are ignored or cached.
     ///    - If the sources are cached the corresponding artifact is retrieved.
+    ///    - If the `additional_filter` returns `false`, the contract is ignored.
     ///
     /// 3. Resolve Graph of Sources and Versions:
     ///    - The function creates a graph using the `Graph::resolve_sources` method, passing the
@@ -1000,12 +1056,14 @@ impl ZkSolc {
     ///    - The function returns a `BTreeMap` containing the versioned sources, where each entry in
     ///      the map represents a Solidity compiler version and its associated contracts.
     ///    - The map is constructed using the `solc_version` and `versions` variables.
-    ///    - The function also returns a vector of bytes which represent the cached artifacts.
+    ///    - The function also returns a vector which represent the cached artifacts.
     ///    - If the construction of the versioned sources map fails, an error is returned.
     ///
     /// # Arguments
     ///
     /// * `self` - A reference to the `ZkSolc` instance.
+    /// * `sources` - The starting list of `Sources`.
+    /// * `additional_filter` - Predicate which determines wheter to filter out a source by path
     ///
     /// # Returns
     ///
@@ -1027,36 +1085,38 @@ impl ZkSolc {
     /// ```ignore
     /// use foundry_cli::cmd::forge::zksolc::ZkSolc;
     /// let mut zk_solc = ZkSolc::new(...);
-    /// let versioned_sources = zk_solc.get_versioned_sources()?;
+    /// let sources = zk_solc.project.paths.read_input_files()?;
+    /// let (versioned_sources, cached) = zk_solc.filter_sources(sources, |_| false)?;
     /// ```
     ///
-    /// In this example, a `ZkSolc` instance is created, and the `get_versioned_sources` method is
+    /// In this example, a `ZkSolc` instance is created, and the `filter_sources` method is
     /// called to retrieve the versioned sources for the Solidity contracts in the project.
     /// The resulting `BTreeMap` of versioned sources is stored in the `versioned_sources` variable.
     ///
     /// # Note
     ///
-    /// The `get_versioned_sources` function is typically called internally within the `ZkSolc`
+    /// The `filter_sources` function is typically called internally within the `ZkSolc`
     /// struct to obtain the necessary versioned sources for contract compilation.
     /// The versioned sources can then be used for further processing or analysis.
-    fn get_versioned_sources(&self) -> Result<(Vec<Vec<u8>>, VersionedSources)> {
+    fn filter_sources(
+        &self,
+        sources: Sources,
+        additional_filter: impl Fn(&PathBuf) -> bool,
+    ) -> Result<(Vec<ZkSolcCompilerOutput>, VersionedSources)> {
         let artifacts_paths = &self.project.paths.artifacts;
 
-        // Step 1: Retrieve Project Sources
-        let project_sources = self.project.paths.read_input_files()?;
-
-        // Step 2: Resolve Graph of Sources and Versions
-        let graph = Graph::resolve_sources(&self.project.paths, project_sources)
-            .wrap_err("Could not resolve project sources")?;
+        // Step 1: Resolve Graph of Sources and Versions
+        let graph = Graph::resolve_sources(&self.project.paths, sources)
+            .wrap_err("Could not given sources")?;
         let (mut all_sources, _) = graph.into_sources();
 
-        // Step 3: Filter out ignored and cached sources
+        // Step 2: Filter out ignored and cached sources
         let mut cache = Vec::with_capacity(all_sources.len());
         all_sources.retain(|path, _| {
             let relative_path = path.strip_prefix(self.project.root()).unwrap_or(path.as_ref());
             let is_ignored = self.is_contract_ignored_in_config(relative_path);
+            let is_ignored = is_ignored || additional_filter(path);
 
-            //TODO: feed cached artifacts to compiler?
             let cached =
                 Self::check_contract_is_cached(artifacts_paths, path).ok().and_then(|r| r.0);
 
@@ -1065,22 +1125,30 @@ impl ZkSolc {
                 (false, None) => true,
                 (true, _) => false,
                 (false, Some(cached)) => {
-                    cache.push(cached);
-                    false
+                    let output = Self::parse_compiler_output(cached);
+
+                    // if contract has missing libraries
+                    if Self::missing_libraries_iter(&output).0 {
+                        // recompile it
+                        true
+                    } else {
+                        cache.push(output);
+                        false
+                    }
                 }
             }
         });
 
-        // Step 4: Resolve Graph of remaining Sources
+        // Step 3: Resolve Graph of remaining Sources
         let graph = Graph::resolve_sources(&self.project.paths, all_sources)
             .wrap_err("Could not resolve sources")?;
 
-        // Step 5: Extract Versions and Edges
+        // Step 4: Extract Versions and Edges
         let (versions, _edges) = graph
             .into_sources_by_version(self.project.offline)
             .wrap_err("Could not match solc versions to files")?;
 
-        // Step 6: Retrieve Solc Version
+        // Step 5: Retrieve Solc Version
         versions.get(&self.project).wrap_err("Could not get solc").map(|s| (cache, s))
     }
 
@@ -1144,23 +1212,28 @@ impl ZkSolc {
     /// libraries
     fn missing_libraries_iter(
         output: &'_ ZkSolcCompilerOutput,
-    ) -> (impl Iterator<Item = &'_ ZkContract>, impl Iterator<Item = ZkMissingLibrary> + '_) {
-        let contracts_with_libs = output
+    ) -> (
+        bool,
+        impl Iterator<Item = (&'_ String, &'_ ZkContract)>,
+        impl Iterator<Item = ZkMissingLibrary> + '_,
+    ) {
+        let mut contracts_with_libs = output
             .contracts
-            .values()
-            .flat_map(|ccs| ccs.iter())
-            .filter(|(_, contract)| {
+            .iter()
+            .flat_map(|(path, ccs)| ccs.iter().map(move |c| (path, c)))
+            .filter(|(_, (_, contract))| {
                 !contract
                     .missing_libraries
                     .as_ref()
                     .map(|libs| !libs.is_empty())
                     .unwrap_or_default()
             })
-            .map(|(_, c)| c);
+            .map(|(p, (_, c))| (p, c))
+            .peekable();
+        let has_missing_libs = contracts_with_libs.peek().is_some();
 
         let libs = contracts_with_libs.clone()
-
-            .flat_map(|contract| contract.missing_libraries.iter().flatten())
+            .flat_map(|(_, contract)| contract.missing_libraries.iter().flatten())
             .map(|library| {
 let mut split = library.split(':');
             let path = split.next().expect("missing library format {{path}}:{{contract_name}}; unable to parse path ");
@@ -1180,7 +1253,7 @@ output
                 })
             });
 
-        (contracts_with_libs, libs)
+        (has_missing_libs, contracts_with_libs, libs)
     }
 
     fn run_compiler(&self, json_input: &str, solc: &Solc) -> Result<Option<std::process::Output>> {

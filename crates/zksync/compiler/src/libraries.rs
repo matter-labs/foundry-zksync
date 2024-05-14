@@ -24,8 +24,7 @@ pub(crate) fn add_dependencies_to_missing_libraries_cache(
 ) -> eyre::Result<()> {
     let file_path = get_missing_libraries_cache_path(project_root);
     fs::create_dir_all(file_path.parent().unwrap()).unwrap();
-    fs::File::create(file_path)?
-        .write_all(serde_json::to_string_pretty(libraries).unwrap().as_bytes())?;
+    fs::File::create(file_path)?.write_all(serde_json::to_string(libraries).unwrap().as_bytes())?;
     Ok(())
 }
 
