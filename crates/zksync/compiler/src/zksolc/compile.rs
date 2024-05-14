@@ -62,6 +62,7 @@ use tracing::{error, info, trace, warn};
 use zksync_basic_types::H256;
 
 type ArtifactsMap<T> = <Artifacts<T> as core::ops::Deref>::Target;
+type VersionedSources = BTreeMap<Solc, SolidityVersionSources>;
 
 use crate::zksolc::PackedEraBytecode;
 
@@ -950,9 +951,10 @@ impl ZkSolc {
         }
     }
 
-    /// Retrieves the versioned sources for the Solidity contracts in the project. The versioned
-    /// sources represent the contracts grouped by their corresponding Solidity compiler
-    /// versions. The function performs the following steps to obtain the versioned sources:
+    /// Retrieves the versioned sources for the Solidity contracts in the project and cached
+    /// artifacts. The versioned sources represent the contracts grouped by their corresponding
+    /// Solidity compiler versions. The function performs the following steps to obtain the
+    /// versioned sources:
     ///
     /// # Workflow:
     /// 1. Retrieve Project Sources:
@@ -960,14 +962,18 @@ impl ZkSolc {
     ///      Solidity contract sources for the project.
     ///    - If the retrieval of project sources fails, an error is returned.
     ///
-    /// 2. Resolve Graph of Sources and Versions:
+    /// 2. Filter out cached Sources:
+    ///    - The function filters out any sources that are ignored or cached.
+    ///    - If the sources are cached the corresponding artifact is retrieved.
+    ///
+    /// 3. Resolve Graph of Sources and Versions:
     ///    - The function creates a graph using the `Graph::resolve_sources` method, passing the
     ///      project paths and the retrieved contract sources.
     ///    - The graph represents the relationships between the contract sources and their
     ///      corresponding Solidity compiler versions.
     ///    - If the resolution of the graph fails, an error is returned.
     ///
-    /// 3. Extract Versions and Edges:
+    /// 4. Extract Versions and Edges:
     ///    - The function extracts the versions and edges from the resolved graph.
     ///    - The `versions` variable contains a mapping of Solidity compiler versions to the
     ///      contracts associated with each version.
@@ -975,24 +981,26 @@ impl ZkSolc {
     ///      corresponding Solidity compiler versions.
     ///    - If the extraction of versions and edges fails, an error is returned.
     ///
-    /// 4. Retrieve Solc Version:
+    /// 5. Retrieve Solc Version:
     ///    - The function attempts to retrieve the Solidity compiler version associated with the
     ///      project.
     ///    - If the retrieval of the solc version fails, an error is returned.
     ///
-    /// 5. Return Versioned Sources:
+    /// 6. Return Versioned Sources:
     ///    - The function returns a `BTreeMap` containing the versioned sources, where each entry in
     ///      the map represents a Solidity compiler version and its associated contracts.
     ///    - The map is constructed using the `solc_version` and `versions` variables.
+    ///    - The function also returns a vector of bytes which represent the cached artifacts.
     ///    - If the construction of the versioned sources map fails, an error is returned.
     ///
     /// # Arguments
     ///
-    /// * `self` - A mutable reference to the `ZkSolc` instance.
+    /// * `self` - A reference to the `ZkSolc` instance.
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `BTreeMap` of the versioned sources on success, or an
+    /// A `Result` containing a `BTreeMap` of the versioned sources
+    /// and a `Vec` of the artifacts present in cache on success, or an
     /// `anyhow::Error` on failure.
     ///
     /// # Errors
@@ -1021,9 +1029,7 @@ impl ZkSolc {
     /// The `get_versioned_sources` function is typically called internally within the `ZkSolc`
     /// struct to obtain the necessary versioned sources for contract compilation.
     /// The versioned sources can then be used for further processing or analysis.
-    fn get_versioned_sources(
-        &mut self,
-    ) -> Result<(Vec<Vec<u8>>, BTreeMap<Solc, SolidityVersionSources>)> {
+    fn get_versioned_sources(&self) -> Result<(Vec<Vec<u8>>, VersionedSources)> {
         let artifacts_paths = &self.project.paths.artifacts;
 
         // Step 1: Retrieve Project Sources
