@@ -341,6 +341,11 @@ impl ZkSolc {
                 format!("Compiling {total} files..."),
                 None,
             );
+            let ci = std::env::var_os("CI").map(|ci| ci == "true").unwrap_or_default();
+
+            if ci {
+                sp.stop_with_message("Spinner hidden in CI");
+            }
 
             let input = self
                 .prepare_compiler_input(sources)
@@ -364,7 +369,9 @@ impl ZkSolc {
                 &mut contract_bytecodes,
             );
 
-            sp.success(&format!("Compiled {total} files!"));
+            if !ci {
+                sp.success(&format!("Compiled {total} files!"));
+            }
         }
 
         // Step 4: If missing library dependencies, save them to a file and return an error
