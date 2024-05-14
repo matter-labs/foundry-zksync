@@ -4543,7 +4543,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.3.9"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#900c9c8b287710d4af3002ede2bf6c93150d8931"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#02712ec0ec2c5cc464a19d74c50ef349a3c8a191"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -4561,6 +4561,7 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "regex",
+ "reqwest",
  "semver 1.0.22",
  "serde",
  "serde_json",
