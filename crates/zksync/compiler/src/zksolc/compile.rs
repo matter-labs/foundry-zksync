@@ -81,7 +81,6 @@ struct CompilationOutput {
     pub displayed_warnings: HashSet<String>,
     pub contract_bytecodes: ContractBytecodes,
     pub missing_libraries: HashSet<ZkMissingLibrary>,
-    pub contracts_with_libraries: HashSet<String>,
 }
 
 impl CompilationOutput {
@@ -92,16 +91,10 @@ impl CompilationOutput {
             displayed_warnings: HashSet::new(),
             contract_bytecodes: ContractBytecodes::new(),
             missing_libraries: HashSet::new(),
-            contracts_with_libraries: HashSet::new(),
         }
     }
 
-    pub fn process_missing_libraries(
-        &mut self,
-        contracts: impl IntoIterator<Item = String>,
-        libs: impl IntoIterator<Item = ZkMissingLibrary>,
-    ) {
-        self.contracts_with_libraries.extend(contracts.into_iter());
+    pub fn process_missing_libraries(&mut self, libs: impl IntoIterator<Item = ZkMissingLibrary>) {
         self.missing_libraries.extend(libs);
     }
 
@@ -314,9 +307,8 @@ impl ZkSolc {
 
             let output = Self::parse_compiler_output(output.stdout);
 
-            let (has_missing_libs, contracts, libs) = Self::missing_libraries_iter(&output);
-
-            result.process_missing_libraries(contracts.map(|(path, _)| path.clone()), libs);
+            let (has_missing_libs, _, libs) = Self::missing_libraries_iter(&output);
+            result.process_missing_libraries(libs);
 
             // Step 6: Handle Output (Errors and Warnings)
             if !has_missing_libs {
@@ -416,25 +408,15 @@ impl ZkSolc {
         // Step 3: Compile
         let output = self._compile(cached, sources)?;
 
-        // Step 4: Compile again without missing libraries to populate cache
+        // Step 4: Save missing libraries to file and error
         if !output.missing_libraries.is_empty() {
-            let CompilationOutput { missing_libraries, contracts_with_libraries, .. } = output;
+            let CompilationOutput { missing_libraries, .. } = output;
 
-            // Step 4a: Save missing libraries to file
             let dependencies: Vec<ZkMissingLibrary> = missing_libraries.into_iter().collect();
             libraries::add_dependencies_to_missing_libraries_cache(
                 &self.project.paths.root,
                 dependencies.as_slice(),
             )?;
-
-            // Step 5: Filter Sources (removing missing libs)
-            let (cached, sources) = self
-                .filter_sources(project_sources.clone(), move |path| {
-                    contracts_with_libraries.contains(&format!("{}", path.display()))
-                })
-                .wrap_err("Cannot get source files")?;
-
-            let _ = self._compile(cached, sources)?;
 
             eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", dependencies);
         } else {
