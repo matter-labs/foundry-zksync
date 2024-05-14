@@ -1036,16 +1036,20 @@ impl ZkSolc {
         let artifacts_paths = &self.project.paths.artifacts;
 
         // Step 1: Retrieve Project Sources
-        let mut sources = self.project.paths.read_input_files()?;
-        let mut cache = Vec::with_capacity(sources.len());
-        sources.retain(|path, _| {
+        let project_sources = self.project.paths.read_input_files()?;
+
+        // Step 2: Resolve Graph of Sources and Versions
+        let graph = Graph::resolve_sources(&self.project.paths, project_sources)
+            .wrap_err("Could not resolve project sources")?;
+        let (mut all_sources, _) = graph.into_sources();
+
+        // Step 3: Filter out ignored and cached sources
+        let mut cache = Vec::with_capacity(all_sources.len());
+        all_sources.retain(|path, _| {
             let relative_path = path.strip_prefix(self.project.root()).unwrap_or(path.as_ref());
             let is_ignored = self.is_contract_ignored_in_config(relative_path);
 
             //TODO: feed cached artifacts to compiler?
-            //TODO: retrieve cached artifacts for dependencies too?
-            // that would also mean we need to first resolve, then filter
-            // and resolve again with new sources
             let cached =
                 Self::check_contract_is_cached(artifacts_paths, path).ok().and_then(|r| r.0);
 
@@ -1060,16 +1064,16 @@ impl ZkSolc {
             }
         });
 
-        // Step 2: Resolve Graph of Sources and Versions
-        let graph = Graph::resolve_sources(&self.project.paths, sources)
+        // Step 4: Resolve Graph of remaining Sources
+        let graph = Graph::resolve_sources(&self.project.paths, all_sources)
             .wrap_err("Could not resolve sources")?;
 
-        // Step 3: Extract Versions and Edges
+        // Step 5: Extract Versions and Edges
         let (versions, _edges) = graph
             .into_sources_by_version(self.project.offline)
             .wrap_err("Could not match solc versions to files")?;
 
-        // Step 4: Retrieve Solc Version
+        // Step 6: Retrieve Solc Version
         versions.get(&self.project).wrap_err("Could not get solc").map(|s| (cache, s))
     }
 
