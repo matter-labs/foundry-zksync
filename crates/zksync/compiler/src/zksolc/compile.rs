@@ -348,7 +348,6 @@ impl ZkSolc {
 
             // TODO: split compilation between is-system and non-system
             let Some(output) = self.run_compiler(&input, &solc)? else { continue };
-            tracing::debug!(status = ?output.status, output = ?&output.stdout[..2048], "compiler output");
 
             let output = Self::parse_compiler_output(output.stdout);
 
@@ -643,6 +642,8 @@ impl ZkSolc {
 
         /// Writes artifact to disk
         ///
+        /// If `raw_compiler_input` is `None`, no artifacts will be written.
+        ///
         /// Args:
         /// * raw_compiler_input: stored in `input.json` - represents the standard json input to the
         ///   compiler
@@ -651,8 +652,6 @@ impl ZkSolc {
         /// * artifacts_paths: artifact output folder
         /// * filename: source contract filename
         /// * source_hash: hash of the contents of the source file
-        /// * bytecode_hash: stored in `contract_hash` - contract bytecode hash
-        /// * contract_name: name of the contract with the given bytecode hash
         fn write_artifact(
             raw_compiler_input: Option<&str>,
             artifact_output: ZkSolcCompilerOutput,
@@ -660,8 +659,6 @@ impl ZkSolc {
             filename: &str,
             source_hash: &str,
         ) {
-            let artifacts = artifacts_paths.as_ref().join(filename);
-
             artifact_output
                 .contracts
                 .values()
@@ -670,6 +667,12 @@ impl ZkSolc {
                 .for_each(|(contract_name, bytecode_hash)| {
                     info!(?filename, "{contract_name} -> Bytecode Hash: {bytecode_hash}")
                 });
+
+            // skip writing if no compiler input (from cache)
+            if raw_compiler_input.is_none() {
+                return
+            }
+            let artifacts = artifacts_paths.as_ref().join(filename);
 
             let artifacts = ZkSolcArtifactPaths::new(artifacts);
             artifacts.create().unwrap();
