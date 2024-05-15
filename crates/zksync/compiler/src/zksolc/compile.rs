@@ -1204,11 +1204,7 @@ impl ZkSolc {
             .iter()
             .flat_map(|(path, ccs)| ccs.iter().map(move |c| (path, c)))
             .filter(|(_, (_, contract))| {
-                !contract
-                    .missing_libraries
-                    .as_ref()
-                    .map(|libs| !libs.is_empty())
-                    .unwrap_or_default()
+                contract.missing_libraries.as_ref().map(|libs| !libs.is_empty()).unwrap_or_default()
             })
             .map(|(p, (_, c))| (p, c))
             .peekable();
