@@ -114,7 +114,7 @@ impl BuildArgs {
                     .map_err(|e| eyre::eyre!(e))?,
                 config.zk_project()?,
             );
-            let (zk_output, _contract_bytecodes) = match zksolc.compile() {
+            let zk_output = match zksolc.compile() {
                 Ok(compiled) => compiled,
                 Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
             };

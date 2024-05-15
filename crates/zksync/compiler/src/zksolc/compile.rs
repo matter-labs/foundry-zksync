@@ -40,8 +40,8 @@ use ansi_term::Colour::{Red, Yellow};
 use eyre::{Context, ContextCompat, Result};
 use foundry_compilers::{
     artifacts::{
-        output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode, Source,
-        StandardJsonCompilerInput,
+        self, output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
+        Source, StandardJsonCompilerInput,
     },
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
@@ -51,9 +51,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fmt, fs,
-    fs::File,
-    io::{Read, Write},
+    fmt,
+    fs::{self, File},
+    io::{BufWriter, Read, Write},
     path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
@@ -196,7 +196,7 @@ impl fmt::Display for ZkSolc {
 pub fn compile_smart_contracts(
     zksolc_cfg: ZkSolcConfig,
     project: Project,
-) -> eyre::Result<(ProjectCompileOutput, ContractBytecodes)> {
+) -> eyre::Result<ProjectCompileOutput> {
     //TODO: use remappings
     let mut zksolc = ZkSolc::new(zksolc_cfg, project);
     match zksolc.compile() {
@@ -208,6 +208,25 @@ pub fn compile_smart_contracts(
             eyre::bail!("Failed to compile smart contracts with zksolc: {}", err);
         }
     }
+}
+
+pub enum CachedContractEntry {
+    Found {
+        cache: ContractCache,
+        artifacts: BTreeMap<String, ArtifactFile<ConfigurableContractArtifact>>,
+    },
+    Missing {
+        cache: ContractCache,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ContractCache {
+    #[serde(skip)]
+    pub path: PathBuf,
+    pub input_file: String,
+    pub hash: String,
+    pub artifacts: Vec<String>,
 }
 
 impl ZkSolc {
@@ -288,9 +307,9 @@ impl ZkSolc {
     /// The `compile` function modifies the `ZkSolc` instance to store the parsed JSON input and the
     /// versioned sources. These modified values can be accessed after the compilation process
     /// for further processing or analysis.
-    pub fn compile(&mut self) -> Result<(ProjectCompileOutput, ContractBytecodes)> {
+    pub fn compile(&mut self) -> Result<ProjectCompileOutput> {
         let mut displayed_warnings = HashSet::new();
-        let mut data = BTreeMap::new();
+
         // Step 1: Collect Source Files
         let mut sources = self.get_versioned_sources().wrap_err("Cannot get source files")?;
         sources.retain(|_, (_, sources)| {
@@ -302,13 +321,23 @@ impl ZkSolc {
             // and prune any group that is now empty
             !sources.is_empty()
         });
-        let mut contract_bytecodes = BTreeMap::new();
 
         // Step 2: Check missing libraries
         // Map from (contract_path, contract_name) -> missing_libraries
         let mut all_missing_libraries: HashMap<(String, String), HashSet<String>> = HashMap::new();
 
+        // Used to resolve artifact paths
+        // let mut final_artifact_paths = HashSet::new();
+        // let mut final_canonical_artifact_paths = HashSet::new();
+
+        let project_cache_path = self.project.paths.artifacts.join("~cache");
+        if !project_cache_path.exists() {
+            fs::create_dir_all(&project_cache_path)
+                .wrap_err(format!("Could not create cache path: {:?}", project_cache_path))?;
+        }
+
         // Step 3: Proceed with contract compilation
+        let mut all_artifacts = BTreeMap::new();
         for (solc, version) in sources {
             info!(solc = ?solc.solc, "\nCompiling {} files...", version.1.len());
             // Configure project solc for each solc version
@@ -319,69 +348,196 @@ impl ZkSolc {
                     .to_str()
                     .expect("Invalid Contract filename");
 
-                // Run Compiler (or use cached) and Handle Output
-                let artifact_paths =
-                    ZkSolcArtifactPaths::new(self.project.paths.artifacts.join(filename));
 
-                info!("Compiling {:?}...", contract_path);
-                let (output, contract_hash) = self.check_contract_is_cached(&contract_path)?;
-                let (output, maybe_artifact_paths) = match output {
-                    Some(output) => {
+                let (maybe_cache, artifacts) = match self
+                    .check_contract_is_cached(&project_cache_path, &contract_path)?
+                {
+                    CachedContractEntry::Found { artifacts, .. } => {
                         info!("Using hashed artifact for {:?}", filename);
-                        (output, None)
+                        (None, artifacts)
                     }
-                    None => {
-                        self.prepare_compiler_input(&contract_path).wrap_err(format!(
-                            "Failed to prepare inputs when compiling {:?}",
-                            contract_path
-                        ))?;
+                    CachedContractEntry::Missing { cache } => {
+                        let compiled_cache = cache.path.parent().unwrap().join("compiled.json");
 
-                        let Some(output) = self.run_compiler(&contract_path, &solc)? else {
-                            continue
-                        };
+                        // hacky caching for intermittent compilation
+                        if compiled_cache.exists() {
+                            let file = File::open(&compiled_cache).unwrap();
+                            let reader = std::io::BufReader::new(file);
+                            let output = serde_json::from_reader::<_, Vec<u8>>(reader).unwrap();
 
-                        let missing_libraries =
-                            Self::get_missing_libraries_from_output(&output.stdout)?;
-                        tracing::trace!(path = ?contract_path, ?missing_libraries);
-                        let has_missing_libraries = !missing_libraries.is_empty();
+                            let artifacts =
+                                ZkSolc::handle_output2(output, filename, &mut displayed_warnings);
 
-                        // collect missing libraries
-                        for missing_library in missing_libraries {
-                            all_missing_libraries
-                                .entry((
-                                    missing_library.contract_path.clone(),
-                                    missing_library.contract_name.clone(),
-                                ))
-                                .and_modify(|missing_dependencies| {
-                                    missing_dependencies
-                                        .extend(missing_library.missing_libraries.clone())
-                                })
-                                .or_insert_with(|| {
-                                    HashSet::from_iter(missing_library.missing_libraries.clone())
-                                });
+                            (Some(cache), artifacts)
+                        } else {
+                            self.prepare_compiler_input(&contract_path, &cache.path).wrap_err(
+                                format!(
+                                    "Failed to prepare inputs when compiling {:?}",
+                                    contract_path
+                                ),
+                            )?;
+
+                            let Some(output) = self.run_compiler(&contract_path, &solc)? else {
+                                continue
+                            };
+
+                            let missing_libraries =
+                                Self::get_missing_libraries_from_output(&output.stdout)?;
+                            tracing::trace!(path = ?contract_path, ?missing_libraries);
+                            let has_missing_libraries = !missing_libraries.is_empty();
+
+                            // collect missing libraries
+                            for missing_library in missing_libraries {
+                                all_missing_libraries
+                                    .entry((
+                                        missing_library.contract_path.clone(),
+                                        missing_library.contract_name.clone(),
+                                    ))
+                                    .and_modify(|missing_dependencies| {
+                                        missing_dependencies
+                                            .extend(missing_library.missing_libraries.clone())
+                                    })
+                                    .or_insert_with(|| {
+                                        HashSet::from_iter(
+                                            missing_library.missing_libraries.clone(),
+                                        )
+                                    });
+                            }
+
+                            if has_missing_libraries {
+                                //skip current contract output from processing
+                                continue;
+                            }
+
+                            // (output.stdout, Some(artifact_paths))
+
+                            // let artifacts = ZkSolc::handle_output(
+                            //     output.stdout,
+                            //     filename,
+                            //     &mut displayed_warnings,
+                            //     cache,
+                            //     &contract_path,
+                            //     &self.project.paths.artifacts,
+                            //     &self.project.paths.root,
+                            //     &mut final_artifact_paths,
+                            // );
+
+                            // hacky caching for intermittent compilation
+                            let file = File::create(&compiled_cache).unwrap();
+                            let writer = std::io::BufWriter::new(file);
+                            serde_json::to_writer(writer, &output.stdout).unwrap();
+
+                            let artifacts = ZkSolc::handle_output2(
+                                output.stdout,
+                                filename,
+                                &mut displayed_warnings,
+                            );
+
+                            (Some(cache), artifacts)
                         }
-
-                        if has_missing_libraries {
-                            //skip current contract output from processing
-                            continue;
-                        }
-
-                        (output.stdout, Some(artifact_paths))
                     }
                 };
 
-                // Step 6: Handle Output (Errors and Warnings)
-                let (artifacts, bytecodes) = ZkSolc::handle_output(
-                    output,
-                    filename,
-                    &mut displayed_warnings,
-                    &contract_hash,
-                    maybe_artifact_paths,
-                );
-                data.insert(filename.to_string(), artifacts);
-                contract_bytecodes.extend(bytecodes);
+                let contract_path =
+                    contract_path.to_str().expect("failed creating artifact_path str").to_string();
+                // println!("PATH_STR {artifact_path_str:?}");
+                all_artifacts.insert(contract_path, (maybe_cache, artifacts));
             }
         }
+
+        // Write artifacts
+        let mut mapped_contracts = HashMap::new();
+        for (contract_path, (_, artifacts)) in &mut all_artifacts {
+            for (artifact_key, artifact) in artifacts {
+                mapped_contracts
+                    .entry(artifact_key)
+                    .or_insert(vec![])
+                    .push((contract_path, artifact));
+            }
+        }
+
+        let mut final_artifact_paths = HashSet::new();
+        for (artifact_key, mut contracts) in mapped_contracts {
+            let mut contract_artifact_paths = vec![];
+            for (idx, (contract_path, _)) in contracts.iter().enumerate() {
+                let mut artifact_path = self.project.paths.artifacts.join(PathBuf::from(&artifact_key));
+                println!("NAME-LEN {artifact_key} {} {artifact_path:?}", contracts.len());
+                if contracts.len() > 1 {
+                    // naming conflict where the `artifact_path` belongs to two conflicting
+                    // contracts need to adjust the paths properly
+
+                    // we keep the top most conflicting file unchanged
+                    let is_top_most = contracts.iter().enumerate().filter(|(i, _)| *i != idx).all(
+                        |(_, (cp, _))| {
+                            let x = Path::new(contract_path).components().count() <
+                                Path::new(cp).components().count();
+                            println!(
+                                "NAME-LEN is_top? {x:?} {:?} {:?} / {:?} {:?}",
+                                contract_path,
+                                Path::new(contract_path).components().count(),
+                                cp,
+                                Path::new(cp).components().count()
+                            );
+                            Path::new(contract_path).components().count() <
+                                Path::new(cp).components().count()
+                        },
+                    );
+                    println!("NAME-LEN is_top_most? {is_top_most:?}");
+                    if !is_top_most {
+                        // we resolve the conflicting by finding a new unique, alternative path
+                        artifact_path = Self::conflict_free_output_file(
+                            &final_artifact_paths,
+                            artifact_path,
+                            Path::new(&contract_path),
+                            &self.project.paths.artifacts,
+                        );
+                        println!("\t new-> {artifact_path:?}");
+                    }
+                }
+                final_artifact_paths.insert(artifact_path.clone());
+                contract_artifact_paths.push(artifact_path);
+            }
+            for (idx, artifact_path) in contract_artifact_paths.into_iter().enumerate() {
+                contracts[idx].1.file = artifact_path
+            }
+        }
+
+        let all_artifacts = all_artifacts
+            .into_iter()
+            .map(|(contract_path, (mut maybe_cache, artifacts))| {
+                let artifacts = artifacts
+                    .into_iter()
+                    .map(|(_, artifact)| {
+                        // write artifact
+                        let artifact_path =
+                            artifact.file.to_str().expect("must be valid path").to_string();
+                        if let Some(cache) = &mut maybe_cache {
+                            // TODO write artifact to artifact.file
+                            cache.artifacts.push(artifact_path.clone());
+                        }
+                        (artifact_path, vec![artifact])
+                    })
+                    .collect();
+
+                // write contract
+                if let Some(cache) = maybe_cache {
+                    let output_file = File::create(&cache.path)
+                        .wrap_err("Could not create contract cache file")
+                        .unwrap();
+
+                    serde_json::to_writer_pretty(BufWriter::new(output_file), &cache)
+                        .unwrap_or_else(|e| panic!("Could not write contract cache file: {}", e));
+                }
+
+                (contract_path, artifacts)
+            })
+            .collect();
+        // for (contract_path, (maybe_cache, artifacts)) in &mut all_artifacts {
+        //     for (artifact_key, artifact) in artifacts {
+        //         let path = PathBuf::from(&contract_path).join(artifact.file);
+        //         mapped_contracts.entry(artifact_key).or_insert(vec![]).push((contract_path,
+        // artifact));     }
+        // }
 
         // Step 4: If missing library dependencies, save them to a file and return an error
         if !all_missing_libraries.is_empty() {
@@ -401,41 +557,138 @@ impl ZkSolc {
         }
 
         let mut result = ProjectCompileOutput::default();
-        result.set_compiled_artifacts(Artifacts(data));
-        Ok((result, contract_bytecodes))
+        result.set_compiled_artifacts(Artifacts(all_artifacts));
+        Ok(result)
     }
 
     /// Checks if the contract has already been compiled for the given input contract hash.
     /// If yes, returns the pre-compiled data.
     fn check_cache(
         &self,
-        artifact_paths: &ZkSolcArtifactPaths,
+        contract_path: impl AsRef<Path>,
+        contract_cache_path: &PathBuf,
+        // artifact_paths: &ZkSolcArtifactPaths,
         contract_hash: &str,
-    ) -> Option<Vec<u8>> {
-        if artifact_paths.contract_hash.exists() && artifact_paths.artifact.exists() {
-            File::open(&artifact_paths.contract_hash)
-                .and_then(|mut file| {
-                    let mut cached_contract_hash = String::new();
-                    file.read_to_string(&mut cached_contract_hash).map(|_| cached_contract_hash)
+    ) -> CachedContractEntry {
+        // println!("checking {:?} {:?}", artifact_paths.contract_hash, artifact_paths.artifact);
+        let contract_cache = contract_cache_path.join("output.json");
+        let contract_name = contract_path
+            .as_ref()
+            .file_name()
+            .expect("must have filename")
+            .to_str()
+            .expect("must be valid string");
+        // println!("checking {:?}", contract_cache);
+        if contract_cache.exists() {
+            let maybe_cached = File::open(&contract_cache)
+                .and_then(|file| {
+                    let reader = std::io::BufReader::new(file);
+                    serde_json::from_reader::<_, ContractCache>(reader).map_err(|err| {
+                        std::io::Error::other(format!("failed deserializing: {:?}", err))
+                    })
                 })
-                .and_then(|cached_contract_hash| {
-                    if cached_contract_hash == contract_hash {
-                        Ok(Some(contract_hash))
+                .and_then(|mut cache: ContractCache| {
+                    if cache.hash == contract_hash {
+                        // verify all artifacts exist
+                        for path in &cache.artifacts {
+                            let path = Path::new(&path);
+                            if !path.exists() {
+                                return Err(std::io::Error::other(format!(
+                                    "artifact file does not exist: {:?}",
+                                    path
+                                )))
+                            }
+                        }
+
+                        let mut artifacts = BTreeMap::new();
+                        for path in &cache.artifacts {
+                            let artifact_path = Path::new(&path);
+                            let artifact_filename = artifact_path
+                                .file_name()
+                                .expect("must have filename")
+                                .to_str()
+                                .expect("must be valid string");
+                            match File::open(&artifact_path) {
+                                Ok(file) => {
+                                    let reader = std::io::BufReader::new(file);
+                                    match serde_json::from_reader::<
+                                            _,
+                                            ConfigurableContractArtifact,
+                                        >(reader)
+                                        .map_err(|err| {
+                                            std::io::Error::other(format!(
+                                                "failed deserializing: {:?}",
+                                                err
+                                            ))
+                                        }) {
+                                            Ok(art) => {
+                                                let artifact_name = format!(
+                                                    "{}/{}",
+                                                    contract_name, artifact_filename
+                                                );
+                                                let version = art
+                                                    .metadata
+                                                    .as_ref()
+                                                    .map(|meta| meta.compiler.version.clone())
+                                                    .unwrap_or_default();
+                                                let artifact = ArtifactFile {
+                                                    artifact: art,
+                                                    file: Path::new(&artifact_name).to_path_buf(),
+                                                    version: Version::parse(&version).unwrap(),
+                                                };
+                                                artifacts.insert(artifact_name, artifact);
+                                            }
+                                            Err(err) => return Err(err),
+                                        }
+                                }
+                                Err(err) => return Err(err),
+                            }
+                        }
+                        cache.path = contract_cache.clone();
+                        Ok((artifacts, cache))
                     } else {
                         Err(std::io::Error::new(std::io::ErrorKind::Other, "hashes do not match"))
                     }
                 })
-                .and_then(|_| {
-                    File::open(&artifact_paths.artifact).and_then(|mut file| {
-                        let mut buffer = Vec::new();
-                        file.read_to_end(&mut buffer).map(|_| Some(buffer))
-                    })
-                })
-                .ok()
-                .flatten()
-        } else {
-            None
+                .ok();
+
+            if let Some((artifacts, cache)) = maybe_cached {
+                return CachedContractEntry::Found { cache, artifacts };
+            }
         }
+
+        CachedContractEntry::Missing {
+            cache: ContractCache {
+                path: contract_cache.clone(),
+                input_file: contract_path.as_ref().to_str().expect("must be a path").to_string(),
+                hash: contract_hash.to_string(),
+                artifacts: vec![],
+            },
+        }
+        // if artifact_paths.contract_hash.exists() && artifact_paths.artifact.exists() {
+        //     File::open(&artifact_paths.contract_hash)
+        //         .and_then(|mut file| {
+        //             let mut cached_contract_hash = String::new();
+        //             file.read_to_string(&mut cached_contract_hash).map(|_| cached_contract_hash)
+        //         })
+        //         .and_then(|cached_contract_hash| {
+        //             if cached_contract_hash == contract_hash {
+        //                 Ok(Some(contract_hash))
+        //             } else {
+        //                 Err(std::io::Error::new(std::io::ErrorKind::Other, "hashes do not
+        // match"))             }
+        //         })
+        //         .and_then(|_| {
+        //             File::open(&artifact_paths.artifact).and_then(|mut file| {
+        //                 let mut buffer = Vec::new();
+        //                 file.read_to_end(&mut buffer).map(|_| Some(buffer))
+        //             })
+        //         })
+        //         .ok()
+        //         .flatten()
+        // } else {
+        //     None
+        // }
     }
 
     /// Builds the compiler arguments for the Solidity compiler based on the provided versioned
@@ -529,14 +782,11 @@ impl ZkSolc {
     /// In this example, the `handle_output` function is called with the compiler output, contract
     /// source, and a mutable set for displayed warnings. It processes the output, handles
     /// errors and warnings, and saves the artifacts.
-    pub fn handle_output(
+    pub fn handle_output2(
         output: Vec<u8>,
         source: &str,
         displayed_warnings: &mut HashSet<String>,
-        contract_hash: &str,
-        write_artifacts: Option<ZkSolcArtifactPaths>,
-    ) -> (BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>>, ContractBytecodes)
-    {
+    ) -> BTreeMap<String, ArtifactFile<ConfigurableContractArtifact>> {
         // Deserialize the compiler output into a serde_json::Value object
         let compiler_output: ZkSolcCompilerOutput = match serde_json::from_slice(&output) {
             Ok(output) => output,
@@ -588,9 +838,6 @@ impl ZkSolc {
         }
 
         let mut result = BTreeMap::new();
-        let mut contract_bytecodes = BTreeMap::new();
-
-        // Get the bytecode hashes for each contract in the output
         for key in compiler_output.contracts.keys() {
             if key.contains(source) {
                 let contracts_in_file = compiler_output.contracts.get(key).unwrap();
@@ -606,8 +853,6 @@ impl ZkSolc {
                         contract_name,
                         contract.hash.as_ref().unwrap()
                     );
-                    contract_bytecodes
-                        .insert(contract.hash.clone().unwrap(), contract_name.clone());
 
                     let factory_deps: Vec<String> = contract
                         .factory_dependencies
@@ -659,45 +904,433 @@ impl ZkSolc {
 
                     art.abi = contract.abi.clone();
 
+                    let artifact_key = format!("{}/{}.json", source, contract_name);
                     let artifact = ArtifactFile {
                         artifact: art,
-                        file: format!("{}.sol", contract_name).into(),
+                        file: PathBuf::from(&artifact_key),
                         version: Version::parse(&compiler_output.version).unwrap(),
                     };
-                    result.insert(contract_name.clone(), vec![artifact]);
+                    result.insert(artifact_key, artifact);
                 }
             }
         }
-        if let Some(write_artifacts) = write_artifacts {
-            let output_json: Value = serde_json::from_slice(&output)
-                .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
 
-            // Beautify the output JSON
-            let output_json_pretty = serde_json::to_string_pretty(&output_json)
-                .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
+        result
+    }
 
-            // Create the artifacts file for saving the compiler output
-            let mut artifacts_file = File::create(write_artifacts.artifact)
-                .wrap_err("Could not create artifacts file")
-                .unwrap();
+    /// foo
+    pub fn handle_output(
+        output: Vec<u8>,
+        source: &str,
+        displayed_warnings: &mut HashSet<String>,
+        mut contract_cache: ContractCache,
+        artifact_path: &Path,
+        project_artifacts_path: &PathBuf,
+        project_root_path: &PathBuf,
+        final_artifact_paths: &mut HashSet<PathBuf>,
+    ) -> BTreeMap<String, Vec<ArtifactFile<ConfigurableContractArtifact>>> {
+        // Deserialize the compiler output into a serde_json::Value object
+        let compiler_output: ZkSolcCompilerOutput = match serde_json::from_slice(&output) {
+            Ok(output) => output,
+            Err(_) => {
+                let output_str = String::from_utf8_lossy(&output);
+                let parsed_json: Result<serde_json::Value, _> = serde_json::from_str(&output_str);
 
-            // Write the beautified output JSON to the artifacts file
-            artifacts_file
-                .write_all(output_json_pretty.as_bytes())
-                .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+                match parsed_json {
+                    Ok(json) if json.get("errors").is_some() => {
+                        let errors = json["errors"]
+                            .as_array()
+                            .expect("Expected 'errors' to be an array")
+                            .iter()
+                            .map(|e| {
+                                serde_json::from_value(e.clone()).expect("Error parsing error")
+                            })
+                            .collect::<Vec<CompilerError>>();
+                        // Handle errors in the output
+                        ZkSolc::handle_output_errors(errors);
+                    }
+                    _ => info!("Failed to parse compiler output!"),
+                }
+                exit(1);
+            }
+        };
 
-            // Create the contract_hash file for saving the input contract hash
-            let mut contract_hash_file = File::create(write_artifacts.contract_hash)
-                .wrap_err("Could not create contract_hash file")
-                .unwrap();
+        // Handle warnings in the output
+        ZkSolc::handle_output_warnings(&compiler_output, displayed_warnings);
 
-            // Write the contract's file hash to the contract_hash file
-            contract_hash_file
-                .write_all(contract_hash.as_bytes())
-                .unwrap_or_else(|e| panic!("Could not write contract_hash file: {}", e));
+        // First - let's get all the bytecodes.
+        let mut all_bytecodes: HashMap<String, String> = Default::default();
+        for source_file_results in compiler_output.contracts.values() {
+            for contract_results in source_file_results.values() {
+                if let Some(hash) = &contract_results.hash {
+                    all_bytecodes.insert(
+                        hash.clone(),
+                        contract_results
+                            .evm
+                            .as_ref()
+                            .unwrap()
+                            .bytecode
+                            .as_ref()
+                            .unwrap()
+                            .object
+                            .clone(),
+                    );
+                }
+            }
         }
 
-        (result, contract_bytecodes)
+        println!("---> NEW");
+
+        let mut result = BTreeMap::new();
+
+        // Get the bytecode hashes for each contract in the output
+
+        let mut mapped_contracts = HashMap::new();
+        for key in compiler_output.contracts.keys() {
+            if key.contains(source) {
+                let contracts_in_file = compiler_output.contracts.get(key).unwrap();
+                for (contract_name, contract) in contracts_in_file {
+                    // if contract hash is empty, skip
+                    if contract.hash.is_none() {
+                        trace!("{} -> empty contract.hash", contract_name);
+                        continue
+                    }
+
+                    info!(
+                        "{} -> Bytecode Hash: {} ",
+                        contract_name,
+                        contract.hash.as_ref().unwrap()
+                    );
+
+                    let factory_deps: Vec<String> = contract
+                        .factory_dependencies
+                        .as_ref()
+                        .unwrap()
+                        .keys()
+                        .map(|factory_hash| all_bytecodes.get(factory_hash).unwrap())
+                        .cloned()
+                        .collect();
+
+                    let packed_bytecode = Bytes::from(
+                        PackedEraBytecode::new(
+                            contract.hash.as_ref().unwrap().clone(),
+                            contract
+                                .evm
+                                .as_ref()
+                                .unwrap()
+                                .bytecode
+                                .as_ref()
+                                .unwrap()
+                                .object
+                                .clone(),
+                            factory_deps,
+                        )
+                        .to_vec(),
+                    );
+
+                    let mut art = ConfigurableContractArtifact {
+                        bytecode: Some(CompactBytecode {
+                            object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
+                                packed_bytecode.clone(),
+                            ),
+                            source_map: None,
+                            link_references: Default::default(),
+                        }),
+                        deployed_bytecode: Some(CompactDeployedBytecode {
+                            bytecode: Some(CompactBytecode {
+                                object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
+                                    packed_bytecode,
+                                ),
+                                source_map: None,
+                                link_references: Default::default(),
+                            }),
+                            immutable_references: Default::default(),
+                        }),
+                        // Initialize other fields with their default values if they exist
+                        ..ConfigurableContractArtifact::default()
+                    };
+
+                    art.abi = contract.abi.clone();
+
+                    // let contract_artifact_path = artifact_path.join(format!("{}.json",
+                    // contract_name)); println!("\t{:?} {:?}", contract_name,
+                    // contract_artifact_path); let canonical_artifact_path =
+                    //     artifact_path.join(format!("{}.json", contract_name));
+
+                    // println!("canon: {canonical_artifact_path:?}");
+                    // let artifact = ArtifactFile {
+                    //     artifact: art,
+                    //     file: contract_artifact_path.clone(),
+                    //     version: Version::parse(&compiler_output.version).unwrap(),
+                    // };
+                    // result.insert(
+                    //     contract_artifact_path
+                    //         .to_str()
+                    //         .expect("failed creating canonical artifact_path")
+                    //         .to_string(),
+                    //     vec![artifact],
+                    // );
+                    let contract_path = project_root_path.join(key);
+                    println!(
+                        "+ {:?}",
+                        (format!("{}/{}.json", source, contract_name), &contract_path)
+                    );
+                    // mapped_contracts.push((format!("{}/{}.json", source, contract_name),
+                    // contract_path, art));
+                    let key = format!("{}/{}.json", source, contract_name);
+                    let entry = mapped_contracts.entry(key.clone()).or_insert(vec![]);
+                    println!("ENTRY {} {}", key, entry.len());
+                    entry.push((contract_path, art));
+                }
+            }
+        }
+
+        let mut final_artifact_paths = HashSet::new();
+        for (name, contracts) in mapped_contracts {
+            for (idx, (contract_path, artifact)) in contracts.iter().enumerate() {
+                let mut artifact_path = Path::new(&name).to_path_buf();
+                println!("NAME-LEN {name} {}", contracts.len());
+                if contracts.len() > 1 {
+                    // naming conflict where the `artifact_path` belongs to two conflicting
+                    // contracts need to adjust the paths properly
+
+                    // we keep the top most conflicting file unchanged
+                    let is_top_most = contracts.iter().enumerate().filter(|(i, _)| *i != idx).all(
+                        |(_, (cp, art))| {
+                            let x = Path::new(contract_path).components().count() <
+                                Path::new(cp).components().count();
+                            println!(
+                                "NAME-LEN is_top? {x:?} {:?} {:?} / {:?} {:?}",
+                                contract_path,
+                                Path::new(contract_path).components().count(),
+                                cp,
+                                Path::new(cp).components().count()
+                            );
+                            Path::new(contract_path).components().count() <
+                                Path::new(cp).components().count()
+                        },
+                    );
+                    println!("NAME-LEN is_top_most? {is_top_most:?}");
+                    if !is_top_most {
+                        // we resolve the conflicting by finding a new unique, alternative path
+                        artifact_path = Self::conflict_free_output_file(
+                            &final_artifact_paths,
+                            Path::new(&name).to_path_buf(),
+                            Path::new(&contract_path),
+                            &project_artifacts_path,
+                        );
+                    }
+                }
+                /*
+
+                                checking "/media/nish/storage/work/purestake/projects/aave-governance-v3/zkout/~cache/c47f91016fee4124/output.json"
+                + ("Errors.sol/Errors.json", "/media/nish/storage/work/purestake/projects/aave-governance-v3/src/contracts/foobar/Errors.sol")
+                + ("Errors.sol/ErrorsFoo.json", "/media/nish/storage/work/purestake/projects/aave-governance-v3/src/contracts/foobar/Errors.sol")
+                write?  src="Errors.sol" name="Errors.sol/ErrorsFoo.json" -> path="/media/nish/storage/work/purestake/projects/aave-governance-v3/src/contracts/foobar/Errors.sol" => "Errors.sol/ErrorsFoo.json" ("/media/nish/storage/work/purestake/projects/aave-governance-v3/zkout")
+                write?  src="Errors.sol" name="Errors.sol/Errors.json" -> path="/media/nish/storage/work/purestake/projects/aave-governance-v3/src/contracts/foobar/Errors.sol" => "Errors.sol/Errors.json" ("/media/nish/storage/work/purestake/projects/aave-governance-v3/zkout")
+
+
+                                RESOLVE "Errors.sol/Errors.json" "/media/nish/storage/work/purestake/projects/aave-governance-v3/src/contracts/foobar/Errors.sol" "/media/nish/storage/work/purestake/projects/aave-governance-v3/out" => "foobar/Errors.sol/Errors.json"
+
+                                 */
+
+                println!("write?  src={source:?} name={name:?} -> path={contract_path:?} => {artifact_path:?} ({project_artifacts_path:?})");
+
+                final_artifact_paths.insert(artifact_path.clone());
+                // let artifact_path = Self::conflict_free_output_file(
+                //     &final_artifact_paths,
+                //     path.clone(),
+                //     source,
+                //     &project_artifacts_path,
+                // );
+
+                // println!("----");
+                // println!("{:#?}", final_artifact_paths);
+                // println!("write?  src={source:?} -> path={path:?} key={key:?} =>
+                // {artifact_path:?} ({project_artifacts_path:?})"); println!("===="
+                // ); final_artifact_paths.insert(artifact_path.clone());
+
+                let artifact = ArtifactFile {
+                    artifact: artifact.clone(),
+                    file: artifact_path.clone(),
+                    version: Version::parse(&compiler_output.version).unwrap(),
+                };
+                result.insert(
+                    artifact_path
+                        .to_str()
+                        .expect("failed creating canonical artifact_path")
+                        .to_string(),
+                    vec![artifact],
+                );
+            }
+        }
+
+        // for key in compiler_output.contracts.keys() {
+        //     let filename = Path::new(key).file_name().unwrap();
+        //     let path = project_artifacts_path.join(source);
+        //     let artifact_path = Self::conflict_free_output_file(
+        //         &final_artifact_paths,
+        //         path.clone(),
+        //         key,
+        //         &project_artifacts_path,
+        //     );
+        //     // "Errors.sol/Errors.json"
+        //     // "/media/nish/storage/work/purestake/projects/aave-governance-v3/src/contracts/
+        // foobar/     // Errors.sol" "/media/nish/storage/work/purestake/projects/
+        //     // aave-governance-v3/out"  => "foobar/Errors.sol/Errors.json"
+
+        //     println!("----");
+        //     // println!("{:#?}", final_artifact_paths);
+        //     println!("write?  src={source:?} -> path={path:?} key={key:?} => {artifact_path:?}
+        // ({project_artifacts_path:?})");     println!("====");
+        //     final_artifact_paths.insert(artifact_path.clone());
+
+        //     if key.contains(source) {
+        //         let contracts_in_file = compiler_output.contracts.get(key).unwrap();
+        //         for (contract_name, contract) in contracts_in_file {
+        //             // if contract hash is empty, skip
+        //             if contract.hash.is_none() {
+        //                 trace!("{} -> empty contract.hash", contract_name);
+        //                 continue
+        //             }
+
+        //             info!(
+        //                 "{} -> Bytecode Hash: {} ",
+        //                 contract_name,
+        //                 contract.hash.as_ref().unwrap()
+        //             );
+
+        //             let factory_deps: Vec<String> = contract
+        //                 .factory_dependencies
+        //                 .as_ref()
+        //                 .unwrap()
+        //                 .keys()
+        //                 .map(|factory_hash| all_bytecodes.get(factory_hash).unwrap())
+        //                 .cloned()
+        //                 .collect();
+
+        //             let packed_bytecode = Bytes::from(
+        //                 PackedEraBytecode::new(
+        //                     contract.hash.as_ref().unwrap().clone(),
+        //                     contract
+        //                         .evm
+        //                         .as_ref()
+        //                         .unwrap()
+        //                         .bytecode
+        //                         .as_ref()
+        //                         .unwrap()
+        //                         .object
+        //                         .clone(),
+        //                     factory_deps,
+        //                 )
+        //                 .to_vec(),
+        //             );
+
+        //             let mut art = ConfigurableContractArtifact {
+        //                 bytecode: Some(CompactBytecode {
+        //                     object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
+        //                         packed_bytecode.clone(),
+        //                     ),
+        //                     source_map: None,
+        //                     link_references: Default::default(),
+        //                 }),
+        //                 deployed_bytecode: Some(CompactDeployedBytecode {
+        //                     bytecode: Some(CompactBytecode {
+        //                         object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
+        //                             packed_bytecode,
+        //                         ),
+        //                         source_map: None,
+        //                         link_references: Default::default(),
+        //                     }),
+        //                     immutable_references: Default::default(),
+        //                 }),
+        //                 // Initialize other fields with their default values if they exist
+        //                 ..ConfigurableContractArtifact::default()
+        //             };
+
+        //             art.abi = contract.abi.clone();
+
+        //             // let filename = source.file_name().expect("Failed to get Contract
+        // filename.");             // let path = project_artifacts_path.join(filename);
+
+        //             // let filename = source;
+        //             // let filename = format!("{}/{}.json", source, contract_name);
+        //             // let filename = source.file_name().expect("Failed to get Contract
+        // filename.");             // let path = project_artifacts_path.join(filename);
+        //             // let artifact_path = Self::conflict_free_output_file(
+        //             //     &final_artifact_paths,
+        //             //     path.clone(),
+        //             //     source,
+        //             //     &project_artifacts_path,
+        //             // );
+        //             // println!("----");
+        //             // println!("{:#?}", final_artifact_paths);
+        //             // println!("write?  src={source:?} -> path={path:?} key={key:?} =>
+        //             // {artifact_path:?} ({project_artifacts_path:?})");
+        //             // println!("====");
+        //             // final_artifact_paths.insert(artifact_path.clone());
+
+        //             let contract_artifact_path =
+        //                 artifact_path.join(format!("{}.json", contract_name));
+        //             println!("\t{:?} {:?}", contract_name, contract_artifact_path);
+        //             // let canonical_artifact_path =
+        //             //     artifact_path.join(format!("{}.json", contract_name));
+
+        //             // println!("canon: {canonical_artifact_path:?}");
+        //             let artifact = ArtifactFile {
+        //                 artifact: art,
+        //                 file: contract_artifact_path.clone(),
+        //                 version: Version::parse(&compiler_output.version).unwrap(),
+        //             };
+        //             result.insert(
+        //                 contract_artifact_path
+        //                     .to_str()
+        //                     .expect("failed creating canonical artifact_path")
+        //                     .to_string(),
+        //                 vec![artifact],
+        //             );
+        //         }
+        //     }
+        // }
+        let output_json: Value = serde_json::from_slice(&output)
+            .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
+
+        // Beautify the output JSON
+        let output_json_pretty = serde_json::to_string_pretty(&output_json)
+            .unwrap_or_else(|e| panic!("Could not beautify zksolc compiler output: {}", e));
+
+        // Create the artifacts file for saving the compiler output
+        println!("WRITE --> {:?}", contract_cache.path);
+        // Create the contract_hash file for saving the input contract hash
+        let cached = File::create(&contract_cache.path)
+            .wrap_err("Could not create contract cache file")
+            .unwrap();
+        // Write the contract's file hash to the contract_hash file
+        contract_cache.artifacts = result.clone().into_keys().collect();
+
+        serde_json::to_writer_pretty(BufWriter::new(cached), &contract_cache)
+            .unwrap_or_else(|e| panic!("Could not write contract cache file: {}", e));
+
+        // let mut artifacts_file = File::create(write_artifacts.artifact)
+        //     .wrap_err("Could not create artifacts file")
+        //     .unwrap();
+
+        // // Write the beautified output JSON to the artifacts file
+        // artifacts_file
+        //     .write_all(output_json_pretty.as_bytes())
+        //     .unwrap_or_else(|e| panic!("Could not write artifacts file: {}", e));
+
+        // // Create the contract_hash file for saving the input contract hash
+        // let mut contract_hash_file = File::create(write_artifacts.contract_hash)
+        //     .wrap_err("Could not create contract_hash file")
+        //     .unwrap();
+
+        // // Write the contract's file hash to the contract_hash file
+        // contract_hash_file
+        //     .write_all(contract_hash.as_bytes())
+        //     .unwrap_or_else(|e| panic!("Could not write contract_hash file: {}", e));
+
+        result
     }
 
     /// Handles the errors and warnings present in the output JSON from the compiler.
@@ -835,7 +1468,9 @@ impl ZkSolc {
     /// In this example, the `prepare_compiler_input` function is called with the contract source
     /// path. It generates the JSON input for the contract, configures the Solidity compiler,
     /// and saves the input to the artifacts directory.
-    fn prepare_compiler_input(&mut self, contract_path: &PathBuf) -> Result<()> {
+    fn prepare_compiler_input(&mut self, contract_path: &PathBuf, cache_path: &Path) -> Result<()> {
+        let artifact_path = cache_path.parent().unwrap().to_path_buf();
+
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
         file_output_selection
@@ -879,7 +1514,7 @@ impl ZkSolc {
         self.standard_json = Some(std_zk_json.to_owned());
 
         // Step 5: Build Artifacts Path
-        let artifact_path = &self.build_artifacts_path(contract_path)?;
+        // let artifact_path = &self.build_artifacts_path(contract_path, final_artifact_paths)?;
 
         // Step 6: Save JSON Input
         let json_input_path = artifact_path.join("json_input.json");
@@ -1040,11 +1675,110 @@ impl ZkSolc {
     /// This function can return an error if any of the following occurs:
     /// - The extraction of the filename from the contract source path fails.
     /// - The creation of the artifacts directory fails.
-    fn build_artifacts_path(&self, source: &Path) -> Result<PathBuf> {
+    fn build_artifacts_path(
+        &self,
+        source: &Path,
+        final_artifact_paths: &mut HashSet<PathBuf>,
+    ) -> Result<PathBuf> {
+        println!("BUILD PATH {source:?}");
+        // println!("PATHS {:#?}", self.project.paths);
+        let mut source_path = source
+            .strip_prefix(&self.project.paths.root)
+            .expect("cannot strip root path prefix")
+            .components();
+        source_path.next(); // strip top-most directory (src, lib, scripts, etc.)
+        let source_path = source_path.as_path();
+
+        let path = self.project.paths.artifacts.join(source_path);
+        println!("\tbuild1 --> {path:?}");
+
         let filename = source.file_name().expect("Failed to get Contract filename.");
         let path = self.project.paths.artifacts.join(filename);
+
+        let artifact_path = Self::conflict_free_output_file(
+            &final_artifact_paths,
+            path.clone(),
+            source,
+            &self.project.paths.artifacts,
+        );
+
+        println!("\tbuild2 --> {artifact_path:?}");
+        let path = artifact_path;
+
         fs::create_dir_all(&path).wrap_err("Could not create artifacts directory")?;
         Ok(path)
+    }
+
+    /// Returns the appropriate file name for the conflicting file.
+    ///
+    /// This should ensure that the resulting `PathBuf` is conflict free, which could be possible if
+    /// there are two separate contract files (in different folders) that contain the same contract:
+    ///
+    /// `src/A.sol::A`
+    /// `src/nested/A.sol::A`
+    ///
+    /// Which would result in the same `PathBuf` if only the file and contract name is taken into
+    /// account, [`Self::output_file`].
+    ///
+    /// This return a unique output file
+    fn conflict_free_output_file(
+        already_taken: &HashSet<PathBuf>,
+        conflict: PathBuf,
+        contract_file: impl AsRef<Path>,
+        artifacts_folder: impl AsRef<Path>,
+    ) -> PathBuf {
+        println!("CFO-IN {conflict:?}");
+        let artifacts_folder = artifacts_folder.as_ref();
+        let mut rel_candidate = conflict;
+        if let Ok(stripped) = rel_candidate.strip_prefix(artifacts_folder) {
+            rel_candidate = stripped.to_path_buf();
+        }
+        #[allow(clippy::redundant_clone)] // false positive
+        let mut candidate = rel_candidate.clone();
+        let contract_file = contract_file.as_ref();
+        let mut current_parent = contract_file.parent();
+
+        while let Some(parent_name) = current_parent.and_then(|f| f.file_name()) {
+            // this is problematic if both files are absolute
+            candidate = Path::new(parent_name).join(&candidate);
+            let out_path = artifacts_folder.join(&candidate);
+            if !already_taken.contains(&out_path) {
+                trace!("found alternative output file={:?} for {:?}", out_path, contract_file);
+                return out_path;
+            }
+            current_parent = current_parent.and_then(|f| f.parent());
+        }
+
+        // this means we haven't found an alternative yet, which shouldn't actually happen since
+        // `contract_file` are unique, but just to be safe, handle this case in which case
+        // we simply numerate the parent folder
+
+        trace!("no conflict free output file found after traversing the file");
+
+        let mut num = 1;
+
+        loop {
+            // this will attempt to find an alternate path by numerating the first component in the
+            // path: `<root>+_<num>/....sol`
+            let mut components = rel_candidate.components();
+            let first = components.next().expect("path not empty");
+            let name = first.as_os_str();
+            let mut numerated = std::ffi::OsString::with_capacity(name.len() + 2);
+            numerated.push(name);
+            numerated.push("_");
+            numerated.push(num.to_string());
+
+            let candidate: PathBuf = Some(numerated.as_os_str())
+                .into_iter()
+                .chain(components.map(|c| c.as_os_str()))
+                .collect();
+            if !already_taken.contains(&candidate) {
+                trace!("found alternative output file={:?} for {:?}", candidate, contract_file);
+                return candidate;
+            }
+
+            num += 1;
+        }
     }
 
     /// Checks if the contract has been ignored by the user in the configuration file.
@@ -1078,19 +1812,27 @@ impl ZkSolc {
     /// Checks if the contract has already been compiled for the given contract path.
     fn check_contract_is_cached(
         &self,
+        cache_path: &PathBuf,
         contract_path: impl AsRef<Path>,
-    ) -> Result<(Option<Vec<u8>>, String)> {
-        let contract_path = contract_path.as_ref();
-        let contract_hash =
-            Self::hash_contract(contract_path).wrap_err("Trying to hash contract contents")?;
-        let artifact_paths = ZkSolcArtifactPaths::new(
-            self.project.paths.artifacts.join(
-                contract_path
-                    .file_name()
-                    .wrap_err(format!("Could not get filename from {:?}", contract_path))?,
-            ),
+    ) -> Result<CachedContractEntry> {
+        let contract_hash = Self::hash_contract(contract_path.as_ref())
+            .wrap_err("Trying to hash contract contents")?;
+        let contract_path_hash = hex::encode(
+            xxhash_rust::const_xxh3::xxh3_64(
+                contract_path.as_ref().to_str().expect("failed creating contract_path").as_bytes(),
+            )
+            .to_be_bytes(),
         );
-        Ok((self.check_cache(&artifact_paths, &contract_hash), contract_hash))
+
+        let contract_cache_path = cache_path.join(contract_path_hash);
+        if !contract_cache_path.exists() {
+            fs::create_dir_all(&contract_cache_path).wrap_err(format!(
+                "Could not create contract cache path: {:?}",
+                contract_cache_path
+            ))?;
+        }
+
+        Ok(self.check_cache(&contract_path, &contract_cache_path, &contract_hash))
     }
 
     /// Returns the hash of the contract at the given path.

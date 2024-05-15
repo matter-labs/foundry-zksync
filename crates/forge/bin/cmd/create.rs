@@ -34,7 +34,8 @@ use foundry_compilers::{
 use foundry_config::Chain;
 use foundry_wallets::WalletSigner;
 use foundry_zksync_compiler::{
-    libraries as zklibs, DualCompiledContract, DualCompiledContracts, ZkSolc,
+    libraries as zklibs, DualCompiledArtifactPaths, DualCompiledContract, DualCompiledContracts,
+    ZkSolc,
 };
 
 use serde_json::json;
@@ -175,6 +176,8 @@ impl CreateArgs {
                 )
             };
 
+            let zk_project = config.zk_project()?;
+            let zk_artifacts = zk_project.paths.artifacts.clone();
             let mut zksolc = ZkSolc::new(
                 config
                     .new_zksolc_config_builder()
@@ -185,13 +188,20 @@ impl CreateArgs {
                             .build()
                     })
                     .map_err(|e| eyre::eyre!(e))?,
-                config.zk_project()?,
+                zk_project,
             );
-            let (zk_output, _contract_bytecodes) = match zksolc.compile() {
+            let zk_output = match zksolc.compile() {
                 Ok(compiled) => compiled,
                 Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
             };
-            let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
+            let dual_compiled_contracts = DualCompiledContracts::new(
+                &output,
+                &zk_output,
+                DualCompiledArtifactPaths {
+                    evm: project.paths.artifacts.clone(),
+                    zk: zk_artifacts,
+                },
+            );
 
             for mut contract in contracts_batch {
                 if let Some(ref mut path) = contract.path {

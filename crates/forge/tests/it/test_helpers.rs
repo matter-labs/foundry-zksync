@@ -90,7 +90,7 @@ fn zk_compile(project: Project) -> ProjectCompileOutput {
     // ]);
 
     // let mut zksolc = ZkSolc::new(zksolc_config, project);
-    // let (zk_out, _) = zksolc.compile().unwrap();
+    // let zk_out = zksolc.compile().unwrap();
     // zk_out
 
     let config = ZkSolcConfigBuilder::new()
@@ -112,7 +112,7 @@ fn zk_compile(project: Project) -> ProjectCompileOutput {
         .build()
         .expect("failed building zksolc config");
     let mut zksolc = ZkSolc::new(config, project);
-    let (zk_output, _) = zksolc.compile().expect("failed compiling with zksolc");
+    let zk_output = zksolc.compile().expect("failed compiling with zksolc");
     zk_output
 }
 

@@ -11,7 +11,7 @@ use foundry_compilers::{
     info::ContractInfo,
     ArtifactId, Project, ProjectCompileOutput,
 };
-use foundry_zksync_compiler::{DualCompiledContracts, ZkSolc};
+use foundry_zksync_compiler::{DualCompiledArtifactPaths, DualCompiledContracts, ZkSolc};
 use std::str::FromStr;
 
 impl ScriptArgs {
@@ -30,6 +30,8 @@ impl ScriptArgs {
 
         // ZK
         let config = &script_config.config;
+        let zk_project = config.zk_project()?;
+        let zk_artifacts = zk_project.paths.artifacts.clone();
         let mut zksolc = ZkSolc::new(
             config
                 .new_zksolc_config_builder()
@@ -40,13 +42,16 @@ impl ScriptArgs {
                         .build()
                 })
                 .map_err(|e| eyre::eyre!(e))?,
-            config.zk_project()?,
+                zk_project,
         );
-        let (zk_output, _contract_bytecodes) = match zksolc.compile() {
+        let zk_output = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
-        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
+        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output, DualCompiledArtifactPaths {
+            evm: project.paths.artifacts.clone(),
+            zk: zk_artifacts,
+        });
 
         let sources = ContractSources::from_project_output(&output, root)?;
         let contracts = output.into_artifacts().collect();

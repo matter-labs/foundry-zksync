@@ -5,12 +5,15 @@ mod config;
 mod factory_deps;
 mod manager;
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    path::PathBuf,
+};
 
 pub use compile::*;
 pub use config::*;
 pub use factory_deps::*;
-use foundry_compilers::{Artifact, ProjectCompileOutput};
+use foundry_compilers::{Artifact, ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput};
 pub use manager::*;
 
 use alloy_primitives::{keccak256, B256};
@@ -36,6 +39,15 @@ pub struct DualCompiledContract {
     pub evm_bytecode: Vec<u8>,
 }
 
+/// Artifact paths for `[DualCompiledContract]`s
+#[derive(Debug, Default, Clone)]
+pub struct DualCompiledArtifactPaths {
+    /// The artifact path for solc output
+    pub evm: PathBuf,
+    /// The artifact path for zksolc output
+    pub zk: PathBuf,
+}
+
 /// A collection of `[DualCompiledContract]`s
 #[derive(Debug, Default, Clone)]
 pub struct DualCompiledContracts {
@@ -44,10 +56,37 @@ pub struct DualCompiledContracts {
 
 impl DualCompiledContracts {
     /// Creates a collection of `[DualCompiledContract]`s from the provided solc and zksolc output.
-    pub fn new(output: &ProjectCompileOutput, zk_output: &ProjectCompileOutput) -> Self {
+    pub fn new(
+        output: &ProjectCompileOutput,
+        zk_output: &ProjectCompileOutput,
+        artifact_paths: DualCompiledArtifactPaths,
+    ) -> Self {
         let mut dual_compiled_contracts = vec![];
         let mut solc_bytecodes = HashMap::new();
-        for (contract_name, artifact) in output.artifacts() {
+
+        let output_artifacts = output
+            .cached_artifacts()
+            .artifact_files()
+            .chain(output.compiled_artifacts().artifact_files())
+            .filter_map(|artifact| {
+                ConfigurableArtifacts::contract_name(&artifact.file)
+                    .map(|name| (name, (&artifact.file, &artifact.artifact)))
+            });
+        let zk_output_artifacts = zk_output
+            .cached_artifacts()
+            .artifact_files()
+            .chain(zk_output.compiled_artifacts().artifact_files())
+            .filter_map(|artifact| {
+                ConfigurableArtifacts::contract_name(&artifact.file)
+                    .map(|name| (name, (&artifact.file, &artifact.artifact)))
+            });
+
+        // for (contract_name, artifact) in output.artifacts() {
+        for (contract_name, (contract_file, artifact)) in output_artifacts {
+            let contract_file = contract_file
+                .strip_prefix(&artifact_paths.evm)
+                .expect("failed stripping artifact path")
+                .to_path_buf();
             let contract_name =
                 contract_name.split('.').next().expect("name cannot be empty").to_string();
             let deployed_bytecode = artifact.get_deployed_bytecode();
@@ -57,12 +96,17 @@ impl DualCompiledContracts {
             let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
             if let Some(bytecode) = bytecode {
                 if let Some(deployed_bytecode) = deployed_bytecode {
-                    solc_bytecodes
-                        .insert(contract_name.clone(), (bytecode, deployed_bytecode.clone()));
+                    solc_bytecodes.insert(contract_file, (bytecode, deployed_bytecode.clone()));
                 }
             }
         }
-        for (contract_name, artifact) in zk_output.artifacts() {
+        // for (contract_name, artifact) in zk_output.artifacts() {
+        for (contract_name, (contract_file, artifact)) in zk_output_artifacts {
+            let contract_file = contract_file
+                .strip_prefix(&artifact_paths.zk)
+                .expect("failed stripping artifact path")
+                .to_path_buf();
+
             let deployed_bytecode = artifact.get_deployed_bytecode();
             let deployed_bytecode = deployed_bytecode
                 .as_ref()
@@ -70,7 +114,7 @@ impl DualCompiledContracts {
             if let Some(deployed_bytecode) = deployed_bytecode {
                 let packed_bytecode = PackedEraBytecode::from_vec(deployed_bytecode);
                 if let Some((solc_bytecode, solc_deployed_bytecode)) =
-                    solc_bytecodes.get(&contract_name)
+                    solc_bytecodes.get(&contract_file)
                 {
                     dual_compiled_contracts.push(DualCompiledContract {
                         name: contract_name,
@@ -81,6 +125,8 @@ impl DualCompiledContracts {
                         evm_bytecode: solc_bytecode.to_vec(),
                         evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
                     });
+                } else {
+                    tracing::warn!("matching solc artifact not found for {contract_file:?}");
                 }
             }
         }
@@ -95,7 +141,14 @@ impl DualCompiledContracts {
 
     /// Finds a contract matching the EVM bytecode
     pub fn find_by_evm_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
-        self.contracts.iter().find(|contract| bytecode.starts_with(&contract.evm_bytecode))
+        self.contracts.iter().find(|contract| {
+            let x = bytecode.starts_with(&contract.evm_bytecode);
+            println!(
+                "{} {:?} {:?} = {x}",
+                contract.name, contract.zk_bytecode_hash, contract.evm_bytecode_hash
+            );
+            x
+        })
     }
 
     /// Finds a contract matching the ZK bytecode hash
