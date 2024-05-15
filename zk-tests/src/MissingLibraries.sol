@@ -10,3 +10,10 @@ contract Mathematician {
         return Maths.square(number);
     }
 }
+
+contract MathematicianTest is Test {
+    function testLibraries() external {
+        Mathematician maths = new Mathematician();
+        assertEq(maths.square(2), 4);
+    }
+}
