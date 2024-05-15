@@ -162,13 +162,6 @@ impl CreateArgs {
                     contracts_batch
                         .iter()
                         .map(|lib| lib.path.clone().expect("libraries must specify path"))
-                        .map(|path| {
-                            PathBuf::from(path)
-                                .file_name()
-                                .expect("contract path to have filename")
-                                .to_string_lossy()
-                                .to_string()
-                        })
                         // respect passed in --contracts-to-compile but don't deploy them
                         .chain(input_contracts_to_compile.take().into_iter().flatten())
                         .collect(),
