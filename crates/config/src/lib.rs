@@ -435,6 +435,8 @@ pub struct Config {
     pub force_evmla: bool,
     /// Path to cache missing library dependencies, used for compiling and deploying libraries.
     pub detect_missing_libraries: bool,
+    /// Source files to avoid compiling on zksolc
+    pub avoid_contracts: Option<Vec<String>>,
 }
 
 /// Mapping of fallback standalone sections. See [`FallbackProfileProvider`]
@@ -724,6 +726,12 @@ impl Config {
         // when setting up the builder for the sake of consistency (requires dedicated
         // builder methods)
         project.zksync_zksolc_config = ZkSolcConfig { settings: self.zksync_zksolc_settings()? };
+        project.zksync_avoid_contracts = self.avoid_contracts.clone().map(|patterns| {
+            patterns
+                .into_iter()
+                .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
+                .collect::<Vec<_>>()
+        });
 
         if let Some(zksolc) = self.zksync_ensure_zksolc()? {
             project.zksync_zksolc = zksolc;
@@ -2056,6 +2064,7 @@ impl Default for Config {
             force_evmla: false,
             is_system: false,
             detect_missing_libraries: false,
+            avoid_contracts: None,
         }
     }
 }

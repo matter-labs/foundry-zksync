@@ -4543,7 +4543,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.3.9"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#02712ec0ec2c5cc464a19d74c50ef349a3c8a191"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#268b9e3d3e750eb2eeec20c20eee6dfa446d3417"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -4552,6 +4552,7 @@ dependencies = [
  "dunce",
  "fs_extra",
  "futures-util",
+ "globset",
  "home",
  "itertools 0.12.1",
  "md-5 0.10.6",
@@ -4590,7 +4591,6 @@ dependencies = [
  "figment",
  "foundry-block-explorers",
  "foundry-compilers",
- "foundry-zksync-compiler",
  "globset",
  "number_prefix",
  "once_cell",
