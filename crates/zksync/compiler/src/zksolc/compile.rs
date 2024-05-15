@@ -41,7 +41,7 @@ use eyre::{Context, ContextCompat, Result};
 use foundry_compilers::{
     artifacts::{
         output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode, Source,
-        Sources, StandardJsonCompilerInput,
+        Sources,
     },
     ArtifactFile, Artifacts, CompilerInput, ConfigurableContractArtifact, Graph, Project,
     ProjectCompileOutput, Solc,
@@ -228,7 +228,6 @@ type SolidityVersionSources = (Version, BTreeMap<PathBuf, Source>);
 pub struct ZkSolc {
     config: ZkSolcConfig,
     project: Project,
-    standard_json: Option<ZkStandardJsonCompilerInput>,
 }
 
 impl fmt::Display for ZkSolc {
@@ -273,7 +272,7 @@ pub fn compile_smart_contracts(
 
 impl ZkSolc {
     pub fn new(config: ZkSolcConfig, project: Project) -> Self {
-        Self { config, project, standard_json: None }
+        Self { config, project }
     }
 
     fn _compile(
@@ -298,21 +297,33 @@ impl ZkSolc {
                 sp.stop_with_message("Spinner hidden in CI");
             }
 
-            let input = self
+            let inputs = self
                 .prepare_compiler_input(sources)
                 .wrap_err("Failed to prepare compiler inputs")?;
 
-            // TODO: split compilation between is-system and non-system
-            let Some(output) = self.run_compiler(&input, &solc)? else { continue };
+            for input in inputs {
+                let json = serde_json::to_string(&input)
+                    .wrap_err("unable to serialize standard json input")?;
 
-            let output = Self::parse_compiler_output(output.stdout);
+                let Some(output) = self.run_compiler(
+                    &json,
+                    &solc,
+                    input.settings.is_system,
+                    input.settings.force_evmla,
+                )?
+                else {
+                    continue
+                };
 
-            let (has_missing_libs, _, libs) = Self::missing_libraries_iter(&output);
-            result.process_missing_libraries(libs);
+                let output = Self::parse_compiler_output(output.stdout);
 
-            // Step 6: Handle Output (Errors and Warnings)
-            if !has_missing_libs {
-                result.handle_output(output, Some(&input));
+                let (has_missing_libs, _, libs) = Self::missing_libraries_iter(&output);
+                result.process_missing_libraries(libs);
+
+                // Step 6: Handle Output (Errors and Warnings)
+                if !has_missing_libs {
+                    result.handle_output(output, Some(&json));
+                }
             }
 
             if !ci {
@@ -472,29 +483,25 @@ impl ZkSolc {
     /// # Returns
     ///
     /// A vector of strings representing the compiler arguments.
-    fn build_compiler_args<'s>(
-        &'s self,
-        solc: &'s Solc,
+    fn build_compiler_args(
+        solc: &Solc,
         detect_missing_libraries: bool,
-    ) -> Vec<&'s str> {
+        is_system: bool,
+        force_evmla: bool,
+    ) -> Vec<&str> {
         // Get the solc compiler path as a string
         let solc_path = solc.solc.to_str().expect("Given solc compiler path wasn't valid.");
 
         // Build compiler arguments
         let mut comp_args = vec!["--standard-json", "--solc", solc_path];
 
-        // // Check if system mode is enabled or if the source path contains "is-system"
-        // if self.config.settings.is_system ||
-        //     contract_path
-        //         .to_str()
-        //         .expect("Given contract path wasn't valid.")
-        //         .contains("is-system")
-        // {
-        //     comp_args.push("--system-mode");
-        // }
+        // Check if system mode
+        if is_system {
+            comp_args.push("--system-mode");
+        }
 
         // Check if force-evmla is enabled
-        if self.config.settings.force_evmla {
+        if force_evmla {
             comp_args.push("--force-evmla");
         }
 
@@ -875,7 +882,10 @@ impl ZkSolc {
     /// In this example, the `prepare_compiler_input` function is called with the contract source
     /// path. It generates the JSON input for the contract, configures the Solidity compiler,
     /// and returns the input to pass to the compiler.
-    fn prepare_compiler_input(&mut self, sources: Sources) -> Result<String> {
+    fn prepare_compiler_input(
+        &mut self,
+        sources: Sources,
+    ) -> Result<Vec<ZkStandardJsonCompilerInput>> {
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
         file_output_selection
@@ -930,72 +940,84 @@ impl ZkSolc {
             .map(|(path, source)| (rebase_path(root, path), source.clone()))
             .collect();
 
-        let mut compiler_input = CompilerInput::with_sources(sources);
-        //FIXME: keep and process Yul sources?
-        compiler_input.retain(|i| i.language == "Solidity");
-        let mut compiler_input = compiler_input.pop().expect("No solidity compiler input");
+        let compiler_input = CompilerInput::with_sources(sources);
 
-        compiler_input.settings = self.project.solc_config.settings.clone();
-        compiler_input.settings.remappings = self
-            .project
-            .paths
-            .remappings
-            .clone()
+        compiler_input
             .into_iter()
-            .map(|r| r.into_relative(self.project.root()).to_relative_remapping())
-            .collect::<Vec<_>>();
+            .flat_map(|input| {
+                // zksolc only supports 1 input file in yul-mode
+                if input.language == "Yul" {
+                    let mut yuls = vec![];
+                    for source in input.sources {
+                        yuls.push(CompilerInput {
+                            language: input.language.clone(),
+                            sources: [source].into_iter().collect(),
+                            settings: input.settings.clone(),
+                        })
+                    }
+                    yuls
+                } else {
+                    vec![input]
+                }
+            })
+            .map(|mut compiler_input| {
+                compiler_input.settings = self.project.solc_config.settings.clone();
+                compiler_input.settings.remappings = self
+                    .project
+                    .paths
+                    .remappings
+                    .clone()
+                    .into_iter()
+                    .map(|r| r.into_relative(self.project.root()).to_relative_remapping())
+                    .collect::<Vec<_>>();
 
-        // Step 4: Generate Standard JSON Input
-        let standard_json = {
-            let CompilerInput { language, sources, settings } = compiler_input;
-            StandardJsonCompilerInput { language, sources: sources.into_iter().collect(), settings }
-        };
+                let mut settings = self.config.settings.clone();
+                settings.is_system = settings.is_system ||
+                    compiler_input
+                        .sources
+                        .keys()
+                        .any(|path| path.to_string_lossy().contains("is-system"));
 
-        // Convert the standard JSON input to the zk-specific standard JSON format for further
-        // processing
-        let mut std_zk_json = self.convert_to_zk_standard_json(standard_json);
+                // Step 4: Generate Standard JSON Input
+                let mut std_zk_json = {
+                    let CompilerInput { language, sources, settings } = compiler_input;
+                    ZkStandardJsonCompilerInput {
+                        language,
+                        sources: sources.into_iter().collect(),
+                        settings: Settings {
+                            remappings: settings.remappings,
+                            metadata: settings.metadata,
+                            libraries: settings.libraries,
+                            output_selection: settings.output_selection,
+                            optimizer: self.config.settings.optimizer.clone(),
+                            is_system: self.config.settings.is_system,
+                            force_evmla: self.config.settings.force_evmla,
+                            missing_libraries_path: self
+                                .config
+                                .settings
+                                .missing_libraries_path
+                                .clone(),
+                            are_libraries_missing: self.config.settings.are_libraries_missing,
+                            contracts_to_compile: self.config.settings.contracts_to_compile.clone(),
+                        },
+                    }
+                };
 
-        // Patch the libraries to be relative to the project root
-        // NOTE: This is a temporary fix until zksolc supports relative paths
-        for (mut path, details) in
-            std::mem::take(&mut std_zk_json.settings.libraries.libs).into_iter()
-        {
-            if let Ok(patched) = path.strip_prefix(&self.project.paths.root) {
-                path = patched.to_owned();
-            }
+                // Patch the libraries to be relative to the project root
+                // NOTE: This is a temporary fix until zksolc supports relative paths
+                for (mut path, details) in
+                    std::mem::take(&mut std_zk_json.settings.libraries.libs).into_iter()
+                {
+                    if let Ok(patched) = path.strip_prefix(&self.project.paths.root) {
+                        path = patched.to_owned();
+                    }
 
-            std_zk_json.settings.libraries.libs.insert(path, details);
-        }
+                    std_zk_json.settings.libraries.libs.insert(path, details);
+                }
 
-        let serialized_input =
-            serde_json::to_string(&std_zk_json).wrap_err("Could not serialize JSON input")?;
-
-        // Store the generated standard JSON input in the ZkSolc instance
-        self.standard_json = Some(std_zk_json);
-
-        Ok(serialized_input)
-    }
-
-    fn convert_to_zk_standard_json(
-        &self,
-        input: StandardJsonCompilerInput,
-    ) -> ZkStandardJsonCompilerInput {
-        ZkStandardJsonCompilerInput {
-            language: input.language,
-            sources: input.sources,
-            settings: Settings {
-                remappings: input.settings.remappings,
-                optimizer: self.config.settings.optimizer.clone(),
-                metadata: input.settings.metadata,
-                output_selection: input.settings.output_selection,
-                libraries: input.settings.libraries,
-                is_system: self.config.settings.is_system,
-                force_evmla: self.config.settings.force_evmla,
-                missing_libraries_path: self.config.settings.missing_libraries_path.clone(),
-                are_libraries_missing: self.config.settings.are_libraries_missing,
-                contracts_to_compile: self.config.settings.contracts_to_compile.clone(),
-            },
-        }
+                Ok(std_zk_json)
+            })
+            .collect()
     }
 
     /// Retrieves the versioned sources for the Solidity contracts in the project and cached
@@ -1234,14 +1256,21 @@ output
         (has_missing_libs, contracts_with_libs, libs)
     }
 
-    fn run_compiler(&self, json_input: &str, solc: &Solc) -> Result<Option<std::process::Output>> {
+    fn run_compiler(
+        &self,
+        json_input: &str,
+        solc: &Solc,
+        is_system: bool,
+        force_evmla: bool,
+    ) -> Result<Option<std::process::Output>> {
         let get_compiler = |args| {
             let mut command = Command::new(&self.config.compiler_path);
             command.args(&args).stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
             command
         };
 
-        let mut command = get_compiler(self.build_compiler_args(solc, false));
+        let mut command =
+            get_compiler(ZkSolc::build_compiler_args(solc, false, is_system, force_evmla));
         trace!(compiler_path = ?command.get_program(), args = ?command.get_args(), "Running compiler");
 
         let exec_compiler = |command: &mut Command| -> Result<std::process::Output> {
@@ -1258,7 +1287,7 @@ output
 
         // retry but detect missing libraries this time
         if !output.status.success() && Self::maybe_missing_libraries(&output.stderr) {
-            command = get_compiler(self.build_compiler_args(solc, true));
+            command = get_compiler(ZkSolc::build_compiler_args(solc, true, is_system, force_evmla));
             trace!("Running compiler with missing libraries detection");
             output = exec_compiler(&mut command)?;
         }
