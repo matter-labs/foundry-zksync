@@ -1124,7 +1124,7 @@ impl ZkSolc {
             let cached =
                 Self::check_contract_is_cached(artifacts_paths, path).ok().and_then(|r| r.0);
 
-            // prune ignored or cached contractacs
+            // prune ignored or cached contracts
             match (is_ignored, cached) {
                 (false, None) => true,
                 (true, _) => false,
