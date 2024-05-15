@@ -197,12 +197,9 @@ contract ZkContractsTest is Test {
 
         // ConstantNumber zksolc hash obtained from zkout/ConstantNumber.sol/artifacts.json
         string memory artifact = vm.readFile(
-            "zkout/ConstantNumber.sol/artifacts.json"
+            "zkout/ConstantNumber.sol/ConstantNumber.json"
         );
-        bytes32 bytecodeHash = vm.parseJsonBytes32(
-            artifact,
-            '.contracts.["src/ConstantNumber.sol"].ConstantNumber.hash'
-        );
+        bytes32 bytecodeHash = vm.parseJsonBytes32(artifact, ".hash");
         address sender = address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496);
         bytes32 salt = "12345";
         bytes32 constructorInputHash = keccak256(abi.encode());
