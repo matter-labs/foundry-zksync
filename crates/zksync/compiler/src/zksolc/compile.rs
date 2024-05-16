@@ -439,7 +439,7 @@ impl ZkSolc {
 
                 let artifacts = match self.check_cache(&project_cache_path, &contract_path)? {
                     CachedContractEntry::Found { output, .. } => {
-                        println!("Using hashed artifact for {:?}", filename);
+                        info!("Using hashed artifact for {:?}", filename);
                         ZkSolc::handle_output2(&output, filename, &mut displayed_warnings)
                     }
                     CachedContractEntry::Missing { cache } => {
@@ -508,26 +508,11 @@ impl ZkSolc {
                                     exit(1);
                                 }
                             };
-
-                        // caching for intermittent compilation
-                        // let file = File::create(&cache.output_path).unwrap();
-                        // let writer = std::io::BufWriter::new(file);
-                        // let output_json: Value = serde_json::from_slice(&output.stdout)
-                        //     .unwrap_or_else(|e| {
-                        //         panic!("Could not parse zksolc compiler output: {}", e)
-                        //     });
-                        // let output_json_pretty = serde_json::to_string_pretty(&output_json)
-                        //     .unwrap_or_else(|e| {
-                        //         panic!("Could not beautify zksolc compiler output: {}", e)
-                        //     });
-                        // serde_json::to_writer(writer, &output_json_pretty).unwrap();
-
                         let artifacts = ZkSolc::handle_output2(
                             &compiler_output,
                             filename,
                             &mut displayed_warnings,
                         );
-
                         cache.write(&compiler_output);
 
                         artifacts
@@ -557,7 +542,6 @@ impl ZkSolc {
             for (idx, (contract_path, _)) in contracts.iter().enumerate() {
                 let mut artifact_path =
                     self.project.paths.artifacts.join(PathBuf::from(&artifact_key));
-                println!("NAME-LEN {artifact_key} {} {artifact_path:?}", contracts.len());
                 if contracts.len() > 1 {
                     // naming conflict where the `artifact_path` belongs to two conflicting
                     // contracts need to adjust the paths properly
@@ -565,20 +549,10 @@ impl ZkSolc {
                     // we keep the top most conflicting file unchanged
                     let is_top_most = contracts.iter().enumerate().filter(|(i, _)| *i != idx).all(
                         |(_, (cp, _))| {
-                            let x = Path::new(contract_path).components().count() <
-                                Path::new(cp).components().count();
-                            println!(
-                                "NAME-LEN is_top? {x:?} {:?} {:?} / {:?} {:?}",
-                                contract_path,
-                                Path::new(contract_path).components().count(),
-                                cp,
-                                Path::new(cp).components().count()
-                            );
                             Path::new(contract_path).components().count() <
                                 Path::new(cp).components().count()
                         },
                     );
-                    println!("NAME-LEN is_top_most? {is_top_most:?}");
                     if !is_top_most {
                         // we resolve the conflicting by finding a new unique, alternative path
                         artifact_path = Self::conflict_free_output_file(
@@ -587,7 +561,6 @@ impl ZkSolc {
                             Path::new(&contract_path),
                             &self.project.paths.artifacts,
                         );
-                        println!("\t new-> {artifact_path:?}");
                     }
                 }
                 final_artifact_paths.insert(artifact_path.clone());
@@ -652,7 +625,7 @@ impl ZkSolc {
         match cache.read_cached_output() {
             Ok(output) => Ok(CachedContractEntry::Found { cache, output }),
             Err(err) => {
-                println!("missed cache for {contract_path:?}: {err:?}");
+                tracing::trace!("missed cache for {contract_path:?}: {err:?}");
                 Ok(CachedContractEntry::Missing { cache })
             }
         }
@@ -1253,7 +1226,6 @@ impl ZkSolc {
         contract_file: impl AsRef<Path>,
         artifacts_folder: impl AsRef<Path>,
     ) -> PathBuf {
-        println!("CFO-IN {conflict:?}");
         let artifacts_folder = artifacts_folder.as_ref();
         let mut rel_candidate = conflict;
         if let Ok(stripped) = rel_candidate.strip_prefix(artifacts_folder) {
