@@ -37,7 +37,7 @@ use crate::{
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::Bytes;
 use ansi_term::Colour::{Red, Yellow};
-use eyre::{Context, ContextCompat, Result};
+use eyre::{Context, Result};
 use foundry_compilers::{
     artifacts::{
         output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
@@ -422,18 +422,19 @@ impl ZkSolc {
             info!(solc = ?solc.solc, "\nCompiling {} files...", version.1.len());
             // Configure project solc for each solc version
             for (contract_path, _) in version.1 {
-                let filename = contract_path
-                    .file_name()
-                    .wrap_err(format!("Could not get filename from {:?}", contract_path))?
-                    .to_str()
-                    .expect("Invalid Contract filename");
-
+                let relative_contract_path = contract_path
+                    .strip_prefix(&self.project.paths.root)
+                    .expect("file must belong to root path");
                 let artifacts = match self
                     .check_cache(&self.project.paths.artifacts, &contract_path)?
                 {
                     CachedContractEntry::Found { output, .. } => {
-                        info!("Using hashed artifact for {:?}", filename);
-                        ZkSolc::handle_output(&output, filename, &mut displayed_warnings)
+                        info!("Using hashed artifact for {:?}", relative_contract_path);
+                        ZkSolc::handle_output(
+                            &output,
+                            relative_contract_path,
+                            &mut displayed_warnings,
+                        )
                     }
                     CachedContractEntry::Missing { cache } => {
                         self.prepare_compiler_input(&contract_path, &cache.base_path).wrap_err(
@@ -501,7 +502,7 @@ impl ZkSolc {
                             };
                         let artifacts = ZkSolc::handle_output(
                             &compiler_output,
-                            filename,
+                            relative_contract_path,
                             &mut displayed_warnings,
                         );
                         cache.write(&compiler_output);
@@ -686,7 +687,7 @@ impl ZkSolc {
     /// # Arguments
     ///
     /// * `output` - The output of the Solidity compiler as a `std::process::Output` struct.
-    /// * `source` - The path of the contract source file that was compiled.
+    /// * `source` - The relative path of the contract source file that was compiled.
     /// * `displayed_warnings` - A mutable set that keeps track of displayed warnings to avoid
     ///   duplicates.
     ///
@@ -714,7 +715,7 @@ impl ZkSolc {
     ///
     /// ```ignore
     /// let output = std::process::Output { ... };
-    /// let source = "/path/to/contract.sol".to_string();
+    /// let source = "src/foo/contract.sol".to_string();
     /// let mut displayed_warnings = HashSet::new();
     /// let compiler_output = serde_json::from_slice::<ZkSolcCompilerOutput>(&output).unwrap();
     /// ZkSolc::handle_output(&compiler_output, source, &mut displayed_warnings);
@@ -725,7 +726,7 @@ impl ZkSolc {
     /// errors and warnings, and saves the artifacts.
     pub fn handle_output(
         compiler_output: &ZkSolcCompilerOutput,
-        source: &str,
+        source: &Path,
         displayed_warnings: &mut HashSet<String>,
     ) -> BTreeMap<String, ArtifactFile<ConfigurableContractArtifact>> {
         // Handle warnings in the output
@@ -752,81 +753,73 @@ impl ZkSolc {
             }
         }
 
+        // Get the output entry only for the source
+        let source_path = source.to_str().expect("must be valid string");
         let mut result = BTreeMap::new();
-        for key in compiler_output.contracts.keys() {
-            if key.contains(source) {
-                let contracts_in_file = compiler_output.contracts.get(key).unwrap();
-                for (contract_name, contract) in contracts_in_file {
-                    // if contract hash is empty, skip
-                    if contract.hash.is_none() {
-                        trace!("{} -> empty contract.hash", contract_name);
-                        continue
-                    }
+        if let Some(contracts_in_file) = compiler_output.contracts.get(source_path) {
+            for (contract_name, contract) in contracts_in_file {
+                // if contract hash is empty, skip
+                if contract.hash.is_none() {
+                    trace!("{} -> empty contract.hash", contract_name);
+                    continue
+                }
 
-                    info!(
-                        "{} -> Bytecode Hash: {} ",
-                        contract_name,
-                        contract.hash.as_ref().unwrap()
-                    );
+                info!("{} -> Bytecode Hash: {} ", contract_name, contract.hash.as_ref().unwrap());
 
-                    let factory_deps: Vec<String> = contract
-                        .factory_dependencies
-                        .as_ref()
-                        .unwrap()
-                        .keys()
-                        .map(|factory_hash| all_bytecodes.get(factory_hash).unwrap())
-                        .cloned()
-                        .collect();
+                let factory_deps: Vec<String> = contract
+                    .factory_dependencies
+                    .as_ref()
+                    .unwrap()
+                    .keys()
+                    .map(|factory_hash| all_bytecodes.get(factory_hash).unwrap())
+                    .cloned()
+                    .collect();
 
-                    let packed_bytecode = Bytes::from(
-                        PackedEraBytecode::new(
-                            contract.hash.as_ref().unwrap().clone(),
-                            contract
-                                .evm
-                                .as_ref()
-                                .unwrap()
-                                .bytecode
-                                .as_ref()
-                                .unwrap()
-                                .object
-                                .clone(),
-                            factory_deps,
-                        )
-                        .to_vec(),
-                    );
+                let packed_bytecode = Bytes::from(
+                    PackedEraBytecode::new(
+                        contract.hash.as_ref().unwrap().clone(),
+                        contract.evm.as_ref().unwrap().bytecode.as_ref().unwrap().object.clone(),
+                        factory_deps,
+                    )
+                    .to_vec(),
+                );
 
-                    let mut art = ConfigurableContractArtifact {
+                let mut art = ConfigurableContractArtifact {
+                    bytecode: Some(CompactBytecode {
+                        object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
+                            packed_bytecode.clone(),
+                        ),
+                        source_map: None,
+                        link_references: Default::default(),
+                    }),
+                    deployed_bytecode: Some(CompactDeployedBytecode {
                         bytecode: Some(CompactBytecode {
                             object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
-                                packed_bytecode.clone(),
+                                packed_bytecode,
                             ),
                             source_map: None,
                             link_references: Default::default(),
                         }),
-                        deployed_bytecode: Some(CompactDeployedBytecode {
-                            bytecode: Some(CompactBytecode {
-                                object: foundry_compilers::artifacts::BytecodeObject::Bytecode(
-                                    packed_bytecode,
-                                ),
-                                source_map: None,
-                                link_references: Default::default(),
-                            }),
-                            immutable_references: Default::default(),
-                        }),
-                        // Initialize other fields with their default values if they exist
-                        ..ConfigurableContractArtifact::default()
-                    };
+                        immutable_references: Default::default(),
+                    }),
+                    // Initialize other fields with their default values if they exist
+                    ..ConfigurableContractArtifact::default()
+                };
 
-                    art.abi = contract.abi.clone();
+                art.abi = contract.abi.clone();
 
-                    let artifact_key = format!("{}/{}.json", source, contract_name);
-                    let artifact = ArtifactFile {
-                        artifact: art,
-                        file: PathBuf::from(&artifact_key),
-                        version: Version::parse(&compiler_output.version).unwrap(),
-                    };
-                    result.insert(artifact_key, artifact);
-                }
+                let source_filename = source
+                    .file_name()
+                    .expect("must have filename")
+                    .to_str()
+                    .expect("must be valid string");
+                let artifact_key = format!("{}/{}.json", source_filename, contract_name);
+                let artifact = ArtifactFile {
+                    artifact: art,
+                    file: PathBuf::from(&artifact_key),
+                    version: Version::parse(&compiler_output.version).unwrap(),
+                };
+                result.insert(artifact_key, artifact);
             }
         }
 
