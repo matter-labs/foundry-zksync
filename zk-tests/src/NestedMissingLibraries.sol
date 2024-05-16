@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {NestedMaths} from "./NestedMaths.sol";
-import 'forge-std/Test.sol';
+import 'forge-std/Script.sol';
 
 contract NestedMathematician {
     uint256 public number;
@@ -16,10 +16,10 @@ contract NestedMathematician {
     }
 }
 
-contract NestedMathematicianTest is Test {
-    function testNestedLibraries() external {
+contract NestedMathematicianScript is Script {
+    function run() external {
         NestedMathematician maths = new NestedMathematician(2);
 
-        assertEq(maths.square(), 4);
+        assert(maths.square() == 4);
     }
 }

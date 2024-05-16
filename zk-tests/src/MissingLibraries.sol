@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Maths} from "./Maths.sol";
-import 'forge-std/Test.sol';
+import 'forge-std/Script.sol';
 
 contract Mathematician {
     uint256 public number;
@@ -16,10 +16,10 @@ contract Mathematician {
     }
 }
 
-contract MathematicianTest is Test {
-    function testLibraries() external {
+contract MathematicianScript is Script {
+    function run() external {
         Mathematician maths = new Mathematician(2);
 
-        assertEq(maths.square(), 4);
+        assert(maths.square() == 4);
     }
 }

@@ -132,6 +132,8 @@ output=$(RUST_LOG=warn "${FORGE}" build --zksync 2>&1 || true)
 
 if echo "$output" | grep -q "Missing libraries detected"; then
     RUST_LOG=warn "${FORGE}" create --deploy-missing-libraries --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync
+    RUST_LOG=warn "${FORGE}" script ./src/MissingLibraries.sol:MathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync --chain 260 --use "./${SOLC}" -vvv || fail "forge script with libs failed"
+    RUST_LOG=warn "${FORGE}" script ./src/NestedMissingLibraries.sol:NestedMathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync --chain 260 --use "./${SOLC}" -vvv || fail "forge script with nested libs failed"
 else
     echo "No missing libraries detected."
 fi
