@@ -543,6 +543,8 @@ impl ZkSolc {
 
     /// Converts the artifacts into canonical foundry artifact paths using it's custom
     /// name-resolution scheme. This mirrors the artifact paths generated via solc compilation.
+    /// This function takes artifacts indexed as "Foo.sol/Foo.json" and generate a collision-free
+    /// path in the artifacts directory.
     fn canonicalize_artifact_paths(
         &self,
         mut all_artifacts: BTreeMap<

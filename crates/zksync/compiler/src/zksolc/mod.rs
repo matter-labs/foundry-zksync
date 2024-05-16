@@ -81,8 +81,8 @@ impl DualCompiledContracts {
                     .map(|name| (name, (&artifact.file, &artifact.artifact)))
             });
 
-        for (_contract_name, (contract_file, artifact)) in output_artifacts {
-            let contract_file = contract_file
+        for (_contract_name, (artifact_path, artifact)) in output_artifacts {
+            let contract_file = artifact_path
                 .strip_prefix(&artifact_paths.evm)
                 .expect("failed stripping artifact path")
                 .to_path_buf();
@@ -97,8 +97,8 @@ impl DualCompiledContracts {
                 }
             }
         }
-        for (contract_name, (contract_file, artifact)) in zk_output_artifacts {
-            let contract_file = contract_file
+        for (contract_name, (artifact_path, artifact)) in zk_output_artifacts {
+            let contract_file = artifact_path
                 .strip_prefix(&artifact_paths.zk)
                 .expect("failed stripping artifact path")
                 .to_path_buf();
