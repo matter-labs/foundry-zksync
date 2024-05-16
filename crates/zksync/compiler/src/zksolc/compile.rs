@@ -436,11 +436,9 @@ impl ZkSolc {
                         ZkSolc::handle_output(&output, filename, &mut displayed_warnings)
                     }
                     CachedContractEntry::Missing { cache } => {
-                        self.prepare_compiler_input(&contract_path, &cache.metadata_path)
-                            .wrap_err(format!(
-                                "Failed to prepare inputs when compiling {:?}",
-                                contract_path
-                            ))?;
+                        self.prepare_compiler_input(&contract_path, &cache.base_path).wrap_err(
+                            format!("Failed to prepare inputs when compiling {:?}", contract_path),
+                        )?;
 
                         let Some(output) = self.run_compiler(&contract_path, &solc)? else {
                             continue
@@ -968,8 +966,12 @@ impl ZkSolc {
     /// In this example, the `prepare_compiler_input` function is called with the contract source
     /// path. It generates the JSON input for the contract, configures the Solidity compiler,
     /// and saves the input to the artifacts directory.
-    fn prepare_compiler_input(&mut self, contract_path: &PathBuf, cache_path: &Path) -> Result<()> {
-        let artifact_path = cache_path.parent().unwrap().to_path_buf();
+    fn prepare_compiler_input(
+        &mut self,
+        contract_path: &PathBuf,
+        cache_base_path: &Path,
+    ) -> Result<()> {
+        let artifact_path = cache_base_path.to_path_buf();
 
         // Step 1: Configure File Output Selection
         let mut file_output_selection: FileOutputSelection = BTreeMap::default();
