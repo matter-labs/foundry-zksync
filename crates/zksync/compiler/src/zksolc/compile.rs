@@ -230,7 +230,7 @@ impl ContractCache {
                 let mut buffer = Vec::new();
                 file.read_to_end(&mut buffer).map(|_| buffer)
             })
-            .and_then(|data| Ok(hex::encode(xxhash_rust::const_xxh3::xxh3_64(&data).to_be_bytes())))
+            .map(|data| hex::encode(xxhash_rust::const_xxh3::xxh3_64(&data).to_be_bytes()))
             .map_err(|err| eyre::eyre!("failed hashing input contract: {err:?}"))?;
 
         let input_file = contract_path.to_str().expect("failed creating contract_path").to_string();
@@ -607,8 +607,8 @@ impl ZkSolc {
             .into_iter()
             .map(|(contract_path, artifacts)| {
                 let artifacts = artifacts
-                    .into_iter()
-                    .map(|(_, artifact)| {
+                    .into_values()
+                    .map(|artifact| {
                         let artifact_path =
                             artifact.file.to_str().expect("must be valid path").to_string();
                         (artifact_path, vec![artifact])
@@ -621,12 +621,8 @@ impl ZkSolc {
 
     /// Checks if the contract has already been compiled for the given input contract hash.
     /// If yes, returns the pre-compiled data.
-    fn check_cache(
-        &self,
-        cache_path: &PathBuf,
-        contract_path: &Path,
-    ) -> Result<CachedContractEntry> {
-        let cache = ContractCache::new(cache_path, contract_path.as_ref())?;
+    fn check_cache(&self, cache_path: &Path, contract_path: &Path) -> Result<CachedContractEntry> {
+        let cache = ContractCache::new(cache_path, contract_path)?;
         match cache.read_cached_output() {
             Ok(output) => Ok(CachedContractEntry::Found { cache, output }),
             Err(err) => {
