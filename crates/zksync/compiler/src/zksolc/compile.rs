@@ -1221,18 +1221,25 @@ impl ZkSolc {
         impl Iterator<Item = (&'_ String, &'_ ZkContract)>,
         impl Iterator<Item = ZkMissingLibrary> + '_,
     ) {
-        let mut contracts_with_libs = output
-            .contracts
-            .iter()
-            .flat_map(|(path, ccs)| ccs.iter().map(move |c| (path, c)))
-            .filter(|(_, (_, contract))| {
-                contract.missing_libraries.as_ref().map(|libs| !libs.is_empty()).unwrap_or_default()
-            })
-            .map(|(p, (_, c))| (p, c))
-            .peekable();
+        let get_contracts_with_libs_iter = || {
+            output
+                .contracts
+                .iter()
+                .flat_map(|(path, ccs)| ccs.iter().map(move |c| (path, c)))
+                .filter(|(_, (_, contract))| {
+                    contract
+                        .missing_libraries
+                        .as_ref()
+                        .map(|libs| !libs.is_empty())
+                        .unwrap_or_default()
+                })
+                .map(|(p, (_, c))| (p, c))
+        };
+
+        let mut contracts_with_libs = get_contracts_with_libs_iter().peekable();
         let has_missing_libs = contracts_with_libs.peek().is_some();
 
-        let libs = contracts_with_libs.clone()
+        let libs = get_contracts_with_libs_iter()
             .flat_map(|(_, contract)| contract.missing_libraries.iter().flatten())
             .map(|library| {
 let mut split = library.split(':');
@@ -1245,6 +1252,7 @@ output
                 .get(path)
                 .and_then(|contract_map| contract_map.get(name))
                 .map(|lib| {
+                    tracing::debug!(?path, ?name, "missing library");
                     ZkMissingLibrary {
                         contract_name: name.to_string(),
                         contract_path: path.to_string(),
