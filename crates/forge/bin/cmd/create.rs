@@ -145,13 +145,14 @@ impl CreateArgs {
             libs_batches
         };
 
-        let mut input_contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
+        //let mut input_contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
         for contracts_batch in contracts_to_deploy {
             // Find Project & Compile
             let project = self.opts.project()?;
             let mut output =
                 ProjectCompiler::new().quiet_if(self.json || self.opts.silent).compile(&project)?;
 
+            /* TODO: see if we need to support this
             let contracts_to_compile = if !deploying_libraries {
                 self.opts.compiler.contracts_to_compile.clone()
             } else {
@@ -171,6 +172,7 @@ impl CreateArgs {
                         .collect(),
                 )
             };
+            */
 
             let zk_compiler = ProjectCompiler::new().quiet_if(self.json || self.opts.silent);
             let zk_output = zk_compiler.zksync_compile(&project)?;
