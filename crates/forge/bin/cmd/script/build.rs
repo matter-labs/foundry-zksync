@@ -42,16 +42,17 @@ impl ScriptArgs {
                         .build()
                 })
                 .map_err(|e| eyre::eyre!(e))?,
-                zk_project,
+            zk_project,
         );
         let zk_output = match zksolc.compile() {
             Ok(compiled) => compiled,
             Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
         };
-        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output, DualCompiledArtifactPaths {
-            evm: project.paths.artifacts.clone(),
-            zk: zk_artifacts,
-        });
+        let dual_compiled_contracts = DualCompiledContracts::new(
+            &output,
+            &zk_output,
+            DualCompiledArtifactPaths { evm: project.paths.artifacts.clone(), zk: zk_artifacts },
+        );
 
         let sources = ContractSources::from_project_output(&output, root)?;
         let contracts = output.into_artifacts().collect();
