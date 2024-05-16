@@ -112,8 +112,7 @@ fn zk_compile(project: Project) -> ProjectCompileOutput {
         .build()
         .expect("failed building zksolc config");
     let mut zksolc = ZkSolc::new(config, project);
-    let zk_output = zksolc.compile().expect("failed compiling with zksolc");
-    zk_output
+    zksolc.compile().expect("failed compiling with zksolc")
 }
 
 pub static COMPILED_ZK: Lazy<ProjectCompileOutput> = Lazy::new(|| {

@@ -1392,17 +1392,16 @@ mod tests {
         let data = include_str!("../../../../../testdata/artifacts-counter/artifacts.json")
             .as_bytes()
             .to_vec();
+        let parsed_data: ZkSolcCompilerOutput = serde_json::from_slice(&data).unwrap();
         let mut displayed_warnings = HashSet::new();
         let source = "src/Counter.sol".to_owned();
-        let (result, _) = ZkSolc::handle_output(data, &source, &mut displayed_warnings, "", None);
+        let result = ZkSolc::handle_output(&parsed_data, &source, &mut displayed_warnings);
 
-        let artifacts = result.get("Counter").unwrap();
-        assert_eq!(artifacts.len(), 1);
-        let first = &artifacts[0];
-        assert_eq!(first.file.to_str(), Some("Counter.sol"));
-        assert_eq!(first.version.to_string(), "0.8.20");
-        assert!(first.artifact.abi.is_some());
-        assert_eq!(first.artifact.bytecode.as_ref().unwrap().object.bytes_len(), 3883);
+        let artifact = result.get("src/Counter.sol/Counter.json").unwrap();
+        assert_eq!(artifact.file.to_str(), Some("src/Counter.sol/Counter.json"));
+        assert_eq!(artifact.version.to_string(), "0.8.20");
+        assert!(artifact.artifact.abi.is_some());
+        assert_eq!(artifact.artifact.bytecode.as_ref().unwrap().object.bytes_len(), 3883);
     }
     #[test]
     pub fn test_json_parsing() {
