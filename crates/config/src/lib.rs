@@ -789,7 +789,7 @@ impl Config {
         if let Some(ref zksolc) = self.zksolc {
             let zksolc = match zksolc {
                 SolcReq::Version(version) => {
-                    let mut zksolc = ZkSolc::find_installed_version(&version)?;
+                    let mut zksolc = ZkSolc::find_installed_version(version)?;
                     if zksolc.is_none() {
                         if self.offline {
                             return Err(SolcError::msg(format!(
@@ -797,7 +797,7 @@ impl Config {
                             )))
                         }
                         ZkSolc::blocking_install(version)?;
-                        zksolc = ZkSolc::find_installed_version(&version)?;
+                        zksolc = ZkSolc::find_installed_version(version)?;
                     }
                     zksolc
                 }
