@@ -113,8 +113,9 @@ contract ZkCheatcodesTest is Test {
     function testZkCheatcodesEtch() public {
         vm.selectFork(forkEra);
 
+        // ConstantNumber artifact from `xxHash("src/ConstantNumber.sol")/output.json`
         string memory artifact = vm.readFile(
-            "zkout/ConstantNumber.sol/artifacts.json"
+            "zkout/69a9b5be160ded2b/output.json"
         );
         bytes memory constantNumberCode = vm.parseJsonBytes(
             artifact,
