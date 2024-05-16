@@ -735,6 +735,20 @@ impl Config {
 
         if let Some(zksolc) = self.zksync_ensure_zksolc()? {
             project.zksync_zksolc = zksolc;
+        } else {
+            // TODO: we automatically install a zksolc version
+            // if none is found, but maybe we should mirror auto detect settings
+            // as done with solc
+            if !self.offline {
+                let default_version = Version::new(1, 4, 1);
+                let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
+                if zksolc.is_none() {
+                    ZkSolc::blocking_install(&default_version)?;
+                    zksolc = ZkSolc::find_installed_version(&default_version)?;
+                }
+                project.zksync_zksolc = zksolc
+                    .unwrap_or_else(|| panic!("Could not install zksolc v{}", default_version));
+            }
         }
 
         Ok(project)
