@@ -224,7 +224,8 @@ pub struct ContractCache {
 impl ContractCache {
     /// Creates a new cache instance for the given contract.
     /// The function can fail on reading the input file, and/or calculating its content hash.
-    pub fn new(cache_path: &Path, contract_path: &Path) -> Result<Self> {
+    /// The contract hash is based on its relative path to the root.
+    pub fn new(root_path: &Path, cache_path: &Path, contract_path: &Path) -> Result<Self> {
         let contract_hash = File::open(contract_path)
             .and_then(|mut file| {
                 let mut buffer = Vec::new();
@@ -233,7 +234,10 @@ impl ContractCache {
             .map(|data| hex::encode(xxhash_rust::const_xxh3::xxh3_64(&data).to_be_bytes()))
             .map_err(|err| eyre::eyre!("failed hashing input contract: {err:?}"))?;
 
-        let input_file = contract_path.to_str().expect("failed creating contract_path").to_string();
+        let relative_contract_path =
+            contract_path.strip_prefix(root_path).expect("failed creating relative path");
+        let input_file =
+            relative_contract_path.to_str().expect("failed creating contract_path").to_string();
         let contract_path_hash =
             hex::encode(xxhash_rust::const_xxh3::xxh3_64(input_file.as_bytes()).to_be_bytes());
 
@@ -622,7 +626,7 @@ impl ZkSolc {
     /// Checks if the contract has already been compiled for the given input contract hash.
     /// If yes, returns the pre-compiled data.
     fn check_cache(&self, cache_path: &Path, contract_path: &Path) -> Result<CachedContractEntry> {
-        let cache = ContractCache::new(cache_path, contract_path)?;
+        let cache = ContractCache::new(&self.project.paths.root, cache_path, contract_path)?;
         match cache.read_cached_output() {
             Ok(output) => Ok(CachedContractEntry::Found { cache, output }),
             Err(err) => {
