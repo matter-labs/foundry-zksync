@@ -234,8 +234,7 @@ impl ContractCache {
             .map(|data| hex::encode(xxhash_rust::const_xxh3::xxh3_64(&data).to_be_bytes()))
             .map_err(|err| eyre::eyre!("failed hashing input contract: {err:?}"))?;
 
-        let relative_contract_path =
-            contract_path.strip_prefix(root_path).expect("failed creating relative path");
+        let relative_contract_path = contract_path.strip_prefix(root_path).unwrap_or(contract_path);
         let input_file =
             relative_contract_path.to_str().expect("failed creating contract_path").to_string();
         let contract_path_hash =
