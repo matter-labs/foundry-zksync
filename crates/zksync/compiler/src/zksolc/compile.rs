@@ -417,12 +417,6 @@ impl ZkSolc {
         // Map from (contract_path, contract_name) -> missing_libraries
         let mut all_missing_libraries: HashMap<(String, String), HashSet<String>> = HashMap::new();
 
-        let project_cache_path = self.project.paths.artifacts.join("~cache");
-        if !project_cache_path.exists() {
-            fs::create_dir_all(&project_cache_path)
-                .wrap_err(format!("Could not create cache path: {:?}", project_cache_path))?;
-        }
-
         // Step 3: Proceed with compilation
         let mut all_artifacts = BTreeMap::new();
         for (solc, version) in sources {
@@ -435,7 +429,9 @@ impl ZkSolc {
                     .to_str()
                     .expect("Invalid Contract filename");
 
-                let artifacts = match self.check_cache(&project_cache_path, &contract_path)? {
+                let artifacts = match self
+                    .check_cache(&self.project.paths.artifacts, &contract_path)?
+                {
                     CachedContractEntry::Found { output, .. } => {
                         info!("Using hashed artifact for {:?}", filename);
                         ZkSolc::handle_output(&output, filename, &mut displayed_warnings)
