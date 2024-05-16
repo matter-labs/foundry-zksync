@@ -195,7 +195,7 @@ contract ZkContractsTest is Test {
     function testZkContractsCreate2() public {
         vm.selectFork(forkEra);
 
-        // ConstantNumber zksolc hash obtained from `xxHash("src/ConstantNumber.sol")/output.json`
+        // ConstantNumber zksolc hash obtained from `xxh3("src/ConstantNumber.sol")/output.json`
         string memory artifact = vm.readFile(
             "zkout/69a9b5be160ded2b/output.json"
         );

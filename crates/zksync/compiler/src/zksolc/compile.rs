@@ -224,7 +224,7 @@ pub struct ContractCache {
 impl ContractCache {
     /// Creates a new cache instance for the given contract.
     /// The function can fail on reading the input file, and/or calculating its content hash.
-    /// The contract hash is based on its relative path to the root.
+    /// The contract hash is based on xxh3 hash of its relative path to the root.
     pub fn new(root_path: &Path, cache_path: &Path, contract_path: &Path) -> Result<Self> {
         let contract_hash = File::open(contract_path)
             .and_then(|mut file| {
