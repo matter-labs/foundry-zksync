@@ -40,8 +40,8 @@ use ansi_term::Colour::{Red, Yellow};
 use eyre::{Context, ContextCompat, Result};
 use foundry_compilers::{
     artifacts::{
-        self, output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
-        Source, StandardJsonCompilerInput,
+        output_selection::FileOutputSelection, CompactBytecode, CompactDeployedBytecode,
+        FileToContractsMap, Source, StandardJsonCompilerInput,
     },
     ArtifactFile, Artifacts, ConfigurableContractArtifact, Graph, Project, ProjectCompileOutput,
     Solc,
@@ -53,7 +53,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt,
     fs::{self, File},
-    io::{BufWriter, Read, Write},
+    io::{BufWriter, Read},
     path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
@@ -68,21 +68,6 @@ const MISSING_LIBS_ERROR: &[u8] = b"not found in the project".as_slice();
 
 /// Mapping of bytecode hash (without "0x" prefix) to the respective contract name.
 pub type ContractBytecodes = BTreeMap<String, String>;
-
-#[derive(Debug, Default, Clone)]
-pub struct ZkSolcArtifactPaths {
-    artifact: PathBuf,
-    contract_hash: PathBuf,
-}
-
-impl ZkSolcArtifactPaths {
-    pub fn new(filename: PathBuf) -> Self {
-        Self {
-            artifact: filename.join("artifacts.json"),
-            contract_hash: filename.join("contract_hash"),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct ZkSolcOpts {
@@ -210,32 +195,43 @@ pub fn compile_smart_contracts(
     }
 }
 
+/// Represents a cache hit or a miss for a contract.
 pub enum CachedContractEntry {
+    /// Cache hit.
     Found { cache: ContractCache, output: ZkSolcCompilerOutput },
+    /// Cache miss.
     Missing { cache: ContractCache },
 }
 
+/// Represents the state of a cached contract.
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct ContractCache {
+    /// The base cache directory for the contract.
     #[serde(skip)]
     pub base_path: PathBuf,
+    /// The cached metadata file for the contract.
     #[serde(skip)]
     pub metadata_path: PathBuf,
+    /// The cached output file for the contract.
     #[serde(skip)]
     pub output_path: PathBuf,
+    /// Provided input file.
     pub input_file: String,
+    /// Hash of the input file's contents.
     pub hash: String,
 }
 
 impl ContractCache {
+    /// Creates a new cache instance for the given contract.
+    /// The function can fail on reading the input file, and/or calculating its content hash.
     pub fn new(cache_path: &Path, contract_path: &Path) -> Result<Self> {
-        let mut contract_hash = File::open(contract_path)
+        let contract_hash = File::open(contract_path)
             .and_then(|mut file| {
                 let mut buffer = Vec::new();
                 file.read_to_end(&mut buffer).map(|_| buffer)
             })
             .and_then(|data| Ok(hex::encode(xxhash_rust::const_xxh3::xxh3_64(&data).to_be_bytes())))
-            .map_err(|err| eyre::eyre!("failed hashing input contract"))?;
+            .map_err(|err| eyre::eyre!("failed hashing input contract: {err:?}"))?;
 
         let input_file = contract_path.to_str().expect("failed creating contract_path").to_string();
         let contract_path_hash =
@@ -254,26 +250,21 @@ impl ContractCache {
         Ok(ContractCache { base_path, metadata_path, output_path, input_file, hash: contract_hash })
     }
 
+    /// Writes the contract's output into the cache along with the metadata.
     pub fn write(&self, output: &ZkSolcCompilerOutput) {
         let file = File::create(&self.output_path).unwrap();
         let writer = std::io::BufWriter::new(file);
-        // let output_json: Value = serde_json::from_slice(&output)
-        //     .unwrap_or_else(|e| panic!("Could not parse zksolc compiler output: {}", e));
-        serde_json::to_writer_pretty(writer, &output).unwrap();
+        serde_json::to_writer(writer, &output).unwrap();
 
         let output_file = File::create(&self.metadata_path)
             .wrap_err("Could not create contract cache file")
             .unwrap();
-
         serde_json::to_writer(BufWriter::new(output_file), &self)
             .unwrap_or_else(|e| panic!("Could not write contract cache file: {}", e));
     }
 
+    /// Reads the cached output if the input file content hash matches the stored entry.
     pub fn read_cached_output(&self) -> Result<ZkSolcCompilerOutput> {
-        // https://docs.rs/serde_json/latest/serde_json/fn.from_reader.html
-        // serde_json docs recommend buffering the whole reader to a string
-        // This also prevents a borrowing issue when deserializing from a reader
-
         if !self.metadata_path.exists() {
             eyre::bail!("{:?} does not exist", self.metadata_path);
         }
@@ -281,6 +272,9 @@ impl ContractCache {
             eyre::bail!("{:?} does not exist", self.output_path);
         }
 
+        // https://docs.rs/serde_json/latest/serde_json/fn.from_reader.html
+        // serde_json docs recommend buffering the whole reader to a string
+        // This also prevents a borrowing issue when deserializing from a reader
         File::open(&self.metadata_path)
             .map_err(|err| eyre::eyre!("failed reading metadata: {:?}", err))
             .and_then(|file| {
@@ -425,7 +419,7 @@ impl ZkSolc {
                 .wrap_err(format!("Could not create cache path: {:?}", project_cache_path))?;
         }
 
-        // Step 3: Proceed with contract compilation
+        // Step 3: Proceed with compilation
         let mut all_artifacts = BTreeMap::new();
         for (solc, version) in sources {
             info!(solc = ?solc.solc, "\nCompiling {} files...", version.1.len());
@@ -440,7 +434,7 @@ impl ZkSolc {
                 let artifacts = match self.check_cache(&project_cache_path, &contract_path)? {
                     CachedContractEntry::Found { output, .. } => {
                         info!("Using hashed artifact for {:?}", filename);
-                        ZkSolc::handle_output2(&output, filename, &mut displayed_warnings)
+                        ZkSolc::handle_output(&output, filename, &mut displayed_warnings)
                     }
                     CachedContractEntry::Missing { cache } => {
                         self.prepare_compiler_input(&contract_path, &cache.metadata_path)
@@ -508,7 +502,7 @@ impl ZkSolc {
                                     exit(1);
                                 }
                             };
-                        let artifacts = ZkSolc::handle_output2(
+                        let artifacts = ZkSolc::handle_output(
                             &compiler_output,
                             filename,
                             &mut displayed_warnings,
@@ -525,7 +519,42 @@ impl ZkSolc {
             }
         }
 
-        // Write artifacts
+        // Convert the artifacts to their canonical file paths
+        let all_artifacts = self.canonicalize_artifact_paths(all_artifacts);
+
+        // Step 4: If missing library dependencies, save them to a file and return an error
+        if !all_missing_libraries.is_empty() {
+            let dependencies: Vec<ZkMissingLibrary> = all_missing_libraries
+                .into_iter()
+                .map(|((contract_path, contract_name), missing_libraries)| ZkMissingLibrary {
+                    contract_path,
+                    contract_name,
+                    missing_libraries: missing_libraries.into_iter().collect(),
+                })
+                .collect();
+            libraries::add_dependencies_to_missing_libraries_cache(
+                &self.project.paths.root,
+                dependencies.as_slice(),
+            )?;
+            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", dependencies);
+        }
+
+        let mut result = ProjectCompileOutput::default();
+        result.set_compiled_artifacts(Artifacts(all_artifacts));
+        Ok(result)
+    }
+
+    /// Converts the artifacts into canonical foundry artifact paths using it's custom
+    /// name-resolution scheme. This mirrors the artifact paths generated via solc compilation.
+    fn canonicalize_artifact_paths(
+        &self,
+        mut all_artifacts: BTreeMap<
+            String,
+            BTreeMap<String, ArtifactFile<ConfigurableContractArtifact>>,
+        >,
+    ) -> FileToContractsMap<Vec<ArtifactFile<ConfigurableContractArtifact>>> {
+        // Create a mapping of artifacts with their artifact keys. This will group duplicates
+        // together.
         let mut mapped_contracts = HashMap::new();
         for (contract_path, artifacts) in &mut all_artifacts {
             for (artifact_key, artifact) in artifacts {
@@ -536,6 +565,7 @@ impl ZkSolc {
             }
         }
 
+        // Generate unique paths per artifact, resolving duplicates
         let mut final_artifact_paths = HashSet::new();
         for (artifact_key, mut contracts) in mapped_contracts {
             let mut contract_artifact_paths = vec![];
@@ -571,7 +601,9 @@ impl ZkSolc {
             }
         }
 
-        let all_artifacts = all_artifacts
+        // Recreate the artifacts with their canonical file path, as generated by foundry's solc
+        // compilation
+        all_artifacts
             .into_iter()
             .map(|(contract_path, artifacts)| {
                 let artifacts = artifacts
@@ -584,34 +616,7 @@ impl ZkSolc {
                     .collect();
                 (contract_path, artifacts)
             })
-            .collect();
-        // for (contract_path, (maybe_cache, artifacts)) in &mut all_artifacts {
-        //     for (artifact_key, artifact) in artifacts {
-        //         let path = PathBuf::from(&contract_path).join(artifact.file);
-        //         mapped_contracts.entry(artifact_key).or_insert(vec![]).push((contract_path,
-        // artifact));     }
-        // }
-
-        // Step 4: If missing library dependencies, save them to a file and return an error
-        if !all_missing_libraries.is_empty() {
-            let dependencies: Vec<ZkMissingLibrary> = all_missing_libraries
-                .into_iter()
-                .map(|((contract_path, contract_name), missing_libraries)| ZkMissingLibrary {
-                    contract_path,
-                    contract_name,
-                    missing_libraries: missing_libraries.into_iter().collect(),
-                })
-                .collect();
-            libraries::add_dependencies_to_missing_libraries_cache(
-                &self.project.paths.root,
-                dependencies.as_slice(),
-            )?;
-            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", dependencies);
-        }
-
-        let mut result = ProjectCompileOutput::default();
-        result.set_compiled_artifacts(Artifacts(all_artifacts));
-        Ok(result)
+            .collect()
     }
 
     /// Checks if the contract has already been compiled for the given input contract hash.
@@ -716,13 +721,14 @@ impl ZkSolc {
     /// let output = std::process::Output { ... };
     /// let source = "/path/to/contract.sol".to_string();
     /// let mut displayed_warnings = HashSet::new();
-    /// ZkSolc::handle_output(output, source, &mut displayed_warnings);
+    /// let compiler_output = serde_json::from_slice::<ZkSolcCompilerOutput>(&output).unwrap();
+    /// ZkSolc::handle_output(&compiler_output, source, &mut displayed_warnings);
     /// ```
     ///
     /// In this example, the `handle_output` function is called with the compiler output, contract
     /// source, and a mutable set for displayed warnings. It processes the output, handles
     /// errors and warnings, and saves the artifacts.
-    pub fn handle_output2(
+    pub fn handle_output(
         compiler_output: &ZkSolcCompilerOutput,
         source: &str,
         displayed_warnings: &mut HashSet<String>,
@@ -1012,10 +1018,7 @@ impl ZkSolc {
         // Store the generated standard JSON input in the ZkSolc instance
         self.standard_json = Some(std_zk_json.to_owned());
 
-        // Step 5: Build Artifacts Path
-        // let artifact_path = &self.build_artifacts_path(contract_path, final_artifact_paths)?;
-
-        // Step 6: Save JSON Input
+        // Step 5: Save JSON Input
         let json_input_path = artifact_path.join("json_input.json");
 
         std::fs::write(
@@ -1138,76 +1141,6 @@ impl ZkSolc {
         versions.get(&self.project).wrap_err("Could not get solc")
     }
 
-    /// Builds the path for saving the artifacts (compiler output) of a contract based on the
-    /// contract's source file. The function performs the following steps to construct the
-    /// artifacts path:
-    ///
-    /// # Workflow:
-    /// 1. Extract Filename:
-    ///    - The function extracts the filename from the provided contract source path using the
-    ///      `file_name` method.
-    ///    - If the extraction of the filename fails, an error is returned.
-    ///
-    /// 2. Build Artifacts Path:
-    ///    - The function constructs the artifacts path by joining the extracted filename with the
-    ///      project's artifacts directory path.
-    ///    - The `join` method is used on the `artifacts` directory path, passing the extracted
-    ///      filename.
-    ///
-    /// 3. Create Artifacts Directory:
-    ///    - The function creates the artifacts directory and all its parent directories using the
-    ///      `create_dir_all` method from the `fs` module.
-    ///    - If the creation of the artifacts directory fails, an error is returned.
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - A reference to the `ZkSolc` instance.
-    /// * `source` - The contract source path represented as a `PathBuf`.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing the constructed artifacts path (`PathBuf`) on success, or an
-    /// `anyhow::Error` on failure.
-    ///
-    /// # Errors
-    ///
-    /// This function can return an error if any of the following occurs:
-    /// - The extraction of the filename from the contract source path fails.
-    /// - The creation of the artifacts directory fails.
-    fn build_artifacts_path(
-        &self,
-        source: &Path,
-        final_artifact_paths: &mut HashSet<PathBuf>,
-    ) -> Result<PathBuf> {
-        println!("BUILD PATH {source:?}");
-        // println!("PATHS {:#?}", self.project.paths);
-        let mut source_path = source
-            .strip_prefix(&self.project.paths.root)
-            .expect("cannot strip root path prefix")
-            .components();
-        source_path.next(); // strip top-most directory (src, lib, scripts, etc.)
-        let source_path = source_path.as_path();
-
-        let path = self.project.paths.artifacts.join(source_path);
-        println!("\tbuild1 --> {path:?}");
-
-        let filename = source.file_name().expect("Failed to get Contract filename.");
-        let path = self.project.paths.artifacts.join(filename);
-
-        let artifact_path = Self::conflict_free_output_file(
-            &final_artifact_paths,
-            path.clone(),
-            source,
-            &self.project.paths.artifacts,
-        );
-
-        println!("\tbuild2 --> {artifact_path:?}");
-        let path = artifact_path;
-
-        fs::create_dir_all(&path).wrap_err("Could not create artifacts directory")?;
-        Ok(path)
-    }
-
     /// Returns the appropriate file name for the conflicting file.
     ///
     /// This should ensure that the resulting `PathBuf` is conflict free, which could be possible if
@@ -1305,15 +1238,6 @@ impl ZkSolc {
         };
 
         !should_compile
-    }
-
-    /// Returns the hash of the contract at the given path.
-    fn hash_contract(contract_path: &Path) -> Result<String> {
-        let mut contract_file = File::open(contract_path)?;
-        let mut buffer = Vec::new();
-        contract_file.read_to_end(&mut buffer)?;
-        let contract_hash = hex::encode(xxhash_rust::const_xxh3::xxh3_64(&buffer).to_be_bytes());
-        Ok(contract_hash)
     }
 
     /// Returns the missing libraries from the zksolc output.

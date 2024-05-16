@@ -81,14 +81,11 @@ impl DualCompiledContracts {
                     .map(|name| (name, (&artifact.file, &artifact.artifact)))
             });
 
-        // for (contract_name, artifact) in output.artifacts() {
-        for (contract_name, (contract_file, artifact)) in output_artifacts {
+        for (_contract_name, (contract_file, artifact)) in output_artifacts {
             let contract_file = contract_file
                 .strip_prefix(&artifact_paths.evm)
                 .expect("failed stripping artifact path")
                 .to_path_buf();
-            let contract_name =
-                contract_name.split('.').next().expect("name cannot be empty").to_string();
             let deployed_bytecode = artifact.get_deployed_bytecode();
             let deployed_bytecode = deployed_bytecode
                 .as_ref()
@@ -100,7 +97,6 @@ impl DualCompiledContracts {
                 }
             }
         }
-        // for (contract_name, artifact) in zk_output.artifacts() {
         for (contract_name, (contract_file, artifact)) in zk_output_artifacts {
             let contract_file = contract_file
                 .strip_prefix(&artifact_paths.zk)
