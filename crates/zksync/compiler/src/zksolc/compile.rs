@@ -1390,7 +1390,7 @@ mod tests {
             .to_vec();
         let parsed_data: ZkSolcCompilerOutput = serde_json::from_slice(&data).unwrap();
         let mut displayed_warnings = HashSet::new();
-        let source = "src/Counter.sol".to_owned();
+        let source = Path::new("src/Counter.sol");
         let result = ZkSolc::handle_output(&parsed_data, &source, &mut displayed_warnings);
 
         let artifact = result.get("src/Counter.sol/Counter.json").unwrap();
