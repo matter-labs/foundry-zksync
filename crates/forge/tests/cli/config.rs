@@ -124,7 +124,6 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         isolate: true,
         __non_exhaustive: (),
         __warnings: vec![],
-        compiler_path: Default::default(),
         zk_optimizer: Default::default(),
         mode: Default::default(),
         zksync: false,
@@ -133,6 +132,9 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         is_system: Default::default(),
         force_evmla: Default::default(),
         detect_missing_libraries: Default::default(),
+        zksolc: Default::default(),
+        zk_bytecode_hash: Default::default(),
+        avoid_contracts: Default::default(),
     };
     prj.write_config(input.clone());
     let config = cmd.config();
