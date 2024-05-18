@@ -265,6 +265,9 @@ packed_simd = { git = "https://github.com/nbaztec/packed_simd", branch = "foundr
 # [patch."https://github.com/matter-labs/era-test-node"]
 # era_test_node = { path = "../era-test-node" }
 
+# [patch."https://github.com/Moonsong-Labs/compilers"]
+# foundry-compilers = { path = "../msl-compilers" }
+
 [patch."https://github.com/matter-labs/era-boojum"]
 cs_derive = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }
 boojum = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }

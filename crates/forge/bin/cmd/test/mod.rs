@@ -171,7 +171,8 @@ impl TestArgs {
 
         let zk_compiler = ProjectCompiler::new().quiet_if(self.json || self.opts.silent);
         let zk_output = zk_compiler.zksync_compile(&project)?;
-        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
+        let dual_compiled_contracts =
+            DualCompiledContracts::new(&output, &zk_output, &project.paths);
 
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;
