@@ -78,7 +78,12 @@ impl DualCompiledContracts {
         for (_contract_name, (artifact_path, artifact)) in output_artifacts {
             let contract_file = artifact_path
                 .strip_prefix(&layout.artifacts)
-                .expect("failed stripping artifact path")
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "failed stripping artifact path '{:?}' from '{:?}'",
+                        layout.artifacts, artifact_path
+                    )
+                })
                 .to_path_buf();
 
             let deployed_bytecode = artifact.get_deployed_bytecode();
@@ -111,7 +116,12 @@ impl DualCompiledContracts {
         for (contract_name, (artifact_path, artifact)) in zk_output_artifacts {
             let contract_file = artifact_path
                 .strip_prefix(&layout.zksync_artifacts)
-                .expect("failed stripping artifact path")
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "failed stripping artifact path '{:?}' from '{:?}'",
+                        layout.artifacts, artifact_path
+                    )
+                })
                 .to_path_buf();
 
             let maybe_bytecode = &artifact.bytecode;
