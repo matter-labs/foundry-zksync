@@ -1,4 +1,4 @@
-//! Handles resolution and storage of missing libraries emitted by zksolc
+//! Handles resolution nd storage of missing libraries emitted by zksolc
 
 use std::{
     fs,
@@ -6,11 +6,21 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde::{Deserialize, Serialize};
 use tracing::{trace, warn};
 
 use foundry_compilers::info::ContractInfo;
 
-use crate::ZkMissingLibrary;
+#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Missing Library entry
+pub struct ZkMissingLibrary {
+    /// Contract name
+    pub contract_name: String,
+    /// Contract path
+    pub contract_path: String,
+    /// Missing Libraries
+    pub missing_libraries: Vec<String>,
+}
 
 /// Return the missing libraries cache path
 pub(crate) fn get_missing_libraries_cache_path(project_root: impl AsRef<Path>) -> PathBuf {

@@ -1,23 +1,13 @@
 //! ZKSolc module.
-
-mod compile;
-mod config;
-mod factory_deps;
-mod manager;
-
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     str::FromStr,
 };
 
-pub use compile::*;
-pub use config::*;
-pub use factory_deps::*;
 use foundry_compilers::{
     zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact,
     ProjectCompileOutput,
 };
-pub use manager::*;
 
 use alloy_primitives::{keccak256, B256};
 use tracing::debug;

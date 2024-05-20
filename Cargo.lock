@@ -4543,7 +4543,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.3.9"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#03ffc562c837cf7c272244332d1308dbe61b57fe"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#1d9cad70ade975c76f4b10b0acd6c7859dda5476"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -4822,26 +4822,13 @@ dependencies = [
 name = "foundry-zksync-compiler"
 version = "0.0.2"
 dependencies = [
- "alloy-json-abi",
  "alloy-primitives",
- "ansi_term",
- "anyhow",
- "const-hex",
- "dirs 5.0.1",
  "eyre",
  "foundry-compilers",
- "globset",
- "reqwest",
- "semver 1.0.22",
  "serde",
  "serde_json",
- "tokio",
  "tracing",
- "url",
- "xxhash-rust",
- "zksync_basic_types",
  "zksync_types",
- "zksync_utils",
 ]
 
 [[package]]
@@ -12681,12 +12668,6 @@ name = "xml-rs"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fcb9cbac069e033553e8bb871be2fbdffcab578eb25bd0f7c508cedc6dcd75a"
-
-[[package]]
-name = "xxhash-rust"
-version = "0.8.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "927da81e25be1e1a2901d59b81b37dd2efd1fc9c9345a55007f09bf5a2d3ee03"
 
 [[package]]
 name = "yansi"
