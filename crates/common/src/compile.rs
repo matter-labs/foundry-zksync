@@ -312,7 +312,7 @@ impl ProjectCompiler {
             Report::new(NoReporter::default())
         } else {
             if std::io::stdout().is_terminal() {
-                Report::new(SpinnerReporter::spawn())
+                Report::new(SpinnerReporter::spawn_with("Compiling (zksync)..."))
             } else {
                 Report::new(BasicStdoutReporter::default())
             }

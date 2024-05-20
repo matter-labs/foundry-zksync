@@ -34,7 +34,8 @@ impl ScriptArgs {
         let zk_compiler = ProjectCompiler::new().quiet(self.opts.args.silent);
         let zk_output = zk_compiler.zksync_compile(&project)?;
 
-        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
+        let dual_compiled_contracts =
+            DualCompiledContracts::new(&output, &zk_output, &project.paths);
 
         let sources = ContractSources::from_project_output(&output, root)?;
         let contracts = output.into_artifacts().collect();

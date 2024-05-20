@@ -96,18 +96,27 @@ pub struct SpinnerReporter {
 }
 
 impl SpinnerReporter {
-    /// Spawns the [`Spinner`] on a new thread
+    /// Spawns the [`Spinner`] on a new thread with the default message
     ///
     /// The spinner's message will be updated via the `reporter` events
     ///
     /// On drop the channel will disconnect and the thread will terminate
     pub fn spawn() -> Self {
+        Self::spawn_with("Compiling...")
+    }
+
+    /// Spawns the [`Spinner`] on a new thread with the given message
+    ///
+    /// The spinner's message will be updated via the `reporter` events
+    ///
+    /// On drop the channel will disconnect and the thread will terminate
+    pub fn spawn_with(msg: impl Into<String> + Send + 'static) -> Self {
         let (sender, rx) = mpsc::channel::<SpinnerMsg>();
 
         std::thread::Builder::new()
             .name("spinner".into())
             .spawn(move || {
-                let mut spinner = Spinner::new("Compiling...");
+                let mut spinner = Spinner::new(msg);
                 loop {
                     spinner.tick();
                     match rx.try_recv() {
