@@ -995,13 +995,23 @@ impl ZkSolc {
         let graph = Graph::resolve_sources(&self.project.paths, sources)
             .wrap_err("Could not resolve sources")?;
 
-        // Step 3: Extract Versions and Edges
-        let (versions, _edges) = graph
-            .into_sources_by_version(self.project.offline)
-            .wrap_err("Could not match solc versions to files")?;
+        if self.project.auto_detect {
+            // Step 3: Extract Versions and Edges
+            let (versions, _edges) = graph
+                .into_sources_by_version(self.project.offline)
+                .wrap_err("Could not match solc versions to files")?;
 
-        // Step 4: Retrieve Solc Version
-        versions.get(&self.project).wrap_err("Could not get solc")
+            // Step 4: Retrieve Solc Version
+            versions.get(&self.project).wrap_err("Could not get solc")
+        } else {
+            // Step 3: Extract sources
+            let (sources, _) = graph.into_sources();
+
+            // Step 4: Retrieve Solc Version
+            let version = self.project.solc.version()?;
+
+            Ok(BTreeMap::from([(self.project.solc.clone(), (version, sources))]))
+        }
     }
 
     /// Builds the path for saving the artifacts (compiler output) of a contract based on the
