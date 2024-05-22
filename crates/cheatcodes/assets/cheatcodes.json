@@ -4861,7 +4861,7 @@
     {
       "func": {
         "id": "keyExists",
-        "description": "Checks if `key` exists in a JSON object.",
+        "description": "Checks if `key` exists in a JSON object\n`keyExists` is being deprecated in favor of `keyExistsJson`. It will be removed in future versions.",
         "declaration": "function keyExists(string calldata json, string calldata key) external view returns (bool);",
         "visibility": "external",
         "mutability": "view",
@@ -4872,6 +4872,26 @@
           138,
           104,
           60
+        ]
+      },
+      "group": "json",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "keyExistsJson",
+        "description": "Checks if `key` exists in a JSON object.",
+        "declaration": "function keyExistsJson(string calldata json, string calldata key) external view returns (bool);",
+        "visibility": "external",
+        "mutability": "view",
+        "signature": "keyExistsJson(string,string)",
+        "selector": "0xdb4235f6",
+        "selectorBytes": [
+          219,
+          66,
+          53,
+          246
         ]
       },
       "group": "json",

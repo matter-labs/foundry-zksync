@@ -1661,8 +1661,12 @@ interface Vm {
     // limitations and caveats of the JSON parsing cheats.
 
     /// Checks if `key` exists in a JSON object.
-    #[cheatcode(group = Json)]
+    /// `keyExists` is being deprecated in favor of `keyExistsJson`. It will be removed in future versions.
+    #[cheatcode(group = Json, status = Deprecated)]
     function keyExists(string calldata json, string calldata key) external view returns (bool);
+    /// Checks if `key` exists in a JSON object.
+    #[cheatcode(group = Json)]
+    function keyExistsJson(string calldata json, string calldata key) external view returns (bool);
 
     /// ABI-encodes a JSON object.
     #[cheatcode(group = Json)]
