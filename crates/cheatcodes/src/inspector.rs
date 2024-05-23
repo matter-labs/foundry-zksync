@@ -1241,35 +1241,29 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 accesses: self.accesses.as_mut(),
                 persisted_factory_deps,
             };
-            if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
+            if let Ok((logs, result)) = foundry_zksync_core::vm::call::<_, DatabaseError>(
                 call,
                 data.env,
                 data.db,
                 &mut data.journaled_state,
                 ccx,
             ) {
+                self.combined_logs.extend(logs.clone().into_iter().map(|log| {
+                    Some(Log {
+                        address: log.address,
+                        data: LogData::new_unchecked(log.topics, log.data),
+                    })
+                }));
+                //for each log in cloned logs call handle_expect_emit
+                if !self.expected_emits.is_empty() {
+                    for log in logs {
+                        expect::handle_expect_emit(self, &log.address, &log.topics, &log.data);
+                    }
+                }
+
                 return match result {
-                    ExecutionResult::Success { output, logs, .. } => match output {
-                        Output::Call(bytes) => {
-                            self.combined_logs.extend(logs.clone().into_iter().map(|log| {
-                                Some(Log {
-                                    address: log.address,
-                                    data: LogData::new_unchecked(log.topics, log.data),
-                                })
-                            }));
-                            //for each log in cloned logs call handle_expect_emit
-                            if !self.expected_emits.is_empty() {
-                                for log in logs {
-                                    expect::handle_expect_emit(
-                                        self,
-                                        &log.address,
-                                        &log.topics,
-                                        &log.data,
-                                    );
-                                }
-                            }
-                            (InstructionResult::Return, gas, bytes)
-                        }
+                    ExecutionResult::Success { output, .. } => match output {
+                        Output::Call(bytes) => (InstructionResult::Return, gas, bytes),
                         _ => (InstructionResult::Revert, gas, Bytes::new()),
                     },
                     ExecutionResult::Revert { output, .. } => {
@@ -1726,7 +1720,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 accesses: self.accesses.as_mut(),
                 persisted_factory_deps,
             };
-            if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
+            if let Ok((logs, result)) = foundry_zksync_core::vm::create::<_, DatabaseError>(
                 call,
                 zk_contract,
                 factory_deps,
@@ -1735,15 +1729,16 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 &mut data.journaled_state,
                 ccx,
             ) {
+                self.combined_logs.extend(logs.into_iter().map(|log| {
+                    Some(Log {
+                        address: log.address,
+                        data: LogData::new_unchecked(log.topics, log.data),
+                    })
+                }));
+
                 return match result {
-                    ExecutionResult::Success { output, logs, .. } => match output {
+                    ExecutionResult::Success { output, .. } => match output {
                         Output::Create(bytes, address) => {
-                            self.combined_logs.extend(logs.into_iter().map(|log| {
-                                Some(Log {
-                                    address: log.address,
-                                    data: LogData::new_unchecked(log.topics, log.data),
-                                })
-                            }));
                             (InstructionResult::Return, address, gas, bytes)
                         }
                         _ => (InstructionResult::Revert, None, gas, Bytes::new()),
