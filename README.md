@@ -21,6 +21,7 @@ To use for zkSync environments, include `--zksync` when running `forge` or `vm.z
    - zkSync VM processes the transaction and returns state changes, which are applied to `journaled_state`. Results are relayed back.
 5. **Logging:**
    - `console.log()` outputs within zkSync VM are captured and displayed in Foundry.
+   - `ZK_DEBUG_RESOLVE_HASHES` and `ZK_DEBUG_SHOW_OUTPUTS` env variable may be set to `true` to display zkSync VM call logs with resolved selector hashes (requires Internet connection), and the call outputs, respectively.
 6. **Fuzzing**
    - Adds config option `no_zksync_reserved_addresses`. Since zkSync reserves addresses below 2^16 as system addresses, a fuzz test would've required a broad `vm.assume` and many `vm.excludeSender` calls to exclude these. This is not only cumbersome but could also trigger `proptest`'s global `max_global_rejects` failure. When this option is set to `true` the `proptest` generation itself ensures that no invalid addresses are generated, and thus need not be filtered adding up to the `max_test_rejects` count.
 
