@@ -404,8 +404,7 @@ where
     for (k, v) in &modified_storage {
         let address = k.address().to_address();
         let index = k.key().to_ru256();
-        let account = era_db.load_account(address);
-        let previous = account.storage.get(&index).map(|v| v.present_value).unwrap_or_default();
+        let previous = era_db.sload(address, index);
         let entry = storage.entry(address).or_default();
         entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
 
