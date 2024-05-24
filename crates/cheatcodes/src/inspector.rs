@@ -590,7 +590,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
     }
 
     fn step_end(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
-        if !self.use_zk_mv {
+        if !self.use_zk_vm {
             return;
         }
 
