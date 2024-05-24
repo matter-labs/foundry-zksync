@@ -109,7 +109,7 @@ impl DualCompiledContracts {
                 .unwrap_or_else(|_| {
                     panic!(
                         "failed stripping artifact path '{:?}' from '{:?}'",
-                        layout.artifacts, artifact_path
+                        layout.zksync_artifacts, artifact_path
                     )
                 })
                 .to_path_buf();
