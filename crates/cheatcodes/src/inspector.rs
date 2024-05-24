@@ -590,9 +590,13 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
     }
 
     fn step_end(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
+        if !self.use_zk_mv {
+            return;
+        }
+
         let address = match interpreter.current_opcode() {
-            opcode::SELFBALANCE if self.use_zk_vm => interpreter.contract().address,
-            opcode::BALANCE if self.use_zk_vm => {
+            opcode::SELFBALANCE => interpreter.contract().address,
+            opcode::BALANCE => {
                 if interpreter.stack.is_empty() {
                     interpreter.instruction_result = InstructionResult::StackUnderflow;
                     return;
