@@ -449,7 +449,6 @@ impl CallTraceDecoder {
                 } else {
                     let mut decoded = func.abi_decode_input(&data[SELECTOR_LEN..], false).ok()?;
                     let token =
-                    
                     if func.name.as_str() == "parseJson" || 
                         // `keyExists` is being deprecated in favor of `keyExistsJson`. It will be removed in future versions.
                         func.name.as_str() == "keyExists" || 
