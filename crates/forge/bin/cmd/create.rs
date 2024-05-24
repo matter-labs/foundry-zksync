@@ -185,13 +185,34 @@ impl CreateArgs {
                         let artifact =
                             zk_output.remove_contract(&contract).expect("Artifact not found");
                         let ZkContractArtifact {
-                            abi, bytecode, hash, factory_dependencies, ..
+                            bytecode,
+                            hash,
+                            factory_dependencies,
+                            metadata,
+                            ..
                         } = artifact;
-                        let abi = abi.expect("Abi not found");
+
+                        // Get abi from solc_metadata
+                        // TODO: This can probably be optimized by defining the proper
+                        // deserializers on compilers but metadata is given as a stringified json
+                        // and JsonAbi is complaining about not supporting serde_json::from_reader
+                        // so there is some serde handling neded
+                        let metadata = metadata.unwrap();
+                        let solc_metadata_value = metadata
+                            .get("solc_metadata")
+                            .and_then(serde_json::Value::as_str)
+                            .expect("`solc_metadata` field not found in artifact");
+                        let solc_metadata_json: serde_json::Value =
+                            serde_json::from_str(solc_metadata_value).unwrap();
+                        let abi_json = &solc_metadata_json["output"]["abi"];
+                        let abi_string = abi_json.to_string();
+                        let abi: JsonAbi = JsonAbi::from_json_str(&abi_string)?;
+
                         let bin = bytecode.expect("Bytecode not found");
                         let bytecode_hash =
                             H256::from_str(&hash.expect("Contract hash not found"))?;
                         let bytecode = bin.object.clone().into_bytes().unwrap().to_vec();
+
                         let factory_dependencies_map =
                             factory_dependencies.expect("factory deps not found");
                         let factory_deps = factory_dependencies_map
