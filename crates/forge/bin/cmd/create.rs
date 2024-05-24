@@ -215,7 +215,7 @@ impl CreateArgs {
 
                         let factory_dependencies_map =
                             factory_dependencies.expect("factory deps not found");
-                        let factory_deps = factory_dependencies_map
+                        let mut factory_deps: Vec<Vec<u8>> = factory_dependencies_map
                             .values()
                             .map(|contract_info_str| {
                                 let mut split = contract_info_str.split(':');
@@ -242,6 +242,7 @@ impl CreateArgs {
                                 fdep_bytecode.object.clone().into_bytes().unwrap().to_vec()
                             })
                             .collect();
+                        factory_deps.push(bytecode.clone());
                         let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
                         (abi, bin.object, Some(zk_data))
                     }
