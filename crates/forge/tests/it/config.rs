@@ -18,7 +18,7 @@ use foundry_evm::{
     traces::{render_trace_arena, CallTraceDecoderBuilder},
 };
 use foundry_test_utils::{init_tracing, Filter};
-use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts, PackedEraBytecode};
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use futures::future::join_all;
 use itertools::Itertools;
 use std::{

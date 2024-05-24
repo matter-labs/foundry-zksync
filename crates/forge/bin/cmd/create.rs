@@ -189,9 +189,6 @@ impl CreateArgs {
                         } = artifact;
                         let abi = abi.expect("Abi not found");
                         let bin = bytecode.expect("Bytecode not found");
-                        // TODO: zk data
-                        //let mut factory_deps =
-                        // dual_compiled_contracts.fetch_all_factory_deps(contract);
                         let bytecode_hash =
                             H256::from_str(&hash.expect("Contract hash not found"))?;
                         let bytecode = bin.object.clone().into_bytes().unwrap().to_vec();
@@ -224,7 +221,6 @@ impl CreateArgs {
                                 fdep_bytecode.object.clone().into_bytes().unwrap().to_vec()
                             })
                             .collect();
-                        //TODO: ver como es el bytecode que se pasa aca
                         let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
                         (abi, bin.object, Some(zk_data))
                     }
