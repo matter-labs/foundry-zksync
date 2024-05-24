@@ -15,8 +15,9 @@ use foundry_compilers::{
     Artifact, ArtifactId, FileFilter, Graph, Project, ProjectCompileOutput, ProjectPathsConfig,
     Solc, SolcConfig,
 };
+use foundry_zksync_compiler::libraries::{self, ZkMissingLibrary};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     convert::Infallible,
     fmt::Display,
     io::IsTerminal,
@@ -286,7 +287,7 @@ impl ProjectCompiler {
         // Taking is fine since we don't need these in `compile_with`.
         //let filter = std::mem::take(&mut self.filter);
         let files = std::mem::take(&mut self.files);
-        self.zksync_compile_with(|| {
+        self.zksync_compile_with(&project.paths.root, || {
             if !files.is_empty() {
                 project.zksync_compile_files(files)
             /* TODO: evualuate supporting compiling with filters
@@ -301,7 +302,11 @@ impl ProjectCompiler {
     }
 
     #[instrument(target = "forge::compile", skip_all)]
-    fn zksync_compile_with<F>(self, f: F) -> Result<ZkProjectCompileOutput>
+    fn zksync_compile_with<F>(
+        self,
+        root_path: impl AsRef<Path>,
+        f: F,
+    ) -> Result<ZkProjectCompileOutput>
     where
         F: FnOnce() -> Result<ZkProjectCompileOutput>,
     {
@@ -344,16 +349,66 @@ impl ProjectCompiler {
                 println!("{output}");
             }
 
-            self.zksync_handle_output(&output);
+            self.zksync_handle_output(root_path, &output)?;
         }
 
         Ok(output)
     }
 
     /// If configured, this will print sizes or names
-    fn zksync_handle_output(&self, output: &ZkProjectCompileOutput) {
+    fn zksync_handle_output(
+        &self,
+        root_path: impl AsRef<Path>,
+        output: &ZkProjectCompileOutput,
+    ) -> Result<()> {
         let print_names = self.print_names.unwrap_or(false);
         let print_sizes = self.print_sizes.unwrap_or(false);
+
+        // Process missing libraries
+        // TODO: skip this if project was not compiled using --detect-missing-libraries
+        let mut missing_libs_unique: HashSet<String> = HashSet::new();
+        for (_, artifact) in output.artifacts() {
+            if let Some(mls) = &artifact.missing_libraries {
+                missing_libs_unique.extend(mls.clone());
+            }
+        }
+
+        let missing_libs: Vec<ZkMissingLibrary> = missing_libs_unique
+            .into_iter()
+            .map(|ml| {
+                let mut split = ml.split(':');
+                let contract_path =
+                    split.next().expect("Failed to extract contract path for missing library");
+                let contract_name =
+                    split.next().expect("Failed to extract contract name for missing library");
+
+                let mut abs_path_buf = PathBuf::new();
+                abs_path_buf.push(root_path.as_ref());
+                abs_path_buf.push(contract_path);
+                let abs_path_str = abs_path_buf.to_string_lossy();
+
+                let art = output.find(abs_path_str, contract_name).unwrap_or_else(|| {
+                    panic!(
+                        "Could not find contract {} at path {} for compilation output",
+                        contract_name, contract_path
+                    )
+                });
+
+                ZkMissingLibrary {
+                    contract_path: contract_path.to_string(),
+                    contract_name: contract_name.to_string(),
+                    missing_libraries: art.missing_libraries.clone().unwrap_or_default(),
+                }
+            })
+            .collect();
+        if !missing_libs.is_empty() {
+            libraries::add_dependencies_to_missing_libraries_cache(
+                root_path,
+                missing_libs.as_slice(),
+            )
+            .expect("Error while adding missing libraries");
+            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", missing_libs);
+        }
 
         // print any sizes or names
         if print_names {
@@ -411,6 +466,7 @@ impl ProjectCompiler {
                 std::process::exit(1);
             }
         }
+        Ok(())
     }
 }
 

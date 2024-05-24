@@ -4327,6 +4327,7 @@ dependencies = [
  "watchexec",
  "yansi 0.5.1",
  "zksync-web3-rs",
+ "zksync_types",
 ]
 
 [[package]]
@@ -4519,6 +4520,7 @@ dependencies = [
  "foundry-compilers",
  "foundry-config",
  "foundry-macros",
+ "foundry-zksync-compiler",
  "glob",
  "globset",
  "itertools 0.11.0",
@@ -4543,7 +4545,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.3.9"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#8847ef6b689b18030b4a2e8780f7d1b4c8866039"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-zksolc#2be1e19a663c4d08b87a44e0e4c00c149cc169be"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",

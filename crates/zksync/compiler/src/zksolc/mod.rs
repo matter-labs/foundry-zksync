@@ -96,7 +96,7 @@ impl DualCompiledContracts {
             if let (Some(hash), Some(bytecode)) = (&zk_artifact.hash, &zk_artifact.bytecode) {
                 // TODO: we can do this because no bytecode object could be unlinked
                 // at this stage for zksolc, and BytecodeObject as ref will get the bytecode bytes.
-                // We should be careful however we should check and handle errors in
+                // We should be careful however and check/handle errors in
                 // case an Unlinked BytecodeObject gets here somehow
                 let bytes = bytecode.object.clone().into_bytes().unwrap();
                 zksolc_all_bytecodes.insert(hash.clone(), bytes.to_vec());

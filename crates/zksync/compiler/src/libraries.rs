@@ -28,7 +28,7 @@ pub(crate) fn get_missing_libraries_cache_path(project_root: impl AsRef<Path>) -
 }
 
 /// Add libraries to missing libraries cache
-pub(crate) fn add_dependencies_to_missing_libraries_cache(
+pub fn add_dependencies_to_missing_libraries_cache(
     project_root: impl AsRef<Path>,
     libraries: &[ZkMissingLibrary],
 ) -> eyre::Result<()> {
