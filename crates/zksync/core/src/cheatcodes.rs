@@ -222,11 +222,11 @@ pub fn set_mocked_account<'a, DB>(
         .expect("failed storing value");
 
     let hash_key = empty_code_hash.to_ru256();
-    let has_key = journaled_state
+    let has_hash = journaled_state
         .sload(known_code_addr, hash_key, db)
         .map(|(v, _)| !v.is_zero())
         .unwrap_or_default();
-    if !has_key {
+    if !has_hash {
         journaled_state.touch(&known_code_addr);
         journaled_state
             .sstore(known_code_addr, hash_key, rU256::from(1u32), db)
