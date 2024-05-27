@@ -590,13 +590,22 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
     }
 
     fn step_end(&mut self, interpreter: &mut Interpreter<'_>, data: &mut EVMData<'_, DB>) {
-        if self.use_zk_vm && interpreter.current_opcode() == opcode::BALANCE {
-            if interpreter.stack.is_empty() {
-                interpreter.instruction_result = InstructionResult::StackUnderflow;
-                return;
-            }
+        // ovverride address(x).balance retrieval to make it consistent between EraVM and EVM
+        if self.use_zk_vm {
+            let address = match interpreter.current_opcode() {
+                opcode::SELFBALANCE => interpreter.contract().address,
+                opcode::BALANCE => {
+                    if interpreter.stack.is_empty() {
+                        interpreter.instruction_result = InstructionResult::StackUnderflow;
+                        return;
+                    }
+
+                    Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }))
+                }
+                _ => return,
+            };
+
             // Safety: Length is checked above.
-            let address = Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }));
             let balance = foundry_zksync_core::balance(address, data.db, &mut data.journaled_state);
 
             // Skip the current BALANCE instruction since we've already handled it
