@@ -36,7 +36,14 @@ use foundry_zksync_compiler::libraries as zklibs;
 use zksync_types::H256;
 
 use serde_json::json;
-use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, str::FromStr, sync::Arc};
+use std::{
+    borrow::Borrow,
+    collections::{HashSet, VecDeque},
+    marker::PhantomData,
+    path::PathBuf,
+    str::FromStr,
+    sync::Arc,
+};
 
 /// CLI arguments for `forge create`.
 #[derive(Clone, Debug, Parser)]
@@ -215,10 +222,17 @@ impl CreateArgs {
 
                         let factory_dependencies_map =
                             factory_dependencies.expect("factory deps not found");
-                        let mut factory_deps: Vec<Vec<u8>> = factory_dependencies_map
-                            .values()
-                            .map(|contract_info_str| {
-                                let mut split = contract_info_str.split(':');
+                        let mut visited_paths = HashSet::new();
+                        let mut visited_bytecodes = HashSet::new();
+                        let mut queue = VecDeque::new();
+
+                        for dep in factory_dependencies_map.values() {
+                            queue.push_back(dep.clone());
+                        }
+
+                        while let Some(dep_info) = queue.pop_front() {
+                            if visited_paths.insert(dep_info.clone()) {
+                                let mut split = dep_info.split(':');
                                 let contract_path = split.next().expect(
                                     "Failed to extract contract path for factory dependency",
                                 );
@@ -229,20 +243,35 @@ impl CreateArgs {
                                 abs_path_buf.push(project.root());
                                 abs_path_buf.push(contract_path);
                                 let abs_path_str = abs_path_buf.to_string_lossy();
-                                let fdep_art =
-                                    output.find(abs_path_str, contract_name).unwrap_or_else(|| {
+                                let fdep_art = zk_output
+                                    .find(abs_path_str, contract_name)
+                                    .unwrap_or_else(|| {
                                         panic!(
                                     "Could not find contract {} at path {} for compilation output",
                                     contract_name, contract_path)
                                     });
+                                let fdep_fdeps_map = fdep_art
+                                    .factory_dependencies
+                                    .clone()
+                                    .expect("factory deps not found");
+                                for dep in fdep_fdeps_map.values() {
+                                    queue.push_back(dep.clone())
+                                }
+
                                 let fdep_bytecode = fdep_art
                                     .bytecode
                                     .clone()
-                                    .expect("Bytecode not found for factory dependency");
-                                fdep_bytecode.object.clone().into_bytes().unwrap().to_vec()
-                            })
-                            .collect();
-                        factory_deps.push(bytecode.clone());
+                                    .expect("Bytecode not found for factory dependency")
+                                    .object
+                                    .clone()
+                                    .into_bytes()
+                                    .unwrap()
+                                    .to_vec();
+                                visited_bytecodes.insert(fdep_bytecode);
+                            }
+                        }
+                        visited_bytecodes.insert(bytecode.clone());
+                        let factory_deps: Vec<Vec<u8>> = visited_bytecodes.into_iter().collect();
                         let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
                         (abi, bin.object, Some(zk_data))
                     }
