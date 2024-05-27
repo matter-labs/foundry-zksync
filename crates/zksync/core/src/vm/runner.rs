@@ -32,8 +32,9 @@ use revm::{
     precompile::Precompiles,
     primitives::{
         Address, Bytecode, Bytes, CreateScheme, EVMResultGeneric, Env, Eval,
-        ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, OutOfGasError,
-        Output, ResultAndState, SpecId, StorageSlot, TransactTo, B256, U256 as rU256,
+        ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, Log as rLog,
+        OutOfGasError, Output, ResultAndState, SpecId, StorageSlot, TransactTo, B256,
+        U256 as rU256,
     },
     Database, JournaledState,
 };
@@ -57,7 +58,12 @@ use super::{storage_view::StorageView, tracer::CheatcodeTracerContext};
 /// Maximum gas price allowed for L1.
 const MAX_L1_GAS_PRICE: u64 = 1000;
 
-type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
+pub struct ZKVMExecutionResult {
+    pub logs: Vec<rLog>,
+    pub execution_result: rExecutionResult,
+}
+
+type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
 
 /// Transacts
 pub fn transact<'a, DB>(
@@ -116,7 +122,9 @@ where
     };
 
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
-        Ok(result) => Ok(ResultAndState { result, state: journaled_state.finalize().0 }),
+        Ok(ZKVMExecutionResult { execution_result: result, .. }) => {
+            Ok(ResultAndState { result, state: journaled_state.finalize().0 })
+        }
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
 }
@@ -334,20 +342,20 @@ where
         }
     }
 
+    let logs = tx_result
+        .logs
+        .events
+        .clone()
+        .into_iter()
+        .map(|event| revm::primitives::Log {
+            address: event.address.to_address(),
+            topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
+            data: event.value.into(),
+        })
+        .collect_vec();
+
     let execution_result = match tx_result.result {
         ExecutionResult::Success { output, .. } => {
-            let logs = tx_result
-                .logs
-                .events
-                .clone()
-                .into_iter()
-                .map(|event| revm::primitives::Log {
-                    address: event.address.to_address(),
-                    topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
-                    data: event.value.into(),
-                })
-                .collect_vec();
-
             let result = ethabi::decode(&[ethabi::ParamType::Bytes], &output)
                 .ok()
                 .and_then(|result| result.first().cloned())
@@ -366,12 +374,15 @@ where
                 Output::Call(Bytes::from(result))
             };
 
-            rExecutionResult::Success {
-                reason: Eval::Return,
-                gas_used: tx_result.statistics.gas_used as u64,
-                gas_refunded: tx_result.refunds.gas_refunded as u64,
-                logs,
-                output,
+            ZKVMExecutionResult {
+                logs: logs.clone(),
+                execution_result: rExecutionResult::Success {
+                    reason: Eval::Return,
+                    gas_used: tx_result.statistics.gas_used as u64,
+                    gas_refunded: tx_result.refunds.gas_refunded as u64,
+                    logs,
+                    output,
+                },
             }
         }
         ExecutionResult::Revert { output } => {
@@ -381,9 +392,12 @@ where
                 _ => Vec::new(),
             };
 
-            rExecutionResult::Revert {
-                gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
-                output: Bytes::from(output),
+            ZKVMExecutionResult {
+                logs,
+                execution_result: rExecutionResult::Revert {
+                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                    output: Bytes::from(output),
+                },
             }
         }
         ExecutionResult::Halt { reason } => {
@@ -392,9 +406,13 @@ where
                 Halt::NotEnoughGasProvided => rHalt::OutOfGas(OutOfGasError::BasicOutOfGas),
                 _ => rHalt::PrecompileError,
             };
-            rExecutionResult::Halt {
-                reason: mapped_reason,
-                gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+
+            ZKVMExecutionResult {
+                logs,
+                execution_result: rExecutionResult::Halt {
+                    reason: mapped_reason,
+                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                },
             }
         }
     };
