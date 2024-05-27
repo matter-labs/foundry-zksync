@@ -7,3 +7,4 @@ solc-v*
 era_test_node
 cache/
 broadcast/
+.zksolc-libraries-cache/
