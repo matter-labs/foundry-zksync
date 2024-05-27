@@ -6,7 +6,7 @@
 /// is usually collecing all the diffs - and applies them to database itself.
 use std::{collections::HashMap, fmt::Debug};
 
-use alloy_primitives::Address;
+use alloy_primitives::{Address, U256 as rU256};
 use foundry_cheatcodes_common::record::RecordAccess;
 use revm::{primitives::Account, Database, JournaledState};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
@@ -170,12 +170,20 @@ where
         h256_to_u256(balance_storage)
     }
 
+    /// Load an account into the journaled state.
     pub fn load_account(&mut self, address: Address) -> &mut Account {
         let (account, _) = self
             .journaled_state
             .load_account(address, self.db)
             .expect("account could not be loaded");
         account
+    }
+
+    /// Load an storage slot into the journaled state.
+    /// The account must be already loaded else this function panics.
+    pub fn sload(&mut self, address: Address, key: rU256) -> rU256 {
+        let (value, _) = self.journaled_state.sload(address, key, self.db).unwrap_or_default();
+        value
     }
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
