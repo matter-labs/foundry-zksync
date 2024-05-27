@@ -1248,28 +1248,22 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 &mut data.journaled_state,
                 ccx,
             ) {
-                return match result {
-                    ExecutionResult::Success { output, logs, .. } => match output {
-                        Output::Call(bytes) => {
-                            self.combined_logs.extend(logs.clone().into_iter().map(|log| {
-                                Some(Log {
-                                    address: log.address,
-                                    data: LogData::new_unchecked(log.topics, log.data),
-                                })
-                            }));
-                            //for each log in cloned logs call handle_expect_emit
-                            if !self.expected_emits.is_empty() {
-                                for log in logs {
-                                    expect::handle_expect_emit(
-                                        self,
-                                        &log.address,
-                                        &log.topics,
-                                        &log.data,
-                                    );
-                                }
-                            }
-                            (InstructionResult::Return, gas, bytes)
-                        }
+                self.combined_logs.extend(result.logs.clone().into_iter().map(|log| {
+                    Some(Log {
+                        address: log.address,
+                        data: LogData::new_unchecked(log.topics, log.data),
+                    })
+                }));
+                //for each log in cloned logs call handle_expect_emit
+                if !self.expected_emits.is_empty() {
+                    for log in result.logs {
+                        expect::handle_expect_emit(self, &log.address, &log.topics, &log.data);
+                    }
+                }
+
+                return match result.execution_result {
+                    ExecutionResult::Success { output, .. } => match output {
+                        Output::Call(bytes) => (InstructionResult::Return, gas, bytes),
                         _ => (InstructionResult::Revert, gas, Bytes::new()),
                     },
                     ExecutionResult::Revert { output, .. } => {
@@ -1735,15 +1729,16 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 &mut data.journaled_state,
                 ccx,
             ) {
-                return match result {
-                    ExecutionResult::Success { output, logs, .. } => match output {
+                self.combined_logs.extend(result.logs.into_iter().map(|log| {
+                    Some(Log {
+                        address: log.address,
+                        data: LogData::new_unchecked(log.topics, log.data),
+                    })
+                }));
+
+                return match result.execution_result {
+                    ExecutionResult::Success { output, .. } => match output {
                         Output::Create(bytes, address) => {
-                            self.combined_logs.extend(logs.into_iter().map(|log| {
-                                Some(Log {
-                                    address: log.address,
-                                    data: LogData::new_unchecked(log.topics, log.data),
-                                })
-                            }));
                             (InstructionResult::Return, address, gas, bytes)
                         }
                         _ => (InstructionResult::Revert, None, gas, Bytes::new()),
