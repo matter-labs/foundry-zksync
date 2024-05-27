@@ -32,6 +32,16 @@ contract FixedGreeter {
     }
 }
 
+contract MultiNumber {
+    function one() public pure returns (uint8) {
+        return 1;
+    }
+
+    function two() public pure returns (uint8) {
+        return 2;
+    }
+}
+
 contract PayableFixedNumber {
     address sender;
     uint256 value;
@@ -80,6 +90,7 @@ contract CustomStorage {
 contract ZkContractsTest is Test {
     Number number;
     CustomNumber customNumber;
+    MultiNumber multiNumber;
 
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
@@ -93,6 +104,7 @@ contract ZkContractsTest is Test {
     function setUp() public {
         number = new Number();
         customNumber = new CustomNumber(20);
+        multiNumber = new MultiNumber();
         vm.makePersistent(address(number));
         vm.makePersistent(address(customNumber));
 
@@ -258,5 +270,16 @@ contract ZkContractsTest is Test {
         );
 
         assertEq(address(0x46efB6258A2A539f7C8b44e2EF659D778fb5BAAd), addr);
+    }
+
+    function testZkContractsDeployedInSetupAreMockable() public {
+        vm.mockCall(
+            address(multiNumber),
+            abi.encodeWithSelector(MultiNumber.one.selector),
+            abi.encode(42)
+        );
+
+        assertEq(42, multiNumber.one());
+        assertEq(2, multiNumber.two());
     }
 }

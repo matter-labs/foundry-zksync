@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use alloy_primitives::{Bytes, B256};
 use revm::{
-    primitives::{Address, Bytecode, Env, StorageSlot, U256 as rU256},
+    primitives::{Address, Bytecode, Env, U256 as rU256},
     Database, JournaledState,
 };
 use tracing::info;
@@ -195,36 +195,41 @@ pub fn set_mocked_account<'a, DB>(
     let account_code_addr = zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
     let known_code_addr = zksync_types::KNOWN_CODES_STORAGE_ADDRESS.to_address();
     {
-        let (account_code_acc, _) = journaled_state
+        journaled_state
             .load_account(account_code_addr, db)
-            .expect("account could not be loaded");
-
-        let key = address.to_h256().to_ru256();
-
-        // Apply only if the address doesn't have any associated bytecode entry
-        let has_code = account_code_acc
-            .storage
-            .get(&key)
-            .map(|v| !v.present_value.is_zero())
-            .unwrap_or_default();
-        if has_code {
-            return;
-        }
-
-        let hash = zksync_utils::bytecode::hash_bytecode(&EMPTY_CODE);
-        let value: StorageSlot = StorageSlot::new(hash.to_ru256());
-
-        if !account_code_acc.storage.contains_key(&key) {
-            account_code_acc.storage.insert(key, value);
-        }
+            .expect("account 'ACCOUNT_CODE_STORAGE_ADDRESS' could not be loaded");
+        journaled_state
+            .load_account(known_code_addr, db)
+            .expect("account 'KNOWN_CODES_STORAGE_ADDRESS' could not be loaded");
     }
-    {
-        let (known_codes_acc, _) =
-            journaled_state.load_account(known_code_addr, db).expect("account could not be loaded");
-        let hash = zksync_utils::bytecode::hash_bytecode(&EMPTY_CODE);
-        let key = hash.to_ru256();
-        if !known_codes_acc.storage.contains_key(&key) {
-            known_codes_acc.storage.insert(key, StorageSlot::new(rU256::from(1u32)));
-        }
+
+    let empty_code_hash = zksync_utils::bytecode::hash_bytecode(&EMPTY_CODE);
+
+    // update account code storage for empty code
+    let account_key = address.to_h256().to_ru256();
+    let has_code = journaled_state
+        .sload(account_code_addr, account_key, db)
+        .map(|(v, _)| !v.is_zero())
+        .unwrap_or_default();
+    if has_code {
+        return;
+    }
+
+    // update known code storage for empty code
+    journaled_state.touch(&account_code_addr);
+    journaled_state
+        .sstore(account_code_addr, account_key, empty_code_hash.to_ru256(), db)
+        .expect("failed storing value");
+
+    let hash_key = empty_code_hash.to_ru256();
+    let has_hash = journaled_state
+        .sload(known_code_addr, hash_key, db)
+        .map(|(v, _)| !v.is_zero())
+        .unwrap_or_default();
+    if !has_hash {
+        journaled_state.touch(&known_code_addr);
+        journaled_state
+            .sstore(known_code_addr, hash_key, rU256::from(1u32), db)
+            .expect("failed storing value");
     }
 }
