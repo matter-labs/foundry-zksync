@@ -276,7 +276,7 @@ impl ProjectCompiler {
     }
 
     /// Compiles the project.
-    pub fn zksync_compile(mut self, project: &Project) -> Result<ZkProjectCompileOutput> {
+    pub fn zksync_compile(self, project: &Project) -> Result<ZkProjectCompileOutput> {
         // TODO: Avoid process::exit
         if !project.paths.has_input_files() && self.files.is_empty() {
             println!("Nothing to compile");
@@ -286,7 +286,10 @@ impl ProjectCompiler {
 
         // Taking is fine since we don't need these in `compile_with`.
         //let filter = std::mem::take(&mut self.filter);
-        let files = std::mem::take(&mut self.files);
+
+        // We need to clone these since we use them in compiled with
+        // for whitelisting in missing libraries detection
+        let files = self.files.clone();
         self.zksync_compile_with(&project.paths.root, || {
             if !files.is_empty() {
                 project.zksync_compile_files(files)
@@ -367,9 +370,18 @@ impl ProjectCompiler {
         // Process missing libraries
         // TODO: skip this if project was not compiled using --detect-missing-libraries
         let mut missing_libs_unique: HashSet<String> = HashSet::new();
-        for (_, artifact) in output.artifacts() {
-            if let Some(mls) = &artifact.missing_libraries {
-                missing_libs_unique.extend(mls.clone());
+        for (artifact_id, artifact) in output.artifact_ids() {
+            // TODO: when compiling specific files, the output might still add cached artifacts
+            // that are not part of the file list to the output, which may cause missing libraries
+            // error to trigger for files that were not intended to be compiled.
+            // This behaviour needs to be investigated better on the foundry-compilers side.
+            // For now we filter, checking only the files passed to compile.
+            let is_target_file =
+                self.files.is_empty() || self.files.iter().any(|f| artifact_id.path == *f);
+            if is_target_file {
+                if let Some(mls) = &artifact.missing_libraries {
+                    missing_libs_unique.extend(mls.clone());
+                }
             }
         }
 
