@@ -125,7 +125,7 @@ impl DualCompiledContracts {
                 {
                     // TODO: we can do this because no bytecode object could be unlinked
                     // at this stage for zksolc, and BytecodeObject as ref will get the bytecode
-                    // bytes. We should be careful however we should check and
+                    // bytes. However, we should check and
                     // handle errors in case an Unlinked BytecodeObject gets
                     // here somehow
                     let bytecode_vec = bytecode.object.clone().into_bytes().unwrap().to_vec();
