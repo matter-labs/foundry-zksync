@@ -190,4 +190,11 @@ contract ZkCheatcodesTest is Test {
 
         transactor.transact();
     }
+
+    function testBlockHash() public {
+        vm.selectFork(forkEth);
+        require(block.number == ETH_FORK_BLOCK, "eth block number mismatch");
+
+        require(blockhash(ETH_FORK_BLOCK) == bytes32(0), "blockhash mismatch");
+    }
 }

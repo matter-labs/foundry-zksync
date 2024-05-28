@@ -1,9 +1,10 @@
+use core::panic;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
 
-use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
+use alloy_primitives::{hex, Address, Bytes, Uint, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
@@ -61,6 +62,12 @@ const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: [u8; 4] = hex!("796b89b9");
 ///
 /// Selector for `baseFee()`
 const SELECTOR_BASE_FEE: [u8; 4] = hex!("6ef25c3a");
+
+/// Selector for retrieving the blockhash of a given block.
+/// This is used to override the current `blockhash()` to foundry test's context.
+///
+/// Selector for `blockhash()`
+const SELECTOR_BLOCK_HASH: [u8; 4] = hex!("84e3b606");
 
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
@@ -286,6 +293,20 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             }
         }
 
+        // Override blockhash
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let calldata = get_calldata(&state, memory);
+            let current = state.vm_local_state.callstack.current;
+
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
+                calldata.starts_with(&SELECTOR_BLOCK_HASH)
+            {
+                self.farcall_handler
+                    .set_immediate_return(vec![0]);
+                return
+            }
+        }
+        
         if let Some(delegate_as) = self.call_context.delegate_as {
             if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
                 let current = state.vm_local_state.callstack.current;
