@@ -287,8 +287,8 @@ impl ProjectCompiler {
         // Taking is fine since we don't need these in `compile_with`.
         //let filter = std::mem::take(&mut self.filter);
 
-        // We need to clone these since we use them in compiled with
-        // for whitelisting in missing libraries detection
+        // We need to clone files since we use them in `compile_with`
+        // for filtering artifacts in missing libraries detection
         let files = self.files.clone();
         self.zksync_compile_with(&project.paths.root, || {
             if !files.is_empty() {
