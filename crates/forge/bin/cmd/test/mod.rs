@@ -31,7 +31,7 @@ use foundry_config::{
     get_available_profiles, Config,
 };
 use foundry_debugger::Debugger;
-use foundry_zksync_compiler::{DualCompiledContracts, ZkSolc};
+use foundry_zksync_compiler::DualCompiledContracts;
 use regex::Regex;
 use std::{sync::mpsc::channel, time::Instant};
 use watchexec::config::{InitConfig, RuntimeConfig};
@@ -169,23 +169,10 @@ impl TestArgs {
         }
         let output = compiler.compile(&project)?;
 
-        let mut zksolc = ZkSolc::new(
-            config
-                .new_zksolc_config_builder()
-                .and_then(|builder| {
-                    builder
-                        .avoid_contracts(self.opts.compiler.avoid_contracts.clone())
-                        .contracts_to_compile(self.opts.compiler.contracts_to_compile.clone())
-                        .build()
-                })
-                .map_err(|e| eyre::eyre!(e))?,
-            config.zk_project()?,
-        );
-        let (zk_output, _contract_bytecodes) = match zksolc.compile() {
-            Ok(compiled) => compiled,
-            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
-        };
-        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
+        let zk_compiler = ProjectCompiler::new().quiet_if(self.json || self.opts.silent);
+        let zk_output = zk_compiler.zksync_compile(&project)?;
+        let dual_compiled_contracts =
+            DualCompiledContracts::new(&output, &zk_output, &project.paths);
 
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;

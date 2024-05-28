@@ -89,6 +89,7 @@ opener = "0.6"
 
 # zk
 zksync-web3-rs = { workspace = true }
+zksync_types = { workspace = true }
 
 [dev-dependencies]
 anvil.workspace = true

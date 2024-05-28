@@ -114,11 +114,11 @@ contract ZkCheatcodesTest is Test {
         vm.selectFork(forkEra);
 
         string memory artifact = vm.readFile(
-            "zkout/ConstantNumber.sol/artifacts.json"
+            "zkout/ConstantNumber.sol/ConstantNumber.json"
         );
         bytes memory constantNumberCode = vm.parseJsonBytes(
             artifact,
-            '.contracts.["src/ConstantNumber.sol"].ConstantNumber.evm.bytecode.object'
+            ".bytecode.object"
         );
         vm.etch(TEST_ADDRESS, constantNumberCode);
 
@@ -142,6 +142,7 @@ contract ZkCheatcodesTest is Test {
         assertEq(reads[0], keySlot0);
         assertEq(writes[0], keySlot0);
     }
+
     function testZkCheatcodesValueFunctionMockReturn() public {
         InnerMock inner = new InnerMock();
         // Send some funds to so it can pay for the inner call
