@@ -205,7 +205,6 @@ pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunne
     let output = COMPILED.clone();
     let zk_output = COMPILED_ZK.clone();
 
-    // let project = &*PROJECT;
     let mut paths = ProjectPathsConfig::builder().root(TESTDATA).sources(TESTDATA).build().unwrap();
     paths.zksync_artifacts = format!("{TESTDATA}/zkout").into();
     // Dual compiled contracts
