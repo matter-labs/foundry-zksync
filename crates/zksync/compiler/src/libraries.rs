@@ -11,8 +11,8 @@ use tracing::{trace, warn};
 
 use foundry_compilers::info::ContractInfo;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
 /// Missing Library entry
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ZkMissingLibrary {
     /// Contract name
     pub contract_name: String,
