@@ -1,10 +1,9 @@
-use core::panic;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
 
-use alloy_primitives::{hex, Address, Bytes, Uint, U256 as rU256};
+use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
