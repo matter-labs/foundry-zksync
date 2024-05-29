@@ -309,19 +309,19 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state)
+    let chain_id = if env.cfg.chain_id <= u32::MAX as u64 {
+        L2ChainId::from(env.cfg.chain_id as u32)
+    } else {
+        tracing::warn!(provided = ?env.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
+        L2ChainId::from(DEFAULT_CHAIN_ID)
+    };
+
+    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state, chain_id)
         .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps))
         .with_storage_accesses(ccx.accesses.take());
 
     let is_create = call_ctx.is_create;
     tracing::info!(?call_ctx, "executing transaction in zk vm");
-
-    let chain_id_u32 = if env.cfg.chain_id <= u32::MAX as u64 {
-        env.cfg.chain_id as u32
-    } else {
-        tracing::warn!(provided = ?env.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
-        DEFAULT_CHAIN_ID
-    };
 
     if tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -334,7 +334,7 @@ where
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) =
-        inspect_inner(tx, storage_ptr, L2ChainId::from(chain_id_u32), ccx, call_ctx);
+        inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
 
     if let Some(record) = &mut era_db.accesses {
         for k in modified_storage.keys() {
