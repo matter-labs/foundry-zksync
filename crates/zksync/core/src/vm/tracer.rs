@@ -19,6 +19,7 @@ use multivm::{
     },
 };
 use once_cell::sync::OnceCell;
+use tracing::info;
 use zksync_state::WriteStorage;
 use zksync_types::{
     BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, SYSTEM_CONTEXT_ADDRESS, U256,
@@ -297,16 +298,17 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
-
+            let zero: [u8; 32] = [0; 32];
             if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
                 calldata.starts_with(&SELECTOR_BLOCK_HASH)
             {
+                info!(?current.code_address, ?calldata, "blockhash");
                 self.farcall_handler
-                    .set_immediate_return(vec![0]);
+                    .set_immediate_return(zero.to_vec());
                 return
             }
         }
-        
+
         if let Some(delegate_as) = self.call_context.delegate_as {
             if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
                 let current = state.vm_local_state.callstack.current;
