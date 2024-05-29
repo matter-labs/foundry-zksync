@@ -105,12 +105,12 @@ pub struct CompilerArgs {
     #[serde(skip)]
     pub zk_optimizer: bool,
 
-    /// Contracts to compile
-    #[clap(long, help_heading = "Contracts to compile", value_delimiter = ',')]
-    pub contracts_to_compile: Option<Vec<String>>,
-
-    /// Contracts to avoid compiling
-    #[clap(long, help_heading = "Contracts to avoid compilation", value_delimiter = ',')]
+    /// Contracts to avoid compiling on zkSync
+    #[clap(
+        long,
+        help_heading = "Contracts to avoid during zkSync compilation",
+        value_delimiter = ','
+    )]
     pub avoid_contracts: Option<Vec<String>>,
 }
 
