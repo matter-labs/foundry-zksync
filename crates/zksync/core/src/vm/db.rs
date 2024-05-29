@@ -82,11 +82,11 @@ where
     pub fn new_with_system_contracts(
         db: &'a mut DB,
         journaled_state: &'a mut JournaledState,
+        chain_id: L2ChainId,
     ) -> Self {
         let contracts = era_test_node::system_contracts::get_deployed_contracts(
             &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
         );
-        let chain_id = L2ChainId::from(DEFAULT_CHAIN_ID);
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         let mut override_keys = HashMap::default();
