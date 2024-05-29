@@ -68,7 +68,7 @@ Follow these steps to quickly install the binaries for `foundry-zksync`:
    Begin by cloning the `foundry-zksync` repository from GitHub. This will download the latest version of the source code to your local machine.
 
    ```bash
-   https://github.com/matter-labs/foundry-zksync.git
+   git clone git@github.com:matter-labs/foundry-zksync.git
    ```
 
 2. **Change Directory**:
