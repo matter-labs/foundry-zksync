@@ -19,7 +19,6 @@ use multivm::{
     },
 };
 use once_cell::sync::OnceCell;
-use tracing::info;
 use zksync_state::WriteStorage;
 use zksync_types::{
     BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, SYSTEM_CONTEXT_ADDRESS, U256,
@@ -67,8 +66,8 @@ const SELECTOR_BASE_FEE: [u8; 4] = hex!("6ef25c3a");
 /// Selector for retrieving the blockhash of a given block.
 /// This is used to override the current `blockhash()` to foundry test's context.
 ///
-/// Selector for `blockhash()`
-const SELECTOR_BLOCK_HASH: [u8; 4] = hex!("84e3b606");
+/// Selector for `getBlockHashEVM(uint256)`
+const SELECTOR_BLOCK_HASH: [u8; 4] = hex!("80b41246");
 
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
@@ -299,12 +298,11 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
             let zero: [u8; 32] = [0; 32];
+
             if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
                 calldata.starts_with(&SELECTOR_BLOCK_HASH)
             {
-                info!(?current.code_address, ?calldata, "blockhash");
-                self.farcall_handler
-                    .set_immediate_return(zero.to_vec());
+                self.farcall_handler.set_immediate_return(zero.to_vec());
                 return
             }
         }
