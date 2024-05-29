@@ -21,6 +21,7 @@ To use for zkSync environments, include `--zksync` when running `forge` or `vm.z
    - zkSync VM processes the transaction and returns state changes, which are applied to `journaled_state`. Results are relayed back.
 5. **Logging:**
    - `console.log()` outputs within zkSync VM are captured and displayed in Foundry.
+   - `ZK_DEBUG_RESOLVE_HASHES` and `ZK_DEBUG_SHOW_OUTPUTS` env variable may be set to `true` to display zkSync VM call logs with resolved selector hashes (requires Internet connection), and the call outputs, respectively.
 6. **Fuzzing**
    - Adds config option `no_zksync_reserved_addresses`. Since zkSync reserves addresses below 2^16 as system addresses, a fuzz test would've required a broad `vm.assume` and many `vm.excludeSender` calls to exclude these. This is not only cumbersome but could also trigger `proptest`'s global `max_global_rejects` failure. When this option is set to `true` the `proptest` generation itself ensures that no invalid addresses are generated, and thus need not be filtered adding up to the `max_test_rejects` count.
 
@@ -55,6 +56,7 @@ While `foundry-zksync` is **alpha stage**, there are some limitations to be awar
 - **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://era.zksync.io/docs/reference/architecture/differences-with-ethereum.html#create-create2).
 - **Contract Verification**: Currently contract verification via the `--verify` flag do not work as expected but will be added shortly.  
 - **Specific Foundry Features**: Currently features such as `--gas-report`, `--coverage` may not work as intended. We are actively working on providing support for these feature types.
+- **Solc Compatibility**: `zksolc` requires a `solc` binary to be run as a child process. The version/path to use for each can be specified by the `zksolc` and `solc` options in `foundry.toml`. Not all `solc` versions are supported by all `zksolc` versions, compiling with a `solc` version higher than the one supported may lead to unexpected errors. [Read the docs](https://docs.zksync.io/zk-stack/components/compiler/toolchain/solidity.html#limitations) about version limitations and check the [zksolc changelog](https://github.com/matter-labs/era-compiler-solidity/blob/main/CHANGELOG.md) to see the latest supported `solc` version.
 
 For the most effective use of our library, we recommend familiarizing yourself with these features and limitations.
 

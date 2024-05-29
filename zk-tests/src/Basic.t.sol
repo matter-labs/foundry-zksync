@@ -7,11 +7,13 @@ contract BlockEnv {
     uint256 public number;
     uint256 public timestamp;
     uint256 public basefee;
+    uint256 public chainid;
 
     constructor() {
         number = block.number;
         timestamp = block.timestamp;
         basefee = block.basefee;
+        chainid = block.chainid;
     }
 }
 
@@ -82,6 +84,10 @@ contract ZkBasicTest is Test {
             be.basefee() == block.basefee,
             "propagated block basefee is the same as current"
         );
+        require(
+            be.chainid() == block.chainid,
+            "propagated block chainid is the same as current"
+        );
 
         be = new BlockEnv();
         require(
@@ -95,6 +101,10 @@ contract ZkBasicTest is Test {
         require(
             be.basefee() == block.basefee,
             "propagated block basefee stays constant"
+        );
+        require(
+            be.chainid() == block.chainid,
+            "propagated block chainid stays constant"
         );
 
         vm.roll(42);

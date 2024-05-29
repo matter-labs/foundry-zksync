@@ -125,15 +125,26 @@ build_forge "${REPO_ROOT}"
 
 "${FORGE}" install transmissions11/solmate Openzeppelin/openzeppelin-contracts --no-commit
 
-echo "Running tests..."
-RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" -vvv  || fail "forge test failed"
-
-echo "Running tests with '--zksync'..."
-RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" -vvv --zksync  || fail "forge test --zksync failed"
-
-echo "Running script..."
 start_era_test_node
 
+# Test missing libraries detection and deploy
+output=$(RUST_LOG=warn "${FORGE}" build --zksync 2>&1 || true)
+
+if echo "$output" | grep -q "Missing libraries detected"; then
+    RUST_LOG=warn "${FORGE}" create --deploy-missing-libraries --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync
+    RUST_LOG=warn "${FORGE}" script ./src/MissingLibraries.sol:MathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync --chain 260 --use "./${SOLC}" -vvv || fail "forge script with libs failed"
+    RUST_LOG=warn "${FORGE}" script ./src/NestedMissingLibraries.sol:NestedMathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync --chain 260 --use "./${SOLC}" -vvv || fail "forge script with nested libs failed"
+else
+    echo "No missing libraries detected."
+fi
+
+echo "Running tests..."
+RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv  || fail "forge test failed"
+
+echo "Running tests with '--zksync'..."
+RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv --zksync  || fail "forge test --zksync failed"
+
+echo "Running script..."
 RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  || fail "forge script failed"
 RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  || fail "forge script failed on 2nd deploy"
 

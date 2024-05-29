@@ -137,8 +137,8 @@ foundry-zksync-core = { path = "crates/zksync/core" }
 foundry-zksync-compiler = { path = "crates/zksync/compiler" }
 
 # solc & compilation utilities
-foundry-block-explorers = { version = "0.2.3", default-features = false }
-foundry-compilers = { version = "0.3.9", default-features = false }
+foundry-block-explorers = { git = "https://github.com/Moonsong-Labs/block-explorers", branch = "zksync-v0.2.3", default-features = false }
+foundry-compilers = { git = "https://github.com/Moonsong-Labs/compilers", branch = "zksync-v0.3.9" }
 
 ## revm
 # no default features to avoid c-kzg
@@ -264,6 +264,9 @@ packed_simd = { git = "https://github.com/nbaztec/packed_simd", branch = "foundr
 
 # [patch."https://github.com/matter-labs/era-test-node"]
 # era_test_node = { path = "../era-test-node" }
+
+# [patch."https://github.com/Moonsong-Labs/compilers"]
+# foundry-compilers = { path = "../msl-compilers" }
 
 [patch."https://github.com/matter-labs/era-boojum"]
 cs_derive = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }
