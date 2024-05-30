@@ -1738,12 +1738,19 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 &mut data.journaled_state,
                 ccx,
             ) {
-                self.combined_logs.extend(result.logs.into_iter().map(|log| {
+                self.combined_logs.extend(result.logs.clone().into_iter().map(|log| {
                     Some(Log {
                         address: log.address,
                         data: LogData::new_unchecked(log.topics, log.data),
                     })
                 }));
+
+                //for each log in cloned logs call handle_expect_emit
+                if !self.expected_emits.is_empty() {
+                    for log in result.logs {
+                        expect::handle_expect_emit(self, &log.address, &log.topics, &log.data);
+                    }
+                }
 
                 return match result.execution_result {
                     ExecutionResult::Success { output, .. } => match output {
