@@ -1745,7 +1745,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     })
                 }));
 
-                //for each log in cloned logs call handle_expect_emit
+                // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
                     for log in result.logs {
                         expect::handle_expect_emit(self, &log.address, &log.topics, &log.data);
