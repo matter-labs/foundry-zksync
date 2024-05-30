@@ -139,10 +139,10 @@ else
 fi
 
 echo "Running tests..."
-RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" -vvv  || fail "forge test failed"
+RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv  || fail "forge test failed"
 
 echo "Running tests with '--zksync'..."
-RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" -vvv --zksync  || fail "forge test --zksync failed"
+RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv --zksync  || fail "forge test --zksync failed"
 
 echo "Running script..."
 RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  || fail "forge script failed"
