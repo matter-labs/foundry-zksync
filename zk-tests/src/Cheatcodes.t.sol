@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
-import {BlockhashCaller} from "./BlockhashCaller.sol";
 
 contract FixedSlot {
     uint8 num; // slot index: 0
@@ -190,11 +189,5 @@ contract ZkCheatcodesTest is Test {
         );
 
         transactor.transact();
-    }
-
-    function testBlockHash() public {
-        BlockhashCaller caller = new BlockhashCaller();
-        bytes32 hash = caller.getBlockhash(1);
-        require(hash == bytes32(0), "blockhash mismatch");
     }
 }

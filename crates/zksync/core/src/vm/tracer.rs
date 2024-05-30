@@ -296,12 +296,11 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
-            let zero: [u8; 32] = [0; 32];
 
             if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
                 calldata.starts_with(&SELECTOR_BLOCK_HASH)
             {
-                self.farcall_handler.set_immediate_return(zero.to_vec());
+                self.farcall_handler.set_immediate_return(rU256::ZERO.to_be_bytes_vec());
                 return
             }
         }
