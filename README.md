@@ -80,21 +80,14 @@ Follow these steps to quickly install the binaries for `foundry-zksync`:
    cd foundry-zksync
    ```
 
-3. **Make the Installer Executable**:
-   Before running the installation script, ensure it is executable. This step is crucial for allowing the script to run without permission issues.
-
-   ```bash
-   chmod +x ./install-foundry-zksync
-   ```
-
-4. **Run the Installer**:
+3. **Run the Installer**:
    Now, you're ready to execute the installation script. This command initializes the setup and installs `foundry-zksync` binaries `forge` and `cast`.
 
    ```bash
    ./install-foundry-zksync
    ```
 
-5. **Verify the Installation** (Recommended):
+4. **Verify the Installation** (Recommended):
    After installation, it's good practice to verify that the binaries have been installed correctly. Run the following command to check the installed version:
 
    ```bash
