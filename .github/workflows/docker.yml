@@ -5,9 +5,13 @@ on:
         tags:
             - "v*.*.*"
     workflow_dispatch:
+        inputs:
+            registry_image:
+                description: 'Registry image'
+                required: false
 
 env:
-    REGISTRY_IMAGE: ghcr.io/matter-labs/foundry-zksync
+    REGISTRY_IMAGE: ${{ github.event.inputs.registry_image || 'ghcr.io/matter-labs/foundry-zksync' }}
 
 jobs:
     build:
