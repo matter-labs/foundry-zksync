@@ -3027,7 +3027,7 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 [[package]]
 name = "era_test_node"
 version = "0.1.0-alpha.21"
-source = "git+https://github.com/matter-labs/era-test-node.git?rev=e0090706173c27f42f0179e2eec1d00760f534d4#e0090706173c27f42f0179e2eec1d00760f534d4"
+source = "git+https://github.com/matter-labs/era-test-node.git?rev=1d72eae6e9400b5b6caed5e60093e7c32eee8abb#1d72eae6e9400b5b6caed5e60093e7c32eee8abb"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -12087,8 +12087,8 @@ dependencies = [
 
 [[package]]
 name = "zksync-web3-rs"
-version = "0.1.0"
-source = "git+https://github.com/lambdaclass/zksync-web3-rs.git?rev=70327ae5413c517bd4d27502507cdd96ee40cd22#70327ae5413c517bd4d27502507cdd96ee40cd22"
+version = "0.1.1"
+source = "git+https://github.com/lambdaclass/zksync-web3-rs.git?rev=fd7adf634c016f40ea01f702e0e05f57aa5ba614#fd7adf634c016f40ea01f702e0e05f57aa5ba614"
 dependencies = [
  "async-trait",
  "clap",
@@ -12096,6 +12096,7 @@ dependencies = [
  "ethers",
  "ethers-contract",
  "hex",
+ "lazy_static",
  "log",
  "serde",
  "serde_json",

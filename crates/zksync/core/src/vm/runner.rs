@@ -378,8 +378,8 @@ where
                 logs: logs.clone(),
                 execution_result: rExecutionResult::Success {
                     reason: Eval::Return,
-                    gas_used: tx_result.statistics.gas_used as u64,
-                    gas_refunded: tx_result.refunds.gas_refunded as u64,
+                    gas_used: tx_result.statistics.gas_used,
+                    gas_refunded: tx_result.refunds.gas_refunded,
                     logs,
                     output,
                 },
@@ -395,7 +395,7 @@ where
             ZKVMExecutionResult {
                 logs,
                 execution_result: rExecutionResult::Revert {
-                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded,
                     output: Bytes::from(output),
                 },
             }
@@ -411,7 +411,7 @@ where
                 logs,
                 execution_result: rExecutionResult::Halt {
                     reason: mapped_reason,
-                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded,
                 },
             }
         }
