@@ -7,7 +7,7 @@ on:
     workflow_dispatch:
 
 env:
-    REGISTRY_IMAGE: ghcr.io/eteissonniere/foundry-zksync
+    REGISTRY_IMAGE: ghcr.io/matter-labs/foundry-zksync
 
 jobs:
     build:
