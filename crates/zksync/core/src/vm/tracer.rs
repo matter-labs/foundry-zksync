@@ -10,7 +10,7 @@ use foundry_cheatcodes_common::{
     record::RecordAccess,
 };
 use multivm::{
-    interface::{dyn_tracers::vm_1_4_1::DynTracer, tracer::TracerExecutionStatus},
+    interface::{dyn_tracers::vm_1_5_0::DynTracer, tracer::TracerExecutionStatus},
     vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
     zk_evm_latest::{
         tracing::{AfterDecodingData, AfterExecutionData, BeforeExecutionData, VmLocalStateData},

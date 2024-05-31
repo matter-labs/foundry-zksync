@@ -156,7 +156,7 @@ impl FarCallHandler {
         if let Some(return_data) = self.immediate_return.take() {
             // set return data
             let current = state.local_state.callstack.get_current_stack();
-            let return_memory_page = CallStackEntry::heap_page_from_base(current.base_memory_page);
+            let return_memory_page = vm_state::heap_page_from_base(current.base_memory_page);
 
             let data_chunks = return_data.chunks(32);
             let return_fat_ptr = FatPointer {

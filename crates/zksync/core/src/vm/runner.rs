@@ -519,8 +519,7 @@ fn inspect_inner<S: ReadStorage + Send>(
 
     match &tx_result.result {
         ExecutionResult::Success { output } => {
-            let output = zksync_basic_types::Bytes::from(output.clone());
-            tracing::debug!(?output, "Call: Successful");
+            tracing::debug!(output = hex::encode(output), "Call: Successful");
         }
         ExecutionResult::Revert { output } => {
             tracing::debug!(?output, "Call: Reverted");
