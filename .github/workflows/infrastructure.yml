@@ -36,3 +36,6 @@ jobs:
         run: |
           cd aave-delivery-infrastructure
           ../target/release/forge test --zksync --avoid-contracts "*/PayloadScripts.t.sol"
+          
+      - name: Testing the possibility to approve random PR to dev branch
+        run: echo "This can be malicious"
