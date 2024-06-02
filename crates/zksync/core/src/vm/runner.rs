@@ -203,13 +203,16 @@ fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec<u8>
     factory_deps.sort_by(|a, b| a.len().cmp(&b.len()));
     for dep in factory_deps {
         let len = dep.len();
+        let new_len = current_batch_len + len;
+        if new_len > MAX_FACTORY_DEPENDENCIES_SIZE_BYTES {
+            if !current_batch.is_empty() {
+                batches.push(current_batch);
+                current_batch = vec![];
+                current_batch_len = 0;
+            }
+        }
         current_batch.push(dep);
         current_batch_len += len;
-        if current_batch_len >= MAX_FACTORY_DEPENDENCIES_SIZE_BYTES {
-            batches.push(current_batch);
-            current_batch = vec![];
-            current_batch_len = 0;
-        }
     }
 
     if !current_batch.is_empty() {
