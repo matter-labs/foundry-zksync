@@ -204,12 +204,10 @@ fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec<u8>
     for dep in factory_deps {
         let len = dep.len();
         let new_len = current_batch_len + len;
-        if new_len > MAX_FACTORY_DEPENDENCIES_SIZE_BYTES {
-            if !current_batch.is_empty() {
-                batches.push(current_batch);
-                current_batch = vec![];
-                current_batch_len = 0;
-            }
+        if new_len > MAX_FACTORY_DEPENDENCIES_SIZE_BYTES && !current_batch.is_empty() {
+            batches.push(current_batch);
+            current_batch = vec![];
+            current_batch_len = 0;
         }
         current_batch.push(dep);
         current_batch_len += len;
@@ -272,7 +270,7 @@ where
             txs.push(L2Tx::new(
                 H160::zero(),
                 Vec::default(),
-                nonce.clone(),
+                nonce,
                 Fee {
                     gas_limit,
                     max_fee_per_gas,
