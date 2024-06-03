@@ -22,8 +22,10 @@ use alloy_primitives::{Address, Bytes, U256 as rU256};
 use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 use eyre::{eyre, OptionExt};
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
+use vm::batch_factory_dependencies;
 pub use vm::{balance, encode_create_params, nonce};
 
+use zksync_basic_types::H160;
 use zksync_types::utils::storage_key_for_eth_balance;
 pub use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, L2_ETH_TOKEN_ADDRESS,
@@ -34,7 +36,7 @@ use zksync_web3_rs::{
     eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest},
     providers::Middleware,
     signers::Signer,
-    types::transaction::eip2718::TypedTransaction,
+    types::{transaction::eip2718::TypedTransaction, NameOrAddress},
     zks_provider::types::Fee,
     zks_utils::EIP712_TX_TYPE,
 };
@@ -59,12 +61,52 @@ pub struct ZkTransactionMetadata {
     pub factory_deps: Vec<Vec<u8>>,
 }
 
+/// Creates a new batch of signed EIP-712 transactions, splitting the tx based on the factory deps
+pub async fn new_eip712_batch_transactions<M: Middleware, S: Signer>(
+    mut tx: TypedTransaction,
+    factory_deps: Vec<Vec<u8>>,
+    provider: &M,
+    signer: &S,
+) -> Result<Vec<Bytes>> {
+    use foundry_common::types::ToEthers;
+
+    let mut batched = batch_factory_dependencies(factory_deps);
+    let last_deps = batched.pop();
+
+    let mut txs = Vec::with_capacity(batched.len() + 1);
+    for deps in batched.into_iter() {
+        let mut local_tx = tx.clone();
+        local_tx
+            .set_to(NameOrAddress::Address(H160::default()))
+            .set_data(Bytes::new().to_ethers())
+            .set_value(0);
+
+        if let Some(nonce) = tx.nonce() {
+            tx.set_nonce(nonce.saturating_add(rU256::from(1).to_u256()));
+        }
+
+        txs.push(new_eip712_transaction(local_tx, deps, provider, signer).await?);
+    }
+
+    txs.push(
+        new_eip712_transaction(
+            tx,
+            last_deps.expect("at least one set of factory deps"),
+            provider,
+            signer,
+        )
+        .await?,
+    );
+
+    Ok(txs)
+}
+
 /// Creates a new signed EIP-712 transaction with the provided factory deps.
 pub async fn new_eip712_transaction<M: Middleware, S: Signer>(
     legacy_or_1559: TypedTransaction,
     factory_deps: Vec<Vec<u8>>,
-    provider: M,
-    signer: S,
+    provider: &M,
+    signer: &S,
 ) -> Result<Bytes> {
     let from = legacy_or_1559.from().cloned().ok_or_eyre("`from` cannot be empty")?;
     let to = legacy_or_1559
