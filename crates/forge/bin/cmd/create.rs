@@ -736,11 +736,13 @@ where
 
                 let mut pending = None;
                 for tx in txs {
-                    pending.replace(self.client
-                        .borrow()
-                        .send_raw_transaction(tx.to_ethers())
-                        .await
-                        .map_err(ContractError::from_middleware_error)?);
+                    pending.replace(
+                        self.client
+                            .borrow()
+                            .send_raw_transaction(tx.to_ethers())
+                            .await
+                            .map_err(ContractError::from_middleware_error)?,
+                    );
                 }
                 pending.expect("at least 1 tx")
             }
