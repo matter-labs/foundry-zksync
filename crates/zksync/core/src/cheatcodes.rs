@@ -150,6 +150,13 @@ pub fn etch<'a, DB>(
     <DB as Database>::Error: Debug,
 {
     info!(?address, bytecode = hex::encode(bytecode), "cheatcode etch");
+    let len = bytecode.len();
+    if len % 32 != 0 {
+        panic!(
+            "etch bytecode length must be divisible by 32, found '{}' with length {len}",
+            hex::encode(&bytecode)
+        );
+    }
 
     let bytecode_hash = hash_bytecode(bytecode).to_ru256();
     let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(bytecode));
