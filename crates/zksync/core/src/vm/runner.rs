@@ -21,9 +21,9 @@ use crate::{
     fix_l2_gas_limit, fix_l2_gas_price,
     vm::{
         db::ZKVMData,
+        factory_deps::split_tx_by_factory_deps,
         inspect::{inspect, inspect_multi, ZKVMExecutionResult, ZKVMResult},
         tracer::{CallContext, CheatcodeTracerContext},
-        tx::split_tx_by_factory_deps,
     },
 };
 
