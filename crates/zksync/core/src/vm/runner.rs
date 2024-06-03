@@ -21,7 +21,7 @@ use crate::{
     fix_l2_gas_limit, fix_l2_gas_price,
     vm::{
         db::ZKVMData,
-        inspect::{inspect, ZKVMExecutionResult, ZKVMResult},
+        inspect::{inspect, inspect_multi, ZKVMExecutionResult, ZKVMResult},
         tracer::{CallContext, CheatcodeTracerContext},
         tx::split_tx_by_factory_deps,
     },
@@ -180,7 +180,6 @@ where
         Some(factory_deps),
         PaymasterParams::default(),
     ));
-    let batched_factory_deps_count = txns.len();
 
     let call_ctx = CallContext {
         tx_caller: env.tx.caller,
@@ -193,46 +192,7 @@ where
         is_create: true,
     };
 
-    let mut aggregated_result: Option<ZKVMExecutionResult> = None;
-    for (idx, tx) in transactions.into_iter().enumerate() {
-        info!("executing batched tx ({}/{})", idx, batched_factory_deps_count);
-        let result = inspect(tx, env, db, journaled_state, &mut ccx, call_ctx.clone())?;
-        if let Some(aggregated_result) = &mut aggregated_result {
-            match result.execution_result {
-                rExecutionResult::Success { reason, gas_used, gas_refunded, logs, output } => {
-                    aggregated_result.logs.extend(result.logs);
-                    match &mut aggregated_result.execution_result {
-                        rExecutionResult::Success {
-                            reason: agg_reason,
-                            gas_used: agg_gas_used,
-                            gas_refunded: agg_gas_refunded,
-                            logs: agg_logs,
-                            output: agg_output,
-                        } => {
-                            *agg_reason = reason;
-                            *agg_gas_used += gas_used;
-                            *agg_gas_refunded += gas_refunded;
-                            agg_logs.extend(logs);
-                            *agg_output = output;
-                        }
-                        _ => unreachable!("aggregated result must only contain success"),
-                    }
-                }
-                _ => return Ok(result),
-            }
-        } else {
-            match result.execution_result {
-                rExecutionResult::Revert { .. } | rExecutionResult::Halt { .. } => {
-                    return Ok(result)
-                }
-                _ => {
-                    aggregated_result.replace(result);
-                }
-            }
-        }
-    }
-
-    Ok(aggregated_result.expect("must have result"))
+    inspect_multi(txns, env, db, journaled_state, &mut ccx, call_ctx)
 }
 
 /// Executes a CALL opcode on the ZK-VM.
