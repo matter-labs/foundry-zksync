@@ -200,7 +200,7 @@ fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec<u8>
     let mut current_batch_len = 0;
 
     // sort in increasing order of size to ensure the smaller bytecodes are packed efficiently
-    factory_deps.sort_by(|a, b| a.len().cmp(&b.len()));
+    factory_deps.sort_by_key(|a| a.len());
     for dep in factory_deps {
         let len = dep.len();
         let new_len = current_batch_len + len;
