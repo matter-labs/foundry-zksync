@@ -60,6 +60,66 @@ pub struct ZKVMExecutionResult {
 /// Revm-style result with ZKVM Execution
 pub type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
 
+/// Same as [`inspect`] but for multiple L2Tx.
+///
+/// Will handle aggregating execution results, where errors, reverts or halts will be propagated
+/// immediately.
+/// All logs will be collected as they happen, and returned with the final result.
+pub fn inspect_multi<'a, DB, E>(
+    txns: Vec<L2Tx>,
+    env: &'a mut Env,
+    db: &'a mut DB,
+    journaled_state: &'a mut JournaledState,
+    ccx: &mut CheatcodeTracerContext,
+    call_ctx: CallContext,
+) -> ZKVMResult<E>
+where
+    DB: Database + Send,
+    <DB as Database>::Error: Debug,
+{
+    let total_txns = txns.len();
+    let mut aggregated_result: Option<ZKVMExecutionResult> = None;
+
+    for (idx, tx) in txns.into_iter().enumerate() {
+        info!("executing batched tx ({}/{})", idx, total_txns);
+        let mut result = inspect(tx, env, db, journaled_state, ccx, call_ctx.clone())?;
+
+        match (&mut aggregated_result, result.execution_result) {
+            (_, exec @ rExecutionResult::Revert { .. } | exec @ rExecutionResult::Halt { .. }) => {
+                return Ok(ZKVMExecutionResult { logs: result.logs, execution_result: exec });
+            }
+            (None, exec) => {
+                aggregated_result
+                    .replace(ZKVMExecutionResult { logs: result.logs, execution_result: exec });
+            }
+            (
+                Some(ZKVMExecutionResult {
+                    logs: aggregated_logs,
+                    execution_result:
+                        rExecutionResult::Success {
+                            reason: agg_reason,
+                            gas_used: agg_gas_used,
+                            gas_refunded: agg_gas_refunded,
+                            logs: agg_logs,
+                            output: agg_output,
+                        },
+                }),
+                rExecutionResult::Success { reason, gas_used, gas_refunded, logs, output },
+            ) => {
+                aggregated_logs.append(&mut result.logs);
+                *agg_reason = reason;
+                *agg_gas_used += gas_used;
+                *agg_gas_refunded += gas_refunded;
+                agg_logs.extend(logs);
+                *agg_output = output;
+            }
+            _ => unreachable!("aggregated result must only contain success"),
+        }
+    }
+
+    Ok(aggregated_result.expect("must have result"))
+}
+
 /// Processes a [`L2Tx`] with EraVM and returns the final execution result and logs.
 ///
 /// State changes will be reflected in the given `Env`, `DB`, `JournaledState`.
