@@ -51,17 +51,13 @@ use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 use crate::vm::{
     db::{ZKVMData, DEFAULT_CHAIN_ID},
     env::{create_l1_batch_env, create_system_env},
+    tx::split_tx_by_factory_deps,
 };
 
 use super::{storage_view::StorageView, tracer::CheatcodeTracerContext};
 
 /// Maximum gas price allowed for L1.
 const MAX_L1_GAS_PRICE: u64 = 1000;
-
-/// Maximum size allowed for factory_deps during create.
-/// We batch factory_deps till this upper limit if there are multiple deps.
-/// These batches are they deployed individually
-const MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: usize = 100000; // 100kB
 
 #[derive(Debug)]
 pub struct ZKVMExecutionResult {
@@ -184,50 +180,6 @@ where
     ZKVMData::new(db, journaled_state).get_tx_nonce(address).0
 }
 
-/// Batch factory deps on the basis of size.
-///
-/// For large factory_deps the VM can out of gas. To avoid this case we batch factory_deps
-/// on the basis of [MAX_FACTORY_DEPENDENCIES_SIZE_BYTES] and deploy the initial batches
-/// via empty transactions and the last one normally via create.
-fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec<u8>>> {
-    let factory_deps_count = factory_deps.len();
-    let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
-    let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();
-    tracing::info!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, "optimizing factory_deps");
-
-    let mut batches = vec![];
-    let mut current_batch = vec![];
-    let mut current_batch_len = 0;
-
-    // sort in increasing order of size to ensure the smaller bytecodes are packed efficiently
-    factory_deps.sort_by_key(|a| a.len());
-    for dep in factory_deps {
-        let len = dep.len();
-        let new_len = current_batch_len + len;
-        if new_len > MAX_FACTORY_DEPENDENCIES_SIZE_BYTES && !current_batch.is_empty() {
-            batches.push(current_batch);
-            current_batch = vec![];
-            current_batch_len = 0;
-        }
-        current_batch.push(dep);
-        current_batch_len += len;
-    }
-
-    if !current_batch.is_empty() {
-        batches.push(current_batch);
-    }
-
-    let batch_count = batches.len();
-    let batch_individual_sizes =
-        batches.iter().map(|deps| deps.iter().map(|dep| dep.len()).collect_vec()).collect_vec();
-    let batch_cumulative_sizes =
-        batches.iter().map(|deps| deps.iter().map(|dep| dep.len()).sum::<usize>()).collect_vec();
-    let batch_total_size = batch_cumulative_sizes.iter().sum::<usize>();
-    tracing::info!(count=batch_count, total=batch_total_size, sizes=?batch_cumulative_sizes, batched_sizes=?batch_individual_sizes, "optimized factory_deps into batches");
-
-    batches
-}
-
 /// Executes a CREATE opcode on the ZK-VM.
 pub fn create<'a, DB, E>(
     call: &CreateInputs,
@@ -252,72 +204,23 @@ where
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
     // If we have more than one factory_dep, we deploy them individually to ensure we
-    // do not out of gas.
-    // TODO: Split on the basis of size, perhaps max 100_000 bytes per batch
-    let batched_factory_deps = batch_factory_dependencies(factory_deps);
-    let batched_factory_deps_count = batched_factory_deps.len();
-    let transactions = if batched_factory_deps.len() > 1 {
-        let mut txs = vec![];
-        let mut last_deps = None;
-        let mut nonce = nonce;
-        for (i, deps) in batched_factory_deps.into_iter().enumerate() {
-            // skip if last factory_dep, so we can deploy it normally
-            if i == batched_factory_deps_count - 1 {
-                last_deps.replace(deps);
-                break
-            }
-
-            txs.push(L2Tx::new(
-                H160::zero(),
-                Vec::default(),
-                nonce,
-                Fee {
-                    gas_limit,
-                    max_fee_per_gas,
-                    max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-                    gas_per_pubdata_limit: U256::from(20000),
-                },
-                caller.to_h160(),
-                Default::default(),
-                Some(deps),
-                PaymasterParams::default(),
-            ));
-            nonce = Nonce(nonce.saturating_add(1));
-        }
-        txs.push(L2Tx::new(
-            CONTRACT_DEPLOYER_ADDRESS,
-            calldata,
-            nonce,
-            Fee {
-                gas_limit,
-                max_fee_per_gas,
-                max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-                gas_per_pubdata_limit: U256::from(20000),
-            },
-            caller.to_h160(),
-            call.value.to_u256(),
-            Some(last_deps.expect("must have an element left")),
-            PaymasterParams::default(),
-        ));
-
-        txs
-    } else {
-        vec![L2Tx::new(
-            CONTRACT_DEPLOYER_ADDRESS,
-            calldata,
-            nonce,
-            Fee {
-                gas_limit,
-                max_fee_per_gas,
-                max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-                gas_per_pubdata_limit: U256::from(20000),
-            },
-            caller.to_h160(),
-            call.value.to_u256(),
-            Some(batched_factory_deps.into_iter().next().expect("must have one element")),
-            PaymasterParams::default(),
-        )]
-    };
+    // do not run out of gas.
+    let txns = split_tx_by_factory_deps(L2Tx::new(
+        CONTRACT_DEPLOYER_ADDRESS,
+        calldata,
+        nonce,
+        Fee {
+            gas_limit,
+            max_fee_per_gas,
+            max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
+            gas_per_pubdata_limit: U256::from(20000),
+        },
+        caller.to_h160(),
+        call.value.to_u256(),
+        Some(factory_deps),
+        PaymasterParams::default(),
+    ));
+    let batched_factory_deps_count = txns.len();
 
     let call_ctx = CallContext {
         tx_caller: env.tx.caller,
