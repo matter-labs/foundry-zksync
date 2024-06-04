@@ -57,7 +57,7 @@ where
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, &mut journaled_state, caller);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
-    let txns = split_tx_by_factory_deps(L2Tx::new(
+    let tx = L2Tx::new(
         transact_to,
         env.tx.data.to_vec(),
         nonce,
@@ -71,7 +71,7 @@ where
         env.tx.value.to_u256(),
         factory_deps,
         PaymasterParams::default(),
-    ));
+    );
 
     let call_ctx = CallContext {
         tx_caller: env.tx.caller,
@@ -84,8 +84,8 @@ where
         is_create,
     };
 
-    match inspect_multi::<_, DB::Error>(
-        txns,
+    match inspect::<_, DB::Error>(
+        tx,
         env,
         db,
         &mut journaled_state,

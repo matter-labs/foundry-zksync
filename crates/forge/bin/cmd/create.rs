@@ -725,7 +725,7 @@ where
                 .await
                 .map_err(ContractError::from_middleware_error)?,
             Some(factory_deps) => {
-                let txs = foundry_zksync_core::new_eip712_batch_transactions(
+                let tx = foundry_zksync_core::new_eip712_transaction(
                     self.tx,
                     factory_deps,
                     self.client.borrow().provider(),
@@ -734,17 +734,11 @@ where
                 .await
                 .map_err(|_| ContractError::DecodingError(ethers_core::abi::Error::InvalidData))?;
 
-                let mut pending = None;
-                for tx in txs {
-                    pending.replace(
-                        self.client
-                            .borrow()
-                            .send_raw_transaction(tx.to_ethers())
-                            .await
-                            .map_err(ContractError::from_middleware_error)?,
-                    );
-                }
-                pending.expect("at least 1 tx")
+                self.client
+                    .borrow()
+                    .send_raw_transaction(tx.to_ethers())
+                    .await
+                    .map_err(ContractError::from_middleware_error)?
             }
         };
 
