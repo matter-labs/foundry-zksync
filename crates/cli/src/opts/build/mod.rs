@@ -60,7 +60,7 @@ pub struct CompilerArgs {
 
     #[clap(
         help_heading = "zkSync Compiler options",
-        help = "Solc compiler path to when compiling with zksolc",
+        help = "Solc compiler path to use when compiling with zksolc",
         long = "zk-solc-path",
         value_name = "ZK_SOLC_PATH"
     )]
