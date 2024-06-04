@@ -133,6 +133,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         force_evmla: Default::default(),
         detect_missing_libraries: Default::default(),
         zksolc: Default::default(),
+        zk_solc_path: None,
         zk_bytecode_hash: Default::default(),
         avoid_contracts: Default::default(),
     };
