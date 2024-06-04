@@ -15,6 +15,10 @@ contract BlockEnv {
         basefee = block.basefee;
         chainid = block.chainid;
     }
+
+    function ZkBlockhash(uint256 _blockNumber) public view returns (bytes32) {
+        return blockhash(_blockNumber);
+    }
 }
 
 contract ZkBasicTest is Test {
@@ -28,12 +32,16 @@ contract ZkBasicTest is Test {
 
     uint256 forkEra;
     uint256 forkEth;
+    uint256 latestForkEth;
 
     function setUp() public {
         forkEra = vm.createFork("mainnet", ERA_FORK_BLOCK);
         forkEth = vm.createFork(
-            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf",
+            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", //trufflehog:ignore
             ETH_FORK_BLOCK
+        );
+        latestForkEth = vm.createFork(
+            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf" //trufflehog:ignore
         );
     }
 
@@ -88,6 +96,14 @@ contract ZkBasicTest is Test {
             be.chainid() == block.chainid,
             "propagated block chainid is the same as current"
         );
+        require(
+            be.ZkBlockhash(block.number) == blockhash(block.number),
+            "propagated blockhash is the same as current"
+        );
+        require(
+            be.ZkBlockhash(block.number) == bytes32(0),
+            "blockhash mismatch"
+        );
 
         be = new BlockEnv();
         require(
@@ -138,6 +154,15 @@ contract ZkBasicTest is Test {
         require(
             beAfter.basefee() == block.basefee,
             "propagated block basefee is the same as before"
+        );
+    }
+
+    function testZkBlockhashWithNewerBlocks() public {
+        vm.selectFork(latestForkEth);
+        BlockEnv be = new BlockEnv();
+        require(
+            be.ZkBlockhash(block.number) == blockhash(block.number),
+            "blockhash mismatch"
         );
     }
 }
