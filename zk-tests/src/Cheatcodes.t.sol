@@ -36,6 +36,7 @@ interface IMyProxyCaller {
 
 contract MyProxyCaller {
     address inner;
+
     constructor(address _inner) {
         inner = _inner;
     }
@@ -45,7 +46,22 @@ contract MyProxyCaller {
     }
 }
 
+contract Emitter {
+    event EventConstructor(string message);
+    event EventFunction(string message);
+
+    constructor() {
+        emit EventConstructor("constructor");
+    }
+
+    function functionEmit() public {
+        emit EventFunction("function");
+    }
+}
+
 contract ZkCheatcodesTest is Test {
+    event EventConstructor(string message);
+    event EventFunction(string message);
     uint256 testSlot = 0; //0x000000000000000000000000000000000000000000000000000000000000001e slot
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
@@ -114,11 +130,11 @@ contract ZkCheatcodesTest is Test {
         vm.selectFork(forkEra);
 
         string memory artifact = vm.readFile(
-            "zkout/ConstantNumber.sol/artifacts.json"
+            "zkout/ConstantNumber.sol/ConstantNumber.json"
         );
         bytes memory constantNumberCode = vm.parseJsonBytes(
             artifact,
-            '.contracts.["src/ConstantNumber.sol"].ConstantNumber.evm.bytecode.object'
+            ".bytecode.object"
         );
         vm.etch(TEST_ADDRESS, constantNumberCode);
 
@@ -142,6 +158,20 @@ contract ZkCheatcodesTest is Test {
         assertEq(reads[0], keySlot0);
         assertEq(writes[0], keySlot0);
     }
+
+    function testExpectEmit() public {
+        vm.expectEmit(true, true, true, true);
+        emit EventFunction("function");
+        Emitter emitter = new Emitter();
+        emitter.functionEmit();
+    }
+
+    function testExpectEmitOnCreate() public {
+        vm.expectEmit(true, true, true, true);
+        emit EventConstructor("constructor");
+        new Emitter();
+    }
+
     function testZkCheatcodesValueFunctionMockReturn() public {
         InnerMock inner = new InnerMock();
         // Send some funds to so it can pay for the inner call

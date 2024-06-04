@@ -22,6 +22,15 @@ use foundry_compilers::{
     cache::SOLIDITY_FILES_CACHE_FILENAME,
     error::SolcError,
     remappings::{RelativeRemapping, Remapping},
+    zksync::{
+        artifacts::{
+            BytecodeHash as ZkSolcBytecodeHash, Optimizer as ZkSolcOptimizer,
+            OptimizerDetails as ZkSolcOptimizerDetails, Settings as ZkSolcSettings,
+            SettingsMetadata as ZkSolcSettingsMetadata,
+        },
+        compile::ZkSolc,
+        config::ZkSolcConfig,
+    },
     ConfigurableArtifacts, EvmVersion, Project, ProjectPathsConfig, Solc, SolcConfig,
 };
 use inflector::Inflector;
@@ -96,8 +105,6 @@ use providers::remappings::RemappingsProvider;
 mod inline;
 use crate::etherscan::EtherscanEnvProvider;
 pub use inline::{validate_profiles, InlineConfig, InlineConfigError, InlineConfigParser, NatSpec};
-
-use foundry_zksync_compiler::{ZkSolcConfig, ZkSolcConfigBuilder, DEFAULT_ZKSOLC_VERSION};
 
 /// Foundry configuration
 ///
@@ -410,14 +417,16 @@ pub struct Config {
     ///
     /// Use zksync era
     pub zksync: bool,
-    /// Path to zksolc binary. Can be a URL.
-    pub compiler_path: PathBuf,
+    /// The zkSolc instance to use if any.
+    pub zksolc: Option<SolcReq>,
     /// Optimizer settings for zkSync
     pub zk_optimizer: bool,
     /// The optimization mode string.
-    pub mode: String,
-    /// solc optimizer details remain the same
-    pub zk_optimizer_details: Option<OptimizerDetails>,
+    pub mode: char,
+    /// zksolc optimizer details remain the same
+    pub zk_optimizer_details: Option<ZkSolcOptimizerDetails>,
+    /// Whether to include the metadata hash for zksolc compiled bytecode.
+    pub zk_bytecode_hash: ZkSolcBytecodeHash,
     /// Whether to try to recompile with -Oz if the bytecode is too large.
     pub fallback_oz: bool,
     /// Whether to support compilation of zkSync-specific simulations
@@ -426,6 +435,8 @@ pub struct Config {
     pub force_evmla: bool,
     /// Path to cache missing library dependencies, used for compiling and deploying libraries.
     pub detect_missing_libraries: bool,
+    /// Source files to avoid compiling on zksolc
+    pub avoid_contracts: Option<Vec<String>>,
 }
 
 /// Mapping of fallback standalone sections. See [`FallbackProfileProvider`]
@@ -673,80 +684,6 @@ impl Config {
         self.create_project(self.cache, false)
     }
 
-    /// Serves as the entrypoint for obtaining the zk project.
-    ///
-    /// Returns the `Project` configured with all `solc` and path related values.
-    ///
-    /// *Note*: this also _cleans_ [`Project::cleanup`] the workspace if `force` is set to true.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use foundry_config::Config;
-    /// let config = Config::load_with_root(".").sanitized();
-    /// let project = config.project();
-    /// ```
-    pub fn zk_project(&self) -> Result<Project, SolcError> {
-        self.create_project(self.cache, false).map(|mut project| {
-            project.paths.artifacts = project.paths.root.join("zkout");
-            project
-        })
-    }
-
-    /// Serves as the entrypoint for using zksolc for compilation on zkSync projects.
-    ///
-    /// Returns the [ZkSolcConfigBuilder] configured with all `zksolc` and path related values.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use foundry_config::Config;
-    /// let config = Config::load_with_root(".").sanitized();
-    /// let zksolc = config.new_zksolc_config_builder().and_then(|builder| builder.build());
-    /// ```
-    pub fn new_zksolc_config_builder(&self) -> Result<ZkSolcConfigBuilder, String> {
-        let builder = ZkSolcConfigBuilder::new();
-
-        let libraries = match self.parsed_libraries() {
-            Ok(libs) => libs.with_applied_remappings(&self.project_paths()),
-            Err(e) => return Err(format!("Failed to parse libraries: {}", e)),
-        };
-        let optimizer_details =
-            if self.zk_optimizer { self.optimizer_details.clone() } else { None };
-
-        let builder = builder.compiler_version(DEFAULT_ZKSOLC_VERSION).settings(|builder| {
-            builder
-                .libraries(libraries)
-                .is_system(self.is_system)
-                .force_evmla(self.force_evmla)
-                .optimizer(|builder| {
-                    builder
-                        .enabled(self.zk_optimizer)
-                        .mode(self.mode.clone())
-                        .optimize_for_size_fallback(self.fallback_oz)
-                        .disable_system_request_memoization(true)
-                        .details(optimizer_details)
-                })
-        });
-
-        Ok(builder)
-    }
-
-    /// Serves as the entrypoint for using zksolc for compilation on zkSync projects.
-    ///
-    /// Returns the default [ZkSolcConfig] configured with all `zksolc` and path related values.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use foundry_config::Config;
-    /// let config = Config::load_with_root(".").sanitized();
-    /// let zksolc = config.zk_solc_config();
-    /// ```
-    pub fn zk_solc_config(&self) -> Result<ZkSolcConfig, String> {
-        self.new_zksolc_config_builder().and_then(|builder| builder.build())
-    }
-
     /// Same as [`Self::project()`] but sets configures the project to not emit artifacts and ignore
     /// cache, caching causes no output until https://github.com/gakonst/ethers-rs/issues/727
     pub fn ephemeral_no_artifacts_project(&self) -> Result<Project, SolcError> {
@@ -782,6 +719,36 @@ impl Config {
 
         if let Some(solc) = self.ensure_solc()? {
             project.solc = solc;
+        }
+
+        // Set up zksolc project values
+        // TODO: maybe some of these could be included
+        // when setting up the builder for the sake of consistency (requires dedicated
+        // builder methods)
+        project.zksync_zksolc_config = ZkSolcConfig { settings: self.zksync_zksolc_settings()? };
+        project.zksync_avoid_contracts = self.avoid_contracts.clone().map(|patterns| {
+            patterns
+                .into_iter()
+                .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
+                .collect::<Vec<_>>()
+        });
+
+        if let Some(zksolc) = self.zksync_ensure_zksolc()? {
+            project.zksync_zksolc = zksolc;
+        } else {
+            // TODO: we automatically install a zksolc version
+            // if none is found, but maybe we should mirror auto detect settings
+            // as done with solc
+            if !self.offline {
+                let default_version = Version::new(1, 4, 1);
+                let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
+                if zksolc.is_none() {
+                    ZkSolc::blocking_install(&default_version)?;
+                    zksolc = ZkSolc::find_installed_version(&default_version)?;
+                }
+                project.zksync_zksolc = zksolc
+                    .unwrap_or_else(|| panic!("Could not install zksolc v{}", default_version));
+            }
         }
 
         Ok(project)
@@ -821,6 +788,44 @@ impl Config {
                 }
             };
             return Ok(solc)
+        }
+
+        Ok(None)
+    }
+
+    /// Ensures that the configured version is installed if explicitly set
+    ///
+    /// If `zksolc` is [`SolcReq::Version`] then this will download and install the solc version if
+    /// it's missing, unless the `offline` flag is enabled, in which case an error is thrown.
+    ///
+    /// If `zksolc` is [`SolcReq::Local`] then this will ensure that the path exists.
+    fn zksync_ensure_zksolc(&self) -> Result<Option<ZkSolc>, SolcError> {
+        if let Some(ref zksolc) = self.zksolc {
+            let zksolc = match zksolc {
+                SolcReq::Version(version) => {
+                    let mut zksolc = ZkSolc::find_installed_version(version)?;
+                    if zksolc.is_none() {
+                        if self.offline {
+                            return Err(SolcError::msg(format!(
+                                "can't install missing zksolc {version} in offline mode"
+                            )))
+                        }
+                        ZkSolc::blocking_install(version)?;
+                        zksolc = ZkSolc::find_installed_version(version)?;
+                    }
+                    zksolc
+                }
+                SolcReq::Local(zksolc) => {
+                    if !zksolc.is_file() {
+                        return Err(SolcError::msg(format!(
+                            "`zksolc` {} does not exist",
+                            zksolc.display()
+                        )))
+                    }
+                    Some(ZkSolc::new(zksolc))
+                }
+            };
+            return Ok(zksolc)
         }
 
         Ok(None)
@@ -1197,6 +1202,43 @@ impl Config {
         if self.ast || self.build_info {
             settings = settings.with_ast();
         }
+
+        Ok(settings)
+    }
+
+    /// Returns the configured `zksolc` `Settings` that includes:
+    /// - all libraries
+    /// - the optimizer (including details, if configured)
+    /// - evm version
+    pub fn zksync_zksolc_settings(&self) -> Result<ZkSolcSettings, SolcError> {
+        let libraries = match self.parsed_libraries() {
+            Ok(libs) => libs.with_applied_remappings(&self.project_paths()),
+            Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {}", e))),
+        };
+
+        let optimizer = ZkSolcOptimizer {
+            enabled: Some(self.zk_optimizer),
+            mode: Some(self.mode),
+            fallback_to_optimizing_for_size: Some(self.fallback_oz),
+            disable_system_request_memoization: Some(true),
+            details: self.zk_optimizer_details.clone(),
+            jump_table_density_threshold: None,
+        };
+
+        let settings = ZkSolcSettings {
+            libraries,
+            optimizer,
+            evm_version: Some(self.evm_version),
+            metadata: Some(ZkSolcSettingsMetadata { bytecode_hash: Some(self.zk_bytecode_hash) }),
+            via_ir: Some(self.via_ir),
+            // Set in project paths.
+            remappings: Vec::new(),
+            detect_missing_libraries: self.detect_missing_libraries,
+            system_mode: self.is_system,
+            force_evmla: self.force_evmla,
+            // TODO: See if we need to set this from here
+            output_selection: Default::default(),
+        };
 
         Ok(settings)
     }
@@ -2026,15 +2068,17 @@ impl Default for Config {
             __non_exhaustive: (),
             __warnings: vec![],
             // @zkSync
-            compiler_path: Default::default(),
+            zksolc: None,
+            zk_bytecode_hash: ZkSolcBytecodeHash::None,
             zk_optimizer: true,
-            mode: "3".to_string(),
+            mode: '3',
             zksync: false,
             zk_optimizer_details: None,
             fallback_oz: false,
             force_evmla: false,
             is_system: false,
             detect_missing_libraries: false,
+            avoid_contracts: None,
         }
     }
 }

@@ -32,8 +32,9 @@ use revm::{
     precompile::Precompiles,
     primitives::{
         Address, Bytecode, Bytes, CreateScheme, EVMResultGeneric, Env, Eval,
-        ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, OutOfGasError,
-        Output, ResultAndState, SpecId, StorageSlot, TransactTo, B256, U256 as rU256,
+        ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, Log as rLog,
+        OutOfGasError, Output, ResultAndState, SpecId, StorageSlot, TransactTo, B256,
+        U256 as rU256,
     },
     Database, JournaledState,
 };
@@ -57,7 +58,12 @@ use super::{storage_view::StorageView, tracer::CheatcodeTracerContext};
 /// Maximum gas price allowed for L1.
 const MAX_L1_GAS_PRICE: u64 = 1000;
 
-type ZKVMResult<E> = EVMResultGeneric<rExecutionResult, E>;
+pub struct ZKVMExecutionResult {
+    pub logs: Vec<rLog>,
+    pub execution_result: rExecutionResult,
+}
+
+type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
 
 /// Transacts
 pub fn transact<'a, DB>(
@@ -116,7 +122,9 @@ where
     };
 
     match inspect::<_, DB::Error>(tx, env, db, &mut journaled_state, Default::default(), call_ctx) {
-        Ok(result) => Ok(ResultAndState { result, state: journaled_state.finalize().0 }),
+        Ok(ZKVMExecutionResult { execution_result: result, .. }) => {
+            Ok(ResultAndState { result, state: journaled_state.finalize().0 })
+        }
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
 }
@@ -301,19 +309,19 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state)
+    let chain_id = if env.cfg.chain_id <= u32::MAX as u64 {
+        L2ChainId::from(env.cfg.chain_id as u32)
+    } else {
+        tracing::warn!(provided = ?env.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
+        L2ChainId::from(DEFAULT_CHAIN_ID)
+    };
+
+    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state, chain_id)
         .with_extra_factory_deps(std::mem::take(&mut ccx.persisted_factory_deps))
         .with_storage_accesses(ccx.accesses.take());
 
     let is_create = call_ctx.is_create;
     tracing::info!(?call_ctx, "executing transaction in zk vm");
-
-    let chain_id_u32 = if env.cfg.chain_id <= u32::MAX as u64 {
-        env.cfg.chain_id as u32
-    } else {
-        tracing::warn!(provided = ?env.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
-        DEFAULT_CHAIN_ID
-    };
 
     if tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -326,7 +334,7 @@ where
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
     let (tx_result, bytecodes, modified_storage) =
-        inspect_inner(tx, storage_ptr, L2ChainId::from(chain_id_u32), ccx, call_ctx);
+        inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
 
     if let Some(record) = &mut era_db.accesses {
         for k in modified_storage.keys() {
@@ -334,20 +342,20 @@ where
         }
     }
 
+    let logs = tx_result
+        .logs
+        .events
+        .clone()
+        .into_iter()
+        .map(|event| revm::primitives::Log {
+            address: event.address.to_address(),
+            topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
+            data: event.value.into(),
+        })
+        .collect_vec();
+
     let execution_result = match tx_result.result {
         ExecutionResult::Success { output, .. } => {
-            let logs = tx_result
-                .logs
-                .events
-                .clone()
-                .into_iter()
-                .map(|event| revm::primitives::Log {
-                    address: event.address.to_address(),
-                    topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
-                    data: event.value.into(),
-                })
-                .collect_vec();
-
             let result = ethabi::decode(&[ethabi::ParamType::Bytes], &output)
                 .ok()
                 .and_then(|result| result.first().cloned())
@@ -366,12 +374,15 @@ where
                 Output::Call(Bytes::from(result))
             };
 
-            rExecutionResult::Success {
-                reason: Eval::Return,
-                gas_used: tx_result.statistics.gas_used as u64,
-                gas_refunded: tx_result.refunds.gas_refunded as u64,
-                logs,
-                output,
+            ZKVMExecutionResult {
+                logs: logs.clone(),
+                execution_result: rExecutionResult::Success {
+                    reason: Eval::Return,
+                    gas_used: tx_result.statistics.gas_used as u64,
+                    gas_refunded: tx_result.refunds.gas_refunded as u64,
+                    logs,
+                    output,
+                },
             }
         }
         ExecutionResult::Revert { output } => {
@@ -381,9 +392,12 @@ where
                 _ => Vec::new(),
             };
 
-            rExecutionResult::Revert {
-                gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
-                output: Bytes::from(output),
+            ZKVMExecutionResult {
+                logs,
+                execution_result: rExecutionResult::Revert {
+                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                    output: Bytes::from(output),
+                },
             }
         }
         ExecutionResult::Halt { reason } => {
@@ -392,9 +406,13 @@ where
                 Halt::NotEnoughGasProvided => rHalt::OutOfGas(OutOfGasError::BasicOutOfGas),
                 _ => rHalt::PrecompileError,
             };
-            rExecutionResult::Halt {
-                reason: mapped_reason,
-                gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+
+            ZKVMExecutionResult {
+                logs,
+                execution_result: rExecutionResult::Halt {
+                    reason: mapped_reason,
+                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                },
             }
         }
     };
@@ -404,8 +422,8 @@ where
     for (k, v) in &modified_storage {
         let address = k.address().to_address();
         let index = k.key().to_ru256();
-        let account = era_db.load_account(address);
-        let previous = account.storage.get(&index).map(|v| v.present_value).unwrap_or_default();
+        era_db.load_account(address);
+        let previous = era_db.sload(address, index);
         let entry = storage.entry(address).or_default();
         entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
 
@@ -535,9 +553,10 @@ fn inspect_inner<S: ReadStorage + Send>(
     }
 
     let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
+    let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
     tracing::info!("=== Calls: ");
     for call in call_traces.iter() {
-        formatter::print_call(call, 0, &ShowCalls::All, resolve_hashes, true);
+        formatter::print_call(call, 0, &ShowCalls::All, show_outputs, resolve_hashes);
     }
 
     tracing::info!("==== {}", format!("{} events", tx_result.logs.events.len()));

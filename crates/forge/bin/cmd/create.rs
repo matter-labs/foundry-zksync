@@ -27,18 +27,23 @@ use foundry_common::{
     types::{ToAlloy, ToEthers},
 };
 use foundry_compilers::{
-    artifacts::{BytecodeObject, CompactBytecode},
-    info::ContractInfo,
-    utils::canonicalized,
+    artifacts::BytecodeObject, info::ContractInfo, utils::canonicalized,
+    zksync::artifact_output::zk::ZkContractArtifact,
 };
 use foundry_config::Chain;
 use foundry_wallets::WalletSigner;
-use foundry_zksync_compiler::{
-    libraries as zklibs, DualCompiledContract, DualCompiledContracts, ZkSolc,
-};
+use foundry_zksync_compiler::libraries as zklibs;
+use zksync_types::H256;
 
 use serde_json::json;
-use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::{
+    borrow::Borrow,
+    collections::{HashSet, VecDeque},
+    marker::PhantomData,
+    path::PathBuf,
+    str::FromStr,
+    sync::Arc,
+};
 
 /// CLI arguments for `forge create`.
 #[derive(Clone, Debug, Parser)]
@@ -104,14 +109,11 @@ pub struct CreateArgs {
 
     #[clap(flatten)]
     retry: RetryArgs,
-
-    #[clap(long)]
-    factory_deps: Vec<ContractInfo>,
 }
 
 impl CreateArgs {
     /// Executes the command to create a contract
-    pub async fn run(mut self) -> Result<()> {
+    pub async fn run(self) -> Result<()> {
         let mut config = self.eth.try_load_config_emit_warnings()?;
         let project_root = config.project_paths().root;
         let zksync = self.opts.compiler.zksync;
@@ -130,15 +132,14 @@ impl CreateArgs {
                     path: Some(lib_path.to_string()),
                 });
             }
-
             info!("Resolving missing libraries");
 
             zklibs::resolve_libraries(missing_libraries, &all_deployed_libraries)?
         } else {
             vec![]
         };
-        let deploying_libraries = !libs_batches.is_empty();
 
+        let deploying_libraries = !libs_batches.is_empty();
         let contracts_to_deploy = if !deploying_libraries {
             vec![vec![self
                 .contract
@@ -148,136 +149,131 @@ impl CreateArgs {
             libs_batches
         };
 
-        let mut input_contracts_to_compile = self.opts.compiler.contracts_to_compile.clone();
         for contracts_batch in contracts_to_deploy {
             // Find Project & Compile
             let project = self.opts.project()?;
-            let mut output =
-                ProjectCompiler::new().quiet_if(self.json || self.opts.silent).compile(&project)?;
-
-            let contracts_to_compile = if !deploying_libraries {
-                self.opts.compiler.contracts_to_compile.clone()
-            } else {
-                Some(
-                    contracts_batch
-                        .iter()
-                        .map(|lib| lib.path.clone().expect("libraries must specify path"))
-                        .map(|path| {
-                            PathBuf::from(path)
-                                .file_name()
-                                .expect("contract path to have filename")
-                                .to_string_lossy()
-                                .to_string()
-                        })
-                        // respect passed in --contracts-to-compile but don't deploy them
-                        .chain(input_contracts_to_compile.take().into_iter().flatten())
-                        .collect(),
+            let files = contracts_batch.iter().map(|lib| {
+                canonicalized(
+                    project.root().join(lib.path.clone().expect("libraries must specify path")),
                 )
-            };
+            });
+            let compiler =
+                ProjectCompiler::new().quiet_if(self.json || self.opts.silent).files(files.clone());
+            let zk_compiler =
+                ProjectCompiler::new().quiet_if(self.json || self.opts.silent).files(files);
 
-            let mut zksolc = ZkSolc::new(
-                config
-                    .new_zksolc_config_builder()
-                    .and_then(|builder| {
-                        builder
-                            .avoid_contracts(self.opts.compiler.avoid_contracts.clone())
-                            .contracts_to_compile(contracts_to_compile)
-                            .build()
-                    })
-                    .map_err(|e| eyre::eyre!(e))?,
-                config.zk_project()?,
-            );
-            let (zk_output, _contract_bytecodes) = match zksolc.compile() {
-                Ok(compiled) => compiled,
-                Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
-            };
-            let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
+            let mut output = compiler.compile(&project)?;
+            let mut zk_output = zk_compiler.zksync_compile(&project)?;
 
             for mut contract in contracts_batch {
                 if let Some(ref mut path) = contract.path {
                     // paths are absolute in the project's output
                     *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
                 }
+                let (abi, bytecode_object, zk_data) = {
+                    if !zksync {
+                        let (abi, bin, _) = remove_contract(&mut output, &contract)?;
+                        let bytecode_object = match bin.object {
+                            BytecodeObject::Bytecode(_) => bin.object,
+                            _ => {
+                                let link_refs = bin
+                                    .link_references
+                                    .iter()
+                                    .flat_map(|(path, names)| {
+                                        names.keys().map(move |name| format!("\t{name}: {path}"))
+                                    })
+                                    .collect::<Vec<String>>()
+                                    .join("\n");
+                                eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                            }
+                        };
+                        (abi, bytecode_object, None)
+                    } else {
+                        let artifact =
+                            zk_output.remove_contract(&contract).expect("Artifact not found");
+                        let ZkContractArtifact {
+                            bytecode,
+                            hash,
+                            factory_dependencies,
+                            metadata,
+                            ..
+                        } = artifact;
 
-                let (abi, bin, _) = remove_contract(&mut output, &contract)?;
+                        // Get abi from solc_metadata
+                        // TODO: This can probably be optimized by defining the proper
+                        // deserializers on compilers but metadata is given as a stringified json
+                        // and JsonAbi is complaining about not supporting serde_json::from_reader
+                        // so there is some serde handling neded
+                        let metadata = metadata.unwrap();
+                        let solc_metadata_value = metadata
+                            .get("solc_metadata")
+                            .and_then(serde_json::Value::as_str)
+                            .expect("`solc_metadata` field not found in artifact");
+                        let solc_metadata_json: serde_json::Value =
+                            serde_json::from_str(solc_metadata_value).unwrap();
+                        let abi_json = &solc_metadata_json["output"]["abi"];
+                        let abi_string = abi_json.to_string();
+                        let abi: JsonAbi = JsonAbi::from_json_str(&abi_string)?;
 
-                let (bin, zk_data) = if zksync {
-                    let contract = bin
-                        .object
-                        .as_bytes()
-                        .and_then(|bytes| dual_compiled_contracts.find_by_evm_bytecode(&bytes.0))
-                        .ok_or(eyre::eyre!(
-                            "Could not find zksolc contract for contract {}",
-                            contract.name
-                        ))?;
+                        let bin = bytecode.expect("Bytecode not found");
+                        let bytecode_hash =
+                            H256::from_str(&hash.expect("Contract hash not found"))?;
+                        let bytecode = bin.object.clone().into_bytes().unwrap().to_vec();
 
-                    let zk_bin = CompactBytecode {
-                        object: BytecodeObject::Bytecode(Bytes::from(
-                            contract.zk_deployed_bytecode.clone(),
-                        )),
-                        link_references: Default::default(),
-                        source_map: Default::default(),
-                    };
+                        let factory_dependencies_map =
+                            factory_dependencies.expect("factory deps not found");
+                        let mut visited_paths = HashSet::new();
+                        let mut visited_bytecodes = HashSet::new();
+                        let mut queue = VecDeque::new();
 
-                    let mut factory_deps = dual_compiled_contracts.fetch_all_factory_deps(contract);
-
-                    // for manual specified factory deps
-                    for mut contract in std::mem::take(&mut self.factory_deps) {
-                        if let Some(path) = contract.path.as_mut() {
-                            *path = canonicalized(project.root().join(&path))
-                                .to_string_lossy()
-                                .to_string();
+                        for dep in factory_dependencies_map.values() {
+                            queue.push_back(dep.clone());
                         }
 
-                        let (_, bin, _) =
-                            remove_contract(&mut output, &contract).with_context(|| {
-                                format!(
-                                    "Unable to find specified factory deps ({}) in project",
-                                    contract.name
-                                )
-                            })?;
+                        while let Some(dep_info) = queue.pop_front() {
+                            if visited_paths.insert(dep_info.clone()) {
+                                let mut split = dep_info.split(':');
+                                let contract_path = split.next().expect(
+                                    "Failed to extract contract path for factory dependency",
+                                );
+                                let contract_name = split.next().expect(
+                                    "Failed to extract contract name for factory dependency",
+                                );
+                                let mut abs_path_buf = PathBuf::new();
+                                abs_path_buf.push(project.root());
+                                abs_path_buf.push(contract_path);
+                                let abs_path_str = abs_path_buf.to_string_lossy();
+                                let fdep_art = zk_output
+                                    .find(abs_path_str, contract_name)
+                                    .unwrap_or_else(|| {
+                                        panic!(
+                                    "Could not find contract {} at path {} for compilation output",
+                                    contract_name, contract_path)
+                                    });
+                                let fdep_fdeps_map = fdep_art
+                                    .factory_dependencies
+                                    .clone()
+                                    .expect("factory deps not found");
+                                for dep in fdep_fdeps_map.values() {
+                                    queue.push_back(dep.clone())
+                                }
 
-                        let zk = bin
-                            .object
-                            .as_bytes()
-                            .and_then(|bytes| {
-                                dual_compiled_contracts.find_by_evm_bytecode(&bytes.0)
-                            })
-                            .ok_or(eyre::eyre!(
-                                "Could not find zksolc contract for contract {}",
-                                contract.name
-                            ))?;
-
-                        // if the dep isn't already present,
-                        // fetch all deps and add them to the final list
-                        if !factory_deps.contains(&zk.zk_deployed_bytecode) {
-                            let additional_factory_deps =
-                                dual_compiled_contracts.fetch_all_factory_deps(zk);
-                            factory_deps.extend(additional_factory_deps);
-                            factory_deps.dedup();
+                                let fdep_bytecode = fdep_art
+                                    .bytecode
+                                    .clone()
+                                    .expect("Bytecode not found for factory dependency")
+                                    .object
+                                    .clone()
+                                    .into_bytes()
+                                    .unwrap()
+                                    .to_vec();
+                                visited_bytecodes.insert(fdep_bytecode);
+                            }
                         }
-                    }
-
-                    (
-                        zk_bin,
-                        Some((contract, factory_deps.into_iter().map(|bc| bc.to_vec()).collect())),
-                    )
-                } else {
-                    (bin, None)
-                };
-
-                let bin = match bin.object {
-                    BytecodeObject::Bytecode(_) => bin.object,
-                    _ => {
-                        let link_refs = bin
-                            .link_references
-                            .iter()
-                            .flat_map(|(path, names)| {
-                                names.keys().map(move |name| format!("\t{name}: {path}"))
-                            })
-                            .collect::<Vec<String>>()
-                            .join("\n");
-                        eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                        visited_bytecodes.insert(bytecode.clone());
+                        let factory_deps: Vec<Vec<u8>> = visited_bytecodes.into_iter().collect();
+                        let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
+                        (abi, bin.object, Some(zk_data))
                     }
                 };
 
@@ -306,8 +302,17 @@ impl CreateArgs {
                     // Deploy with unlocked account
                     let sender = self.eth.wallet.from.expect("required");
                     let provider = provider.with_sender(sender.to_ethers());
-                    self.deploy(&contract, abi, bin, params, provider, chain_id, zk_data, None)
-                        .await?
+                    self.deploy(
+                        &contract,
+                        abi,
+                        bytecode_object,
+                        params,
+                        provider,
+                        chain_id,
+                        zk_data,
+                        None,
+                    )
+                    .await?
                 } else {
                     // Deploy with signer
                     let signer = self.eth.wallet.signer().await?;
@@ -317,7 +322,7 @@ impl CreateArgs {
                     self.deploy(
                         &contract,
                         abi,
-                        bin,
+                        bytecode_object,
                         params,
                         provider,
                         chain_id,
@@ -406,7 +411,7 @@ impl CreateArgs {
         args: Vec<DynSolValue>,
         provider: M,
         chain: u64,
-        zk_data: Option<(&DualCompiledContract, Vec<Vec<u8>>)>,
+        maybe_zk_data: Option<ZkSyncData>,
         signer: Option<WalletSigner>,
     ) -> Result<Address> {
         let deployer_address =
@@ -418,9 +423,9 @@ impl CreateArgs {
         let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone());
 
         let is_args_empty = args.is_empty();
-        let deployer = if let Some((contract, factory_deps)) = &zk_data {
-            factory.deploy_tokens_zk(args.clone(), contract).context("failed to deploy contract")
-                .map(|deployer| deployer.set_zk_factory_deps(factory_deps.clone()))
+        let deployer = if let Some(zk_data) = &maybe_zk_data {
+            factory.deploy_tokens_zk(args.clone(), zk_data).context("failed to deploy contract")
+                .map(|deployer| deployer.set_zk_factory_deps(zk_data.factory_deps.clone()))
         } else {
             factory.deploy_tokens(args.clone()).context("failed to deploy contract")
         }.map_err(|e| {
@@ -440,9 +445,9 @@ impl CreateArgs {
             deployer.tx.set_value(value.to_ethers());
         }
 
-        match zk_data {
+        match maybe_zk_data {
             None => provider.fill_transaction(&mut deployer.tx, None).await?,
-            Some((contract, factory_deps)) => {
+            Some(zk_data) => {
                 let chain_id = provider.get_chainid().await?.as_u64();
                 deployer.tx.set_chain_id(chain_id);
 
@@ -460,7 +465,7 @@ impl CreateArgs {
                 };
                 let data = foundry_zksync_core::encode_create_params(
                     &forge::revm::primitives::CreateScheme::Create,
-                    contract.zk_bytecode_hash,
+                    zk_data.bytecode_hash,
                     constructor_args,
                 );
                 let data = Bytes::from(data);
@@ -472,7 +477,7 @@ impl CreateArgs {
 
                 let estimated_gas = foundry_zksync_core::estimate_gas(
                     &deployer.tx,
-                    factory_deps.clone(),
+                    zk_data.factory_deps.clone(),
                     &provider,
                 )
                 .await?;
@@ -604,6 +609,13 @@ impl CreateArgs {
         let params = params.iter().map(|(ty, arg)| (ty, arg.as_str()));
         parse_tokens(params)
     }
+}
+
+/// Data used to deploy a contract on zksync
+pub struct ZkSyncData {
+    bytecode: Vec<u8>,
+    bytecode_hash: H256,
+    factory_deps: Vec<Vec<u8>>,
 }
 
 /// `ContractFactory` is a [`DeploymentTxFactory`] object with an
@@ -862,7 +874,7 @@ where
     pub fn deploy_tokens_zk(
         self,
         params: Vec<DynSolValue>,
-        contract: &DualCompiledContract,
+        zk_data: &ZkSyncData,
     ) -> Result<Deployer<B, M>, ContractError<M>>
     where
         B: Clone,
@@ -878,7 +890,7 @@ where
         };
         let data: Bytes = foundry_zksync_core::encode_create_params(
             &forge::revm::primitives::CreateScheme::Create,
-            contract.zk_bytecode_hash,
+            zk_data.bytecode_hash,
             constructor_args,
         )
         .into();
@@ -895,7 +907,7 @@ where
             tx: tx.into(),
             confs: 1,
             block: BlockNumber::Latest,
-            zk_factory_deps: Some(vec![contract.zk_deployed_bytecode.clone()]),
+            zk_factory_deps: Some(vec![zk_data.bytecode.clone()]),
             _m: PhantomData,
         })
     }

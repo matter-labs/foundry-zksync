@@ -11,7 +11,7 @@ use foundry_compilers::{
     info::ContractInfo,
     ArtifactId, Project, ProjectCompileOutput,
 };
-use foundry_zksync_compiler::{DualCompiledContracts, ZkSolc};
+use foundry_zksync_compiler::DualCompiledContracts;
 use std::str::FromStr;
 
 impl ScriptArgs {
@@ -29,24 +29,13 @@ impl ScriptArgs {
         let output = output.with_stripped_file_prefixes(root);
 
         // ZK
-        let config = &script_config.config;
-        let mut zksolc = ZkSolc::new(
-            config
-                .new_zksolc_config_builder()
-                .and_then(|builder| {
-                    builder
-                        .avoid_contracts(self.opts.args.compiler.avoid_contracts.clone())
-                        .contracts_to_compile(self.opts.args.compiler.contracts_to_compile.clone())
-                        .build()
-                })
-                .map_err(|e| eyre::eyre!(e))?,
-            config.zk_project()?,
-        );
-        let (zk_output, _contract_bytecodes) = match zksolc.compile() {
-            Ok(compiled) => compiled,
-            Err(e) => return Err(eyre::eyre!("Failed to compile with zksolc: {}", e)),
-        };
-        let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output);
+        // TODO: see if we need to support the `get_project_and_output` flow
+        // seems it verifies script is part of the project
+        let zk_compiler = ProjectCompiler::new().quiet(self.opts.args.silent);
+        let zk_output = zk_compiler.zksync_compile(&project)?;
+
+        let dual_compiled_contracts =
+            DualCompiledContracts::new(&output, &zk_output, &project.paths);
 
         let sources = ContractSources::from_project_output(&output, root)?;
         let contracts = output.into_artifacts().collect();
