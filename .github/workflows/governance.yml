@@ -10,6 +10,7 @@ on:
 
 env:
     CARGO_TERM_COLOR: always
+    RPC_MAINNET: ${{ secrets.RPC_MAINNET }}
 jobs:
   test:
     runs-on: ubuntu-22.04-github-hosted-16core
