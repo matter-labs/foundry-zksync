@@ -4545,7 +4545,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.3.9"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.3.9#2f1fac2502d4a81f58f8d232c3fc4f2454c2a964"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.3.9#463c09c40f828a93ce8a2766f164e72d395829f7"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
