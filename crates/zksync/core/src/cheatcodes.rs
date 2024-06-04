@@ -154,7 +154,7 @@ pub fn etch<'a, DB>(
     if len % 32 != 0 {
         panic!(
             "etch bytecode length must be divisible by 32, found '{}' with length {len}",
-            hex::encode(&bytecode)
+            hex::encode(bytecode)
         );
     }
 
