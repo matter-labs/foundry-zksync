@@ -240,3 +240,21 @@ pub fn set_mocked_account<'a, DB>(
             .expect("failed storing value");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use revm::db::EmptyDB;
+
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "bytecode length must be divisible by 32")]
+    fn test_etch_panics_when_bytecode_not_aligned_on_32_bytes() {
+        etch(
+            Address::ZERO,
+            &[0],
+            &mut EmptyDB::default(),
+            &mut JournaledState::new(revm::primitives::SpecId::BYZANTIUM, vec![]),
+        );
+    }
+}
