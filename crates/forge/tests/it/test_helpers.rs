@@ -3,6 +3,7 @@
 use alloy_primitives::U256;
 use foundry_compilers::{
     artifacts::{Libraries, Settings},
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     Project, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
 use foundry_config::Config;
@@ -13,13 +14,12 @@ use foundry_evm::{
     revm::db::DatabaseRef,
 };
 use foundry_test_utils::fd_lock;
-use foundry_zksync_compiler::{ZkSolc, ZkSolcConfigBuilder, DEFAULT_ZKSOLC_VERSION};
 use once_cell::sync::Lazy;
 use std::{env, io::Write};
 
 pub const RE_PATH_SEPARATOR: &str = "/";
 
-const TESTDATA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata");
+pub const TESTDATA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata");
 
 pub static PROJECT: Lazy<Project> = Lazy::new(|| {
     let paths = ProjectPathsConfig::builder().root(TESTDATA).sources(TESTDATA).build().unwrap();
@@ -64,7 +64,7 @@ pub static COMPILED: Lazy<ProjectCompileOutput> = Lazy::new(|| {
 });
 
 /// Compile ZK project
-fn zk_compile(project: Project) -> ProjectCompileOutput {
+fn zk_compile(project: Project) -> ZkProjectCompileOutput {
     // let compiler_path =
     //     futures::executor::block_on(setup_zksolc_manager(DEFAULT_ZKSOLC_VERSION.to_owned()))
     //         .expect("failed setting up zksolc");
@@ -93,39 +93,15 @@ fn zk_compile(project: Project) -> ProjectCompileOutput {
     // let (zk_out, _) = zksolc.compile().unwrap();
     // zk_out
 
-    let config = ZkSolcConfigBuilder::new()
-        .compiler_version(DEFAULT_ZKSOLC_VERSION)
-        .contracts_to_compile(Some(vec![
-            String::from("zk/*"),
-            String::from("lib/*"),
-            String::from("cheats/Vm.sol"),
-        ]))
-        .settings(|builder| {
-            builder.optimizer(|builder| {
-                builder
-                    .enabled(true)
-                    .mode(String::from("3"))
-                    .optimize_for_size_fallback(false)
-                    .disable_system_request_memoization(true)
-            })
-        })
-        .build()
-        .expect("failed building zksolc config");
-    let mut zksolc = ZkSolc::new(config, project);
-    let (zk_output, _) = zksolc.compile().expect("failed compiling with zksolc");
-    zk_output
+    project.zksync_compile().expect("failed compiling with zksolc")
 }
 
-pub static COMPILED_ZK: Lazy<ProjectCompileOutput> = Lazy::new(|| {
+pub static COMPILED_ZK: Lazy<ZkProjectCompileOutput> = Lazy::new(|| {
     const LOCK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata/.lock-zk");
 
     // let project = &*PROJECT;
-    let paths = ProjectPathsConfig::builder()
-        .root(TESTDATA)
-        .sources(TESTDATA)
-        .artifacts(format!("{TESTDATA}/zkout"))
-        .build()
-        .unwrap();
+    let mut paths = ProjectPathsConfig::builder().root(TESTDATA).sources(TESTDATA).build().unwrap();
+    paths.zksync_artifacts = format!("{TESTDATA}/zkout").into();
 
     let libs =
         ["fork/Fork.t.sol:DssExecLib:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4".to_string()];

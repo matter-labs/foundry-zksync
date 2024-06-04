@@ -4327,6 +4327,7 @@ dependencies = [
  "watchexec",
  "yansi 0.5.1",
  "zksync-web3-rs",
+ "zksync_types",
 ]
 
 [[package]]
@@ -4382,8 +4383,7 @@ dependencies = [
 [[package]]
 name = "foundry-block-explorers"
 version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a056d4aa33a639c0aa1e9e473c25b9b191be30cbea94b31445fac5c272418ae"
+source = "git+https://github.com/Moonsong-Labs/block-explorers?branch=zksync-v0.2.3#b442f11077f30584cda7621311ee36a322135b86"
 dependencies = [
  "alloy-chains",
  "alloy-json-abi",
@@ -4520,6 +4520,7 @@ dependencies = [
  "foundry-compilers",
  "foundry-config",
  "foundry-macros",
+ "foundry-zksync-compiler",
  "glob",
  "globset",
  "itertools 0.11.0",
@@ -4544,8 +4545,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1b77c95e79bff02ddaa38426fc6809a3a438dce0e6a2eb212dac97da7c157b4"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.3.9#2f1fac2502d4a81f58f8d232c3fc4f2454c2a964"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -4554,6 +4554,7 @@ dependencies = [
  "dunce",
  "fs_extra",
  "futures-util",
+ "globset",
  "home",
  "itertools 0.12.1",
  "md-5 0.10.6",
@@ -4563,6 +4564,7 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "regex",
+ "reqwest",
  "semver 1.0.22",
  "serde",
  "serde_json",
@@ -4591,7 +4593,6 @@ dependencies = [
  "figment",
  "foundry-block-explorers",
  "foundry-compilers",
- "foundry-zksync-compiler",
  "globset",
  "number_prefix",
  "once_cell",
@@ -4823,26 +4824,13 @@ dependencies = [
 name = "foundry-zksync-compiler"
 version = "0.0.2"
 dependencies = [
- "alloy-json-abi",
  "alloy-primitives",
- "ansi_term",
- "anyhow",
- "const-hex",
- "dirs 5.0.1",
  "eyre",
  "foundry-compilers",
- "globset",
- "reqwest",
- "semver 1.0.22",
  "serde",
  "serde_json",
- "tokio",
  "tracing",
- "url",
- "xxhash-rust",
- "zksync_basic_types",
  "zksync_types",
- "zksync_utils",
 ]
 
 [[package]]
@@ -12682,12 +12670,6 @@ name = "xml-rs"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fcb9cbac069e033553e8bb871be2fbdffcab578eb25bd0f7c508cedc6dcd75a"
-
-[[package]]
-name = "xxhash-rust"
-version = "0.8.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "927da81e25be1e1a2901d59b81b37dd2efd1fc9c9345a55007f09bf5a2d3ee03"
 
 [[package]]
 name = "yansi"

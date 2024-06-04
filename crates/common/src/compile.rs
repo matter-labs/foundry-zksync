@@ -8,11 +8,16 @@ use foundry_compilers::{
     artifacts::{BytecodeObject, CompactContractBytecode, ContractBytecodeSome},
     remappings::Remapping,
     report::{BasicStdoutReporter, NoReporter, Report},
+    zksync::{
+        artifact_output::Artifact as ZkArtifact,
+        compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
+    },
     Artifact, ArtifactId, FileFilter, Graph, Project, ProjectCompileOutput, ProjectPathsConfig,
     Solc, SolcConfig,
 };
+use foundry_zksync_compiler::libraries::{self, ZkMissingLibrary};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     convert::Infallible,
     fmt::Display,
     io::IsTerminal,
@@ -268,6 +273,212 @@ impl ProjectCompiler {
                 std::process::exit(1);
             }
         }
+    }
+
+    /// Compiles the project.
+    pub fn zksync_compile(self, project: &Project) -> Result<ZkProjectCompileOutput> {
+        // TODO: Avoid process::exit
+        if !project.paths.has_input_files() && self.files.is_empty() {
+            println!("Nothing to compile");
+            // nothing to do here
+            std::process::exit(0);
+        }
+
+        // Taking is fine since we don't need these in `compile_with`.
+        //let filter = std::mem::take(&mut self.filter);
+
+        // We need to clone files since we use them in `compile_with`
+        // for filtering artifacts in missing libraries detection
+        let files = self.files.clone();
+        self.zksync_compile_with(&project.paths.root, || {
+            if !files.is_empty() {
+                project.zksync_compile_files(files)
+            /* TODO: evualuate supporting compiling with filters
+            } else if let Some(filter) = filter {
+                project.compile_sparse(filter)
+            */
+            } else {
+                project.zksync_compile()
+            }
+            .map_err(Into::into)
+        })
+    }
+
+    #[instrument(target = "forge::compile", skip_all)]
+    fn zksync_compile_with<F>(
+        self,
+        root_path: impl AsRef<Path>,
+        f: F,
+    ) -> Result<ZkProjectCompileOutput>
+    where
+        F: FnOnce() -> Result<ZkProjectCompileOutput>,
+    {
+        let quiet = self.quiet.unwrap_or(false);
+        let bail = self.bail.unwrap_or(true);
+        #[allow(clippy::collapsible_else_if)]
+        let reporter = if quiet {
+            Report::new(NoReporter::default())
+        } else {
+            if std::io::stdout().is_terminal() {
+                Report::new(SpinnerReporter::spawn_with("Compiling (zksync)..."))
+            } else {
+                Report::new(BasicStdoutReporter::default())
+            }
+        };
+
+        let output = foundry_compilers::report::with_scoped(&reporter, || {
+            tracing::debug!("compiling project");
+
+            let timer = std::time::Instant::now();
+            let r = f();
+            let elapsed = timer.elapsed();
+
+            tracing::debug!("finished compiling in {:.3}s", elapsed.as_secs_f64());
+            r
+        })?;
+
+        // need to drop the reporter here, so that the spinner terminates
+        drop(reporter);
+
+        if bail && output.has_compiler_errors() {
+            eyre::bail!("{output}")
+        }
+
+        if !quiet {
+            if output.is_unchanged() {
+                println!("No files changed, compilation skipped");
+            } else {
+                // print the compiler output / warnings
+                println!("{output}");
+            }
+
+            self.zksync_handle_output(root_path, &output)?;
+        }
+
+        Ok(output)
+    }
+
+    /// If configured, this will print sizes or names
+    fn zksync_handle_output(
+        &self,
+        root_path: impl AsRef<Path>,
+        output: &ZkProjectCompileOutput,
+    ) -> Result<()> {
+        let print_names = self.print_names.unwrap_or(false);
+        let print_sizes = self.print_sizes.unwrap_or(false);
+
+        // Process missing libraries
+        // TODO: skip this if project was not compiled using --detect-missing-libraries
+        let mut missing_libs_unique: HashSet<String> = HashSet::new();
+        for (artifact_id, artifact) in output.artifact_ids() {
+            // TODO: when compiling specific files, the output might still add cached artifacts
+            // that are not part of the file list to the output, which may cause missing libraries
+            // error to trigger for files that were not intended to be compiled.
+            // This behaviour needs to be investigated better on the foundry-compilers side.
+            // For now we filter, checking only the files passed to compile.
+            let is_target_file =
+                self.files.is_empty() || self.files.iter().any(|f| artifact_id.path == *f);
+            if is_target_file {
+                if let Some(mls) = &artifact.missing_libraries {
+                    missing_libs_unique.extend(mls.clone());
+                }
+            }
+        }
+
+        let missing_libs: Vec<ZkMissingLibrary> = missing_libs_unique
+            .into_iter()
+            .map(|ml| {
+                let mut split = ml.split(':');
+                let contract_path =
+                    split.next().expect("Failed to extract contract path for missing library");
+                let contract_name =
+                    split.next().expect("Failed to extract contract name for missing library");
+
+                let mut abs_path_buf = PathBuf::new();
+                abs_path_buf.push(root_path.as_ref());
+                abs_path_buf.push(contract_path);
+                let abs_path_str = abs_path_buf.to_string_lossy();
+
+                let art = output.find(abs_path_str, contract_name).unwrap_or_else(|| {
+                    panic!(
+                        "Could not find contract {} at path {} for compilation output",
+                        contract_name, contract_path
+                    )
+                });
+
+                ZkMissingLibrary {
+                    contract_path: contract_path.to_string(),
+                    contract_name: contract_name.to_string(),
+                    missing_libraries: art.missing_libraries.clone().unwrap_or_default(),
+                }
+            })
+            .collect();
+        if !missing_libs.is_empty() {
+            libraries::add_dependencies_to_missing_libraries_cache(
+                root_path,
+                missing_libs.as_slice(),
+            )
+            .expect("Error while adding missing libraries");
+            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", missing_libs);
+        }
+
+        // print any sizes or names
+        if print_names {
+            let mut artifacts: BTreeMap<_, Vec<_>> = BTreeMap::new();
+            for (name, (_, version)) in output.versioned_artifacts() {
+                artifacts.entry(version).or_default().push(name);
+            }
+            for (version, names) in artifacts {
+                println!(
+                    "  compiler version: {}.{}.{}",
+                    version.major, version.minor, version.patch
+                );
+                for name in names {
+                    println!("    - {name}");
+                }
+            }
+        }
+
+        if print_sizes {
+            // add extra newline if names were already printed
+            if print_names {
+                println!();
+            }
+
+            let mut size_report = SizeReport { contracts: BTreeMap::new() };
+            let artifacts: BTreeMap<_, _> = output.artifacts().collect();
+            for (name, artifact) in artifacts {
+                let bytecode = artifact.get_bytecode_object().unwrap_or_default();
+                let size = match bytecode.as_ref() {
+                    BytecodeObject::Bytecode(bytes) => bytes.len(),
+                    BytecodeObject::Unlinked(_) => {
+                        // TODO: This should never happen on zksolc, maybe error somehow
+                        0
+                    }
+                };
+
+                let dev_functions =
+                    artifact.abi.as_ref().map(|abi| abi.functions()).into_iter().flatten().filter(
+                        |func| {
+                            func.name.is_test() ||
+                                func.name.eq("IS_TEST") ||
+                                func.name.eq("IS_SCRIPT")
+                        },
+                    );
+
+                let is_dev_contract = dev_functions.count() > 0;
+                size_report.contracts.insert(name, ContractInfo { size, is_dev_contract });
+            }
+
+            println!("{size_report}");
+
+            // TODO: avoid process::exit
+            // exit with error if any contract exceeds the size limit, excluding test contracts.
+            if size_report.exceeds_size_limit() {
+                std::process::exit(1);
+            }
+        }
+        Ok(())
     }
 }
 
