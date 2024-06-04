@@ -30,7 +30,7 @@ jobs:
         run: cargo build --release --bin forge
 
       - name: Clone aave governance v3
-        run: git clone https://github.com/Moonsong-Labs/aave-governance-v3.git --depth=1 -b ci
+        run: git clone https://github.com/Moonsong-Labs/aave-governance-v3.git --depth=1 
 
       - name: Run tests using built binary
         run: |
