@@ -60,9 +60,9 @@ pub struct CompilerArgs {
 
     #[clap(
         help_heading = "zkSync Compiler options",
-        help = "Solc compiler path to when when compiling with zksolc",
+        help = "Solc compiler path to when compiling with zksolc",
         long = "zk-solc-path",
-        value_name = "SYSTEM_MODE"
+        value_name = "ZK_SOLC_PATH"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zk_solc_path: Option<PathBuf>,
