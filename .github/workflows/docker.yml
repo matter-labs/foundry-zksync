@@ -1,0 +1,56 @@
+name: docker
+
+on:
+    push:
+        tags:
+            - "v*.*.*"
+    workflow_dispatch:
+        inputs:
+            registry_image:
+                description: 'Registry image'
+                required: false
+
+env:
+    REGISTRY_IMAGE: ${{ github.event.inputs.registry_image || 'ghcr.io/matter-labs/foundry-zksync' }}
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:                  
+            - name: Checkout
+              uses: actions/checkout@v2
+
+            - name: Docker meta
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: ${{ env.REGISTRY_IMAGE }}
+                tags: |
+                  type=schedule
+                  type=ref,event=branch
+                  type=ref,event=pr
+                  type=semver,pattern={{version}}
+                  type=semver,pattern={{major}}.{{minor}}
+                  type=semver,pattern={{major}}
+                  type=sha
+                
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+      
+            - name: Login to GHCR
+              if: github.event_name != 'pull_request'
+              uses: docker/login-action@v3
+              with:
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+            
+            
+            - name: Build and push
+              uses: docker/build-push-action@v5
+              with:
+                context: .
+                file: './Dockerfile'
+                push: ${{ github.event_name != 'pull_request' }}
+                tags: ${{ steps.meta.outputs.tags }}
+                labels: ${{ steps.meta.outputs.labels }}
