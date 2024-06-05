@@ -1,0 +1,55 @@
+name: Helpers tests
+
+on:
+    push:
+        branches:
+            - dev
+    pull_request:
+        branches:
+            - dev
+
+env:
+    CARGO_TERM_COLOR: always
+    RPC_MAINNET: ${{ secrets.RPC_MAINNET }}
+    RPC_OPTIMISM: ${{ secrets.RPC_OPTIMISM }}
+    RPC_AVALANCHE: ${{ secrets.RPC_AVALANCHE }}
+    RPC_POLYGON: ${{ secrets.RPC_POLYGON }}
+    RPC_ARBITRUM: ${{ secrets.RPC_ARBITRUM }}
+    RPC_FANTOM: ${{ secrets.RPC_FANTOM }}
+    RPC_HARMONY: ${{ secrets.RPC_HARMONY }}
+    RPC_METIS: ${{ secrets.RPC_METIS }}
+    RPC_BASE: ${{ secrets.RPC_BASE }}
+    RPC_BNB: ${{ secrets.RPC_BNB }}
+    RPC_SEPOLIA: ${{ secrets.RPC_SEPOLIA }}
+    RPC_GNOSIS: ${{ secrets.RPC_GNOSIS }}
+    RPC_SCROLL: ${{ secrets.RPC_SCROLL }}
+    RPC_ZKEVM: ${{ secrets.RPC_ZKEVM }}
+
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04-github-hosted-16core
+
+    steps:  
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+            submodules: recursive
+            ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+            toolchain: nightly-2024-02-06
+
+      - name: Build forge binary
+        run: cargo build --release --bin forge
+
+      - name: Clone aave helpers
+        run: git clone git@github.com:bgd-labs/aave-helpers.git --depth=1 -b feat/zksync
+
+      - name: Run tests using built binary
+        run: |
+          cd aave-helpers 
+          ../target/release/forge test --zksync
+
