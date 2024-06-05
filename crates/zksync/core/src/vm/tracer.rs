@@ -78,7 +78,7 @@ pub struct CheatcodeTracerContext<'a> {
     /// Recorded storage accesses
     pub accesses: Option<&'a mut RecordAccess>,
     /// Factory deps that were persisted across calls
-    pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
+    pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
 }
 
 /// Tracer result to return back to foundry.
@@ -88,7 +88,7 @@ pub struct CheatcodeTracerResult {
 }
 
 /// Defines the context for a Vm call.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CallContext {
     /// The transaction caller.
     pub tx_caller: Address,
