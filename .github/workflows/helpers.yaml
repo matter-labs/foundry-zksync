@@ -46,7 +46,7 @@ jobs:
         run: cargo build --release --bin forge
 
       - name: Clone aave helpers
-        run: git clone git@github.com:bgd-labs/aave-helpers.git --depth=1 -b feat/zksync
+        run: git clone https://github.com/bgd-labs/aave-helpers.git --depth=1 -b feat/zksync
 
       - name: Run tests using built binary
         run: |
