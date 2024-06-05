@@ -213,17 +213,19 @@ where
 
     fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
         self.factory_deps.get(&hash).cloned().or_else(|| {
-            let result = self.db.code_by_hash(hash.to_b256());
-            let res = match result {
-                Ok(bytecode) => {
-                    if bytecode.is_empty() {
-                        return self.factory_deps.get(&hash).cloned()
+            let hash_b256 = hash.to_b256();
+            self.journaled_state
+                .state
+                .values()
+                .find_map(|account| {
+                    if account.info.code_hash == hash_b256 {
+                        return Some(account.info.code.clone().map(|code| code.bytecode.to_vec()))
                     }
-                    Some(bytecode.bytecode.to_vec())
-                }
-                Err(_) => self.factory_deps.get(&hash).cloned(),
-            };
-            res
+                    None
+                })
+                .unwrap_or_else(|| {
+                    self.db.code_by_hash(hash_b256).ok().map(|bytecode| bytecode.bytecode.to_vec())
+                })
         })
     }
 
