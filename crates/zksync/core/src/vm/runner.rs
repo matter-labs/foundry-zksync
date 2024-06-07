@@ -21,8 +21,7 @@ use crate::{
     fix_l2_gas_limit, fix_l2_gas_price,
     vm::{
         db::ZKVMData,
-        factory_deps::split_tx_by_factory_deps,
-        inspect::{inspect, inspect_multi, ZKVMExecutionResult, ZKVMResult},
+        inspect::{inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult},
         tracer::{CallContext, CheatcodeTracerContext},
     },
 };
@@ -163,9 +162,7 @@ where
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
-    // If we have more than one factory_dep, we deploy them individually to ensure we
-    // do not run out of gas.
-    let txns = split_tx_by_factory_deps(L2Tx::new(
+    let tx = L2Tx::new(
         CONTRACT_DEPLOYER_ADDRESS,
         calldata,
         nonce,
@@ -179,7 +176,7 @@ where
         call.value.to_u256(),
         Some(factory_deps),
         PaymasterParams::default(),
-    ));
+    );
 
     let call_ctx = CallContext {
         tx_caller: env.tx.caller,
@@ -192,7 +189,7 @@ where
         is_create: true,
     };
 
-    inspect_multi(txns, env, db, journaled_state, &mut ccx, call_ctx)
+    inspect_as_batch(tx, env, db, journaled_state, &mut ccx, call_ctx)
 }
 
 /// Executes a CALL opcode on the ZK-VM.
