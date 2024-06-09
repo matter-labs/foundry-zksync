@@ -3,7 +3,7 @@ use clap::Parser;
 use eyre::Result;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
 use foundry_common::compile::{ProjectCompiler, SkipBuildFilter, SkipBuildFilters};
-use foundry_compilers::{Project, ProjectCompileOutput};
+use foundry_compilers::{Project};
 use foundry_config::{
     figment::{
         self,
