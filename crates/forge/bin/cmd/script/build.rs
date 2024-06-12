@@ -28,14 +28,19 @@ impl ScriptArgs {
         let root = project.root();
         let output = output.with_stripped_file_prefixes(root);
 
-        // ZK
-        // TODO: see if we need to support the `get_project_and_output` flow
-        // seems it verifies script is part of the project
-        let zk_compiler = ProjectCompiler::new().quiet(self.opts.args.silent);
-        let zk_output = zk_compiler.zksync_compile(&project)?;
+        // TODO: find a way to not compile _all_ contracts but only the ones necessary
+        // in each mode
+        let dual_compiled_contracts = if script_config.config.zksync {
+            // ZK
+            // TODO: see if we need to support the `get_project_and_output` flow
+            // seems it verifies script is part of the project
+            let zk_compiler = ProjectCompiler::new().quiet(self.opts.args.silent);
+            let zk_output = zk_compiler.zksync_compile(&project)?;
 
-        let dual_compiled_contracts =
-            DualCompiledContracts::new(&output, &zk_output, &project.paths);
+            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
+        } else {
+            None
+        };
 
         let sources = ContractSources::from_project_output(&output, root)?;
         let contracts = output.into_artifacts().collect();
@@ -64,7 +69,7 @@ impl ScriptArgs {
             libraries,
             predeploy_libraries,
             sources,
-            dual_compiled_contracts: Some(dual_compiled_contracts),
+            dual_compiled_contracts,
         })
     }
 
