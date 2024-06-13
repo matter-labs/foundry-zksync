@@ -86,12 +86,8 @@ pub struct DualCompiledContracts {
 }
 
 impl DualCompiledContracts {
-    /// Creates a collection of `[DualCompiledContract]`s from the provided solc and zksolc output.
-    pub fn new(
-        output: &ProjectCompileOutput,
-        zk_output: &ZkProjectCompileOutput,
-        layout: &ProjectPathsConfig,
-    ) -> Self {
+    /// Creates a collection of `[DualCompiledContract]`s from the provided solc output.
+    pub fn new_solc(output: &ProjectCompileOutput, layout: &ProjectPathsConfig) -> Self {
         let mut this = Self::default();
 
         let output_artifacts = output
@@ -134,6 +130,13 @@ impl DualCompiledContracts {
                 }
             }
         }
+
+        this
+    }
+
+    /// Creates a collection of `[DualCompiledContract]`s from the provided zksolc output.
+    pub fn new_zksolc(zk_output: &ZkProjectCompileOutput, layout: &ProjectPathsConfig) -> Self {
+        let mut this = Self::default();
 
         let zk_output_artifacts = zk_output
             .cached_artifacts()
@@ -196,21 +199,54 @@ impl DualCompiledContracts {
                     factory_deps: factory_deps_vec,
                 });
 
-                if let Some(dual) = this.edit_by_path(&contract_file) {
-                    dual.zk = zk_contract;
-                } else {
-                    tracing::warn!("matching solc artifact not found for {contract_file:?}");
-                    this.push(DualCompiledContract {
-                        name: contract_name,
-                        path: Some(contract_file),
-                        zk: zk_contract,
-                        evm: None,
-                    });
-                }
+                this.push(DualCompiledContract {
+                    name: contract_name,
+                    path: Some(contract_file),
+                    zk: zk_contract,
+                    evm: None,
+                });
             }
         }
 
         this
+    }
+
+    /// Merge 2 [`DualCompiledContracts`] instances
+    ///
+    /// When a contract in the collections have the same components, the `other`'s is used
+    fn _merge(this: DualCompiledContracts, mut other: DualCompiledContracts) -> Self {
+        this.into_iter().for_each(|contract| {
+            let Some(path) = contract.path.as_ref() else {
+                other.push(contract);
+                return;
+            };
+
+            if let Some(existing) = other.edit_by_path(path) {
+                if let Some(evm) = contract.evm {
+                    existing.evm.get_or_insert(evm);
+                }
+
+                if let Some(zk) = contract.zk {
+                    existing.zk.get_or_insert(zk);
+                }
+            } else {
+                other.push(contract);
+            }
+        });
+
+        other
+    }
+
+    /// Creates a collection of `[DualCompiledContract]`s from the provided solc and zksolc output.
+    pub fn new_dual(
+        output: &ProjectCompileOutput,
+        zk_output: &ZkProjectCompileOutput,
+        layout: &ProjectPathsConfig,
+    ) -> Self {
+        let this = Self::new_solc(output, layout);
+        let other = Self::new_zksolc(zk_output, layout);
+
+        Self::_merge(this, other)
     }
 
     /// Finds a contract matching the contract path
@@ -289,6 +325,11 @@ impl DualCompiledContracts {
     /// Returns an iterator over all `[DualCompiledContract]`s in the collection
     pub fn iter(&self) -> impl Iterator<Item = &DualCompiledContract> {
         self.contracts.iter()
+    }
+
+    /// Returns an iterator over all `[DualCompiledContract]`s in the collection
+    pub fn into_iter(self) -> impl Iterator<Item = DualCompiledContract> {
+        self.contracts.into_iter()
     }
 
     /// Adds a new `[DualCompiledContract]` to the collection
