@@ -22,15 +22,7 @@ use foundry_compilers::{
     cache::SOLIDITY_FILES_CACHE_FILENAME,
     error::SolcError,
     remappings::{RelativeRemapping, Remapping},
-    zksync::{
-        artifacts::{
-            BytecodeHash as ZkSolcBytecodeHash, Optimizer as ZkSolcOptimizer,
-            OptimizerDetails as ZkSolcOptimizerDetails, Settings as ZkSolcSettings,
-            SettingsMetadata as ZkSolcSettingsMetadata,
-        },
-        compile::ZkSolc,
-        config::ZkSolcConfig,
-    },
+    zksync::{artifacts::Settings as ZkSolcSettings, compile::ZkSolc, config::ZkSolcConfig},
     ConfigurableArtifacts, EvmVersion, Project, ProjectPathsConfig, Solc, SolcConfig,
 };
 use inflector::Inflector;
@@ -105,6 +97,9 @@ use providers::remappings::RemappingsProvider;
 mod inline;
 use crate::etherscan::EtherscanEnvProvider;
 pub use inline::{validate_profiles, InlineConfig, InlineConfigError, InlineConfigParser, NatSpec};
+
+mod zksync;
+use zksync::ZkSyncConfig;
 
 /// Foundry configuration
 ///
@@ -414,31 +409,7 @@ pub struct Config {
     pub __warnings: Vec<Warning>,
 
     /// @zkSync zkSolc configuration and settings
-    ///
-    /// Use zksync era
-    pub zksync: bool,
-    /// The zkSolc instance to use if any.
-    pub zksolc: Option<SolcReq>,
-    /// solc path to use along the zksolc compiler
-    pub zk_solc_path: Option<PathBuf>,
-    /// Optimizer settings for zkSync
-    pub zk_optimizer: bool,
-    /// The optimization mode string.
-    pub mode: char,
-    /// zksolc optimizer details remain the same
-    pub zk_optimizer_details: Option<ZkSolcOptimizerDetails>,
-    /// Whether to include the metadata hash for zksolc compiled bytecode.
-    pub zk_bytecode_hash: ZkSolcBytecodeHash,
-    /// Whether to try to recompile with -Oz if the bytecode is too large.
-    pub fallback_oz: bool,
-    /// Whether to support compilation of zkSync-specific simulations
-    pub is_system: bool,
-    /// Force evmla for zkSync
-    pub force_evmla: bool,
-    /// Path to cache missing library dependencies, used for compiling and deploying libraries.
-    pub detect_missing_libraries: bool,
-    /// Source files to avoid compiling on zksolc
-    pub avoid_contracts: Option<Vec<String>>,
+    pub zksync: ZkSyncConfig,
 }
 
 /// Mapping of fallback standalone sections. See [`FallbackProfileProvider`]
@@ -461,7 +432,7 @@ impl Config {
 
     /// Standalone sections in the config which get integrated into the selected profile
     pub const STANDALONE_SECTIONS: &'static [&'static str] =
-        &["rpc_endpoints", "etherscan", "fmt", "doc", "fuzz", "invariant", "labels"];
+        &["rpc_endpoints", "etherscan", "fmt", "doc", "fuzz", "invariant", "labels", "zksync"];
 
     /// File name of config toml file
     pub const FILE_NAME: &'static str = "foundry.toml";
@@ -728,12 +699,13 @@ impl Config {
         // when setting up the builder for the sake of consistency (requires dedicated
         // builder methods)
         project.zksync_zksolc_config = ZkSolcConfig { settings: self.zksync_zksolc_settings()? };
-        project.zksync_avoid_contracts = self.avoid_contracts.clone().map(|patterns| {
-            patterns
-                .into_iter()
-                .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
-                .collect::<Vec<_>>()
-        });
+        project.zksync_avoid_contracts =
+            self.zksync.compiler.avoid_contracts.clone().map(|patterns| {
+                patterns
+                    .into_iter()
+                    .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
+                    .collect::<Vec<_>>()
+            });
 
         if let Some(zksolc) = self.zksync_ensure_zksolc()? {
             project.zksync_zksolc = zksolc;
@@ -802,7 +774,7 @@ impl Config {
     ///
     /// If `zksolc` is [`SolcReq::Local`] then this will ensure that the path exists.
     fn zksync_ensure_zksolc(&self) -> Result<Option<ZkSolc>, SolcError> {
-        if let Some(ref zksolc) = self.zksolc {
+        if let Some(ref zksolc) = self.zksync.compiler.zksolc {
             let zksolc = match zksolc {
                 SolcReq::Version(version) => {
                     let mut zksolc = ZkSolc::find_installed_version(version)?;
@@ -1218,32 +1190,7 @@ impl Config {
             Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {}", e))),
         };
 
-        let optimizer = ZkSolcOptimizer {
-            enabled: Some(self.zk_optimizer),
-            mode: Some(self.mode),
-            fallback_to_optimizing_for_size: Some(self.fallback_oz),
-            disable_system_request_memoization: Some(true),
-            details: self.zk_optimizer_details.clone(),
-            jump_table_density_threshold: None,
-        };
-
-        let settings = ZkSolcSettings {
-            libraries,
-            optimizer,
-            evm_version: Some(self.evm_version),
-            metadata: Some(ZkSolcSettingsMetadata { bytecode_hash: Some(self.zk_bytecode_hash) }),
-            via_ir: Some(self.via_ir),
-            // Set in project paths.
-            remappings: Vec::new(),
-            detect_missing_libraries: self.detect_missing_libraries,
-            system_mode: self.is_system,
-            force_evmla: self.force_evmla,
-            // TODO: See if we need to set this from here
-            output_selection: Default::default(),
-            solc: self.zk_solc_path.clone(),
-        };
-
-        Ok(settings)
+        Ok(self.zksync.compiler.settings(libraries, self.evm_version, self.via_ir))
     }
 
     /// Returns the default figment
@@ -2070,19 +2017,7 @@ impl Default for Config {
             labels: Default::default(),
             __non_exhaustive: (),
             __warnings: vec![],
-            // @zkSync
-            zksolc: None,
-            zk_bytecode_hash: ZkSolcBytecodeHash::None,
-            zk_optimizer: true,
-            mode: '3',
-            zksync: false,
-            zk_solc_path: None,
-            zk_optimizer_details: None,
-            fallback_oz: false,
-            force_evmla: false,
-            is_system: false,
-            detect_missing_libraries: false,
-            avoid_contracts: None,
+            zksync: Default::default(),
         }
     }
 }

@@ -210,7 +210,7 @@ impl TestArgs {
                 evm_opts.clone(),
                 None,
                 dual_compiled_contracts,
-                config.zksync,
+                config.zksync.run_in_zk_mode(),
             ))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
@@ -226,7 +226,7 @@ impl TestArgs {
             }
             *test_pattern = Some(debug_test_pattern.clone());
         }
-        runner.use_zk = config.zksync;
+        runner.use_zk = config.zksync.run_in_zk_mode();
 
         let outcome = self.run_tests(runner, config, verbosity, &filter, test_options).await?;
 

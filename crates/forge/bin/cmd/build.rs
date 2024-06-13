@@ -103,7 +103,7 @@ impl BuildArgs {
             println!("{}", serde_json::to_string_pretty(&output.clone().output())?);
         }
 
-        if config.zksync {
+        if config.zksync.enable {
             let zk_compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)
