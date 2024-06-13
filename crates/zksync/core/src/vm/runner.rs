@@ -153,10 +153,15 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
+    let contract_evm =
+        contract.evm.as_ref().expect("dual compiled contract should have evm component");
+    let contract_zk =
+        contract.zk.as_ref().expect("dual compiled contract should have zk component");
+
     info!(?call, "create tx {}", hex::encode(&call.init_code));
-    let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
+    let constructor_input = call.init_code[contract_evm.bytecode.len()..].to_vec();
     let caller = env.tx.caller;
-    let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
+    let calldata = encode_create_params(&call.scheme, contract_zk.bytecode_hash, constructor_input);
     let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
