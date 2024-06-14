@@ -139,6 +139,10 @@ pub struct Cheatcodes {
     /// in the execution environment.
     pub gas_price: Option<U256>,
 
+    /// SkipZkVM
+    /// Used to skip ZK-VM execution and switch to EVM
+    pub skip_zk_vm: bool,
+
     /// Address labels
     pub labels: HashMap<Address, String>,
 
@@ -1233,7 +1237,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             }]);
         }
 
-        if self.use_zk_vm {
+        if self.use_zk_vm && !self.skip_zk_vm {
             if let TransactTo::Call(test_contract) = data.env.tx.transact_to {
                 if call.contract == test_contract {
                     info!("using evm for calls to test contract {:?}", data.env);
@@ -1299,6 +1303,11 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
     ) -> (InstructionResult, Gas, Bytes) {
         let cheatcode_call =
             call.contract == CHEATCODE_ADDRESS || call.contract == HARDHAT_CONSOLE_ADDRESS;
+
+        if !cheatcode_call && self.skip_zk_vm {
+            trace!("Disabling zk vm skipping");
+            self.skip_zk_vm = false;
+        }
 
         // Clean up pranks/broadcasts if it's not a cheatcode call end. We shouldn't do
         // it for cheatcode calls because they are not appplied for cheatcodes in the `call` hook.
