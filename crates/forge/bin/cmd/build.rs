@@ -162,6 +162,21 @@ impl Provider for BuildArgs {
             dict.insert("sizes".to_string(), true.into());
         }
 
+        // these are handled in CoreBuildArgs -> Figment impl
+        for zksync_flag in [
+            "zksync",
+            "zk_solc_path",
+            "enable_eravm_extensions",
+            "force_evmla",
+            "fallback_oz",
+            "detect_missing_libraries",
+            "avoid_contracts",
+            "zk_optimizer",
+            "zk_optimizer_mode",
+        ] {
+            dict.remove(zksync_flag);
+        }
+
         Ok(Map::from([(Config::selected_profile(), dict)]))
     }
 }

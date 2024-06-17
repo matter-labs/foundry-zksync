@@ -71,11 +71,11 @@ pub struct CompilerArgs {
     #[clap(
         help_heading = "zkSync Compiler options",
         help = "Enable the system contract compilation mode.",
-        long = "is-system",
-        value_name = "SYSTEM_MODE"
+        long = "enable-eravm-extensions",
+        value_name = "ENABLE_ERAVM_EXTENSIONS"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_system: Option<bool>,
+    pub enable_eravm_extensions: Option<bool>,
 
     /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
     #[clap(
@@ -105,11 +105,11 @@ pub struct CompilerArgs {
     #[clap(
         help_heading = "zkSync Compiler options",
         short = 'O',
-        long = "optimization",
+        long = "zk-optimization",
         value_name = "LEVEL"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mode: Option<String>,
+    pub zk_optimizer_mode: Option<String>,
 
     /// Enables optimizations
     #[clap(help_heading = "zkSync Compiler options", long = "zk-optimizer")]

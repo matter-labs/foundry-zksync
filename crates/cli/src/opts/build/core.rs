@@ -6,14 +6,14 @@ use foundry_compilers::{
     artifacts::RevertStrings, remappings::Remapping, utils::canonicalized, Project,
 };
 use foundry_config::{
-    figment,
     figment::{
+        self,
         error::Kind::InvalidType,
         value::{Dict, Map, Value},
         Figment, Metadata, Profile, Provider,
     },
     providers::remappings::Remappings,
-    Config,
+    Config, ZkSyncConfig,
 };
 use serde::Serialize;
 use std::path::PathBuf;
@@ -157,7 +157,51 @@ impl<'a> From<&'a CoreBuildArgs> for Figment {
         let mut remappings = Remappings::new_with_remappings(args.project_paths.get_remappings());
         remappings
             .extend(figment.extract_inner::<Vec<Remapping>>("remappings").unwrap_or_default());
-        figment.merge(("remappings", remappings.into_inner())).merge(args)
+
+        // override only set values from the CLI for zksync
+        let zksync = {
+            let mut zksync = figment.extract_inner::<ZkSyncConfig>("zksync").unwrap_or_default();
+            let compiler_cfg = &args.compiler;
+
+            macro_rules! set_if_some {
+                ($src:expr, $dst:expr) => {
+                    if let Some(src) = $src {
+                        $dst = src.into();
+                    }
+                };
+            }
+
+            set_if_some!(compiler_cfg.zksync.then_some(true), zksync.enable);
+            set_if_some!(compiler_cfg.zk_solc_path.clone(), zksync.compiler.solc);
+            set_if_some!(
+                compiler_cfg.enable_eravm_extensions,
+                zksync.compiler.enable_eravm_extensions
+            );
+            set_if_some!(compiler_cfg.force_evmla, zksync.compiler.force_evmla);
+            set_if_some!(compiler_cfg.fallback_oz, zksync.compiler.fallback_oz);
+            set_if_some!(
+                compiler_cfg.detect_missing_libraries.then_some(true),
+                zksync.compiler.detect_missing_libraries
+            );
+            set_if_some!(compiler_cfg.avoid_contracts.clone(), zksync.compiler.avoid_contracts);
+
+            set_if_some!(
+                compiler_cfg.zk_optimizer.then_some(true),
+                zksync.compiler.optimizer.enable
+            );
+            set_if_some!(
+                compiler_cfg
+                    .zk_optimizer_mode
+                    .as_ref()
+                    .map(|mode| mode.parse::<char>().ok())
+                    .flatten(),
+                zksync.compiler.optimizer.mode
+            );
+
+            zksync
+        };
+
+        figment.merge(("remappings", remappings.into_inner())).merge(args).merge(("zksync", zksync))
     }
 }
 

@@ -99,7 +99,7 @@ use crate::etherscan::EtherscanEnvProvider;
 pub use inline::{validate_profiles, InlineConfig, InlineConfigError, InlineConfigParser, NatSpec};
 
 mod zksync;
-use zksync::ZkSyncConfig;
+pub use zksync::*;
 
 /// Foundry configuration
 ///

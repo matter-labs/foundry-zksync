@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use crate::SolcReq;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// ZkSolc optimizer configuration
 pub struct ZkOptimizerConfig {
     /// Optimizer settings for zkSync
     pub enable: bool,
@@ -28,6 +29,7 @@ impl Default for ZkOptimizerConfig {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// ZkSolc compiler configuration
 pub struct ZkCompilerConfig {
     /// The zkSolc instance to use if any.
     pub zksolc: Option<SolcReq>,
@@ -58,6 +60,7 @@ pub struct ZkCompilerConfig {
 }
 
 impl ZkCompilerConfig {
+    /// Convert the compiler config to a foundry_compilers zksync Settings
     pub fn settings(
         &self,
         libraries: Libraries,
@@ -92,6 +95,7 @@ impl ZkCompilerConfig {
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// ZkSync configuration
 pub struct ZkSyncConfig {
     /// Enable zksync mode
     pub enable: bool,
