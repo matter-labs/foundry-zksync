@@ -277,7 +277,8 @@ impl CreateArgs {
                     Ok((abi, bin.object, Some(zk_data)))
                 };
 
-                let (abi, bytecode_object, zk_data) = output.as_mut().either(process_evm_output, process_zk_output)?;
+                let (abi, bytecode_object, zk_data) =
+                    output.as_mut().either(process_evm_output, process_zk_output)?;
 
                 // Add arguments to constructor
                 let provider = utils::get_provider(&config)?;
