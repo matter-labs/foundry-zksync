@@ -5,18 +5,15 @@ use std::{collections::HashMap, default, fmt::Debug};
 use alloy_primitives::Address;
 use itertools::Itertools;
 use multivm::{
-    vm_latest::{BootloaderState, HistoryMode, SimpleMemory, ZkSyncVmState},
-    zk_evm_latest::{
+        vm_1_3_2::zk_evm_1_3_3::zkevm_opcode_defs::RetABI, vm_latest::{BootloaderState, HistoryMode, SimpleMemory, ZkSyncVmState}, zk_evm_latest::{
         aux_structures::{MemoryPage, Timestamp},
         opcodes::DecodedOpcode as ZkDecodedOpcode,
         tracing::{AfterExecutionData, BeforeExecutionData, VmLocalStateData},
-        vm_state::{self, PrimitiveValue},
+        vm_state::{self, code_page_candidate_from_base, PrimitiveValue},
         zkevm_opcode_defs::{
-            decoding::{EncodingModeProduction, VmEncodingMode},
-            FarCallABI, FarCallOpcode, FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
-            CALL_SYSTEM_ABI_REGISTERS, RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
+            decoding::{EncodingModeProduction, VmEncodingMode}, FarCallABI, FarCallOpcode, FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER, CALL_SYSTEM_ABI_REGISTERS, RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER
         },
-    },
+    }
 };
 use zksync_basic_types::{H160, U256};
 use zksync_state::{StoragePtr, WriteStorage};
@@ -146,49 +143,94 @@ impl FarCallHandler {
         }
     }
 
+    fn populate_page_with_data<S: WriteStorage + Send, H: HistoryMode>(
+        state: &mut ZkSyncVmState<S, H>,
+        page: MemoryPage,
+        data: Vec<u8>,
+    ) {
+        let data_chunks = data.chunks(32);
+
+        let start_slot = 0;
+        let data = data_chunks
+            .enumerate()
+            .map(|(index, value)| (start_slot + index, U256::from_big_endian(value)))
+            .collect_vec();
+
+        state.memory.populate_page(
+            page.0 as usize,
+            data,
+            Timestamp(state.local_state.timestamp),
+        );
+    }
+
     /// Attempts to return the preset data ignoring any following opcodes, if set.
     /// Must be called during `finish_cycle`.
     pub(crate) fn maybe_return_early<S: WriteStorage + Send, H: HistoryMode>(
         &mut self,
         state: &mut ZkSyncVmState<S, H>,
         _bootloader_state: &mut BootloaderState,
+        
     ) {
         if let Some(return_data) = self.immediate_return.take() {
             // set return data
-            let current = state.local_state.callstack.get_current_stack();
+            let current = *state.local_state.callstack.get_current_stack();
             let return_memory_page = vm_state::heap_page_from_base(current.base_memory_page);
 
             let data_chunks = return_data.chunks(32);
             let return_fat_ptr = FatPointer {
-                memory_page: return_memory_page.0,
+                // 0 is fine since heap page will be assiged automatically
+                memory_page: 0,
                 offset: 0,
                 start: 0,
                 length: (data_chunks.len() as u32) * 32,
             };
-            let start_slot = (return_fat_ptr.start / 32) as usize;
-            let data = data_chunks
-                .enumerate()
-                .map(|(index, value)| (start_slot + index, U256::from_big_endian(value)))
-                .collect_vec();
 
-            state.local_state.registers[RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER as usize] =
-                PrimitiveValue { value: return_fat_ptr.to_u256(), is_pointer: true };
-            state.memory.populate_page(
-                return_fat_ptr.memory_page as usize,
-                data,
-                Timestamp(state.local_state.timestamp),
+            Self::populate_page_with_data(
+                state,
+                return_memory_page,
+                return_data
             );
 
-            // pop the current stack to simulate return
-            let previous_cs = state.local_state.callstack.pop_entry();
+            // Just in case to avoid any gas csots related to memory
+            state.local_state.callstack.current.heap_bound = u32::MAX;
 
-            // Set gas consumption. A significant amount of gas is set aside for the
-            // active far call, which needs to be "refunded" back.
-            //
-            // We consume no gas for setting immediate returns. This may cause gas related
-            // discrepancies. E.g. returning from a `baseFee()` can ignore up to
-            // 67_000_000 gas
-            state.local_state.callstack.current.ergs_remaining = previous_cs.ergs_remaining;
+            let immediate_return_opcoded = DecodedOpcode {
+                inner: multivm::zk_evm_latest::zkevm_opcode_defs::DecodedOpcode::<8, EncodingModeProduction> {
+                    variant: multivm::zk_evm_latest::zkevm_opcode_defs::OpcodeVariant {
+                        opcode: multivm::zk_evm_latest::zkevm_opcode_defs::Opcode::Ret(
+                            multivm::zk_evm_latest::zkevm_opcode_defs::RetOpcode::Ok
+                        ),
+                        src0_operand_type: multivm::zk_evm_latest::zkevm_opcode_defs::Operand::RegOnly,
+                        dst0_operand_type: multivm::zk_evm_latest::zkevm_opcode_defs::Operand::RegOnly,
+                        flags: [false; 2],
+                    },
+                    condition: multivm::zk_evm_latest::zkevm_opcode_defs::Condition::Always,
+                    // src0 is the only thing that matters.
+                    // it means that the ret abi will be taken from r1
+                    src0_reg_idx: 1,
+                    src1_reg_idx: 0,
+                    dst0_reg_idx: 0,
+                    dst1_reg_idx: 0,
+                    imm_0: 0,
+                    imm_1: 0,
+                }
+            };
+
+            // Note that register `0` should contain `RetABI`. However besides the pointer the other fields
+            // can be zero for our purposes.
+            state.local_state.registers[0] =
+                // `is_pointer` must be false as it is not a pointer, but rather a heap slice
+                PrimitiveValue { value: return_fat_ptr.to_u256(), is_pointer: false };
+
+            
+            // Just rewriting `code_page` is very error-prone, since the same memory page would be re-used for decommitments.
+            // We'll use a different approach: 
+            // - Set `previous_code_word` to the value that we want
+            // - Set `previous_code_memory_page` to the current code page + `previous_super_pc` to 0 (as it corresponds 
+            // to the current pc of 0). This will ensure that VM will *not even read* from the code memory page.
+            state.local_state.previous_code_word = U256([0,0,0,immediate_return_opcoded.serialize_as_integer()]);
+            state.local_state.previous_code_memory_page = state.local_state.callstack.current.code_page;
+            state.local_state.previous_super_pc = 0u16.into();
         }
     }
 
