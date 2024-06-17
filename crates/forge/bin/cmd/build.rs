@@ -110,9 +110,9 @@ impl BuildArgs {
                 .quiet(self.format_json)
                 .bail(!self.format_json);
 
-            let output = zk_compiler.zksync_compile(&project)?;
+            let zk_output = zk_compiler.zksync_compile(&project)?;
             if self.format_json {
-                println!("{}", serde_json::to_string_pretty(&output.output())?);
+                println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
             }
         }
 
