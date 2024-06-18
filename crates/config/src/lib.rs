@@ -419,6 +419,8 @@ pub struct Config {
     pub zksync: bool,
     /// The zkSolc instance to use if any.
     pub zksolc: Option<SolcReq>,
+    /// solc path to use along the zksolc compiler
+    pub zk_solc_path: Option<PathBuf>,
     /// Optimizer settings for zkSync
     pub zk_optimizer: bool,
     /// The optimization mode string.
@@ -1238,6 +1240,7 @@ impl Config {
             force_evmla: self.force_evmla,
             // TODO: See if we need to set this from here
             output_selection: Default::default(),
+            solc: self.zk_solc_path.clone(),
         };
 
         Ok(settings)
@@ -2073,6 +2076,7 @@ impl Default for Config {
             zk_optimizer: true,
             mode: '3',
             zksync: false,
+            zk_solc_path: None,
             zk_optimizer_details: None,
             fallback_oz: false,
             force_evmla: false,
