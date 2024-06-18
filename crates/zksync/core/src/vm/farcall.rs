@@ -3,6 +3,7 @@
 use std::{collections::HashMap, default, fmt::Debug};
 
 use alloy_primitives::Address;
+use foundry_common::shell::println;
 use itertools::Itertools;
 use multivm::{
     vm_1_3_2::zk_evm_1_3_3::zkevm_opcode_defs::RetABI,
@@ -157,6 +158,7 @@ impl FarCallHandler {
         _bootloader_state: &mut BootloaderState,
     ) {
         if let Some(return_data) = self.immediate_return.take() {
+            println!("DATA {:?}", hex::encode(&return_data));
             // set return data
             let current = *state.local_state.callstack.get_current_stack();
             let return_memory_page = vm_state::heap_page_from_base(current.base_memory_page);
@@ -198,11 +200,25 @@ impl FarCallHandler {
                     imm_1: 0,
                 },
             };
+            println!("SET");
+            println!("\tm_pc   {:?} = 0", state.local_state.previous_super_pc);
+            println!(
+                "\tm_page {:?} = {:?}",
+                state.local_state.previous_code_memory_page,
+                state.local_state.callstack.current.code_page
+            );
+            println!("\tcode");
+            for w in &state.local_state.previous_code_word.0 {
+                let (w, _) =
+                    EncodingModeProduction::parse_preliminary_variant_and_absolute_number(*w);
+                println!("\t\t{:?}", w);
+            }
+
             state.local_state.previous_code_word =
                 U256([0, 0, 0, immediate_return_opcode.serialize_as_integer()]);
             state.local_state.previous_code_memory_page =
                 state.local_state.callstack.current.code_page;
-            state.local_state.previous_super_pc = 0u16.into();
+            state.local_state.previous_super_pc = 0;
 
             // Just in case to avoid any gas costs related to memory
             state.local_state.callstack.current.heap_bound = u32::MAX;
