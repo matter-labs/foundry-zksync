@@ -33,6 +33,7 @@ use foundry_compilers::{
 use foundry_config::Chain;
 use foundry_wallets::WalletSigner;
 use foundry_zksync_compiler::libraries as zklibs;
+use itertools::Either;
 use zksync_types::H256;
 
 use serde_json::json;
@@ -157,125 +158,127 @@ impl CreateArgs {
                     project.root().join(lib.path.clone().expect("libraries must specify path")),
                 )
             });
+
             let compiler =
                 ProjectCompiler::new().quiet_if(self.json || self.opts.silent).files(files.clone());
-            let zk_compiler =
-                ProjectCompiler::new().quiet_if(self.json || self.opts.silent).files(files);
 
-            let mut output = compiler.compile(&project)?;
-            let mut zk_output = zk_compiler.zksync_compile(&project)?;
+            let mut output = if !zksync {
+                Either::Left(compiler.compile(&project)?)
+            } else {
+                Either::Right(compiler.zksync_compile(&project)?)
+            };
 
             for mut contract in contracts_batch {
                 if let Some(ref mut path) = contract.path {
                     // paths are absolute in the project's output
                     *path = canonicalized(project.root().join(&path)).to_string_lossy().to_string();
                 }
-                let (abi, bytecode_object, zk_data) = {
-                    if !zksync {
-                        let (abi, bin, _) = remove_contract(&mut output, &contract)?;
-                        let bytecode_object = match bin.object {
-                            BytecodeObject::Bytecode(_) => bin.object,
-                            _ => {
-                                let link_refs = bin
-                                    .link_references
-                                    .iter()
-                                    .flat_map(|(path, names)| {
-                                        names.keys().map(move |name| format!("\t{name}: {path}"))
-                                    })
-                                    .collect::<Vec<String>>()
-                                    .join("\n");
-                                eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
-                            }
-                        };
-                        (abi, bytecode_object, None)
-                    } else {
-                        let artifact =
-                            zk_output.remove_contract(&contract).expect("Artifact not found");
-                        let ZkContractArtifact {
-                            bytecode,
-                            hash,
-                            factory_dependencies,
-                            metadata,
-                            ..
-                        } = artifact;
 
-                        // Get abi from solc_metadata
-                        // TODO: This can probably be optimized by defining the proper
-                        // deserializers on compilers but metadata is given as a stringified json
-                        // and JsonAbi is complaining about not supporting serde_json::from_reader
-                        // so there is some serde handling neded
-                        let metadata = metadata.unwrap();
-                        let solc_metadata_value = metadata
-                            .get("solc_metadata")
-                            .and_then(serde_json::Value::as_str)
-                            .expect("`solc_metadata` field not found in artifact");
-                        let solc_metadata_json: serde_json::Value =
-                            serde_json::from_str(solc_metadata_value).unwrap();
-                        let abi_json = &solc_metadata_json["output"]["abi"];
-                        let abi_string = abi_json.to_string();
-                        let abi: JsonAbi = JsonAbi::from_json_str(&abi_string)?;
-
-                        let bin = bytecode.expect("Bytecode not found");
-                        let bytecode_hash =
-                            H256::from_str(&hash.expect("Contract hash not found"))?;
-                        let bytecode = bin.object.clone().into_bytes().unwrap().to_vec();
-
-                        let factory_dependencies_map =
-                            factory_dependencies.expect("factory deps not found");
-                        let mut visited_paths = HashSet::new();
-                        let mut visited_bytecodes = HashSet::new();
-                        let mut queue = VecDeque::new();
-
-                        for dep in factory_dependencies_map.values() {
-                            queue.push_back(dep.clone());
+                let process_evm_output = |output| {
+                    let (abi, bin, _) = remove_contract(output, &contract)?;
+                    let bytecode_object = match bin.object {
+                        BytecodeObject::Bytecode(_) => bin.object,
+                        _ => {
+                            let link_refs = bin
+                                .link_references
+                                .iter()
+                                .flat_map(|(path, names)| {
+                                    names.keys().map(move |name| format!("\t{name}: {path}"))
+                                })
+                                .collect::<Vec<String>>()
+                                .join("\n");
+                            eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
                         }
+                    };
+                    Ok((abi, bytecode_object, None))
+                };
 
-                        while let Some(dep_info) = queue.pop_front() {
-                            if visited_paths.insert(dep_info.clone()) {
-                                let mut split = dep_info.split(':');
-                                let contract_path = split.next().expect(
-                                    "Failed to extract contract path for factory dependency",
-                                );
-                                let contract_name = split.next().expect(
-                                    "Failed to extract contract name for factory dependency",
-                                );
-                                let mut abs_path_buf = PathBuf::new();
-                                abs_path_buf.push(project.root());
-                                abs_path_buf.push(contract_path);
-                                let abs_path_str = abs_path_buf.to_string_lossy();
-                                let fdep_art = zk_output
-                                    .find(abs_path_str, contract_name)
-                                    .unwrap_or_else(|| {
-                                        panic!(
+                let process_zk_output = |zk_output: &mut foundry_compilers::zksync::compile::output::ProjectCompileOutput| {
+                    let artifact =
+                        zk_output.remove_contract(&contract).expect("Artifact not found");
+                    let ZkContractArtifact {
+                        bytecode, hash, factory_dependencies, metadata, ..
+                    } = artifact;
+
+                    // Get abi from solc_metadata
+                    // TODO: This can probably be optimized by defining the proper
+                    // deserializers on compilers but metadata is given as a stringified
+                    // json and JsonAbi is complaining about not
+                    // supporting serde_json::from_reader
+                    // so there is some serde handling neded
+                    let metadata = metadata.unwrap();
+                    let solc_metadata_value = metadata
+                        .get("solc_metadata")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("`solc_metadata` field not found in artifact");
+                    let solc_metadata_json: serde_json::Value =
+                        serde_json::from_str(solc_metadata_value).unwrap();
+                    let abi_json = &solc_metadata_json["output"]["abi"];
+                    let abi_string = abi_json.to_string();
+                    let abi: JsonAbi = JsonAbi::from_json_str(&abi_string)?;
+
+                    let bin = bytecode.expect("Bytecode not found");
+                    let bytecode_hash = H256::from_str(&hash.expect("Contract hash not found"))?;
+                    let bytecode = bin.object.clone().into_bytes().unwrap().to_vec();
+
+                    let factory_dependencies_map =
+                        factory_dependencies.expect("factory deps not found");
+                    let mut visited_paths = HashSet::new();
+                    let mut visited_bytecodes = HashSet::new();
+                    let mut queue = VecDeque::new();
+
+                    for dep in factory_dependencies_map.values() {
+                        queue.push_back(dep.clone());
+                    }
+
+                    while let Some(dep_info) = queue.pop_front() {
+                        if visited_paths.insert(dep_info.clone()) {
+                            let mut split = dep_info.split(':');
+                            let contract_path = split
+                                .next()
+                                .expect("Failed to extract contract path for factory dependency");
+                            let contract_name = split
+                                .next()
+                                .expect("Failed to extract contract name for factory dependency");
+                            let mut abs_path_buf = PathBuf::new();
+                            abs_path_buf.push(project.root());
+                            abs_path_buf.push(contract_path);
+                            let abs_path_str = abs_path_buf.to_string_lossy();
+                            let fdep_art =
+                                zk_output.find(abs_path_str, contract_name).unwrap_or_else(|| {
+                                    panic!(
                                     "Could not find contract {} at path {} for compilation output",
                                     contract_name, contract_path)
-                                    });
-                                let fdep_fdeps_map = fdep_art
-                                    .factory_dependencies
-                                    .clone()
-                                    .expect("factory deps not found");
-                                for dep in fdep_fdeps_map.values() {
-                                    queue.push_back(dep.clone())
-                                }
-
-                                let fdep_bytecode = fdep_art
-                                    .bytecode
-                                    .clone()
-                                    .expect("Bytecode not found for factory dependency")
-                                    .object
-                                    .clone()
-                                    .into_bytes()
-                                    .unwrap()
-                                    .to_vec();
-                                visited_bytecodes.insert(fdep_bytecode);
+                                });
+                            let fdep_fdeps_map = fdep_art
+                                .factory_dependencies
+                                .clone()
+                                .expect("factory deps not found");
+                            for dep in fdep_fdeps_map.values() {
+                                queue.push_back(dep.clone())
                             }
+
+                            let fdep_bytecode = fdep_art
+                                .bytecode
+                                .clone()
+                                .expect("Bytecode not found for factory dependency")
+                                .object
+                                .clone()
+                                .into_bytes()
+                                .unwrap()
+                                .to_vec();
+                            visited_bytecodes.insert(fdep_bytecode);
                         }
-                        visited_bytecodes.insert(bytecode.clone());
-                        let factory_deps: Vec<Vec<u8>> = visited_bytecodes.into_iter().collect();
-                        let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
-                        (abi, bin.object, Some(zk_data))
                     }
+
+                    visited_bytecodes.insert(bytecode.clone());
+                    let factory_deps: Vec<Vec<u8>> = visited_bytecodes.into_iter().collect();
+                    let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
+                    Ok((abi, bin.object, Some(zk_data)))
                 };
+
+                let (abi, bytecode_object, zk_data) =
+                    output.as_mut().either(process_evm_output, process_zk_output)?;
 
                 // Add arguments to constructor
                 let provider = utils::get_provider(&config)?;
