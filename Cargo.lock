@@ -1742,7 +1742,7 @@ dependencies = [
 [[package]]
 name = "circuit_encodings"
 version = "0.1.50"
-source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.5.0#1d27bf6ce3648d3a6c6c89e7861519a9fe381353"
+source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.5.0#5d6a06c37f4656d26a4170d22f2298cd7716c070"
 dependencies = [
  "derivative",
  "serde",
@@ -1804,7 +1804,7 @@ dependencies = [
 [[package]]
 name = "circuit_sequencer_api"
 version = "0.1.50"
-source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.5.0#1d27bf6ce3648d3a6c6c89e7861519a9fe381353"
+source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.5.0#5d6a06c37f4656d26a4170d22f2298cd7716c070"
 dependencies = [
  "bellman_ce",
  "circuit_encodings 0.1.50",
@@ -6180,9 +6180,9 @@ dependencies = [
 
 [[package]]
 name = "lz4-sys"
-version = "1.9.4"
+version = "1.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57d27b317e207b10f69f5e75494119e391a96f48861ae870d1da6edac98ca900"
+checksum = "e9764018d143cc854c9f17f0b907de70f14393b1f502da6375dce70f00514eb3"
 dependencies = [
  "cc",
  "libc",
@@ -7077,7 +7077,7 @@ dependencies = [
 [[package]]
 name = "pairing_ce"
 version = "0.28.5"
-source = "git+https://github.com/matter-labs/pairing.git#d24f2c5871089c4cd4f54c0ca266bb9fef6115eb"
+source = "git+https://github.com/matter-labs/pairing.git#f55393fd366596eac792d78525d26e9c4d6ed1ca"
 dependencies = [
  "byteorder",
  "cfg-if 1.0.0",
