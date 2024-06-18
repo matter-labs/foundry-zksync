@@ -1,75 +1,30 @@
-use crate::{
-    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    is_system_address,
-    vm::tracer::{CallContext, CheatcodeTracer},
-};
-use alloy_primitives::Log;
-use alloy_sol_types::{SolEvent, SolInterface, SolValue};
-use ansi_term::Color::Cyan;
-use era_test_node::{
-    formatter,
-    node::ShowCalls,
-    system_contracts::{Options, SystemContracts},
-    utils::bytecode_to_factory_dep,
-};
-use foundry_common::{
-    console::HARDHAT_CONSOLE_ADDRESS, fmt::ConsoleFmt, patch_hh_console_selector, Console,
-    HardhatConsole,
-};
 use foundry_zksync_compiler::DualCompiledContract;
-use std::{cmp::min, collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
-
-use crate::{fix_l2_gas_limit, fix_l2_gas_price};
-use itertools::Itertools;
-use multivm::{
-    interface::{Halt, VmExecutionResultAndLogs, VmInterface, VmRevertReason},
-    tracers::CallTracer,
-    vm_latest::{ExecutionResult, HistoryDisabled, ToTracerPointer, Vm, VmExecutionMode},
-};
-use once_cell::sync::OnceCell;
 use revm::{
     interpreter::{CallInputs, CallScheme, CreateInputs},
     precompile::Precompiles,
     primitives::{
-        Address, Bytecode, Bytes, CreateScheme, EVMResultGeneric, Env, Eval,
-        ExecutionResult as rExecutionResult, Halt as rHalt, HashMap as rHashMap, Log as rLog,
-        OutOfGasError, Output, ResultAndState, SpecId, StorageSlot, TransactTo, B256,
-        U256 as rU256,
+        Address, CreateScheme, Env, ResultAndState, SpecId, TransactTo, B256, U256 as rU256,
     },
     Database, JournaledState,
 };
-use tracing::{info, trace};
-use zksync_basic_types::{L2ChainId, H256};
-use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
+use tracing::{debug, error, info};
+use zksync_basic_types::H256;
 use zksync_types::{
-    ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, vm_trace::Call, Nonce,
-    PackedEthSignature, StorageKey, Transaction, VmEvent, ACCOUNT_CODE_STORAGE_ADDRESS,
-    CONTRACT_DEPLOYER_ADDRESS, H160, U256,
-};
-use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
-
-use crate::vm::{
-    db::{ZKVMData, DEFAULT_CHAIN_ID},
-    env::{create_l1_batch_env, create_system_env},
+    ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, CONTRACT_DEPLOYER_ADDRESS,
+    U256,
 };
 
-use super::{storage_view::StorageView, tracer::CheatcodeTracerContext};
+use std::{cmp::min, fmt::Debug};
 
-/// Maximum gas price allowed for L1.
-const MAX_L1_GAS_PRICE: u64 = 1000;
-
-/// Maximum size allowed for factory_deps during create.
-/// We batch factory_deps till this upper limit if there are multiple deps.
-/// These batches are they deployed individually
-const MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: usize = 100000; // 100kB
-
-#[derive(Debug)]
-pub struct ZKVMExecutionResult {
-    pub logs: Vec<rLog>,
-    pub execution_result: rExecutionResult,
-}
-
-type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
+use crate::{
+    convert::{ConvertAddress, ConvertH160, ConvertRU256, ConvertU256},
+    fix_l2_gas_limit, fix_l2_gas_price,
+    vm::{
+        db::ZKVMData,
+        inspect::{inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult},
+        tracer::{CallContext, CheatcodeTracerContext},
+    },
+};
 
 /// Transacts
 pub fn transact<'a, DB>(
@@ -81,7 +36,7 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    tracing::debug!("zk transact");
+    debug!("zk transact");
     let mut journaled_state = JournaledState::new(
         env.cfg.spec_id,
         Precompiles::new(to_precompile_id(env.cfg.spec_id))
@@ -184,50 +139,6 @@ where
     ZKVMData::new(db, journaled_state).get_tx_nonce(address).0
 }
 
-/// Batch factory deps on the basis of size.
-///
-/// For large factory_deps the VM can out of gas. To avoid this case we batch factory_deps
-/// on the basis of [MAX_FACTORY_DEPENDENCIES_SIZE_BYTES] and deploy the initial batches
-/// via empty transactions and the last one normally via create.
-fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec<u8>>> {
-    let factory_deps_count = factory_deps.len();
-    let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
-    let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();
-    tracing::info!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, "optimizing factory_deps");
-
-    let mut batches = vec![];
-    let mut current_batch = vec![];
-    let mut current_batch_len = 0;
-
-    // sort in increasing order of size to ensure the smaller bytecodes are packed efficiently
-    factory_deps.sort_by_key(|a| a.len());
-    for dep in factory_deps {
-        let len = dep.len();
-        let new_len = current_batch_len + len;
-        if new_len > MAX_FACTORY_DEPENDENCIES_SIZE_BYTES && !current_batch.is_empty() {
-            batches.push(current_batch);
-            current_batch = vec![];
-            current_batch_len = 0;
-        }
-        current_batch.push(dep);
-        current_batch_len += len;
-    }
-
-    if !current_batch.is_empty() {
-        batches.push(current_batch);
-    }
-
-    let batch_count = batches.len();
-    let batch_individual_sizes =
-        batches.iter().map(|deps| deps.iter().map(|dep| dep.len()).collect_vec()).collect_vec();
-    let batch_cumulative_sizes =
-        batches.iter().map(|deps| deps.iter().map(|dep| dep.len()).sum::<usize>()).collect_vec();
-    let batch_total_size = batch_cumulative_sizes.iter().sum::<usize>();
-    tracing::info!(count=batch_count, total=batch_total_size, sizes=?batch_cumulative_sizes, batched_sizes=?batch_individual_sizes, "optimized factory_deps into batches");
-
-    batches
-}
-
 /// Executes a CREATE opcode on the ZK-VM.
 pub fn create<'a, DB, E>(
     call: &CreateInputs,
@@ -251,73 +162,21 @@ where
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
-    // If we have more than one factory_dep, we deploy them individually to ensure we
-    // do not out of gas.
-    // TODO: Split on the basis of size, perhaps max 100_000 bytes per batch
-    let batched_factory_deps = batch_factory_dependencies(factory_deps);
-    let batched_factory_deps_count = batched_factory_deps.len();
-    let transactions = if batched_factory_deps.len() > 1 {
-        let mut txs = vec![];
-        let mut last_deps = None;
-        let mut nonce = nonce;
-        for (i, deps) in batched_factory_deps.into_iter().enumerate() {
-            // skip if last factory_dep, so we can deploy it normally
-            if i == batched_factory_deps_count - 1 {
-                last_deps.replace(deps);
-                break
-            }
-
-            txs.push(L2Tx::new(
-                H160::zero(),
-                Vec::default(),
-                nonce,
-                Fee {
-                    gas_limit,
-                    max_fee_per_gas,
-                    max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-                    gas_per_pubdata_limit: U256::from(20000),
-                },
-                caller.to_h160(),
-                Default::default(),
-                Some(deps),
-                PaymasterParams::default(),
-            ));
-            nonce = Nonce(nonce.saturating_add(1));
-        }
-        txs.push(L2Tx::new(
-            CONTRACT_DEPLOYER_ADDRESS,
-            calldata,
-            nonce,
-            Fee {
-                gas_limit,
-                max_fee_per_gas,
-                max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-                gas_per_pubdata_limit: U256::from(20000),
-            },
-            caller.to_h160(),
-            call.value.to_u256(),
-            Some(last_deps.expect("must have an element left")),
-            PaymasterParams::default(),
-        ));
-
-        txs
-    } else {
-        vec![L2Tx::new(
-            CONTRACT_DEPLOYER_ADDRESS,
-            calldata,
-            nonce,
-            Fee {
-                gas_limit,
-                max_fee_per_gas,
-                max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-                gas_per_pubdata_limit: U256::from(20000),
-            },
-            caller.to_h160(),
-            call.value.to_u256(),
-            Some(batched_factory_deps.into_iter().next().expect("must have one element")),
-            PaymasterParams::default(),
-        )]
-    };
+    let tx = L2Tx::new(
+        CONTRACT_DEPLOYER_ADDRESS,
+        calldata,
+        nonce,
+        Fee {
+            gas_limit,
+            max_fee_per_gas,
+            max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
+            gas_per_pubdata_limit: U256::from(20000),
+        },
+        caller.to_h160(),
+        call.value.to_u256(),
+        Some(factory_deps),
+        PaymasterParams::default(),
+    );
 
     let call_ctx = CallContext {
         tx_caller: env.tx.caller,
@@ -330,46 +189,7 @@ where
         is_create: true,
     };
 
-    let mut aggregated_result: Option<ZKVMExecutionResult> = None;
-    for (idx, tx) in transactions.into_iter().enumerate() {
-        info!("executing batched tx ({}/{})", idx, batched_factory_deps_count);
-        let result = inspect(tx, env, db, journaled_state, &mut ccx, call_ctx.clone())?;
-        if let Some(aggregated_result) = &mut aggregated_result {
-            match result.execution_result {
-                rExecutionResult::Success { reason, gas_used, gas_refunded, logs, output } => {
-                    aggregated_result.logs.extend(result.logs);
-                    match &mut aggregated_result.execution_result {
-                        rExecutionResult::Success {
-                            reason: agg_reason,
-                            gas_used: agg_gas_used,
-                            gas_refunded: agg_gas_refunded,
-                            logs: agg_logs,
-                            output: agg_output,
-                        } => {
-                            *agg_reason = reason;
-                            *agg_gas_used += gas_used;
-                            *agg_gas_refunded += gas_refunded;
-                            agg_logs.extend(logs);
-                            *agg_output = output;
-                        }
-                        _ => unreachable!("aggregated result must only contain success"),
-                    }
-                }
-                _ => return Ok(result),
-            }
-        } else {
-            match result.execution_result {
-                rExecutionResult::Revert { .. } | rExecutionResult::Halt { .. } => {
-                    return Ok(result)
-                }
-                _ => {
-                    aggregated_result.replace(result);
-                }
-            }
-        }
-    }
-
-    Ok(aggregated_result.expect("must have result"))
+    inspect_as_batch(tx, env, db, journaled_state, &mut ccx, call_ctx)
 }
 
 /// Executes a CALL opcode on the ZK-VM.
@@ -441,364 +261,12 @@ where
     let value = env.tx.value.to_u256();
     let balance = ZKVMData::new(db, journaled_state).get_balance(caller);
     if balance.is_zero() {
-        tracing::error!("balance is 0 for {caller:?}, transaction will fail");
+        error!("balance is 0 for {caller:?}, transaction will fail");
     }
     let max_fee_per_gas = fix_l2_gas_price(env.tx.gas_price.to_u256());
     let gas_limit = fix_l2_gas_limit(env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
 
     (gas_limit, max_fee_per_gas)
-}
-
-fn inspect<'a, DB, E>(
-    mut tx: L2Tx,
-    env: &'a mut Env,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
-    ccx: &mut CheatcodeTracerContext,
-    call_ctx: CallContext,
-) -> ZKVMResult<E>
-where
-    DB: Database + Send,
-    <DB as Database>::Error: Debug,
-{
-    let chain_id = if env.cfg.chain_id <= u32::MAX as u64 {
-        L2ChainId::from(env.cfg.chain_id as u32)
-    } else {
-        tracing::warn!(provided = ?env.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
-        L2ChainId::from(DEFAULT_CHAIN_ID)
-    };
-
-    let persisted_factory_deps = ccx
-        .persisted_factory_deps
-        .as_ref()
-        .map(|factory_deps| (*factory_deps).clone())
-        .unwrap_or_default();
-
-    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state, chain_id)
-        .with_extra_factory_deps(persisted_factory_deps)
-        .with_storage_accesses(ccx.accesses.take());
-
-    let is_create = call_ctx.is_create;
-    tracing::info!(?call_ctx, "executing transaction in zk vm");
-
-    if tx.common_data.signature.is_empty() {
-        // FIXME: This is a hack to make sure that the signature is not empty.
-        // Fails without a signature here: https://github.com/matter-labs/zksync-era/blob/73a1e8ff564025d06e02c2689da238ae47bb10c3/core/lib/types/src/transaction_request.rs#L381
-        tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
-    }
-
-    let modified_storage_keys = era_db.override_keys.clone();
-    let storage_ptr =
-        StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
-            .into_rc_ptr();
-    let (tx_result, bytecodes, modified_storage) =
-        inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
-
-    if let Some(record) = &mut era_db.accesses {
-        for k in modified_storage.keys() {
-            record.writes.entry(k.address().to_address()).or_default().push(k.key().to_ru256());
-        }
-    }
-
-    let logs = tx_result
-        .logs
-        .events
-        .clone()
-        .into_iter()
-        .map(|event| revm::primitives::Log {
-            address: event.address.to_address(),
-            topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
-            data: event.value.into(),
-        })
-        .collect_vec();
-
-    let execution_result = match tx_result.result {
-        ExecutionResult::Success { output, .. } => {
-            let result = ethabi::decode(&[ethabi::ParamType::Bytes], &output)
-                .ok()
-                .and_then(|result| result.first().cloned())
-                .and_then(|result| result.into_bytes())
-                .unwrap_or_default();
-            info!("zk vm decoded result {}", hex::encode(&result));
-
-            let address = if result.len() == 32 {
-                Some(h256_to_account_address(&H256::from_slice(&result)))
-            } else {
-                None
-            };
-            let output = if is_create {
-                Output::Create(Bytes::from(result), address.map(ConvertH160::to_address))
-            } else {
-                Output::Call(Bytes::from(result))
-            };
-
-            ZKVMExecutionResult {
-                logs: logs.clone(),
-                execution_result: rExecutionResult::Success {
-                    reason: Eval::Return,
-                    gas_used: tx_result.statistics.gas_used as u64,
-                    gas_refunded: tx_result.refunds.gas_refunded as u64,
-                    logs,
-                    output,
-                },
-            }
-        }
-        ExecutionResult::Revert { output } => {
-            let output = match output {
-                VmRevertReason::General { data, .. } => data,
-                VmRevertReason::Unknown { data, .. } => data,
-                _ => Vec::new(),
-            };
-
-            ZKVMExecutionResult {
-                logs,
-                execution_result: rExecutionResult::Revert {
-                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
-                    output: Bytes::from(output),
-                },
-            }
-        }
-        ExecutionResult::Halt { reason } => {
-            tracing::error!("tx execution halted: {}", reason);
-            let mapped_reason = match reason {
-                Halt::NotEnoughGasProvided => rHalt::OutOfGas(OutOfGasError::BasicOutOfGas),
-                _ => rHalt::PrecompileError,
-            };
-
-            ZKVMExecutionResult {
-                logs,
-                execution_result: rExecutionResult::Halt {
-                    reason: mapped_reason,
-                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
-                },
-            }
-        }
-    };
-
-    // Insert into persisted_bytecodes. This is currently used in
-    // deploying multiple factory_dep transactions in create to ensure
-    // create does not OOG (Out of Gas) due to large factory deps.
-    if let Some(persisted_factory_deps) = ccx.persisted_factory_deps.as_mut() {
-        for (hash, bytecode) in &bytecodes {
-            let bytecode =
-                bytecode.iter().flat_map(|x| u256_to_h256(*x).to_fixed_bytes()).collect_vec();
-            persisted_factory_deps.insert(hash.to_h256(), bytecode);
-        }
-    }
-
-    let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
-    let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
-    for (k, v) in &modified_storage {
-        let address = k.address().to_address();
-        let index = k.key().to_ru256();
-        era_db.load_account(address);
-        let previous = era_db.sload(address, index);
-        let entry = storage.entry(address).or_default();
-        entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
-
-        if k.address() == &ACCOUNT_CODE_STORAGE_ADDRESS {
-            if let Some(bytecode) = bytecodes.get(&h256_to_u256(*v)) {
-                let bytecode =
-                    bytecode.iter().flat_map(|x| u256_to_h256(*x).to_fixed_bytes()).collect_vec();
-                let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
-                let hash = B256::from_slice(v.as_bytes());
-                codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
-            } else {
-                // We populate bytecodes for all non-system addresses
-                if !is_system_address(k.key().to_h160().to_address()) {
-                    if let Some(bytecode) = (&mut era_db).load_factory_dep(*v) {
-                        let hash = B256::from_slice(v.as_bytes());
-                        let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
-                        codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
-                    } else {
-                        tracing::warn!(
-                            "no bytecode was found for {:?}, requested by account {:?}",
-                            *v,
-                            k.key().to_h160()
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    for (address, storage) in storage {
-        journaled_state.load_account(address, db).expect("account could not be loaded");
-        journaled_state.touch(&address);
-
-        for (key, value) in storage {
-            journaled_state
-                .sstore(address, key, value.present_value, db)
-                .expect("failed writing to slot");
-        }
-    }
-
-    for (address, (code_hash, code)) in codes {
-        journaled_state.load_account(address, db).expect("account could not be loaded");
-        journaled_state.touch(&address);
-        let account = journaled_state.state.get_mut(&address).expect("account is loaded");
-
-        account.info.code_hash = code_hash;
-        account.info.code = Some(code);
-    }
-
-    Ok(execution_result)
-}
-
-fn inspect_inner<S: ReadStorage + Send>(
-    l2_tx: L2Tx,
-    storage: StoragePtr<StorageView<S>>,
-    chain_id: L2ChainId,
-    ccx: &mut CheatcodeTracerContext,
-    call_ctx: CallContext,
-) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
-    let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MAX_L1_GAS_PRICE);
-    let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
-    let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price, fair_l2_gas_price);
-
-    let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity);
-    let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);
-
-    let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env.clone(), system_env, storage.clone());
-
-    let tx: Transaction = l2_tx.clone().into();
-
-    vm.push_transaction(tx.clone());
-    let call_tracer_result = Arc::new(OnceCell::default());
-    let cheatcode_tracer_result = Arc::new(OnceCell::default());
-    let mut expected_calls = HashMap::<_, _>::new();
-    if let Some(ec) = &ccx.expected_calls {
-        for (addr, v) in ec.iter() {
-            expected_calls.insert(*addr, v.clone());
-        }
-    }
-    let tracers = vec![
-        CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
-        CheatcodeTracer::new(
-            ccx.mocked_calls.clone(),
-            expected_calls,
-            cheatcode_tracer_result.clone(),
-            call_ctx,
-        )
-        .into_tracer_pointer(),
-    ];
-    let mut tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
-    let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
-    trace!(?tx_result.result, "zk vm result");
-
-    match &tx_result.result {
-        ExecutionResult::Success { output } => {
-            let output = zksync_basic_types::Bytes::from(output.clone());
-            tracing::debug!(?output, "Call: Successful");
-        }
-        ExecutionResult::Revert { output } => {
-            tracing::debug!(?output, "Call: Reverted");
-        }
-        ExecutionResult::Halt { reason } => {
-            tracing::debug!(?reason, "Call: Halted");
-        }
-    };
-
-    // update expected calls from cheatcode tracer's result
-    let cheatcode_result =
-        Arc::try_unwrap(cheatcode_tracer_result).unwrap().take().unwrap_or_default();
-    if let Some(expected_calls) = ccx.expected_calls.as_mut() {
-        expected_calls.extend(cheatcode_result.expected_calls);
-    }
-
-    formatter::print_vm_details(&tx_result);
-
-    tracing::info!("=== Console Logs: ");
-    let log_parser = ConsoleLogParser::new();
-    let console_logs = log_parser.get_logs(&call_traces, true);
-
-    for log in console_logs {
-        tx_result.logs.events.push(VmEvent {
-            location: Default::default(),
-            address: H160::zero(),
-            indexed_topics: log.topics().iter().map(|topic| H256::from(topic.0)).collect(),
-            value: log.data.data.to_vec(),
-        });
-    }
-
-    let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
-    let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
-    tracing::info!("=== Calls: ");
-    for call in call_traces.iter() {
-        formatter::print_call(call, 0, &ShowCalls::All, show_outputs, resolve_hashes);
-    }
-
-    tracing::info!("==== {}", format!("{} events", tx_result.logs.events.len()));
-    for event in &tx_result.logs.events {
-        formatter::print_event(event, resolve_hashes);
-    }
-
-    let bytecodes = vm
-        .get_last_tx_compressed_bytecodes()
-        .iter()
-        .map(|b| bytecode_to_factory_dep(b.original.clone()))
-        .collect();
-    let modified_keys = storage.borrow().modified_storage_keys().clone();
-    (tx_result, bytecodes, modified_keys)
-}
-
-struct ConsoleLogParser {
-    hardhat_console_address: H160,
-}
-
-impl ConsoleLogParser {
-    fn new() -> Self {
-        Self { hardhat_console_address: HARDHAT_CONSOLE_ADDRESS.to_h160() }
-    }
-
-    pub fn get_logs(&self, call_traces: &[Call], print: bool) -> Vec<Log> {
-        let mut logs = vec![];
-        for call in call_traces {
-            self.parse_call_recursive(call, &mut logs, print);
-        }
-        logs
-    }
-
-    fn parse_call_recursive(&self, current_call: &Call, logs: &mut Vec<Log>, print: bool) {
-        self.parse_call(current_call, logs, print);
-        for call in &current_call.calls {
-            self.parse_call_recursive(call, logs, print);
-        }
-    }
-
-    fn parse_call(&self, current_call: &Call, logs: &mut Vec<Log>, print: bool) {
-        if current_call.to != self.hardhat_console_address {
-            return;
-        }
-        if current_call.input.len() < 4 {
-            return;
-        }
-
-        let mut input = current_call.input.clone();
-
-        // Patch the Hardhat-style selector (`uint` instead of `uint256`)
-        patch_hh_console_selector(&mut input);
-
-        // Decode the call
-        let Ok(call) = HardhatConsole::HardhatConsoleCalls::abi_decode(&input, false) else {
-            return;
-        };
-
-        // Convert the parameters of the call to their string representation using `ConsoleFmt`.
-        let message = call.fmt(Default::default());
-        let log = Log::new(
-            Address::default(),
-            vec![Console::log::SIGNATURE_HASH],
-            message.abi_encode().into(),
-        )
-        .unwrap_or_else(|| Log { ..Default::default() });
-
-        logs.push(log);
-
-        if print {
-            tracing::info!("{}", Cyan.paint(message));
-        }
-    }
 }
 
 /// Prepares calldata to invoke deployer contract.
@@ -856,18 +324,4 @@ fn to_precompile_id(spec_id: SpecId) -> revm::precompile::SpecId {
         SpecId::CANYON |
         SpecId::LATEST => revm::precompile::SpecId::BERLIN,
     }
-}
-
-fn get_env_var<T>(name: &str) -> T
-where
-    T: FromStr + Default,
-    T::Err: Debug,
-{
-    std::env::var(name)
-        .map(|value| {
-            value.parse::<T>().unwrap_or_else(|err| {
-                panic!("failed parsing env variable {}={}, {:?}", name, value, err)
-            })
-        })
-        .unwrap_or_default()
 }
