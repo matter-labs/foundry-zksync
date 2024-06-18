@@ -59,7 +59,7 @@ use zksync_types::{
     get_code_key, get_nonce_key,
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
-    H256, KNOWN_CODES_STORAGE_ADDRESS, L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    H256, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
 };
 
@@ -396,7 +396,7 @@ impl Cheatcodes {
 
         let system_account = SYSTEM_CONTEXT_ADDRESS.to_address();
         journaled_account(data, system_account).expect("failed to load account");
-        let balance_account = L2_ETH_TOKEN_ADDRESS.to_address();
+        let balance_account = L2_BASE_TOKEN_ADDRESS.to_address();
         journaled_account(data, balance_account).expect("failed to load account");
         let nonce_account = NONCE_HOLDER_ADDRESS.to_address();
         journaled_account(data, nonce_account).expect("failed to load account");
@@ -538,7 +538,7 @@ impl Cheatcodes {
         let system_account = journaled_account(data, system_addr).expect("failed to load account");
         system_account.storage.extend(system_storage.clone());
 
-        let balance_addr = L2_ETH_TOKEN_ADDRESS.to_address();
+        let balance_addr = L2_BASE_TOKEN_ADDRESS.to_address();
         let balance_account =
             journaled_account(data, balance_addr).expect("failed to load account");
         balance_account.storage.extend(l2_eth_storage.clone());

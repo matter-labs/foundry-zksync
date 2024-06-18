@@ -1,14 +1,15 @@
 use multivm::{
     interface::{L1BatchEnv, L2BlockEnv, SystemEnv},
     vm_latest::{
-        constants::BLOCK_GAS_LIMIT, utils::l2_blocks::load_last_l2_block, TxExecutionMode,
+        constants::BATCH_COMPUTATIONAL_GAS_LIMIT, utils::l2_blocks::load_last_l2_block,
+        TxExecutionMode,
     },
 };
-use zksync_basic_types::{AccountTreeId, L1BatchNumber, L2ChainId, MiniblockNumber, H160};
+use zksync_basic_types::{AccountTreeId, L1BatchNumber, L2BlockNumber, L2ChainId, H160};
 use zksync_contracts::BaseSystemContracts;
 use zksync_state::{ReadStorage, StoragePtr};
 use zksync_types::{
-    block::{unpack_block_info, MiniblockHasher},
+    block::{unpack_block_info, L2BlockHasher},
     fee_model::L1PeggedBatchFeeModelInput,
     StorageKey, SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
 };
@@ -31,7 +32,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
         L2BlockEnv {
             number: 1,
             timestamp: 1,
-            prev_block_hash: MiniblockHasher::legacy_hash(MiniblockNumber(0)),
+            prev_block_hash: L2BlockHasher::legacy_hash(L2BlockNumber(0)),
             max_virtual_blocks_to_create: 1,
         }
     };
@@ -70,9 +71,9 @@ pub(crate) fn create_system_env(
         // itself.
         version: zksync_types::ProtocolVersionId::latest(),
         base_system_smart_contracts: base_system_contracts,
-        gas_limit: BLOCK_GAS_LIMIT,
+        bootloader_gas_limit: BATCH_COMPUTATIONAL_GAS_LIMIT,
         execution_mode: TxExecutionMode::VerifyExecute,
-        default_validation_computational_gas_limit: BLOCK_GAS_LIMIT,
+        default_validation_computational_gas_limit: BATCH_COMPUTATIONAL_GAS_LIMIT,
         chain_id,
     }
 }

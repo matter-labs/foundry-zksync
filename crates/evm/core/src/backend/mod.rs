@@ -10,7 +10,7 @@ use alloy_genesis::GenesisAccount;
 use alloy_primitives::{b256, keccak256, Address, B256, U256, U64};
 use alloy_rpc_types::{Block, BlockNumberOrTag, BlockTransactions, Transaction};
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
-use foundry_zksync_core::{convert::ConvertH160, L2_ETH_TOKEN_ADDRESS};
+use foundry_zksync_core::{convert::ConvertH160, L2_BASE_TOKEN_ADDRESS};
 use itertools::Itertools;
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -1964,7 +1964,7 @@ fn merge_zk_account_data<ExtDB: DatabaseRef>(
     trace!(?addr, "merging zk database data");
 
     // TODO: do the same for nonce and codes
-    let balance_addr = L2_ETH_TOKEN_ADDRESS.to_address();
+    let balance_addr = L2_BASE_TOKEN_ADDRESS.to_address();
     let mut acc = if let Some(acc) = active.accounts.get(&balance_addr).cloned() {
         acc
     } else {

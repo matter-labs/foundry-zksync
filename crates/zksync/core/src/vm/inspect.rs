@@ -5,6 +5,7 @@ use era_test_node::{
     system_contracts::{Options, SystemContracts},
     utils::bytecode_to_factory_dep,
 };
+use foundry_common::{Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS};
 use itertools::Itertools;
 use multivm::{
     interface::{Halt, VmInterface, VmRevertReason},
@@ -212,8 +213,8 @@ where
                 logs: logs.clone(),
                 execution_result: rExecutionResult::Success {
                     reason: Eval::Return,
-                    gas_used: tx_result.statistics.gas_used as u64,
-                    gas_refunded: tx_result.refunds.gas_refunded as u64,
+                    gas_used: tx_result.statistics.gas_used,
+                    gas_refunded: tx_result.refunds.gas_refunded,
                     logs,
                     output,
                 },
@@ -229,7 +230,7 @@ where
             ZKVMExecutionResult {
                 logs,
                 execution_result: rExecutionResult::Revert {
-                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded,
                     output: Bytes::from(output),
                 },
             }
@@ -245,7 +246,7 @@ where
                 logs,
                 execution_result: rExecutionResult::Halt {
                     reason: mapped_reason,
-                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded as u64,
+                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded,
                 },
             }
         }
@@ -364,8 +365,7 @@ fn inspect_inner<S: ReadStorage + Send>(
 
     match &tx_result.result {
         ExecutionResult::Success { output } => {
-            let output = zksync_basic_types::Bytes::from(output.clone());
-            debug!(?output, "Call: Successful");
+            debug!(output = hex::encode(output), "Call: Successful");
         }
         ExecutionResult::Revert { output } => {
             debug!(?output, "Call: Reverted");
@@ -425,7 +425,7 @@ struct ConsoleLogParser {
 
 impl ConsoleLogParser {
     fn new() -> Self {
-        Self { hardhat_console_address: foundry_common::HARDHAT_CONSOLE_ADDRESS.to_h160() }
+        Self { hardhat_console_address: HARDHAT_CONSOLE_ADDRESS.to_h160() }
     }
 
     pub fn get_logs(&self, call_traces: &[Call], print: bool) -> Vec<Log> {
@@ -460,9 +460,7 @@ impl ConsoleLogParser {
         foundry_common::patch_hh_console_selector(&mut input);
 
         // Decode the call
-        let Ok(call) =
-            foundry_common::HardhatConsole::HardhatConsoleCalls::abi_decode(&input, false)
-        else {
+        let Ok(call) = HardhatConsole::HardhatConsoleCalls::abi_decode(&input, false) else {
             return;
         };
 
@@ -470,7 +468,7 @@ impl ConsoleLogParser {
         let message = call.fmt(Default::default());
         let log = Log::new(
             Address::default(),
-            vec![foundry_common::Console::log::SIGNATURE_HASH],
+            vec![Console::log::SIGNATURE_HASH],
             message.abi_encode().into(),
         )
         .unwrap_or_else(|| Log { ..Default::default() });
