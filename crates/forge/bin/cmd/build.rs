@@ -3,7 +3,7 @@ use clap::Parser;
 use eyre::Result;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
 use foundry_common::compile::{ProjectCompiler, SkipBuildFilter, SkipBuildFilters};
-use foundry_compilers::{Project, ProjectCompileOutput};
+use foundry_compilers::Project;
 use foundry_config::{
     figment::{
         self,
@@ -75,7 +75,7 @@ pub struct BuildArgs {
 }
 
 impl BuildArgs {
-    pub fn run(self) -> Result<ProjectCompileOutput> {
+    pub fn run(self) -> Result<()> {
         let mut config = self.try_load_config_emit_warnings()?;
         let mut project = config.project()?;
 
@@ -87,35 +87,36 @@ impl BuildArgs {
             project = config.project()?;
         }
 
-        let mut compiler = ProjectCompiler::new()
-            .print_names(self.names)
-            .print_sizes(self.sizes)
-            .quiet(self.format_json)
-            .bail(!self.format_json);
-        if let Some(skip) = self.skip {
-            if !skip.is_empty() {
-                compiler = compiler.filter(Box::new(SkipBuildFilters::new(skip)?));
+        if !config.zksync {
+            let mut compiler = ProjectCompiler::new()
+                .print_names(self.names)
+                .print_sizes(self.sizes)
+                .quiet(self.format_json)
+                .bail(!self.format_json);
+            if let Some(skip) = self.skip {
+                if !skip.is_empty() {
+                    compiler = compiler.filter(Box::new(SkipBuildFilters::new(skip)?));
+                }
             }
-        }
-        let output = compiler.compile(&project)?;
 
-        if self.format_json {
-            println!("{}", serde_json::to_string_pretty(&output.clone().output())?);
-        }
-
-        if config.zksync {
+            let output = compiler.compile(&project)?;
+            if self.format_json {
+                println!("{}", serde_json::to_string_pretty(&output.output())?);
+            }
+        } else {
             let zk_compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .quiet(self.format_json)
                 .bail(!self.format_json);
+
             let zk_output = zk_compiler.zksync_compile(&project)?;
             if self.format_json {
-                println!("{}", serde_json::to_string_pretty(&zk_output.clone().output())?);
+                println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
             }
         }
 
-        Ok(output)
+        Ok(())
     }
 
     /// Returns the `Project` for the current workspace
