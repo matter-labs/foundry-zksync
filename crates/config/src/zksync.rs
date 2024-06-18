@@ -10,27 +10,11 @@ use std::path::PathBuf;
 use crate::SolcReq;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-/// ZkSolc optimizer configuration
-pub struct ZkOptimizerConfig {
-    /// Optimizer settings for zkSync
+/// ZkSync configuration
+pub struct ZkSyncConfig {
+    /// Enable zksync mode
     pub enable: bool,
 
-    /// The optimization mode string.
-    pub mode: char,
-
-    /// zksolc optimizer details remain the same
-    pub details: Option<OptimizerDetails>,
-}
-
-impl Default for ZkOptimizerConfig {
-    fn default() -> Self {
-        Self { enable: Default::default(), mode: '3', details: Default::default() }
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-/// ZkSolc compiler configuration
-pub struct ZkCompilerConfig {
     /// The zkSolc instance to use if any.
     pub zksolc: Option<SolcReq>,
 
@@ -39,9 +23,6 @@ pub struct ZkCompilerConfig {
 
     /// Whether to include the metadata hash for zksolc compiled bytecode.
     pub bytecode_hash: BytecodeHash,
-
-    /// Optimizer configuration
-    pub optimizer: ZkOptimizerConfig,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
     pub fallback_oz: bool,
@@ -57,10 +38,43 @@ pub struct ZkCompilerConfig {
 
     /// Source files to avoid compiling on zksolc
     pub avoid_contracts: Option<Vec<String>>,
+
+    /// Optimizer settings for zkSync
+    pub enable_optimizer: bool,
+
+    /// The optimization mode string.
+    pub optimizer_mode: char,
+
+    /// zksolc optimizer details remain the same
+    pub optimizer_details: Option<OptimizerDetails>,
 }
 
-impl ZkCompilerConfig {
-    /// Convert the compiler config to a foundry_compilers zksync Settings
+impl Default for ZkSyncConfig {
+    fn default() -> Self {
+        Self {
+            enable: Default::default(),
+            zksolc: Default::default(),
+            solc: Default::default(),
+            bytecode_hash: Default::default(),
+            fallback_oz: Default::default(),
+            enable_eravm_extensions: Default::default(),
+            force_evmla: Default::default(),
+            detect_missing_libraries: Default::default(),
+            avoid_contracts: Default::default(),
+            enable_optimizer: Default::default(),
+            optimizer_mode: '3',
+            optimizer_details: Default::default(),
+        }
+    }
+}
+
+impl ZkSyncConfig {
+    /// Returns true if zk mode is enabled and it if tests should be run in zk mode
+    pub fn run_in_zk_mode(&self) -> bool {
+        self.enable
+    }
+
+    /// Convert the zksync config to a foundry_compilers zksync Settings
     pub fn settings(
         &self,
         libraries: Libraries,
@@ -68,11 +82,11 @@ impl ZkCompilerConfig {
         via_ir: bool,
     ) -> Settings {
         let optimizer = Optimizer {
-            enabled: Some(self.optimizer.enable),
-            mode: Some(self.optimizer.mode),
+            enabled: Some(self.enable_optimizer),
+            mode: Some(self.optimizer_mode),
             fallback_to_optimizing_for_size: Some(self.fallback_oz),
             disable_system_request_memoization: Some(true),
-            details: self.optimizer.details.clone(),
+            details: self.optimizer_details.clone(),
             jump_table_density_threshold: None,
         };
 
@@ -91,22 +105,5 @@ impl ZkCompilerConfig {
             output_selection: Default::default(),
             solc: self.solc.clone(),
         }
-    }
-}
-
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-/// ZkSync configuration
-pub struct ZkSyncConfig {
-    /// Enable zksync mode
-    pub enable: bool,
-
-    /// zkSync compiler
-    pub compiler: ZkCompilerConfig,
-}
-
-impl ZkSyncConfig {
-    /// Returns true if zk mode is enabled and it if tests should be run in zk mode
-    pub fn run_in_zk_mode(&self) -> bool {
-        self.enable
     }
 }

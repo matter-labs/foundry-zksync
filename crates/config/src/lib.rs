@@ -699,13 +699,12 @@ impl Config {
         // when setting up the builder for the sake of consistency (requires dedicated
         // builder methods)
         project.zksync_zksolc_config = ZkSolcConfig { settings: self.zksync_zksolc_settings()? };
-        project.zksync_avoid_contracts =
-            self.zksync.compiler.avoid_contracts.clone().map(|patterns| {
-                patterns
-                    .into_iter()
-                    .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
-                    .collect::<Vec<_>>()
-            });
+        project.zksync_avoid_contracts = self.zksync.avoid_contracts.clone().map(|patterns| {
+            patterns
+                .into_iter()
+                .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
+                .collect::<Vec<_>>()
+        });
 
         if let Some(zksolc) = self.zksync_ensure_zksolc()? {
             project.zksync_zksolc = zksolc;
@@ -774,7 +773,7 @@ impl Config {
     ///
     /// If `zksolc` is [`SolcReq::Local`] then this will ensure that the path exists.
     fn zksync_ensure_zksolc(&self) -> Result<Option<ZkSolc>, SolcError> {
-        if let Some(ref zksolc) = self.zksync.compiler.zksolc {
+        if let Some(ref zksolc) = self.zksync.zksolc {
             let zksolc = match zksolc {
                 SolcReq::Version(version) => {
                     let mut zksolc = ZkSolc::find_installed_version(version)?;
@@ -1190,7 +1189,7 @@ impl Config {
             Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {}", e))),
         };
 
-        Ok(self.zksync.compiler.settings(libraries, self.evm_version, self.via_ir))
+        Ok(self.zksync.settings(libraries, self.evm_version, self.via_ir))
     }
 
     /// Returns the default figment
