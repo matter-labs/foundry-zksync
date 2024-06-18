@@ -62,6 +62,12 @@ const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: [u8; 4] = hex!("796b89b9");
 /// Selector for `baseFee()`
 const SELECTOR_BASE_FEE: [u8; 4] = hex!("6ef25c3a");
 
+/// Selector for retrieving the blockhash of a given block.
+/// This is used to override the current `blockhash()` to foundry test's context.
+///
+/// Selector for `getBlockHashEVM(uint256)`
+const SELECTOR_BLOCK_HASH: [u8; 4] = hex!("80b41246");
+
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
 pub struct CheatcodeTracerContext<'a> {
@@ -72,7 +78,7 @@ pub struct CheatcodeTracerContext<'a> {
     /// Recorded storage accesses
     pub accesses: Option<&'a mut RecordAccess>,
     /// Factory deps that were persisted across calls
-    pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
+    pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
 }
 
 /// Tracer result to return back to foundry.
@@ -82,7 +88,7 @@ pub struct CheatcodeTracerResult {
 }
 
 /// Defines the context for a Vm call.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CallContext {
     /// The transaction caller.
     pub tx_caller: Address,
@@ -282,6 +288,19 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             {
                 self.farcall_handler
                     .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
+                return
+            }
+        }
+
+        // Override blockhash
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let calldata = get_calldata(&state, memory);
+            let current = state.vm_local_state.callstack.current;
+
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
+                calldata.starts_with(&SELECTOR_BLOCK_HASH)
+            {
+                self.farcall_handler.set_immediate_return(rU256::ZERO.to_be_bytes_vec());
                 return
             }
         }

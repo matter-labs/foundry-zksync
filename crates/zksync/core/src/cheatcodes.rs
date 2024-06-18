@@ -150,6 +150,13 @@ pub fn etch<'a, DB>(
     <DB as Database>::Error: Debug,
 {
     info!(?address, bytecode = hex::encode(bytecode), "cheatcode etch");
+    let len = bytecode.len();
+    if len % 32 != 0 {
+        panic!(
+            "etch bytecode length must be divisible by 32, found '{}' with length {len}",
+            hex::encode(bytecode)
+        );
+    }
 
     let bytecode_hash = hash_bytecode(bytecode).to_ru256();
     let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(bytecode));
@@ -231,5 +238,23 @@ pub fn set_mocked_account<'a, DB>(
         journaled_state
             .sstore(known_code_addr, hash_key, rU256::from(1u32), db)
             .expect("failed storing value");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use revm::db::EmptyDB;
+
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "bytecode length must be divisible by 32")]
+    fn test_etch_panics_when_bytecode_not_aligned_on_32_bytes() {
+        etch(
+            Address::ZERO,
+            &[0],
+            &mut EmptyDB::default(),
+            &mut JournaledState::new(revm::primitives::SpecId::BYZANTIUM, vec![]),
+        );
     }
 }

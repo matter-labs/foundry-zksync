@@ -16,9 +16,17 @@ echo "Running the installation script..."
 SHELL_CONFIG_FILE=$(sed -n "s/.*Run 'source \(.*\)'.*/\1/p" install.log)
 
 if [ -n "$SHELL_CONFIG_FILE" ]; then
-    echo "Sourcing the shell configuration file: $SHELL_CONFIG_FILE"
-    # Use dot (.) to source the file, which is more universally compatible
-    . "$SHELL_CONFIG_FILE"
+    if [ -n "${CI}" ]; then
+        # Add manually to $PATH in CI mode as GHA does not work with `.`
+        FOUNDRY_BIN_DIR="${XDG_CONFIG_HOME:-$HOME}/.foundry/bin"
+        echo "adding '${FOUNDRY_BIN_DIR}' to PATH and GITHUB_PATH"
+        export PATH="$PATH:$FOUNDRY_BIN_DIR"
+        echo "${FOUNDRY_BIN_DIR}" >> $GITHUB_PATH
+    else
+        echo "Sourcing the shell configuration file: '$SHELL_CONFIG_FILE'"
+        # Use dot (.) to source the file, which is more universally compatible
+        . "$SHELL_CONFIG_FILE"
+    fi
 else
     echo "No shell configuration file detected. Please source your shell manually or start a new terminal session."
 fi
@@ -31,4 +39,5 @@ if forge --version | grep -q "0.0.2"; then
     echo "Forge version 0.0.2 is successfully installed."
 else
     echo "Installation verification failed. Forge is not properly installed."
+    exit 1
 fi

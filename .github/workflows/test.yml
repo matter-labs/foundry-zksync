@@ -136,3 +136,13 @@ jobs:
           env:
             RUST_BACKTRACE: full
           run: cd zk-tests && ./test.sh
+    
+    check-ci-install:
+      name: CI install
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: install foundry-zksync
+          run: ./install-foundry-zksync
+        - name: verify
+          run: forge --version
