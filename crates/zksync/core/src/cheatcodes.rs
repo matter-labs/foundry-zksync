@@ -11,7 +11,7 @@ use zksync_types::{
     get_nonce_key,
     utils::storage_key_for_eth_balance,
     ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
-    L2_ETH_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
 use zksync_utils::bytecode::hash_bytecode;
 
@@ -87,7 +87,7 @@ where
 {
     info!(?address, ?balance, "cheatcode deal");
 
-    let balance_addr = L2_ETH_TOKEN_ADDRESS.to_address();
+    let balance_addr = L2_BASE_TOKEN_ADDRESS.to_address();
     journaled_state.load_account(balance_addr, db).expect("account could not be loaded");
     let zk_address = address.to_h160();
     let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
