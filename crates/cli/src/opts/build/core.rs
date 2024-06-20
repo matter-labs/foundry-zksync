@@ -6,8 +6,8 @@ use foundry_compilers::{
     artifacts::RevertStrings, remappings::Remapping, utils::canonicalized, Project,
 };
 use foundry_config::{
-    figment,
     figment::{
+        self,
         error::Kind::InvalidType,
         value::{Dict, Map, Value},
         Figment, Metadata, Profile, Provider,
@@ -157,7 +157,12 @@ impl<'a> From<&'a CoreBuildArgs> for Figment {
         let mut remappings = Remappings::new_with_remappings(args.project_paths.get_remappings());
         remappings
             .extend(figment.extract_inner::<Vec<Remapping>>("remappings").unwrap_or_default());
-        figment.merge(("remappings", remappings.into_inner())).merge(args)
+
+        // override only set values from the CLI for zksync
+        let zksync =
+            args.compiler.zk.apply_overrides(figment.extract_inner("zksync").unwrap_or_default());
+
+        figment.merge(("remappings", remappings.into_inner())).merge(args).merge(("zksync", zksync))
     }
 }
 
