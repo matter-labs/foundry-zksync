@@ -46,14 +46,14 @@ To use for zkSync environments, include `--zksync` when running `forge` or `vm.z
 While `foundry-zksync` is **alpha stage**, there are some limitations to be aware of:
 
 - **Compile Time**: Some users may experience slower compile times.
-- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration. For more information please refer to [official docs](https://era.zksync.io/docs/tools/hardhat/compiling-libraries.html).
+- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration. For more information please refer to [official docs](https://docs.zksync.io/build/developer-reference/ethereum-differences/libraries).
 
     ```
     libraries = [
         "src/MyLibrary.sol:MyLibrary:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4"
     ]
     ```
-- **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://era.zksync.io/docs/reference/architecture/differences-with-ethereum.html#create-create2).
+- **Create2 Address Derivation**: There are differences in Create2 Address derivation compared to Ethereum. [Read the details](https://docs.zksync.io/build/developer-reference/ethereum-differences/evm-instructions#create-create2).
 - **Contract Verification**: Currently contract verification via the `--verify` flag do not work as expected but will be added shortly.  
 - **Specific Foundry Features**: Currently features such as `--gas-report`, `--coverage` may not work as intended. We are actively working on providing support for these feature types.
 - **Solc Compatibility**: `zksolc` requires a `solc` binary to be run as a child process. The version/path to use for each can be specified by the `zksolc` and `solc` options in `foundry.toml`. Not all `solc` versions are supported by all `zksolc` versions, compiling with a `solc` version higher than the one supported may lead to unexpected errors. [Read the docs](https://docs.zksync.io/zk-stack/components/compiler/toolchain/solidity.html#limitations) about version limitations and check the [zksolc changelog](https://github.com/matter-labs/era-compiler-solidity/blob/main/CHANGELOG.md) to see the latest supported `solc` version.
