@@ -52,6 +52,7 @@ pub struct DualCompiledContract {
 
 impl DualCompiledContract {
     /// Instantiate a new full DualCompiledContract
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
         path: Option<PathBuf>,
@@ -327,11 +328,6 @@ impl DualCompiledContracts {
         self.contracts.iter()
     }
 
-    /// Returns an iterator over all `[DualCompiledContract]`s in the collection
-    pub fn into_iter(self) -> impl Iterator<Item = DualCompiledContract> {
-        self.contracts.into_iter()
-    }
-
     /// Adds a new `[DualCompiledContract]` to the collection
     pub fn push(&mut self, contract: DualCompiledContract) {
         self.contracts.push(contract);
@@ -345,5 +341,14 @@ impl DualCompiledContracts {
         self.contracts
             .iter_mut()
             .find(|contract| contract.path.as_deref() == Some(contract_file.as_ref()))
+    }
+}
+
+impl IntoIterator for DualCompiledContracts {
+    type IntoIter = <Vec<DualCompiledContract> as IntoIterator>::IntoIter;
+    type Item = <Self::IntoIter as Iterator>::Item;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.contracts.into_iter()
     }
 }
