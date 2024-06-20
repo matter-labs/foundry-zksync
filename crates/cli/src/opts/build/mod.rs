@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use clap::Parser;
 use foundry_compilers::{artifacts::output_selection::ContractOutputSelection, EvmVersion};
 use serde::Serialize;
@@ -9,6 +7,9 @@ pub use self::core::CoreBuildArgs;
 
 mod paths;
 pub use self::paths::ProjectPathsArgs;
+
+mod zksync;
+pub use self::zksync::ZkSyncArgs;
 
 // A set of solc compiler settings that can be set via command line arguments, which are intended
 // to be merged into an existing `foundry_config::Config`.
@@ -53,76 +54,8 @@ pub struct CompilerArgs {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub extra_output_files: Vec<ContractOutputSelection>,
 
-    // @zksync
-    /// Use ZKSync era vm.
-    #[clap(help_heading = "Use ZKSync era vm", long)]
-    pub zksync: bool,
-
-    #[clap(
-        help_heading = "zkSync Compiler options",
-        help = "Solc compiler path to use when compiling with zksolc",
-        long = "zk-solc-path",
-        value_name = "ZK_SOLC_PATH"
-    )]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub zk_solc_path: Option<PathBuf>,
-
-    /// A flag indicating whether to enable the system contract compilation mode.
-    #[clap(
-        help_heading = "zkSync Compiler options",
-        help = "Enable the system contract compilation mode.",
-        long = "enable-eravm-extensions",
-        value_name = "ENABLE_ERAVM_EXTENSIONS"
-    )]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enable_eravm_extensions: Option<bool>,
-
-    /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
-    #[clap(
-        help_heading = "zkSync Compiler options",
-        help = "Forcibly switch to the EVM legacy assembly pipeline.",
-        long = "force-evmla",
-        value_name = "FORCE_EVMLA"
-    )]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub force_evmla: Option<bool>,
-
-    /// Try to recompile with -Oz if the bytecode is too large.
-    #[clap(
-        help_heading = "zkSync Compiler options",
-        long = "fallback-oz",
-        value_name = "FALLBACK_OZ"
-    )]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fallback_oz: Option<bool>,
-
-    /// Path to cache missing library dependencies, used for compiling and deploying libraries.
-    #[clap(help_heading = "zkSync Compiler options", long = "detect-missing-libraries")]
-    pub detect_missing_libraries: bool,
-
-    /// Set the LLVM optimization parameter `-O[0 | 1 | 2 | 3 | s | z]`.
-    /// Use `3` for best performance and `z` for minimal size.
-    #[clap(
-        help_heading = "zkSync Compiler options",
-        short = 'O',
-        long = "zk-optimization",
-        value_name = "LEVEL"
-    )]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub zk_optimizer_mode: Option<String>,
-
-    /// Enables optimizations
-    #[clap(help_heading = "zkSync Compiler options", long = "zk-optimizer")]
-    #[serde(skip)]
-    pub zk_optimizer: bool,
-
-    /// Contracts to avoid compiling on zkSync
-    #[clap(
-        long,
-        help_heading = "Contracts to avoid during zkSync compilation",
-        value_delimiter = ','
-    )]
-    pub avoid_contracts: Option<Vec<String>>,
+    #[clap(flatten)]
+    pub zk: ZkSyncArgs,
 }
 
 #[cfg(test)]

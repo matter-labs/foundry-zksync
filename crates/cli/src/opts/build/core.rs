@@ -13,7 +13,7 @@ use foundry_config::{
         Figment, Metadata, Profile, Provider,
     },
     providers::remappings::Remappings,
-    Config, ZkSyncConfig,
+    Config,
 };
 use serde::Serialize;
 use std::path::PathBuf;
@@ -135,38 +135,6 @@ impl CoreBuildArgs {
     pub fn get_remappings(&self) -> Vec<Remapping> {
         self.project_paths.get_remappings()
     }
-
-    /// Merge the current cli arguments into the specified zksync configuration
-    fn apply_zksync_overrides(&self, mut zksync: ZkSyncConfig) -> ZkSyncConfig {
-        let compiler_cfg = &self.compiler;
-
-        macro_rules! set_if_some {
-            ($src:expr, $dst:expr) => {
-                if let Some(src) = $src {
-                    $dst = src.into();
-                }
-            };
-        }
-
-        set_if_some!(compiler_cfg.zksync.then_some(true), zksync.enable);
-        set_if_some!(compiler_cfg.zk_solc_path.clone(), zksync.solc);
-        set_if_some!(compiler_cfg.enable_eravm_extensions, zksync.enable_eravm_extensions);
-        set_if_some!(compiler_cfg.force_evmla, zksync.force_evmla);
-        set_if_some!(compiler_cfg.fallback_oz, zksync.fallback_oz);
-        set_if_some!(
-            compiler_cfg.detect_missing_libraries.then_some(true),
-            zksync.detect_missing_libraries
-        );
-        set_if_some!(compiler_cfg.avoid_contracts.clone(), zksync.avoid_contracts);
-
-        set_if_some!(compiler_cfg.zk_optimizer.then_some(true), zksync.enable_optimizer);
-        set_if_some!(
-            compiler_cfg.zk_optimizer_mode.as_ref().and_then(|mode| mode.parse::<char>().ok()),
-            zksync.optimizer_mode
-        );
-
-        zksync
-    }
 }
 
 // Loads project's figment and merges the build cli arguments into it
@@ -192,7 +160,7 @@ impl<'a> From<&'a CoreBuildArgs> for Figment {
 
         // override only set values from the CLI for zksync
         let zksync =
-            args.apply_zksync_overrides(figment.extract_inner("zksync").unwrap_or_default());
+            args.compiler.zk.apply_overrides(figment.extract_inner("zksync").unwrap_or_default());
 
         figment.merge(("remappings", remappings.into_inner())).merge(args).merge(("zksync", zksync))
     }

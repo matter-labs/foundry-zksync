@@ -13,39 +13,56 @@ use crate::SolcReq;
 /// ZkSync configuration
 pub struct ZkSyncConfig {
     /// Enable zksync mode
+    #[serde(alias = "zk", alias = "zksync")]
     pub enable: bool,
 
     /// The zkSolc instance to use if any.
     pub zksolc: Option<SolcReq>,
 
     /// solc path to use along the zksolc compiler
-    pub solc: Option<PathBuf>,
+    #[serde(alias = "zk-solc-path", alias = "solc")]
+    pub solc_path: Option<PathBuf>,
 
     /// Whether to include the metadata hash for zksolc compiled bytecode.
+    #[serde(alias = "zk-bytecode-hash")]
     pub bytecode_hash: BytecodeHash,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
+    #[serde(alias = "zk-fallback-oz")]
     pub fallback_oz: bool,
 
     /// Whether to support compilation of zkSync-specific simulations
-    pub enable_eravm_extensions: bool,
+    #[serde(
+        alias = "system-mode",
+        alias = "enable-eravm-extensions",
+        alias = "zk-eravm-extensions"
+    )]
+    pub eravm_extensions: bool,
 
     /// Force evmla for zkSync
+    #[serde(alias = "zk-force-evmla")]
     pub force_evmla: bool,
 
-    /// Path to cache missing library dependencies, used for compiling and deploying libraries.
+    /// Detect missing libraries, instead of erroring
+    ///
+    /// Currently unused
+    #[serde(alias = "zk-detect-missing-libraries")]
     pub detect_missing_libraries: bool,
 
     /// Source files to avoid compiling on zksolc
+    #[serde(alias = "zk-avoid-contracts")]
     pub avoid_contracts: Option<Vec<String>>,
 
-    /// Optimizer settings for zkSync
-    pub enable_optimizer: bool,
+    /// Enable optimizer for zkSync
+    #[serde(alias = "zk-optimizer", alias = "enable-optimizer")]
+    pub optimizer: bool,
 
-    /// The optimization mode string.
+    /// The optimization mode string for zkSync
+    #[serde(alias = "zk-optimizer-mode")]
     pub optimizer_mode: char,
 
-    /// zksolc optimizer details remain the same
+    /// zkSolc optimizer details
+    #[serde(alias = "zk-optimizer-details")]
     pub optimizer_details: Option<OptimizerDetails>,
 }
 
@@ -54,14 +71,14 @@ impl Default for ZkSyncConfig {
         Self {
             enable: Default::default(),
             zksolc: Default::default(),
-            solc: Default::default(),
+            solc_path: Default::default(),
             bytecode_hash: Default::default(),
             fallback_oz: Default::default(),
-            enable_eravm_extensions: Default::default(),
+            eravm_extensions: Default::default(),
             force_evmla: Default::default(),
             detect_missing_libraries: Default::default(),
             avoid_contracts: Default::default(),
-            enable_optimizer: Default::default(),
+            optimizer: Default::default(),
             optimizer_mode: '3',
             optimizer_details: Default::default(),
         }
@@ -82,7 +99,7 @@ impl ZkSyncConfig {
         via_ir: bool,
     ) -> Settings {
         let optimizer = Optimizer {
-            enabled: Some(self.enable_optimizer),
+            enabled: Some(self.optimizer),
             mode: Some(self.optimizer_mode),
             fallback_to_optimizing_for_size: Some(self.fallback_oz),
             disable_system_request_memoization: Some(true),
@@ -99,11 +116,11 @@ impl ZkSyncConfig {
             // Set in project paths.
             remappings: Vec::new(),
             detect_missing_libraries: self.detect_missing_libraries,
-            system_mode: self.enable_eravm_extensions,
+            system_mode: self.eravm_extensions,
             force_evmla: self.force_evmla,
             // TODO: See if we need to set this from here
             output_selection: Default::default(),
-            solc: self.solc.clone(),
+            solc: self.solc_path.clone(),
         }
     }
 }
