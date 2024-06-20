@@ -63,7 +63,7 @@ impl Default for ZkSyncConfig {
             force_evmla: Default::default(),
             detect_missing_libraries: Default::default(),
             avoid_contracts: Default::default(),
-            optimizer: Default::default(),
+            optimizer: true,
             optimizer_mode: '3',
             optimizer_details: Default::default(),
         }
