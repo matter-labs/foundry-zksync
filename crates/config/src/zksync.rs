@@ -15,6 +15,9 @@ pub struct ZkSyncConfig {
     /// Enable zksync mode
     pub enable: bool,
 
+    /// Avoid running vm in zk mode directly
+    pub compile_only: bool,
+
     /// The zkSolc instance to use if any.
     pub zksolc: Option<SolcReq>,
 
@@ -55,6 +58,7 @@ impl Default for ZkSyncConfig {
     fn default() -> Self {
         Self {
             enable: Default::default(),
+            compile_only: Default::default(),
             zksolc: Default::default(),
             solc_path: Default::default(),
             bytecode_hash: Default::default(),
@@ -73,6 +77,11 @@ impl Default for ZkSyncConfig {
 impl ZkSyncConfig {
     /// Returns true if zk mode is enabled and it if tests should be run in zk mode
     pub fn run_in_zk_mode(&self) -> bool {
+        self.enable && !self.compile_only
+    }
+
+    /// Returns true if contracts should be compiled for zk
+    pub fn should_compile(&self) -> bool {
         self.enable
     }
 

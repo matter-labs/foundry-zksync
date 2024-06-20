@@ -11,6 +11,12 @@ pub struct ZkSyncArgs {
     #[clap(long = "zksync", visible_alias = "zk")]
     pub enable: bool,
 
+    /// Compile contracts for zkSync without running in ZKSync era vm directly
+    ///
+    /// This allows tests & scripts to be run in EVM mode and switch to zkVM mode during execution
+    #[clap(long = "zk-compile-only")]
+    pub compile_only: bool,
+
     #[clap(
         help = "Solc compiler path to use when compiling with zksolc",
         long = "zk-solc-path",
@@ -84,6 +90,7 @@ impl ZkSyncArgs {
         }
 
         set_if_some!(self.enable.then_some(true), zksync.enable);
+        set_if_some!(self.compile_only.then_some(true), zksync.compile_only);
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
         set_if_some!(self.eravm_extensions, zksync.eravm_extensions);
         set_if_some!(self.force_evmla, zksync.force_evmla);

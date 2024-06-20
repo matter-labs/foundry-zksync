@@ -117,7 +117,7 @@ impl CreateArgs {
     pub async fn run(self) -> Result<()> {
         let mut config = self.eth.try_load_config_emit_warnings()?;
         let project_root = config.project_paths().root;
-        let zksync = self.opts.compiler.zk.enable;
+        let zksync = config.zksync.should_compile();
 
         // Resolve missing libraries
         let libs_batches = if zksync && self.deploy_missing_libraries {

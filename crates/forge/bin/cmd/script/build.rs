@@ -30,13 +30,14 @@ impl ScriptArgs {
 
         // TODO: find a way to not compile _all_ contracts but only the ones necessary
         // in each mode
-        let dual_compiled_contracts = if script_config.config.zksync {
+        let dual_compiled_contracts = if script_config.config.zksync.should_compile() {
             // ZK
             // TODO: see if we need to support the `get_project_and_output` flow
             // seems it verifies script is part of the project
             let zk_compiler = ProjectCompiler::new().quiet(self.opts.args.silent);
             let zk_output = zk_compiler.zksync_compile(&project)?;
 
+            //we always need solc output as the tests first run in EVM
             Some(DualCompiledContracts::new_dual(&output, &zk_output, &project.paths))
         } else {
             Some(DualCompiledContracts::new_solc(&output, &project.paths))
