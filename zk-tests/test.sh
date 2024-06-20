@@ -121,6 +121,8 @@ command -v git &>/dev/null || {
   exit 1
 }
 
+#remove
+
 build_forge "${REPO_ROOT}"
 
 "${FORGE}" install transmissions11/solmate Openzeppelin/openzeppelin-contracts --no-commit
