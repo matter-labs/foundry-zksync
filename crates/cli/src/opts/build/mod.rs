@@ -55,6 +55,7 @@ pub struct CompilerArgs {
     pub extra_output_files: Vec<ContractOutputSelection>,
 
     #[clap(flatten)]
+    #[serde(skip)]
     pub zk: ZkSyncArgs,
 }
 

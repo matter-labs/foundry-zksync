@@ -13,56 +13,41 @@ use crate::SolcReq;
 /// ZkSync configuration
 pub struct ZkSyncConfig {
     /// Enable zksync mode
-    #[serde(alias = "zk", alias = "zksync")]
     pub enable: bool,
 
     /// The zkSolc instance to use if any.
     pub zksolc: Option<SolcReq>,
 
     /// solc path to use along the zksolc compiler
-    #[serde(alias = "zk-solc-path", alias = "solc")]
     pub solc_path: Option<PathBuf>,
 
     /// Whether to include the metadata hash for zksolc compiled bytecode.
-    #[serde(alias = "zk-bytecode-hash")]
     pub bytecode_hash: BytecodeHash,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
-    #[serde(alias = "zk-fallback-oz")]
     pub fallback_oz: bool,
 
     /// Whether to support compilation of zkSync-specific simulations
-    #[serde(
-        alias = "system-mode",
-        alias = "enable-eravm-extensions",
-        alias = "zk-eravm-extensions"
-    )]
     pub eravm_extensions: bool,
 
     /// Force evmla for zkSync
-    #[serde(alias = "zk-force-evmla")]
     pub force_evmla: bool,
 
     /// Detect missing libraries, instead of erroring
     ///
     /// Currently unused
-    #[serde(alias = "zk-detect-missing-libraries")]
     pub detect_missing_libraries: bool,
 
     /// Source files to avoid compiling on zksolc
-    #[serde(alias = "zk-avoid-contracts")]
     pub avoid_contracts: Option<Vec<String>>,
 
     /// Enable optimizer for zkSync
-    #[serde(alias = "zk-optimizer", alias = "enable-optimizer")]
     pub optimizer: bool,
 
     /// The optimization mode string for zkSync
-    #[serde(alias = "zk-optimizer-mode")]
     pub optimizer_mode: char,
 
     /// zkSolc optimizer details
-    #[serde(alias = "zk-optimizer-details")]
     pub optimizer_details: Option<OptimizerDetails>,
 }
 
