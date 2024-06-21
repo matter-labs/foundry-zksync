@@ -6,26 +6,35 @@ use foundry_config::ZkSyncConfig;
 /// Represents the zkVM mode setting
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 enum Mode {
+    /// Enable zkVM mode
+    ///
+    /// This will compile contracts with zkVM, but won't override `compile_only` setting in
+    /// configuration
+    #[default]
+    Dwim,
     /// Run in zkVM mode
     ///
     /// This will run tests & scripts with zkVM mode enabled at startup
-    #[default]
     Run,
-    /// Compile contracts for zkSync
+    /// Do not run in zkVM mode, but do also compile contracts with zkSync
     ///
     /// This allows tests & scripts to be run in EVM mode and switch to zkVM mode during execution
-    Compile,
+    CompileOnly,
 }
 
 impl ValueEnum for Mode {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Run, Self::Compile]
+        &[Self::Run, Self::CompileOnly]
     }
 
     fn to_possible_value(&self) -> Option<PossibleValue> {
         Some(match self {
-            Mode::Run => PossibleValue::new("run").alias("r"),
-            Mode::Compile => PossibleValue::new("compile").alias("compile-only").alias("c"),
+            Mode::Run => PossibleValue::new("run").alias("r").help("run in zkVM"),
+            Mode::CompileOnly => PossibleValue::new("compile")
+                .alias("compile-only")
+                .alias("c")
+                .help("compile for zkVM"),
+            Mode::Dwim => PossibleValue::new("dwim").hide(true),
         })
     }
 }
@@ -34,7 +43,7 @@ impl ValueEnum for Mode {
 #[clap(next_help_heading = "ZKSync configuration")]
 pub struct ZkSyncArgs {
     /// Use ZKSync era vm.
-    #[clap(long = "zksync", num_args = 0..=1, require_equals = true, default_missing_value = "run")]
+    #[clap(long = "zksync", num_args = 0..=1, require_equals = true, default_missing_value = "dwim")]
     mode: Option<Mode>,
 
     #[clap(
@@ -122,7 +131,15 @@ impl ZkSyncArgs {
         }
 
         set_if_some!(self.mode.map(|_| true), zksync.enable);
-        set_if_some!(self.mode.map(|zkvm| zkvm == Mode::Compile), zksync.compile_only);
+        set_if_some!(
+            self.mode.and_then(|zkvm| match zkvm {
+                // avoid overriding config in dwim mode
+                Mode::Dwim => None,
+                Mode::Run => Some(false),
+                Mode::CompileOnly => Some(true),
+            }),
+            zksync.compile_only
+        );
 
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
         set_if_some!(self.eravm_extensions, zksync.eravm_extensions);
