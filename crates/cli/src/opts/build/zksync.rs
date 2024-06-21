@@ -1,28 +1,47 @@
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{builder::PossibleValue, Parser, ValueEnum};
 use foundry_config::ZkSyncConfig;
-use serde::Serialize;
 
-#[derive(Clone, Debug, Default, Serialize, Parser)]
+/// Represents the zkVM mode setting
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+enum Mode {
+    /// Run in zkVM mode
+    ///
+    /// This will run tests & scripts with zkVM mode enabled at startup
+    #[default]
+    Run,
+    /// Compile contracts for zkSync
+    ///
+    /// This allows tests & scripts to be run in EVM mode and switch to zkVM mode during execution
+    Compile,
+}
+
+impl ValueEnum for Mode {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::Run, Self::Compile]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        Some(match self {
+            Mode::Run => PossibleValue::new("run").alias("r"),
+            Mode::Compile => PossibleValue::new("compile").alias("compile-only").alias("c"),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Default, Parser)]
 #[clap(next_help_heading = "ZKSync configuration")]
 pub struct ZkSyncArgs {
     /// Use ZKSync era vm.
-    #[clap(long = "zksync", visible_alias = "zk")]
-    pub enable: bool,
-
-    /// Compile contracts for zkSync without running in ZKSync era vm directly
-    ///
-    /// This allows tests & scripts to be run in EVM mode and switch to zkVM mode during execution
-    #[clap(long = "zk-compile-only")]
-    pub compile_only: bool,
+    #[clap(long = "zksync", num_args = 0..=1, require_equals = true, default_missing_value = "run")]
+    mode: Option<Mode>,
 
     #[clap(
         help = "Solc compiler path to use when compiling with zksolc",
         long = "zk-solc-path",
         value_name = "ZK_SOLC_PATH"
     )]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub solc_path: Option<PathBuf>,
 
     /// A flag indicating whether to enable the system contract compilation mode.
@@ -31,9 +50,9 @@ pub struct ZkSyncArgs {
         long = "zk-eravm-extensions",
         visible_alias = "enable-eravm-extensions",
         visible_alias = "system-mode",
-        value_name = "ENABLE_ERAVM_EXTENSIONS"
+        value_name = "ENABLE_ERAVM_EXTENSIONS",
+        default_missing_value = "true"
     )]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub eravm_extensions: Option<bool>,
 
     /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
@@ -41,20 +60,24 @@ pub struct ZkSyncArgs {
         help = "Forcibly switch to the EVM legacy assembly pipeline.",
         long = "zk-force-evmla",
         visible_alias = "force-evmla",
-        value_name = "FORCE_EVMLA"
+        value_name = "FORCE_EVMLA",
+        default_missing_value = "true"
     )]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub force_evmla: Option<bool>,
 
     /// Try to recompile with -Oz if the bytecode is too large.
-    #[clap(long = "zk-fallback-oz", visible_alias = "fallback-oz", value_name = "FALLBACK_OZ")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[clap(
+        long = "zk-fallback-oz",
+        visible_alias = "fallback-oz",
+        value_name = "FALLBACK_OZ",
+        default_missing_value = "true"
+    )]
     pub fallback_oz: Option<bool>,
 
     /// Detect missing libraries, instead of erroring
     ///
     /// Currently unused
-    #[clap(long = "zk-detect-missing-libraries")]
+    #[clap(long = "zk-detect-missing-libraries", default_missing_value = "true")]
     pub detect_missing_libraries: bool,
 
     /// Set the LLVM optimization parameter `-O[0 | 1 | 2 | 3 | s | z]`.
@@ -65,12 +88,10 @@ pub struct ZkSyncArgs {
         visible_alias = "zk-optimization",
         value_name = "LEVEL"
     )]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub optimizer_mode: Option<String>,
 
     /// Enables optimizations
-    #[clap(long = "zk-optimizer")]
-    #[serde(skip)]
+    #[clap(long = "zk-optimizer", default_missing_value = "true")]
     pub optimizer: bool,
 
     /// Contracts to avoid compiling on zkSync
@@ -79,6 +100,11 @@ pub struct ZkSyncArgs {
 }
 
 impl ZkSyncArgs {
+    /// Returns true if zksync mode is enabled
+    pub fn enabled(&self) -> bool {
+        self.mode.is_some()
+    }
+
     /// Merge the current cli arguments into the specified zksync configuration
     pub(crate) fn apply_overrides(&self, mut zksync: ZkSyncConfig) -> ZkSyncConfig {
         macro_rules! set_if_some {
@@ -89,8 +115,9 @@ impl ZkSyncArgs {
             };
         }
 
-        set_if_some!(self.enable.then_some(true), zksync.enable);
-        set_if_some!(self.compile_only.then_some(true), zksync.compile_only);
+        set_if_some!(self.mode.map(|_| true), zksync.enable);
+        set_if_some!(self.mode.map(|zkvm| zkvm == Mode::Compile), zksync.compile_only);
+
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
         set_if_some!(self.eravm_extensions, zksync.eravm_extensions);
         set_if_some!(self.force_evmla, zksync.force_evmla);
