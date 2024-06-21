@@ -51,6 +51,8 @@ pub struct ZkSyncArgs {
         visible_alias = "enable-eravm-extensions",
         visible_alias = "system-mode",
         value_name = "ENABLE_ERAVM_EXTENSIONS",
+        num_args = 0..=1,
+        require_equals = true,
         default_missing_value = "true"
     )]
     pub eravm_extensions: Option<bool>,
@@ -61,6 +63,8 @@ pub struct ZkSyncArgs {
         long = "zk-force-evmla",
         visible_alias = "force-evmla",
         value_name = "FORCE_EVMLA",
+        num_args = 0..=1,
+        require_equals = true,
         default_missing_value = "true"
     )]
     pub force_evmla: Option<bool>,
@@ -70,6 +74,8 @@ pub struct ZkSyncArgs {
         long = "zk-fallback-oz",
         visible_alias = "fallback-oz",
         value_name = "FALLBACK_OZ",
+        num_args = 0..=1,
+        require_equals = true,
         default_missing_value = "true"
     )]
     pub fallback_oz: Option<bool>,
@@ -77,7 +83,7 @@ pub struct ZkSyncArgs {
     /// Detect missing libraries, instead of erroring
     ///
     /// Currently unused
-    #[clap(long = "zk-detect-missing-libraries", default_missing_value = "true")]
+    #[clap(long = "zk-detect-missing-libraries")]
     pub detect_missing_libraries: bool,
 
     /// Set the LLVM optimization parameter `-O[0 | 1 | 2 | 3 | s | z]`.
@@ -91,7 +97,7 @@ pub struct ZkSyncArgs {
     pub optimizer_mode: Option<String>,
 
     /// Enables optimizations
-    #[clap(long = "zk-optimizer", default_missing_value = "true")]
+    #[clap(long = "zk-optimizer")]
     pub optimizer: bool,
 
     /// Contracts to avoid compiling on zkSync
