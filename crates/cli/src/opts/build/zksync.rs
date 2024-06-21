@@ -24,7 +24,7 @@ enum Mode {
 
 impl ValueEnum for Mode {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Run, Self::CompileOnly]
+        &[Self::Run, Self::CompileOnly, Self::Dwim]
     }
 
     fn to_possible_value(&self) -> Option<PossibleValue> {
