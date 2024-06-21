@@ -1615,7 +1615,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             });
 
                         if dual_compiled_contract.zk.is_none() {
-                            error!(file = ?dual_compiled_contract.path, name = dual_compiled_contract.name, "No corresponding ZK contract. Try running the same command with the `--zksync` flag.");
+                            error!(file = ?dual_compiled_contract.path, name = dual_compiled_contract.name, "No corresponding ZK contract. Try running the same command with the `--zksync=compile` flag.");
                             return (InstructionResult::FatalExternalError, None, gas, Bytes::new())
                         }
 
@@ -1728,7 +1728,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 .unwrap_or_else(|| panic!("failed finding EVM contract for {:?}", call.init_code));
 
             if dual_compiled_contract.zk.is_none() {
-                error!(file = ?dual_compiled_contract.path, name = dual_compiled_contract.name, "No corresponding ZK contract. Try running the same command with the `--zksync` flag.");
+                error!(file = ?dual_compiled_contract.path, name = dual_compiled_contract.name, "No corresponding ZK contract. Try running the same command with the `--zksync=compile` flag.");
                 return (InstructionResult::FatalExternalError, None, gas, Bytes::new())
             }
 
