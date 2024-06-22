@@ -265,16 +265,18 @@ impl Cheatcodes {
         let zk_bytecode_hash = foundry_zksync_core::hash_bytecode(&foundry_zksync_core::EMPTY_CODE);
         let zk_deployed_bytecode = foundry_zksync_core::EMPTY_CODE.to_vec();
 
-        dual_compiled_contracts.push(DualCompiledContract::new(
-            String::from("EmptyEVMBytecode"),
-            None,
+        dual_compiled_contracts.push(DualCompiledContract {
+            name: String::from("EmptyEVMBytecode"),
             zk_bytecode_hash,
-            zk_deployed_bytecode.clone(),
-            Default::default(),
-            B256::from_slice(&keccak256(&empty_bytes)[..]),
-            Bytecode::new_raw(empty_bytes.clone()).to_checked().bytecode.to_vec(),
-            Bytecode::new_raw(empty_bytes).to_checked().bytecode.to_vec(),
-        ));
+            zk_deployed_bytecode: zk_deployed_bytecode.clone(),
+            zk_factory_deps: Default::default(),
+            evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
+            evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone())
+                .to_checked()
+                .bytecode
+                .to_vec(),
+            evm_bytecode: Bytecode::new_raw(empty_bytes).to_checked().bytecode.to_vec(),
+        });
 
         let mut persisted_factory_deps = HashMap::new();
         persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
@@ -437,12 +439,11 @@ impl Cheatcodes {
                 .and_then(|zk_bytecode_hash| {
                     self.dual_compiled_contracts
                         .find_by_zk_bytecode_hash(zk_bytecode_hash.to_h256())
-                        .and_then(|contract| contract.evm.as_ref())
                         .map(|contract| {
                             (
-                                contract.bytecode_hash,
+                                contract.evm_bytecode_hash,
                                 Some(Bytecode::new_raw(Bytes::from(
-                                    contract.deployed_bytecode.clone(),
+                                    contract.evm_deployed_bytecode.clone(),
                                 ))),
                             )
                         })
@@ -506,27 +507,17 @@ impl Cheatcodes {
             let full_nonce = nonces_to_full_nonce(info.nonce.into(), info.nonce.into());
             nonce_storage.insert(nonce_key, StorageSlot::new(full_nonce.to_ru256()));
 
-            if let Some(contract) = self
-                .dual_compiled_contracts
-                .iter()
-                .find(|contract| {
-                    info.code_hash != KECCAK_EMPTY &&
-                        contract
-                            .evm
-                            .as_ref()
-                            .map(|evm| evm.bytecode_hash == info.code_hash)
-                            .unwrap_or_default()
-                })
-                .and_then(|contract| contract.zk.as_ref())
-            {
+            if let Some(contract) = self.dual_compiled_contracts.iter().find(|contract| {
+                info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
+            }) {
                 account_code_storage.insert(
                     zk_address.to_h256().to_ru256(),
-                    StorageSlot::new(contract.bytecode_hash.to_ru256()),
+                    StorageSlot::new(contract.zk_bytecode_hash.to_ru256()),
                 );
                 known_codes_storage
-                    .insert(contract.bytecode_hash.to_ru256(), StorageSlot::new(U256::ZERO));
+                    .insert(contract.zk_bytecode_hash.to_ru256(), StorageSlot::new(U256::ZERO));
 
-                let code_hash = B256::from_slice(contract.bytecode_hash.as_bytes());
+                let code_hash = B256::from_slice(contract.zk_bytecode_hash.as_bytes());
                 deployed_codes.insert(
                     address,
                     AccountInfo {
@@ -534,7 +525,7 @@ impl Cheatcodes {
                         nonce: info.nonce,
                         code_hash,
                         code: Some(Bytecode::new_raw(Bytes::from(
-                            contract.deployed_bytecode.clone(),
+                            contract.zk_deployed_bytecode.clone(),
                         ))),
                     },
                 );
@@ -1607,28 +1598,21 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             data.db,
                             &mut data.journaled_state,
                         ) as u64;
-                        let dual_compiled_contract = self
+                        let contract = self
                             .dual_compiled_contracts
                             .find_by_evm_bytecode(&call.init_code.0)
                             .unwrap_or_else(|| {
-                                panic!("failed finding EVM contract for {:?}", call.init_code)
+                                panic!("failed finding contract for {:?}", call.init_code)
                             });
+                        let factory_deps =
+                            self.dual_compiled_contracts.fetch_all_factory_deps(contract);
 
-                        if dual_compiled_contract.zk.is_none() {
-                            error!(file = ?dual_compiled_contract.path, name = dual_compiled_contract.name, "No corresponding ZK contract. Try running the same command with the `--zksync=compile` flag.");
-                            return (InstructionResult::FatalExternalError, None, gas, Bytes::new())
-                        }
+                        let constructor_input =
+                            call.init_code[contract.evm_bytecode.len()..].to_vec();
 
-                        let factory_deps = self
-                            .dual_compiled_contracts
-                            .fetch_all_factory_deps(dual_compiled_contract);
-
-                        let constructor_input = call.init_code
-                            [dual_compiled_contract.evm.as_ref().unwrap().bytecode.len()..]
-                            .to_vec();
                         let create_input = foundry_zksync_core::encode_create_params(
                             &call.scheme,
-                            dual_compiled_contract.zk.as_ref().unwrap().bytecode_hash,
+                            contract.zk_bytecode_hash,
                             constructor_input,
                         );
                         bytecode = Bytes::from(create_input);
@@ -1722,19 +1706,14 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 return (InstructionResult::Continue, None, gas, Bytes::new())
             }
 
-            let dual_compiled_contract = self
+            let zk_contract = self
                 .dual_compiled_contracts
                 .find_by_evm_bytecode(&call.init_code.0)
-                .unwrap_or_else(|| panic!("failed finding EVM contract for {:?}", call.init_code));
+                .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
 
-            if dual_compiled_contract.zk.is_none() {
-                error!(file = ?dual_compiled_contract.path, name = dual_compiled_contract.name, "No corresponding ZK contract. Try running the same command with the `--zksync=compile` flag.");
-                return (InstructionResult::FatalExternalError, None, gas, Bytes::new())
-            }
+            let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
+            tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
 
-            let factory_deps =
-                self.dual_compiled_contracts.fetch_all_factory_deps(dual_compiled_contract);
-            tracing::debug!(contract = dual_compiled_contract.name, "using dual compiled contract");
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
@@ -1743,7 +1722,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
             };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
                 call,
-                dual_compiled_contract,
+                zk_contract,
                 factory_deps,
                 data.env,
                 data.db,

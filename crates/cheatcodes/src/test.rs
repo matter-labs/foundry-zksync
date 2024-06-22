@@ -34,29 +34,20 @@ impl Cheatcode for zkRegisterContractCall {
             zkDeployedBytecode,
         } = self;
 
-        let new_contract = DualCompiledContract::new(
-            name.clone(),
-            None,
-            zkBytecodeHash.0.into(),
-            zkDeployedBytecode.clone(),
+        let new_contract = DualCompiledContract {
+            name: name.clone(),
+            zk_bytecode_hash: zkBytecodeHash.0.into(),
+            zk_deployed_bytecode: zkDeployedBytecode.clone(),
             //TODO: add argument to cheatcode
-            vec![],
-            *evmBytecodeHash,
-            evmDeployedBytecode.clone(),
-            evmBytecode.clone(),
-        );
+            zk_factory_deps: vec![],
+            evm_bytecode_hash: *evmBytecodeHash,
+            evm_deployed_bytecode: evmDeployedBytecode.clone(),
+            evm_bytecode: evmBytecode.clone(),
+        };
 
         if let Some(existing) = ccx.state.dual_compiled_contracts.iter().find(|contract| {
-            contract
-                .evm
-                .as_ref()
-                .map(|evm| evm.bytecode_hash == *evmBytecodeHash)
-                .unwrap_or_default() &&
-                contract
-                    .zk
-                    .as_ref()
-                    .map(|zk| zk.bytecode_hash == zkBytecodeHash.0.into())
-                    .unwrap_or_default()
+            contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
+                contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
         }) {
             warn!(name = existing.name, "contract already exists with the given bytecode hashes");
             return Ok(Default::default())
