@@ -37,10 +37,9 @@ impl ScriptArgs {
             let zk_compiler = ProjectCompiler::new().quiet(self.opts.args.silent);
             let zk_output = zk_compiler.zksync_compile(&project)?;
 
-            //we always need solc output as the tests first run in EVM
-            Some(DualCompiledContracts::new_dual(&output, &zk_output, &project.paths))
+            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
         } else {
-            Some(DualCompiledContracts::new_solc(&output, &project.paths))
+            None
         };
 
         let sources = ContractSources::from_project_output(&output, root)?;
