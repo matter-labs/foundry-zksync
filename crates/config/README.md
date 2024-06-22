@@ -214,6 +214,8 @@ The `zksync` settings must be prefixed with the profile they correspond to:
 [profile.default.zksync] 
 # Overridden by `--zksync` flag
 enable = false 
+# Set to `true` when tests should not start in zkVM mode
+compile_only = false
 # By default the latest version is used
 zksolc = "1.5.0" 
 # By default the corresponding solc patched version from matter-labs is used
