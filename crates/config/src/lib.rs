@@ -432,7 +432,7 @@ impl Config {
 
     /// Standalone sections in the config which get integrated into the selected profile
     pub const STANDALONE_SECTIONS: &'static [&'static str] =
-        &["rpc_endpoints", "etherscan", "fmt", "doc", "fuzz", "invariant", "labels", "zksync"];
+        &["rpc_endpoints", "etherscan", "fmt", "doc", "fuzz", "invariant", "labels"];
 
     /// File name of config toml file
     pub const FILE_NAME: &'static str = "foundry.toml";
