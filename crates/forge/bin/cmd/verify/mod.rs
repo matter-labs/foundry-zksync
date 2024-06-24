@@ -4,7 +4,7 @@ use clap::{Parser, ValueHint};
 use eyre::Result;
 use foundry_cli::{opts::EtherscanOpts, utils::LoadConfig};
 use foundry_compilers::{info::ContractInfo, EvmVersion};
-use foundry_config::{figment, impl_figment_convert, impl_figment_convert_cast, Config};
+use foundry_config::{figment, impl_figment_convert, impl_figment_convert_cast, Config, ZkSyncConfig};
 use provider::VerificationProviderType;
 use reqwest::Url;
 use std::path::PathBuf;
@@ -117,6 +117,10 @@ pub struct VerifyArgs {
 
     #[clap(flatten)]
     pub verifier: VerifierArgs,
+
+    /// Verify for zksync
+    #[clap(long)]
+    pub zksync: bool,
 }
 
 impl_figment_convert!(VerifyArgs);
@@ -146,6 +150,11 @@ impl figment::Provider for VerifyArgs {
         if self.via_ir {
             dict.insert("via_ir".to_string(), figment::value::Value::serialize(self.via_ir)?);
         }
+
+        if self.zksync {
+            dict.insert("zksync".to_string(), figment::value::Value::serialize(ZkSyncConfig{ enable: self.zksync, ..Default::default() })?);
+        }
+
         Ok(figment::value::Map::from([(Config::selected_profile(), dict)]))
     }
 }
