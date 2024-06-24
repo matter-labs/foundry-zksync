@@ -21,7 +21,7 @@ use regex::Regex;
 use semver::{BuildMetadata, Version};
 use std::{
     fmt::Debug,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, str::FromStr,
 };
 
 mod flatten;
@@ -241,7 +241,10 @@ impl EtherscanVerificationProvider {
 
     /// Configures the API request to the etherscan API using the given [`VerifyArgs`].
     async fn prepare_request(&mut self, args: &VerifyArgs) -> Result<(Client, VerifyContract)> {
-        let config = args.try_load_config_emit_warnings()?;
+        let mut config = args.try_load_config_emit_warnings()?;
+        //TODO: fix this at the figment provider level
+        config.zksync.enable = args.zksync;
+
         let etherscan = self.client(
             args.etherscan.chain.unwrap_or_default(),
             args.verifier.verifier_url.as_deref(),
@@ -404,7 +407,38 @@ impl EtherscanVerificationProvider {
             return Ok(None);
         }
 
-        let zksolc = project.zksync_zksolc.version()?;
+        //TODO: remove when foundry-compilers zksolc detection is fixed for 1.5.0
+        let get_zksolc_compiler_version = |path: &std::path::Path| -> Result<Version> {
+            use std::process::*;
+            let mut cmd = Command::new(path);
+            cmd.arg("--version")
+                .stdin(Stdio::piped())
+                .stderr(Stdio::piped())
+                .stdout(Stdio::piped());
+            debug!(?cmd, "getting ZkSolc version");
+            let output = cmd.output().wrap_err("error retrieving --version for zksolc")?;
+
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let version = stdout
+                    .lines()
+                    .filter(|l| !l.trim().is_empty())
+                    .last()
+                    .ok_or(eyre!("Version not found in zksolc output"))?;
+                Ok(Version::from_str(
+                    version
+                        .split_whitespace()
+                        .find(|s| s.starts_with('v'))
+                        .ok_or(eyre!("Unable to retrieve version from zksolc output"))?
+                        .trim_start_matches('v'),
+                )?)
+            } else {
+                return Err(eyre!("zkSolc error: {}", String::from_utf8_lossy(&output.stderr)))
+                    .wrap_err("Error retrieving zksolc version with --version");
+            }
+        };
+
+        let zksolc = get_zksolc_compiler_version(project.zksync_zksolc.zksolc.as_ref())?;
         let mut is_zksync_solc = false;
 
         let solc = if let Some(solc) = &config.zksync.solc_path {

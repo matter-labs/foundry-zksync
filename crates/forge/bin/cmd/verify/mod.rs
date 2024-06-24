@@ -151,10 +151,6 @@ impl figment::Provider for VerifyArgs {
             dict.insert("via_ir".to_string(), figment::value::Value::serialize(self.via_ir)?);
         }
 
-        if self.zksync {
-            dict.insert("zksync".to_string(), figment::value::Value::serialize(ZkSyncConfig{ enable: self.zksync, ..Default::default() })?);
-        }
-
         Ok(figment::value::Map::from([(Config::selected_profile(), dict)]))
     }
 }
