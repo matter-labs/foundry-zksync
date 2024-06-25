@@ -8,8 +8,14 @@ use serde::Serialize;
 #[clap(next_help_heading = "ZKSync configuration")]
 pub struct ZkSyncArgs {
     /// Compile for zkVM
-    #[clap(long = "zk-compile", default_value_if("zk-startup", "true", "true"))]
-    pub compile: bool,
+    #[clap(
+        long = "zk-compile",
+        value_name = "COMPILE_FOR_ZKVM",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true",
+        default_value_if("zk-startup", "true", "true"))]
+    pub compile: Option<bool>,
 
     /// Enable zkVM at startup
     #[clap(
@@ -106,7 +112,7 @@ impl ZkSyncArgs {
             };
         }
 
-        set_if_some!(self.compile.then_some(true), zksync.compile);
+        set_if_some!(self.compile, zksync.compile);
         set_if_some!(self.startup, zksync.startup);
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
         set_if_some!(self.eravm_extensions, zksync.eravm_extensions);
