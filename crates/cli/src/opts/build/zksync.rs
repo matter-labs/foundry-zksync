@@ -7,15 +7,21 @@ use serde::Serialize;
 #[derive(Clone, Debug, Default, Serialize, Parser)]
 #[clap(next_help_heading = "ZKSync configuration")]
 pub struct ZkSyncArgs {
-    /// Use ZKSync era vm.
-    #[clap(long = "zksync", visible_alias = "zk")]
-    pub enable: bool,
+    /// Compile for zkVM
+    #[clap(long = "zk-compile", default_value_if("zk-startup", "true", "true"))]
+    pub compile: bool,
 
-    /// Compile contracts for zkSync without running in ZKSync era vm directly
-    ///
-    /// This allows tests & scripts to be run in EVM mode and switch to zkVM mode during execution
-    #[clap(long = "zk-compile-only")]
-    pub compile_only: bool,
+    /// Enable zkVM at startup
+    #[clap(
+        long = "zk-startup",
+        visible_alias = "zksync",
+        display_order = 0,
+        value_name = "ENABLE_ZKVM_AT_STARTUP",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true",
+    )]
+    pub startup: Option<bool>,
 
     #[clap(
         help = "Solc compiler path to use when compiling with zksolc",
@@ -100,8 +106,8 @@ impl ZkSyncArgs {
             };
         }
 
-        set_if_some!(self.enable.then_some(true), zksync.enable);
-        set_if_some!(self.compile_only.then_some(true), zksync.compile_only);
+        set_if_some!(self.compile.then_some(true), zksync.compile);
+        set_if_some!(self.startup, zksync.startup);
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
         set_if_some!(self.eravm_extensions, zksync.eravm_extensions);
         set_if_some!(self.force_evmla, zksync.force_evmla);

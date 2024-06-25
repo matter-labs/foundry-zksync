@@ -12,11 +12,11 @@ use crate::SolcReq;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 /// ZkSync configuration
 pub struct ZkSyncConfig {
-    /// Enable zksync mode
-    pub enable: bool,
+    /// Compile for zkVM
+    pub compile: bool,
 
-    /// Avoid running vm in zk mode directly
-    pub compile_only: bool,
+    /// Start VM in zkVM mode
+    pub startup: bool,
 
     /// The zkSolc instance to use if any.
     pub zksolc: Option<SolcReq>,
@@ -57,8 +57,8 @@ pub struct ZkSyncConfig {
 impl Default for ZkSyncConfig {
     fn default() -> Self {
         Self {
-            enable: Default::default(),
-            compile_only: Default::default(),
+            compile: Default::default(),
+            startup: true,
             zksolc: Default::default(),
             solc_path: Default::default(),
             bytecode_hash: Default::default(),
@@ -77,12 +77,12 @@ impl Default for ZkSyncConfig {
 impl ZkSyncConfig {
     /// Returns true if zk mode is enabled and it if tests should be run in zk mode
     pub fn run_in_zk_mode(&self) -> bool {
-        self.enable && !self.compile_only
+        self.compile && self.startup
     }
 
     /// Returns true if contracts should be compiled for zk
     pub fn should_compile(&self) -> bool {
-        self.enable
+        self.compile
     }
 
     /// Convert the zksync config to a foundry_compilers zksync Settings
