@@ -102,6 +102,11 @@ pub struct ZkSyncArgs {
 }
 
 impl ZkSyncArgs {
+    /// Returns true if zksync mode is enabled
+    pub fn enabled(&self) -> bool {
+        self.compile.unwrap_or_default()
+    }
+
     /// Merge the current cli arguments into the specified zksync configuration
     pub(crate) fn apply_overrides(&self, mut zksync: ZkSyncConfig) -> ZkSyncConfig {
         macro_rules! set_if_some {
