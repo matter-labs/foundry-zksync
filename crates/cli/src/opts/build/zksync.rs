@@ -11,7 +11,7 @@ enum Mode {
     /// This will compile contracts with zkVM, but won't override `compile_only` setting in
     /// configuration
     #[default]
-    Dwim,
+    Enable,
     /// Run in zkVM mode
     ///
     /// This will run tests & scripts with zkVM mode enabled at startup
@@ -24,7 +24,7 @@ enum Mode {
 
 impl ValueEnum for Mode {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Run, Self::CompileOnly, Self::Dwim]
+        &[Self::Run, Self::CompileOnly, Self::Enable]
     }
 
     fn to_possible_value(&self) -> Option<PossibleValue> {
@@ -34,7 +34,7 @@ impl ValueEnum for Mode {
                 .alias("compile-only")
                 .alias("c")
                 .help("compile for zkVM"),
-            Mode::Dwim => PossibleValue::new("dwim").hide(true),
+            Mode::Enable => PossibleValue::new("enable").hide(true),
         })
     }
 }
@@ -43,7 +43,7 @@ impl ValueEnum for Mode {
 #[clap(next_help_heading = "ZKSync configuration")]
 pub struct ZkSyncArgs {
     /// Use ZKSync era vm.
-    #[clap(long = "zksync", num_args = 0..=1, require_equals = true, default_missing_value = "dwim")]
+    #[clap(long = "zksync", num_args = 0..=1, require_equals = true, default_missing_value = "enable")]
     mode: Option<Mode>,
 
     #[clap(
@@ -133,8 +133,8 @@ impl ZkSyncArgs {
         set_if_some!(self.mode.map(|_| true), zksync.enable);
         set_if_some!(
             self.mode.and_then(|zkvm| match zkvm {
-                // avoid overriding config in dwim mode
-                Mode::Dwim => None,
+                // avoid overriding config in Enable mode
+                Mode::Enable => None,
                 Mode::Run => Some(false),
                 Mode::CompileOnly => Some(true),
             }),
