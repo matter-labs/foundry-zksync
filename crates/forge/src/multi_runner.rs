@@ -343,8 +343,8 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        use_zk: bool,
     ) -> Result<MultiContractRunner> {
+        let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
 
         // This is just the contracts compiled, but we need to merge this with the read cached
@@ -405,15 +405,14 @@ impl MultiContractRunnerBuilder {
             let zk_contracts =
                 zk_output.unwrap().with_stripped_file_prefixes(root).into_artifacts();
             for (id, contract) in zk_contracts {
-                let Some(abi) = contract.abi.as_ref() else {
-                    continue;
-                };
-                let Some(bytecode) = contract.bytecode.as_ref().and_then(|b| b.object.as_bytes())
-                else {
-                    known_contracts.insert(id.clone(), (abi.clone(), vec![]));
-                    continue;
-                };
-                known_contracts.insert(id, (abi.clone(), bytecode.to_vec()));
+                if let Some(abi) = contract.abi.as_ref() {
+                    let bytecode = contract
+                        .bytecode
+                        .as_ref()
+                        .and_then(|b| b.object.as_bytes())
+                        .map_or_else(Vec::new, |b| b.to_vec());
+                    known_contracts.insert(id, (abi.clone(), bytecode));
+                }
             }
         }
 

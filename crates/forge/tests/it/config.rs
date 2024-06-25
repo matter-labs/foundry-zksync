@@ -190,7 +190,7 @@ pub async fn runner_with_config(mut config: Config) -> MultiContractRunner {
             false,
         ))
         .sender(config.sender)
-        .build(root, output, None, env, opts.clone(), false)
+        .build(root, output, None, env, opts.clone())
         .unwrap()
 }
 
@@ -220,7 +220,7 @@ pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunne
             false,
         ))
         .sender(config.sender)
-        .build(root, output, Some(zk_output), env, opts.clone(), true)
+        .build(root, output, Some(zk_output), env, opts.clone())
         .unwrap()
 }
 
@@ -235,7 +235,6 @@ pub async fn tracing_runner() -> MultiContractRunner {
             None,
             EVM_OPTS.evm_env().await.expect("Could not instantiate fork environment"),
             opts,
-            false,
         )
         .unwrap()
 }
@@ -252,7 +251,7 @@ pub async fn forked_runner(rpc: &str) -> MultiContractRunner {
 
     base_runner()
         .with_fork(fork)
-        .build(&PROJECT.paths.root, (*COMPILED).clone(), None, env, opts, false)
+        .build(&PROJECT.paths.root, (*COMPILED).clone(), None, env, opts)
         .unwrap()
 }
 

@@ -214,14 +214,7 @@ impl TestArgs {
             ))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
-            .build(
-                project_root,
-                output,
-                Some(zk_output),
-                env,
-                evm_opts,
-                config.zksync.run_in_zk_mode(),
-            )?;
+            .build(project_root, output, Some(zk_output), env, evm_opts)?;
 
         if let Some(debug_test_pattern) = &self.debug {
             let test_pattern = &mut filter.args_mut().test_pattern;
