@@ -7,9 +7,27 @@ use serde::Serialize;
 #[derive(Clone, Debug, Default, Serialize, Parser)]
 #[clap(next_help_heading = "ZKSync configuration")]
 pub struct ZkSyncArgs {
-    /// Use ZKSync era vm.
-    #[clap(long = "zksync", visible_alias = "zk")]
-    pub enable: bool,
+    /// Compile for zkVM
+    #[clap(
+        long = "zk-compile",
+        value_name = "COMPILE_FOR_ZKVM",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true",
+        default_value_if("startup", "true", "true"))]
+    pub compile: Option<bool>,
+
+    /// Enable zkVM at startup
+    #[clap(
+        long = "zk-startup",
+        visible_alias = "zksync",
+        display_order = 0,
+        value_name = "ENABLE_ZKVM_AT_STARTUP",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true",
+    )]
+    pub startup: Option<bool>,
 
     #[clap(
         help = "Solc compiler path to use when compiling with zksolc",
@@ -25,7 +43,10 @@ pub struct ZkSyncArgs {
         long = "zk-eravm-extensions",
         visible_alias = "enable-eravm-extensions",
         visible_alias = "system-mode",
-        value_name = "ENABLE_ERAVM_EXTENSIONS"
+        value_name = "ENABLE_ERAVM_EXTENSIONS",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eravm_extensions: Option<bool>,
@@ -35,14 +56,23 @@ pub struct ZkSyncArgs {
         help = "Forcibly switch to the EVM legacy assembly pipeline.",
         long = "zk-force-evmla",
         visible_alias = "force-evmla",
-        value_name = "FORCE_EVMLA"
+        value_name = "FORCE_EVMLA",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub force_evmla: Option<bool>,
 
     /// Try to recompile with -Oz if the bytecode is too large.
-    #[clap(long = "zk-fallback-oz", visible_alias = "fallback-oz", value_name = "FALLBACK_OZ")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[clap(
+        long = "zk-fallback-oz",
+        visible_alias = "fallback-oz",
+        value_name = "FALLBACK_OZ",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true"
+    )]
     pub fallback_oz: Option<bool>,
 
     /// Detect missing libraries, instead of erroring
@@ -64,7 +94,6 @@ pub struct ZkSyncArgs {
 
     /// Enables optimizations
     #[clap(long = "zk-optimizer")]
-    #[serde(skip)]
     pub optimizer: bool,
 
     /// Contracts to avoid compiling on zkSync
@@ -73,6 +102,11 @@ pub struct ZkSyncArgs {
 }
 
 impl ZkSyncArgs {
+    /// Returns true if zksync mode is enabled
+    pub fn enabled(&self) -> bool {
+        self.compile.unwrap_or_default()
+    }
+
     /// Merge the current cli arguments into the specified zksync configuration
     pub(crate) fn apply_overrides(&self, mut zksync: ZkSyncConfig) -> ZkSyncConfig {
         macro_rules! set_if_some {
@@ -83,7 +117,8 @@ impl ZkSyncArgs {
             };
         }
 
-        set_if_some!(self.enable.then_some(true), zksync.enable);
+        set_if_some!(self.compile, zksync.compile);
+        set_if_some!(self.startup, zksync.startup);
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
         set_if_some!(self.eravm_extensions, zksync.eravm_extensions);
         set_if_some!(self.force_evmla, zksync.force_evmla);
