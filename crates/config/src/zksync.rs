@@ -103,7 +103,7 @@ impl ZkSyncConfig {
             detect_missing_libraries: self.detect_missing_libraries,
             system_mode: self.eravm_extensions,
             force_evmla: self.force_evmla,
-            // We specified it here to retrieve the ABI in the output. 
+            // We specified it here to retrieve the ABI in the output.
             // TODO: figure out if we need the metadata field.
             output_selection: serde_json::from_str(
                 "{\"*\":{\"*\":[\"abi\",\"evm.methodIdentifiers\",\"metadata\", \"irOptimized\"]}}",
