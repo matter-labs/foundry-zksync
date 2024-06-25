@@ -14,7 +14,7 @@ pub struct ZkSyncArgs {
         num_args = 0..=1,
         require_equals = true,
         default_missing_value = "true",
-        default_value_if("zk-startup", "true", "true"))]
+        default_value_if("startup", "true", "true"))]
     pub compile: Option<bool>,
 
     /// Enable zkVM at startup
