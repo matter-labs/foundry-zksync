@@ -190,7 +190,7 @@ impl ScriptArgs {
                 }
 
                 let is_fixed_gas_limit = tx.gas.is_some();
-                debug!("HERMAN SET?: {is_fixed_gas_limit}");
+                debug!("HERMAN GAS SET?: {is_fixed_gas_limit}");
                 match tx.gas {
                     // If tx.gas is already set that means it was specified in script
                     Some(gas) => {
