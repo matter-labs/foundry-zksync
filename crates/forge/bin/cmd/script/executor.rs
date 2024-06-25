@@ -190,6 +190,7 @@ impl ScriptArgs {
                 }
 
                 let is_fixed_gas_limit = tx.gas.is_some();
+                debug!("HERMAN SET?: {is_fixed_gas_limit}");
                 match tx.gas {
                     // If tx.gas is already set that means it was specified in script
                     Some(gas) => {
@@ -197,7 +198,10 @@ impl ScriptArgs {
                     }
                     // We inflate the gas used by the user specified percentage
                     None => {
+                        let gas_used = result.gas_used;
+                        let gas_multiplier = self.gas_estimate_multiplier;
                         let gas = U256::from(result.gas_used * self.gas_estimate_multiplier / 100);
+                        debug!("HERMAN: ENTERING UNSET GAS: TOTAL = GAS_USED({gas_used})*GAS_MULTIPLIER({gas_multiplier}) = {gas}");
                         tx.gas = Some(gas);
                     }
                 }
@@ -340,6 +344,7 @@ impl ScriptArgs {
                     )
                     .enable_isolation(script_config.evm_opts.isolate)
             });
+            debug!("HERMAN: FINISH LOCAL SCRIPT");
         }
 
         let mut executor = builder.build(env, db);

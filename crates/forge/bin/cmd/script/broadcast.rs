@@ -109,6 +109,7 @@ impl ScriptArgs {
             let sequential_broadcast =
                 send_kind.signers_count() != 1 || self.slow || !has_batch_support(chain);
 
+            debug!("HERMAN: Passing scripting");
             // Make a one-time gas price estimation
             let (gas_price, eip1559_fees) = {
                 match deployment_sequence.transactions.front().unwrap().typed_tx() {
