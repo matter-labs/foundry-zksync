@@ -25,7 +25,7 @@ use foundry_evm::{
 };
 use rayon::prelude::*;
 use revm::primitives::SpecId;
-use semver::Op;
+
 use std::{
     collections::BTreeMap,
     fmt::Debug,
