@@ -103,8 +103,10 @@ impl ZkSyncConfig {
             detect_missing_libraries: self.detect_missing_libraries,
             system_mode: self.eravm_extensions,
             force_evmla: self.force_evmla,
-            // TODO: See if we need to set this from here
-            output_selection: Default::default(),
+            output_selection: serde_json::from_str(
+                "{\"*\":{\"*\":[\"abi\",\"evm.methodIdentifiers\",\"metadata\", \"irOptimized\"]}}",
+            )
+            .unwrap(),
             solc: self.solc_path.clone(),
         }
     }

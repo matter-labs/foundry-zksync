@@ -199,7 +199,7 @@ impl TestArgs {
         // Clone the output only if we actually need it later for the debugger.
         let output_clone = should_debug.then(|| output.clone());
 
-        let mut runner = MultiContractRunnerBuilder::default()
+        let runner = MultiContractRunnerBuilder::default()
             .set_debug(should_debug)
             .initial_balance(evm_opts.initial_balance)
             .evm_spec(config.evm_spec_id())
@@ -214,7 +214,14 @@ impl TestArgs {
             ))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
-            .build(project_root, output, env, evm_opts)?;
+            .build(
+                project_root,
+                output,
+                Some(zk_output),
+                env,
+                evm_opts,
+                config.zksync.run_in_zk_mode(),
+            )?;
 
         if let Some(debug_test_pattern) = &self.debug {
             let test_pattern = &mut filter.args_mut().test_pattern;
@@ -226,7 +233,6 @@ impl TestArgs {
             }
             *test_pattern = Some(debug_test_pattern.clone());
         }
-        runner.use_zk = config.zksync.run_in_zk_mode();
 
         let outcome = self.run_tests(runner, config, verbosity, &filter, test_options).await?;
 

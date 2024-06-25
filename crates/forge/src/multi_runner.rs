@@ -10,8 +10,9 @@ use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    contracts::ArtifactContracts, Artifact, ArtifactId, ArtifactOutput, ConfigurableArtifacts,
-    ProjectCompileOutput,
+    contracts::ArtifactContracts,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact, ArtifactId,
+    ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput,
 };
 use foundry_evm::{
     backend::Backend,
@@ -24,6 +25,7 @@ use foundry_evm::{
 };
 use rayon::prelude::*;
 use revm::primitives::SpecId;
+use semver::Op;
 use std::{
     collections::BTreeMap,
     fmt::Debug,
@@ -338,9 +340,13 @@ impl MultiContractRunnerBuilder {
         self,
         root: &Path,
         output: ProjectCompileOutput,
+        zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
+        use_zk: bool,
     ) -> Result<MultiContractRunner> {
+        let mut known_contracts = ContractsByArtifact::default();
+
         // This is just the contracts compiled, but we need to merge this with the read cached
         // artifacts.
         let contracts = output
@@ -358,8 +364,6 @@ impl MultiContractRunnerBuilder {
 
         // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
         let mut deployable_contracts = DeployableContracts::default();
-
-        let mut known_contracts = ContractsByArtifact::default();
 
         for (id, contract) in &linker.contracts.0 {
             let Some(abi) = contract.abi.as_ref() else {
@@ -391,8 +395,25 @@ impl MultiContractRunnerBuilder {
                 deployable_contracts.insert(id.clone(), (abi.clone(), bytecode, libs_to_deploy));
             }
 
-            if let Some(bytes) = linked_contract.get_deployed_bytecode_bytes() {
-                known_contracts.insert(id.clone(), (abi.clone(), bytes.to_vec()));
+            if !use_zk {
+                if let Some(bytes) = linked_contract.get_deployed_bytecode_bytes() {
+                    known_contracts.insert(id.clone(), (abi.clone(), bytes.to_vec()));
+                }
+            }
+        }
+        if use_zk {
+            let zk_contracts =
+                zk_output.unwrap().with_stripped_file_prefixes(root).into_artifacts();
+            for (id, contract) in zk_contracts {
+                let Some(abi) = contract.abi.as_ref() else {
+                    continue;
+                };
+                let Some(bytecode) = contract.bytecode.as_ref().and_then(|b| b.object.as_bytes())
+                else {
+                    known_contracts.insert(id.clone(), (abi.clone(), vec![]));
+                    continue;
+                };
+                known_contracts.insert(id, (abi.clone(), bytecode.to_vec()));
             }
         }
 
@@ -413,7 +434,7 @@ impl MultiContractRunnerBuilder {
             debug: self.debug,
             test_options: self.test_options.unwrap_or_default(),
             isolation: self.isolation,
-            use_zk: false,
+            use_zk,
         })
     }
 }
