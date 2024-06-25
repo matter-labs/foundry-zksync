@@ -1,56 +1,28 @@
 use std::path::PathBuf;
 
-use clap::{builder::PossibleValue, Parser, ValueEnum};
+use clap::Parser;
 use foundry_config::ZkSyncConfig;
+use serde::Serialize;
 
-/// Represents the zkVM mode setting
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
-enum Mode {
-    /// Enable zkVM mode
-    ///
-    /// This will compile contracts with zkVM, but won't override `compile_only` setting in
-    /// configuration
-    #[default]
-    Enable,
-    /// Run in zkVM mode
-    ///
-    /// This will run tests & scripts with zkVM mode enabled at startup
-    Run,
-    /// Do not run in zkVM mode, but do also compile contracts with zkSync
-    ///
-    /// This allows tests & scripts to be run in EVM mode and switch to zkVM mode during execution
-    CompileOnly,
-}
-
-impl ValueEnum for Mode {
-    fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Run, Self::CompileOnly, Self::Enable]
-    }
-
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        Some(match self {
-            Mode::Run => PossibleValue::new("run").alias("r").help("run in zkVM"),
-            Mode::CompileOnly => PossibleValue::new("compile")
-                .alias("compile-only")
-                .alias("c")
-                .help("compile for zkVM"),
-            Mode::Enable => PossibleValue::new("enable").hide(true),
-        })
-    }
-}
-
-#[derive(Clone, Debug, Default, Parser)]
+#[derive(Clone, Debug, Default, Serialize, Parser)]
 #[clap(next_help_heading = "ZKSync configuration")]
 pub struct ZkSyncArgs {
     /// Use ZKSync era vm.
-    #[clap(long = "zksync", num_args = 0..=1, require_equals = true, default_missing_value = "enable")]
-    mode: Option<Mode>,
+    #[clap(long = "zksync", visible_alias = "zk")]
+    pub enable: bool,
+
+    /// Compile contracts for zkSync without running in ZKSync era vm directly
+    ///
+    /// This allows tests & scripts to be run in EVM mode and switch to zkVM mode during execution
+    #[clap(long = "zk-compile-only")]
+    pub compile_only: bool,
 
     #[clap(
         help = "Solc compiler path to use when compiling with zksolc",
         long = "zk-solc-path",
         value_name = "ZK_SOLC_PATH"
     )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub solc_path: Option<PathBuf>,
 
     /// A flag indicating whether to enable the system contract compilation mode.
@@ -64,6 +36,7 @@ pub struct ZkSyncArgs {
         require_equals = true,
         default_missing_value = "true"
     )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub eravm_extensions: Option<bool>,
 
     /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
@@ -76,6 +49,7 @@ pub struct ZkSyncArgs {
         require_equals = true,
         default_missing_value = "true"
     )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub force_evmla: Option<bool>,
 
     /// Try to recompile with -Oz if the bytecode is too large.
@@ -103,6 +77,7 @@ pub struct ZkSyncArgs {
         visible_alias = "zk-optimization",
         value_name = "LEVEL"
     )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub optimizer_mode: Option<String>,
 
     /// Enables optimizations
@@ -115,11 +90,6 @@ pub struct ZkSyncArgs {
 }
 
 impl ZkSyncArgs {
-    /// Returns true if zksync mode is enabled
-    pub fn enabled(&self) -> bool {
-        self.mode.is_some()
-    }
-
     /// Merge the current cli arguments into the specified zksync configuration
     pub(crate) fn apply_overrides(&self, mut zksync: ZkSyncConfig) -> ZkSyncConfig {
         macro_rules! set_if_some {
@@ -130,17 +100,8 @@ impl ZkSyncArgs {
             };
         }
 
-        set_if_some!(self.mode.map(|_| true), zksync.enable);
-        set_if_some!(
-            self.mode.and_then(|zkvm| match zkvm {
-                // avoid overriding config in Enable mode
-                Mode::Enable => None,
-                Mode::Run => Some(false),
-                Mode::CompileOnly => Some(true),
-            }),
-            zksync.compile_only
-        );
-
+        set_if_some!(self.enable.then_some(true), zksync.enable);
+        set_if_some!(self.compile_only.then_some(true), zksync.compile_only);
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
         set_if_some!(self.eravm_extensions, zksync.eravm_extensions);
         set_if_some!(self.force_evmla, zksync.force_evmla);
