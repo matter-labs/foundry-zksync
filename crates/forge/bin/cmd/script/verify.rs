@@ -47,7 +47,7 @@ impl VerifyBundle {
         };
 
         let via_ir = config.via_ir;
-        let zksync = config.zksync.enable;
+        let zksync = config.zksync.should_compile();
 
         VerifyBundle {
             num_of_optimizations,
