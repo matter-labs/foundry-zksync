@@ -343,8 +343,8 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        use_zk: bool,
     ) -> Result<MultiContractRunner> {
+        let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
 
         // This is just the contracts compiled, but we need to merge this with the read cached

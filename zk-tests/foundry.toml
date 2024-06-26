@@ -3,6 +3,7 @@ src = 'src'
 out = 'out'
 libs = ['lib']
 fs_permissions = [{ access = "read", path = "./zkout/ConstantNumber.sol/ConstantNumber.json"}]
+libraries = ["/Users/jrigada/foundry-zksync/zk-tests/src/Maths.sol:Maths:0x9c1a3d7c98dbf89c7f5d167f2219c29c2fe775a7", "/Users/jrigada/foundry-zksync/zk-tests/src/NestedMaths.sol:NestedMaths:0xceab1fc2693930bbad33024d270598c620d7a52b"]
 
 [fuzz]
 no_zksync_reserved_addresses = true
@@ -11,4 +12,8 @@ no_zksync_reserved_addresses = true
 local = "${ERA_TEST_NODE_RPC_URL}"
 mainnet = "https://mainnet.era.zksync.io:443"
 testnet = "https://testnet.era.zksync.dev:443"
+
+[invariant]
+runs = 10
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

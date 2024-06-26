@@ -169,12 +169,14 @@ impl TestArgs {
         }
         let output = compiler.compile(&project)?;
 
-        let dual_compiled_contracts = if config.zksync.should_compile() {
+        let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
             let zk_compiler = ProjectCompiler::new().quiet_if(self.json || self.opts.silent);
             let zk_output = zk_compiler.zksync_compile(&project)?;
-            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
+            let dual_compiled_contracts =
+                Some(DualCompiledContracts::new(&output, &zk_output, &project.paths));
+            (Some(zk_output), dual_compiled_contracts)
         } else {
-            None
+            (None, None)
         };
 
         // Create test options from general project settings and compiler output.
@@ -217,14 +219,7 @@ impl TestArgs {
             ))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
-            .build(
-                project_root,
-                output,
-                Some(zk_output),
-                env,
-                evm_opts,
-                config.zksync.run_in_zk_mode(),
-            )?;
+            .build(project_root, output, zk_output, env, evm_opts)?;
 
         if let Some(debug_test_pattern) = &self.debug {
             let test_pattern = &mut filter.args_mut().test_pattern;
