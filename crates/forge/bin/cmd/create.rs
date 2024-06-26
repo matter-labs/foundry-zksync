@@ -620,7 +620,7 @@ impl CreateArgs {
             tracing::warn!(
                 given = actual_params,
                 expected = expected_params,
-               "Constructor argument mismatch: expected {expected} arguments, but received {given}. Ensure that the number of arguments provided matches the constructor definition."
+               "Constructor argument mismatch: expected {expected_params} arguments, but received {actual_params}. Ensure that the number of arguments provided matches the constructor definition."
             );
         }
 
