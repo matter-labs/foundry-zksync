@@ -4,7 +4,9 @@ use clap::{Parser, ValueHint};
 use eyre::Result;
 use foundry_cli::{opts::EtherscanOpts, utils::LoadConfig};
 use foundry_compilers::{info::ContractInfo, EvmVersion};
-use foundry_config::{figment, impl_figment_convert, impl_figment_convert_cast, Config, ZkSyncConfig};
+use foundry_config::{
+    figment, impl_figment_convert, impl_figment_convert_cast, Config,
+};
 use provider::VerificationProviderType;
 use reqwest::Url;
 use std::path::PathBuf;

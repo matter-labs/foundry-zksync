@@ -48,6 +48,14 @@ trait EtherscanSourceProvider: Send + Sync + Debug {
         target: &Path,
         version: &Version,
     ) -> Result<(String, String, CodeFormat)>;
+
+    fn zk_source(
+        &self,
+        args: &VerifyArgs,
+        project: &Project,
+        target: &Path,
+        version: &Version,
+    ) -> Result<(String, String, CodeFormat)>;
 }
 
 #[async_trait::async_trait]
@@ -241,9 +249,7 @@ impl EtherscanVerificationProvider {
 
     /// Configures the API request to the etherscan API using the given [`VerifyArgs`].
     async fn prepare_request(&mut self, args: &VerifyArgs) -> Result<(Client, VerifyContract)> {
-        let mut config = args.try_load_config_emit_warnings()?;
-        //TODO: fix this at the figment provider level
-        config.zksync.enable = args.zksync;
+        let config = args.try_load_config_emit_warnings()?;
 
         let etherscan = self.client(
             args.etherscan.chain.unwrap_or_default(),
@@ -330,31 +336,43 @@ impl EtherscanVerificationProvider {
         let project = config.project()?;
 
         let contract_path = self.contract_path(args, &project)?;
-        let mut compiler_version = self.compiler_version(args, &config, &project)?;
-        let zk_args = match self.zk_compiler_version(&config, &project)? {
-            None => vec![],
+        let compiler_version = self.compiler_version(args, &config, &project)?;
+        let zk_compiler_version = self.zk_compiler_version(args, &config, &project)?;
+
+        let source_provider = self.source_provider(args);
+        let (source, contract_name, code_format) = if let Some(zk) = &zk_compiler_version {
+            source_provider.zk_source(args, &project, &contract_path, &zk.zksolc)
+        } else {
+            source_provider.source(args, &project, &contract_path, &compiler_version)
+        }?;
+
+        let (compiler_version, zk_args) = match zk_compiler_version {
+            None => (format!("v{}", ensure_solc_build_metadata(compiler_version).await?), vec![]),
             Some(zk) => {
+                let mut compiler_version = compiler_version;
                 if let Some(solc) = zk.solc {
-                    compiler_version = solc;
+                    //FIXME: avoid strip metadata
+                    compiler_version = Version::new(solc.major, solc.minor, solc.patch);
                 }
-                let compilermode = if zk.is_zksync_solc { "zksync" } else { "solc" }.to_string();
-                let version = format!("v{}", zk.zksolc);
-                vec![
-                    ("compilermode".to_string(), compilermode),
-                    ("zksolcVersion".to_string(), version),
-                ]
+
+                (
+                    //FIXME: allow `v` before solc compiler version
+                    format!("{compiler_version}"),
+                    vec![("zkCompilerVersion".to_string(), format!("v{}", zk.zksolc))],
+                )
             }
         };
 
-        let (source, contract_name, code_format) =
-            self.source_provider(args).source(args, &project, &contract_path, &compiler_version)?;
-
-        let compiler_version = format!("v{}", ensure_solc_build_metadata(compiler_version).await?);
         let constructor_args = self.constructor_args(args, &project)?;
         let mut verify_args =
             VerifyContract::new(args.address, contract_name, source, compiler_version)
-                .constructor_arguments(constructor_args)
+                //FIXME: leave optimization None
+                .not_optimized()
                 .code_format(code_format);
+
+        //FIXME: use `constructor_arguments` method
+        verify_args.blockscout_constructor_arguments = constructor_args.clone();
+        verify_args.constructor_arguments = constructor_args;
         verify_args.other.extend(zk_args.into_iter());
 
         if args.via_ir {
@@ -400,10 +418,11 @@ impl EtherscanVerificationProvider {
 
     fn zk_compiler_version(
         &mut self,
+        args: &VerifyArgs,
         config: &Config,
         project: &Project,
     ) -> Result<Option<ZkVersion>> {
-        if !config.zksync.enable {
+        if !args.zksync {
             return Ok(None);
         }
 
