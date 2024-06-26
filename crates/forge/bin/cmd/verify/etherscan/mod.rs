@@ -21,7 +21,8 @@ use regex::Regex;
 use semver::{BuildMetadata, Version};
 use std::{
     fmt::Debug,
-    path::{Path, PathBuf}, str::FromStr,
+    path::{Path, PathBuf},
+    str::FromStr,
 };
 
 mod flatten;
@@ -393,6 +394,7 @@ impl EtherscanVerificationProvider {
             };
         }
 
+        dbg!(&verify_args);
         Ok(verify_args)
     }
 
@@ -452,8 +454,8 @@ impl EtherscanVerificationProvider {
                         .trim_start_matches('v'),
                 )?)
             } else {
-                return Err(eyre!("zkSolc error: {}", String::from_utf8_lossy(&output.stderr)))
-                    .wrap_err("Error retrieving zksolc version with --version");
+                Err(eyre!("zkSolc error: {}", String::from_utf8_lossy(&output.stderr)))
+                    .wrap_err("Error retrieving zksolc version with --version")
             }
         };
 
