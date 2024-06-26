@@ -19,6 +19,7 @@ use futures::FutureExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::{BuildMetadata, Version};
+use serde_json::Value;
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
@@ -48,7 +49,7 @@ trait EtherscanSourceProvider: Send + Sync + Debug {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(String, String, CodeFormat)>;
+    ) -> Result<(Value, String, CodeFormat)>;
 
     fn zk_source(
         &self,
@@ -56,7 +57,7 @@ trait EtherscanSourceProvider: Send + Sync + Debug {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(String, String, CodeFormat)>;
+    ) -> Result<(Value, String, CodeFormat)>;
 }
 
 #[async_trait::async_trait]
@@ -179,6 +180,10 @@ impl VerificationProvider for EtherscanVerificationProvider {
 
                     if resp.result == "Pending in queue" {
                         return Err(eyre!("Verification is still pending...",))
+                    }
+
+                    if resp.result == "In progress" {
+                        return Err(eyre!("Verification is in progress...",))
                     }
 
                     if resp.result == "Unable to verify" {
@@ -351,9 +356,11 @@ impl EtherscanVerificationProvider {
             None => (format!("v{}", ensure_solc_build_metadata(compiler_version).await?), vec![]),
             Some(zk) => {
                 let mut compiler_version = compiler_version;
+                //FIXME: avoid strip metadata
                 if let Some(solc) = zk.solc {
-                    //FIXME: avoid strip metadata
                     compiler_version = Version::new(solc.major, solc.minor, solc.patch);
+                } else  {
+                    compiler_version = Version::new(compiler_version.major, compiler_version.minor, compiler_version.patch);
                 }
 
                 (
@@ -371,7 +378,8 @@ impl EtherscanVerificationProvider {
                 .not_optimized()
                 .code_format(code_format);
 
-        //FIXME: use `constructor_arguments` method
+        //FIXME: use `constructor_arguments`
+        // right now we do it this way to skip 0x removal
         verify_args.blockscout_constructor_arguments = constructor_args.clone();
         verify_args.constructor_arguments = constructor_args;
         verify_args.other.extend(zk_args.into_iter());

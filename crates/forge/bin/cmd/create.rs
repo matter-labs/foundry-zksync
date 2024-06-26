@@ -538,7 +538,7 @@ impl CreateArgs {
                     .constructor()
                     .ok_or_else(|| eyre::eyre!("could not find constructor"))?
                     .abi_encode_input(&args)?;
-                constructor_args = Some(hex::encode(encoded_args));
+                constructor_args = Some(hex::encode_prefixed(encoded_args));
             }
 
             self.verify_preflight_check(contract, constructor_args.clone(), chain).await?;

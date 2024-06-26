@@ -3,6 +3,7 @@ use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
 use foundry_compilers::{artifacts::StandardJsonCompilerInput, Project};
 use semver::Version;
+use serde_json::Value;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -14,7 +15,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(String, String, CodeFormat)> {
+    ) -> Result<(Value, String, CodeFormat)> {
         let mut input: StandardJsonCompilerInput = project
             .standard_json_input(target)
             .wrap_err("Failed to get standard json input")?
@@ -32,9 +33,9 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         input.settings.sanitize(version);
 
         let source =
-            serde_json::to_string(&input).wrap_err("Failed to parse standard json input")?;
+            serde_json::to_value(&input).wrap_err("Failed to parse standard json input")?;
 
-        trace!(target: "forge::verify", standard_json=source, "determined standard json input");
+        trace!(target: "forge::verify", standard_json=?source, "determined standard json input");
 
         let name = format!(
             "{}:{}",
@@ -50,7 +51,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(String, String, CodeFormat)> {
+    ) -> Result<(Value, String, CodeFormat)> {
         let mut input = project
             .zksync_standard_json_input(target)
             .wrap_err("Failed to get standard json input")?
@@ -65,9 +66,9 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
             .collect();
 
         let source =
-            serde_json::to_string(&input).wrap_err("Failed to parse standard json input")?;
+            serde_json::to_value(&input).wrap_err("Failed to parse standard json input")?;
 
-        trace!(target: "forge::verify", standard_json=source, "determined standard json input");
+        trace!(target: "forge::verify", standard_json=?source, "determined zksync standard json input");
 
         let name = format!(
             "{}:{}",

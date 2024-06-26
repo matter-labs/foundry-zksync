@@ -10,6 +10,7 @@ use foundry_compilers::{
     AggregatedCompilerOutput, CompilerInput, Project, Solc,
 };
 use semver::{BuildMetadata, Version};
+use serde_json::Value;
 use std::{collections::BTreeMap, path::Path};
 
 #[derive(Debug)]
@@ -21,7 +22,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(String, String, CodeFormat)> {
+    ) -> Result<(Value, String, CodeFormat)> {
         let metadata = project.solc_config.settings.metadata.as_ref();
         let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
 
@@ -45,7 +46,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
         }
 
         let name = args.contract.name.clone();
-        Ok((source, name, CodeFormat::SingleFile))
+        Ok((Value::from(source), name, CodeFormat::SingleFile))
     }
 
     fn zk_source(
@@ -54,7 +55,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(String, String, CodeFormat)> {
+    ) -> Result<(Value, String, CodeFormat)> {
         let metadata = project.zksync_zksolc_config.settings.metadata.as_ref();
         let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
 
@@ -78,7 +79,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
         }
 
         let name = args.contract.name.clone();
-        Ok((source, name, CodeFormat::SingleFile))
+        Ok((Value::from(source), name, CodeFormat::SingleFile))
     }
 }
 
