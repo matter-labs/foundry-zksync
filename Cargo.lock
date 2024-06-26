@@ -3943,7 +3943,7 @@ dependencies = [
 [[package]]
 name = "foundry-block-explorers"
 version = "0.2.3"
-source = "git+https://github.com/Moonsong-Labs/block-explorers?branch=zksync-v0.2.3-verify-zksyncio#5cd84407330773f0ded19a52ac5c01a049f202c0"
+source = "git+https://github.com/Moonsong-Labs/block-explorers?branch=zksync-v0.2.3#b442f11077f30584cda7621311ee36a322135b86"
 dependencies = [
  "alloy-chains",
  "alloy-json-abi",

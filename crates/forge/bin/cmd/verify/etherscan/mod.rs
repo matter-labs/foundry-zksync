@@ -49,7 +49,7 @@ trait EtherscanSourceProvider: Send + Sync + Debug {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(Value, String, CodeFormat)>;
+    ) -> Result<(String, String, CodeFormat)>;
 
     fn zk_source(
         &self,
@@ -57,7 +57,7 @@ trait EtherscanSourceProvider: Send + Sync + Debug {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(Value, String, CodeFormat)>;
+    ) -> Result<(String, String, CodeFormat)>;
 }
 
 #[async_trait::async_trait]
@@ -342,7 +342,7 @@ impl EtherscanVerificationProvider {
         let project = config.project()?;
 
         let contract_path = self.contract_path(args, &project)?;
-        let compiler_version = self.compiler_version(args, &config, &project)?;
+        let mut compiler_version = self.compiler_version(args, &config, &project)?;
         let zk_compiler_version = self.zk_compiler_version(args, &config, &project)?;
 
         let source_provider = self.source_provider(args);
@@ -352,45 +352,28 @@ impl EtherscanVerificationProvider {
             source_provider.source(args, &project, &contract_path, &compiler_version)
         }?;
 
-        let (compiler_version, zk_args) = match zk_compiler_version {
-            None => (format!("v{}", ensure_solc_build_metadata(compiler_version).await?), vec![]),
+        let zk_args = match zk_compiler_version {
+            None => vec![],
             Some(zk) => {
-                let mut compiler_version = compiler_version;
-                //FIXME: avoid strip metadata
                 if let Some(solc) = zk.solc {
                     compiler_version = Version::new(solc.major, solc.minor, solc.patch);
-                } else {
-                    compiler_version = Version::new(
-                        compiler_version.major,
-                        compiler_version.minor,
-                        compiler_version.patch,
-                    );
                 }
 
                 let compilermode = if zk.is_zksync_solc { "zksync" } else { "solc" }.to_string();
 
-                (
-                    //FIXME: allow `v` before solc compiler version
-                    format!("{compiler_version}"),
-                    vec![
-                        ("compilermode".to_string(), compilermode),
-                        ("zkCompilerVersion".to_string(), format!("v{}", zk.zksolc)),
-                    ],
-                )
+                vec![
+                    ("compilermode".to_string(), compilermode),
+                    ("zksolcVersion".to_string(), format!("v{}", zk.zksolc)),
+                ]
             }
         };
+        let compiler_version = format!("v{}", ensure_solc_build_metadata(compiler_version).await?);
 
         let constructor_args = self.constructor_args(args, &project)?;
         let mut verify_args =
             VerifyContract::new(args.address, contract_name, source, compiler_version)
-                //FIXME: leave optimization None
-                .not_optimized()
+                .constructor_arguments(constructor_args)
                 .code_format(code_format);
-
-        //FIXME: use `constructor_arguments`
-        // right now we do it this way to skip 0x removal
-        verify_args.blockscout_constructor_arguments = constructor_args.clone();
-        verify_args.constructor_arguments = constructor_args;
         verify_args.other.extend(zk_args.into_iter());
 
         if args.via_ir {

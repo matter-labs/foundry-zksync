@@ -14,4 +14,4 @@ testnet = "https://testnet.era.zksync.dev:443"
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [etherscan]
-testnet = { key = "IGNOREME", chain = "300", url = "https://block-explorer-api.sepolia.zksync.dev/api" }
+testnet = { key = "PLACEHOLDER", chain = "300", url = "https://api-sepolia-era.zksync.network/api" }

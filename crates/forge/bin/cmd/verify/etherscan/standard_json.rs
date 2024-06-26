@@ -15,7 +15,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(Value, String, CodeFormat)> {
+    ) -> Result<(String, String, CodeFormat)> {
         let mut input: StandardJsonCompilerInput = project
             .standard_json_input(target)
             .wrap_err("Failed to get standard json input")?
@@ -33,7 +33,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         input.settings.sanitize(version);
 
         let source =
-            serde_json::to_value(&input).wrap_err("Failed to parse standard json input")?;
+            serde_json::to_string(&input).wrap_err("Failed to parse standard json input")?;
 
         trace!(target: "forge::verify", standard_json=?source, "determined standard json input");
 
@@ -51,7 +51,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         project: &Project,
         target: &Path,
         version: &Version,
-    ) -> Result<(Value, String, CodeFormat)> {
+    ) -> Result<(String, String, CodeFormat)> {
         let mut input = project
             .zksync_standard_json_input(target)
             .wrap_err("Failed to get standard json input")?
@@ -66,7 +66,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
             .collect();
 
         let source =
-            serde_json::to_value(&input).wrap_err("Failed to parse standard json input")?;
+            serde_json::to_string(&input).wrap_err("Failed to parse standard json input")?;
 
         trace!(target: "forge::verify", standard_json=?source, "determined zksync standard json input");
 
