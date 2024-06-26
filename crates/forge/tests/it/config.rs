@@ -220,7 +220,7 @@ pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunne
             false,
         ))
         .sender(config.sender)
-        .build(root, output, Some(zk_output), env, opts.clone())
+        .build(root, output, Some(zk_output), env, opts.clone(), false)
         .unwrap()
 }
 
@@ -251,7 +251,7 @@ pub async fn forked_runner(rpc: &str) -> MultiContractRunner {
 
     base_runner()
         .with_fork(fork)
-        .build(&PROJECT.paths.root, (*COMPILED).clone(), None, env, opts)
+        .build(&PROJECT.paths.root, (*COMPILED).clone(), None, env, opts, false)
         .unwrap()
 }
 

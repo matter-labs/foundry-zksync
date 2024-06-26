@@ -343,8 +343,8 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
+        use_zk: bool,
     ) -> Result<MultiContractRunner> {
-        let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
 
         // This is just the contracts compiled, but we need to merge this with the read cached
@@ -405,7 +405,15 @@ impl MultiContractRunnerBuilder {
             let zk_contracts =
                 zk_output.unwrap().with_stripped_file_prefixes(root).into_artifacts();
             for (id, contract) in zk_contracts {
-                if let Some(abi) = contract.abi.as_ref() {
+                let metadata = contract.metadata.unwrap();
+                if let Some(solc_metadata_value) =
+                    metadata.get("solc_metadata").and_then(serde_json::Value::as_str)
+                {
+                    let solc_metadata_json: serde_json::Value =
+                        serde_json::from_str(solc_metadata_value).unwrap();
+                    let abi_json = &solc_metadata_json["output"]["abi"];
+                    let abi_string = abi_json.to_string();
+                    let abi: JsonAbi = JsonAbi::from_json_str(&abi_string)?;
                     let bytecode = contract
                         .bytecode
                         .as_ref()
