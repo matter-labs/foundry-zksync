@@ -137,7 +137,7 @@ foundry-zksync-core = { path = "crates/zksync/core" }
 foundry-zksync-compiler = { path = "crates/zksync/compiler" }
 
 # solc & compilation utilities
-foundry-block-explorers = { git = "https://github.com/Moonsong-Labs/block-explorers", branch = "zksync-v0.2.3", default-features = false }
+foundry-block-explorers = { git = "https://github.com/Moonsong-Labs/block-explorers", branch = "zksync-v0.2.3-verify-zksyncio", default-features = false }
 foundry-compilers = { git = "https://github.com/Moonsong-Labs/compilers", branch = "zksync-v0.3.9" }
 
 ## revm
