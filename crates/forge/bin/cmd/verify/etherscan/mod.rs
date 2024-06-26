@@ -19,7 +19,7 @@ use futures::FutureExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::{BuildMetadata, Version};
-use serde_json::Value;
+
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},

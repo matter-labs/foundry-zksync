@@ -10,7 +10,7 @@ use foundry_compilers::{
     AggregatedCompilerOutput, CompilerInput, Project, Solc,
 };
 use semver::{BuildMetadata, Version};
-use serde_json::Value;
+
 use std::{collections::BTreeMap, path::Path};
 
 #[derive(Debug)]
