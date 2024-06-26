@@ -87,7 +87,7 @@ impl BuildArgs {
             project = config.project()?;
         }
 
-        if !config.zksync.enable {
+        if !config.zksync.should_compile() {
             let mut compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)
