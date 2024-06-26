@@ -359,14 +359,23 @@ impl EtherscanVerificationProvider {
                 //FIXME: avoid strip metadata
                 if let Some(solc) = zk.solc {
                     compiler_version = Version::new(solc.major, solc.minor, solc.patch);
-                } else  {
-                    compiler_version = Version::new(compiler_version.major, compiler_version.minor, compiler_version.patch);
+                } else {
+                    compiler_version = Version::new(
+                        compiler_version.major,
+                        compiler_version.minor,
+                        compiler_version.patch,
+                    );
                 }
+
+                let compilermode = if zk.is_zksync_solc { "zksync" } else { "solc" }.to_string();
 
                 (
                     //FIXME: allow `v` before solc compiler version
                     format!("{compiler_version}"),
-                    vec![("zkCompilerVersion".to_string(), format!("v{}", zk.zksolc))],
+                    vec![
+                        ("compilermode".to_string(), compilermode),
+                        ("zkCompilerVersion".to_string(), format!("v{}", zk.zksolc)),
+                    ],
                 )
             }
         };
