@@ -394,7 +394,6 @@ impl EtherscanVerificationProvider {
             };
         }
 
-        dbg!(&verify_args);
         Ok(verify_args)
     }
 
