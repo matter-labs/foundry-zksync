@@ -344,7 +344,6 @@ impl MultiContractRunnerBuilder {
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
     ) -> Result<MultiContractRunner> {
-        let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
 
         // This is just the contracts compiled, but we need to merge this with the read cached
@@ -395,15 +394,14 @@ impl MultiContractRunnerBuilder {
                 deployable_contracts.insert(id.clone(), (abi.clone(), bytecode, libs_to_deploy));
             }
 
-            if !use_zk {
+            if zk_output.is_none() {
                 if let Some(bytes) = linked_contract.get_deployed_bytecode_bytes() {
                     known_contracts.insert(id.clone(), (abi.clone(), bytes.to_vec()));
                 }
             }
         }
-        if use_zk {
-            let zk_contracts =
-                zk_output.unwrap().with_stripped_file_prefixes(root).into_artifacts();
+        if let Some(zk_output) = zk_output.clone() {
+            let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
             for (id, contract) in zk_contracts {
                 if let Some(metadata) = contract.metadata {
                     if let Some(solc_metadata_value) =
@@ -442,7 +440,7 @@ impl MultiContractRunnerBuilder {
             debug: self.debug,
             test_options: self.test_options.unwrap_or_default(),
             isolation: self.isolation,
-            use_zk,
+            use_zk: zk_output.is_some(),
         })
     }
 }
