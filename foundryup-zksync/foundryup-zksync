@@ -132,17 +132,14 @@ main() {
     say "downloading latest forge, and cast"
     if [ "$PLATFORM" = "win32" ]; then
       tmp="$(mktemp -d 2>/dev/null || echo ".")/foundry-zksync.zip"
-      if ping -c 1 -W 5 "$BIN_ARCHIVE_URL" &> /dev/null; then
-        say "URL is reachable: $BIN_ARCHIVE_URL"
-      else
-        err "URL is not reachable: $BIN_ARCHIVE_URL"
-      fi
       ensure download "$BIN_ARCHIVE_URL" "$tmp"
       say "$(file "$tmp")"
       ensure unzip "$tmp" -d "$FOUNDRY_BIN_DIR"
       rm -f "$tmp"
     else
-      ensure download "$BIN_ARCHIVE_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR"
+      ensure download "$BIN_ARCHIVE_URL"
+      say "$(file "$FOUNDRY_BIN_DIR")"
+      ensure tar -xzC "$FOUNDRY_BIN_DIR"
     fi
 
     # Optionally download the manuals
