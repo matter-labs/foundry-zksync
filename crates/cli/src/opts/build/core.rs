@@ -177,9 +177,12 @@ impl<'a> From<&'a CoreBuildArgs> for Figment {
             .extend(figment.extract_inner::<Vec<Remapping>>("remappings").unwrap_or_default());
         // override only set values from the CLI for zksync
         let zksync =
-        args.compiler.zk.apply_overrides(figment.extract_inner("zksync").unwrap_or_default());
+            args.compiler.zk.apply_overrides(figment.extract_inner("zksync").unwrap_or_default());
 
-        figment = figment.merge(("remappings", remappings.into_inner())).merge(args).merge(("zksync", zksync));
+        figment = figment
+            .merge(("remappings", remappings.into_inner()))
+            .merge(args)
+            .merge(("zksync", zksync));
 
         if let Some(skip) = &args.skip {
             let mut skip = skip.iter().map(|s| s.file_pattern().to_string()).collect::<Vec<_>>();

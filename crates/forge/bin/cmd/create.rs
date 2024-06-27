@@ -84,10 +84,6 @@ pub struct CreateArgs {
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> Result<()> {
-        let mut config = self.eth.try_load_config_emit_warnings()?;
-        let project_root = config.project_paths().root;
-        let zksync = self.opts.compiler.zk.enabled();
-        
         // Find Project & Compile
         let project = self.opts.project()?;
 

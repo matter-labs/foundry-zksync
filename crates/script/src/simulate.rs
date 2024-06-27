@@ -108,7 +108,7 @@ impl PreSimulationState {
                         to,
                         tx.input.clone().into_input(),
                         tx.value,
-                        (self.script_config.config.zksync, zk.clone()),
+                        (self.script_config.config.zksync.run_in_zk_mode(), zk.clone()),
                     )
                     .wrap_err("Internal EVM error during simulation")?;
 

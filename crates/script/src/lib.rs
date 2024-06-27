@@ -605,7 +605,7 @@ impl ScriptConfig {
                             Some(script_wallets),
                             Some(target.version),
                             dual_compiled_contracts,
-                            self.config.zksync,
+                            self.config.zksync.run_in_zk_mode(),
                         )
                         .into(),
                     )
@@ -614,7 +614,7 @@ impl ScriptConfig {
         }
 
         let mut executor = builder.build(env, db);
-        executor.use_zk = self.config.zksync;
+        executor.use_zk = self.config.zksync.run_in_zk_mode();
         Ok(ScriptRunner::new(executor, self.evm_opts.clone()))
     }
 }

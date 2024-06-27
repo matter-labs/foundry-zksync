@@ -29,14 +29,7 @@ use foundry_compilers::{
         multi::{MultiCompiler, MultiCompilerSettings},
         solc::{Solc, SolcCompiler},
         vyper::{Vyper, VyperSettings},
-        zksolc::{
-            settings::{
-                BytecodeHash as ZkSolcBytecodeHash, Optimizer as ZkSolcOptimizer,
-                OptimizerDetails as ZkSolcOptimizerDetails,
-                SettingsMetadata as ZkSolcSettingsMetadata,
-            },
-            ZkSolc,
-        },
+        zksolc::ZkSolc,
         Compiler,
     },
     error::SolcError,

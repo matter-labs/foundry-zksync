@@ -98,7 +98,7 @@ impl BuildArgs {
                 }
             }
 
-            let mut compiler = ProjectCompiler::new()
+            let compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .quiet(self.format_json)
