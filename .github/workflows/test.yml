@@ -139,7 +139,7 @@ jobs:
     
     check-ci-install:
       name: CI install
-      runs-on: ubuntu-22.04-github-hosted-16core
+      runs-on: macos-latest-xlarge
       steps:
         - uses: actions/checkout@v4
         - name: install foundry-zksync
