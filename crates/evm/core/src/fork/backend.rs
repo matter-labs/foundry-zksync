@@ -4,8 +4,10 @@ use crate::{
     fork::{cache::FlushJsonBlockCacheDB, BlockchainDb},
 };
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
-use alloy_providers::provider::TempProvider;
+use alloy_provider::{network::AnyNetwork, Provider};
 use alloy_rpc_types::{Block, BlockId, Transaction};
+use alloy_serde::WithOtherFields;
+use alloy_transport::Transport;
 use eyre::WrapErr;
 use foundry_common::NON_ARCHIVE_NODE_WARNING;
 use futures::{
@@ -18,8 +20,11 @@ use revm::{
     db::DatabaseRef,
     primitives::{AccountInfo, Bytecode, KECCAK_EMPTY},
 };
+use rustc_hash::FxHashMap;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
+    future::IntoFuture,
+    marker::PhantomData,
     pin::Pin,
     sync::{
         mpsc::{channel as oneshot_channel, Sender as OneshotSender},
@@ -30,13 +35,17 @@ use std::{
 // Various future/request type aliases
 
 type AccountFuture<Err> =
-    Pin<Box<dyn Future<Output = (Result<(U256, U256, Bytes), Err>, Address)> + Send>>;
+    Pin<Box<dyn Future<Output = (Result<(U256, u64, Bytes), Err>, Address)> + Send>>;
 type StorageFuture<Err> = Pin<Box<dyn Future<Output = (Result<U256, Err>, Address, U256)> + Send>>;
 type BlockHashFuture<Err> = Pin<Box<dyn Future<Output = (Result<B256, Err>, u64)> + Send>>;
 type FullBlockFuture<Err> =
     Pin<Box<dyn Future<Output = (FullBlockSender, Result<Option<Block>, Err>, BlockId)> + Send>>;
-type TransactionFuture<Err> =
-    Pin<Box<dyn Future<Output = (TransactionSender, Result<Transaction, Err>, B256)> + Send>>;
+type TransactionFuture<Err> = Pin<
+    Box<
+        dyn Future<Output = (TransactionSender, Result<WithOtherFields<Transaction>, Err>, B256)>
+            + Send,
+    >,
+>;
 type BytecodeHashFuture<Err> =
     Pin<Box<dyn Future<Output = (ByteCodeHashSender, Result<Option<Bytecode>, Err>, B256)> + Send>>;
 
@@ -44,7 +53,7 @@ type AccountInfoSender = OneshotSender<DatabaseResult<AccountInfo>>;
 type StorageSender = OneshotSender<DatabaseResult<U256>>;
 type BlockHashSender = OneshotSender<DatabaseResult<B256>>;
 type FullBlockSender = OneshotSender<DatabaseResult<Block>>;
-type TransactionSender = OneshotSender<DatabaseResult<Transaction>>;
+type TransactionSender = OneshotSender<DatabaseResult<WithOtherFields<Transaction>>>;
 type ByteCodeHashSender = OneshotSender<DatabaseResult<Bytecode>>;
 
 /// Request variants that are executed by the provider
@@ -80,9 +89,10 @@ enum BackendRequest {
 ///
 /// This handler will remain active as long as it is reachable (request channel still open) and
 /// requests are in progress.
-#[must_use = "BackendHandler does nothing unless polled."]
-pub struct BackendHandler<P> {
+#[must_use = "futures do nothing unless polled"]
+pub struct BackendHandler<T, P> {
     provider: P,
+    transport: PhantomData<T>,
     /// Stores all the data.
     db: BlockchainDb,
     /// Requests currently in progress
@@ -92,7 +102,7 @@ pub struct BackendHandler<P> {
     /// Listeners that wait for a `get_storage_at` response
     storage_requests: HashMap<(Address, U256), Vec<StorageSender>>,
     /// Listeners that wait for a `get_block` response
-    block_requests: HashMap<u64, Vec<BlockHashSender>>,
+    block_requests: FxHashMap<u64, Vec<BlockHashSender>>,
     /// Incoming commands.
     incoming: Receiver<BackendRequest>,
     /// unprocessed queued requests
@@ -110,9 +120,10 @@ pub trait ZkSyncMiddleware: Send + Sync {
            + std::marker::Send;
 }
 
-impl<P> BackendHandler<P>
+impl<T, P> BackendHandler<T, P>
 where
-    P: ZkSyncMiddleware + TempProvider + Clone + 'static,
+    T: Transport + Clone,
+    P: ZkSyncMiddleware + Provider<T, AnyNetwork> + Clone + Unpin + 'static,
 {
     fn new(
         provider: P,
@@ -130,6 +141,7 @@ where
             queued_requests: Default::default(),
             incoming: rx,
             block_id,
+            transport: PhantomData,
         }
     }
 
@@ -138,7 +150,7 @@ where
     /// We always check:
     ///  1. if the requested value is already stored in the cache, then answer the sender
     ///  2. otherwise, fetch it via the provider but check if a request for that value is already in
-    /// progress (e.g. another Sender just requested the same account)
+    ///     progress (e.g. another Sender just requested the same account)
     fn on_request(&mut self, req: BackendRequest) {
         match req {
             BackendRequest::Basic(addr, sender) => {
@@ -194,10 +206,13 @@ where
                 trace!(target: "backendhandler", %address, %idx, "preparing storage request");
                 entry.insert(vec![listener]);
                 let provider = self.provider.clone();
-                let block_id = self.block_id;
+                let block_id = self.block_id.unwrap_or_default();
                 let fut = Box::pin(async move {
-                    let storage =
-                        provider.get_storage_at(address, idx, block_id).await.map_err(Into::into);
+                    let storage = provider
+                        .get_storage_at(address, idx)
+                        .block_id(block_id)
+                        .await
+                        .map_err(Into::into);
                     (storage, address, idx)
                 });
                 self.pending_requests.push(ProviderRequest::Storage(fut));
@@ -209,11 +224,11 @@ where
     fn get_account_req(&self, address: Address) -> ProviderRequest<eyre::Report> {
         trace!(target: "backendhandler", "preparing account request, address={:?}", address);
         let provider = self.provider.clone();
-        let block_id = self.block_id;
+        let block_id = self.block_id.unwrap_or_default();
         let fut = Box::pin(async move {
-            let balance = provider.get_balance(address, block_id);
-            let nonce = provider.get_transaction_count(address, block_id);
-            let code = provider.get_code_at(address, block_id);
+            let balance = provider.get_balance(address).block_id(block_id).into_future();
+            let nonce = provider.get_transaction_count(address).block_id(block_id).into_future();
+            let code = provider.get_code_at(address).block_id(block_id).into_future();
             let resp = tokio::try_join!(balance, nonce, code).map_err(Into::into);
             (resp, address)
         });
@@ -237,8 +252,10 @@ where
     fn request_full_block(&mut self, number: BlockId, sender: FullBlockSender) {
         let provider = self.provider.clone();
         let fut = Box::pin(async move {
-            let block =
-                provider.get_block(number, true).await.wrap_err("could not fetch block {number:?}");
+            let block = provider
+                .get_block(number, true.into())
+                .await
+                .wrap_err("could not fetch block {number:?}");
             (sender, block, number)
         });
 
@@ -252,7 +269,10 @@ where
             let block = provider
                 .get_transaction_by_hash(tx)
                 .await
-                .wrap_err("could not get transaction {tx}");
+                .wrap_err_with(|| format!("could not get transaction {tx}"))
+                .and_then(|maybe| {
+                    maybe.ok_or_else(|| eyre::eyre!("could not get transaction {tx}"))
+                });
             (sender, block, tx)
         });
 
@@ -312,9 +332,10 @@ where
     }
 }
 
-impl<P> Future for BackendHandler<P>
+impl<T, P> Future for BackendHandler<T, P>
 where
-    P: ZkSyncMiddleware + TempProvider + Clone + Unpin + 'static,
+    T: Transport + Clone + Unpin,
+    P: ZkSyncMiddleware + Provider<T, AnyNetwork> + Clone + Unpin + 'static,
 {
     type Output = ();
 
@@ -372,9 +393,9 @@ where
 
                             // update the cache
                             let acc = AccountInfo {
-                                nonce: nonce.to(),
+                                nonce,
                                 balance,
-                                code: Some(Bytecode::new_raw(code).to_checked()),
+                                code: Some(Bytecode::new_raw(code)),
                                 code_hash,
                             };
                             pin.db.accounts().write().insert(addr, acc.clone());
@@ -521,7 +542,7 @@ where
 /// that is used by the `BackendHandler` to send the result of an executed `BackendRequest` back to
 /// `SharedBackend`.
 ///
-/// The `BackendHandler` holds an ethers `Provider` to look up missing accounts or storage slots
+/// The `BackendHandler` holds a `Provider` to look up missing accounts or storage slots
 /// from remote (e.g. infura). It detects duplicate requests from multiple `SharedBackend`s and
 /// bundles them together, so that always only one provider request is executed. For example, there
 /// are two `SharedBackend`s, `A` and `B`, both request the basic account info of account
@@ -555,9 +576,14 @@ impl SharedBackend {
     /// dropped.
     ///
     /// NOTE: this should be called with `Arc<Provider>`
-    pub async fn spawn_backend<P>(provider: P, db: BlockchainDb, pin_block: Option<BlockId>) -> Self
+    pub async fn spawn_backend<T, P>(
+        provider: P,
+        db: BlockchainDb,
+        pin_block: Option<BlockId>,
+    ) -> Self
     where
-        P: ZkSyncMiddleware + TempProvider + Unpin + 'static + Clone,
+        T: Transport + Clone + Unpin,
+        P: ZkSyncMiddleware + Provider<T, AnyNetwork> + Unpin + 'static + Clone,
     {
         let (shared, handler) = Self::new(provider, db, pin_block);
         // spawn the provider handler to a task
@@ -568,13 +594,14 @@ impl SharedBackend {
 
     /// Same as `Self::spawn_backend` but spawns the `BackendHandler` on a separate `std::thread` in
     /// its own `tokio::Runtime`
-    pub fn spawn_backend_thread<P>(
+    pub fn spawn_backend_thread<T, P>(
         provider: P,
         db: BlockchainDb,
         pin_block: Option<BlockId>,
     ) -> Self
     where
-        P: ZkSyncMiddleware + TempProvider + Unpin + 'static + Clone,
+        T: Transport + Clone + Unpin,
+        P: ZkSyncMiddleware + Provider<T, AnyNetwork> + Unpin + 'static + Clone,
     {
         let (shared, handler) = Self::new(provider, db, pin_block);
 
@@ -597,13 +624,14 @@ impl SharedBackend {
     }
 
     /// Returns a new `SharedBackend` and the `BackendHandler`
-    pub fn new<P>(
+    pub fn new<T, P>(
         provider: P,
         db: BlockchainDb,
         pin_block: Option<BlockId>,
-    ) -> (Self, BackendHandler<P>)
+    ) -> (Self, BackendHandler<T, P>)
     where
-        P: ZkSyncMiddleware + TempProvider + Clone + 'static,
+        T: Transport + Clone + Unpin,
+        P: ZkSyncMiddleware + Provider<T, AnyNetwork> + Unpin + 'static + Clone,
     {
         let (backend, backend_rx) = channel(1);
         let cache = Arc::new(FlushJsonBlockCacheDB(Arc::clone(db.cache())));
@@ -628,7 +656,7 @@ impl SharedBackend {
     }
 
     /// Returns the transaction for the hash
-    pub fn get_transaction(&self, tx: B256) -> DatabaseResult<Transaction> {
+    pub fn get_transaction(&self, tx: B256) -> DatabaseResult<WithOtherFields<Transaction>> {
         tokio::task::block_in_place(|| {
             let (sender, rx) = oneshot_channel();
             let req = BackendRequest::Transaction(tx, sender);
@@ -740,7 +768,7 @@ mod tests {
         fork::{BlockchainDbMeta, CreateFork, JsonBlockCacheDB},
         opts::EvmOpts,
     };
-    use foundry_common::provider::alloy::get_http_provider;
+    use foundry_common::provider::get_http_provider;
     use foundry_config::{Config, NamedChain};
     use std::{collections::BTreeSet, path::PathBuf};
 
@@ -819,7 +847,7 @@ mod tests {
             evm_opts,
         };
 
-        let backend = Backend::spawn(Some(fork)).await;
+        let backend = Backend::spawn(Some(fork));
 
         // some rng contract from etherscan
         let address: Address = "63091244180ae240c87d1f528f5f269134cb07b3".parse().unwrap();

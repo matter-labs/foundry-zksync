@@ -49,7 +49,7 @@ pub struct ChiselResult {
     /// Called address
     pub address: Option<Address>,
     /// EVM State at the final instruction of the `run()` function
-    pub state: Option<(revm::interpreter::Stack, Vec<u8>, InstructionResult)>,
+    pub state: Option<(Vec<U256>, Vec<u8>, InstructionResult)>,
 }
 
 /// ChiselRunner implementation
@@ -153,7 +153,7 @@ impl ChiselRunner {
                 match res.exit_reason {
                     InstructionResult::Revert |
                     InstructionResult::OutOfGas |
-                    InstructionResult::OutOfFund => {
+                    InstructionResult::OutOfFunds => {
                         lowest_gas_limit = mid_gas_limit;
                     }
                     _ => {
@@ -189,7 +189,7 @@ impl ChiselRunner {
 
         if commit {
             // if explicitly requested we can now commit the call
-            res = self.executor.call_raw_committing(from, to, calldata, value)?;
+            res = self.executor.transact_raw(from, to, calldata, value)?;
         }
 
         let RawCallResult { result, reverted, logs, traces, labels, chisel_state, .. } = res;

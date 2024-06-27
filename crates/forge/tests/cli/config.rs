@@ -2,7 +2,10 @@
 
 use alloy_primitives::{Address, B256, U256};
 use foundry_cli::utils as forge_utils;
-use foundry_compilers::artifacts::{OptimizerDetails, RevertStrings, YulDetails};
+use foundry_compilers::{
+    artifacts::{BytecodeHash, OptimizerDetails, RevertStrings, YulDetails},
+    solc::Solc,
+};
 use foundry_config::{
     cache::{CachedChains, CachedEndpoints, StorageCachingConfig},
     fs_permissions::{FsAccessPermission, PathPermission},
@@ -10,11 +13,11 @@ use foundry_config::{
 };
 use foundry_evm::opts::EvmOpts;
 use foundry_test_utils::{
-    foundry_compilers::{remappings::Remapping, EvmVersion},
+    foundry_compilers::artifacts::{remappings::Remapping, EvmVersion},
     util::{pretty_err, OutputExt, TestCommand, OTHER_SOLC_VERSION},
 };
 use path_slash::PathBufExt;
-use pretty_assertions::assert_eq;
+use similar_asserts::assert_eq;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -26,7 +29,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
     // explicitly set all values
     let input = Config {
         profile: Config::DEFAULT_PROFILE,
-        __root: Default::default(),
+        root: Default::default(),
         src: "test-src".into(),
         test: "test-test".into(),
         script: "test-script".into(),
@@ -65,11 +68,18 @@ forgetest!(can_extract_config_values, |prj, cmd| {
             runs: 1000,
             max_test_rejects: 100203,
             seed: Some(U256::from(1000)),
+            failure_persist_dir: Some("test-cache/fuzz".into()),
+            failure_persist_file: Some("failures".to_string()),
             ..Default::default()
         },
-        invariant: InvariantConfig { runs: 256, ..Default::default() },
+        invariant: InvariantConfig {
+            runs: 256,
+            failure_persist_dir: Some("test-cache/fuzz".into()),
+            ..Default::default()
+        },
         ffi: true,
         always_use_create_2_factory: false,
+        prompt_timeout: 0,
         sender: "00a329c0648769A73afAc7F9381D08FB43dBEA72".parse().unwrap(),
         tx_origin: "00a329c0648769A73afAc7F9F81E08FB43dBEA72".parse().unwrap(),
         initial_balance: U256::from(0xffffffffffffffffffffffffu128),
@@ -85,6 +95,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         block_difficulty: 10,
         block_prevrandao: B256::random(),
         block_gas_limit: Some(100u64.into()),
+        disable_block_gas_limit: false,
         memory_limit: 1 << 27,
         eth_rpc_url: Some("localhost".to_string()),
         eth_rpc_jwt: None,
@@ -120,10 +131,15 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         doc: Default::default(),
         fs_permissions: Default::default(),
         labels: Default::default(),
-        cancun: true,
+        prague: true,
         isolate: true,
-        __non_exhaustive: (),
-        __warnings: vec![],
+        unchecked_cheatcode_artifacts: false,
+        create2_library_salt: Config::DEFAULT_CREATE2_LIBRARY_SALT,
+        vyper: Default::default(),
+        skip: vec![],
+        dependencies: Default::default(),
+        warnings: vec![],
+        _non_exhaustive: (),
         zk_optimizer: Default::default(),
         mode: Default::default(),
         zksync: false,
@@ -139,7 +155,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
     };
     prj.write_config(input.clone());
     let config = cmd.config();
-    pretty_assertions::assert_eq!(input, config);
+    similar_asserts::assert_eq!(input, config);
 });
 
 // tests config gets printed to std out
@@ -161,14 +177,14 @@ forgetest_init!(can_override_config, |prj, cmd| {
 
     let profile = Config::load_with_root(prj.root());
     // ensure that the auto-generated internal remapping for forge-std's ds-test exists
-    assert_eq!(profile.remappings.len(), 2);
-    assert_eq!("ds-test/=lib/forge-std/lib/ds-test/src/", profile.remappings[0].to_string());
+    assert_eq!(profile.remappings.len(), 1);
+    assert_eq!("forge-std/=lib/forge-std/src/", profile.remappings[0].to_string());
 
     // ensure remappings contain test
-    assert_eq!("ds-test/=lib/forge-std/lib/ds-test/src/", profile.remappings[0].to_string());
+    assert_eq!("forge-std/=lib/forge-std/src/", profile.remappings[0].to_string());
     // the loaded config has resolved, absolute paths
     assert_eq!(
-        "ds-test/=lib/forge-std/lib/ds-test/src/",
+        "forge-std/=lib/forge-std/src/",
         Remapping::from(profile.remappings[0].clone()).to_string()
     );
 
@@ -232,12 +248,12 @@ forgetest_init!(can_parse_remappings_correctly, |prj, cmd| {
 
     let profile = Config::load_with_root(prj.root());
     // ensure that the auto-generated internal remapping for forge-std's ds-test exists
-    assert_eq!(profile.remappings.len(), 2);
-    let [r, _] = &profile.remappings[..] else { unreachable!() };
-    assert_eq!("ds-test/=lib/forge-std/lib/ds-test/src/", r.to_string());
+    assert_eq!(profile.remappings.len(), 1);
+    let r = &profile.remappings[0];
+    assert_eq!("forge-std/=lib/forge-std/src/", r.to_string());
 
     // the loaded config has resolved, absolute paths
-    assert_eq!("ds-test/=lib/forge-std/lib/ds-test/src/", Remapping::from(r.clone()).to_string());
+    assert_eq!("forge-std/=lib/forge-std/src/", Remapping::from(r.clone()).to_string());
 
     cmd.arg("config");
     let expected = profile.to_string_pretty().unwrap();
@@ -312,8 +328,10 @@ forgetest_init!(can_get_evm_opts, |prj, _cmd| {
 
 // checks that we can set various config values
 forgetest_init!(can_set_config_values, |prj, _cmd| {
-    let config = prj.config_from_output(["--via-ir"]);
+    let config = prj.config_from_output(["--via-ir", "--no-metadata"]);
     assert!(config.via_ir);
+    assert_eq!(config.cbor_metadata, false);
+    assert_eq!(config.bytecode_hash, BytecodeHash::None);
 });
 
 // tests that solc can be explicitly set
@@ -358,12 +376,10 @@ contract Foo {}
 
     // fails to use solc that does not exist
     cmd.forge_fuse().args(["build", "--use", "this/solc/does/not/exist"]);
-    assert!(cmd.stderr_lossy().contains("this/solc/does/not/exist does not exist"));
+    assert!(cmd.stderr_lossy().contains("`solc` this/solc/does/not/exist does not exist"));
 
     // `OTHER_SOLC_VERSION` was installed in previous step, so we can use the path to this directly
-    let local_solc = foundry_compilers::Solc::find_svm_installed_version(OTHER_SOLC_VERSION)
-        .unwrap()
-        .expect("solc is installed");
+    let local_solc = Solc::find_or_install(&OTHER_SOLC_VERSION.parse().unwrap()).unwrap();
     cmd.forge_fuse().args(["build", "--force", "--use"]).arg(local_solc.solc).root_arg();
     let stdout = cmd.stdout_lossy();
     assert!(stdout.contains("Compiler run successful"));
@@ -443,11 +459,10 @@ forgetest!(can_set_gas_price, |prj, cmd| {
 forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
     let config = cmd.config();
     let remappings = config.remappings.iter().cloned().map(Remapping::from).collect::<Vec<_>>();
-    pretty_assertions::assert_eq!(
+    similar_asserts::assert_eq!(
         remappings,
         vec![
             // global
-            "ds-test/=lib/forge-std/lib/ds-test/src/".parse().unwrap(),
             "forge-std/=lib/forge-std/src/".parse().unwrap(),
         ]
     );
@@ -462,11 +477,10 @@ forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
 
     let config = cmd.config();
     let remappings = config.remappings.iter().cloned().map(Remapping::from).collect::<Vec<_>>();
-    pretty_assertions::assert_eq!(
+    similar_asserts::assert_eq!(
         remappings,
         vec![
             // default
-            "ds-test/=lib/forge-std/lib/ds-test/src/".parse().unwrap(),
             "forge-std/=lib/forge-std/src/".parse().unwrap(),
             // remapping is local to the lib
             "nested-lib/=lib/nested-lib/src/".parse().unwrap(),
@@ -486,13 +500,12 @@ forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
     let another_config = cmd.config();
     let remappings =
         another_config.remappings.iter().cloned().map(Remapping::from).collect::<Vec<_>>();
-    pretty_assertions::assert_eq!(
+    similar_asserts::assert_eq!(
         remappings,
         vec![
             // local to the lib
             "another-lib/=lib/nested-lib/lib/another-lib/src/".parse().unwrap(),
             // global
-            "ds-test/=lib/forge-std/lib/ds-test/src/".parse().unwrap(),
             "forge-std/=lib/forge-std/src/".parse().unwrap(),
             "nested-lib/=lib/nested-lib/src/".parse().unwrap(),
             // remappings local to the lib
@@ -505,13 +518,12 @@ forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
     pretty_err(&toml_file, fs::write(&toml_file, config.to_string_pretty().unwrap()));
     let config = cmd.config();
     let remappings = config.remappings.iter().cloned().map(Remapping::from).collect::<Vec<_>>();
-    pretty_assertions::assert_eq!(
+    similar_asserts::assert_eq!(
         remappings,
         vec![
             // local to the lib
             "another-lib/=lib/nested-lib/lib/another-lib/custom-source-dir/".parse().unwrap(),
             // global
-            "ds-test/=lib/forge-std/lib/ds-test/src/".parse().unwrap(),
             "forge-std/=lib/forge-std/src/".parse().unwrap(),
             "nested-lib/=lib/nested-lib/src/".parse().unwrap(),
             // remappings local to the lib
@@ -536,11 +548,10 @@ forgetest_init!(can_prioritise_closer_lib_remappings, |prj, cmd| {
 
     let config = cmd.config();
     let remappings = config.get_all_remappings().collect::<Vec<_>>();
-    pretty_assertions::assert_eq!(
+    similar_asserts::assert_eq!(
         remappings,
         vec![
             "dep1/=lib/dep1/src/".parse().unwrap(),
-            "ds-test/=lib/forge-std/lib/ds-test/src/".parse().unwrap(),
             "forge-std/=lib/forge-std/src/".parse().unwrap()
         ]
     );
@@ -684,4 +695,12 @@ forgetest_init!(can_resolve_symlink_fs_permissions, |prj, cmd| {
     // read permission to file should be granted through symlink
     let permission = fs_permissions.find_permission(&config_path.join("config.json")).unwrap();
     assert_eq!(permission, FsAccessPermission::Read);
+});
+
+// tests if evm version is normalized for config output
+forgetest!(normalize_config_evm_version, |_prj, cmd| {
+    cmd.args(["config", "--use", "0.8.0", "--json"]);
+    let output = cmd.stdout_lossy();
+    let config: Config = serde_json::from_str(&output).unwrap();
+    assert_eq!(config.evm_version, EvmVersion::Istanbul);
 });

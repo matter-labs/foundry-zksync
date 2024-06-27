@@ -11,6 +11,15 @@ A local Ethereum node, akin to Ganache, designed for development with [**Forge**
     -   mining modes: auto, interval, manual, none
     -   ...
 
+## Supported Versions
+
+- **anvil**:
+  - **evm**: Cancun
+- **forge**:
+  - **solc**: Latest
+  - **evm**: Cancun
+
+  
 ## Installation
 
 `anvil` binary is available via [`foundryup`](../../README.md#installation).
@@ -20,7 +29,7 @@ A local Ethereum node, akin to Ganache, designed for development with [**Forge**
 ```sh
 git clone https://github.com/foundry-rs/foundry
 cd foundry
-cargo install --path ./crates/anvil --profile local --locked --offline --force
+cargo install --path ./crates/anvil --profile local --locked --force
 ```
 
 ## Getting started

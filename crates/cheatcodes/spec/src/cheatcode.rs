@@ -2,7 +2,7 @@ use super::Function;
 use alloy_sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
-/// Cheatcode definition trait. Implemented by all [`Vm`] functions.
+/// Cheatcode definition trait. Implemented by all [`Vm`](crate::Vm) functions.
 pub trait CheatcodeDef: std::fmt::Debug + Clone + SolCall {
     /// The static cheatcode definition.
     const CHEATCODE: &'static Cheatcode<'static>;
@@ -108,6 +108,12 @@ pub enum Group {
     ///
     /// Safety: safe.
     Json,
+    /// Utility cheatcodes that deal with parsing values from and converting values to TOML.
+    ///
+    /// Examples: `parseToml`, `writeToml`.
+    ///
+    /// Safety: safe.
+    Toml,
     /// Generic, uncategorized utilities.
     ///
     /// Examples: `toString`, `parse*`, `serialize*`.
@@ -130,6 +136,7 @@ impl Group {
             Self::Environment |
             Self::String |
             Self::Json |
+            Self::Toml |
             Self::Utilities => Some(Safety::Safe),
         }
     }
@@ -145,6 +152,7 @@ impl Group {
             Self::Environment => "environment",
             Self::String => "string",
             Self::Json => "json",
+            Self::Toml => "toml",
             Self::Utilities => "utilities",
         }
     }

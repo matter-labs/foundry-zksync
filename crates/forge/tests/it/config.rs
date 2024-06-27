@@ -12,7 +12,6 @@ use foundry_config::{
 };
 use foundry_evm::{
     decode::decode_console_logs,
-    inspectors::CheatsConfig,
     revm::primitives::SpecId,
     traces::{render_trace_arena, CallTraceDecoderBuilder},
 };
@@ -20,14 +19,13 @@ use foundry_test_utils::{init_tracing, Filter};
 use foundry_zksync_compiler::DualCompiledContracts;
 use futures::future::join_all;
 use itertools::Itertools;
-use std::{collections::BTreeMap, path::Path};
+use std::collections::BTreeMap;
 
 /// How to execute a test run.
 pub struct TestConfig {
     pub runner: MultiContractRunner,
     pub should_fail: bool,
     pub filter: Filter,
-    pub opts: TestOptions,
 }
 
 impl TestConfig {
@@ -35,13 +33,9 @@ impl TestConfig {
         Self::with_filter(runner, Filter::matches_all())
     }
 
-    pub async fn filter(filter: Filter) -> Self {
-        Self::with_filter(runner().await, filter)
-    }
-
     pub fn with_filter(runner: MultiContractRunner, filter: Filter) -> Self {
         init_tracing();
-        Self { runner, should_fail: false, filter, opts: test_opts() }
+        Self { runner, should_fail: false, filter }
     }
 
     pub fn evm_spec(mut self, spec: SpecId) -> Self {
@@ -59,8 +53,8 @@ impl TestConfig {
     }
 
     /// Executes the test runner
-    pub async fn test(&mut self) -> BTreeMap<String, SuiteResult> {
-        self.runner.test_collect(&self.filter, self.opts.clone()).await
+    pub fn test(&mut self) -> BTreeMap<String, SuiteResult> {
+        self.runner.test_collect(&self.filter)
     }
 
     pub async fn run(&mut self) {
@@ -73,7 +67,7 @@ impl TestConfig {
     ///    * filter matched 0 test cases
     ///    * a test results deviates from the configured `should_fail` setting
     pub async fn try_run(&mut self) -> eyre::Result<()> {
-        let suite_result = self.test().await;
+        let suite_result = self.test();
         if suite_result.is_empty() {
             eyre::bail!("empty test result");
         }
@@ -110,161 +104,6 @@ impl TestConfig {
 
         Ok(())
     }
-}
-
-/// Returns the [`TestOptions`] used by the tests.
-pub fn test_opts() -> TestOptions {
-    TestOptionsBuilder::default()
-        .fuzz(FuzzConfig {
-            runs: 256,
-            max_test_rejects: 65536,
-            seed: None,
-            dictionary: FuzzDictionaryConfig {
-                include_storage: true,
-                include_push_bytes: true,
-                dictionary_weight: 40,
-                max_fuzz_dictionary_addresses: 10_000,
-                max_fuzz_dictionary_values: 10_000,
-            },
-            no_zksync_reserved_addresses: false,
-        })
-        .invariant(InvariantConfig {
-            runs: 256,
-            depth: 15,
-            fail_on_revert: false,
-            call_override: false,
-            dictionary: FuzzDictionaryConfig {
-                dictionary_weight: 80,
-                include_storage: true,
-                include_push_bytes: true,
-                max_fuzz_dictionary_addresses: 10_000,
-                max_fuzz_dictionary_values: 10_000,
-            },
-            shrink_sequence: true,
-            shrink_run_limit: 2usize.pow(18u32),
-            no_zksync_reserved_addresses: false,
-        })
-        .build(&COMPILED, &PROJECT.paths.root)
-        .expect("Config loaded")
-}
-
-pub fn manifest_root() -> &'static Path {
-    let mut root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    // need to check here where we're executing the test from, if in `forge` we need to also allow
-    // `testdata`
-    if root.ends_with("forge") {
-        root = root.parent().unwrap();
-    }
-    root
-}
-
-/// Builds a base runner
-pub fn base_runner() -> MultiContractRunnerBuilder {
-    init_tracing();
-    MultiContractRunnerBuilder::default().sender(EVM_OPTS.sender)
-}
-
-/// Builds a non-tracing runner
-pub async fn runner() -> MultiContractRunner {
-    let mut config = Config::with_root(PROJECT.root());
-    config.fs_permissions = FsPermissions::new(vec![PathPermission::read_write(manifest_root())]);
-    runner_with_config(config).await
-}
-
-/// Builds a non-tracing runner
-pub async fn runner_with_config(mut config: Config) -> MultiContractRunner {
-    config.rpc_endpoints = rpc_endpoints();
-    config.allow_paths.push(manifest_root().to_path_buf());
-
-    let root = &PROJECT.paths.root;
-    let opts = &*EVM_OPTS;
-    let env = opts.evm_env().await.expect("could not instantiate fork environment");
-    let output = COMPILED.clone();
-    base_runner()
-        .with_test_options(test_opts())
-        .with_cheats_config(CheatsConfig::new(
-            &config,
-            opts.clone(),
-            None,
-            Default::default(),
-            false,
-        ))
-        .sender(config.sender)
-        .build(root, output, env, opts.clone())
-        .unwrap()
-}
-
-/// Builds a non-tracing zk runner
-pub async fn runner_with_config_and_zk(mut config: Config) -> MultiContractRunner {
-    config.rpc_endpoints = rpc_endpoints();
-    config.allow_paths.push(manifest_root().to_path_buf());
-
-    let root = &PROJECT.paths.root;
-    let opts = &*EVM_OPTS;
-    let env = opts.evm_env().await.expect("could not instantiate fork environment");
-    let output = COMPILED.clone();
-    let zk_output = COMPILED_ZK.clone();
-
-    let mut paths = ProjectPathsConfig::builder().root(TESTDATA).sources(TESTDATA).build().unwrap();
-    paths.zksync_artifacts = format!("{TESTDATA}/zkout").into();
-    // Dual compiled contracts
-    let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output, &paths);
-
-    base_runner()
-        .with_test_options(test_opts())
-        .with_cheats_config(CheatsConfig::new(
-            &config,
-            opts.clone(),
-            None,
-            dual_compiled_contracts,
-            false,
-        ))
-        .sender(config.sender)
-        .build(root, output, env, opts.clone())
-        .unwrap()
-}
-
-/// Builds a tracing runner
-pub async fn tracing_runner() -> MultiContractRunner {
-    let mut opts = EVM_OPTS.clone();
-    opts.verbosity = 5;
-    base_runner()
-        .build(
-            &PROJECT.paths.root,
-            (*COMPILED).clone(),
-            EVM_OPTS.evm_env().await.expect("Could not instantiate fork environment"),
-            opts,
-        )
-        .unwrap()
-}
-
-// Builds a runner that runs against forked state
-pub async fn forked_runner(rpc: &str) -> MultiContractRunner {
-    let mut opts = EVM_OPTS.clone();
-
-    opts.env.chain_id = None; // clear chain id so the correct one gets fetched from the RPC
-    opts.fork_url = Some(rpc.to_string());
-
-    let env = opts.evm_env().await.expect("Could not instantiate fork environment");
-    let fork = opts.get_fork(&Default::default(), env.clone());
-
-    base_runner()
-        .with_fork(fork)
-        .build(&PROJECT.paths.root, (*COMPILED).clone(), env, opts)
-        .unwrap()
-}
-
-/// the RPC endpoints used during tests
-pub fn rpc_endpoints() -> RpcEndpoints {
-    RpcEndpoints::new([
-        (
-            "rpcAlias",
-            RpcEndpoint::Url(
-                "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf".to_string(),
-            ),
-        ),
-        ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".to_string())),
-    ])
 }
 
 /// A helper to assert the outcome of multiple tests with helpful assert messages

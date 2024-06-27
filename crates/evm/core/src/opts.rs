@@ -1,16 +1,12 @@
 use super::fork::environment;
 use crate::fork::CreateFork;
 use alloy_primitives::{Address, B256, U256};
-use alloy_providers::provider::TempProvider;
+use alloy_provider::Provider;
 use alloy_rpc_types::Block;
 use eyre::WrapErr;
-use foundry_common::{
-    provider::alloy::{ProviderBuilder, RpcUrl},
-    ALCHEMY_FREE_TIER_CUPS,
-};
-use foundry_compilers::utils::RuntimeOrHandle;
+use foundry_common::{provider::ProviderBuilder, ALCHEMY_FREE_TIER_CUPS};
 use foundry_config::{Chain, Config};
-use revm::primitives::{BlockEnv, CfgEnv, SpecId, TxEnv};
+use revm::primitives::{BlockEnv, CfgEnv, TxEnv};
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -21,7 +17,7 @@ pub struct EvmOpts {
 
     /// Fetch state over a remote instead of starting from empty state.
     #[serde(rename = "eth_rpc_url")]
-    pub fork_url: Option<RpcUrl>,
+    pub fork_url: Option<String>,
 
     /// Pins the block number for the state fork.
     pub fork_block_number: Option<u64>,
@@ -64,6 +60,9 @@ pub struct EvmOpts {
 
     /// Whether to enable isolation of calls.
     pub isolate: bool,
+
+    /// Whether to disable block gas limit checks.
+    pub disable_block_gas_limit: bool,
 }
 
 impl EvmOpts {
@@ -92,10 +91,11 @@ impl EvmOpts {
         environment(
             &provider,
             self.memory_limit,
-            self.env.gas_price,
+            self.env.gas_price.map(|v| v as u128),
             self.env.chain_id,
             self.fork_block_number,
             self.sender,
+            self.disable_block_gas_limit,
         )
         .await
         .wrap_err_with(|| {
@@ -107,13 +107,13 @@ impl EvmOpts {
     pub fn local_evm_env(&self) -> revm::primitives::Env {
         let mut cfg = CfgEnv::default();
         cfg.chain_id = self.env.chain_id.unwrap_or(foundry_common::DEV_CHAIN_ID);
-        cfg.spec_id = SpecId::MERGE;
         cfg.limit_contract_code_size = self.env.code_size_limit.or(Some(usize::MAX));
         cfg.memory_limit = self.memory_limit;
         // EIP-3607 rejects transactions from senders with deployed code.
         // If EIP-3607 is enabled it can cause issues during fuzz/invariant tests if the
         // caller is a contract. So we disable the check by default.
         cfg.disable_eip3607 = true;
+        cfg.disable_block_gas_limit = self.disable_block_gas_limit;
 
         revm::primitives::Env {
             block: BlockEnv {
@@ -141,14 +141,14 @@ impl EvmOpts {
     /// storage caching for the [CreateFork] will be enabled if
     ///   - `fork_url` is present
     ///   - `fork_block_number` is present
-    ///   - [StorageCachingConfig] allows the `fork_url` +  chain id pair
+    ///   - `StorageCachingConfig` allows the `fork_url` + chain ID pair
     ///   - storage is allowed (`no_storage_caching = false`)
     ///
     /// If all these criteria are met, then storage caching is enabled and storage info will be
-    /// written to [Config::foundry_cache_dir()]/<str(chainid)>/<block>/storage.json
+    /// written to `<Config::foundry_cache_dir()>/<str(chainid)>/<block>/storage.json`.
     ///
     /// for `mainnet` and `--fork-block-number 14435000` on mac the corresponding storage cache will
-    /// be at `~/.foundry/cache/mainnet/14435000/storage.json`
+    /// be at `~/.foundry/cache/mainnet/14435000/storage.json`.
     pub fn get_fork(&self, config: &Config, env: revm::primitives::Env) -> Option<CreateFork> {
         let url = self.fork_url.clone()?;
         let enable_caching = config.enable_caching(&url, env.cfg.chain_id);
@@ -165,11 +165,11 @@ impl EvmOpts {
     ///   - mainnet if `fork_url` contains "mainnet"
     ///   - the chain if `fork_url` is set and the endpoints returned its chain id successfully
     ///   - mainnet otherwise
-    pub fn get_chain_id(&self) -> u64 {
+    pub async fn get_chain_id(&self) -> u64 {
         if let Some(id) = self.env.chain_id {
             return id;
         }
-        self.get_remote_chain_id().unwrap_or(Chain::mainnet()).id()
+        self.get_remote_chain_id().await.unwrap_or(Chain::mainnet()).id()
     }
 
     /// Returns the available compute units per second, which will be
@@ -187,7 +187,7 @@ impl EvmOpts {
     }
 
     /// Returns the chain ID from the RPC, if any.
-    pub fn get_remote_chain_id(&self) -> Option<Chain> {
+    pub async fn get_remote_chain_id(&self) -> Option<Chain> {
         if let Some(ref url) = self.fork_url {
             if url.contains("mainnet") {
                 trace!(?url, "auto detected mainnet chain");
@@ -200,8 +200,8 @@ impl EvmOpts {
                 .ok()
                 .unwrap_or_else(|| panic!("Failed to establish provider to {url}"));
 
-            if let Ok(id) = RuntimeOrHandle::new().block_on(provider.get_chain_id()) {
-                return Some(Chain::from(id.to::<u64>()));
+            if let Ok(id) = provider.get_chain_id().await {
+                return Some(Chain::from(id));
             }
         }
 

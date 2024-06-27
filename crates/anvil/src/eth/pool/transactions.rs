@@ -1,5 +1,5 @@
 use crate::eth::{error::PoolError, util::hex_fmt_many};
-use alloy_primitives::{Address, TxHash, U256};
+use alloy_primitives::{Address, TxHash};
 use anvil_core::eth::transaction::{PendingTransaction, TypedTransaction};
 use parking_lot::RwLock;
 use std::{
@@ -37,14 +37,12 @@ pub enum TransactionOrder {
     Fees,
 }
 
-// === impl TransactionOrder ===
-
 impl TransactionOrder {
     /// Returns the priority of the transactions
     pub fn priority(&self, tx: &TypedTransaction) -> TransactionPriority {
         match self {
-            TransactionOrder::Fifo => TransactionPriority::default(),
-            TransactionOrder::Fees => TransactionPriority(tx.gas_price()),
+            Self::Fifo => TransactionPriority::default(),
+            Self::Fees => TransactionPriority(tx.gas_price()),
         }
     }
 }
@@ -55,8 +53,8 @@ impl FromStr for TransactionOrder {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.to_lowercase();
         let order = match s.as_str() {
-            "fees" => TransactionOrder::Fees,
-            "fifo" => TransactionOrder::Fifo,
+            "fees" => Self::Fees,
+            "fifo" => Self::Fifo,
             _ => return Err(format!("Unknown TransactionOrder: `{s}`")),
         };
         Ok(order)
@@ -65,10 +63,10 @@ impl FromStr for TransactionOrder {
 
 /// Metric value for the priority of a transaction.
 ///
-/// The `TransactionPriority` determines the ordering of two transactions that have all  their
+/// The `TransactionPriority` determines the ordering of two transactions that have all their
 /// markers satisfied.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TransactionPriority(pub U256);
+pub struct TransactionPriority(pub u128);
 
 /// Internal Transaction type
 #[derive(Clone, PartialEq, Eq)]
@@ -92,7 +90,7 @@ impl PoolTransaction {
     }
 
     /// Returns the gas pric of this transaction
-    pub fn gas_price(&self) -> U256 {
+    pub fn gas_price(&self) -> u128 {
         self.pending_transaction.transaction.gas_price()
     }
 }
@@ -132,6 +130,13 @@ impl PendingTransactions {
 
     pub fn is_empty(&self) -> bool {
         self.waiting_queue.is_empty()
+    }
+
+    /// Clears internal state
+    pub fn clear(&mut self) {
+        self.required_markers.clear();
+        self.waiting_markers.clear();
+        self.waiting_queue.clear();
     }
 
     /// Returns an iterator over all transactions in the waiting pool
@@ -377,6 +382,13 @@ impl ReadyTransactions {
         }
     }
 
+    /// Clears the internal state
+    pub fn clear(&mut self) {
+        self.provided_markers.clear();
+        self.ready_tx.write().clear();
+        self.independent_transactions.clear();
+    }
+
     /// Returns true if the transaction is part of the queue.
     pub fn contains(&self, hash: &TxHash) -> bool {
         self.ready_tx.read().contains_key(hash)
@@ -397,12 +409,12 @@ impl ReadyTransactions {
         id
     }
 
-    /// Adds a new transactions to the ready queue
+    /// Adds a new transactions to the ready queue.
     ///
     /// # Panics
     ///
-    /// if the pending transaction is not ready: [PendingTransaction::is_ready()]
-    /// or the transaction is already included
+    /// If the pending transaction is not ready ([`PendingPoolTransaction::is_ready`])
+    /// or the transaction is already included.
     pub fn add_transaction(
         &mut self,
         tx: PendingPoolTransaction,
@@ -672,14 +684,12 @@ pub struct ReadyTransaction {
     pub requires_offset: usize,
 }
 
-// === impl ReadyTransaction ==
-
 impl ReadyTransaction {
     pub fn provides(&self) -> &[TxMarker] {
         &self.transaction.transaction.provides
     }
 
-    pub fn gas_price(&self) -> U256 {
+    pub fn gas_price(&self) -> u128 {
         self.transaction.transaction.gas_price()
     }
 }
