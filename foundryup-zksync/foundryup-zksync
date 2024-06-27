@@ -133,15 +133,10 @@ main() {
     if [ "$PLATFORM" = "win32" ]; then
       tmp="$(mktemp -d 2>/dev/null || echo ".")/foundry-zksync.zip"
       ensure download "$BIN_ARCHIVE_URL" "$tmp"
-      say "$(file "$tmp")"
       ensure unzip "$tmp" -d "$FOUNDRY_BIN_DIR"
       rm -f "$tmp"
     else
-      say "downloading $BIN_ARCHIVE_URL"
-      ensure download "$BIN_ARCHIVE_URL"
-      say "foundry bin dir $FOUNDRY_BIN_DIR"
-      say "$(file "$FOUNDRY_BIN_DIR")"
-      ensure tar -xzC "$FOUNDRY_BIN_DIR"
+      ensure download "$BIN_ARCHIVE_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR"
     fi
 
     # Optionally download the manuals
