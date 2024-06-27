@@ -344,6 +344,7 @@ impl MultiContractRunnerBuilder {
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
     ) -> Result<MultiContractRunner> {
+        let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
 
         // This is just the contracts compiled, but we need to merge this with the read cached
@@ -394,30 +395,32 @@ impl MultiContractRunnerBuilder {
                 deployable_contracts.insert(id.clone(), (abi.clone(), bytecode, libs_to_deploy));
             }
 
-            if zk_output.is_none() {
+            if !use_zk {
                 if let Some(bytes) = linked_contract.get_deployed_bytecode_bytes() {
                     known_contracts.insert(id.clone(), (abi.clone(), bytes.to_vec()));
                 }
             }
         }
-        if let Some(zk_output) = zk_output.clone() {
+        if let Some(zk_output) = zk_output {
             let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
             for (id, contract) in zk_contracts {
                 if let Some(metadata) = contract.metadata {
                     if let Some(solc_metadata_value) =
                         metadata.get("solc_metadata").and_then(serde_json::Value::as_str)
                     {
-                        let solc_metadata_json: serde_json::Value =
-                            serde_json::from_str(solc_metadata_value).unwrap();
-                        let abi_json = &solc_metadata_json["output"]["abi"];
-                        let abi_string = abi_json.to_string();
-                        let abi: JsonAbi = JsonAbi::from_json_str(&abi_string)?;
-                        let bytecode = contract
-                            .bytecode
-                            .as_ref()
-                            .and_then(|b| b.object.as_bytes())
-                            .map_or_else(Vec::new, |b| b.to_vec());
-                        known_contracts.insert(id, (abi.clone(), bytecode));
+                        if let Ok(solc_metadata_json) =
+                            serde_json::from_str::<serde_json::Value>(solc_metadata_value)
+                        {
+                            let abi_json = &solc_metadata_json["output"]["abi"];
+                            let abi_string = abi_json.to_string();
+                            let abi: JsonAbi = JsonAbi::from_json_str(&abi_string)?;
+                            let bytecode = contract
+                                .bytecode
+                                .as_ref()
+                                .and_then(|b| b.object.as_bytes())
+                                .map_or_else(Vec::new, |b| b.to_vec());
+                            known_contracts.insert(id, (abi.clone(), bytecode));
+                        }
                     }
                 }
             }
@@ -440,7 +443,7 @@ impl MultiContractRunnerBuilder {
             debug: self.debug,
             test_options: self.test_options.unwrap_or_default(),
             isolation: self.isolation,
-            use_zk: zk_output.is_some(),
+            use_zk,
         })
     }
 }
