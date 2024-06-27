@@ -1,11 +1,11 @@
 use crate::{
     eth::backend::db::{
-        Db, MaybeForkedDatabase, MaybeHashDatabase, SerializableAccountRecord, SerializableState,
-        StateDb,
+        Db, MaybeForkedDatabase, MaybeFullDatabase, SerializableAccountRecord, SerializableBlock,
+        SerializableState, StateDb,
     },
     revm::primitives::AccountInfo,
 };
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, B256, U256, U64};
 use alloy_rpc_types::BlockId;
 use foundry_evm::{
     backend::{DatabaseResult, RevertSnapshotAction, StateSnapshot},
@@ -32,7 +32,12 @@ impl Db for ForkedDatabase {
         self.inner().block_hashes().write().insert(number, hash);
     }
 
-    fn dump_state(&self, at: BlockEnv) -> DatabaseResult<Option<SerializableState>> {
+    fn dump_state(
+        &self,
+        at: BlockEnv,
+        best_number: U64,
+        blocks: Vec<SerializableBlock>,
+    ) -> DatabaseResult<Option<SerializableState>> {
         let mut db = self.database().clone();
         let accounts = self
             .database()
@@ -44,8 +49,7 @@ impl Db for ForkedDatabase {
                     code
                 } else {
                     db.code_by_hash(v.info.code_hash)?
-                }
-                .to_checked();
+                };
                 Ok((
                     k,
                     SerializableAccountRecord {
@@ -57,7 +61,12 @@ impl Db for ForkedDatabase {
                 ))
             })
             .collect::<Result<_, _>>()?;
-        Ok(Some(SerializableState { block: Some(at), accounts }))
+        Ok(Some(SerializableState {
+            block: Some(at),
+            accounts,
+            best_block_number: Some(best_number),
+            blocks,
+        }))
     }
 
     fn snapshot(&mut self) -> U256 {
@@ -73,7 +82,7 @@ impl Db for ForkedDatabase {
     }
 }
 
-impl MaybeHashDatabase for ForkedDatabase {
+impl MaybeFullDatabase for ForkedDatabase {
     fn clear_into_snapshot(&mut self) -> StateSnapshot {
         let db = self.inner().db();
         let accounts = std::mem::take(&mut *db.accounts.write());
@@ -96,7 +105,7 @@ impl MaybeHashDatabase for ForkedDatabase {
     }
 }
 
-impl MaybeHashDatabase for ForkDbSnapshot {
+impl MaybeFullDatabase for ForkDbSnapshot {
     fn clear_into_snapshot(&mut self) -> StateSnapshot {
         std::mem::take(&mut self.snapshot)
     }

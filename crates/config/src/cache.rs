@@ -5,12 +5,12 @@ use number_prefix::NumberPrefix;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, fmt::Formatter, str::FromStr};
 
-/// Settings to configure caching of remote
+/// Settings to configure caching of remote.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StorageCachingConfig {
-    /// chains to cache
+    /// Chains to cache.
     pub chains: CachedChains,
-    /// endpoints to cache
+    /// Endpoints to cache.
     pub endpoints: CachedEndpoints,
 }
 
@@ -230,7 +230,7 @@ pub struct ChainCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_str_eq;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn can_parse_storage_config() {
@@ -258,7 +258,7 @@ mod tests {
                     Chain::optimism_mainnet(),
                     Chain::from_id(999999)
                 ]),
-                endpoints: CachedEndpoints::All
+                endpoints: CachedEndpoints::All,
             }
         )
     }
@@ -307,6 +307,6 @@ mod tests {
                 - Block Explorer (0.0 B)\n\n\t\
                 - Block 1 (1.0 B)\n\t\
                 - Block 2 (2.0 B)\n";
-        assert_str_eq!(format!("{cache}"), expected);
+        assert_eq!(format!("{cache}"), expected);
     }
 }

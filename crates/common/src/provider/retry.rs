@@ -3,7 +3,7 @@ use alloy_json_rpc::ErrorPayload;
 use alloy_transport::{TransportError, TransportErrorKind};
 use serde::Deserialize;
 
-/// [RetryPolicy] defines logic for which [JsonRpcClient::Error] instances should
+/// [RetryPolicy] defines logic for which [TransportError] instances should
 /// the client retry the request and try to recover from.
 pub trait RetryPolicy: Send + Sync + std::fmt::Debug {
     /// Whether to retry the request based on the given `error`
@@ -30,23 +30,15 @@ impl RetryPolicy for RateLimitRetryPolicy {
             // The transport could not serialize the error itself. The request was malformed from
             // the start.
             TransportError::SerError(_) => false,
-            TransportError::DeserError { text, .. } => {
-                // some providers send invalid JSON RPC in the error case (no `id:u64`), but the
-                // text should be a `JsonRpcError`
-                #[derive(Deserialize)]
-                struct Resp {
-                    error: ErrorPayload,
-                }
-
-                if let Ok(resp) = serde_json::from_str::<Resp>(text) {
-                    return should_retry_json_rpc_error(&resp.error)
-                }
-                false
-            }
+            TransportError::DeserError { text, .. } => should_retry_body(text),
             TransportError::ErrorResp(err) => should_retry_json_rpc_error(err),
+            TransportError::NullResp => true,
+            TransportError::UnsupportedFeature(_) => false,
+            TransportError::LocalUsageError(_) => false,
         }
     }
 
+    /// Provides a backoff hint if the error response contains it
     fn backoff_hint(&self, error: &TransportError) -> Option<std::time::Duration> {
         if let TransportError::ErrorResp(resp) = error {
             let data = resp.try_data_as::<serde_json::Value>();
@@ -67,14 +59,48 @@ impl RetryPolicy for RateLimitRetryPolicy {
     }
 }
 
+/// Tries to decode the error body as payload and check if it should be retried
+fn should_retry_body(body: &str) -> bool {
+    if let Ok(resp) = serde_json::from_str::<ErrorPayload>(body) {
+        return should_retry_json_rpc_error(&resp)
+    }
+
+    // some providers send invalid JSON RPC in the error case (no `id:u64`), but the
+    // text should be a `JsonRpcError`
+    #[derive(Deserialize)]
+    struct Resp {
+        error: ErrorPayload,
+    }
+
+    if let Ok(resp) = serde_json::from_str::<Resp>(body) {
+        return should_retry_json_rpc_error(&resp.error)
+    }
+
+    false
+}
+
 /// Analyzes the [TransportErrorKind] and decides if the request should be retried based on the
 /// variant.
 fn should_retry_transport_level_error(error: &TransportErrorKind) -> bool {
     match error {
         // Missing batch response errors can be retried.
         TransportErrorKind::MissingBatchResponse(_) => true,
+        TransportErrorKind::Custom(err) => {
+            // currently http error responses are not standard in alloy
+            let msg = err.to_string();
+            msg.contains("429 Too Many Requests")
+        }
+
+        TransportErrorKind::HttpError(err) => {
+            if err.status == 429 {
+                return true
+            }
+            should_retry_body(&err.body)
+        }
         // If the backend is gone, or there's a completely custom error, we should assume it's not
         // retryable.
+        TransportErrorKind::PubsubUnavailable => false,
+        TransportErrorKind::BackendGone => false,
         _ => false,
     }
 }

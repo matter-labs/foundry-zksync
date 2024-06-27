@@ -4,16 +4,15 @@ use std::str::FromStr;
 
 /// Additional server options.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "clap", derive(clap::Parser), clap(next_help_heading = "Server options"))]
+#[cfg_attr(feature = "clap", derive(clap::Parser), command(next_help_heading = "Server options"))]
 pub struct ServerConfig {
     /// The cors `allow_origin` header
     #[cfg_attr(
         feature = "clap",
-        clap(
+        arg(
             long,
             help = "Set the CORS allow_origin",
             default_value = "*",
-            name = "allow-origin",
             value_name = "ALLOW_ORIGIN"
         )
     )]
@@ -21,12 +20,10 @@ pub struct ServerConfig {
     /// Whether to enable CORS
     #[cfg_attr(
         feature = "clap",
-        clap(long, help = "Disable CORS", conflicts_with = "allow-origin")
+        arg(long, help = "Disable CORS", conflicts_with = "allow_origin")
     )]
     pub no_cors: bool,
 }
-
-// === impl ServerConfig ===
 
 impl ServerConfig {
     /// Sets the "allow origin" header for cors
@@ -55,7 +52,7 @@ impl FromStr for HeaderValueWrapper {
     type Err = <HeaderValue as FromStr>::Err;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(HeaderValueWrapper(s.parse()?))
+        Ok(Self(s.parse()?))
     }
 }
 
@@ -94,6 +91,6 @@ impl From<HeaderValueWrapper> for HeaderValue {
 
 impl From<HeaderValue> for HeaderValueWrapper {
     fn from(header: HeaderValue) -> Self {
-        HeaderValueWrapper(header)
+        Self(header)
     }
 }

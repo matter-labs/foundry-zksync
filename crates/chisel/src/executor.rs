@@ -91,15 +91,15 @@ impl SessionSource {
                 // Map the source location of the final statement of the `run()` function to its
                 // corresponding runtime program counter
                 let final_pc = {
-                    let offset = source_loc.start();
-                    let length = source_loc.end() - source_loc.start();
+                    let offset = source_loc.start() as u32;
+                    let length = (source_loc.end() - source_loc.start()) as u32;
                     contract
                         .get_source_map_deployed()
                         .unwrap()
                         .unwrap()
                         .into_iter()
                         .zip(InstructionIter::new(&deployed_bytecode))
-                        .filter(|(s, _)| s.offset == offset && s.length == length)
+                        .filter(|(s, _)| s.offset() == offset && s.length() == length)
                         .map(|(_, i)| i.pc)
                         .max()
                         .unwrap_or_default()
@@ -189,12 +189,12 @@ impl SessionSource {
 
         let Some((stack, memory, _)) = &res.state else {
             // Show traces and logs, if there are any, and return an error
-            if let Ok(decoder) = ChiselDispatcher::decode_traces(&source.config, &mut res) {
+            if let Ok(decoder) = ChiselDispatcher::decode_traces(&source.config, &mut res).await {
                 ChiselDispatcher::show_traces(&decoder, &mut res).await?;
             }
             let decoded_logs = decode_console_logs(&res.logs);
             if !decoded_logs.is_empty() {
-                println!("{}", Paint::green("Logs:"));
+                println!("{}", "Logs:".green());
                 for log in decoded_logs {
                     println!("  {log}");
                 }
@@ -236,7 +236,7 @@ impl SessionSource {
 
         // the file compiled correctly, thus the last stack item must be the memory offset of
         // the `bytes memory inspectoor` value
-        let mut offset = stack.data().last().unwrap().to::<usize>();
+        let mut offset = stack.last().unwrap().to::<usize>();
         let mem_offset = &memory[offset..offset + 32];
         let len = U256::try_from_be_slice(mem_offset).unwrap().to::<usize>();
         offset += 32;
@@ -279,7 +279,7 @@ impl SessionSource {
     ///
     /// ### Takes
     ///
-    /// The final statement's program counter for the [ChiselInspector]
+    /// The final statement's program counter for the ChiselInspector
     ///
     /// ### Returns
     ///
@@ -292,10 +292,8 @@ impl SessionSource {
         let backend = match self.config.backend.take() {
             Some(backend) => backend,
             None => {
-                let backend = Backend::spawn(
-                    self.config.evm_opts.get_fork(&self.config.foundry_config, env.clone()),
-                )
-                .await;
+                let fork = self.config.evm_opts.get_fork(&self.config.foundry_config, env.clone());
+                let backend = Backend::spawn(fork);
                 self.config.backend = Some(backend.clone());
                 backend
             }
@@ -309,6 +307,8 @@ impl SessionSource {
                         &self.config.foundry_config,
                         self.config.evm_opts.clone(),
                         None,
+                        None,
+                        Some(self.solc.version.clone()),
                         Default::default(),
                         false,
                     )
@@ -325,34 +325,25 @@ impl SessionSource {
     }
 }
 
-/// Formats a [Token] into an inspection message
-///
-/// ### Takes
-///
-/// An owned [Token]
-///
-/// ### Returns
-///
-/// A formatted [Token] for use in inspection output.
-///
-/// TODO: Verbosity option
+/// Formats a value into an inspection message
+// TODO: Verbosity option
 fn format_token(token: DynSolValue) -> String {
     match token {
         DynSolValue::Address(a) => {
-            format!("Type: {}\n└ Data: {}", Paint::red("address"), Paint::cyan(a.to_string()))
+            format!("Type: {}\n└ Data: {}", "address".red(), a.cyan())
         }
         DynSolValue::FixedBytes(b, byte_len) => {
             format!(
                 "Type: {}\n└ Data: {}",
-                Paint::red(format!("bytes{byte_len}")),
-                Paint::cyan(hex::encode_prefixed(b))
+                format!("bytes{byte_len}").red(),
+                hex::encode_prefixed(b).cyan()
             )
         }
         DynSolValue::Int(i, bit_len) => {
             format!(
                 "Type: {}\n├ Hex: {}\n├ Hex (full word): {}\n└ Decimal: {}",
-                Paint::red(format!("int{}", bit_len)),
-                Paint::cyan(format!(
+                format!("int{bit_len}").red(),
+                format!(
                     "0x{}",
                     format!("{i:x}")
                         .char_indices()
@@ -360,16 +351,17 @@ fn format_token(token: DynSolValue) -> String {
                         .take(bit_len / 4)
                         .map(|(_, c)| c)
                         .collect::<String>()
-                )),
-                Paint::cyan(format!("{i:#x}")),
-                Paint::cyan(i)
+                )
+                .cyan(),
+                format!("{i:#x}").cyan(),
+                i.cyan()
             )
         }
         DynSolValue::Uint(i, bit_len) => {
             format!(
                 "Type: {}\n├ Hex: {}\n├ Hex (full word): {}\n└ Decimal: {}",
-                Paint::red(format!("uint{}", bit_len)),
-                Paint::cyan(format!(
+                format!("uint{bit_len}").red(),
+                format!(
                     "0x{}",
                     format!("{i:x}")
                         .char_indices()
@@ -377,50 +369,51 @@ fn format_token(token: DynSolValue) -> String {
                         .take(bit_len / 4)
                         .map(|(_, c)| c)
                         .collect::<String>()
-                )),
-                Paint::cyan(format!("{i:#x}")),
-                Paint::cyan(i)
+                )
+                .cyan(),
+                format!("{i:#x}").cyan(),
+                i.cyan()
             )
         }
         DynSolValue::Bool(b) => {
-            format!("Type: {}\n└ Value: {}", Paint::red("bool"), Paint::cyan(b))
+            format!("Type: {}\n└ Value: {}", "bool".red(), b.cyan())
         }
         DynSolValue::String(_) | DynSolValue::Bytes(_) => {
             let hex = hex::encode(token.abi_encode());
             let s = token.as_str();
             format!(
                 "Type: {}\n{}├ Hex (Memory):\n├─ Length ({}): {}\n├─ Contents ({}): {}\n├ Hex (Tuple Encoded):\n├─ Pointer ({}): {}\n├─ Length ({}): {}\n└─ Contents ({}): {}",
-                Paint::red(if s.is_some() { "string" } else { "dynamic bytes" }),
+                if s.is_some() { "string" } else { "dynamic bytes" }.red(),
                 if let Some(s) = s {
-                    format!("├ UTF-8: {}\n", Paint::cyan(s))
+                    format!("├ UTF-8: {}\n", s.cyan())
                 } else {
                     String::default()
                 },
-                Paint::yellow("[0x00:0x20]"),
-                Paint::cyan(format!("0x{}", &hex[64..128])),
-                Paint::yellow("[0x20:..]"),
-                Paint::cyan(format!("0x{}", &hex[128..])),
-                Paint::yellow("[0x00:0x20]"),
-                Paint::cyan(format!("0x{}", &hex[..64])),
-                Paint::yellow("[0x20:0x40]"),
-                Paint::cyan(format!("0x{}", &hex[64..128])),
-                Paint::yellow("[0x40:..]"),
-                Paint::cyan(format!("0x{}", &hex[128..])),
+                "[0x00:0x20]".yellow(),
+                format!("0x{}", &hex[64..128]).cyan(),
+                "[0x20:..]".yellow(),
+                format!("0x{}", &hex[128..]).cyan(),
+                "[0x00:0x20]".yellow(),
+                format!("0x{}", &hex[..64]).cyan(),
+                "[0x20:0x40]".yellow(),
+                format!("0x{}", &hex[64..128]).cyan(),
+                "[0x40:..]".yellow(),
+                format!("0x{}", &hex[128..]).cyan(),
             )
         }
         DynSolValue::FixedArray(tokens) | DynSolValue::Array(tokens) => {
             let mut out = format!(
                 "{}({}) = {}",
-                Paint::red("array"),
-                Paint::yellow(format!("{}", tokens.len())),
-                Paint::red('[')
+                "array".red(),
+                format!("{}", tokens.len()).yellow(),
+                '['.red()
             );
             for token in tokens {
                 out.push_str("\n  ├ ");
                 out.push_str(&format_token(token).replace('\n', "\n  "));
                 out.push('\n');
             }
-            out.push_str(&Paint::red(']').to_string());
+            out.push_str(&']'.red().to_string());
             out
         }
         DynSolValue::Tuple(tokens) => {
@@ -430,18 +423,14 @@ fn format_token(token: DynSolValue) -> String {
                 .map(|t| t.unwrap_or_default().into_owned())
                 .collect::<Vec<_>>()
                 .join(", ");
-            let mut out = format!(
-                "{}({}) = {}",
-                Paint::red("tuple"),
-                Paint::yellow(displayed_types),
-                Paint::red('(')
-            );
+            let mut out =
+                format!("{}({}) = {}", "tuple".red(), displayed_types.yellow(), '('.red());
             for token in tokens {
                 out.push_str("\n  ├ ");
                 out.push_str(&format_token(token).replace('\n', "\n  "));
                 out.push('\n');
             }
-            out.push_str(&Paint::red(')').to_string());
+            out.push_str(&')'.red().to_string());
             out
         }
         _ => {
@@ -489,7 +478,7 @@ fn format_event_definition(event_definition: &pt::EventDefinition) -> Result<Str
 
     Ok(format!(
         "Type: {}\n├ Name: {}\n├ Signature: {:?}\n└ Selector: {:?}",
-        Paint::red("event"),
+        "event".red(),
         SolidityHelper::highlight(&format!(
             "{}({})",
             &event.name,
@@ -509,8 +498,8 @@ fn format_event_definition(event_definition: &pt::EventDefinition) -> Result<Str
                 .collect::<Vec<_>>()
                 .join(", ")
         )),
-        Paint::cyan(event.signature()),
-        Paint::cyan(event.selector()),
+        event.signature().cyan(),
+        event.selector().cyan(),
     ))
 }
 
@@ -759,7 +748,7 @@ impl Type {
                     .map(|(returns, _)| map_parameters(returns))
                     .unwrap_or_default();
                 Self::Function(
-                    Box::new(Type::Custom(vec!["__fn_type__".to_string()])),
+                    Box::new(Self::Custom(vec!["__fn_type__".to_string()])),
                     params,
                     returns,
                 )
@@ -904,7 +893,7 @@ impl Type {
 
     /// Recurses over itself, appending all the idents and function arguments in the order that they
     /// are found
-    fn recurse(&self, types: &mut Vec<String>, args: &mut Option<Vec<Option<Type>>>) {
+    fn recurse(&self, types: &mut Vec<String>, args: &mut Option<Vec<Option<Self>>>) {
         match self {
             Self::Builtin(ty) => types.push(ty.to_string()),
             Self::Custom(tys) => types.extend(tys.clone()),
@@ -1171,7 +1160,7 @@ impl Type {
             .function_definitions
             .get(&function_name.name)?;
         let return_parameter = contract.as_ref().returns.first()?.to_owned().1?;
-        Type::ethabi(&return_parameter.ty, Some(intermediate)).map(|p| (contract_expr.unwrap(), p))
+        Self::ethabi(&return_parameter.ty, Some(intermediate)).map(|p| (contract_expr.unwrap(), p))
     }
 
     /// Inverts Int to Uint and viceversa.
@@ -1214,12 +1203,9 @@ impl Type {
     #[inline]
     fn is_dynamic(&self) -> bool {
         match self {
-            Self::Builtin(ty) => match ty {
-                // TODO: Note, this is not entirely correct. Fixed arrays of non-dynamic types are
-                // not dynamic, nor are tuples of non-dynamic types.
-                DynSolType::Bytes | DynSolType::String | DynSolType::Array(_) => true,
-                _ => false,
-            },
+            // TODO: Note, this is not entirely correct. Fixed arrays of non-dynamic types are
+            // not dynamic, nor are tuples of non-dynamic types.
+            Self::Builtin(DynSolType::Bytes | DynSolType::String | DynSolType::Array(_)) => true,
             Self::Array(_) => true,
             _ => false,
         }
@@ -1408,7 +1394,8 @@ impl<'a> Iterator for InstructionIter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use foundry_compilers::{error::SolcError, Solc};
+    use foundry_compilers::{error::SolcError, solc::Solc};
+    use semver::Version;
     use std::sync::Mutex;
 
     #[test]
@@ -1692,10 +1679,10 @@ mod tests {
         for _ in 0..3 {
             let mut is_preinstalled = PRE_INSTALL_SOLC_LOCK.lock().unwrap();
             if !*is_preinstalled {
-                let solc = Solc::find_or_install_svm_version(version)
-                    .and_then(|solc| solc.version().map(|v| (solc, v)));
+                let solc = Solc::find_or_install(&version.parse().unwrap())
+                    .map(|solc| (solc.version.clone(), solc));
                 match solc {
-                    Ok((solc, v)) => {
+                    Ok((v, solc)) => {
                         // successfully installed
                         eprintln!("found installed Solc v{v} @ {}", solc.solc.display());
                         break
@@ -1704,7 +1691,7 @@ mod tests {
                         // try reinstalling
                         eprintln!("error while trying to re-install Solc v{version}: {e}");
                         let solc = Solc::blocking_install(&version.parse().unwrap());
-                        if solc.map_err(SolcError::from).and_then(|solc| solc.version()).is_ok() {
+                        if solc.map_err(SolcError::from).is_ok() {
                             *is_preinstalled = true;
                             break
                         }
@@ -1713,7 +1700,7 @@ mod tests {
             }
         }
 
-        let solc = Solc::find_or_install_svm_version("0.8.19").expect("could not install solc");
+        let solc = Solc::find_or_install(&Version::new(0, 8, 19)).expect("could not install solc");
         SessionSource::new(solc, Default::default())
     }
 
@@ -1785,9 +1772,6 @@ mod tests {
     }
 
     fn init_tracing() {
-        if std::env::var_os("RUST_LOG").is_none() {
-            std::env::set_var("RUST_LOG", "debug");
-        }
         let _ = tracing_subscriber::FmtSubscriber::builder()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .try_init();

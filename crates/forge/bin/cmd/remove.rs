@@ -11,17 +11,18 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, Parser)]
 pub struct RemoveArgs {
     /// The dependencies you want to remove.
+    #[arg(required = true)]
     dependencies: Vec<Dependency>,
 
     /// The project's root path.
     ///
     /// By default root of the Git repository, if in one,
     /// or the current working directory.
-    #[clap(long, value_hint = ValueHint::DirPath, value_name = "PATH")]
+    #[arg(long, value_hint = ValueHint::DirPath, value_name = "PATH")]
     root: Option<PathBuf>,
 
     /// Override the up-to-date check.
-    #[clap(short, long)]
+    #[arg(short, long)]
     force: bool,
 }
 impl_figment_convert_basic!(RemoveArgs);

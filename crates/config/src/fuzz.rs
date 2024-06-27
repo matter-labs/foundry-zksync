@@ -6,9 +6,10 @@ use crate::inline::{
 };
 use alloy_primitives::U256;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Contains for fuzz testing
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FuzzConfig {
     /// The number of test cases that must execute for each property test
     pub runs: u32,
@@ -23,6 +24,12 @@ pub struct FuzzConfig {
     /// The fuzz dictionary configuration
     #[serde(flatten)]
     pub dictionary: FuzzDictionaryConfig,
+    /// Number of runs to execute and include in the gas report.
+    pub gas_report_samples: u32,
+    /// Path where fuzz failures are recorded and replayed.
+    pub failure_persist_dir: Option<PathBuf>,
+    /// Name of the file to record fuzz failures, defaults to `failures`.
+    pub failure_persist_file: Option<String>,
     /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
     pub no_zksync_reserved_addresses: bool,
 }
@@ -34,6 +41,25 @@ impl Default for FuzzConfig {
             max_test_rejects: 65536,
             seed: None,
             dictionary: FuzzDictionaryConfig::default(),
+            gas_report_samples: 256,
+            failure_persist_dir: None,
+            failure_persist_file: None,
+            no_zksync_reserved_addresses: false,
+        }
+    }
+}
+
+impl FuzzConfig {
+    /// Creates fuzz configuration to write failures in `{PROJECT_ROOT}/cache/fuzz` dir.
+    pub fn new(cache_dir: PathBuf) -> Self {
+        FuzzConfig {
+            runs: 256,
+            max_test_rejects: 65536,
+            seed: None,
+            dictionary: FuzzDictionaryConfig::default(),
+            gas_report_samples: 256,
+            failure_persist_dir: Some(cache_dir),
+            failure_persist_file: Some("failures".to_string()),
             no_zksync_reserved_addresses: false,
         }
     }
@@ -51,8 +77,7 @@ impl InlineConfigParser for FuzzConfig {
             return Ok(None)
         }
 
-        // self is Copy. We clone it with dereference.
-        let mut conf_clone = *self;
+        let mut conf_clone = self.clone();
 
         for pair in overrides {
             let key = pair.0;
@@ -63,6 +88,7 @@ impl InlineConfigParser for FuzzConfig {
                 "dictionary-weight" => {
                     conf_clone.dictionary.dictionary_weight = parse_config_u32(key, value)?
                 }
+                "failure-persist-file" => conf_clone.failure_persist_file = Some(value),
                 "no-zksync-reserved-addresses" => {
                     conf_clone.no_zksync_reserved_addresses = parse_config_bool(key, value)?
                 }
@@ -129,11 +155,13 @@ mod tests {
         let configs = &[
             "forge-config: default.fuzz.runs = 42424242".to_string(),
             "forge-config: default.fuzz.dictionary-weight = 42".to_string(),
+            "forge-config: default.fuzz.failure-persist-file = fuzz-failure".to_string(),
         ];
         let base_config = FuzzConfig::default();
         let merged: FuzzConfig = base_config.try_merge(configs).expect("No errors").unwrap();
         assert_eq!(merged.runs, 42424242);
         assert_eq!(merged.dictionary.dictionary_weight, 42);
+        assert_eq!(merged.failure_persist_file, Some("fuzz-failure".to_string()));
     }
 
     #[test]

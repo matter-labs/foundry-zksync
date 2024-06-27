@@ -1,9 +1,8 @@
-//! Implementations of [`Scripting`](crate::Group::Scripting) cheatcodes.
+//! Implementations of [`Scripting`](spec::Group::Scripting) cheatcodes.
 
 use crate::{Cheatcode, CheatsCtxt, DatabaseExt, Result, Vm::*};
-use alloy_primitives::{Address, U256};
-use alloy_signer::{LocalWallet, Signer};
-use foundry_config::Config;
+use alloy_primitives::{Address, B256, U256};
+use alloy_signer_local::PrivateKeySigner;
 use foundry_wallets::{multi_wallet::MultiWallet, WalletSigner};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -84,7 +83,7 @@ pub struct ScriptWalletsInner {
     pub provided_sender: Option<Address>,
 }
 
-/// Clonable wrapper around [ScriptWalletsInner].
+/// Clonable wrapper around [`ScriptWalletsInner`].
 #[derive(Debug, Clone)]
 pub struct ScriptWallets {
     /// Inner data.
@@ -107,9 +106,19 @@ impl ScriptWallets {
     }
 
     /// Locks inner Mutex and adds a signer to the [MultiWallet].
-    pub fn add_signer(&self, private_key: impl AsRef<[u8]>) -> Result {
-        self.inner.lock().multi_wallet.add_signer(WalletSigner::from_private_key(private_key)?);
-        Ok(Default::default())
+    pub fn add_private_key(&self, private_key: &B256) -> Result<()> {
+        self.add_local_signer(PrivateKeySigner::from_bytes(private_key)?);
+        Ok(())
+    }
+
+    /// Locks inner Mutex and adds a signer to the [MultiWallet].
+    pub fn add_local_signer(&self, wallet: PrivateKeySigner) {
+        self.inner.lock().multi_wallet.add_signer(WalletSigner::Local(wallet));
+    }
+
+    /// Locks inner Mutex and returns all signer addresses in the [MultiWallet].
+    pub fn signers(&self) -> Result<Vec<Address>> {
+        Ok(self.inner.lock().multi_wallet.signers()?.keys().cloned().collect())
     }
 }
 
@@ -125,13 +134,10 @@ fn broadcast<DB: DatabaseExt>(
     );
     ensure!(ccx.state.broadcast.is_none(), "a broadcast is active already");
 
-    // TODO probably need to correct nonce in ZK scope
-    correct_sender_nonce(ccx)?;
-
     let mut new_origin = new_origin.cloned();
 
     if new_origin.is_none() {
-        if let Some(script_wallets) = &ccx.state.script_wallets {
+        if let Some(script_wallets) = ccx.state.script_wallets() {
             let mut script_wallets = script_wallets.inner.lock();
             if let Some(provided_sender) = script_wallets.provided_sender {
                 new_origin = Some(provided_sender);
@@ -146,10 +152,10 @@ fn broadcast<DB: DatabaseExt>(
     }
 
     let broadcast = Broadcast {
-        new_origin: new_origin.unwrap_or(ccx.data.env.tx.caller),
+        new_origin: new_origin.unwrap_or(ccx.ecx.env.tx.caller),
         original_caller: ccx.caller,
-        original_origin: ccx.data.env.tx.caller,
-        depth: ccx.data.journaled_state.depth(),
+        original_origin: ccx.ecx.env.tx.caller,
+        depth: ccx.ecx.journaled_state.depth(),
         single_call,
     };
     debug!(target: "cheatcodes", ?broadcast, "started");
@@ -165,30 +171,14 @@ fn broadcast_key<DB: DatabaseExt>(
     private_key: &U256,
     single_call: bool,
 ) -> Result {
-    let key = super::utils::parse_private_key(private_key)?;
-    let new_origin = LocalWallet::from(key.clone()).address();
+    let wallet = super::utils::parse_wallet(private_key)?;
+    let new_origin = wallet.address();
 
     let result = broadcast(ccx, Some(&new_origin), single_call);
-
     if result.is_ok() {
-        if let Some(script_wallets) = &ccx.state.script_wallets {
-            script_wallets.add_signer(key.to_bytes())?;
+        if let Some(script_wallets) = ccx.state.script_wallets() {
+            script_wallets.add_local_signer(wallet);
         }
     }
     result
-}
-
-/// When using `forge script`, the script method is called using the address from `--sender`.
-/// That leads to its nonce being incremented by `call_raw`. In a `broadcast` scenario this is
-/// undesirable. Therefore, we make sure to fix the sender's nonce **once**.
-pub(super) fn correct_sender_nonce<DB: DatabaseExt>(ccx: &mut CheatsCtxt<DB>) -> Result<()> {
-    let sender = ccx.data.env.tx.caller;
-    if !ccx.state.corrected_nonce && sender != Config::DEFAULT_SENDER {
-        let account = super::evm::journaled_account(ccx.data, sender)?;
-        let prev = account.info.nonce;
-        account.info.nonce = prev.saturating_sub(1);
-        debug!(target: "cheatcodes", %sender, nonce=account.info.nonce, prev, "corrected nonce");
-        ccx.state.corrected_nonce = true;
-    }
-    Ok(())
 }

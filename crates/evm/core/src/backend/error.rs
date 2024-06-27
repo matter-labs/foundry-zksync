@@ -1,6 +1,7 @@
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::BlockId;
 use futures::channel::mpsc::{SendError, TrySendError};
+use revm::primitives::EVMError;
 use std::{
     convert::Infallible,
     sync::{mpsc::RecvError, Arc},
@@ -48,17 +49,19 @@ pub enum DatabaseError {
     MissingCreate2Deployer,
     #[error("failed to get bytecode for {0:?}: {1}")]
     GetBytecode(B256, Arc<eyre::Error>),
+    #[error("{0}")]
+    Other(String),
 }
 
 impl DatabaseError {
     /// Create a new error with a message
     pub fn msg(msg: impl Into<String>) -> Self {
-        DatabaseError::Message(msg.into())
+        Self::Message(msg.into())
     }
 
     /// Create a new error with a message
     pub fn display(msg: impl std::fmt::Display) -> Self {
-        DatabaseError::Message(msg.to_string())
+        Self::Message(msg.to_string())
     }
 
     fn get_rpc_error(&self) -> Option<&eyre::Error> {
@@ -79,6 +82,7 @@ impl DatabaseError {
             Self::TransactionNotFound(_) |
             Self::MissingCreate2Deployer => None,
             Self::GetBytecode(_, err) => Some(err),
+            Self::Other(_) => None,
         }
     }
 
@@ -95,7 +99,7 @@ impl DatabaseError {
 
 impl From<tokio::task::JoinError> for DatabaseError {
     fn from(value: tokio::task::JoinError) -> Self {
-        DatabaseError::display(value)
+        Self::display(value)
     }
 }
 
@@ -108,5 +112,15 @@ impl<T> From<TrySendError<T>> for DatabaseError {
 impl From<Infallible> for DatabaseError {
     fn from(value: Infallible) -> Self {
         match value {}
+    }
+}
+
+// Note: this is mostly necessary to use some revm internals that return an [EVMError]
+impl From<EVMError<Self>> for DatabaseError {
+    fn from(err: EVMError<Self>) -> Self {
+        match err {
+            EVMError::Database(err) => err,
+            err => Self::Other(err.to_string()),
+        }
     }
 }

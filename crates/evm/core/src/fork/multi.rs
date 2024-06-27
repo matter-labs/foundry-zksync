@@ -4,9 +4,11 @@
 //! concurrently active pairs at once.
 
 use crate::fork::{BackendHandler, BlockchainDb, BlockchainDbMeta, CreateFork, SharedBackend};
-use alloy_providers::provider::{Provider, TempProvider};
-use alloy_transport::{BoxTransport, TransportResult};
-use foundry_common::provider::alloy::ProviderBuilder;
+use alloy_provider::{Provider, RootProvider};
+use alloy_transport::TransportResult;
+use foundry_common::provider::{
+    runtime_transport::RuntimeTransport, tower::RetryBackoffService, ProviderBuilder, RetryProvider,
+};
 use foundry_config::Config;
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
@@ -41,7 +43,7 @@ impl ForkId {
             Some(n) => write!(id, "{n:#x}").unwrap(),
             None => id.push_str("latest"),
         }
-        ForkId(id)
+        Self(id)
     }
 
     /// Returns the identifier of the fork.
@@ -72,8 +74,6 @@ pub struct MultiFork {
     _shutdown: Arc<ShutDownMultiFork>,
 }
 
-// === impl MultiForkBackend ===
-
 impl MultiFork {
     /// Creates a new pair multi fork pair
     pub fn new() -> (Self, MultiForkHandler) {
@@ -83,7 +83,7 @@ impl MultiFork {
     }
 
     /// Creates a new pair and spawns the `MultiForkHandler` on a background thread.
-    pub async fn spawn() -> Self {
+    pub fn spawn() -> Self {
         trace!(target: "fork::multi", "spawning multifork");
 
         let (fork, mut handler) = Self::new();
@@ -169,7 +169,7 @@ impl MultiFork {
     }
 }
 
-type Handler = BackendHandler<Arc<Provider<BoxTransport>>>;
+type Handler = BackendHandler<RetryBackoffService<RuntimeTransport>, Arc<RetryProvider>>;
 
 type CreateFuture =
     Pin<Box<dyn Future<Output = eyre::Result<(ForkId, CreatedFork, Handler)>> + Send>>;
@@ -221,8 +221,6 @@ pub struct MultiForkHandler {
     /// Optional periodic interval to flush rpc cache
     flush_cache_interval: Option<tokio::time::Interval>,
 }
-
-// === impl MultiForkHandler ===
 
 impl MultiForkHandler {
     fn new(incoming: Receiver<Request>) -> Self {
@@ -438,8 +436,6 @@ struct CreatedFork {
     num_senders: Arc<AtomicUsize>,
 }
 
-// === impl CreatedFork ===
-
 impl CreatedFork {
     pub fn new(opts: CreateFork, backend: SharedBackend) -> Self {
         Self { opts, backend, num_senders: Arc::new(AtomicUsize::new(1)) }
@@ -485,7 +481,9 @@ impl Drop for ShutDownMultiFork {
 ///
 /// This will establish a new `Provider` to the endpoint and return the Fork Backend
 async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork, Handler)> {
-    let provider = Arc::new(
+    let provider: Arc<
+        RootProvider<RetryBackoffService<RuntimeTransport>, alloy_provider::network::AnyNetwork>,
+    > = Arc::new(
         ProviderBuilder::new(fork.url.as_str())
             .maybe_max_retry(fork.evm_opts.fork_retries)
             .maybe_initial_backoff(fork.evm_opts.fork_retry_backoff)
@@ -500,7 +498,7 @@ async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork,
 
     // we need to use the block number from the block because the env's number can be different on
     // some L2s (e.g. Arbitrum).
-    let number = block.header.number.unwrap_or(meta.block_env.number).to::<u64>();
+    let number = block.header.number.unwrap_or(meta.block_env.number.to());
 
     // determine the cache path if caching is enabled
     let cache_path = if fork.enable_caching {
@@ -517,18 +515,22 @@ async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork,
     Ok((fork_id, fork, handler))
 }
 
-impl<T: alloy_transport::Transport + Clone> super::backend::ZkSyncMiddleware for Provider<T> {
+impl<T: alloy_transport::Transport + Clone> super::backend::ZkSyncMiddleware
+    for RootProvider<T, alloy_provider::network::AnyNetwork>
+{
     async fn get_bytecode_by_hash(
         &self,
         hash: alloy_primitives::B256,
     ) -> TransportResult<Option<revm::primitives::Bytecode>> {
         let bytecode: Option<alloy_primitives::Bytes> =
-            self.raw_request("zks_getBytecodeByHash", vec![hash]).await?;
+            self.raw_request("zks_getBytecodeByHash".into(), vec![hash]).await?;
         Ok(bytecode.map(revm::primitives::Bytecode::new_raw))
     }
 }
 
-impl<T: alloy_transport::Transport + Clone> super::backend::ZkSyncMiddleware for Arc<Provider<T>> {
+impl<T: alloy_transport::Transport + Clone> super::backend::ZkSyncMiddleware
+    for Arc<RootProvider<T, alloy_provider::network::AnyNetwork>>
+{
     async fn get_bytecode_by_hash(
         &self,
         hash: alloy_primitives::B256,

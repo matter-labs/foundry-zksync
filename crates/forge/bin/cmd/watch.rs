@@ -16,12 +16,12 @@ use watchexec::{
 };
 
 #[derive(Clone, Debug, Default, Parser)]
-#[clap(next_help_heading = "Watch options")]
+#[command(next_help_heading = "Watch options")]
 pub struct WatchArgs {
     /// Watch the given files or directories for changes.
     ///
     /// If no paths are provided, the source and test directories of the project are watched.
-    #[clap(
+    #[arg(
         long,
         short,
         num_args(0..),
@@ -30,13 +30,13 @@ pub struct WatchArgs {
     pub watch: Option<Vec<PathBuf>>,
 
     /// Do not restart the command while it's still running.
-    #[clap(long)]
+    #[arg(long)]
     pub no_restart: bool,
 
     /// Explicitly re-run all tests when a change is made.
     ///
     /// By default, only the tests of the last modified test file are executed.
-    #[clap(long)]
+    #[arg(long)]
     pub run_all: bool,
 
     /// File update debounce delay.
@@ -52,7 +52,7 @@ pub struct WatchArgs {
     ///
     /// When using --poll mode, you'll want a larger duration, or risk
     /// overloading disk I/O.
-    #[clap(long, value_name = "DELAY")]
+    #[arg(long, value_name = "DELAY")]
     pub watch_delay: Option<String>,
 }
 
@@ -137,7 +137,7 @@ pub async fn watch_test(args: TestArgs) -> Result<()> {
         args.watch.run_all;
 
     let state = WatchTestState {
-        project_root: config.__root.0,
+        project_root: config.root.0,
         no_reconfigure,
         last_test_files: Default::default(),
     };
@@ -163,7 +163,7 @@ struct WatchTestState {
 }
 
 /// The `on_action` hook for `forge test --watch`
-fn on_test(action: OnActionState<WatchTestState>) {
+fn on_test(action: OnActionState<'_, WatchTestState>) {
     let OnActionState { args, runtime, action, wx, cmd, other } = action;
     let WatchTestState { project_root, no_reconfigure, last_test_files } = other;
 

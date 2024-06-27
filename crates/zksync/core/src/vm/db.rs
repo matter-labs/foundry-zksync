@@ -8,7 +8,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use alloy_primitives::{Address, U256 as rU256};
 use foundry_cheatcodes_common::record::RecordAccess;
-use revm::{primitives::Account, Database, JournaledState};
+use revm::{primitives::Account, Database, EvmContext};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
@@ -24,15 +24,19 @@ use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, Con
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
 
-pub struct ZKVMData<'a, DB> {
-    pub db: &'a mut DB,
-    pub journaled_state: &'a mut JournaledState,
+pub struct ZKVMData<'a, DB: Database> {
+    // pub db: &'a mut DB,
+    // pub journaled_state: &'a mut JournaledState,
+    ecx: &'a mut EvmContext<DB>,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: HashMap<StorageKey, StorageValue>,
     pub accesses: Option<&'a mut RecordAccess>,
 }
 
-impl<'a, DB> Debug for ZKVMData<'a, DB> {
+impl<'a, DB> Debug for ZKVMData<'a, DB>
+where
+    DB: Database,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ZKVMData")
             .field("db", &"db")
@@ -49,41 +53,31 @@ where
     <DB as Database>::Error: Debug,
 {
     /// Create a new instance of [ZKEVMData].
-    pub fn new(db: &'a mut DB, journaled_state: &'a mut JournaledState) -> Self {
+    pub fn new(ecx: &'a mut EvmContext<DB>) -> Self {
         // load all deployed contract bytecodes from the JournaledState as factory deps
-        let mut factory_deps =
-            journaled_state
-                .state
-                .values()
-                .flat_map(|account| {
-                    if account.info.is_empty_code_hash() {
-                        None
-                    } else {
-                        account.info.code.as_ref().map(|code| {
-                            (H256::from(account.info.code_hash.0), code.bytecode.to_vec())
-                        })
-                    }
-                })
-                .collect::<HashMap<_, _>>();
+        let mut factory_deps = ecx
+            .journaled_state
+            .state
+            .values()
+            .flat_map(|account| {
+                if account.info.is_empty_code_hash() {
+                    None
+                } else {
+                    account.info.code.as_ref().map(|code| {
+                        (H256::from(account.info.code_hash.0), code.bytecode().to_vec())
+                    })
+                }
+            })
+            .collect::<HashMap<_, _>>();
 
         let empty_code = vec![0u8; 32];
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
-        Self {
-            db,
-            journaled_state,
-            factory_deps,
-            override_keys: Default::default(),
-            accesses: None,
-        }
+        Self { ecx, factory_deps, override_keys: Default::default(), accesses: None }
     }
 
     /// Create a new instance of [ZKEVMData] with system contracts.
-    pub fn new_with_system_contracts(
-        db: &'a mut DB,
-        journaled_state: &'a mut JournaledState,
-        chain_id: L2ChainId,
-    ) -> Self {
+    pub fn new_with_system_contracts(ecx: &'a mut EvmContext<DB>, chain_id: L2ChainId) -> Self {
         let contracts = era_test_node::system_contracts::get_deployed_contracts(
             &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
         );
@@ -106,7 +100,7 @@ where
             .into_iter()
             .map(|contract| (hash_bytecode(&contract.bytecode), contract.bytecode))
             .collect::<HashMap<_, _>>();
-        factory_deps.extend(journaled_state.state.values().flat_map(|account| {
+        factory_deps.extend(ecx.journaled_state.state.values().flat_map(|account| {
             if account.info.is_empty_code_hash() {
                 None
             } else {
@@ -114,14 +108,14 @@ where
                     .info
                     .code
                     .as_ref()
-                    .map(|code| (H256::from(account.info.code_hash.0), code.bytecode.to_vec()))
+                    .map(|code| (H256::from(account.info.code_hash.0), code.bytecode().to_vec()))
             }
         }));
         let empty_code = vec![0u8; 32];
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
 
-        Self { db, journaled_state, factory_deps, override_keys, accesses: None }
+        Self { ecx, factory_deps, override_keys, accesses: None }
     }
 
     /// Extends the currently known factory deps with the provided input
@@ -172,25 +166,21 @@ where
 
     /// Load an account into the journaled state.
     pub fn load_account(&mut self, address: Address) -> &mut Account {
-        let (account, _) = self
-            .journaled_state
-            .load_account(address, self.db)
-            .expect("account could not be loaded");
+        let (account, _) = self.ecx.load_account(address).expect("account could not be loaded");
         account
     }
 
     /// Load an storage slot into the journaled state.
     /// The account must be already loaded else this function panics.
     pub fn sload(&mut self, address: Address, key: rU256) -> rU256 {
-        let (value, _) = self.journaled_state.sload(address, key, self.db).unwrap_or_default();
+        let (value, _) = self.ecx.sload(address, key).unwrap_or_default();
         value
     }
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
         let addr = address.to_address();
-        self.journaled_state.load_account(addr, self.db).expect("failed loading account");
-        let (value, _) =
-            self.journaled_state.sload(addr, idx.to_ru256(), self.db).expect("failed sload");
+        self.ecx.load_account(addr).expect("failed loading account");
+        let (value, _) = self.ecx.sload(addr, idx.to_ru256()).expect("failed sload");
         value.to_h256()
     }
 }
@@ -214,17 +204,22 @@ where
     fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
         self.factory_deps.get(&hash).cloned().or_else(|| {
             let hash_b256 = hash.to_b256();
-            self.journaled_state
+            self.ecx
+                .journaled_state
                 .state
                 .values()
                 .find_map(|account| {
                     if account.info.code_hash == hash_b256 {
-                        return Some(account.info.code.clone().map(|code| code.bytecode.to_vec()))
+                        return Some(account.info.code.clone().map(|code| code.bytecode().to_vec()))
                     }
                     None
                 })
                 .unwrap_or_else(|| {
-                    self.db.code_by_hash(hash_b256).ok().map(|bytecode| bytecode.bytecode.to_vec())
+                    self.ecx
+                        .db
+                        .code_by_hash(hash_b256)
+                        .ok()
+                        .map(|bytecode| bytecode.bytecode().to_vec())
                 })
         })
     }

@@ -925,7 +925,7 @@ impl Cheatcode for assertLeDecimal_3Call {
 impl Cheatcode for assertApproxEqAbs_0Call {
     fn apply(&self, _state: &mut Cheatcodes) -> Result {
         Ok(uint_assert_approx_eq_abs(self.left, self.right, self.maxDelta)
-            .map_err(|e| format!("assertion failed: {}", e))?)
+            .map_err(|e| format!("assertion failed: {e}"))?)
     }
 }
 
@@ -939,7 +939,7 @@ impl Cheatcode for assertApproxEqAbs_1Call {
 impl Cheatcode for assertApproxEqAbs_2Call {
     fn apply(&self, _state: &mut Cheatcodes) -> Result {
         Ok(int_assert_approx_eq_abs(self.left, self.right, self.maxDelta)
-            .map_err(|e| format!("assertion failed: {}", e))?)
+            .map_err(|e| format!("assertion failed: {e}"))?)
     }
 }
 
@@ -981,7 +981,7 @@ impl Cheatcode for assertApproxEqAbsDecimal_3Call {
 impl Cheatcode for assertApproxEqRel_0Call {
     fn apply(&self, _state: &mut Cheatcodes) -> Result {
         Ok(uint_assert_approx_eq_rel(self.left, self.right, self.maxPercentDelta)
-            .map_err(|e| format!("assertion failed: {}", e))?)
+            .map_err(|e| format!("assertion failed: {e}"))?)
     }
 }
 
@@ -995,7 +995,7 @@ impl Cheatcode for assertApproxEqRel_1Call {
 impl Cheatcode for assertApproxEqRel_2Call {
     fn apply(&self, _state: &mut Cheatcodes) -> Result {
         Ok(int_assert_approx_eq_rel(self.left, self.right, self.maxPercentDelta)
-            .map_err(|e| format!("assertion failed: {}", e))?)
+            .map_err(|e| format!("assertion failed: {e}"))?)
     }
 }
 
@@ -1122,13 +1122,17 @@ fn uint_assert_approx_eq_rel(
     right: U256,
     max_delta: U256,
 ) -> Result<Vec<u8>, EqRelAssertionError<U256>> {
-    if right.is_zero() && !left.is_zero() {
-        return Err(EqRelAssertionError::Failure(Box::new(EqRelAssertionFailure {
-            left,
-            right,
-            max_delta,
-            real_delta: EqRelDelta::Undefined,
-        })))
+    if right.is_zero() {
+        if left.is_zero() {
+            return Ok(Default::default())
+        } else {
+            return Err(EqRelAssertionError::Failure(Box::new(EqRelAssertionFailure {
+                left,
+                right,
+                max_delta,
+                real_delta: EqRelDelta::Undefined,
+            })))
+        };
     }
 
     let delta = get_delta_uint(left, right)
@@ -1153,13 +1157,17 @@ fn int_assert_approx_eq_rel(
     right: I256,
     max_delta: U256,
 ) -> Result<Vec<u8>, EqRelAssertionError<I256>> {
-    if right.is_zero() && !left.is_zero() {
-        return Err(EqRelAssertionError::Failure(Box::new(EqRelAssertionFailure {
-            left,
-            right,
-            max_delta,
-            real_delta: EqRelDelta::Undefined,
-        })))
+    if right.is_zero() {
+        if left.is_zero() {
+            return Ok(Default::default())
+        } else {
+            return Err(EqRelAssertionError::Failure(Box::new(EqRelAssertionFailure {
+                left,
+                right,
+                max_delta,
+                real_delta: EqRelDelta::Undefined,
+            })))
+        }
     }
 
     let (_, abs_right) = right.into_sign_and_abs();

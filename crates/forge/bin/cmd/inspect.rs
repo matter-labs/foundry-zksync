@@ -23,21 +23,21 @@ pub struct InspectArgs {
     pub contract: ContractInfo,
 
     /// The contract artifact field to inspect.
-    #[clap(value_enum)]
+    #[arg(value_enum)]
     pub field: ContractArtifactField,
 
     /// Pretty print the selected field, if supported.
-    #[clap(long)]
+    #[arg(long)]
     pub pretty: bool,
 
     /// All build arguments are supported
-    #[clap(flatten)]
+    #[command(flatten)]
     build: CoreBuildArgs,
 }
 
 impl InspectArgs {
     pub fn run(self) -> Result<()> {
-        let InspectArgs { mut contract, field, build, pretty } = self;
+        let Self { mut contract, field, build, pretty } = self;
 
         trace!(target: "forge", ?field, ?contract, "running forge inspect");
 

@@ -1,4 +1,4 @@
-//! Implementations of [`Testing`](crate::Group::Testing) cheatcodes.
+//! Implementations of [`Testing`](spec::Group::Testing) cheatcodes.
 
 use crate::{Cheatcode, Cheatcodes, CheatsCtxt, DatabaseExt, Error, Result, Vm::*};
 use alloy_primitives::Address;
@@ -14,9 +14,9 @@ impl Cheatcode for zkVmCall {
         let Self { enable } = *self;
 
         if enable {
-            ccx.state.select_zk_vm(ccx.data, None);
+            ccx.state.select_zk_vm(ccx.ecx, None);
         } else {
-            ccx.state.select_evm(ccx.data);
+            ccx.state.select_evm(ccx.ecx);
         }
 
         Ok(Default::default())
@@ -37,12 +37,12 @@ impl Cheatcode for zkRegisterContractCall {
         let new_contract = DualCompiledContract {
             name: name.clone(),
             zk_bytecode_hash: zkBytecodeHash.0.into(),
-            zk_deployed_bytecode: zkDeployedBytecode.clone(),
+            zk_deployed_bytecode: zkDeployedBytecode.to_vec(),
             //TODO: add argument to cheatcode
             zk_factory_deps: vec![],
             evm_bytecode_hash: *evmBytecodeHash,
-            evm_deployed_bytecode: evmDeployedBytecode.clone(),
-            evm_bytecode: evmBytecode.clone(),
+            evm_deployed_bytecode: evmDeployedBytecode.to_vec(),
+            evm_bytecode: evmBytecode.to_vec(),
         };
 
         if let Some(existing) = ccx.state.dual_compiled_contracts.iter().find(|contract| {
@@ -120,7 +120,7 @@ impl Cheatcode for skipCall {
         if skipTest {
             // Skip should not work if called deeper than at test level.
             // Since we're not returning the magic skip bytes, this will cause a test failure.
-            ensure!(ccx.data.journaled_state.depth() <= 1, "`skip` can only be used at test level");
+            ensure!(ccx.ecx.journaled_state.depth() <= 1, "`skip` can only be used at test level");
             Err(MAGIC_SKIP.into())
         } else {
             Ok(Default::default())

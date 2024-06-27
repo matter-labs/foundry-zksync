@@ -103,7 +103,7 @@ eth_rpc_url = "https://example.com/"
 # Setting this option enables decoding of error traces from mainnet deployed / verfied contracts via etherscan
 etherscan_api_key = "YOURETHERSCANAPIKEY"
 # ignore solc warnings for missing license and exceeded contract size
-# known error codes are: ["unreachable", "unused-return", "unused-param", "unused-var", "code-size", "shadowing", "func-mutability", "license", "pragma-solidity", "virtual-interfaces", "same-varname"]
+# known error codes are: ["unreachable", "unused-return", "unused-param", "unused-var", "code-size", "shadowing", "func-mutability", "license", "pragma-solidity", "virtual-interfaces", "same-varname", "too-many-warnings", "constructor-visibility", "init-code-size", "missing-receive-ether", "unnamed-return", "transient-storage"]
 # additional warnings can be added using their numeric error code: ["license", 1337]
 ignored_error_codes = ["license", "code-size"]
 ignored_warnings_from = ["path_to_ignore"]
@@ -116,6 +116,7 @@ match_path = "*/Foo*"
 no_match_path = "*/Bar*"
 ffi = false
 always_use_create_2_factory = false
+prompt_timeout = 120
 # These are the default callers, generated using `address(uint160(uint256(keccak256("foundry default caller"))))`
 sender = '0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38'
 tx_origin = '0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38'
@@ -189,13 +190,13 @@ no_zksync_reserved_addresses = true
 
 [invariant]
 runs = 256
-depth = 15
+depth = 500
 fail_on_revert = false
 call_override = false
 dictionary_weight = 80
 include_storage = true
 include_push_bytes = true
-shrink_sequence = true
+shrink_run_limit = 5000
 no_zksync_reserved_addresses = true
 
 [fmt]

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, Bytes, U256};
 
 /// Tracks the expected calls per address.
 ///
@@ -11,7 +11,7 @@ use alloy_primitives::{Address, U256};
 /// This then allows us to customize the matching behavior for each call data on the
 /// `ExpectedCallData` struct and track how many times we've actually seen the call on the second
 /// element of the tuple.
-pub type ExpectedCallTracker = HashMap<Address, HashMap<Vec<u8>, (ExpectedCallData, u64)>>;
+pub type ExpectedCallTracker = HashMap<Address, HashMap<Bytes, (ExpectedCallData, u64)>>;
 
 #[derive(Clone, Debug)]
 pub struct ExpectedCallData {

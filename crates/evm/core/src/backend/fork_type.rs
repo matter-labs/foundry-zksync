@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use alloy_provider::Provider;
+
 /// Defines a fork of the type EVM or ZK.
 #[derive(Debug, Clone)]
 pub enum ForkType {
@@ -33,13 +35,13 @@ impl CachedForkType {
             return fork_url_type.clone()
         }
 
-        let is_zk_url = foundry_common::provider::ethers::try_get_http_provider(fork_url)
+        let is_zk_url = foundry_common::provider::try_get_http_provider(fork_url)
             .map(|provider| {
                 let is_zk_url = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .unwrap()
-                    .block_on(provider.request("zks_L1ChainId", ()))
+                    .block_on(provider.raw_request("zks_L1ChainId".into(), ()))
                     .map(|_: String| true)
                     .unwrap_or_default();
 

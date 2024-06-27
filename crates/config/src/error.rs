@@ -110,7 +110,7 @@ pub enum SolidityErrorCode {
     ContractExceeds24576Bytes,
     /// Warning after shanghai if init code size exceeds 49152 bytes
     ContractInitCodeSizeExceeds49152Bytes,
-    /// Warning that Function state mutability can be restricted to [view,pure]
+    /// Warning that Function state mutability can be restricted to view/pure.
     FunctionStateMutabilityCanBeRestricted,
     /// Warning: Unused local variable
     UnusedLocalVariable,
@@ -134,11 +134,13 @@ pub enum SolidityErrorCode {
     Unreachable,
     /// Missing pragma solidity
     PragmaSolidity,
+    /// Uses transient opcodes
+    TransientStorageUsed,
+    /// There are more than 256 warnings. Ignoring the rest.
+    TooManyWarnings,
     /// All other error codes
     Other(u64),
 }
-
-// === impl SolidityErrorCode ===
 
 impl SolidityErrorCode {
     /// The textual identifier for this error
@@ -147,6 +149,7 @@ impl SolidityErrorCode {
     pub fn as_str(&self) -> Result<&'static str, u64> {
         let s = match self {
             SolidityErrorCode::SpdxLicenseNotProvided => "license",
+            SolidityErrorCode::VisibilityForConstructorIsIgnored => "constructor-visibility",
             SolidityErrorCode::ContractExceeds24576Bytes => "code-size",
             SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes => "init-code-size",
             SolidityErrorCode::FunctionStateMutabilityCanBeRestricted => "func-mutability",
@@ -160,8 +163,9 @@ impl SolidityErrorCode {
             SolidityErrorCode::UnnamedReturnVariable => "unnamed-return",
             SolidityErrorCode::Unreachable => "unreachable",
             SolidityErrorCode::PragmaSolidity => "pragma-solidity",
+            SolidityErrorCode::TransientStorageUsed => "transient-storage",
+            SolidityErrorCode::TooManyWarnings => "too-many-warnings",
             SolidityErrorCode::Other(code) => return Err(*code),
-            SolidityErrorCode::VisibilityForConstructorIsIgnored => "constructor-visibility",
         };
         Ok(s)
     }
@@ -171,7 +175,9 @@ impl From<SolidityErrorCode> for u64 {
     fn from(code: SolidityErrorCode) -> u64 {
         match code {
             SolidityErrorCode::SpdxLicenseNotProvided => 1878,
+            SolidityErrorCode::VisibilityForConstructorIsIgnored => 2462,
             SolidityErrorCode::ContractExceeds24576Bytes => 5574,
+            SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes => 3860,
             SolidityErrorCode::FunctionStateMutabilityCanBeRestricted => 2018,
             SolidityErrorCode::UnusedLocalVariable => 2072,
             SolidityErrorCode::UnusedFunctionParameter => 5667,
@@ -183,8 +189,8 @@ impl From<SolidityErrorCode> for u64 {
             SolidityErrorCode::UnnamedReturnVariable => 6321,
             SolidityErrorCode::Unreachable => 5740,
             SolidityErrorCode::PragmaSolidity => 3420,
-            SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes => 3860,
-            SolidityErrorCode::VisibilityForConstructorIsIgnored => 2462,
+            SolidityErrorCode::TransientStorageUsed => 2394,
+            SolidityErrorCode::TooManyWarnings => 4591,
             SolidityErrorCode::Other(code) => code,
         }
     }
@@ -204,20 +210,23 @@ impl FromStr for SolidityErrorCode {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let code = match s {
-            "unreachable" => SolidityErrorCode::Unreachable,
-            "unused-return" => SolidityErrorCode::UnnamedReturnVariable,
-            "unused-param" => SolidityErrorCode::UnusedFunctionParameter,
-            "unused-var" => SolidityErrorCode::UnusedLocalVariable,
+            "license" => SolidityErrorCode::SpdxLicenseNotProvided,
+            "constructor-visibility" => SolidityErrorCode::VisibilityForConstructorIsIgnored,
             "code-size" => SolidityErrorCode::ContractExceeds24576Bytes,
             "init-code-size" => SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes,
-            "shadowing" => SolidityErrorCode::ShadowsExistingDeclaration,
             "func-mutability" => SolidityErrorCode::FunctionStateMutabilityCanBeRestricted,
-            "license" => SolidityErrorCode::SpdxLicenseNotProvided,
-            "pragma-solidity" => SolidityErrorCode::PragmaSolidity,
+            "unused-var" => SolidityErrorCode::UnusedLocalVariable,
+            "unused-param" => SolidityErrorCode::UnusedFunctionParameter,
+            "unused-return" => SolidityErrorCode::ReturnValueOfCallsNotUsed,
             "virtual-interfaces" => SolidityErrorCode::InterfacesExplicitlyVirtual,
             "missing-receive-ether" => SolidityErrorCode::PayableNoReceiveEther,
+            "shadowing" => SolidityErrorCode::ShadowsExistingDeclaration,
             "same-varname" => SolidityErrorCode::DeclarationSameNameAsAnother,
-            "constructor-visibility" => SolidityErrorCode::VisibilityForConstructorIsIgnored,
+            "unnamed-return" => SolidityErrorCode::UnnamedReturnVariable,
+            "unreachable" => SolidityErrorCode::Unreachable,
+            "pragma-solidity" => SolidityErrorCode::PragmaSolidity,
+            "transient-storage" => SolidityErrorCode::TransientStorageUsed,
+            "too-many-warnings" => SolidityErrorCode::TooManyWarnings,
             _ => return Err(format!("Unknown variant {s}")),
         };
 
@@ -229,6 +238,7 @@ impl From<u64> for SolidityErrorCode {
     fn from(code: u64) -> Self {
         match code {
             1878 => SolidityErrorCode::SpdxLicenseNotProvided,
+            2462 => SolidityErrorCode::VisibilityForConstructorIsIgnored,
             5574 => SolidityErrorCode::ContractExceeds24576Bytes,
             3860 => SolidityErrorCode::ContractInitCodeSizeExceeds49152Bytes,
             2018 => SolidityErrorCode::FunctionStateMutabilityCanBeRestricted,
@@ -240,9 +250,9 @@ impl From<u64> for SolidityErrorCode {
             2519 => SolidityErrorCode::ShadowsExistingDeclaration,
             8760 => SolidityErrorCode::DeclarationSameNameAsAnother,
             6321 => SolidityErrorCode::UnnamedReturnVariable,
-            3420 => SolidityErrorCode::PragmaSolidity,
             5740 => SolidityErrorCode::Unreachable,
-            2462 => SolidityErrorCode::VisibilityForConstructorIsIgnored,
+            3420 => SolidityErrorCode::PragmaSolidity,
+            2394 => SolidityErrorCode::TransientStorageUsed,
             other => SolidityErrorCode::Other(other),
         }
     }

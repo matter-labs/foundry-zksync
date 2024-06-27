@@ -6,7 +6,7 @@ use foundry_cli::{
     utils::FoundryPathExt,
 };
 use foundry_common::{
-    compile::ProjectCompiler,
+    compile::{compile_target, ProjectCompiler},
     selectors::{import_selectors, SelectorImportData},
 };
 use foundry_compilers::{artifacts::output_selection::ContractOutputSelection, info::ContractInfo};
@@ -16,7 +16,7 @@ use std::fs::canonicalize;
 #[derive(Clone, Debug, Parser)]
 pub enum SelectorsSubcommands {
     /// Check for selector collisions between contracts
-    #[clap(visible_alias = "co")]
+    #[command(visible_alias = "co")]
     Collision {
         /// The first of the two contracts for which to look selector collisions for, in the form
         /// `(<path>:)?<contractname>`.
@@ -26,33 +26,33 @@ pub enum SelectorsSubcommands {
         /// `(<path>:)?<contractname>`.
         second_contract: ContractInfo,
 
-        #[clap(flatten)]
+        #[command(flatten)]
         build: Box<CoreBuildArgs>,
     },
 
     /// Upload selectors to registry
-    #[clap(visible_alias = "up")]
+    #[command(visible_alias = "up")]
     Upload {
         /// The name of the contract to upload selectors for.
-        #[clap(required_unless_present = "all")]
+        #[arg(required_unless_present = "all")]
         contract: Option<String>,
 
         /// Upload selectors for all contracts in the project.
-        #[clap(long, required_unless_present = "contract")]
+        #[arg(long, required_unless_present = "contract")]
         all: bool,
 
-        #[clap(flatten)]
+        #[command(flatten)]
         project_paths: ProjectPathsArgs,
     },
 
     /// List selectors from current workspace
-    #[clap(visible_alias = "ls")]
+    #[command(visible_alias = "ls")]
     List {
         /// The name of the contract to list selectors for.
-        #[clap(help = "The name of the contract to list selectors for.")]
+        #[arg(help = "The name of the contract to list selectors for.")]
         contract: Option<String>,
 
-        #[clap(flatten)]
+        #[command(flatten)]
         project_paths: ProjectPathsArgs,
     },
 }
@@ -60,7 +60,7 @@ pub enum SelectorsSubcommands {
 impl SelectorsSubcommands {
     pub async fn run(self) -> Result<()> {
         match self {
-            SelectorsSubcommands::Upload { contract, all, project_paths } => {
+            Self::Upload { contract, all, project_paths } => {
                 let build_args = CoreBuildArgs {
                     project_paths: project_paths.clone(),
                     compiler: CompilerArgs {
@@ -71,13 +71,17 @@ impl SelectorsSubcommands {
                 };
 
                 let project = build_args.project()?;
-                let output = ProjectCompiler::new().quiet(true).compile(&project)?;
+                let output = if let Some(name) = &contract {
+                    let target_path = project.find_contract_path(name)?;
+                    compile_target(&target_path, &project, false)?
+                } else {
+                    ProjectCompiler::new().compile(&project)?
+                };
                 let artifacts = if all {
                     output
                         .into_artifacts_with_files()
                         .filter(|(file, _, _)| {
-                            let is_sources_path = file
-                                .starts_with(&project.paths.sources.to_string_lossy().to_string());
+                            let is_sources_path = file.starts_with(&project.paths.sources);
                             let is_test = file.is_sol_test();
 
                             is_sources_path && !is_test
@@ -114,7 +118,7 @@ impl SelectorsSubcommands {
                     }
                 }
             }
-            SelectorsSubcommands::Collision { mut first_contract, mut second_contract, build } => {
+            Self::Collision { mut first_contract, mut second_contract, build } => {
                 // Compile the project with the two contracts included
                 let project = build.project()?;
                 let mut compiler = ProjectCompiler::new().quiet(true);
@@ -170,7 +174,7 @@ impl SelectorsSubcommands {
                     println!("{table}");
                 }
             }
-            SelectorsSubcommands::List { contract, project_paths } => {
+            Self::List { contract, project_paths } => {
                 println!("Listing selectors for contracts in the project...");
                 let build_args = CoreBuildArgs {
                     project_paths: project_paths.clone(),
@@ -195,7 +199,7 @@ impl SelectorsSubcommands {
                             let suggestion = if let Some(suggestion) = foundry_cli::utils::did_you_mean(&contract, candidates).pop() {
                                 format!("\nDid you mean `{suggestion}`?")
                             } else {
-                                "".to_string()
+                                String::new()
                             };
                             eyre::eyre!(
                                 "Could not find artifact `{contract}` in the compiled artifacts{suggestion}",
@@ -207,8 +211,7 @@ impl SelectorsSubcommands {
                     outcome
                         .into_artifacts_with_files()
                         .filter(|(file, _, _)| {
-                            let is_sources_path = file
-                                .starts_with(&project.paths.sources.to_string_lossy().to_string());
+                            let is_sources_path = file.starts_with(&project.paths.sources);
                             let is_test = file.is_sol_test();
 
                             is_sources_path && !is_test

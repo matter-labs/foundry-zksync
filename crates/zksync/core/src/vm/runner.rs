@@ -1,11 +1,11 @@
 use foundry_zksync_compiler::DualCompiledContract;
 use revm::{
-    interpreter::{CallInputs, CallScheme, CreateInputs},
-    precompile::Precompiles,
+    interpreter::{CallInputs, CallScheme, CallValue, CreateInputs},
+    precompile::{PrecompileSpecId, Precompiles},
     primitives::{
         Address, CreateScheme, Env, ResultAndState, SpecId, TransactTo, B256, U256 as rU256,
     },
-    Database, JournaledState,
+    Database, EvmContext, JournaledState,
 };
 use tracing::{debug, error, info};
 use zksync_basic_types::H256;
@@ -34,27 +34,23 @@ pub fn transact<'a, DB>(
 ) -> eyre::Result<ResultAndState>
 where
     DB: Database + Send,
-    <DB as Database>::Error: Debug,
+    <DB as Database>::Error: Send + Debug,
 {
     debug!("zk transact");
     let mut journaled_state = JournaledState::new(
-        env.cfg.spec_id,
-        Precompiles::new(to_precompile_id(env.cfg.spec_id))
-            .addresses()
-            .into_iter()
-            .copied()
-            .collect(),
+        SpecId::LATEST,
+        Precompiles::new(PrecompileSpecId::LATEST).addresses().into_iter().copied().collect(),
     );
 
+    let mut ecx = EvmContext::new_with_env(db, Box::new(env.clone()));
     let caller = env.tx.caller;
-    let nonce = ZKVMData::new(db, &mut journaled_state).get_tx_nonce(caller);
+    let nonce = ZKVMData::new(&mut ecx).get_tx_nonce(caller);
     let (transact_to, is_create) = match env.tx.transact_to {
         TransactTo::Call(to) => (to.to_h160(), false),
-        TransactTo::Create(CreateScheme::Create) |
-        TransactTo::Create(CreateScheme::Create2 { .. }) => (CONTRACT_DEPLOYER_ADDRESS, true),
+        TransactTo::Create => (CONTRACT_DEPLOYER_ADDRESS, true),
     };
 
-    let (gas_limit, max_fee_per_gas) = gas_params(env, db, &mut journaled_state, caller);
+    let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         transact_to,
@@ -83,14 +79,7 @@ where
         is_create,
     };
 
-    match inspect::<_, DB::Error>(
-        tx,
-        env,
-        db,
-        &mut journaled_state,
-        &mut Default::default(),
-        call_ctx,
-    ) {
+    match inspect::<_, DB::Error>(tx, &mut ecx, &mut Default::default(), call_ctx) {
         Ok(ZKVMExecutionResult { execution_result: result, .. }) => {
             Ok(ResultAndState { result, state: journaled_state.finalize().0 })
         }
@@ -99,44 +88,32 @@ where
 }
 
 /// Retrieves L2 ETH balance for a given address.
-pub fn balance<'a, DB>(
-    address: Address,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
-) -> rU256
+pub fn balance<'a, DB>(address: Address, ecx: &mut EvmContext<DB>) -> rU256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    let balance = ZKVMData::new(db, journaled_state).get_balance(address);
+    let balance = ZKVMData::new(ecx).get_balance(address);
     balance.to_ru256()
 }
 
 /// Retrieves bytecode hash stored at a given address.
 #[allow(dead_code)]
-pub fn code_hash<'a, DB>(
-    address: Address,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
-) -> B256
+pub fn code_hash<'a, DB>(address: Address, ecx: &mut EvmContext<DB>) -> B256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    B256::from(ZKVMData::new(db, journaled_state).get_code_hash(address).0)
+    B256::from(ZKVMData::new(ecx).get_code_hash(address).0)
 }
 
 /// Retrieves nonce for a given address.
-pub fn nonce<'a, DB>(
-    address: Address,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
-) -> u32
+pub fn nonce<'a, DB>(address: Address, ecx: &mut EvmContext<DB>) -> u32
 where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    ZKVMData::new(db, journaled_state).get_tx_nonce(address).0
+    ZKVMData::new(ecx).get_tx_nonce(address).0
 }
 
 /// Executes a CREATE opcode on the ZK-VM.
@@ -144,22 +121,20 @@ pub fn create<'a, DB, E>(
     call: &CreateInputs,
     contract: &DualCompiledContract,
     factory_deps: Vec<Vec<u8>>,
-    env: &'a mut Env,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
+    ecx: &mut EvmContext<DB>,
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
     DB: Database + Send,
-    <DB as Database>::Error: Debug,
+    <DB as Database>::Error: Send + Debug,
 {
     info!(?call, "create tx {}", hex::encode(&call.init_code));
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
-    let caller = env.tx.caller;
+    let caller = ecx.env.tx.caller;
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
-    let nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
+    let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
-    let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
+    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
     let tx = L2Tx::new(
@@ -169,7 +144,7 @@ where
         Fee {
             gas_limit,
             max_fee_per_gas,
-            max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
+            max_priority_fee_per_gas: ecx.env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
             gas_per_pubdata_limit: U256::from(20000),
         },
         caller.to_h160(),
@@ -179,49 +154,50 @@ where
     );
 
     let call_ctx = CallContext {
-        tx_caller: env.tx.caller,
+        tx_caller: ecx.env.tx.caller,
         msg_sender: call.caller,
         contract: CONTRACT_DEPLOYER_ADDRESS.to_address(),
         delegate_as: None,
-        block_number: env.block.number,
-        block_timestamp: env.block.timestamp,
-        block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
+        block_number: ecx.env.block.number,
+        block_timestamp: ecx.env.block.timestamp,
+        block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
         is_create: true,
     };
 
-    inspect_as_batch(tx, env, db, journaled_state, &mut ccx, call_ctx)
+    inspect_as_batch(tx, ecx, &mut ccx, call_ctx)
 }
 
 /// Executes a CALL opcode on the ZK-VM.
 pub fn call<'a, DB, E>(
     call: &CallInputs,
-    env: &'a mut Env,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
+    ecx: &mut EvmContext<DB>,
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
     DB: Database + Send,
-    <DB as Database>::Error: Debug,
+    <DB as Database>::Error: Send + Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
-    let caller = env.tx.caller;
-    let nonce: zksync_types::Nonce = ZKVMData::new(db, journaled_state).get_tx_nonce(caller);
+    let caller = ecx.env.tx.caller;
+    let nonce: zksync_types::Nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
-    let (gas_limit, max_fee_per_gas) = gas_params(env, db, journaled_state, caller);
+    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
-        call.contract.to_h160(),
+        call.bytecode_address.to_h160(),
         call.input.to_vec(),
         nonce,
         Fee {
             gas_limit,
             max_fee_per_gas,
-            max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
+            max_priority_fee_per_gas: ecx.env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
             gas_per_pubdata_limit: U256::from(20000),
         },
         caller.to_h160(),
-        call.transfer.value.to_u256(),
+        match call.value {
+            CallValue::Transfer(value) => value.to_u256(),
+            _ => U256::zero(),
+        },
         None,
         PaymasterParams::default(),
     );
@@ -231,40 +207,35 @@ where
     // CallCode          => { address: contract.address, caller: contract.address }
     // DelegateCall      => { address: contract.address, caller: contract.caller }
     let call_ctx = CallContext {
-        tx_caller: env.tx.caller,
-        msg_sender: call.context.caller,
-        contract: call.contract,
-        delegate_as: match call.context.scheme {
-            CallScheme::DelegateCall => Some(call.context.address),
+        tx_caller: ecx.env.tx.caller,
+        msg_sender: call.caller,
+        contract: call.bytecode_address,
+        delegate_as: match call.scheme {
+            CallScheme::DelegateCall => Some(call.target_address),
             _ => None,
         },
-        block_number: env.block.number,
-        block_timestamp: env.block.timestamp,
-        block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
+        block_number: ecx.env.block.number,
+        block_timestamp: ecx.env.block.timestamp,
+        block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
         is_create: false,
     };
 
-    inspect(tx, env, db, journaled_state, &mut ccx, call_ctx)
+    inspect(tx, ecx, &mut ccx, call_ctx)
 }
 
 /// Assign gas parameters that satisfy zkSync's fee model.
-fn gas_params<'a, DB>(
-    env: &'a mut Env,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
-    caller: Address,
-) -> (U256, U256)
+fn gas_params<'a, DB>(ecx: &mut EvmContext<DB>, caller: Address) -> (U256, U256)
 where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    let value = env.tx.value.to_u256();
-    let balance = ZKVMData::new(db, journaled_state).get_balance(caller);
+    let value = ecx.env.tx.value.to_u256();
+    let balance = ZKVMData::new(ecx).get_balance(caller);
     if balance.is_zero() {
         error!("balance is 0 for {caller:?}, transaction will fail");
     }
-    let max_fee_per_gas = fix_l2_gas_price(env.tx.gas_price.to_u256());
-    let gas_limit = fix_l2_gas_limit(env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
+    let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
+    let gas_limit = fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
 
     (gas_limit, max_fee_per_gas)
 }
@@ -298,30 +269,4 @@ pub fn encode_create_params(
     ]);
 
     signature.iter().copied().chain(params).collect()
-}
-
-fn to_precompile_id(spec_id: SpecId) -> revm::precompile::SpecId {
-    match spec_id {
-        SpecId::FRONTIER |
-        SpecId::FRONTIER_THAWING |
-        SpecId::HOMESTEAD |
-        SpecId::DAO_FORK |
-        SpecId::TANGERINE |
-        SpecId::SPURIOUS_DRAGON => revm::precompile::SpecId::HOMESTEAD,
-        SpecId::BYZANTIUM | SpecId::CONSTANTINOPLE | SpecId::PETERSBURG => {
-            revm::precompile::SpecId::BYZANTIUM
-        }
-        SpecId::ISTANBUL | SpecId::MUIR_GLACIER => revm::precompile::SpecId::ISTANBUL,
-        SpecId::BERLIN |
-        SpecId::LONDON |
-        SpecId::ARROW_GLACIER |
-        SpecId::GRAY_GLACIER |
-        SpecId::MERGE |
-        SpecId::SHANGHAI |
-        SpecId::CANCUN |
-        SpecId::BEDROCK |
-        SpecId::REGOLITH |
-        SpecId::CANYON |
-        SpecId::LATEST => revm::precompile::SpecId::BERLIN,
-    }
 }
