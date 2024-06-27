@@ -242,11 +242,10 @@ src = 'src'
 out = 'out'
 libs = ['lib']
 
-[profile.zksync]
-src = 'src'
-libs = ['lib']
+[profile.default.zksync]
+compile = true
 fallback_oz = true
-mode = "3"
+mode = '3'
 ```
 
 ### Additional Configuration

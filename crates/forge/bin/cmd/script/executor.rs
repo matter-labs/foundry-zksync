@@ -159,7 +159,7 @@ impl ScriptArgs {
                         tx.to,
                         tx.input.clone().into_input(),
                         tx.value,
-                        (script_config.config.zksync, zk.clone()),
+                        (script_config.config.zksync.run_in_zk_mode(), zk.clone()),
                     )
                     .wrap_err("Internal EVM error during simulation")?;
 
@@ -323,6 +323,7 @@ impl ScriptArgs {
             .spec(script_config.config.evm_spec_id())
             .gas_limit(script_config.evm_opts.gas_limit());
 
+        let use_zk = script_config.config.zksync.run_in_zk_mode();
         if let SimulationStage::Local = stage {
             builder = builder.inspectors(|stack| {
                 stack
@@ -333,7 +334,7 @@ impl ScriptArgs {
                             script_config.evm_opts.clone(),
                             script_wallets,
                             dual_compiled_contracts.unwrap_or_default(),
-                            script_config.config.zksync,
+                            use_zk,
                         )
                         .into(),
                     )
@@ -342,7 +343,7 @@ impl ScriptArgs {
         }
 
         let mut executor = builder.build(env, db);
-        executor.use_zk = script_config.config.zksync;
+        executor.use_zk = use_zk;
         Ok(ScriptRunner::new(executor, script_config.evm_opts.initial_balance, sender))
     }
 }

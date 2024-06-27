@@ -274,7 +274,8 @@ impl TestArgs {
 
         let output = compiler.compile(&project)?;
 
-        let zk_output = foundry_zksync_compiler::compile_project(&project)?;
+        let zk_compiler = ProjectCompiler::new().quiet_if(self.json || self.opts.silent);
+        let zk_output = zk_compiler.zksync_compile(&project)?;
         let dual_compiled_contracts =
             DualCompiledContracts::new(&output, &zk_output, &project.paths);
 
@@ -311,7 +312,14 @@ impl TestArgs {
             .evm_spec(config.evm_spec_id())
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
-            .with_test_options(test_options)
+            .with_cheats_config(CheatsConfig::new(
+                &config,
+                evm_opts.clone(),
+                None,
+                dual_compiled_contracts,
+                config.zksync,
+            ))
+            .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
             .build(project_root, output, env, evm_opts, dual_compiled_contracts, config.zksync)?;
 
@@ -325,6 +333,7 @@ impl TestArgs {
             }
             *test_pattern = Some(debug_test_pattern.clone());
         }
+        runner.use_zk = config.zksync;
 
         let libraries = runner.libraries.clone();
         let outcome = self.run_tests(runner, config, verbosity, &filter).await?;

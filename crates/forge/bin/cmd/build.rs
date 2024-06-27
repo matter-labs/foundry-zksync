@@ -87,7 +87,7 @@ impl BuildArgs {
             config = self.load_config();
         }
 
-        if !config.zksync {
+        if !config.zksync.should_compile() {
             let project = config.project()?;
 
             // Collect sources to compile if build subdirectories specified.
@@ -98,8 +98,7 @@ impl BuildArgs {
                 }
             }
 
-            let compiler = ProjectCompiler::new()
-                .files(files)
+            let mut compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .quiet(self.format_json)

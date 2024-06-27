@@ -1801,6 +1801,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
                         let constructor_input =
                             call.init_code[contract.evm_bytecode.len()..].to_vec();
+
                         let create_input = foundry_zksync_core::encode_create_params(
                             &call.scheme,
                             contract.zk_bytecode_hash,
@@ -1882,6 +1883,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
             let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
             tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
+
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),
