@@ -266,33 +266,33 @@ impl ProjectCompiler {
     }
 
     /// Compiles the project.
-    // pub fn zksync_compile(self, project: &Project) -> Result<ZkProjectCompileOutput> {
-    //     // TODO: Avoid process::exit
-    //     if !project.paths.has_input_files() && self.files.is_empty() {
-    //         println!("Nothing to compile");
-    //         // nothing to do here
-    //         std::process::exit(0);
-    //     }
+    pub fn zksync_compile(self, project: &Project<SolcCompiler>) -> Result<ZkProjectCompileOutput> {
+        // TODO: Avoid process::exit
+        if !project.paths.has_input_files() && self.files.is_empty() {
+            println!("Nothing to compile");
+            // nothing to do here
+            std::process::exit(0);
+        }
 
-    //     // Taking is fine since we don't need these in `compile_with`.
-    //     //let filter = std::mem::take(&mut self.filter);
+        // Taking is fine since we don't need these in `compile_with`.
+        //let filter = std::mem::take(&mut self.filter);
 
-    //     // We need to clone files since we use them in `compile_with`
-    //     // for filtering artifacts in missing libraries detection
-    //     let files = self.files.clone();
-    //     self.zksync_compile_with(&project.paths.root, || {
-    //         if !files.is_empty() {
-    //             project.zksync_compile_files(files)
-    //         /* TODO: evualuate supporting compiling with filters
-    //         } else if let Some(filter) = filter {
-    //             project.compile_sparse(filter)
-    //         */
-    //         } else {
-    //             project.zksync_compile()
-    //         }
-    //         .map_err(Into::into)
-    //     })
-    // }
+        // We need to clone files since we use them in `compile_with`
+        // for filtering artifacts in missing libraries detection
+        let files = self.files.clone();
+        self.zksync_compile_with(&project.paths.root, || {
+            if !files.is_empty() {
+                foundry_compilers::zksync::project_compile_files(project, files)
+            /* TODO: evualuate supporting compiling with filters
+            } else if let Some(filter) = filter {
+                project.compile_sparse(filter)
+            */
+            } else {
+                foundry_compilers::zksync::project_compile(project)
+            }
+            .map_err(Into::into)
+        })
+    }
 
     #[instrument(target = "forge::compile", skip_all)]
     fn zksync_compile_with<F>(
@@ -391,8 +391,7 @@ impl ProjectCompiler {
 
                 let art = output.find(abs_path_str, contract_name).unwrap_or_else(|| {
                     panic!(
-                        "Could not find contract {} at path {} for compilation output",
-                        contract_name, contract_path
+                        "Could not find contract {contract_name} at path {contract_path} for compilation output"
                     )
                 });
 
