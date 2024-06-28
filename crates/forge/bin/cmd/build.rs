@@ -109,8 +109,14 @@ impl BuildArgs {
                 println!("{}", serde_json::to_string_pretty(&output.output())?);
             }
         } else {
-            let project = config.project()?;
-            let zk_output = foundry_zksync_compiler::compile_project(&project)?;
+            let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
+            let zk_compiler = ProjectCompiler::new()
+                .print_names(self.names)
+                .print_sizes(self.sizes)
+                .quiet(self.format_json)
+                .bail(!self.format_json);
+
+            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
             if self.format_json {
                 println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
             }

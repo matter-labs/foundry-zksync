@@ -18,6 +18,7 @@ use foundry_compilers::{
     artifacts::{BytecodeObject, Libraries},
     compilers::{multi::MultiCompilerLanguage, Language},
     info::ContractInfo,
+    solc::{SolcCompiler, SolcLanguage},
     utils::source_files_iter,
     ArtifactId, ProjectCompileOutput,
 };
@@ -199,9 +200,24 @@ impl PreprocessedState {
             .compile(&project)?;
 
         // ZK
-        let zk_output = foundry_zksync_compiler::compile_project(&project)?;
-        let dual_compiled_contracts: DualCompiledContracts =
-            DualCompiledContracts::new(&output, &zk_output, &project.paths);
+        let dual_compiled_contracts = if script_config.config.zksync.should_compile() {
+            let zk_project = foundry_zksync_compiler::create_project(
+                &script_config.config,
+                script_config.config.cache,
+                false,
+            )?;
+            let sources_to_compile =
+                source_files_iter(project.paths.sources.as_path(), SolcLanguage::FILE_EXTENSIONS)
+                    .chain([target_path.to_path_buf()]);
+
+            let zk_compiler =
+                ProjectCompiler::new().quiet_if(args.opts.silent).files(sources_to_compile);
+
+            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
+            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
+        } else {
+            None
+        };
 
         let mut target_id: Option<ArtifactId> = None;
 
@@ -245,7 +261,7 @@ impl PreprocessedState {
                 output,
                 target,
                 project_root: project.root().clone(),
-                dual_compiled_contracts: Some(dual_compiled_contracts),
+                dual_compiled_contracts,
             },
         })
     }

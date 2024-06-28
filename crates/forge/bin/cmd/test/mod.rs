@@ -22,6 +22,7 @@ use foundry_common::{
 use foundry_compilers::{
     artifacts::output_selection::OutputSelection,
     compilers::{multi::MultiCompilerLanguage, CompilerSettings, Language},
+    solc::SolcLanguage,
     utils::source_files_iter,
 };
 use foundry_config::{
@@ -157,7 +158,7 @@ impl TestArgs {
     /// Returns sources which include any tests to be executed.
     /// If no filters are provided, sources are filtered by existence of test/invariant methods in
     /// them, If filters are provided, sources are additionaly filtered by them.
-    pub fn get_sources_to_compile(
+    pub fn get_sources_to_compile<L: Language>(
         &self,
         config: &Config,
         filter: &ProjectPathsAwareFilter,
@@ -217,10 +218,7 @@ impl TestArgs {
         }
 
         // Always recompile all sources to ensure that `getCode` cheatcode can use any artifact.
-        test_sources.extend(source_files_iter(
-            project.paths.sources,
-            MultiCompilerLanguage::FILE_EXTENSIONS,
-        ));
+        test_sources.extend(source_files_iter(project.paths.sources, L::FILE_EXTENSIONS));
 
         Ok(test_sources)
     }
@@ -266,7 +264,8 @@ impl TestArgs {
         let mut filter = self.filter(&config);
         trace!(target: "forge::test", ?filter, "using filter");
 
-        let sources_to_compile = self.get_sources_to_compile(&config, &filter)?;
+        let sources_to_compile =
+            self.get_sources_to_compile::<MultiCompilerLanguage>(&config, &filter)?;
 
         let compiler = ProjectCompiler::new()
             .quiet_if(self.json || self.opts.silent)
@@ -274,9 +273,20 @@ impl TestArgs {
 
         let output = compiler.compile(&project)?;
 
-        let zk_output = foundry_zksync_compiler::compile_project(&project)?;
-        let dual_compiled_contracts =
-            DualCompiledContracts::new(&output, &zk_output, &project.paths);
+        let dual_compiled_contracts = if config.zksync.should_compile() {
+            let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
+
+            let sources_to_compile =
+                self.get_sources_to_compile::<SolcLanguage>(&config, &filter)?;
+            let zk_compiler = ProjectCompiler::new()
+                .quiet_if(self.json || self.opts.silent)
+                .files(sources_to_compile);
+
+            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
+            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
+        } else {
+            None
+        };
 
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;
@@ -318,7 +328,7 @@ impl TestArgs {
                 output,
                 env,
                 evm_opts,
-                dual_compiled_contracts,
+                dual_compiled_contracts.unwrap_or_default(),
                 config.zksync.run_in_zk_mode(),
             )?;
 

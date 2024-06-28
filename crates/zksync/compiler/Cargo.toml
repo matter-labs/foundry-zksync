@@ -12,11 +12,14 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+foundry-config.workspace = true
 foundry-compilers = { workspace = true, features = ["svm-solc"] }
 alloy-primitives.workspace = true
 tracing.workspace = true
 serde_json.workspace = true
 serde.workspace = true
+globset = "0.4"
+semver.workspace = true
 
 # zk
 zksync_types.workspace = true
