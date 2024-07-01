@@ -384,7 +384,11 @@ impl Executor {
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
-        let result = backend.inspect(&mut env, &mut inspector)?;
+        let result = match self.zk_tx.take() {
+            None => backend.inspect(&mut env, &mut inspector)?,
+            Some(zk_tx) => backend.inspect_ref_zk(&mut env, Some(zk_tx.factory_deps))?,
+        };
+
         let mut result =
             convert_executed_result(env, inspector, result, backend.has_snapshot_failure())?;
         self.commit(&mut result);
