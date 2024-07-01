@@ -354,6 +354,8 @@ impl ScriptArgs {
         result: &ScriptResult,
         known_contracts: &ContractsByArtifact,
     ) -> Result<()> {
+        //TODO: zk mode contract size check
+
         // (name, &init, &deployed)[]
         let mut bytecodes: Vec<(String, &[u8], &[u8])> = vec![];
 
@@ -591,30 +593,32 @@ impl ScriptConfig {
             .spec(self.config.evm_spec_id())
             .gas_limit(self.evm_opts.gas_limit());
 
+        let use_zk = self.config.zksync.run_in_zk_mode();
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
-            builder = builder.inspectors(|stack| {
-                stack
-                    .debug(debug)
-                    .cheatcodes(
-                        CheatsConfig::new(
-                            &self.config,
-                            self.evm_opts.clone(),
-                            Some(known_contracts),
-                            Some(script_wallets),
-                            Some(target.version),
-                            dual_compiled_contracts,
-                            self.config.zksync.run_in_zk_mode(),
+            builder = builder
+                .inspectors(|stack| {
+                    stack
+                        .debug(debug)
+                        .cheatcodes(
+                            CheatsConfig::new(
+                                &self.config,
+                                self.evm_opts.clone(),
+                                Some(known_contracts),
+                                Some(script_wallets),
+                                Some(target.version),
+                                dual_compiled_contracts,
+                                use_zk,
+                            )
+                            .into(),
                         )
-                        .into(),
-                    )
-                    .enable_isolation(self.evm_opts.isolate)
-            });
+                        .enable_isolation(self.evm_opts.isolate)
+                })
+                .use_zk_vm(use_zk);
         }
 
         let mut executor = builder.build(env, db);
-        executor.use_zk = self.config.zksync.run_in_zk_mode();
         Ok(ScriptRunner::new(executor, self.evm_opts.clone()))
     }
 }

@@ -63,6 +63,7 @@ impl LinkedState {
 
         let target_contract = build_data.get_target_contract()?;
 
+        //TODO: zk bytecode? factory deps?
         let bytecode = target_contract.bytecode().ok_or_eyre("target contract has no bytecode")?;
 
         let (func, calldata) = args.get_method_and_calldata(&target_contract.abi)?;
