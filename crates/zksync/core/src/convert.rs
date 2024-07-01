@@ -5,6 +5,12 @@ use revm::primitives::{Address, B256};
 use zksync_basic_types::{H160, H256, U256};
 use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
 
+use alloy_primitives::{Bytes as AlloyBytes, Signature as AlloySignature};
+use zksync_web3_rs::types::{Bytes as ZkBytes, Signature as ZkSignature};
+
+mod eip712;
+pub use eip712::*;
+
 /// Conversions from [U256]
 pub trait ConvertU256 {
     /// Convert to [rU256]
@@ -127,6 +133,62 @@ impl ConvertAddress for Address {
 
     fn to_h160(self) -> H160 {
         H160::from(self.0 .0)
+    }
+}
+
+/// Conversions to/from [`ZkSignature`] & [`AlloySignature`]
+pub trait ConvertSignature {
+    /// Cast to [`ZkSignature`]
+    fn to_ethers(self) -> ZkSignature;
+    /// Cast to [`AlloySignature`]
+    fn to_alloy(self) -> AlloySignature;
+}
+
+impl ConvertSignature for ZkSignature {
+    fn to_ethers(self) -> ZkSignature {
+        self
+    }
+
+    fn to_alloy(self) -> AlloySignature {
+        AlloySignature::from_rs_and_parity(self.r.to_ru256(), self.s.to_ru256(), self.v).unwrap()
+    }
+}
+
+impl ConvertSignature for AlloySignature {
+    fn to_ethers(self) -> ZkSignature {
+        ZkSignature { r: self.r().to_u256(), s: self.s().to_u256(), v: self.v().to_u64() }
+    }
+
+    fn to_alloy(self) -> AlloySignature {
+        self
+    }
+}
+
+/// Convert to/from [`AlloyBytes`] & [`ZkBytes`]
+pub trait ConvertBytes {
+    /// Convert to [`AlloyBytes`]
+    fn to_alloy(self) -> AlloyBytes;
+    /// Convert to [`ZkBytes`]
+    fn to_ethers(self) -> ZkBytes;
+}
+
+impl ConvertBytes for AlloyBytes {
+    fn to_alloy(self) -> AlloyBytes {
+        self
+    }
+
+    fn to_ethers(self) -> ZkBytes {
+        ZkBytes(self.0)
+    }
+}
+
+impl ConvertBytes for ZkBytes {
+    fn to_alloy(self) -> AlloyBytes {
+        AlloyBytes(self.0)
+    }
+
+    fn to_ethers(self) -> ZkBytes {
+        self
     }
 }
 

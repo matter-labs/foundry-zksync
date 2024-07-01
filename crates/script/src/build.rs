@@ -143,6 +143,7 @@ impl LinkedBuildData {
             Some(&libraries),
         )?;
 
+        //TODO: zk contracts?
         let known_contracts =
             ContractsByArtifact::new(build_data.get_linker().get_linked_artifacts(&libraries)?);
 

@@ -10,6 +10,7 @@ use crate::{
     build::LinkedBuildData,
     execute::{ExecutionArtifacts, ExecutionData},
     sequence::get_commit_hash,
+    transaction::ZkTransaction,
     ScriptArgs, ScriptConfig, ScriptResult,
 };
 use alloy_network::TransactionBuilder;
@@ -135,7 +136,7 @@ impl PreSimulationState {
                         tx.gas = Some(gas as u128);
                     }
                 }
-                let tx = TransactionWithMetadata::new(
+                let tx = TransactionWithMetadata::new_with_zk(
                     tx,
                     rpc,
                     &result,
@@ -143,6 +144,7 @@ impl PreSimulationState {
                     &self.execution_artifacts.decoder,
                     created_contracts,
                     is_fixed_gas_limit,
+                    zk.map(|zk_tx| ZkTransaction { factory_deps: zk_tx.factory_deps }),
                 )?;
 
                 eyre::Ok((Some(tx), result.traces))

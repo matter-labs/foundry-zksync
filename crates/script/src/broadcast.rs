@@ -1,6 +1,6 @@
 use crate::{
     build::LinkedBuildData, progress::ScriptProgress, sequence::ScriptSequenceKind,
-    verify::BroadcastedState, ScriptArgs, ScriptConfig,
+    transaction::ZkTransaction, verify::BroadcastedState, ScriptArgs, ScriptConfig,
 };
 use alloy_chains::Chain;
 use alloy_eips::eip2718::Encodable2718;
@@ -9,6 +9,7 @@ use alloy_primitives::{utils::format_units, Address, TxHash};
 use alloy_provider::{utils::Eip1559Estimation, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
+use alloy_signer::Signer;
 use alloy_transport::Transport;
 use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
@@ -19,11 +20,17 @@ use foundry_common::{
     shell,
 };
 use foundry_config::Config;
+use foundry_wallets::WalletSigner;
+use foundry_zksync_core::convert::{ConvertAddress, ConvertBytes, ConvertEIP712Domain, ConvertSignature, ToTypedData};
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
+};
+use zksync_web3_rs::{
+    eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest},
+    types::transaction::eip712::EIP712Domain,
 };
 
 pub async fn estimate_gas<P, T>(
@@ -53,9 +60,43 @@ pub async fn next_nonce(caller: Address, provider_url: &str) -> eyre::Result<u64
     Ok(provider.get_transaction_count(caller).await?)
 }
 
+async fn convert_to_zksync(
+    provider: &Arc<RetryProvider>,
+    tx: WithOtherFields<TransactionRequest>,
+    zk: &ZkTransaction,
+) -> Result<(Eip712TransactionRequest, Eip712Transaction, EIP712Domain)> {
+    let custom_data = Eip712Meta::new().factory_deps(zk.factory_deps);
+
+    let mut deploy_request = Eip712TransactionRequest::new()
+        .r#type(zksync_web3_rs::zks_utils::EIP712_TX_TYPE)
+        .from(Address(*tx.from().unwrap()).to_h160())
+        .to(tx.to().map(|to| to.to_h160()).unwrap())
+        .chain_id(tx.chain_id().unwrap())
+        .nonce(tx.nonce().unwrap())
+        .gas_price(tx.gas_price().unwrap())
+        .max_fee_per_gas(tx.max_fee_per_gas().unwrap())
+        .data(tx.input().cloned().unwrap().to_ethers())
+        .custom_data(custom_data);
+
+    let gas_price = provider.get_gas_price().await?;
+    let fee: zksync_web3_rs::zks_provider::types::Fee =
+        provider.raw_request("zks_estimateFee".into(), [deploy_request.clone()]).await.unwrap();
+    deploy_request = deploy_request
+        .gas_limit(fee.gas_limit)
+        .max_fee_per_gas(fee.max_fee_per_gas)
+        .max_priority_fee_per_gas(fee.max_priority_fee_per_gas)
+        .gas_price(gas_price);
+
+    let signable = deploy_request.clone().try_into().wrap_err("converting deploy request")?;
+    let domain = zksync_web3_rs::types::transaction::eip712::Eip712::domain(&signable)
+        .wrap_err("unable to get eip712 domain")?;
+    Ok((deploy_request, signable, domain))
+}
+
 pub async fn send_transaction(
     provider: Arc<RetryProvider>,
     mut tx: WithOtherFields<TransactionRequest>,
+    zk: Option<&ZkTransaction>,
     kind: SendTransactionKind<'_>,
     sequential_broadcast: bool,
     is_fixed_gas_limit: bool,
@@ -89,10 +130,26 @@ pub async fn send_transaction(
         SendTransactionKind::Raw(signer) => {
             debug!("sending transaction: {:?}", tx);
 
-            let signed = tx.build(signer).await?;
+            let signed = if let Some(zk) = zk {
+                let (deploy_request, signable, domain) =
+                    convert_to_zksync(&provider, tx, zk).await?;
+
+                let signature = signer
+                    .sign_dynamic_typed_data(&signable.to_typed_data())
+                    .await
+                    .wrap_err("Failed to sign typed data")?;
+
+                let encoded = &*deploy_request
+                    .rlp_signed(signature.to_ethers())
+                    .wrap_err("able to rlp encode deploy request")?;
+
+                [&[zksync_web3_rs::zks_utils::EIP712_TX_TYPE], encoded].concat().into()
+            } else {
+                tx.build(&EthereumWallet::new(signer)).await?.encoded_2718()
+            };
 
             // Submit the raw transaction
-            provider.send_raw_transaction(signed.encoded_2718().as_ref()).await?
+            provider.send_raw_transaction(signed.as_ref()).await?
         }
     };
 
@@ -103,7 +160,7 @@ pub async fn send_transaction(
 #[derive(Clone)]
 pub enum SendTransactionKind<'a> {
     Unlocked(Address),
-    Raw(&'a EthereumWallet),
+    Raw(&'a WalletSigner),
 }
 
 /// Represents how to send _all_ transactions
@@ -111,7 +168,7 @@ pub enum SendTransactionsKind {
     /// Send via `eth_sendTransaction` and rely on the  `from` address being unlocked.
     Unlocked(HashSet<Address>),
     /// Send a signed transaction via `eth_sendRawTransaction`
-    Raw(HashMap<Address, EthereumWallet>),
+    Raw(HashMap<Address, WalletSigner>),
 }
 
 impl SendTransactionsKind {
@@ -222,11 +279,6 @@ impl BundledState {
                 );
             }
 
-            let signers = signers
-                .into_iter()
-                .map(|(addr, signer)| (addr, EthereumWallet::new(signer)))
-                .collect();
-
             SendTransactionsKind::Raw(signers)
         };
 
@@ -284,6 +336,7 @@ impl BundledState {
 
                         let kind = send_kind.for_sender(&from)?;
                         let is_fixed_gas_limit = tx_with_metadata.is_fixed_gas_limit;
+                        let zk = tx_with_metadata.zk.clone();
 
                         let mut tx = tx.clone();
                         tx.set_chain_id(sequence.chain);
@@ -301,7 +354,7 @@ impl BundledState {
                             tx.set_max_fee_per_gas(eip1559_fees.max_fee_per_gas);
                         }
 
-                        Ok((tx, kind, is_fixed_gas_limit))
+                        Ok((tx, zk, kind, is_fixed_gas_limit))
                     })
                     .collect::<Result<Vec<_>>>()?;
 
@@ -330,10 +383,11 @@ impl BundledState {
                         batch_number * batch_size,
                         batch_number * batch_size + std::cmp::min(batch_size, batch.len()) - 1
                     ));
-                    for (tx, kind, is_fixed_gas_limit) in batch {
+                    for (tx, zk, kind, is_fixed_gas_limit) in batch {
                         let fut = send_transaction(
                             provider.clone(),
                             tx.clone(),
+                            zk.as_ref(),
                             kind.clone(),
                             sequential_broadcast,
                             *is_fixed_gas_limit,

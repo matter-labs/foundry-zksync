@@ -4705,6 +4705,7 @@ dependencies = [
  "tempfile",
  "tracing",
  "yansi 1.0.1",
+ "zksync-web3-rs",
 ]
 
 [[package]]
@@ -5346,6 +5347,7 @@ dependencies = [
 name = "foundry-zksync-core"
 version = "0.0.2"
 dependencies = [
+ "alloy-dyn-abi",
  "alloy-primitives",
  "alloy-sol-types",
  "ansi_term",
@@ -5359,6 +5361,7 @@ dependencies = [
  "multivm",
  "once_cell",
  "revm",
+ "serde_json",
  "tracing",
  "url",
  "zksync-web3-rs",
