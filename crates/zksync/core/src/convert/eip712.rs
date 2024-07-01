@@ -1,7 +1,8 @@
-
+use alloy_consensus::{SignableTransaction, Transaction};
 use alloy_dyn_abi::TypedData;
+use alloy_primitives::{bytes::BufMut, Signature, B256};
 /// Conversion between ethers and alloy for EIP712 items
-use alloy_sol_types::{Eip712Domain as AlloyEip712Domain};
+use alloy_sol_types::Eip712Domain as AlloyEip712Domain;
 use zksync_web3_rs::{
     eip712::Eip712Transaction,
     types::transaction::eip712::{
@@ -50,6 +51,85 @@ impl ConvertEIP712Domain for EthersEip712Domain {
             self.verifying_contract.map(ConvertH160::to_address),
             self.salt.map(Into::into),
         )
+    }
+}
+
+/// Wrapper around [`Eip721Transaction`] implementing [`SignableTransaction`]
+pub struct Eip712SignableTransaction(Eip712Transaction);
+
+impl Transaction for Eip712SignableTransaction {
+    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+        Some(self.0.chain_id.as_u64())
+    }
+
+    fn nonce(&self) -> u64 {
+        self.0.nonce.as_u64()
+    }
+
+    fn gas_limit(&self) -> u128 {
+        self.0.gas_limit.as_u128()
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        None
+    }
+
+    fn to(&self) -> alloy_primitives::TxKind {
+        alloy_primitives::TxKind::Call(self.0.to.to_address())
+    }
+
+    fn value(&self) -> alloy_primitives::U256 {
+        self.0.value.to_ru256()
+    }
+
+    fn input(&self) -> &[u8] {
+        self.0.data.as_ref()
+    }
+}
+
+impl SignableTransaction<Signature> for Eip712SignableTransaction {
+    fn set_chain_id(&mut self, chain_id: alloy_primitives::ChainId) {
+        self.0.chain_id = chain_id.into();
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        out.put_u8(0x19);
+        out.put_u8(0x01);
+
+        let domain_separator = self.0.domain_separator().expect("able to get domain separator");
+        out.put_slice(&domain_separator);
+
+        let struct_hash = self.0.struct_hash().expect("able to get struct hash");
+        out.put_slice(&struct_hash);
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        2 + 32 + 32
+    }
+
+    fn into_signed(self, signature: Signature) -> alloy_consensus::Signed<Self, Signature>
+    where
+        Self: Sized,
+    {
+        let hash = self.0.encode_eip712().map(B256::from).expect("able to encode EIP712 hash");
+        alloy_consensus::Signed::new_unchecked(self, signature, hash)
+    }
+}
+
+/// Convert to [`SignableTransaction`]
+pub trait ToSignable<S> {
+    /// Type to convert to
+    type Signable: SignableTransaction<S>;
+
+    /// Perform conversion
+    fn to_signable_tx(self) -> Self::Signable;
+}
+
+impl ToSignable<Signature> for Eip712Transaction {
+    type Signable = Eip712SignableTransaction;
+
+    fn to_signable_tx(self) -> Self::Signable {
+        Eip712SignableTransaction(self)
     }
 }
 

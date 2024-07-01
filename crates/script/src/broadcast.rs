@@ -21,7 +21,7 @@ use foundry_common::{
 };
 use foundry_config::Config;
 use foundry_wallets::WalletSigner;
-use foundry_zksync_core::convert::{ConvertAddress, ConvertBytes, ConvertEIP712Domain, ConvertSignature, ToTypedData};
+use foundry_zksync_core::convert::{ConvertAddress, ConvertBytes, ConvertEIP712Domain, ConvertSignature, ToSignable, ToTypedData};
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{
@@ -64,8 +64,8 @@ async fn convert_to_zksync(
     provider: &Arc<RetryProvider>,
     tx: WithOtherFields<TransactionRequest>,
     zk: &ZkTransaction,
-) -> Result<(Eip712TransactionRequest, Eip712Transaction, EIP712Domain)> {
-    let custom_data = Eip712Meta::new().factory_deps(zk.factory_deps);
+) -> Result<(Eip712TransactionRequest, Eip712Transaction)> {
+    let custom_data = Eip712Meta::new().factory_deps(zk.factory_deps.clone());
 
     let mut deploy_request = Eip712TransactionRequest::new()
         .r#type(zksync_web3_rs::zks_utils::EIP712_TX_TYPE)
@@ -88,9 +88,7 @@ async fn convert_to_zksync(
         .gas_price(gas_price);
 
     let signable = deploy_request.clone().try_into().wrap_err("converting deploy request")?;
-    let domain = zksync_web3_rs::types::transaction::eip712::Eip712::domain(&signable)
-        .wrap_err("unable to get eip712 domain")?;
-    Ok((deploy_request, signable, domain))
+    Ok((deploy_request, signable))
 }
 
 pub async fn send_transaction(
@@ -131,11 +129,14 @@ pub async fn send_transaction(
             debug!("sending transaction: {:?}", tx);
 
             let signed = if let Some(zk) = zk {
-                let (deploy_request, signable, domain) =
+                let signer = signer.signer_by_address(from).wrap_err("Signer not found")?;
+
+                let (deploy_request, signable) =
                     convert_to_zksync(&provider, tx, zk).await?;
+                let mut signable = signable.to_signable_tx();
 
                 let signature = signer
-                    .sign_dynamic_typed_data(&signable.to_typed_data())
+                    .sign_transaction(&mut signable)
                     .await
                     .wrap_err("Failed to sign typed data")?;
 
@@ -145,7 +146,7 @@ pub async fn send_transaction(
 
                 [&[zksync_web3_rs::zks_utils::EIP712_TX_TYPE], encoded].concat().into()
             } else {
-                tx.build(&EthereumWallet::new(signer)).await?.encoded_2718()
+                tx.build(signer).await?.encoded_2718()
             };
 
             // Submit the raw transaction
@@ -160,7 +161,7 @@ pub async fn send_transaction(
 #[derive(Clone)]
 pub enum SendTransactionKind<'a> {
     Unlocked(Address),
-    Raw(&'a WalletSigner),
+    Raw(&'a EthereumWallet),
 }
 
 /// Represents how to send _all_ transactions
@@ -168,7 +169,7 @@ pub enum SendTransactionsKind {
     /// Send via `eth_sendTransaction` and rely on the  `from` address being unlocked.
     Unlocked(HashSet<Address>),
     /// Send a signed transaction via `eth_sendRawTransaction`
-    Raw(HashMap<Address, WalletSigner>),
+    Raw(HashMap<Address, EthereumWallet>),
 }
 
 impl SendTransactionsKind {
@@ -278,6 +279,11 @@ impl BundledState {
                     signers.keys().collect::<Vec<_>>()
                 );
             }
+
+            let signers = signers
+                .into_iter()
+                .map(|(addr, signer)| (addr, EthereumWallet::new(signer)))
+                .collect();
 
             SendTransactionsKind::Raw(signers)
         };
