@@ -163,9 +163,7 @@ impl DualCompiledContracts {
 
     /// Finds a contract matching the EVM bytecode
     pub fn find_by_evm_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
-        self.contracts.iter().find(|contract| {
-            bytecode.starts_with(&contract.evm_bytecode)
-        })
+        self.contracts.iter().find(|contract| bytecode.starts_with(&contract.evm_bytecode))
     }
 
     /// Finds a contract matching the ZK bytecode hash
