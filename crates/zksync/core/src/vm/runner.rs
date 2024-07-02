@@ -28,6 +28,7 @@ use crate::{
 
 /// Transacts
 pub fn transact<'a, DB>(
+    persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
     env: &'a mut Env,
     db: &'a mut DB,
@@ -83,12 +84,15 @@ where
         is_create,
     };
 
+    let mut cheatcode_tracer_context =
+        CheatcodeTracerContext { persisted_factory_deps, ..Default::default() };
+
     match inspect::<_, DB::Error>(
         tx,
         env,
         db,
         &mut journaled_state,
-        &mut Default::default(),
+        &mut cheatcode_tracer_context,
         call_ctx,
     ) {
         Ok(ZKVMExecutionResult { execution_result: result, .. }) => {

@@ -27,7 +27,7 @@ pub use vm::{balance, encode_create_params, nonce};
 use zksync_types::utils::storage_key_for_eth_balance;
 pub use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, L2_BASE_TOKEN_ADDRESS,
-    NONCE_HOLDER_ADDRESS,
+    NONCE_HOLDER_ADDRESS, H256,
 };
 pub use zksync_utils::bytecode::hash_bytecode;
 use zksync_web3_rs::{
