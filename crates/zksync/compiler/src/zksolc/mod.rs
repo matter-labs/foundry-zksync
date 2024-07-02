@@ -70,7 +70,7 @@ impl DualCompiledContracts {
                 .strip_prefix(&layout.artifacts)
                 .unwrap_or_else(|_| {
                     panic!(
-                        "failed stripping artifact path '{:?}' from '{:?}'",
+                        "failed stripping solc artifact path '{:?}' from '{:?}'",
                         layout.artifacts, artifact_path
                     )
                 })
@@ -108,7 +108,7 @@ impl DualCompiledContracts {
                 .strip_prefix(&layout.zksync_artifacts)
                 .unwrap_or_else(|_| {
                     panic!(
-                        "failed stripping artifact path '{:?}' from '{:?}'",
+                        "failed stripping zksolc artifact path '{:?}' from '{:?}'",
                         layout.zksync_artifacts, artifact_path
                     )
                 })
@@ -117,6 +117,7 @@ impl DualCompiledContracts {
             let maybe_bytecode = &artifact.bytecode;
             let maybe_hash = &artifact.hash;
             let maybe_factory_deps = &artifact.factory_dependencies;
+
             if let (Some(bytecode), Some(hash), Some(factory_deps_map)) =
                 (maybe_bytecode, maybe_hash, maybe_factory_deps)
             {
@@ -162,7 +163,9 @@ impl DualCompiledContracts {
 
     /// Finds a contract matching the EVM bytecode
     pub fn find_by_evm_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
-        self.contracts.iter().find(|contract| bytecode.starts_with(&contract.evm_bytecode))
+        self.contracts.iter().find(|contract| {
+            bytecode.starts_with(&contract.evm_bytecode)
+        })
     }
 
     /// Finds a contract matching the ZK bytecode hash

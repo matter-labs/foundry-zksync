@@ -12,11 +12,8 @@ pub use zksolc::*;
 pub mod libraries;
 
 use foundry_compilers::{
-    artifacts::Severity,
-    error::SolcError,
-    solc::{SolcCompiler},
-    zksolc::ZkSolc,
-    zksync::{config::ZkSolcConfig}, Project, ProjectBuilder,
+    artifacts::Severity, error::SolcError, solc::SolcCompiler, zksolc::ZkSolc,
+    zksync::config::ZkSolcConfig, Project, ProjectBuilder,
 };
 
 /// Ensures that the configured version is installed if explicitly set
