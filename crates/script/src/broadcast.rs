@@ -9,7 +9,6 @@ use alloy_primitives::{utils::format_units, Address, TxHash};
 use alloy_provider::{utils::Eip1559Estimation, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
-use alloy_signer::Signer;
 use alloy_transport::Transport;
 use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
@@ -20,18 +19,14 @@ use foundry_common::{
     shell,
 };
 use foundry_config::Config;
-use foundry_wallets::WalletSigner;
-use foundry_zksync_core::convert::{ConvertAddress, ConvertBytes, ConvertEIP712Domain, ConvertSignature, ToSignable, ToTypedData};
+use foundry_zksync_core::convert::{ConvertAddress, ConvertBytes, ConvertSignature, ToSignable};
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use zksync_web3_rs::{
-    eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest},
-    types::transaction::eip712::EIP712Domain,
-};
+use zksync_web3_rs::eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest};
 
 pub async fn estimate_gas<P, T>(
     tx: &mut WithOtherFields<TransactionRequest>,
@@ -67,18 +62,21 @@ async fn convert_to_zksync(
 ) -> Result<(Eip712TransactionRequest, Eip712Transaction)> {
     let custom_data = Eip712Meta::new().factory_deps(zk.factory_deps.clone());
 
+    let gas_price = match tx.gas_price() {
+        Some(price) => price,
+        None => provider.get_gas_price().await?,
+    };
+
     let mut deploy_request = Eip712TransactionRequest::new()
         .r#type(zksync_web3_rs::zks_utils::EIP712_TX_TYPE)
         .from(Address(*tx.from().unwrap()).to_h160())
         .to(tx.to().map(|to| to.to_h160()).unwrap())
         .chain_id(tx.chain_id().unwrap())
         .nonce(tx.nonce().unwrap())
-        .gas_price(tx.gas_price().unwrap())
-        .max_fee_per_gas(tx.max_fee_per_gas().unwrap())
-        .data(tx.input().cloned().unwrap().to_ethers())
+        .data(tx.input().cloned().unwrap_or_default().to_ethers())
+        .gas_price(gas_price)
         .custom_data(custom_data);
 
-    let gas_price = provider.get_gas_price().await?;
     let fee: zksync_web3_rs::zks_provider::types::Fee =
         provider.raw_request("zks_estimateFee".into(), [deploy_request.clone()]).await.unwrap();
     deploy_request = deploy_request
@@ -129,10 +127,9 @@ pub async fn send_transaction(
             debug!("sending transaction: {:?}", tx);
 
             let signed = if let Some(zk) = zk {
-                let signer = signer.signer_by_address(from).wrap_err("Signer not found")?;
+                let signer = signer.signer_by_address(from).ok_or(eyre::eyre!("Signer not found"))?;
 
-                let (deploy_request, signable) =
-                    convert_to_zksync(&provider, tx, zk).await?;
+                let (deploy_request, signable) = convert_to_zksync(&provider, tx, zk).await?;
                 let mut signable = signable.to_signable_tx();
 
                 let signature = signer
