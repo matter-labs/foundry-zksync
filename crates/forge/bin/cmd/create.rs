@@ -394,6 +394,7 @@ impl CreateArgs {
             via_ir: self.opts.via_ir,
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
+            zksync: self.opts.compiler.zk.enabled(),
         };
 
         // Check config for Etherscan API Keys to avoid preflight check failing if no
@@ -539,7 +540,7 @@ impl CreateArgs {
                     .constructor()
                     .ok_or_else(|| eyre::eyre!("could not find constructor"))?
                     .abi_encode_input(&args)?;
-                constructor_args = Some(hex::encode(encoded_args));
+                constructor_args = Some(hex::encode_prefixed(encoded_args));
             }
 
             self.verify_preflight_check(contract, constructor_args.clone(), chain).await?;
@@ -589,6 +590,7 @@ impl CreateArgs {
             via_ir: self.opts.via_ir,
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
+            zksync: self.opts.compiler.zk.enabled(),
         };
         println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
         verify.run().await.map(|_| address)
