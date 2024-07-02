@@ -66,6 +66,7 @@ pub struct CreateArgs {
         long,
         value_hint = ValueHint::FilePath,
         value_name = "PATH",
+        conflicts_with = "constructor_args",
     )]
     constructor_args_path: Option<PathBuf>,
 
@@ -73,7 +74,8 @@ pub struct CreateArgs {
     #[clap(
         long,
         help = "Deploy the missing dependency libraries from last build.",
-        default_value_t = false
+        default_value_t = false,
+        conflicts_with = "contract"
     )]
     deploy_missing_libraries: bool,
 
@@ -603,7 +605,9 @@ impl CreateArgs {
         constructor: &Constructor,
         constructor_args: &[String],
     ) -> Result<Vec<DynSolValue>> {
-        let mut params = Vec::with_capacity(constructor.inputs.len());
+        let expected_params = constructor.inputs.len();
+
+        let mut params = Vec::with_capacity(expected_params);
         for (input, arg) in constructor.inputs.iter().zip(constructor_args) {
             // resolve the input type directly
             let ty = input
@@ -611,6 +615,17 @@ impl CreateArgs {
                 .wrap_err_with(|| format!("Could not resolve constructor arg: input={input}"))?;
             params.push((ty, arg));
         }
+
+        let actual_params = params.len();
+
+        if actual_params != expected_params {
+            tracing::warn!(
+                given = actual_params,
+                expected = expected_params,
+               "Constructor argument mismatch: expected {expected_params} arguments, but received {actual_params}. Ensure that the number of arguments provided matches the constructor definition."
+            );
+        }
+
         let params = params.iter().map(|(ty, arg)| (ty, arg.as_str()));
         parse_tokens(params)
     }
