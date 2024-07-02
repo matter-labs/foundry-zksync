@@ -505,7 +505,7 @@ pub const MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: usize = 100000; // 100kB
 /// For large factory_deps the VM can run out of gas. To avoid this case we batch factory_deps
 /// on the basis of [MAX_FACTORY_DEPENDENCIES_SIZE_BYTES] and deploy all but the last batch
 /// via empty transactions, with the last one deployed normally via create.
-fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec<u8>>> {
+pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec<u8>>> {
     let factory_deps_count = factory_deps.len();
     let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
     let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();

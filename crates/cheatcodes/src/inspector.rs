@@ -1591,7 +1591,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     );
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(data, call.gas_limit);
 
-                    let zk_tx = if self.use_zk_vm {
+                    let mut zk_tx = if self.use_zk_vm {
                         to = Some(CONTRACT_DEPLOYER_ADDRESS.to_address());
                         nonce = foundry_zksync_core::nonce(
                             broadcast.new_origin,
@@ -1617,13 +1617,46 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                         );
                         bytecode = Bytes::from(create_input);
 
-                        Some(ZkTransactionMetadata { factory_deps })
+                        Some(factory_deps)
                     } else {
                         None
                     };
 
+                    let rpc = data.db.active_fork_url();
+
+                    if let Some(factory_deps) = zk_tx {
+                        let mut batched =
+                            foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
+                        debug!(batches = batched.len(), "splitting factory deps for broadcast");
+                        // the last batch is the final one that does the deployment
+                        zk_tx = batched.pop();
+
+                        for factory_deps in batched.into_iter() {
+                            self.broadcastable_transactions.push_back(BroadcastableTransaction {
+                                rpc: rpc.clone(),
+                                transaction: TransactionRequest {
+                                    from: Some(broadcast.new_origin),
+                                    to: Some(Address::ZERO),
+                                    value: Some(call.value),
+                                    input: TransactionInput::default(),
+                                    nonce: Some(U64::from(nonce)),
+                                    gas: if is_fixed_gas_limit {
+                                        Some(U256::from(call.gas_limit))
+                                    } else {
+                                        None
+                                    },
+                                    ..Default::default()
+                                },
+                                zk_tx: Some(ZkTransactionMetadata { factory_deps }),
+                            });
+
+                            //update nonce for each tx
+                            nonce += 1;
+                        }
+                    }
+
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc: data.db.active_fork_url(),
+                        rpc: rpc.clone(),
                         transaction: TransactionRequest {
                             from: Some(broadcast.new_origin),
                             to,
@@ -1637,8 +1670,9 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         },
-                        zk_tx,
+                        zk_tx: zk_tx.map(|factory_deps| ZkTransactionMetadata { factory_deps }),
                     });
+
                     let kind = match call.scheme {
                         CreateScheme::Create => "create",
                         CreateScheme::Create2 { .. } => "create2",
