@@ -54,7 +54,7 @@ impl ConvertEIP712Domain for EthersEip712Domain {
     }
 }
 
-/// Wrapper around [`Eip721Transaction`] implementing [`SignableTransaction`]
+/// Wrapper around [`Eip712Transaction`] implementing [`SignableTransaction`]
 pub struct Eip712SignableTransaction(Eip712Transaction);
 
 impl Transaction for Eip712SignableTransaction {
