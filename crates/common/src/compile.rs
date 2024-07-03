@@ -22,7 +22,6 @@ use foundry_linking::Linker;
 use foundry_zksync_compiler::libraries::{self, ZkMissingLibrary};
 use num_format::{Locale, ToFormattedString};
 use rustc_hash::FxHashMap;
-use semver::Version;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Display,
@@ -281,7 +280,14 @@ impl ProjectCompiler {
         // We need to clone files since we use them in `compile_with`
         // for filtering artifacts in missing libraries detection
         let files = self.files.clone();
-        self.zksync_compile_with(&project.paths.root, &project.zksync_zksolc.version()?, || {
+
+        {
+            Report::new(SpinnerReporter::spawn_with(format!(
+                "Using zksolc-{}",
+                project.zksync_zksolc.version()?
+            )));
+        }
+        self.zksync_compile_with(&project.paths.root, || {
             if !files.is_empty() {
                 foundry_compilers::zksync::project_compile_files(project, files)
             /* TODO: evualuate supporting compiling with filters
@@ -299,7 +305,6 @@ impl ProjectCompiler {
     fn zksync_compile_with<F>(
         self,
         root_path: impl AsRef<Path>,
-        version: &Version,
         f: F,
     ) -> Result<ZkProjectCompileOutput>
     where
@@ -312,10 +317,7 @@ impl ProjectCompiler {
             Report::new(NoReporter::default())
         } else {
             if std::io::stdout().is_terminal() {
-                Report::new(SpinnerReporter::spawn_with(format!(
-                    "Compiling (zksync-{})...",
-                    version
-                )))
+                Report::new(SpinnerReporter::spawn_with("Compiling (zksync)"))
             } else {
                 Report::new(BasicStdoutReporter::default())
             }
