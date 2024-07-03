@@ -82,6 +82,7 @@ where
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create,
+        is_static: false,
     };
 
     let mut cheatcode_tracer_context =
@@ -191,6 +192,7 @@ where
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create: true,
+        is_static: false,
     };
 
     inspect_as_batch(tx, env, db, journaled_state, &mut ccx, call_ctx)
@@ -246,6 +248,7 @@ where
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create: false,
+        is_static: call.is_static,
     };
 
     inspect(tx, env, db, journaled_state, &mut ccx, call_ctx)

@@ -51,9 +51,16 @@ contract DeployScript is Script {
         );
         require(success, "zkVm() call failed");
         vm.startBroadcast();
+
         greeter = new Greeter();
-        greeter.greeting("john");
         greeter.setAge(123);
+
+        uint256 age = greeter.getAge();
+
+        greeter.greeting("john");
+
         vm.stopBroadcast();
+
+        assert(age == 123);
     }
 }
