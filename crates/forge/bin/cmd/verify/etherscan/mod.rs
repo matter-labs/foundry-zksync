@@ -359,10 +359,10 @@ impl EtherscanVerificationProvider {
                     compiler_version = Version::new(solc.major, solc.minor, solc.patch);
                 }
 
-                let compilermode = if zk.is_zksync_solc { "zksync" } else { "solc" }.to_string();
+                let compiler_mode = if zk.is_zksync_solc { "zksync" } else { "solc" }.to_string();
 
                 vec![
-                    ("compilermode".to_string(), compilermode),
+                    ("compilermode".to_string(), compiler_mode),
                     ("zksolcVersion".to_string(), format!("v{}", zk.zksolc)),
                 ]
             }
