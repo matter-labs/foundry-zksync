@@ -661,7 +661,7 @@ impl ScriptArgs {
                 .nonce(legacy_or_1559.nonce().unwrap())
                 .gas_price(legacy_or_1559.gas_price().unwrap())
                 .max_fee_per_gas(legacy_or_1559.max_cost().unwrap())
-                .data(legacy_or_1559.data().cloned().unwrap())
+                .data(legacy_or_1559.data().cloned().unwrap_or_default())
                 .custom_data(custom_data);
 
             let gas_price = provider.get_gas_price().await?;
