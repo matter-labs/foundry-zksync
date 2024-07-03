@@ -639,7 +639,7 @@ impl<DB: DatabaseExt + DatabaseCommit + Send> Inspector<&mut DB> for InspectorSt
     fn step_end(&mut self, interpreter: &mut Interpreter, ecx: &mut EvmContext<&mut DB>) {
         call_inspectors_adjust_depth!(
             #[no_ret]
-            [&mut self.tracer, &mut self.chisel_state, &mut self.printer],
+            [&mut self.tracer, &mut self.cheatcodes, &mut self.printer],
             |inspector| inspector.step_end(interpreter, ecx),
             self,
             ecx
