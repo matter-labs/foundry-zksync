@@ -117,6 +117,10 @@ pub struct VerifyArgs {
 
     #[clap(flatten)]
     pub verifier: VerifierArgs,
+
+    /// Verify for zksync
+    #[clap(long)]
+    pub zksync: bool,
 }
 
 impl_figment_convert!(VerifyArgs);
@@ -146,6 +150,7 @@ impl figment::Provider for VerifyArgs {
         if self.via_ir {
             dict.insert("via_ir".to_string(), figment::value::Value::serialize(self.via_ir)?);
         }
+
         Ok(figment::value::Map::from([(Config::selected_profile(), dict)]))
     }
 }
