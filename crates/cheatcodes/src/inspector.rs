@@ -1631,7 +1631,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                         // the last batch is the final one that does the deployment
                         zk_tx = batched.pop();
 
-                        for factory_deps in batched.into_iter() {
+                        for factory_deps in batched {
                             self.broadcastable_transactions.push_back(BroadcastableTransaction {
                                 rpc: rpc.clone(),
                                 transaction: TransactionRequest {
