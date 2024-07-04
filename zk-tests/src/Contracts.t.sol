@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console2 as console} from "forge-std/Test.sol";
 import {ConstantNumber} from "./ConstantNumber.sol";
+import {Greeter} from "./Greeter.sol";
 
 interface ISystemContractDeployer {
     function getNewAddressCreate2(
@@ -299,5 +300,33 @@ contract ZkContractsTest is Test {
 
         assertEq(42, multiNumber.one());
         assertEq(2, multiNumber.two());
+    }
+
+    function testZkStaticCalls() public {
+        (bool success, ) = address(vm).call(
+            abi.encodeWithSignature("zkVm(bool)", true)
+        );
+        require(success, "zkVm() call failed");
+        address sender = address(this);
+        uint64 startingNonce = vm.getNonce(sender);
+
+        //this ensures calls & deployments increase the nonce
+        vm.startBroadcast(sender);
+
+        Greeter greeter = new Greeter();
+        assert(vm.getNonce(sender) == startingNonce + 1);
+
+        greeter.setAge(42);
+        assert(vm.getNonce(sender) == startingNonce + 2);
+
+        // static-call, nonce shouldn't change
+        uint256 age = greeter.getAge();
+        assert(age == 42);
+        assert(vm.getNonce(sender) == startingNonce + 2);
+
+        uint256 num = greeter.greeting2("zksync", 2);
+        assert(num == 4);
+        assert(vm.getNonce(sender) == startingNonce + 3);
+        vm.stopBroadcast();
     }
 }
