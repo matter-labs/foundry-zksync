@@ -647,6 +647,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
         }
     }
 
+    #[inline]
     fn step_end(&mut self, interpreter: &mut Interpreter, ecx: &mut EvmContext<DB>) {
         // ovverride address(x).balance retrieval to make it consistent between EraVM and EVM
         if self.use_zk_vm {

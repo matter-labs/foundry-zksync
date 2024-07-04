@@ -18,7 +18,7 @@ use foundry_compilers::{
     artifacts::{BytecodeObject, Libraries},
     compilers::{multi::MultiCompilerLanguage, Language},
     info::ContractInfo,
-    solc::{SolcCompiler, SolcLanguage},
+    solc::SolcLanguage,
     utils::source_files_iter,
     ArtifactId, ProjectCompileOutput,
 };
