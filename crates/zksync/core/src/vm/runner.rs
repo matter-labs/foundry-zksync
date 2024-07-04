@@ -77,6 +77,7 @@ where
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create,
+        is_static: false,
     };
 
     match inspect::<_, DB::Error>(tx, &mut ecx, &mut Default::default(), call_ctx) {
@@ -162,6 +163,7 @@ where
         block_timestamp: ecx.env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
         is_create: true,
+        is_static: false,
     };
 
     inspect_as_batch(tx, ecx, &mut ccx, call_ctx)
@@ -218,6 +220,7 @@ where
         block_timestamp: ecx.env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
         is_create: false,
+        is_static: call.is_static,
     };
 
     inspect(tx, ecx, &mut ccx, call_ctx)

@@ -347,6 +347,7 @@ fn inspect_inner<S: ReadStorage + Send>(
             expected_calls.insert(*addr, v.clone());
         }
     }
+    let is_static = call_ctx.is_static;
     let tracers = vec![
         CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
         CheatcodeTracer::new(
@@ -412,7 +413,11 @@ fn inspect_inner<S: ReadStorage + Send>(
         .iter()
         .map(|b| bytecode_to_factory_dep(b.original.clone()))
         .collect();
-    let modified_keys = storage.borrow().modified_storage_keys().clone();
+    let modified_keys = if is_static {
+        Default::default()
+    } else {
+        storage.borrow().modified_storage_keys().clone()
+    };
     (tx_result, bytecodes, modified_keys)
 }
 
