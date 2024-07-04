@@ -14,7 +14,7 @@ use zksync_types::{
     U256,
 };
 
-use std::{cmp::min, fmt::Debug};
+use std::{cmp::min, collections::HashMap, fmt::Debug};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertRU256, ConvertU256},
@@ -28,6 +28,7 @@ use crate::{
 
 /// Transacts
 pub fn transact<'a, DB>(
+    persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
     env: &'a mut Env,
     db: &'a mut DB,
@@ -36,7 +37,7 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Send + Debug,
 {
-    debug!("zk transact");
+    debug!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|v| v.len()).unwrap_or_default(), "zk transact");
     let mut journaled_state = JournaledState::new(
         SpecId::LATEST,
         Precompiles::new(PrecompileSpecId::LATEST).addresses().into_iter().copied().collect(),
@@ -51,7 +52,7 @@ where
     };
 
     let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller);
-    info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
+    debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         transact_to,
         env.tx.data.to_vec(),
@@ -80,7 +81,9 @@ where
         is_static: false,
     };
 
-    match inspect::<_, DB::Error>(tx, &mut ecx, &mut Default::default(), call_ctx) {
+    let mut ccx = CheatcodeTracerContext { persisted_factory_deps, ..Default::default() };
+
+    match inspect::<_, DB::Error>(tx, &mut ecx, &mut ccx, call_ctx) {
         Ok(ZKVMExecutionResult { execution_result: result, .. }) => {
             Ok(ResultAndState { result, state: journaled_state.finalize().0 })
         }
