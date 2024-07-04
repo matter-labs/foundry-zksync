@@ -59,6 +59,13 @@ pub struct ZkTransactionMetadata {
     pub factory_deps: Vec<Vec<u8>>,
 }
 
+impl ZkTransactionMetadata {
+    /// Create a new [`ZkTransactionMetadata`] with the given factory deps
+    pub fn new(factory_deps: Vec<Vec<u8>>) -> Self {
+        Self { factory_deps }
+    }
+}
+
 /// Creates a new signed EIP-712 transaction with the provided factory deps.
 pub async fn new_eip712_transaction<M: Middleware, S: Signer>(
     legacy_or_1559: TypedTransaction,
