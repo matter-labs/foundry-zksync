@@ -84,6 +84,9 @@ rustc-hash.workspace = true
 num-format.workspace = true
 chrono.workspace = true
 
+# zksync
+globset = "0.4"
+
 [dev-dependencies]
 foundry-macros.workspace = true
 similar-asserts.workspace = true

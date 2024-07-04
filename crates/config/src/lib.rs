@@ -833,12 +833,6 @@ impl Config {
         // when setting up the builder for the sake of consistency (requires dedicated
         // builder methods)
         project.zksync_zksolc_config = ZkSolcConfig { settings: self.zksync_zksolc_settings()? };
-        project.zksync_avoid_contracts = self.zksync.avoid_contracts.clone().map(|patterns| {
-            patterns
-                .into_iter()
-                .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
-                .collect::<Vec<_>>()
-        });
 
         if let Some(zksolc) = self.zksync_ensure_zksolc()? {
             project.zksync_zksolc = zksolc;

@@ -118,4 +118,13 @@ impl ZkSyncConfig {
             solc: self.solc_path.clone(),
         }
     }
+
+    pub fn avoid_contracts(&self) -> Option<Vec<globset::GlobMatcher>> {
+        self.avoid_contracts.clone().map(|patterns| {
+            patterns
+                .into_iter()
+                .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
+                .collect::<Vec<_>>()
+        })
+    }
 }
