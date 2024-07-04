@@ -17,6 +17,8 @@ foundry-cheatcodes-common.workspace = true
 foundry-zksync-compiler.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
+alloy-dyn-abi.workspace = true
+alloy-consensus.workspace = true
 hex.workspace = true
 itertools.workspace = true
 revm = { workspace = true, default-features = false, features = [
@@ -30,6 +32,7 @@ revm = { workspace = true, default-features = false, features = [
     "optimism",
 ] }
 tracing.workspace = true
+serde_json.workspace = true
 
 # zk
 multivm.workspace = true

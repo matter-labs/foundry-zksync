@@ -57,5 +57,8 @@ alloy-primitives.workspace = true
 alloy-eips.workspace = true
 alloy-transport.workspace = true
 
+# zksync
+zksync-web3-rs.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
