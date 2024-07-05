@@ -2,7 +2,7 @@ use alloy_chains::Chain;
 use alloy_primitives::{utils::format_units, TxHash, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types::AnyTransactionReceipt;
-use eyre::{Context, Result};
+use eyre::Result;
 use foundry_common::provider::RetryProvider;
 use std::time::Duration;
 

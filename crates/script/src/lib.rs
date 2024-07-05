@@ -618,7 +618,7 @@ impl ScriptConfig {
                 .use_zk_vm(use_zk);
         }
 
-        let mut executor = builder.build(env, db);
+        let executor = builder.build(env, db);
         Ok(ScriptRunner::new(executor, self.evm_opts.clone()))
     }
 }
