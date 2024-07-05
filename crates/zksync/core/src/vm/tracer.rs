@@ -107,6 +107,8 @@ pub struct CallContext {
     pub block_basefee: rU256,
     /// Whether the current call is a create.
     pub is_create: bool,
+    /// Wheter the current call is a static call.
+    pub is_static: bool,
 }
 
 /// A tracer to allow for foundry-specific functionality.
