@@ -36,10 +36,10 @@ pub struct ZkSyncConfig {
     /// Force evmla for zkSync
     pub force_evmla: bool,
 
+    /// The extra LLVM options.
     pub llvm_options: Vec<String>,
+
     /// Detect missing libraries, instead of erroring
-    ///
-    /// Currently unused
     pub detect_missing_libraries: bool,
 
     /// Source files to avoid compiling on zksolc
