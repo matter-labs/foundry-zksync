@@ -14,7 +14,7 @@ use zksync_types::{
     U256,
 };
 
-use std::{cmp::min, fmt::Debug};
+use std::{cmp::min, collections::HashMap, fmt::Debug};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertRU256, ConvertU256},
@@ -28,6 +28,7 @@ use crate::{
 
 /// Transacts
 pub fn transact<'a, DB>(
+    persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
     env: &'a mut Env,
     db: &'a mut DB,
@@ -36,7 +37,7 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
 {
-    debug!("zk transact");
+    debug!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|v| v.len()).unwrap_or_default(), "zk transact");
     let mut journaled_state = JournaledState::new(
         env.cfg.spec_id,
         Precompiles::new(to_precompile_id(env.cfg.spec_id))
@@ -55,7 +56,7 @@ where
     };
 
     let (gas_limit, max_fee_per_gas) = gas_params(env, db, &mut journaled_state, caller);
-    info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
+    debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         transact_to,
         env.tx.data.to_vec(),
@@ -81,14 +82,18 @@ where
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create,
+        is_static: false,
     };
+
+    let mut cheatcode_tracer_context =
+        CheatcodeTracerContext { persisted_factory_deps, ..Default::default() };
 
     match inspect::<_, DB::Error>(
         tx,
         env,
         db,
         &mut journaled_state,
-        &mut Default::default(),
+        &mut cheatcode_tracer_context,
         call_ctx,
     ) {
         Ok(ZKVMExecutionResult { execution_result: result, .. }) => {
@@ -187,6 +192,7 @@ where
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create: true,
+        is_static: false,
     };
 
     inspect_as_batch(tx, env, db, journaled_state, &mut ccx, call_ctx)
@@ -242,6 +248,7 @@ where
         block_timestamp: env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create: false,
+        is_static: call.is_static,
     };
 
     inspect(tx, env, db, journaled_state, &mut ccx, call_ctx)

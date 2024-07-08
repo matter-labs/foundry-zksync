@@ -75,6 +75,8 @@ pub struct Executor {
 
     /// Sets up the next transaction to be executed as a ZK transaction.
     zk_tx: Option<ZkTransactionMetadata>,
+    // simulate persisted factory deps
+    zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
 
     pub use_zk: bool,
 }
@@ -92,7 +94,15 @@ impl Executor {
             },
         );
 
-        Executor { backend, env, inspector, gas_limit, zk_tx: None, use_zk: false }
+        Executor {
+            backend,
+            env,
+            inspector,
+            gas_limit,
+            zk_tx: None,
+            zk_persisted_factory_deps: Default::default(),
+            use_zk: false,
+        }
     }
 
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
@@ -324,7 +334,11 @@ impl Executor {
         let mut db = FuzzBackendWrapper::new(&self.backend);
 
         let result = match &self.zk_tx {
-            Some(zk_tx) => db.inspect_ref_zk(&mut env, Some(zk_tx.factory_deps.clone()))?,
+            Some(zk_tx) => db.inspect_ref_zk(
+                &mut env,
+                &mut self.zk_persisted_factory_deps.clone(),
+                Some(zk_tx.factory_deps.clone()),
+            )?,
             None => db.inspect_ref(&mut env, &mut inspector)?,
         };
 
@@ -345,8 +359,12 @@ impl Executor {
         // execute the call
         let mut inspector = self.inspector.clone();
 
-        let result = match self.zk_tx.take() {
-            Some(zk_tx) => self.backend.inspect_ref_zk(&mut env, Some(zk_tx.factory_deps))?,
+        let result = match &self.zk_tx {
+            Some(zk_tx) => self.backend.inspect_ref_zk(
+                &mut env,
+                &mut self.zk_persisted_factory_deps.clone(),
+                Some(zk_tx.factory_deps.clone()),
+            )?,
             None => self.backend.inspect_ref(&mut env, &mut inspector)?,
         };
 
@@ -356,6 +374,16 @@ impl Executor {
     /// Commit the changeset to the database and adjust `self.inspector_config`
     /// values according to the executed call result
     fn commit(&mut self, result: &mut RawCallResult) {
+        // Persist factory deps from just executed tx
+        if let Some(zk_tx) = self.zk_tx.take() {
+            self.zk_persisted_factory_deps.extend(
+                zk_tx
+                    .factory_deps
+                    .into_iter()
+                    .map(|dep| (foundry_zksync_core::hash_bytecode(&dep), dep)),
+            );
+        }
+
         // Persist changes to db
         if let Some(changes) = &result.state_changeset {
             self.backend.commit(changes.clone());

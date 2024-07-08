@@ -9,7 +9,7 @@ use tracing::info;
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_nonce_key,
-    utils::storage_key_for_eth_balance,
+    utils::{decompose_full_nonce, storage_key_for_eth_balance},
     ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
     L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
@@ -109,13 +109,17 @@ pub fn set_nonce<'a, DB>(
     <DB as Database>::Error: Debug,
 {
     info!(?address, ?nonce, "cheatcode setNonce");
+    //ensure nonce is _only_ tx nonce
+    let (tx_nonce, _deploy_nonce) = decompose_full_nonce(nonce.to_u256());
 
     let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
     journaled_state.load_account(nonce_addr, db).expect("account could not be loaded");
     let zk_address = address.to_h160();
     let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
     journaled_state.touch(&nonce_addr);
-    journaled_state.sstore(nonce_addr, nonce_key, nonce, db).expect("failed storing value");
+    journaled_state
+        .sstore(nonce_addr, nonce_key, tx_nonce.to_ru256(), db)
+        .expect("failed storing value");
 }
 
 /// Gets nonce for a specific address.
@@ -134,9 +138,10 @@ where
     journaled_state.load_account(nonce_addr, db).expect("account could not be loaded");
     let zk_address = address.to_h160();
     let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
-    let (nonce, _) = journaled_state.sload(nonce_addr, nonce_key, db).unwrap_or_default();
+    let (full_nonce, _) = journaled_state.sload(nonce_addr, nonce_key, db).unwrap_or_default();
 
-    nonce
+    let (tx_nonce, _deploy_nonce) = decompose_full_nonce(full_nonce.to_u256());
+    tx_nonce.to_ru256()
 }
 
 /// Sets code for a specific address.
