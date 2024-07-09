@@ -20,6 +20,7 @@ use foundry_linking::{LinkOutput, Linker};
 use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
+
 use std::{
     borrow::Borrow,
     collections::BTreeMap,
@@ -370,6 +371,7 @@ impl MultiContractRunnerBuilder {
         self,
         root: &Path,
         output: ProjectCompileOutput<C>,
+        zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
         dual_compiled_contracts: DualCompiledContracts,

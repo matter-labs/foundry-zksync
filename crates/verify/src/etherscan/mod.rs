@@ -18,7 +18,12 @@ use futures::FutureExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::{BuildMetadata, Version};
-use std::fmt::Debug;
+
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 mod flatten;
 mod standard_json;
@@ -38,6 +43,14 @@ trait EtherscanSourceProvider: Send + Sync + Debug {
         &self,
         args: &VerifyArgs,
         context: &VerificationContext,
+    ) -> Result<(String, String, CodeFormat)>;
+
+    fn zk_source(
+        &self,
+        args: &VerifyArgs,
+        project: &Project,
+        target: &Path,
+        version: &Version,
     ) -> Result<(String, String, CodeFormat)>;
 }
 
@@ -167,6 +180,10 @@ impl VerificationProvider for EtherscanVerificationProvider {
                         return Err(eyre!("Verification is still pending...",))
                     }
 
+                    if resp.result == "In progress" {
+                        return Err(eyre!("Verification is in progress...",))
+                    }
+
                     if resp.result == "Unable to verify" {
                         return Err(eyre!("Unable to verify.",))
                     }
@@ -211,6 +228,7 @@ impl EtherscanVerificationProvider {
         context: &VerificationContext,
     ) -> Result<(Client, VerifyContract)> {
         let config = args.try_load_config_emit_warnings()?;
+
         let etherscan = self.client(
             args.etherscan.chain.unwrap_or_default(),
             args.verifier.verifier_url.as_deref(),
@@ -300,6 +318,29 @@ impl EtherscanVerificationProvider {
             _ => BuildMetadata::EMPTY,
         };
 
+        let zk_compiler_version = self.zk_compiler_version(args, &config, &project)?;
+        let (source, contract_name, code_format) = if let Some(zk) = &zk_compiler_version {
+            self.source_provider(args).zk_source(args, context)
+        } else {
+            self.source_provider(args).source(args, context)
+        }?;
+
+        let zk_args = match zk_compiler_version {
+            None => vec![],
+            Some(zk) => {
+                if let Some(solc) = zk.solc {
+                    compiler_version = Version::new(solc.major, solc.minor, solc.patch);
+                }
+
+                let compiler_mode = if zk.is_zksync_solc { "zksync" } else { "solc" }.to_string();
+
+                vec![
+                    ("compilermode".to_string(), compiler_mode),
+                    ("zksolcVersion".to_string(), format!("v{}", zk.zksolc)),
+                ]
+            }
+        };
+
         let compiler_version =
             format!("v{}", ensure_solc_build_metadata(context.compiler_version.clone()).await?);
         let constructor_args = self.constructor_args(args, context).await?;
@@ -307,6 +348,7 @@ impl EtherscanVerificationProvider {
             VerifyContract::new(args.address, contract_name, source, compiler_version)
                 .constructor_arguments(constructor_args)
                 .code_format(code_format);
+        verify_args.other.extend(zk_args.into_iter());
 
         if args.via_ir {
             // we explicitly set this __undocumented__ argument to true if provided by the user,
@@ -327,6 +369,69 @@ impl EtherscanVerificationProvider {
         }
 
         Ok(verify_args)
+    }
+
+    fn zk_compiler_version(
+        &mut self,
+        args: &VerifyArgs,
+        config: &Config,
+        project: &Project,
+    ) -> Result<Option<ZkVersion>> {
+        if !args.zksync {
+            return Ok(None);
+        }
+
+        //TODO: remove when foundry-compilers zksolc detection is fixed for 1.5.0
+        let get_zksolc_compiler_version = |path: &std::path::Path| -> Result<Version> {
+            use std::process::*;
+            let mut cmd = Command::new(path);
+            cmd.arg("--version")
+                .stdin(Stdio::piped())
+                .stderr(Stdio::piped())
+                .stdout(Stdio::piped());
+            debug!(?cmd, "getting ZkSolc version");
+            let output = cmd.output().wrap_err("error retrieving --version for zksolc")?;
+
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let version = stdout
+                    .lines()
+                    .filter(|l| !l.trim().is_empty())
+                    .last()
+                    .ok_or(eyre!("Version not found in zksolc output"))?;
+                Ok(Version::from_str(
+                    version
+                        .split_whitespace()
+                        .find(|s| s.starts_with('v'))
+                        .ok_or(eyre!("Unable to retrieve version from zksolc output"))?
+                        .trim_start_matches('v'),
+                )?)
+            } else {
+                Err(eyre!("zkSolc error: {}", String::from_utf8_lossy(&output.stderr)))
+                    .wrap_err("Error retrieving zksolc version with --version")
+            }
+        };
+
+        let zksolc = get_zksolc_compiler_version(project.zksync_zksolc.zksolc.as_ref())?;
+        let mut is_zksync_solc = false;
+
+        let solc = if let Some(solc) = &config.zksync.solc_path {
+            let solc = Solc::new(solc);
+            let version = solc.version().wrap_err(
+                "unable to retrieve version of solc in use with zksolc via `solc_path`",
+            )?;
+            //TODO: determine if this solc is zksync or not
+            Some(version)
+        } else {
+            //if there's no `solc_path` specified then we use the same
+            // as the project version, but the zksync forc
+            is_zksync_solc = true;
+            Some(project.solc.version().wrap_err(
+                "unable to retrieve version of solc in use with zksolc via project `solc`",
+            )?)
+        };
+
+        Ok(Some(ZkVersion { zksolc, solc, is_zksync_solc }))
     }
 
     /// Return the optional encoded constructor arguments. If the path to
@@ -440,6 +545,13 @@ async fn ensure_solc_build_metadata(version: Version) -> Result<Version> {
     } else {
         Ok(lookup_compiler_version(&version).await?)
     }
+}
+
+#[derive(Debug)]
+pub struct ZkVersion {
+    zksolc: Version,
+    solc: Option<Version>,
+    is_zksync_solc: bool,
 }
 
 #[cfg(test)]

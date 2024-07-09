@@ -87,6 +87,8 @@ pub struct Executor {
 
     /// Sets up the next transaction to be executed as a ZK transaction.
     zk_tx: Option<ZkTransactionMetadata>,
+    // simulate persisted factory deps
+    zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
 
     pub use_zk: bool,
 }
@@ -113,7 +115,15 @@ impl Executor {
             },
         );
 
-        Self { backend, env, inspector, gas_limit, zk_tx: None, use_zk: false }
+        Self {
+            backend,
+            env,
+            inspector,
+            gas_limit,
+            zk_tx: None,
+            zk_persisted_factory_deps: Default::default(),
+            use_zk: false,
+        }
     }
 
     /// Returns the spec ID of the executor.
