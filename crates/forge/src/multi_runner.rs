@@ -453,7 +453,6 @@ impl MultiContractRunnerBuilder {
                                         immutable_references: BTreeMap::new(),
                                     }),
                                 };
-                                warn!("id: {:?}", id);
                                 zk_contracts_map.insert(id.clone(), compact_contract);
                             }
                         }

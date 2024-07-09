@@ -339,7 +339,6 @@ impl<'a> ContractRunner<'a> {
 
         // Invariant testing requires tracing to figure out what contracts were created.
         let has_invariants = self.contract.abi.functions().any(|func| func.is_invariant_test());
-        warn!("has_invariants: {:?}", has_invariants);
         let tmp_tracing = self.executor.inspector.tracer.is_none() && has_invariants && call_setup;
         if tmp_tracing {
             self.executor.set_tracing(true);
@@ -397,7 +396,6 @@ impl<'a> ContractRunner<'a> {
                 &setup.deployments,
             )
         });
-        warn!("identified_contracts: {:?}", identified_contracts);
         let test_results = functions
             .par_iter()
             .map(|&func| {
