@@ -6,6 +6,8 @@
 /// ZKSolc specific logic.
 mod zksolc;
 
+use std::path::Path;
+
 use foundry_config::{Config, SkipBuildFilters, SolcReq};
 pub use zksolc::*;
 
@@ -13,7 +15,7 @@ pub mod libraries;
 
 use foundry_compilers::{
     artifacts::Severity, error::SolcError, solc::SolcCompiler, zksolc::ZkSolc,
-    zksync::config::ZkSolcConfig, Project, ProjectBuilder,
+    zksync::config::ZkSolcConfig, Compiler, Project, ProjectBuilder,
 };
 
 /// Ensures that the configured version is installed if explicitly set
@@ -112,4 +114,30 @@ pub fn create_project(
     }
 
     Ok(project)
+}
+
+/// Obtain a standard json input for zksolc
+pub fn standard_json_input<C: Compiler>(
+    project: &Project<C>,
+    target_path: impl AsRef<Path>,
+) -> Result<serde_json::Value, SolcError>
+where
+    C::Settings: Into<foundry_compilers::artifacts::Settings>,
+{
+    let input = project.standard_json_input(target_path)?;
+    tracing::debug!(?input.settings.remappings, "standard_json_input for zksync");
+
+    let mut settings = project.zksync_zksolc_config.settings.clone();
+    settings.libraries.libs = settings
+        .libraries
+        .libs
+        .into_iter()
+        .map(|(f, libs)| (f.strip_prefix(project.root()).unwrap_or(&f).to_path_buf(), libs))
+        .collect();
+    let settings = serde_json::to_value(settings).expect("able to serialize settings as json");
+
+    let mut serialized = serde_json::to_value(input).expect("able to serialize input as json");
+    serialized["settings"] = settings;
+
+    Ok(serialized)
 }
