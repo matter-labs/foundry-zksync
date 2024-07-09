@@ -111,15 +111,24 @@ impl TraceIdentifier for LocalTraceIdentifier<'_> {
     where
         A: Iterator<Item = (&'a Address, Option<&'a [u8]>)>,
     {
-        trace!(target: "evm::traces", "identify {:?} addresses", addresses.size_hint().1);
+        warn!(target: "evm::traces", "identify {:?} addresses", addresses.size_hint().1);
+
+        warn!("self.known_contracts: {:?}", self.known_contracts);
 
         addresses
+            .filter(|(address, code)| {
+                warn!("address in identify: {:?}", address);
+                warn!("code: {:?}", code);
+                true
+            })
             .filter_map(|(address, code)| {
                 let _span = trace_span!(target: "evm::traces", "identify", %address).entered();
 
-                trace!(target: "evm::traces", "identifying");
+                warn!(target: "evm::traces", "identifying");
                 let (id, abi) = self.identify_code(code?)?;
-                trace!(target: "evm::traces", id=%id.identifier(), "identified");
+                warn!("id: {:?}", id);
+                warn!("abi: {:?}", abi);
+                warn!(target: "evm::traces", id=%id.identifier(), "identified");
 
                 Some(AddressIdentity {
                     address: *address,

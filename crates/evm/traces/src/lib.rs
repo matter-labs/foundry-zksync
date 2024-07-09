@@ -303,8 +303,18 @@ pub fn load_contracts<'a>(
     let decoder = CallTraceDecoder::new();
     let mut contracts = ContractsByAddress::new();
     for trace in traces {
-        for address in local_identifier.identify_addresses(decoder.trace_addresses(trace)) {
-            if let (Some(contract), Some(abi)) = (address.contract, address.abi) {
+        warn!("trace: {:?}", trace);
+        let a = decoder.trace_addresses(trace);
+        for (address, _) in a.clone() {
+            warn!("address in trace: {:?}", address);
+        }
+        let identified_addresses = local_identifier.identify_addresses(a);
+        for address in identified_addresses {
+            let contract = address.contract;
+            let abi = address.abi;
+            warn!("contract: {:?}", contract);
+            warn!("abi: {:?}", abi);
+            if let (Some(contract), Some(abi)) = (contract, abi) {
                 contracts.insert(address.address, (contract, abi.into_owned()));
             }
         }
