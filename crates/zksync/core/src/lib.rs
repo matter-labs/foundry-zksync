@@ -199,45 +199,6 @@ pub async fn estimate_gas<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
     Ok(EstimatedGas { price: gas_price, limit: fee.gas_limit.low_u128() })
 }
 
-// /// Estimates the gas parameters for the provided transaction.
-// pub async fn estimate_gas<M: Middleware>(
-//     legacy_or_1559: &TypedTransaction,
-//     factory_deps: Vec<Vec<u8>>,
-//     provider: M,
-// ) -> Result<EstimatedGas> {
-//     let to = legacy_or_1559
-//         .to()
-//         .and_then(|to| to.as_address())
-//         .cloned()
-//         .ok_or_eyre("`to` cannot be empty")?;
-//     let chain_id = legacy_or_1559.chain_id().ok_or_eyre("`chain_id` cannot be empty")?;
-//     let nonce = legacy_or_1559.nonce().ok_or_eyre("`nonce` cannot be empty")?;
-//     let gas_price = legacy_or_1559.gas_price().ok_or_eyre("`gas_price` cannot be empty")?;
-//     let data = legacy_or_1559.data().cloned().ok_or_eyre("`data` cannot be empty")?;
-//     let custom_data = Eip712Meta::new().factory_deps(factory_deps);
-
-//     let mut deploy_request = Eip712TransactionRequest::new()
-//         .r#type(EIP712_TX_TYPE)
-//         .to(to)
-//         .chain_id(chain_id.as_u64())
-//         .nonce(nonce)
-//         .gas_price(gas_price)
-//         .data(data)
-//         .custom_data(custom_data);
-//     if let Some(from) = legacy_or_1559.from() {
-//         deploy_request = deploy_request.from(*from)
-//     }
-
-//     let gas_price = provider.get_gas_price().await.unwrap();
-//     let fee: Fee = provider
-//         .provider()
-//         .request("zks_estimateFee", [deploy_request.clone()])
-//         .await
-//         .map_err(|err| eyre!("failed rpc call for estimating fee: {:?}", err))?;
-
-//     Ok(EstimatedGas { price: gas_price.to_ru256(), limit: fee.gas_limit.to_ru256() })
-// }
-
 /// Returns true if the provided address is a reserved zkSync system address
 /// All addresses less than 2^16 are considered reserved addresses.
 pub fn is_system_address(address: Address) -> bool {
