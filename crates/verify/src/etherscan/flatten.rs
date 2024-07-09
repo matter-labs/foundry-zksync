@@ -10,6 +10,10 @@ use foundry_compilers::{
         Compiler, CompilerInput,
     },
     solc::Solc,
+    zksolc::{
+        input::{ZkSolcInput, ZkSolcVersionedInput},
+        ZkSolc,
+    },
     AggregatedCompilerOutput,
 };
 use semver::{BuildMetadata, Version};
@@ -59,24 +63,29 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
     fn zk_source(
         &self,
         args: &VerifyArgs,
-        project: &Project,
-        target: &Path,
-        version: &Version,
+        context: &VerificationContext,
     ) -> Result<(String, String, CodeFormat)> {
-        let metadata = project.zksync_zksolc_config.settings.metadata.as_ref();
+        let metadata = context.project.zksync_zksolc_config.settings.metadata.as_ref();
         let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
 
         eyre::ensure!(
-            bch == ZkBytecodeHash::Keccak256,
+            bch == foundry_compilers::zksolc::settings::BytecodeHash::Keccak256,
             "When using flattened source with zksync, bytecodeHash must be set to keccak256 because Etherscan uses Keccak256 in its Compiler Settings when re-compiling your code. BytecodeHash is currently: {}. Hint: Set the bytecodeHash key in your foundry.toml :)",
             bch,
         );
 
-        let source = project.flatten(target).wrap_err("Failed to flatten contract")?;
+        let source = context
+            .project
+            .paths
+            .clone()
+            .with_language::<SolcLanguage>()
+            .flatten(&context.target_path)
+            .wrap_err("Failed to flatten contract")?;
 
         if !args.force {
             // solc dry run of flattened code
-            self.zk_check_flattened(source.clone(), version, target).map_err(|err| {
+            self.check_flattened(source.clone(), &context.compiler_version, &context.target_path)
+                .map_err(|err| {
                 eyre::eyre!(
                     "Failed to compile the flattened code locally: `{}`\
             To skip this solc dry, have a look at the `--force` flag of this command.",
@@ -85,8 +94,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
             })?;
         }
 
-        let name = args.contract.name.clone();
-        Ok((source, name, CodeFormat::SingleFile))
+        Ok((source, context.target_name.clone(), CodeFormat::SingleFile))
     }
 }
 
@@ -164,16 +172,23 @@ Diagnostics: {diags}",
         let zksolc = ZkSolc::find_installed_version(&version)?
             .unwrap_or(ZkSolc::blocking_install(&version)?);
 
-        let input = ZkCompilerInput {
-            language: "Solidity".to_string(),
-            sources: BTreeMap::from([("contract.sol".into(), Source::new(content))]),
-            settings: Default::default(),
+        let mut input = ZkSolcVersionedInput {
+            input: ZkSolcInput {
+                language: SolcLanguage::Solidity,
+                sources: BTreeMap::from([("contract.sol".into(), Source::new(content))]),
+                ..Default::default()
+            },
+            solc_version: version,
+            allow_paths: Default::default(),
+            base_path: Default::default(),
+            include_paths: Default::default(),
         };
 
-        let (out, _) = zksolc.compile(&input)?;
+        let out = zksolc.compile(&mut input)?;
         if out.has_error() {
-            let mut o = ZkAggregatedCompilerOutput::default();
-            o.extend(version, out);
+            let o = AggregatedCompilerOutput::<SolcCompiler>::default();
+            // TODO: RawBuildInfo cannot accept zksolc's CompilerOutput
+            // o.extend(version.clone(), RawBuildInfo::new(&input, &out, false)?, out);
             let diags = o.diagnostics(&[], &[], Default::default());
 
             eyre::bail!(

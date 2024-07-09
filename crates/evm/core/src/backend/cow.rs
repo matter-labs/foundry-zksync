@@ -19,7 +19,10 @@ use revm::{
     },
     Database, DatabaseCommit, JournaledState,
 };
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+};
 
 use super::ForkInfo;
 

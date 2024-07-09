@@ -10,6 +10,7 @@ use eyre::Result;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
     artifacts::Libraries, compilers::Compiler, Artifact, ArtifactId, ProjectCompileOutput,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm::{
@@ -377,6 +378,7 @@ impl MultiContractRunnerBuilder {
         dual_compiled_contracts: DualCompiledContracts,
         use_zk: bool,
     ) -> Result<MultiContractRunner> {
+        // TODO: Use zk_output
         let output = output.with_stripped_file_prefixes(root);
         let linker = Linker::new(root, output.artifact_ids().collect());
 

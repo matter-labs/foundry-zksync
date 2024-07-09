@@ -1829,12 +1829,12 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                                 rpc: rpc.clone(),
                                 transaction: TransactionRequest {
                                     from: Some(broadcast.new_origin),
-                                    to: Some(Address::ZERO),
+                                    to: Some(TxKind::Call(Address::ZERO)),
                                     value: Some(call.value),
                                     input: TransactionInput::default(),
-                                    nonce: Some(U64::from(nonce)),
+                                    nonce: Some(nonce),
                                     gas: if is_fixed_gas_limit {
-                                        Some(U256::from(call.gas_limit))
+                                        Some(call.gas_limit as u128)
                                     } else {
                                         None
                                     },

@@ -11,7 +11,7 @@ use foundry_block_explorers::{
 };
 use foundry_cli::utils::{self, read_constructor_args_file, LoadConfig};
 use foundry_common::{abi::encode_function_args, retry::Retry, shell};
-use foundry_compilers::{artifacts::BytecodeObject, Artifact};
+use foundry_compilers::{artifacts::BytecodeObject, solc::Solc, Artifact};
 use foundry_config::{Chain, Config};
 use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
 use futures::FutureExt;
@@ -19,11 +19,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::{BuildMetadata, Version};
 
-use std::{
-    fmt::Debug,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{fmt::Debug, str::FromStr};
 
 mod flatten;
 mod standard_json;
@@ -48,9 +44,7 @@ trait EtherscanSourceProvider: Send + Sync + Debug {
     fn zk_source(
         &self,
         args: &VerifyArgs,
-        project: &Project,
-        target: &Path,
-        version: &Version,
+        context: &VerificationContext,
     ) -> Result<(String, String, CodeFormat)>;
 }
 
@@ -309,21 +303,20 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &VerificationContext,
     ) -> Result<VerifyContract> {
-        let (source, contract_name, code_format) =
-            self.source_provider(args).source(args, context)?;
+        let zk_compiler_version = self.zk_compiler_version(args, &context)?;
+        let (source, contract_name, code_format) = if let Some(zk) = &zk_compiler_version {
+            let mut zk_context = context.clone();
+            zk_context.compiler_version = zk.zksolc.clone();
+            self.source_provider(args).zk_source(args, &zk_context)
+        } else {
+            self.source_provider(args).source(args, context)
+        }?;
 
         let mut compiler_version = context.compiler_version.clone();
         compiler_version.build = match RE_BUILD_COMMIT.captures(compiler_version.build.as_str()) {
             Some(cap) => BuildMetadata::new(cap.name("commit").unwrap().as_str())?,
             _ => BuildMetadata::EMPTY,
         };
-
-        let zk_compiler_version = self.zk_compiler_version(args, &config, &project)?;
-        let (source, contract_name, code_format) = if let Some(zk) = &zk_compiler_version {
-            self.source_provider(args).zk_source(args, context)
-        } else {
-            self.source_provider(args).source(args, context)
-        }?;
 
         let zk_args = match zk_compiler_version {
             None => vec![],
@@ -374,8 +367,7 @@ impl EtherscanVerificationProvider {
     fn zk_compiler_version(
         &mut self,
         args: &VerifyArgs,
-        config: &Config,
-        project: &Project,
+        context: &VerificationContext,
     ) -> Result<Option<ZkVersion>> {
         if !args.zksync {
             return Ok(None);
@@ -412,23 +404,19 @@ impl EtherscanVerificationProvider {
             }
         };
 
-        let zksolc = get_zksolc_compiler_version(project.zksync_zksolc.zksolc.as_ref())?;
+        let zksolc = get_zksolc_compiler_version(context.project.zksync_zksolc.zksolc.as_ref())?;
         let mut is_zksync_solc = false;
 
-        let solc = if let Some(solc) = &config.zksync.solc_path {
-            let solc = Solc::new(solc);
-            let version = solc.version().wrap_err(
-                "unable to retrieve version of solc in use with zksolc via `solc_path`",
-            )?;
+        let solc = if let Some(solc) = &context.config.zksync.solc_path {
+            let solc = Solc::new(solc)?;
+            let version = solc.version;
             //TODO: determine if this solc is zksync or not
             Some(version)
         } else {
             //if there's no `solc_path` specified then we use the same
             // as the project version, but the zksync forc
             is_zksync_solc = true;
-            Some(project.solc.version().wrap_err(
-                "unable to retrieve version of solc in use with zksolc via project `solc`",
-            )?)
+            Some(context.compiler_version.clone())
         };
 
         Ok(Some(ZkVersion { zksolc, solc, is_zksync_solc }))
