@@ -401,7 +401,7 @@ impl Executor {
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
-        let result = match self.zk_tx.take() {
+        let result_and_state = match self.zk_tx.take() {
             None => backend.inspect(&mut env, &mut inspector)?,
             Some(zk_tx) => backend.inspect_ref_zk(
                 &mut env,
@@ -411,9 +411,24 @@ impl Executor {
                 Some(zk_tx.factory_deps),
             )?,
         };
+        let mut result = convert_executed_result(
+            env,
+            inspector,
+            result_and_state.clone(),
+            backend.has_snapshot_failure(),
+        )?;
+        let state = result_and_state.state.clone();
+        if let Some(traces) = &mut result.traces {
+            for trace_node in traces.nodes() {
+                if let Some(account_info) = state.get(&trace_node.trace.address) {
+                    result.deployments.insert(
+                        trace_node.trace.address,
+                        account_info.info.code.clone().unwrap_or_default().bytes(),
+                    );
+                }
+            }
+        }
 
-        let mut result =
-            convert_executed_result(env, inspector, result, backend.has_snapshot_failure())?;
         self.commit(&mut result);
         Ok(result)
     }
@@ -724,11 +739,14 @@ pub struct RawCallResult {
     pub out: Option<Output>,
     /// The chisel state
     pub chisel_state: Option<(Vec<U256>, Vec<u8>, InstructionResult)>,
+    /// The deployments generated during the call
+    pub deployments: HashMap<Address, Bytes>,
 }
 
 impl Default for RawCallResult {
     fn default() -> Self {
         Self {
+            deployments: HashMap::new(),
             exit_reason: InstructionResult::Continue,
             reverted: false,
             has_snapshot_failure: false,
@@ -886,6 +904,7 @@ fn convert_executed_result(
     };
 
     Ok(RawCallResult {
+        deployments: HashMap::new(),
         exit_reason,
         reverted: !matches!(exit_reason, return_ok!()),
         has_snapshot_failure,

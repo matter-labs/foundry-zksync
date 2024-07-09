@@ -7,14 +7,9 @@ use crate::{
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
-use foundry_common::{
-    get_contract_name, BytecodeData, ContractData, ContractsByArtifact, TestFunctionExt,
-};
+use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    artifacts::{
-        BytecodeObject, CompactBytecode, CompactContractBytecode, CompactDeployedBytecode,
-        Libraries,
-    },
+    artifacts::{CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Libraries},
     compilers::Compiler,
     zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     Artifact, ArtifactId, ProjectCompileOutput,
@@ -29,10 +24,9 @@ use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
 use std::{
-    borrow::{Borrow, BorrowMut},
+    borrow::Borrow,
     collections::BTreeMap,
     fmt::Debug,
-    os::unix::net::SocketAddr,
     path::Path,
     sync::{mpsc, Arc},
     time::Instant,

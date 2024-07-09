@@ -8,12 +8,12 @@
 #[macro_use]
 extern crate tracing;
 
-use alloy_primitives::LogData;
+use alloy_primitives::{Address, Bytes, LogData};
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use foundry_evm_core::constants::CHEATCODE_ADDRESS;
 use futures::{future::BoxFuture, FutureExt};
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
+use std::{collections::HashMap, fmt::Write};
 use yansi::{Color, Paint};
 
 /// Call trace address identifiers.
@@ -298,12 +298,13 @@ fn trace_color(trace: &CallTrace) -> Color {
 pub fn load_contracts<'a>(
     traces: impl IntoIterator<Item = &'a CallTraceArena>,
     known_contracts: &ContractsByArtifact,
+    deployments: &HashMap<Address, Bytes>,
 ) -> ContractsByAddress {
     let mut local_identifier = LocalTraceIdentifier::new(known_contracts);
+    local_identifier.deployments = deployments.clone();
     let decoder = CallTraceDecoder::new();
     let mut contracts = ContractsByAddress::new();
     for trace in traces {
-        warn!("trace: {:?}", trace);
         let a = decoder.trace_addresses(trace);
         for (address, _) in a.clone() {
             warn!("address in trace: {:?}", address);

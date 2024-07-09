@@ -17,5 +17,6 @@ mainnet = "https://mainnet.era.zksync.io:443"
 testnet = "https://testnet.era.zksync.dev:443"
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
-[invariant]
+[profile.default.invariant]
 runs = 10
+depth = 1

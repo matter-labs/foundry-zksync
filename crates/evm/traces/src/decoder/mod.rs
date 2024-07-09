@@ -240,12 +240,8 @@ impl CallTraceDecoder {
             .nodes()
             .iter()
             .map(|node| {
-                {
-                    let address = &node.trace.address;
-                    let output = node.trace.kind.is_any_create().then_some(&node.trace.output[..]);
-                    warn!("trace address: {:?}, output: {:?}", address, output);
-                    (address, output)
-                }
+                let address = &node.trace.address;
+                let output = node.trace.kind.is_any_create().then_some(&node.trace.output[..]);                (address, output)
             })
             .filter(|&(address, _)| {
                 !self.labels.contains_key(address) || !self.contracts.contains_key(address)
