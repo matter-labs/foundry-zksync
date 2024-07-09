@@ -9,8 +9,9 @@ use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    artifacts::Libraries, compilers::Compiler, Artifact, ArtifactId, ProjectCompileOutput,
-    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
+    artifacts::Libraries, compilers::Compiler,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact, ArtifactId,
+    ProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm::{

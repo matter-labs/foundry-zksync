@@ -118,7 +118,8 @@ impl CreateArgs {
             let config = self.opts.try_load_config_emit_warnings()?;
             let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
             let zk_compiler = ProjectCompiler::new().quiet(self.json || self.opts.silent);
-            let mut zk_output = zk_compiler.zksync_compile(&zk_project)?;
+            let mut zk_output =
+                zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
 
             let artifact = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
@@ -650,6 +651,7 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
+            zksync: true,
         };
         println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
         verify.run().await
@@ -765,7 +767,6 @@ where
     P: Provider<T, AnyNetwork>,
     T: Transport + Clone,
 {
-
     /// Set zksync's factory deps.
     pub fn set_zk_factory_deps(mut self, deps: Vec<Vec<u8>>) -> Self {
         self.zk_factory_deps = Some(deps);

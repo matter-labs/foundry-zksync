@@ -282,8 +282,9 @@ impl TestArgs {
                 .quiet_if(self.json || self.opts.silent)
                 .files(sources_to_compile);
 
-            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
-            let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output, &project.paths);
+            let zk_output = zk_compiler.zksync_compile(&zk_project, None)?;
+            let dual_compiled_contracts =
+                DualCompiledContracts::new(&output, &zk_output, &project.paths);
             (Some(zk_output), Some(dual_compiled_contracts))
         } else {
             (None, None)
