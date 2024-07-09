@@ -87,6 +87,8 @@ pub struct Executor {
 
     /// Sets up the next transaction to be executed as a ZK transaction.
     zk_tx: Option<ZkTransactionMetadata>,
+    // simulate persisted factory deps
+    zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
 
     pub use_zk: bool,
 }
@@ -113,7 +115,15 @@ impl Executor {
             },
         );
 
-        Self { backend, env, inspector, gas_limit, zk_tx: None, use_zk: false }
+        Self {
+            backend,
+            env,
+            inspector,
+            gas_limit,
+            zk_tx: None,
+            zk_persisted_factory_deps: Default::default(),
+            use_zk: false,
+        }
     }
 
     /// Returns the spec ID of the executor.
@@ -376,7 +386,14 @@ impl Executor {
     pub fn call_with_env(&self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let mut backend = CowBackend::new(&self.backend);
-        let result = backend.inspect(&mut env, &mut inspector)?;
+        let result = match &self.zk_tx {
+            None => backend.inspect(&mut env, &mut inspector)?,
+            Some(zk_tx) => backend.inspect_ref_zk(
+                &mut env,
+                &mut self.zk_persisted_factory_deps.clone(),
+                Some(zk_tx.factory_deps.clone()),
+            )?,
+        };
         convert_executed_result(env, inspector, result, backend.has_snapshot_failure())
     }
 
@@ -386,7 +403,13 @@ impl Executor {
         let backend = &mut self.backend;
         let result = match self.zk_tx.take() {
             None => backend.inspect(&mut env, &mut inspector)?,
-            Some(zk_tx) => backend.inspect_ref_zk(&mut env, Some(zk_tx.factory_deps))?,
+            Some(zk_tx) => backend.inspect_ref_zk(
+                &mut env,
+                // this will persist the added factory deps,
+                // no need to commit them later
+                &mut self.zk_persisted_factory_deps,
+                Some(zk_tx.factory_deps),
+            )?,
         };
 
         let mut result =

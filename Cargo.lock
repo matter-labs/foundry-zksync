@@ -4917,6 +4917,7 @@ dependencies = [
  "foundry-linking",
  "foundry-macros",
  "foundry-zksync-compiler",
+ "globset",
  "itertools 0.13.0",
  "num-format",
  "once_cell",

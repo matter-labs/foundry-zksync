@@ -35,7 +35,7 @@ pub use vm::{balance, encode_create_params, nonce};
 
 use zksync_types::utils::storage_key_for_eth_balance;
 pub use zksync_types::{
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, L2_BASE_TOKEN_ADDRESS,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, L2_BASE_TOKEN_ADDRESS,
     NONCE_HOLDER_ADDRESS,
 };
 pub use zksync_utils::bytecode::hash_bytecode;
@@ -63,6 +63,13 @@ pub fn get_balance_key(address: Address) -> rU256 {
 pub struct ZkTransactionMetadata {
     /// Factory Deps for ZK transactions.
     pub factory_deps: Vec<Vec<u8>>,
+}
+
+impl ZkTransactionMetadata {
+    /// Create a new [`ZkTransactionMetadata`] with the given factory deps
+    pub fn new(factory_deps: Vec<Vec<u8>>) -> Self {
+        Self { factory_deps }
+    }
 }
 
 /// Creates a new signed EIP-712 transaction with the provided factory deps.

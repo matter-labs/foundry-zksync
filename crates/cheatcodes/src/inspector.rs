@@ -1788,7 +1788,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     let mut nonce = account.info.nonce;
                     let mut call_init_code = call.init_code.clone();
 
-                    let zk_tx = if self.use_zk_vm {
+                    let mut zk_tx = if self.use_zk_vm {
                         to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
                         nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx) as u64;
                         let contract = self
@@ -1810,13 +1810,45 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                         );
                         call_init_code = Bytes::from(create_input);
 
-                        Some(ZkTransactionMetadata { factory_deps })
+                        Some(factory_deps)
                     } else {
                         None
                     };
 
+                    let rpc = ecx.db.active_fork_url();
+                    if let Some(factory_deps) = zk_tx {
+                        let mut batched =
+                            foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
+                        debug!(batches = batched.len(), "splitting factory deps for broadcast");
+                        // the last batch is the final one that does the deployment
+                        zk_tx = batched.pop();
+
+                        for factory_deps in batched {
+                            self.broadcastable_transactions.push_back(BroadcastableTransaction {
+                                rpc: rpc.clone(),
+                                transaction: TransactionRequest {
+                                    from: Some(broadcast.new_origin),
+                                    to: Some(TxKind::Call(Address::ZERO)),
+                                    value: Some(call.value),
+                                    input: TransactionInput::default(),
+                                    nonce: Some(nonce),
+                                    gas: if is_fixed_gas_limit {
+                                        Some(call.gas_limit as u128)
+                                    } else {
+                                        None
+                                    },
+                                    ..Default::default()
+                                },
+                                zk_tx: Some(ZkTransactionMetadata { factory_deps }),
+                            });
+
+                            //update nonce for each tx
+                            nonce += 1;
+                        }
+                    }
+
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc: ecx.db.active_fork_url(),
+                        rpc: rpc.clone(),
                         transaction: TransactionRequest {
                             from: Some(broadcast.new_origin),
                             to,
@@ -1830,7 +1862,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         },
-                        zk_tx,
+                        zk_tx: zk_tx.map(|factory_deps| ZkTransactionMetadata { factory_deps }),
                     });
 
                     let kind = match call.scheme {

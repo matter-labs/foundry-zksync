@@ -308,7 +308,7 @@ revm-primitives = { git = "https://github.com/bluealloy/revm.git", rev = "41e2f7
 # era_test_node = { path = "../era-test-node" }
 
 # [patch."https://github.com/Moonsong-Labs/compilers"]
-# foundry-compilers = { path = "../msl-compilers" }
+# foundry-compilers = { path = "../compilers/crates/compilers/" }
 
 # [patch."https://github.com/matter-labs/era-boojum"]
 # cs_derive = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }
