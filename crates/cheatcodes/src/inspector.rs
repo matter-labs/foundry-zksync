@@ -1830,7 +1830,13 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                                     from: Some(broadcast.new_origin),
                                     to: Some(TxKind::Call(Address::ZERO)),
                                     value: Some(call.value),
+                                    input: TransactionInput::default(),
                                     nonce: Some(nonce),
+                                    gas: if is_fixed_gas_limit {
+                                        Some(call.gas_limit as u128)
+                                    } else {
+                                        None
+                                    },
                                     ..Default::default()
                                 },
                                 zk_tx: Some(ZkTransactionMetadata { factory_deps }),
@@ -1842,7 +1848,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     }
 
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc,
+                        rpc: rpc.clone(),
                         transaction: TransactionRequest {
                             from: Some(broadcast.new_origin),
                             to,
@@ -1856,7 +1862,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         },
-                        zk_tx: zk_tx.map(ZkTransactionMetadata::new),
+                        zk_tx: zk_tx.map(|factory_deps| ZkTransactionMetadata { factory_deps }),
                     });
 
                     let kind = match call.scheme {

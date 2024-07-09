@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.18;
 
-import {console2 as console} from "forge-std/console2.sol";
-
 contract Greeter {
     string name;
     uint256 age;
@@ -11,8 +9,10 @@ contract Greeter {
 
     function greeting(string memory _name) public returns (string memory) {
         name = _name;
+
         string memory greet = string(abi.encodePacked("Hello ", _name));
         emit Greet(greet);
+
         return greet;
     }
 
@@ -21,9 +21,10 @@ contract Greeter {
         uint256 n
     ) public returns (uint256) {
         name = _name;
+
         string memory greet = string(abi.encodePacked("Hello ", _name));
-        console.log(name);
         emit Greet(greet);
+
         return n * 2;
     }
 

@@ -23,6 +23,7 @@ use foundry_linking::{LinkOutput, Linker};
 use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
+
 use std::{
     borrow::Borrow,
     collections::BTreeMap,

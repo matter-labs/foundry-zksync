@@ -86,7 +86,7 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?address, ?nonce, "cheatcode setNonce");
-    // ensure nonce is _only_ tx nonce
+    //ensure nonce is _only_ tx nonce
     let (tx_nonce, _deploy_nonce) = decompose_full_nonce(nonce.to_u256());
 
     let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
@@ -112,7 +112,6 @@ where
     let (full_nonce, _) = ecx.sload(nonce_addr, nonce_key).unwrap_or_default();
 
     let (tx_nonce, _deploy_nonce) = decompose_full_nonce(full_nonce.to_u256());
-
     tx_nonce.to_ru256()
 }
 

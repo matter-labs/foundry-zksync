@@ -43,6 +43,7 @@ pub struct CreateArgs {
         long,
         value_hint = ValueHint::FilePath,
         value_name = "PATH",
+        conflicts_with = "constructor_args",
     )]
     constructor_args_path: Option<PathBuf>,
 
@@ -192,6 +193,7 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
+            zksync: self.opts.compiler.zk.enabled(),
         };
 
         // Check config for Etherscan API Keys to avoid preflight check failing if no
@@ -288,7 +290,7 @@ impl CreateArgs {
                     .constructor()
                     .ok_or_else(|| eyre::eyre!("could not find constructor"))?
                     .abi_encode_input(&args)?;
-                constructor_args = Some(hex::encode(encoded_args));
+                constructor_args = Some(hex::encode_prefixed(encoded_args));
             }
 
             self.verify_preflight_check(constructor_args.clone(), chain).await?;
@@ -340,6 +342,7 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
+            zksync: self.opts.compiler.zk.enabled(),
         };
         println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
         verify.run().await
@@ -354,7 +357,9 @@ impl CreateArgs {
         constructor: &Constructor,
         constructor_args: &[String],
     ) -> Result<Vec<DynSolValue>> {
-        let mut params = Vec::with_capacity(constructor.inputs.len());
+        let expected_params = constructor.inputs.len();
+
+        let mut params = Vec::with_capacity(expected_params);
         for (input, arg) in constructor.inputs.iter().zip(constructor_args) {
             // resolve the input type directly
             let ty = input
@@ -362,6 +367,17 @@ impl CreateArgs {
                 .wrap_err_with(|| format!("Could not resolve constructor arg: input={input}"))?;
             params.push((ty, arg));
         }
+
+        let actual_params = params.len();
+
+        if actual_params != expected_params {
+            tracing::warn!(
+                given = actual_params,
+                expected = expected_params,
+               "Constructor argument mismatch: expected {expected_params} arguments, but received {actual_params}. Ensure that the number of arguments provided matches the constructor definition."
+            );
+        }
+
         let params = params.iter().map(|(ty, arg)| (ty, arg.as_str()));
         parse_tokens(params).map_err(Into::into)
     }
