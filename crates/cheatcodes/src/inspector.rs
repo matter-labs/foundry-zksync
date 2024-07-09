@@ -1816,7 +1816,6 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     };
 
                     let rpc = ecx.db.active_fork_url();
-
                     if let Some(factory_deps) = zk_tx {
                         let mut batched =
                             foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);

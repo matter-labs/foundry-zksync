@@ -52,7 +52,7 @@ where
     };
 
     let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller);
-    info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
+    debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         transact_to,
         env.tx.data.to_vec(),
@@ -81,15 +81,9 @@ where
         is_static: false,
     };
 
-    let mut cheatcode_tracer_context =
-        CheatcodeTracerContext { persisted_factory_deps, ..Default::default() };
+    let mut ccx = CheatcodeTracerContext { persisted_factory_deps, ..Default::default() };
 
-    match inspect::<_, DB::Error>(
-        tx,
-        &mut ecx,
-        &mut cheatcode_tracer_context,
-        call_ctx,
-    ) {
+    match inspect::<_, DB::Error>(tx, &mut ecx, &mut ccx, call_ctx) {
         Ok(ZKVMExecutionResult { execution_result: result, .. }) => {
             Ok(ResultAndState { result, state: journaled_state.finalize().0 })
         }

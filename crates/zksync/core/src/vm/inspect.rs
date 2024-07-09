@@ -413,13 +413,11 @@ fn inspect_inner<S: ReadStorage + Send>(
         .iter()
         .map(|b| bytecode_to_factory_dep(b.original.clone()))
         .collect();
-
     let modified_keys = if is_static {
         Default::default()
     } else {
         storage.borrow().modified_storage_keys().clone()
     };
-
     (tx_result, bytecodes, modified_keys)
 }
 

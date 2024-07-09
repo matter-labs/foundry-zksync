@@ -4705,6 +4705,7 @@ dependencies = [
  "tempfile",
  "tracing",
  "yansi 1.0.1",
+ "zksync-web3-rs",
 ]
 
 [[package]]
@@ -4916,6 +4917,7 @@ dependencies = [
  "foundry-linking",
  "foundry-macros",
  "foundry-zksync-compiler",
+ "globset",
  "itertools 0.13.0",
  "num-format",
  "once_cell",
@@ -4938,7 +4940,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#a472fde21e0232f07d803d517b29a9bf92da9f95"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#d2e5d2720b36b23467f226d5a38e1d950994980d"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -4950,7 +4952,6 @@ dependencies = [
  "foundry-compilers-core",
  "fs_extra",
  "futures-util",
- "globset",
  "home",
  "itertools 0.13.0",
  "md-5",
@@ -4977,7 +4978,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#a472fde21e0232f07d803d517b29a9bf92da9f95"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#d2e5d2720b36b23467f226d5a38e1d950994980d"
 dependencies = [
  "foundry-compilers-artifacts-solc",
  "foundry-compilers-artifacts-vyper",
@@ -4987,7 +4988,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-solc"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#a472fde21e0232f07d803d517b29a9bf92da9f95"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#d2e5d2720b36b23467f226d5a38e1d950994980d"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5009,7 +5010,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-vyper"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#a472fde21e0232f07d803d517b29a9bf92da9f95"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#d2e5d2720b36b23467f226d5a38e1d950994980d"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5021,7 +5022,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-zksolc"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#a472fde21e0232f07d803d517b29a9bf92da9f95"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#d2e5d2720b36b23467f226d5a38e1d950994980d"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5042,7 +5043,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-core"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#a472fde21e0232f07d803d517b29a9bf92da9f95"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.8.0#d2e5d2720b36b23467f226d5a38e1d950994980d"
 dependencies = [
  "alloy-primitives",
  "cfg-if 1.0.0",
@@ -5334,7 +5335,6 @@ dependencies = [
  "eyre",
  "foundry-compilers",
  "foundry-config",
- "globset",
  "semver 1.0.23",
  "serde",
  "serde_json",
@@ -5346,6 +5346,8 @@ dependencies = [
 name = "foundry-zksync-core"
 version = "0.0.2"
 dependencies = [
+ "alloy-consensus",
+ "alloy-dyn-abi",
  "alloy-primitives",
  "alloy-sol-types",
  "ansi_term",
@@ -5359,6 +5361,7 @@ dependencies = [
  "multivm",
  "once_cell",
  "revm",
+ "serde_json",
  "tracing",
  "url",
  "zksync-web3-rs",

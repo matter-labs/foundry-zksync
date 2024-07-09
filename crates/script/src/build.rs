@@ -143,6 +143,7 @@ impl LinkedBuildData {
             Some(&libraries),
         )?;
 
+        //TODO: zk contracts?
         let known_contracts =
             ContractsByArtifact::new(build_data.get_linker().get_linked_artifacts(&libraries)?);
 
@@ -213,7 +214,8 @@ impl PreprocessedState {
             let zk_compiler =
                 ProjectCompiler::new().quiet_if(args.opts.silent).files(sources_to_compile);
 
-            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
+            let zk_output = zk_compiler
+                .zksync_compile(&zk_project, script_config.config.zksync.avoid_contracts())?;
             Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
         } else {
             None

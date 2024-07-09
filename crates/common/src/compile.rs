@@ -266,7 +266,11 @@ impl ProjectCompiler {
     }
 
     /// Compiles the project.
-    pub fn zksync_compile(self, project: &Project<SolcCompiler>) -> Result<ZkProjectCompileOutput> {
+    pub fn zksync_compile(
+        self,
+        project: &Project<SolcCompiler>,
+        maybe_avoid_contracts: Option<Vec<globset::GlobMatcher>>,
+    ) -> Result<ZkProjectCompileOutput> {
         // TODO: Avoid process::exit
         if !project.paths.has_input_files() && self.files.is_empty() {
             println!("Nothing to compile");
@@ -288,15 +292,18 @@ impl ProjectCompiler {
             )));
         }
         self.zksync_compile_with(&project.paths.root, || {
-            if !files.is_empty() {
-                foundry_compilers::zksync::project_compile_files(project, files)
-            /* TODO: evualuate supporting compiling with filters
-            } else if let Some(filter) = filter {
-                project.compile_sparse(filter)
-            */
-            } else {
-                foundry_compilers::zksync::project_compile(project)
-            }
+            let files_to_compile =
+                if !files.is_empty() { files } else { project.paths.input_files() };
+            let avoid_contracts = maybe_avoid_contracts.unwrap_or_default();
+            let sources = Source::read_all(
+                files_to_compile
+                    .into_iter()
+                    .filter(|p| !avoid_contracts.iter().any(|c| c.is_match(p))),
+            )?;
+            foundry_compilers::zksync::compile::project::ProjectCompiler::with_sources(
+                project, sources,
+            )?
+            .compile()
             .map_err(Into::into)
         })
     }
