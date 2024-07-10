@@ -303,7 +303,7 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &VerificationContext,
     ) -> Result<VerifyContract> {
-        let zk_compiler_version = self.zk_compiler_version(args, &context)?;
+        let zk_compiler_version = self.zk_compiler_version(args, context)?;
         let (source, contract_name, code_format) = if let Some(zk) = &zk_compiler_version {
             let mut zk_context = context.clone();
             zk_context.compiler_version = zk.zksolc.clone();

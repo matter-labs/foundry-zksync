@@ -86,7 +86,7 @@ mod tests {
         );
 
         let expected = function.abi_encode_input(&[address_fixture]).unwrap();
-        let strategy = fuzz_calldata(function, &FuzzFixtures::new(fixtures));
+        let strategy = fuzz_calldata(function, &FuzzFixtures::new(fixtures), false);
         let _ = strategy.prop_map(move |fuzzed| {
             assert_eq!(expected, fuzzed);
         });

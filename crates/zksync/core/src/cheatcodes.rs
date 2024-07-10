@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Sets `block.timestamp`.
-pub fn warp<'a, DB>(timestamp: rU256, ecx: &'a mut InnerEvmContext<DB>)
+pub fn warp<DB>(timestamp: rU256, ecx: &mut InnerEvmContext<DB>)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -41,7 +41,7 @@ where
 }
 
 /// Sets `block.number`.
-pub fn roll<'a, DB>(number: rU256, ecx: &'a mut InnerEvmContext<DB>)
+pub fn roll<DB>(number: rU256, ecx: &mut InnerEvmContext<DB>)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -61,7 +61,7 @@ where
 }
 
 /// Sets balance for a specific address.
-pub fn deal<'a, DB>(address: Address, balance: rU256, ecx: &'a mut InnerEvmContext<DB>) -> rU256
+pub fn deal<DB>(address: Address, balance: rU256, ecx: &mut InnerEvmContext<DB>) -> rU256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -80,7 +80,7 @@ where
 }
 
 /// Sets nonce for a specific address.
-pub fn set_nonce<'a, DB>(address: Address, nonce: rU256, ecx: &'a mut InnerEvmContext<DB>)
+pub fn set_nonce<DB>(address: Address, nonce: rU256, ecx: &mut InnerEvmContext<DB>)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -98,7 +98,7 @@ where
 }
 
 /// Gets nonce for a specific address.
-pub fn get_nonce<'a, DB>(address: Address, ecx: &'a mut InnerEvmContext<DB>) -> rU256
+pub fn get_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> rU256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -116,7 +116,7 @@ where
 }
 
 /// Sets code for a specific address.
-pub fn etch<'a, DB>(address: Address, bytecode: &[u8], ecx: &'a mut InnerEvmContext<DB>)
+pub fn etch<DB>(address: Address, bytecode: &[u8], ecx: &mut InnerEvmContext<DB>)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -155,11 +155,8 @@ where
 
 /// Sets code for a mocked account. If not done, the mocked call will revert.
 /// The call has no effect if the mocked account already has a bytecode entry.
-pub fn set_mocked_account<'a, DB>(
-    address: Address,
-    ecx: &'a mut InnerEvmContext<DB>,
-    caller: Address,
-) where
+pub fn set_mocked_account<DB>(address: Address, ecx: &mut InnerEvmContext<DB>, caller: Address)
+where
     DB: Database,
     <DB as Database>::Error: Debug,
 {

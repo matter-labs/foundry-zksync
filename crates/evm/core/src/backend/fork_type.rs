@@ -12,12 +12,12 @@ pub enum ForkType {
 impl ForkType {
     /// Returns true if type is [ForkType::Zk]
     pub fn is_zk(&self) -> bool {
-        matches!(self, ForkType::Zk)
+        matches!(self, Self::Zk)
     }
 
     /// Returns true if type is [ForkType::Evm]
     pub fn is_evm(&self) -> bool {
-        matches!(self, ForkType::Evm)
+        matches!(self, Self::Evm)
     }
 }
 

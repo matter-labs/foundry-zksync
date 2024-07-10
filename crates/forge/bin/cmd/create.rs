@@ -196,8 +196,7 @@ impl CreateArgs {
                         let fdep_art =
                             zk_output.find(abs_path_str, contract_name).unwrap_or_else(|| {
                                 panic!(
-                                    "Could not find contract {} at path {} for compilation output",
-                                    contract_name, contract_path
+                                    "Could not find contract {contract_name} at path {contract_path} for compilation output",
                                 )
                             });
                         let fdep_fdeps_map =
@@ -513,6 +512,7 @@ impl CreateArgs {
     }
 
     // Deploys the zk contract
+    #[allow(clippy::too_many_arguments)]
     async fn deploy_zk<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
         self,
         abi: JsonAbi,

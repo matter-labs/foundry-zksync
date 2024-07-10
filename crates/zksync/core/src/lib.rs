@@ -83,14 +83,13 @@ pub async fn new_eip712_transaction<
     provider: P,
     signer: S,
 ) -> Result<Bytes> {
-    let from = tx.from.clone().ok_or_eyre("`from` cannot be empty")?;
+    let from = tx.from.ok_or_eyre("`from` cannot be empty")?;
     let to = tx
         .to
         .and_then(|to| match to {
             alloy_primitives::TxKind::Create => None,
             alloy_primitives::TxKind::Call(to) => Some(to),
         })
-        .clone()
         .ok_or_eyre("`to` cannot be empty")?;
     let chain_id = tx.chain_id.ok_or_eyre("`chain_id` cannot be empty")?;
     let nonce = tx.nonce.ok_or_eyre("`nonce` cannot be empty")?;
@@ -160,7 +159,6 @@ pub async fn estimate_gas<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
             alloy_primitives::TxKind::Create => None,
             alloy_primitives::TxKind::Call(to) => Some(to),
         })
-        .clone()
         .ok_or_eyre("`to` cannot be empty")?;
     let chain_id = tx.chain_id.ok_or_eyre("`chain_id` cannot be empty")?;
     let nonce = tx.nonce.ok_or_eyre("`nonce` cannot be empty")?;

@@ -70,7 +70,18 @@ fn fuzz_param_inner(
     };
 
     match *param {
-        DynSolType::Address => value(),
+        DynSolType::Address => value()
+            .prop_map(move |value| match value.as_address() {
+                Some(addr) => {
+                    if no_zksync_reserved_addresses {
+                        DynSolValue::Address(foundry_zksync_core::to_safe_address(addr))
+                    } else {
+                        DynSolValue::Address(addr)
+                    }
+                }
+                None => value,
+            })
+            .boxed(),
         DynSolType::Int(n @ 8..=256) => super::IntStrategy::new(n, fuzz_fixtures)
             .prop_map(move |x| DynSolValue::Int(x, n))
             .boxed(),
@@ -139,7 +150,7 @@ pub fn fuzz_param_from_state(
     match *param {
         DynSolType::Address => value()
             .prop_map(move |value| {
-                let addr = Address::from_word(value.into());
+                let addr = Address::from_word(value);
                 if no_zksync_reserved_addresses {
                     DynSolValue::Address(foundry_zksync_core::to_safe_address(addr))
                 } else {

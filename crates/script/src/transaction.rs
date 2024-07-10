@@ -66,6 +66,7 @@ impl TransactionWithMetadata {
         Self { transaction: WithOtherFields::new(transaction), ..Default::default() }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         transaction: TransactionRequest,
         rpc: String,
