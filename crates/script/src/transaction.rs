@@ -66,7 +66,7 @@ impl TransactionWithMetadata {
         Self { transaction: WithOtherFields::new(transaction), ..Default::default() }
     }
 
-    pub fn new_with_zk(
+    pub fn new(
         transaction: TransactionRequest,
         rpc: String,
         result: &ScriptResult,

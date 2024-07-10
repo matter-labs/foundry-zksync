@@ -107,7 +107,7 @@ impl CreateArgs {
     pub async fn run(mut self) -> Result<()> {
         // Find Project & Compile
         let project = self.opts.project()?;
-        let zksync = self.opts.compiler.zk.compile.unwrap_or_default();
+        let zksync = self.opts.compiler.zk.enabled();
         if zksync {
             let target_path = if let Some(ref mut path) = self.contract.path {
                 canonicalize(project.root().join(path))?
