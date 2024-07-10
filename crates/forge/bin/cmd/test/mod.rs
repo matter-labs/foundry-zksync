@@ -286,6 +286,7 @@ impl TestArgs {
                 zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
             let dual_compiled_contracts =
                 DualCompiledContracts::new(&output, &zk_output, &project.paths);
+
             (Some(zk_output), Some(dual_compiled_contracts))
         } else {
             (None, None)

@@ -373,38 +373,7 @@ impl EtherscanVerificationProvider {
             return Ok(None);
         }
 
-        //TODO: remove when foundry-compilers zksolc detection is fixed for 1.5.0
-        let get_zksolc_compiler_version = |path: &std::path::Path| -> Result<Version> {
-            use std::process::*;
-            let mut cmd = Command::new(path);
-            cmd.arg("--version")
-                .stdin(Stdio::piped())
-                .stderr(Stdio::piped())
-                .stdout(Stdio::piped());
-            debug!(?cmd, "getting ZkSolc version");
-            let output = cmd.output().wrap_err("error retrieving --version for zksolc")?;
-
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let version = stdout
-                    .lines()
-                    .filter(|l| !l.trim().is_empty())
-                    .last()
-                    .ok_or(eyre!("Version not found in zksolc output"))?;
-                Ok(Version::from_str(
-                    version
-                        .split_whitespace()
-                        .find(|s| s.starts_with('v'))
-                        .ok_or(eyre!("Unable to retrieve version from zksolc output"))?
-                        .trim_start_matches('v'),
-                )?)
-            } else {
-                Err(eyre!("zkSolc error: {}", String::from_utf8_lossy(&output.stderr)))
-                    .wrap_err("Error retrieving zksolc version with --version")
-            }
-        };
-
-        let zksolc = get_zksolc_compiler_version(context.project.zksync_zksolc.zksolc.as_ref())?;
+        let zksolc = context.project.zksync_zksolc.version()?;
         let mut is_zksync_solc = false;
 
         let solc = if let Some(solc) = &context.config.zksync.solc_path {
@@ -414,7 +383,7 @@ impl EtherscanVerificationProvider {
             Some(version)
         } else {
             //if there's no `solc_path` specified then we use the same
-            // as the project version, but the zksync forc
+            // as the project version, but the zksync fork
             is_zksync_solc = true;
             Some(context.compiler_version.clone())
         };
@@ -473,6 +442,7 @@ impl EtherscanVerificationProvider {
             &context.config,
         )?;
 
+        //TODO: zk support
         let creation_data = client.contract_creation_data(args.address).await?;
         let transaction = provider
             .get_transaction_by_hash(creation_data.transaction_hash)
