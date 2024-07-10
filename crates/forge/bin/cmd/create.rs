@@ -130,7 +130,7 @@ impl CreateArgs {
             // TODO: This can probably be optimized by defining the proper
             // deserializers on compilers but metadata is given as a stringified json
             // and JsonAbi is complaining about not supporting serde_json::from_reader
-            // so there is some serde handling neded
+            // so there is some serde handling needed
             let metadata = metadata.unwrap();
             let solc_metadata_value = metadata
                 .get("solc_metadata")
