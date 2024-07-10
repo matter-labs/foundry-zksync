@@ -124,10 +124,11 @@ pub fn standard_json_input<C: Compiler>(
 where
     C::Settings: Into<foundry_compilers::artifacts::Settings>,
 {
-    let input = project.standard_json_input(target_path)?;
+    let mut input = project.standard_json_input(target_path)?;
     tracing::debug!(?input.settings.remappings, "standard_json_input for zksync");
 
     let mut settings = project.zksync_zksolc_config.settings.clone();
+    settings.remappings = std::mem::take(&mut input.settings.remappings);
     settings.libraries.libs = settings
         .libraries
         .libs
