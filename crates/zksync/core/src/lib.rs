@@ -95,12 +95,7 @@ pub async fn new_eip712_transaction<
     let chain_id = tx.chain_id.ok_or_eyre("`chain_id` cannot be empty")?;
     let nonce = tx.nonce.ok_or_eyre("`nonce` cannot be empty")?;
     let gas_price = tx.gas_price.ok_or_eyre("`gas_price` cannot be empty")?;
-    let max_cost = match (&tx.gas, &tx.gas_price) {
-        (Some(gas_limit), Some(gas_price)) => Some(gas_limit * gas_price),
-        _ => None,
-    };
 
-    let max_cost = max_cost.ok_or_eyre("`max_cost` cannot be empty")?;
     let data = tx.input.clone().into_input().unwrap_or_default();
     let custom_data = Eip712Meta::new().factory_deps(factory_deps);
 

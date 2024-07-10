@@ -2,7 +2,7 @@ use super::{EtherscanSourceProvider, VerifyArgs};
 use crate::provider::VerificationContext;
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
-use foundry_compilers::{artifacts::StandardJsonCompilerInput, ArtifactOutput, Compiler, Project};
+use foundry_compilers::artifacts::StandardJsonCompilerInput;
 
 #[derive(Debug)]
 pub struct EtherscanStandardJsonSource;
