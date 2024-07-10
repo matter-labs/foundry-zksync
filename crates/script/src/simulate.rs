@@ -136,7 +136,7 @@ impl PreSimulationState {
                         tx.gas = Some(gas as u128);
                     }
                 }
-                let tx = TransactionWithMetadata::new_with_zk(
+                let tx = TransactionWithMetadata::new(
                     tx,
                     rpc,
                     &result,

@@ -18,8 +18,17 @@ pub mod vm;
 /// ZKSync Era State implementation.
 pub mod state;
 
+use alloy_network::{AnyNetwork, TxSigner};
 use alloy_primitives::{Address, Bytes, U256 as rU256};
-use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
+use alloy_provider::Provider;
+use alloy_rpc_types::TransactionRequest;
+use alloy_serde::WithOtherFields;
+use alloy_signer::Signature;
+use alloy_transport::Transport;
+use convert::{
+    ConvertAddress, ConvertBytes, ConvertH160, ConvertH256, ConvertRU256, ConvertSignature,
+    ToSignable,
+};
 use eyre::{eyre, OptionExt};
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};
@@ -32,9 +41,6 @@ pub use zksync_types::{
 pub use zksync_utils::bytecode::hash_bytecode;
 use zksync_web3_rs::{
     eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest},
-    providers::Middleware,
-    signers::Signer,
-    types::transaction::eip2718::TypedTransaction,
     zks_provider::types::Fee,
     zks_utils::EIP712_TX_TYPE,
 };
@@ -67,34 +73,40 @@ impl ZkTransactionMetadata {
 }
 
 /// Creates a new signed EIP-712 transaction with the provided factory deps.
-pub async fn new_eip712_transaction<M: Middleware, S: Signer>(
-    legacy_or_1559: TypedTransaction,
+pub async fn new_eip712_transaction<
+    P: Provider<T, AnyNetwork>,
+    S: TxSigner<Signature> + Sync,
+    T: Transport + Clone,
+>(
+    tx: WithOtherFields<TransactionRequest>,
     factory_deps: Vec<Vec<u8>>,
-    provider: M,
+    provider: P,
     signer: S,
 ) -> Result<Bytes> {
-    let from = legacy_or_1559.from().cloned().ok_or_eyre("`from` cannot be empty")?;
-    let to = legacy_or_1559
-        .to()
-        .and_then(|to| to.as_address())
-        .cloned()
+    let from = tx.from.clone().ok_or_eyre("`from` cannot be empty")?;
+    let to = tx
+        .to
+        .and_then(|to| match to {
+            alloy_primitives::TxKind::Create => None,
+            alloy_primitives::TxKind::Call(to) => Some(to),
+        })
+        .clone()
         .ok_or_eyre("`to` cannot be empty")?;
-    let chain_id = legacy_or_1559.chain_id().ok_or_eyre("`chain_id` cannot be empty")?;
-    let nonce = legacy_or_1559.nonce().ok_or_eyre("`nonce` cannot be empty")?;
-    let gas_price = legacy_or_1559.gas_price().ok_or_eyre("`gas_price` cannot be empty")?;
-    let max_cost = legacy_or_1559.max_cost().ok_or_eyre("`max_cost` cannot be empty")?;
-    let data = legacy_or_1559.data().cloned().ok_or_eyre("`data` cannot be empty")?;
+    let chain_id = tx.chain_id.ok_or_eyre("`chain_id` cannot be empty")?;
+    let nonce = tx.nonce.ok_or_eyre("`nonce` cannot be empty")?;
+    let gas_price = tx.gas_price.ok_or_eyre("`gas_price` cannot be empty")?;
+
+    let data = tx.input.clone().into_input().unwrap_or_default();
     let custom_data = Eip712Meta::new().factory_deps(factory_deps);
 
     let mut deploy_request = Eip712TransactionRequest::new()
         .r#type(EIP712_TX_TYPE)
-        .from(from)
-        .to(to)
-        .chain_id(chain_id.as_u64())
+        .from(from.to_h160())
+        .to(to.to_h160())
+        .chain_id(chain_id)
         .nonce(nonce)
         .gas_price(gas_price)
-        .max_fee_per_gas(max_cost)
-        .data(data)
+        .data(data.to_ethers())
         .custom_data(custom_data);
 
     let gas_price = provider
@@ -102,8 +114,7 @@ pub async fn new_eip712_transaction<M: Middleware, S: Signer>(
         .await
         .map_err(|err| eyre!("failed retrieving gas_price {:?}", err))?;
     let fee: Fee = provider
-        .provider()
-        .request("zks_estimateFee", [deploy_request.clone()])
+        .raw_request("zks_estimateFee".into(), [deploy_request.clone()])
         .await
         .map_err(|err| eyre!("failed estimating fee {:?}", err))?;
     deploy_request = deploy_request
@@ -117,9 +128,11 @@ pub async fn new_eip712_transaction<M: Middleware, S: Signer>(
         .try_into()
         .map_err(|err| eyre!("failed converting deploy request to eip-712 tx {:?}", err))?;
 
-    let signature = signer.sign_typed_data(&signable).await.expect("Failed to sign typed data");
+    let mut signable = signable.to_signable_tx();
+    let signature =
+        signer.sign_transaction(&mut signable).await.expect("Failed to sign typed data");
     let encoded_rlp = deploy_request
-        .rlp_signed(signature)
+        .rlp_signed(signature.to_ethers())
         .map_err(|err| eyre!("failed encoding deployment request {:?}", err))?;
 
     let tx = [&[EIP712_TX_TYPE], encoded_rlp.to_vec().as_slice()].concat().into();
@@ -130,48 +143,54 @@ pub async fn new_eip712_transaction<M: Middleware, S: Signer>(
 /// Estimated gas from a ZK network.
 pub struct EstimatedGas {
     /// Estimated gas price.
-    pub price: rU256,
+    pub price: u128,
     /// Estimated gas limit.
-    pub limit: rU256,
+    pub limit: u128,
 }
 
 /// Estimates the gas parameters for the provided transaction.
-pub async fn estimate_gas<M: Middleware>(
-    legacy_or_1559: &TypedTransaction,
+pub async fn estimate_gas<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
+    tx: &WithOtherFields<TransactionRequest>,
     factory_deps: Vec<Vec<u8>>,
-    provider: M,
+    provider: P,
 ) -> Result<EstimatedGas> {
-    let to = legacy_or_1559
-        .to()
-        .and_then(|to| to.as_address())
-        .cloned()
+    let to = tx
+        .to
+        .and_then(|to| match to {
+            alloy_primitives::TxKind::Create => None,
+            alloy_primitives::TxKind::Call(to) => Some(to),
+        })
+        .clone()
         .ok_or_eyre("`to` cannot be empty")?;
-    let chain_id = legacy_or_1559.chain_id().ok_or_eyre("`chain_id` cannot be empty")?;
-    let nonce = legacy_or_1559.nonce().ok_or_eyre("`nonce` cannot be empty")?;
-    let gas_price = legacy_or_1559.gas_price().ok_or_eyre("`gas_price` cannot be empty")?;
-    let data = legacy_or_1559.data().cloned().ok_or_eyre("`data` cannot be empty")?;
+    let chain_id = tx.chain_id.ok_or_eyre("`chain_id` cannot be empty")?;
+    let nonce = tx.nonce.ok_or_eyre("`nonce` cannot be empty")?;
+    let gas_price = if let Some(gas_price) = tx.gas_price {
+        gas_price
+    } else {
+        provider.get_gas_price().await?
+    };
+    let data = tx.input.clone().into_input().unwrap_or_default();
     let custom_data = Eip712Meta::new().factory_deps(factory_deps);
 
     let mut deploy_request = Eip712TransactionRequest::new()
         .r#type(EIP712_TX_TYPE)
-        .to(to)
-        .chain_id(chain_id.as_u64())
+        .to(to.to_h160())
+        .chain_id(chain_id)
         .nonce(nonce)
         .gas_price(gas_price)
-        .data(data)
+        .data(data.to_ethers())
         .custom_data(custom_data);
-    if let Some(from) = legacy_or_1559.from() {
-        deploy_request = deploy_request.from(*from)
+    if let Some(from) = tx.from {
+        deploy_request = deploy_request.from(from.to_h160())
     }
 
     let gas_price = provider.get_gas_price().await.unwrap();
     let fee: Fee = provider
-        .provider()
-        .request("zks_estimateFee", [deploy_request.clone()])
+        .raw_request("zks_estimateFee".into(), [deploy_request.clone()])
         .await
         .map_err(|err| eyre!("failed rpc call for estimating fee: {:?}", err))?;
 
-    Ok(EstimatedGas { price: gas_price.to_ru256(), limit: fee.gas_limit.to_ru256() })
+    Ok(EstimatedGas { price: gas_price, limit: fee.gas_limit.low_u128() })
 }
 
 /// Returns true if the provided address is a reserved zkSync system address

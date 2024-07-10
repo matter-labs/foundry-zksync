@@ -6,6 +6,7 @@ use foundry_compilers::{
     artifacts::{CompactBytecode, CompactDeployedBytecode, Settings},
     cache::{CacheEntry, CompilerCache},
     utils::read_json_file,
+    zksync::artifact_output::zk::ZkContractArtifact,
     Artifact, ProjectCompileOutput,
 };
 use foundry_config::{error::ExtractConfigError, figment::Figment, Chain, Config, NamedChain};
@@ -68,6 +69,35 @@ pub fn remove_contract(
         .into_owned();
 
     Ok((abi, bin, runtime))
+}
+
+/// Given a `Project`'s output, removes the matching ABI, Bytecode and
+/// Runtime Bytecode of the given contract.
+#[track_caller]
+pub fn remove_zk_contract(
+    output: &mut foundry_compilers::zksync::compile::output::ProjectCompileOutput,
+    path: &Path,
+    name: &str,
+) -> Result<ZkContractArtifact> {
+    let contract = if let Some(contract) = output.remove(path.to_string_lossy(), name) {
+        contract
+    } else {
+        let mut err = format!("could not find artifact: `{name}`");
+        if let Some(suggestion) =
+            super::did_you_mean(name, output.artifacts().map(|(name, _)| name)).pop()
+        {
+            if suggestion != name {
+                err = format!(
+                    r#"{err}
+
+        Did you mean `{suggestion}`?"#
+                );
+            }
+        }
+        eyre::bail!(err)
+    };
+
+    Ok(contract)
 }
 
 /// Helper function for finding a contract by ContractName

@@ -19,7 +19,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::{BuildMetadata, Version};
 
-use std::{fmt::Debug, str::FromStr};
+use std::fmt::Debug;
 
 mod flatten;
 mod standard_json;
@@ -335,7 +335,7 @@ impl EtherscanVerificationProvider {
         };
 
         let compiler_version =
-            format!("v{}", ensure_solc_build_metadata(context.compiler_version.clone()).await?);
+            format!("v{}", ensure_solc_build_metadata(compiler_version.clone()).await?);
         let constructor_args = self.constructor_args(args, context).await?;
         let mut verify_args =
             VerifyContract::new(args.address, contract_name, source, compiler_version)

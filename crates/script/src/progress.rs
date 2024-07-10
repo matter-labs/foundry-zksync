@@ -172,7 +172,6 @@ impl ScriptProgress {
         if deployment_sequence.pending.is_empty() {
             return Ok(());
         }
-
         let count = deployment_sequence.pending.len();
         let seq_progress = self.get_sequence_progress(sequence_idx, deployment_sequence);
 

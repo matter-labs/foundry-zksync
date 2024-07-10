@@ -66,32 +66,7 @@ impl TransactionWithMetadata {
         Self { transaction: WithOtherFields::new(transaction), ..Default::default() }
     }
 
-    pub fn from_zk_tx_request(transaction: TransactionRequest, zk: Option<ZkTransaction>) -> Self {
-        Self { transaction: WithOtherFields::new(transaction), zk, ..Default::default() }
-    }
-
     pub fn new(
-        transaction: TransactionRequest,
-        rpc: String,
-        result: &ScriptResult,
-        local_contracts: &BTreeMap<Address, &ContractData>,
-        decoder: &CallTraceDecoder,
-        additional_contracts: Vec<AdditionalContract>,
-        is_fixed_gas_limit: bool,
-    ) -> Result<Self> {
-        Self::new_with_zk(
-            transaction,
-            rpc,
-            result,
-            local_contracts,
-            decoder,
-            additional_contracts,
-            is_fixed_gas_limit,
-            None,
-        )
-    }
-
-    pub fn new_with_zk(
         transaction: TransactionRequest,
         rpc: String,
         result: &ScriptResult,
