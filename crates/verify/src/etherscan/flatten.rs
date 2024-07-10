@@ -14,6 +14,9 @@ use foundry_compilers::{
         input::{ZkSolcInput, ZkSolcVersionedInput},
         ZkSolc,
     },
+    zksync::{
+        compile::output::AggregatedCompilerOutput as ZkAggregatedCompilerOutput, raw_build_info_new,
+    },
     AggregatedCompilerOutput,
 };
 use semver::{BuildMetadata, Version};
@@ -84,8 +87,12 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
 
         if !args.force {
             // solc dry run of flattened code
-            self.check_flattened(source.clone(), &context.compiler_version, &context.target_path)
-                .map_err(|err| {
+            self.zk_check_flattened(
+                source.clone(),
+                &context.compiler_version,
+                &context.target_path,
+            )
+            .map_err(|err| {
                 eyre::eyre!(
                     "Failed to compile the flattened code locally: `{}`\
             To skip this solc dry, have a look at the `--force` flag of this command.",
@@ -178,7 +185,7 @@ Diagnostics: {diags}",
                 sources: BTreeMap::from([("contract.sol".into(), Source::new(content))]),
                 ..Default::default()
             },
-            solc_version: version,
+            solc_version: version.clone(),
             allow_paths: Default::default(),
             base_path: Default::default(),
             include_paths: Default::default(),
@@ -186,9 +193,8 @@ Diagnostics: {diags}",
 
         let out = zksolc.compile(&mut input)?;
         if out.has_error() {
-            let o = AggregatedCompilerOutput::<SolcCompiler>::default();
-            // TODO: RawBuildInfo cannot accept zksolc's CompilerOutput
-            // o.extend(version.clone(), RawBuildInfo::new(&input, &out, false)?, out);
+            let mut o = ZkAggregatedCompilerOutput::default();
+            o.extend(version.clone(), raw_build_info_new(&input, &out, false)?, out);
             let diags = o.diagnostics(&[], &[], Default::default());
 
             eyre::bail!(

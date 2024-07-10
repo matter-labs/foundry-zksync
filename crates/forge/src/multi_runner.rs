@@ -9,9 +9,10 @@ use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    artifacts::Libraries, compilers::Compiler,
-    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact, ArtifactId,
-    ProjectCompileOutput,
+    artifacts::{CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Libraries},
+    compilers::Compiler,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
+    Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm::{
@@ -377,9 +378,9 @@ impl MultiContractRunnerBuilder {
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
         dual_compiled_contracts: DualCompiledContracts,
-        use_zk: bool,
     ) -> Result<MultiContractRunner> {
-        // TODO: Use zk_output
+        let use_zk = zk_output.is_some();
+        let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);
         let linker = Linker::new(root, output.artifact_ids().collect());
 
@@ -420,7 +421,47 @@ impl MultiContractRunnerBuilder {
             }
         }
 
-        let known_contracts = ContractsByArtifact::new(linked_contracts);
+        if !use_zk {
+            known_contracts = ContractsByArtifact::new(linked_contracts);
+        } else if let Some(zk_output) = zk_output {
+            let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
+            let mut zk_contracts_map = BTreeMap::new();
+
+            for (id, contract) in zk_contracts {
+                if let Some(metadata) = contract.metadata {
+                    if let Some(solc_metadata_value) =
+                        metadata.get("solc_metadata").and_then(serde_json::Value::as_str)
+                    {
+                        if let Ok(solc_metadata_json) =
+                            serde_json::from_str::<serde_json::Value>(solc_metadata_value)
+                        {
+                            let abi: JsonAbi = JsonAbi::from_json_str(
+                                &solc_metadata_json["output"]["abi"].to_string(),
+                            )?;
+                            let bytecode = contract.bytecode.as_ref();
+
+                            if let Some(bytecode_object) = bytecode.map(|b| b.object.clone()) {
+                                let compact_bytecode = CompactBytecode {
+                                    object: bytecode_object.clone(),
+                                    source_map: None,
+                                    link_references: BTreeMap::new(),
+                                };
+                                let compact_contract = CompactContractBytecode {
+                                    abi: Some(abi),
+                                    bytecode: Some(compact_bytecode.clone()),
+                                    deployed_bytecode: Some(CompactDeployedBytecode {
+                                        bytecode: Some(compact_bytecode),
+                                        immutable_references: BTreeMap::new(),
+                                    }),
+                                };
+                                zk_contracts_map.insert(id.clone(), compact_contract);
+                            }
+                        }
+                    }
+                }
+            }
+            known_contracts = ContractsByArtifact::new(zk_contracts_map);
+        }
 
         Ok(MultiContractRunner {
             contracts: deployable_contracts,
