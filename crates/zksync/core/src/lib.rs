@@ -101,7 +101,7 @@ pub async fn new_eip712_transaction<
     };
 
     let max_cost = max_cost.ok_or_eyre("`max_cost` cannot be empty")?;
-    let data = tx.input.clone().into_input().ok_or_eyre("`data` cannot be empty")?;
+    let data = tx.input.clone().into_input().unwrap_or_default();
     let custom_data = Eip712Meta::new().factory_deps(factory_deps);
 
     let mut deploy_request = Eip712TransactionRequest::new()
@@ -111,7 +111,6 @@ pub async fn new_eip712_transaction<
         .chain_id(chain_id)
         .nonce(nonce)
         .gas_price(gas_price)
-        .max_fee_per_gas(max_cost)
         .data(data.to_ethers())
         .custom_data(custom_data);
 
@@ -175,7 +174,7 @@ pub async fn estimate_gas<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
     } else {
         provider.get_gas_price().await?
     };
-    let data = tx.input.clone().into_input().ok_or_eyre("`data` cannot be empty")?;
+    let data = tx.input.clone().into_input().unwrap_or_default();
     let custom_data = Eip712Meta::new().factory_deps(factory_deps);
 
     let mut deploy_request = Eip712TransactionRequest::new()
