@@ -127,7 +127,8 @@ pub async fn send_transaction(
             debug!("sending transaction: {:?}", tx);
 
             let signed = if let Some(zk) = zk {
-                let signer = signer.signer_by_address(from).ok_or(eyre::eyre!("Signer not found"))?;
+                let signer =
+                    signer.signer_by_address(from).ok_or(eyre::eyre!("Signer not found"))?;
 
                 let (deploy_request, signable) = convert_to_zksync(&provider, tx, zk).await?;
                 let mut signable = signable.to_signable_tx();

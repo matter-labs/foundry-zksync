@@ -147,6 +147,8 @@ impl<'a> ContractRunner<'a> {
         // construction
         self.executor.set_balance(address, self.initial_balance)?;
 
+        let mut zk_setup_deployments = HashMap::new();
+
         // Deploy the test contract
         match self.executor.deploy(
             self.sender,
@@ -176,7 +178,8 @@ impl<'a> ContractRunner<'a> {
             trace!("calling setUp");
             let res = self.executor.setup(None, address, Some(self.revert_decoder));
             let (setup_logs, setup_traces, labeled_addresses, reason, coverage) = match res {
-                Ok(RawCallResult { traces, labels, logs, coverage, .. }) => {
+                Ok(RawCallResult { traces, labels, logs, coverage, deployments, .. }) => {
+                    zk_setup_deployments.extend(deployments);
                     trace!(%address, "successfully called setUp");
                     (logs, traces, labels, None, coverage)
                 }
@@ -195,6 +198,7 @@ impl<'a> ContractRunner<'a> {
             logs.extend(setup_logs);
 
             TestSetup {
+                deployments: zk_setup_deployments,
                 address,
                 logs,
                 traces,
@@ -205,6 +209,7 @@ impl<'a> ContractRunner<'a> {
             }
         } else {
             TestSetup::success(
+                zk_setup_deployments,
                 address,
                 logs,
                 traces,
@@ -384,8 +389,13 @@ impl<'a> ContractRunner<'a> {
             find_time,
         );
 
-        let identified_contracts = has_invariants
-            .then(|| load_contracts(setup.traces.iter().map(|(_, t)| t), &known_contracts));
+        let identified_contracts = has_invariants.then(|| {
+            load_contracts(
+                setup.traces.iter().map(|(_, t)| t),
+                &known_contracts,
+                &setup.deployments,
+            )
+        });
         let test_results = functions
             .par_iter()
             .map(|&func| {

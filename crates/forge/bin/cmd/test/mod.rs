@@ -281,9 +281,11 @@ impl TestArgs {
             let zk_compiler = ProjectCompiler::new()
                 .quiet_if(self.json || self.opts.silent)
                 .files(sources_to_compile);
-
-            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
-            let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output, &project.paths);
+          
+            let zk_output =
+                zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
+            let dual_compiled_contracts =
+                DualCompiledContracts::new(&output, &zk_output, &project.paths);
             (Some(zk_output), Some(dual_compiled_contracts))
         } else {
             (None, None)
@@ -331,7 +333,6 @@ impl TestArgs {
                 env,
                 evm_opts,
                 dual_compiled_contracts.unwrap_or_default(),
-                config.zksync.run_in_zk_mode(),
             )?;
 
         if let Some(debug_test_pattern) = &self.debug {
