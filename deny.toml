@@ -2,8 +2,13 @@
 # More documentation for the advisories section can be found here:
 # https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html
 [advisories]
-version = 2
+vulnerability = "deny"
+unmaintained = "warn"
 yanked = "warn"
+notice = "warn"
+ignore = [
+    "RUSTSEC-2023-0018",
+]
 
 # This section is considered when running `cargo deny check bans`.
 # More documentation about the 'bans' section can be found here:
