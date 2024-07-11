@@ -273,7 +273,7 @@ impl TestArgs {
 
         let output = compiler.compile(&project)?;
 
-        let dual_compiled_contracts = if config.zksync.should_compile() {
+        let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
             let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
 
             let sources_to_compile =
@@ -284,9 +284,12 @@ impl TestArgs {
 
             let zk_output =
                 zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
-            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
+            let dual_compiled_contracts =
+                DualCompiledContracts::new(&output, &zk_output, &project.paths);
+
+            (Some(zk_output), Some(dual_compiled_contracts))
         } else {
-            None
+            (None, None)
         };
 
         // Create test options from general project settings and compiler output.
@@ -327,10 +330,10 @@ impl TestArgs {
             .build(
                 project_root,
                 output,
+                zk_output,
                 env,
                 evm_opts,
                 dual_compiled_contracts.unwrap_or_default(),
-                config.zksync.run_in_zk_mode(),
             )?;
 
         if let Some(debug_test_pattern) = &self.debug {

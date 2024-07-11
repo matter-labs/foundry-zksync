@@ -6,20 +6,130 @@ pragma solidity >=0.6.2 <0.9.0;
 pragma experimental ABIEncoderV2;
 
 interface Vm {
-    enum CallerMode { None, Broadcast, RecurrentBroadcast, Prank, RecurrentPrank }
-    enum AccountAccessKind { Call, DelegateCall, CallCode, StaticCall, Create, SelfDestruct, Resume, Balance, Extcodesize, Extcodehash, Extcodecopy }
-    enum ForgeContext { TestGroup, Test, Coverage, Snapshot, ScriptGroup, ScriptDryRun, ScriptBroadcast, ScriptResume, Unknown }
-    struct Log { bytes32[] topics; bytes data; address emitter; }
-    struct Rpc { string key; string url; }
-    struct EthGetLogs { address emitter; bytes32[] topics; bytes data; bytes32 blockHash; uint64 blockNumber; bytes32 transactionHash; uint64 transactionIndex; uint256 logIndex; bool removed; }
-    struct DirEntry { string errorMessage; string path; uint64 depth; bool isDir; bool isSymlink; }
-    struct FsMetadata { bool isDir; bool isSymlink; uint256 length; bool readOnly; uint256 modified; uint256 accessed; uint256 created; }
-    struct Wallet { address addr; uint256 publicKeyX; uint256 publicKeyY; uint256 privateKey; }
-    struct FfiResult { int32 exitCode; bytes stdout; bytes stderr; }
-    struct ChainInfo { uint256 forkId; uint256 chainId; }
-    struct AccountAccess { ChainInfo chainInfo; AccountAccessKind kind; address account; address accessor; bool initialized; uint256 oldBalance; uint256 newBalance; bytes deployedCode; uint256 value; bytes data; bool reverted; StorageAccess[] storageAccesses; uint64 depth; }
-    struct StorageAccess { address account; bytes32 slot; bool isWrite; bytes32 previousValue; bytes32 newValue; bool reverted; }
-    struct Gas { uint64 gasLimit; uint64 gasTotalUsed; uint64 gasMemoryUsed; int64 gasRefunded; uint64 gasRemaining; }
+    enum CallerMode {
+        None,
+        Broadcast,
+        RecurrentBroadcast,
+        Prank,
+        RecurrentPrank
+    }
+    enum AccountAccessKind {
+        Call,
+        DelegateCall,
+        CallCode,
+        StaticCall,
+        Create,
+        SelfDestruct,
+        Resume,
+        Balance,
+        Extcodesize,
+        Extcodehash,
+        Extcodecopy
+    }
+    enum ForgeContext {
+        TestGroup,
+        Test,
+        Coverage,
+        Snapshot,
+        ScriptGroup,
+        ScriptDryRun,
+        ScriptBroadcast,
+        ScriptResume,
+        Unknown
+    }
+
+    struct Log {
+        bytes32[] topics;
+        bytes data;
+        address emitter;
+    }
+
+    struct Rpc {
+        string key;
+        string url;
+    }
+
+    struct EthGetLogs {
+        address emitter;
+        bytes32[] topics;
+        bytes data;
+        bytes32 blockHash;
+        uint64 blockNumber;
+        bytes32 transactionHash;
+        uint64 transactionIndex;
+        uint256 logIndex;
+        bool removed;
+    }
+
+    struct DirEntry {
+        string errorMessage;
+        string path;
+        uint64 depth;
+        bool isDir;
+        bool isSymlink;
+    }
+
+    struct FsMetadata {
+        bool isDir;
+        bool isSymlink;
+        uint256 length;
+        bool readOnly;
+        uint256 modified;
+        uint256 accessed;
+        uint256 created;
+    }
+
+    struct Wallet {
+        address addr;
+        uint256 publicKeyX;
+        uint256 publicKeyY;
+        uint256 privateKey;
+    }
+
+    struct FfiResult {
+        int32 exitCode;
+        bytes stdout;
+        bytes stderr;
+    }
+
+    struct ChainInfo {
+        uint256 forkId;
+        uint256 chainId;
+    }
+
+    struct AccountAccess {
+        ChainInfo chainInfo;
+        AccountAccessKind kind;
+        address account;
+        address accessor;
+        bool initialized;
+        uint256 oldBalance;
+        uint256 newBalance;
+        bytes deployedCode;
+        uint256 value;
+        bytes data;
+        bool reverted;
+        StorageAccess[] storageAccesses;
+        uint64 depth;
+    }
+
+    struct StorageAccess {
+        address account;
+        bytes32 slot;
+        bool isWrite;
+        bytes32 previousValue;
+        bytes32 newValue;
+        bool reverted;
+    }
+
+    struct Gas {
+        uint64 gasLimit;
+        uint64 gasTotalUsed;
+        uint64 gasMemoryUsed;
+        int64 gasRefunded;
+        uint64 gasRemaining;
+    }
+
     function _expectCheatcodeRevert() external;
     function _expectCheatcodeRevert(bytes4 revertData) external;
     function _expectCheatcodeRevert(bytes calldata revertData) external;
@@ -366,12 +476,18 @@ interface Vm {
     function parseJson(string calldata json) external pure returns (bytes memory abiEncodedData);
     function parseJson(string calldata json, string calldata key) external pure returns (bytes memory abiEncodedData);
     function parseTomlAddress(string calldata toml, string calldata key) external pure returns (address);
-    function parseTomlAddressArray(string calldata toml, string calldata key) external pure returns (address[] memory);
+    function parseTomlAddressArray(string calldata toml, string calldata key)
+        external
+        pure
+        returns (address[] memory);
     function parseTomlBool(string calldata toml, string calldata key) external pure returns (bool);
     function parseTomlBoolArray(string calldata toml, string calldata key) external pure returns (bool[] memory);
     function parseTomlBytes(string calldata toml, string calldata key) external pure returns (bytes memory);
     function parseTomlBytes32(string calldata toml, string calldata key) external pure returns (bytes32);
-    function parseTomlBytes32Array(string calldata toml, string calldata key) external pure returns (bytes32[] memory);
+    function parseTomlBytes32Array(string calldata toml, string calldata key)
+        external
+        pure
+        returns (bytes32[] memory);
     function parseTomlBytesArray(string calldata toml, string calldata key) external pure returns (bytes[] memory);
     function parseTomlInt(string calldata toml, string calldata key) external pure returns (int256);
     function parseTomlIntArray(string calldata toml, string calldata key) external pure returns (int256[] memory);
@@ -464,11 +580,21 @@ interface Vm {
         external
         returns (string memory json);
     function serializeJson(string calldata objectKey, string calldata value) external returns (string memory json);
-    function serializeString(string calldata objectKey, string calldata valueKey, string calldata value) external returns (string memory json);
-    function serializeString(string calldata objectKey, string calldata valueKey, string[] calldata values) external returns (string memory json);
-    function serializeUintToHex(string calldata objectKey, string calldata valueKey, uint256 value) external returns (string memory json);
-    function serializeUint(string calldata objectKey, string calldata valueKey, uint256 value) external returns (string memory json);
-    function serializeUint(string calldata objectKey, string calldata valueKey, uint256[] calldata values) external returns (string memory json);
+    function serializeString(string calldata objectKey, string calldata valueKey, string calldata value)
+        external
+        returns (string memory json);
+    function serializeString(string calldata objectKey, string calldata valueKey, string[] calldata values)
+        external
+        returns (string memory json);
+    function serializeUintToHex(string calldata objectKey, string calldata valueKey, uint256 value)
+        external
+        returns (string memory json);
+    function serializeUint(string calldata objectKey, string calldata valueKey, uint256 value)
+        external
+        returns (string memory json);
+    function serializeUint(string calldata objectKey, string calldata valueKey, uint256[] calldata values)
+        external
+        returns (string memory json);
     function setEnv(string calldata name, string calldata value) external;
     function setNonce(address account, uint64 newNonce) external;
     function setNonceUnsafe(address account, uint64 newNonce) external;

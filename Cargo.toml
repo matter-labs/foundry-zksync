@@ -313,3 +313,11 @@ revm-primitives = { git = "https://github.com/bluealloy/revm.git", rev = "41e2f7
 # [patch."https://github.com/matter-labs/era-boojum"]
 # cs_derive = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }
 # boojum = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }
+
+# [patch."https://github.com/moonsong-labs/compilers"]
+# foundry-compilers = { path = "../msl-compilers/crates/compilers" }
+# foundry-compilers-core = { path = "../msl-compilers/crates/core" }
+# foundry-compilers-artifacts-vyper = { path = "../msl-compilers/crates/artifacts/vyper" }
+# foundry-compilers-artifacts-solc = { path = "../msl-compilers/crates/artifacts/solc" }
+# foundry-compilers-artifacts-zksolc = { path = "../msl-compilers/crates/artifacts/zksolc" }
+# foundry-compilers-artifacts = { path = "../msl-compilers/crates/artifacts/artifacts" }

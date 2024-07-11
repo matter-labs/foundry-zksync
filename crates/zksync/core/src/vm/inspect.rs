@@ -68,7 +68,7 @@ pub type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
 /// immediately.
 /// All logs will be collected as they happen, and returned with the final result.
 //TODO: should we make this transparent in `inspect` directly?
-pub fn inspect_as_batch<'a, DB, E>(
+pub fn inspect_as_batch<DB, E>(
     tx: L2Tx,
     ecx: &mut EvmContext<DB>,
     ccx: &mut CheatcodeTracerContext,
@@ -125,7 +125,7 @@ where
 /// Processes a [`L2Tx`] with EraVM and returns the final execution result and logs.
 ///
 /// State changes will be reflected in the given `Env`, `DB`, `JournaledState`.
-pub fn inspect<'a, DB, E>(
+pub fn inspect<DB, E>(
     mut tx: L2Tx,
     ecx: &mut EvmContext<DB>,
     ccx: &mut CheatcodeTracerContext,

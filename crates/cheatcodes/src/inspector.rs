@@ -516,7 +516,7 @@ impl Cheatcodes {
                 tracing::trace!(?address, "ignoring code translation for test contract");
             } else {
                 account.info.code_hash = code_hash;
-                account.info.code = code.clone();
+                account.info.code.clone_from(&code);
             }
         }
     }
@@ -624,7 +624,7 @@ impl Cheatcodes {
                 tracing::trace!(?address, "ignoring code translation for test contract");
             } else {
                 account.info.code_hash = info.code_hash;
-                account.info.code = info.code.clone();
+                account.info.code.clone_from(&info.code);
             }
         }
     }
@@ -1407,7 +1407,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
-                self.combined_logs.extend(result.logs.clone().into_iter().map(|log| Some(log)));
+                self.combined_logs.extend(result.logs.clone().into_iter().map(Some));
                 //for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
                     for log in result.logs {
@@ -1788,7 +1788,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     let mut nonce = account.info.nonce;
                     let mut call_init_code = call.init_code.clone();
 
-                    let mut zk_tx = if self.use_zk_vm {
+                    let zk_tx = if self.use_zk_vm {
                         to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
                         nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx) as u64;
                         let contract = self
@@ -1810,39 +1810,13 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                         );
                         call_init_code = Bytes::from(create_input);
 
-                        Some(factory_deps)
+                        Some(ZkTransactionMetadata { factory_deps })
                     } else {
                         None
                     };
 
-                    let rpc = ecx.db.active_fork_url();
-                    if let Some(factory_deps) = zk_tx {
-                        let mut batched =
-                            foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
-                        debug!(batches = batched.len(), "splitting factory deps for broadcast");
-                        // the last batch is the final one that does the deployment
-                        zk_tx = batched.pop();
-
-                        for factory_deps in batched {
-                            self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                                rpc: rpc.clone(),
-                                transaction: TransactionRequest {
-                                    from: Some(broadcast.new_origin),
-                                    to: Some(TxKind::Call(Address::ZERO)),
-                                    value: Some(call.value),
-                                    nonce: Some(nonce),
-                                    ..Default::default()
-                                },
-                                zk_tx: Some(ZkTransactionMetadata { factory_deps }),
-                            });
-
-                            //update nonce for each tx
-                            nonce += 1;
-                        }
-                    }
-
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc,
+                        rpc: ecx.db.active_fork_url(),
                         transaction: TransactionRequest {
                             from: Some(broadcast.new_origin),
                             to,
@@ -1856,7 +1830,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         },
-                        zk_tx: zk_tx.map(ZkTransactionMetadata::new),
+                        zk_tx,
                     });
 
                     let kind = match call.scheme {
@@ -1924,7 +1898,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                 ecx,
                 ccx,
             ) {
-                self.combined_logs.extend(result.logs.clone().into_iter().map(|log| Some(log)));
+                self.combined_logs.extend(result.logs.clone().into_iter().map(Some));
 
                 // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {

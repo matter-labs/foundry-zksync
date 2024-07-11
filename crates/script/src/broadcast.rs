@@ -89,6 +89,7 @@ async fn convert_to_zksync(
     Ok((deploy_request, signable))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn send_transaction(
     provider: Arc<RetryProvider>,
     mut tx: WithOtherFields<TransactionRequest>,
@@ -127,7 +128,8 @@ pub async fn send_transaction(
             debug!("sending transaction: {:?}", tx);
 
             let signed = if let Some(zk) = zk {
-                let signer = signer.signer_by_address(from).ok_or(eyre::eyre!("Signer not found"))?;
+                let signer =
+                    signer.signer_by_address(from).ok_or(eyre::eyre!("Signer not found"))?;
 
                 let (deploy_request, signable) = convert_to_zksync(&provider, tx, zk).await?;
                 let mut signable = signable.to_signable_tx();
@@ -141,7 +143,7 @@ pub async fn send_transaction(
                     .rlp_signed(signature.to_ethers())
                     .wrap_err("able to rlp encode deploy request")?;
 
-                [&[zksync_web3_rs::zks_utils::EIP712_TX_TYPE], encoded].concat().into()
+                [&[zksync_web3_rs::zks_utils::EIP712_TX_TYPE], encoded].concat()
             } else {
                 tx.build(signer).await?.encoded_2718()
             };

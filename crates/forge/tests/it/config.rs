@@ -1,14 +1,8 @@
 //! Test config.
 
-use crate::test_helpers::{COMPILED, COMPILED_ZK, EVM_OPTS, PROJECT, TESTDATA};
 use forge::{
     result::{SuiteResult, TestStatus},
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
-};
-use foundry_compilers::ProjectPathsConfig;
-use foundry_config::{
-    fs_permissions::PathPermission, Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig,
-    InvariantConfig, RpcEndpoint, RpcEndpoints,
+    MultiContractRunner,
 };
 use foundry_evm::{
     decode::decode_console_logs,
@@ -16,7 +10,6 @@ use foundry_evm::{
     traces::{render_trace_arena, CallTraceDecoderBuilder},
 };
 use foundry_test_utils::{init_tracing, Filter};
-use foundry_zksync_compiler::DualCompiledContracts;
 use futures::future::join_all;
 use itertools::Itertools;
 use std::collections::BTreeMap;

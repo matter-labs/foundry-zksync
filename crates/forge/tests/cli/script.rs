@@ -1547,8 +1547,7 @@ contract DeployScript is Script {
 
         assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
 
-        let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast"))
-            .into_iter()
+        let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
             .find(|file| file.ends_with("run-latest.json"))
             .expect("No broadcast artifacts");
 

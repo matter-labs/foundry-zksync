@@ -47,4 +47,30 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         );
         Ok((source, name, CodeFormat::StandardJsonInput))
     }
+
+    fn zk_source(
+        &self,
+        _args: &VerifyArgs,
+        context: &VerificationContext,
+    ) -> Result<(String, String, CodeFormat)> {
+        let input =
+            foundry_zksync_compiler::standard_json_input(&context.project, &context.target_path)
+                .wrap_err("failed to get zksolc standard json")?;
+
+        let source =
+            serde_json::to_string(&input).wrap_err("Failed to parse zksync standard json input")?;
+
+        trace!(target: "forge::verify", standard_json=source, "determined zksync standard json input");
+
+        let name = format!(
+            "{}:{}",
+            context
+                .target_path
+                .strip_prefix(context.project.root())
+                .unwrap_or(context.target_path.as_path())
+                .display(),
+            context.target_name.clone()
+        );
+        Ok((source, name, CodeFormat::StandardJsonInput))
+    }
 }

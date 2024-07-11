@@ -40,7 +40,7 @@ where
     debug!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|v| v.len()).unwrap_or_default(), "zk transact");
     let mut journaled_state = JournaledState::new(
         SpecId::LATEST,
-        Precompiles::new(PrecompileSpecId::LATEST).addresses().into_iter().copied().collect(),
+        Precompiles::new(PrecompileSpecId::LATEST).addresses().copied().collect(),
     );
 
     let mut ecx = EvmContext::new_with_env(db, Box::new(env.clone()));
@@ -92,7 +92,7 @@ where
 }
 
 /// Retrieves L2 ETH balance for a given address.
-pub fn balance<'a, DB>(address: Address, ecx: &mut EvmContext<DB>) -> rU256
+pub fn balance<DB>(address: Address, ecx: &mut EvmContext<DB>) -> rU256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -103,7 +103,7 @@ where
 
 /// Retrieves bytecode hash stored at a given address.
 #[allow(dead_code)]
-pub fn code_hash<'a, DB>(address: Address, ecx: &mut EvmContext<DB>) -> B256
+pub fn code_hash<DB>(address: Address, ecx: &mut EvmContext<DB>) -> B256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -112,7 +112,7 @@ where
 }
 
 /// Retrieves nonce for a given address.
-pub fn nonce<'a, DB>(address: Address, ecx: &mut EvmContext<DB>) -> u32
+pub fn nonce<DB>(address: Address, ecx: &mut EvmContext<DB>) -> u32
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -121,7 +121,7 @@ where
 }
 
 /// Executes a CREATE opcode on the ZK-VM.
-pub fn create<'a, DB, E>(
+pub fn create<DB, E>(
     call: &CreateInputs,
     contract: &DualCompiledContract,
     factory_deps: Vec<Vec<u8>>,
@@ -173,7 +173,7 @@ where
 }
 
 /// Executes a CALL opcode on the ZK-VM.
-pub fn call<'a, DB, E>(
+pub fn call<DB, E>(
     call: &CallInputs,
     ecx: &mut EvmContext<DB>,
     mut ccx: CheatcodeTracerContext,
@@ -230,7 +230,7 @@ where
 }
 
 /// Assign gas parameters that satisfy zkSync's fee model.
-fn gas_params<'a, DB>(ecx: &mut EvmContext<DB>, caller: Address) -> (U256, U256)
+fn gas_params<DB>(ecx: &mut EvmContext<DB>, caller: Address) -> (U256, U256)
 where
     DB: Database + Send,
     <DB as Database>::Error: Debug,
