@@ -7,7 +7,6 @@ unmaintained = "warn"
 yanked = "warn"
 notice = "warn"
 ignore = [
-    "RUSTSEC-2023-0018",
     # https://github.com/watchexec/watchexec/issues/852
     "RUSTSEC-2024-0350",
     "RUSTSEC-2024-0351",
