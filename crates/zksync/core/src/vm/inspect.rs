@@ -83,7 +83,16 @@ where
     let total_txns = txns.len();
     let mut aggregated_result: Option<ZKVMExecutionResult> = None;
 
-    for (idx, tx) in txns.into_iter().enumerate() {
+    for (idx, mut tx) in txns.into_iter().enumerate() {
+        let gas_used = aggregated_result
+            .as_ref()
+            .map(|r| r.execution_result.gas_used())
+            .map(U256::from)
+            .unwrap_or_default();
+
+        //deducted gas used so far
+        tx.common_data.fee.gas_limit -= gas_used;
+
         info!("executing batched tx ({}/{})", idx, total_txns);
         let mut result = inspect(tx, env, db, journaled_state, ccx, call_ctx.clone())?;
 
