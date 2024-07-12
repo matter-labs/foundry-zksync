@@ -109,18 +109,14 @@ impl ScriptArgs {
             let sequential_broadcast =
                 send_kind.signers_count() != 1 || self.slow || !has_batch_support(chain);
 
-            debug!("HERMAN: THIS GAS ESTIMATION IN WRONG");
             // Make a one-time gas price estimation
             let (gas_price, eip1559_fees) = {
                 match deployment_sequence.transactions.front().unwrap().typed_tx() {
                     TypedTransaction::Eip1559(_) => {
-                        debug!("HERMAN: ENTERING EIP1559 TX");
                         let fees = estimate_eip1559_fees(&provider, Some(chain))
                             .await
                             .wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
 
-                        
-                        debug!("HERMAN FEEES {:?}", fees);
                         (None, Some(fees))
                     }
                     _ => (provider.get_gas_price().await.ok(), None),
@@ -139,11 +135,9 @@ impl ScriptArgs {
 
                     let kind = send_kind.for_sender(&from)?;
                     let is_fixed_gas_limit = tx_with_metadata.is_fixed_gas_limit;
-                    debug!("HERMAN: is fixed gas limit? {is_fixed_gas_limit}");
                     let zk = tx_with_metadata.zk.clone();
 
                     let mut tx = tx.clone();
-                    debug!("HERMAN: TYPEDTX: {:?}",tx);
 
                     tx.set_chain_id(chain);
 
@@ -151,12 +145,10 @@ impl ScriptArgs {
                         tx.set_gas_price(gas_price.to_ethers());
                     } else {
                         // fill gas price
-                        debug!("HERMAN: FILLING GAS PRICE");
                         match tx {
                             TypedTransaction::Eip1559(ref mut inner) => {
                                 let eip1559_fees =
                                     eip1559_fees.expect("Could not get eip1559 fee estimation.");
-                                debug!("HERMAN: EIP1559 2: {:?}", eip1559_fees);
                                 if let Some(priority_gas_price) = self.priority_gas_price {
                                     inner.max_priority_fee_per_gas =
                                         Some(priority_gas_price.to_ethers());
@@ -170,8 +162,6 @@ impl ScriptArgs {
                             }
                         }
                     }
-                    debug!("HERMAN: EIP1559 TX: {:?}", tx);
-
                     Ok((tx, zk, kind, is_fixed_gas_limit))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -654,7 +644,6 @@ impl ScriptArgs {
             // if already set, some RPC endpoints might simply return the gas value that is
             // already set in the request and omit the estimate altogether, so
             // we remove it here
-            debug!("HERMAN: ENTERING HERE?");
             let _ = legacy_or_1559.gas_mut().take();
 
             self.estimate_gas(&mut legacy_or_1559, &provider).await?;
@@ -689,7 +678,6 @@ impl ScriptArgs {
             let mut signable: Eip712Transaction =
                 deploy_request.clone().try_into().expect("converting deploy request");
             signable.gas_per_pubdata_byte_limit = deploy_request.custom_data.gas_per_pubdata;
-
 
             let signature =
                 signer.sign_typed_data(&signable).await.wrap_err("Failed to sign typed data")?;
