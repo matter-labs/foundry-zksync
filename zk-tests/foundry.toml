@@ -3,6 +3,7 @@ src = 'src'
 out = 'out'
 libs = ['lib']
 fs_permissions = [{ access = "read", path = "./zkout/ConstantNumber.sol/ConstantNumber.json"}]
+evm_version = "paris"
 
 [fuzz]
 no_zksync_reserved_addresses = true
