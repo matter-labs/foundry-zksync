@@ -334,11 +334,17 @@ impl Executor {
         let mut db = FuzzBackendWrapper::new(&self.backend);
 
         let result = match &self.zk_tx {
-            Some(zk_tx) => db.inspect_ref_zk(
-                &mut env,
-                &mut self.zk_persisted_factory_deps.clone(),
-                Some(zk_tx.factory_deps.clone()),
-            )?,
+            Some(zk_tx) => {
+                //apply fork-related env instead of cheatcode handler
+                // since it won't be run inside zkvm
+                env.block = self.env.block.clone();
+                env.tx.gas_price = self.env.tx.gas_price;
+                db.inspect_ref_zk(
+                    &mut env,
+                    &mut self.zk_persisted_factory_deps.clone(),
+                    Some(zk_tx.factory_deps.clone()),
+                )?
+            }
             None => db.inspect_ref(&mut env, &mut inspector)?,
         };
 
@@ -360,11 +366,17 @@ impl Executor {
         let mut inspector = self.inspector.clone();
 
         let result = match &self.zk_tx {
-            Some(zk_tx) => self.backend.inspect_ref_zk(
-                &mut env,
-                &mut self.zk_persisted_factory_deps.clone(),
-                Some(zk_tx.factory_deps.clone()),
-            )?,
+            Some(zk_tx) => {
+                //apply fork-related env instead of cheatcode handler
+                // since it won't be run inside zkvm
+                env.block = self.env.block.clone();
+                env.tx.gas_price = self.env.tx.gas_price;
+                self.backend.inspect_ref_zk(
+                    &mut env,
+                    &mut self.zk_persisted_factory_deps.clone(),
+                    Some(zk_tx.factory_deps.clone()),
+                )?
+            }
             None => self.backend.inspect_ref(&mut env, &mut inspector)?,
         };
 
