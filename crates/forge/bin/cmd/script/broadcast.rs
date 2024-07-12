@@ -662,9 +662,8 @@ impl ScriptArgs {
 
         let signed_tx = if let Some(zk) = zk {
             let custom_data = Eip712Meta::new().factory_deps(zk.factory_deps);
-
-
             let gas_price = provider.get_gas_price().await?;
+
             let mut deploy_request = Eip712TransactionRequest::new()
                 .r#type(EIP712_TX_TYPE)
                 .from(*legacy_or_1559.from().unwrap())
@@ -676,26 +675,25 @@ impl ScriptArgs {
                 .data(legacy_or_1559.data().cloned().unwrap())
                 .custom_data(custom_data);
 
-            debug!("HERMAN: PROVIDER GAS PRICE: {gas_price}");
             let fee: zksync_web3_rs::zks_provider::types::Fee =
                 provider.request("zks_estimateFee", [deploy_request.clone()]).await.unwrap();
 
-            debug!("HERMAN: FEE = {:?}", fee);
             deploy_request = deploy_request
                 .gas_limit(fee.gas_limit)
                 .max_fee_per_gas(fee.max_fee_per_gas)
                 .max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
             deploy_request.custom_data.gas_per_pubdata = fee.gas_per_pubdata_limit;
 
-            let signable: Eip712Transaction =
+            // TODO: This is a work around as try_into is not propagating gas_per_pubdata_byte_limit. It always set the default
+            // We would need to fix taht library or add EIP712 to alloy with correct implementation. 
+            let mut signable: Eip712Transaction =
                 deploy_request.clone().try_into().expect("converting deploy request");
+            signable.gas_per_pubdata_byte_limit = deploy_request.custom_data.gas_per_pubdata;
 
-            debug!("sending transaction: {:?}", signable);
 
             let signature =
                 signer.sign_typed_data(&signable).await.wrap_err("Failed to sign typed data")?;
 
-            debug!("HERMAN: ENCODING:");
             let encoded_rlp =
                 &*deploy_request.rlp_signed(signature).expect("able to rlp encode deploy request");
             [&[EIP712_TX_TYPE], encoded_rlp].concat().into()
@@ -711,7 +709,6 @@ impl ScriptArgs {
 
         // Submit the raw transaction
         let pending = provider.send_raw_transaction(signed_tx).await?;
-        debug!("HERMAN: NOT ENTERING {:?}", pending);
 
         Ok(pending.tx_hash().to_alloy())
     }
