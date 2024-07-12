@@ -106,7 +106,7 @@ impl ScriptArgs {
         contracts: &ContractsByArtifact,
         dual_compiled_contracts: Option<DualCompiledContracts>,
     ) -> Result<VecDeque<TransactionWithMetadata>> {
-        trace!(target: "script", "executing onchain simulation");
+        trace!(target: "script", ?transactions, "executing onchain simulation");
 
         let runners = Arc::new(
             self.build_runners(script_config, dual_compiled_contracts)

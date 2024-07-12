@@ -672,7 +672,7 @@ impl ScriptArgs {
                 .nonce(legacy_or_1559.nonce().unwrap())
                 .gas_price(gas_price)
                 .max_fee_per_gas(legacy_or_1559.max_cost().unwrap())
-                .data(legacy_or_1559.data().cloned().unwrap())
+                .data(legacy_or_1559.data().cloned().unwrap_or_default())
                 .custom_data(custom_data);
 
             let fee: zksync_web3_rs::zks_provider::types::Fee =

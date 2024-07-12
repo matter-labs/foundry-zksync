@@ -241,7 +241,7 @@ out = 'out'
 libs = ['lib']
 
 [profile.default.zksync]
-enable = true
+compile = true
 fallback_oz = true
 mode = '3'
 ```

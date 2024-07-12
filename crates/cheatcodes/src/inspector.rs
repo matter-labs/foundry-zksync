@@ -1591,7 +1591,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                     );
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(data, call.gas_limit);
 
-                    let zk_tx = if self.use_zk_vm {
+                    let mut zk_tx = if self.use_zk_vm {
                         to = Some(CONTRACT_DEPLOYER_ADDRESS.to_address());
                         nonce = foundry_zksync_core::nonce(
                             broadcast.new_origin,
@@ -1609,6 +1609,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
                         let constructor_input =
                             call.init_code[contract.evm_bytecode.len()..].to_vec();
+
                         let create_input = foundry_zksync_core::encode_create_params(
                             &call.scheme,
                             contract.zk_bytecode_hash,
@@ -1616,13 +1617,46 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                         );
                         bytecode = Bytes::from(create_input);
 
-                        Some(ZkTransactionMetadata { factory_deps })
+                        Some(factory_deps)
                     } else {
                         None
                     };
 
+                    let rpc = data.db.active_fork_url();
+
+                    if let Some(factory_deps) = zk_tx {
+                        let mut batched =
+                            foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
+                        debug!(batches = batched.len(), "splitting factory deps for broadcast");
+                        // the last batch is the final one that does the deployment
+                        zk_tx = batched.pop();
+
+                        for factory_deps in batched {
+                            self.broadcastable_transactions.push_back(BroadcastableTransaction {
+                                rpc: rpc.clone(),
+                                transaction: TransactionRequest {
+                                    from: Some(broadcast.new_origin),
+                                    to: Some(Address::ZERO),
+                                    value: Some(call.value),
+                                    input: TransactionInput::default(),
+                                    nonce: Some(U64::from(nonce)),
+                                    gas: if is_fixed_gas_limit {
+                                        Some(U256::from(call.gas_limit))
+                                    } else {
+                                        None
+                                    },
+                                    ..Default::default()
+                                },
+                                zk_tx: Some(ZkTransactionMetadata { factory_deps }),
+                            });
+
+                            //update nonce for each tx
+                            nonce += 1;
+                        }
+                    }
+
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc: data.db.active_fork_url(),
+                        rpc: rpc.clone(),
                         transaction: TransactionRequest {
                             from: Some(broadcast.new_origin),
                             to,
@@ -1636,8 +1670,9 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
                             },
                             ..Default::default()
                         },
-                        zk_tx,
+                        zk_tx: zk_tx.map(|factory_deps| ZkTransactionMetadata { factory_deps }),
                     });
+
                     let kind = match call.scheme {
                         CreateScheme::Create => "create",
                         CreateScheme::Create2 { .. } => "create2",
@@ -1712,6 +1747,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
 
             let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
             tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
+
             let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
                 mocked_calls: self.mocked_calls.clone(),
                 expected_calls: Some(&mut self.expected_calls),

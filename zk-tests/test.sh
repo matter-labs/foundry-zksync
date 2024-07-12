@@ -128,41 +128,44 @@ build_forge "${REPO_ROOT}"
 start_era_test_node
 
 # Test missing libraries detection and deploy
-output=$(RUST_LOG=warn "${FORGE}" build --zksync 2>&1 || true)
+output=$(RUST_LOG=warn "${FORGE}" build --zk-compile 2>&1 || true)
 
 if echo "$output" | grep -q "Missing libraries detected"; then
-    RUST_LOG=warn "${FORGE}" create --deploy-missing-libraries --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync
-    RUST_LOG=warn "${FORGE}" script ./src/MissingLibraries.sol:MathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync --chain 260 --use "./${SOLC}" -vvv || fail "forge script with libs failed"
-    RUST_LOG=warn "${FORGE}" script ./src/NestedMissingLibraries.sol:NestedMathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zksync --chain 260 --use "./${SOLC}" -vvv || fail "forge script with nested libs failed"
+    RUST_LOG=warn "${FORGE}" create --deploy-missing-libraries --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zk-compile
+    RUST_LOG=warn "${FORGE}" script ./src/MissingLibraries.sol:MathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zk-startup --chain 260 --use "./${SOLC}" -vvv || fail "forge script with libs failed"
+    RUST_LOG=warn "${FORGE}" script ./src/NestedMissingLibraries.sol:NestedMathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zk-startup --chain 260 --use "./${SOLC}" -vvv || fail "forge script with nested libs failed"
 else
     echo "No missing libraries detected."
 fi
 
 echo "Running tests..."
-RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv  || fail "forge test failed"
+RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv --zk-compile || fail "forge test failed"
 
-echo "Running tests with '--zksync'..."
-RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv --zksync  || fail "forge test --zksync failed"
+echo "Running tests with '--zk-startup'..."
+RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv --zk-startup || fail "forge test --zk-startup failed"
 
 echo "Running script..."
-RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  || fail "forge script failed"
-RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  || fail "forge script failed on 2nd deploy"
+RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  --zk-compile || fail "forge script failed"
+RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  --zk-compile || fail "forge script failed on 2nd deploy"
+
+echo "Running factory deps script..."
+RUST_LOG=warn "${FORGE}" script ./src/LargeFactoryDependencies.t.sol:ZkLargeFactoryDependenciesScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow -vvv --zk-startup || fail "forge script failed"
 
 echo "Running NFT script"
-RUST_LOG=warn "${FORGE}" script ./script/NFT.s.sol:MyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.20 --zksync  || fail "forge script failed"
+RUST_LOG=warn "${FORGE}" script ./script/NFT.s.sol:MyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.20 --zk-startup || fail "forge script failed"
 
 echo "Running Proxy script"
-RUST_LOG=warn "${FORGE}" script ./script/Proxy.s.sol:ProxyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.20 --zksync  || fail "forge proxy script failed"
+RUST_LOG=warn "${FORGE}" script ./script/Proxy.s.sol:ProxyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.20 --zk-startup  || fail "forge proxy script failed"
 
 # Deploy ERC20
 echo "Deploying MyToken..."
-MYTOKEN_DEPLOYMENT=$(RUST_LOG=warn "${FORGE}" create ./src/ERC20.sol:MyToken --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use 0.8.20 --zksync) || fail "forge script failed"
+MYTOKEN_DEPLOYMENT=$(RUST_LOG=warn "${FORGE}" create ./src/ERC20.sol:MyToken --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use 0.8.20 --zk-startup) || fail "forge script failed"
 MYTOKEN_ADDRESS=$(echo $MYTOKEN_DEPLOYMENT | awk '/Deployed to:/ {for (i=1; i<=NF; i++) if ($i == "to:") print $(i+1)}')
 echo "MyToken deployed at: $MYTOKEN_ADDRESS"
 
 # Deploy TokenReceiver
 echo "Deploying TokenReceiver..."
-TOKENRECEIVER_DEPLOYMENT=$(RUST_LOG=warn "${FORGE}" create ./src/TokenReceiver.sol:TokenReceiver --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use "./${SOLC}" --zksync) || fail "forge script failed"
+TOKENRECEIVER_DEPLOYMENT=$(RUST_LOG=warn "${FORGE}" create ./src/TokenReceiver.sol:TokenReceiver --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use "./${SOLC}" --zk-startup) || fail "forge script failed"
 TOKENRECEIVER_ADDRESS=$(echo $TOKENRECEIVER_DEPLOYMENT | awk '/Deployed to:/ {for (i=1; i<=NF; i++) if ($i == "to:") print $(i+1)}')
 echo "TokenReceiver deployed at: $TOKENRECEIVER_ADDRESS"
 

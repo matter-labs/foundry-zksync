@@ -66,6 +66,7 @@ pub struct CreateArgs {
         long,
         value_hint = ValueHint::FilePath,
         value_name = "PATH",
+        conflicts_with = "constructor_args",
     )]
     constructor_args_path: Option<PathBuf>,
 
@@ -73,7 +74,8 @@ pub struct CreateArgs {
     #[clap(
         long,
         help = "Deploy the missing dependency libraries from last build.",
-        default_value_t = false
+        default_value_t = false,
+        conflicts_with = "contract"
     )]
     deploy_missing_libraries: bool,
 
@@ -117,7 +119,7 @@ impl CreateArgs {
     pub async fn run(self) -> Result<()> {
         let mut config = self.eth.try_load_config_emit_warnings()?;
         let project_root = config.project_paths().root;
-        let zksync = self.opts.compiler.zk.enable;
+        let zksync = self.opts.compiler.zk.enabled();
 
         // Resolve missing libraries
         let libs_batches = if zksync && self.deploy_missing_libraries {
@@ -392,6 +394,7 @@ impl CreateArgs {
             via_ir: self.opts.via_ir,
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
+            zksync: self.opts.compiler.zk.enabled(),
         };
 
         // Check config for Etherscan API Keys to avoid preflight check failing if no
@@ -537,7 +540,7 @@ impl CreateArgs {
                     .constructor()
                     .ok_or_else(|| eyre::eyre!("could not find constructor"))?
                     .abi_encode_input(&args)?;
-                constructor_args = Some(hex::encode(encoded_args));
+                constructor_args = Some(hex::encode_prefixed(encoded_args));
             }
 
             self.verify_preflight_check(contract, constructor_args.clone(), chain).await?;
@@ -587,6 +590,7 @@ impl CreateArgs {
             via_ir: self.opts.via_ir,
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
+            zksync: self.opts.compiler.zk.enabled(),
         };
         println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
         verify.run().await.map(|_| address)
@@ -601,7 +605,9 @@ impl CreateArgs {
         constructor: &Constructor,
         constructor_args: &[String],
     ) -> Result<Vec<DynSolValue>> {
-        let mut params = Vec::with_capacity(constructor.inputs.len());
+        let expected_params = constructor.inputs.len();
+
+        let mut params = Vec::with_capacity(expected_params);
         for (input, arg) in constructor.inputs.iter().zip(constructor_args) {
             // resolve the input type directly
             let ty = input
@@ -609,6 +615,17 @@ impl CreateArgs {
                 .wrap_err_with(|| format!("Could not resolve constructor arg: input={input}"))?;
             params.push((ty, arg));
         }
+
+        let actual_params = params.len();
+
+        if actual_params != expected_params {
+            tracing::warn!(
+                given = actual_params,
+                expected = expected_params,
+               "Constructor argument mismatch: expected {expected_params} arguments, but received {actual_params}. Ensure that the number of arguments provided matches the constructor definition."
+            );
+        }
+
         let params = params.iter().map(|(ty, arg)| (ty, arg.as_str()));
         parse_tokens(params)
     }

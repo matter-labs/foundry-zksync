@@ -169,10 +169,15 @@ impl TestArgs {
         }
         let output = compiler.compile(&project)?;
 
-        let zk_compiler = ProjectCompiler::new().quiet_if(self.json || self.opts.silent);
-        let zk_output = zk_compiler.zksync_compile(&project)?;
-        let dual_compiled_contracts =
-            DualCompiledContracts::new(&output, &zk_output, &project.paths);
+        let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
+            let zk_compiler = ProjectCompiler::new().quiet_if(self.json || self.opts.silent);
+            let zk_output = zk_compiler.zksync_compile(&project)?;
+            let dual_compiled_contracts =
+                Some(DualCompiledContracts::new(&output, &zk_output, &project.paths));
+            (Some(zk_output), dual_compiled_contracts)
+        } else {
+            (None, None)
+        };
 
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;
@@ -199,7 +204,7 @@ impl TestArgs {
         // Clone the output only if we actually need it later for the debugger.
         let output_clone = should_debug.then(|| output.clone());
 
-        let mut runner = MultiContractRunnerBuilder::default()
+        let runner = MultiContractRunnerBuilder::default()
             .set_debug(should_debug)
             .initial_balance(evm_opts.initial_balance)
             .evm_spec(config.evm_spec_id())
@@ -209,12 +214,12 @@ impl TestArgs {
                 &config,
                 evm_opts.clone(),
                 None,
-                dual_compiled_contracts,
+                dual_compiled_contracts.unwrap_or_default(),
                 config.zksync.run_in_zk_mode(),
             ))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
-            .build(project_root, output, env, evm_opts)?;
+            .build(project_root, output, zk_output, env, evm_opts)?;
 
         if let Some(debug_test_pattern) = &self.debug {
             let test_pattern = &mut filter.args_mut().test_pattern;
@@ -226,7 +231,6 @@ impl TestArgs {
             }
             *test_pattern = Some(debug_test_pattern.clone());
         }
-        runner.use_zk = config.zksync.run_in_zk_mode();
 
         let outcome = self.run_tests(runner, config, verbosity, &filter, test_options).await?;
 
