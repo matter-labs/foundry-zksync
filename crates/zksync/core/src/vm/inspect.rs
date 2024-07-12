@@ -83,7 +83,7 @@ where
     let mut aggregated_result: Option<ZKVMExecutionResult> = None;
 
     for (idx, tx) in txns.into_iter().enumerate() {
-        info!("executing batched tx ({}/{})", idx, total_txns);
+        info!("executing batched tx ({}/{})", idx + 1, total_txns);
         let mut result = inspect(tx, ecx, ccx, call_ctx.clone())?;
 
         match (&mut aggregated_result, result.execution_result) {
@@ -512,7 +512,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     let factory_deps_count = factory_deps.len();
     let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
     let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();
-    tracing::debug!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, "optimizing factory_deps");
+    tracing::info!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, "optimizing factory_deps");
 
     let mut batches = vec![];
     let mut current_batch = vec![];
@@ -542,7 +542,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     let batch_cumulative_sizes =
         batches.iter().map(|deps| deps.iter().map(|dep| dep.len()).sum::<usize>()).collect_vec();
     let batch_total_size = batch_cumulative_sizes.iter().sum::<usize>();
-    tracing::debug!(count=batch_count, total=batch_total_size, sizes=?batch_cumulative_sizes, batched_sizes=?batch_individual_sizes, "optimized factory_deps into batches");
+    tracing::info!(count=batch_count, total=batch_total_size, sizes=?batch_cumulative_sizes, batched_sizes=?batch_individual_sizes, "optimized factory_deps into batches");
 
     batches
 }
