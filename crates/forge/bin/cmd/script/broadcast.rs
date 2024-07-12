@@ -682,6 +682,7 @@ impl ScriptArgs {
 
             let signature =
                 signer.sign_typed_data(&signable).await.wrap_err("Failed to sign typed data")?;
+            debug!("sending transaction: {:?}", signable);
 
             let encoded_rlp =
                 &*deploy_request.rlp_signed(signature).expect("able to rlp encode deploy request");
