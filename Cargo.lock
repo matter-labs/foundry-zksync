@@ -5386,6 +5386,7 @@ dependencies = [
  "foundry-common",
  "foundry-zksync-compiler",
  "itertools 0.13.0",
+ "lazy_static",
  "multivm",
  "once_cell",
  "revm",
