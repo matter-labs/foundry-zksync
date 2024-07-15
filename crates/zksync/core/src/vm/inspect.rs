@@ -83,7 +83,16 @@ where
     let total_txns = txns.len();
     let mut aggregated_result: Option<ZKVMExecutionResult> = None;
 
-    for (idx, tx) in txns.into_iter().enumerate() {
+    for (idx, mut tx) in txns.into_iter().enumerate() {
+        let gas_used = aggregated_result
+            .as_ref()
+            .map(|r| r.execution_result.gas_used())
+            .map(U256::from)
+            .unwrap_or_default();
+
+        //deducted gas used so far
+        tx.common_data.fee.gas_limit -= gas_used;
+
         info!("executing batched tx ({}/{})", idx, total_txns);
         let mut result = inspect(tx, env, db, journaled_state, ccx, call_ctx.clone())?;
 
@@ -502,10 +511,18 @@ where
         .unwrap_or_default()
 }
 
-/// Maximum size allowed for factory_deps during create.
-/// We batch factory_deps till this upper limit if there are multiple deps.
-/// These batches are then deployed individually
-pub const MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: usize = 100000; // 100kB
+lazy_static::lazy_static! {
+    /// Maximum size allowed for factory_deps during create.
+    /// We batch factory_deps till this upper limit if there are multiple deps.
+    /// These batches are then deployed individually.
+    ///
+    /// TODO: This feature is disabled by default via `usize::MAX` due to inconsistencies
+    /// with determining a value that works in all cases.
+    static ref MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: usize = std::env::var("MAX_FACTORY_DEPENDENCIES_SIZE_BYTES")
+                                                            .ok()
+                                                            .and_then(|value| value.parse::<usize>().ok())
+                                                            .unwrap_or(usize::MAX);
+}
 
 /// Batch factory deps on the basis of size.
 ///
@@ -516,7 +533,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     let factory_deps_count = factory_deps.len();
     let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
     let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();
-    tracing::debug!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, "optimizing factory_deps");
+    tracing::info!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, max=*MAX_FACTORY_DEPENDENCIES_SIZE_BYTES, "optimizing factory_deps");
 
     let mut batches = vec![];
     let mut current_batch = vec![];
@@ -527,7 +544,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     for dep in factory_deps {
         let len = dep.len();
         let new_len = current_batch_len + len;
-        if new_len > MAX_FACTORY_DEPENDENCIES_SIZE_BYTES && !current_batch.is_empty() {
+        if new_len > *MAX_FACTORY_DEPENDENCIES_SIZE_BYTES && !current_batch.is_empty() {
             batches.push(current_batch);
             current_batch = vec![];
             current_batch_len = 0;
