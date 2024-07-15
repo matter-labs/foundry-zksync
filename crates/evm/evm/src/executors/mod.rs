@@ -335,7 +335,7 @@ impl Executor {
 
         let result = match &self.zk_tx {
             Some(zk_tx) => {
-                //apply fork-related env instead of cheatcode handler
+                // apply fork-related env instead of cheatcode handler
                 // since it won't be run inside zkvm
                 env.block = self.env.block.clone();
                 env.tx.gas_price = self.env.tx.gas_price;
@@ -367,7 +367,7 @@ impl Executor {
 
         let result = match &self.zk_tx {
             Some(zk_tx) => {
-                //apply fork-related env instead of cheatcode handler
+                // apply fork-related env instead of cheatcode handler
                 // since it won't be run inside zkvm
                 env.block = self.env.block.clone();
                 env.tx.gas_price = self.env.tx.gas_price;
