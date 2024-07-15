@@ -675,7 +675,7 @@ impl ScriptArgs {
 
             // TODO: This is a work around as try_into is not propagating
             // gas_per_pubdata_byte_limit. It always set the default We would need to
-            // fix taht library or add EIP712 to alloy with correct implementation.
+            // fix that library or add EIP712 to alloy with correct implementation.
             let mut signable: Eip712Transaction =
                 deploy_request.clone().try_into().expect("converting deploy request");
             signable.gas_per_pubdata_byte_limit = deploy_request.custom_data.gas_per_pubdata;
