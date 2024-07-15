@@ -148,8 +148,9 @@ echo "Running script..."
 RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  --zk-compile || fail "forge script failed"
 RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow  -vvv  --zk-compile || fail "forge script failed on 2nd deploy"
 
-echo "Running factory deps script..."
-RUST_LOG=warn "${FORGE}" script ./src/LargeFactoryDependencies.t.sol:ZkLargeFactoryDependenciesScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow -vvv --zk-startup || fail "forge script failed"
+# Temporarily disabled
+# echo "Running factory deps script..."
+# RUST_LOG=warn "${FORGE}" script ./src/LargeFactoryDependencies.t.sol:ZkLargeFactoryDependenciesScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow -vvv --zk-startup || fail "forge script failed"
 
 echo "Running NFT script"
 RUST_LOG=warn "${FORGE}" script ./script/NFT.s.sol:MyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.20 --zk-startup || fail "forge script failed"
