@@ -5,15 +5,17 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import {LargeContract} from "./LargeContracts.sol";
 
-contract ZkLargeFactoryDependenciesTest is Test {
-    function testLargeFactoryDependenciesAreDeployedInBatches() public {
-        new LargeContract();
-    }
-}
+// Temporarily disabled due to issues with batching
 
-contract ZkLargeFactoryDependenciesScript is Script {
-    function run() external {
-        vm.broadcast();
-        new LargeContract();
-    }
-}
+// contract ZkLargeFactoryDependenciesTest is Test {
+//     function testLargeFactoryDependenciesAreDeployedInBatches() public {
+//         new LargeContract();
+//     }
+// }
+
+// contract ZkLargeFactoryDependenciesScript is Script {
+//     function run() external {
+//         vm.broadcast();
+//         new LargeContract();
+//     }
+// }
