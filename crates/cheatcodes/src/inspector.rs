@@ -25,7 +25,10 @@ use foundry_config::Config;
 use foundry_evm_core::{
     abi::Vm::stopExpectSafeMemoryCall,
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
-    constants::{CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER_CODE, HARDHAT_CONSOLE_ADDRESS},
+    constants::{
+        CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER_CODE,
+        HARDHAT_CONSOLE_ADDRESS,
+    },
     InspectorExt,
 };
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
@@ -275,14 +278,17 @@ impl Cheatcodes {
             zk_deployed_bytecode: zk_deployed_bytecode.clone(),
             zk_factory_deps: Default::default(),
             evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
-            evm_deployed_bytecode: revm::interpreter::analysis::to_analysed(Bytecode::new_raw(
-                empty_bytes.clone(),
-            ))
-            .bytecode()
-            .to_vec(),
-            evm_bytecode: revm::interpreter::analysis::to_analysed(Bytecode::new_raw(empty_bytes))
-                .bytecode()
-                .to_vec(),
+            evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
+            evm_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
+        });
+        dual_compiled_contracts.push(DualCompiledContract {
+            name: String::from("CheatcodeBytecode"),
+            zk_bytecode_hash,
+            zk_deployed_bytecode: zk_deployed_bytecode.clone(),
+            zk_factory_deps: Default::default(),
+            evm_bytecode_hash: CHEATCODE_CONTRACT_HASH,
+            evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
+            evm_bytecode: Bytecode::new_raw(empty_bytes).bytecode().to_vec(),
         });
 
         let mut persisted_factory_deps = HashMap::new();
@@ -461,10 +467,7 @@ impl Cheatcodes {
         // to not lose it across VMs.
 
         let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
-        let (block_info, _) = data
-            .journaled_state
-            .sload(system_account, block_info_key, &mut data.db)
-            .unwrap_or_default();
+        let (block_info, _) = data.sload(system_account, block_info_key).unwrap_or_default();
         let (block_number, block_timestamp) = unpack_block_info(block_info.to_u256());
         data.env.block.number = U256::from(block_number);
         data.env.block.timestamp = U256::from(block_timestamp);
@@ -477,21 +480,14 @@ impl Cheatcodes {
             let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
             let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
 
-            let (balance, _) = data
-                .journaled_state
-                .sload(balance_account, balance_key, &mut data.db)
-                .unwrap_or_default();
-            let (full_nonce, _) = data
-                .journaled_state
-                .sload(nonce_account, nonce_key, &mut data.db)
-                .unwrap_or_default();
+            let (balance, _) = data.sload(balance_account, balance_key).unwrap_or_default();
+            let (full_nonce, _) = data.sload(nonce_account, nonce_key).unwrap_or_default();
             let (tx_nonce, _deployment_nonce) = decompose_full_nonce(full_nonce.to_u256());
             let nonce = tx_nonce.as_u64();
 
             let account_code_key = get_code_key(&zk_address).key().to_ru256();
             let (code_hash, code) = data
-                .journaled_state
-                .sload(account_code_account, account_code_key, &mut data.db)
+                .sload(account_code_account, account_code_key)
                 .map(|(value, _)| value)
                 .ok()
                 .and_then(|zk_bytecode_hash| {
