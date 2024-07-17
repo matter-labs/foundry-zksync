@@ -55,7 +55,8 @@ contract PayableFixedNumber {
     }
 
     function transfer(address payable dest, uint256 amt) public {
-        dest.call{value: amt}("");
+        (bool success, ) = dest.call{value: amt}("");
+        require(success);
     }
 
     function five() public pure returns (uint8) {
@@ -121,11 +122,11 @@ contract ZkContractsTest is Test {
         );
     }
 
-    function testFoo() public {
+    function testZkContractCanCallMethod() public {
         FixedGreeter g = new FixedGreeter();
         vm.makePersistent(address(g));
         vm.selectFork(forkEra);
-        console.log(g.greet("hi"));
+        assertEq("Hello hi", g.greet("hi"));
     }
 
     function testZkContractsPersistedDeployedContractNoArgs() public {
@@ -178,16 +179,23 @@ contract ZkContractsTest is Test {
         vm.selectFork(forkEra);
         uint balanceBefore = address(this).balance;
 
-        PayableFixedNumber one = new PayableFixedNumber{
-            value: 10
-        }();
+        PayableFixedNumber one = new PayableFixedNumber{value: 10}();
 
         PayableFixedNumber two = new PayableFixedNumber();
         one.transfer(payable(address(two)), 5);
 
-        require(address(one).balance == 5, "first contract's balance not decreased");
-        require(address(two).balance == 5, "second contract's balance not increased");
-        require(address(this).balance == balanceBefore - 10, "test address balance not decreased");
+        require(
+            address(one).balance == 5,
+            "first contract's balance not decreased"
+        );
+        require(
+            address(two).balance == 5,
+            "second contract's balance not increased"
+        );
+        require(
+            address(this).balance == balanceBefore - 10,
+            "test address balance not decreased"
+        );
     }
 
     function testZkContractsInlineDeployedContractComplexArgs() public {
