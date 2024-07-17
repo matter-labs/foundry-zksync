@@ -295,17 +295,17 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         }
 
         // Override blockhash
-        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let calldata = get_calldata(&state, memory);
-            let current = state.vm_local_state.callstack.current;
+        // if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+        //     let calldata = get_calldata(&state, memory);
+        //     let current = state.vm_local_state.callstack.current;
 
-            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
-                calldata.starts_with(&SELECTOR_BLOCK_HASH)
-            {
-                self.farcall_handler.set_immediate_return(rU256::ZERO.to_be_bytes_vec());
-                return
-            }
-        }
+        //     if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
+        //         calldata.starts_with(&SELECTOR_BLOCK_HASH)
+        //     {
+        //         self.farcall_handler.set_immediate_return(rU256::ZERO.to_be_bytes_vec());
+        //         return
+        //     }
+        // }
 
         if let Some(delegate_as) = self.call_context.delegate_as {
             if let Opcode::FarCall(_call) = data.opcode.variant.opcode {

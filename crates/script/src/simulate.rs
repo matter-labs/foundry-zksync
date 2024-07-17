@@ -230,7 +230,8 @@ impl PreSimulationState {
             .into_iter()
             .map(|btx| {
                 let mut tx = TransactionWithMetadata::from_tx_request(btx.transaction);
-                tx.zk = btx.zk_tx.map(|metadata| ZkTransaction { factory_deps: metadata.factory_deps });
+                tx.zk =
+                    btx.zk_tx.map(|metadata| ZkTransaction { factory_deps: metadata.factory_deps });
                 tx.rpc = btx.rpc.expect("missing broadcastable tx rpc url");
                 tx
             })

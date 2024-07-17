@@ -647,30 +647,58 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
     fn step_end(&mut self, interpreter: &mut Interpreter, ecx: &mut EvmContext<DB>) {
         // ovverride address(x).balance retrieval to make it consistent between EraVM and EVM
         if self.use_zk_vm {
-            let address = match interpreter.current_opcode() {
-                opcode::SELFBALANCE => interpreter.contract().target_address,
+            match interpreter.current_opcode() {
+                opcode::SELFBALANCE => {
+                    let address = interpreter.contract().target_address;
+                    let balance = foundry_zksync_core::balance(address, ecx);
+
+                    // Skip the current SELFBALANCE instruction since we've already handled it
+                    match interpreter.stack.push(balance) {
+                        Ok(_) => unsafe {
+                            interpreter.instruction_pointer =
+                                interpreter.instruction_pointer.add(1);
+                        },
+                        Err(e) => {
+                            interpreter.instruction_result = e;
+                        }
+                    }
+                }
                 opcode::BALANCE => {
                     if interpreter.stack.is_empty() {
                         interpreter.instruction_result = InstructionResult::StackUnderflow;
                         return;
                     }
 
-                    Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }))
+                    let address =
+                        Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }));
+                    let balance = foundry_zksync_core::balance(address, ecx);
+
+                    // Skip the current BALANCE instruction since we've already handled it
+                    match interpreter.stack.push(balance) {
+                        Ok(_) => unsafe {
+                            interpreter.instruction_pointer =
+                                interpreter.instruction_pointer.add(1);
+                        },
+                        Err(e) => {
+                            interpreter.instruction_result = e;
+                        }
+                    }
+                }
+                opcode::BLOCKHASH => {
+                    let block_number = U256::from(interpreter.stack.pop().unwrap());
+                    let block_hash = ecx.block_hash(block_number.into()).unwrap();
+                    warn!("block_hash: {:?}", block_hash);
+                    warn!("use blockhash_override");
+                    warn!("block number: {:?}", block_number);
+                    match interpreter.stack.push(block_hash.into()) {
+                        Ok(_) => unsafe {
+                            interpreter.instruction_pointer =
+                                interpreter.instruction_pointer.add(1);
+                        },
+                        Err(e) => interpreter.instruction_result = e,
+                    }
                 }
                 _ => return,
-            };
-
-            // Safety: Length is checked above.
-            let balance = foundry_zksync_core::balance(address, ecx);
-
-            // Skip the current BALANCE instruction since we've already handled it
-            match interpreter.stack.push(balance) {
-                Ok(_) => unsafe {
-                    interpreter.instruction_pointer = interpreter.instruction_pointer.add(1);
-                },
-                Err(e) => {
-                    interpreter.instruction_result = e;
-                }
             }
         }
     }
