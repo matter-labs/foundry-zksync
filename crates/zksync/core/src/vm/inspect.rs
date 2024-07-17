@@ -82,7 +82,16 @@ where
     let total_txns = txns.len();
     let mut aggregated_result: Option<ZKVMExecutionResult> = None;
 
-    for (idx, tx) in txns.into_iter().enumerate() {
+    for (idx, mut tx) in txns.into_iter().enumerate() {
+        let gas_used = aggregated_result
+            .as_ref()
+            .map(|r| r.execution_result.gas_used())
+            .map(U256::from)
+            .unwrap_or_default();
+
+        //deducted gas used so far
+        tx.common_data.fee.gas_limit -= gas_used;
+
         info!("executing batched tx ({}/{})", idx + 1, total_txns);
         let mut result = inspect(tx, ecx, ccx, call_ctx.clone())?;
 
@@ -520,7 +529,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     let factory_deps_count = factory_deps.len();
     let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
     let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();
-    tracing::info!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, "optimizing factory_deps");
+    tracing::debug!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, max=*MAX_FACTORY_DEPENDENCIES_SIZE_BYTES, "optimizing factory_deps");
 
     let mut batches = vec![];
     let mut current_batch = vec![];

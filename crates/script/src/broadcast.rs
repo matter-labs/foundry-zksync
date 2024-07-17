@@ -82,10 +82,15 @@ async fn convert_to_zksync(
     deploy_request = deploy_request
         .gas_limit(fee.gas_limit)
         .max_fee_per_gas(fee.max_fee_per_gas)
-        .max_priority_fee_per_gas(fee.max_priority_fee_per_gas)
-        .gas_price(gas_price);
+        .max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
+    deploy_request.custom_data.gas_per_pubdata = fee.gas_per_pubdata_limit;
 
-    let signable = deploy_request.clone().try_into().wrap_err("converting deploy request")?;
+    // TODO: This is a work around as try_into is not propagating
+    // gas_per_pubdata_byte_limit. It always set the default We would need to
+    // fix that library or add EIP712 to alloy with correct implementation.
+    let mut signable: Eip712Transaction = deploy_request.clone().try_into().wrap_err("converting deploy request")?;
+    signable.gas_per_pubdata_byte_limit = deploy_request.custom_data.gas_per_pubdata;
+
     Ok((deploy_request, signable))
 }
 

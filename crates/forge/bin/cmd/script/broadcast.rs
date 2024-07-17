@@ -162,7 +162,6 @@ impl ScriptArgs {
                             }
                         }
                     }
-
                     Ok((tx, zk, kind, is_fixed_gas_limit))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -652,6 +651,7 @@ impl ScriptArgs {
 
         let signed_tx = if let Some(zk) = zk {
             let custom_data = Eip712Meta::new().factory_deps(zk.factory_deps);
+            let gas_price = provider.get_gas_price().await?;
 
             let mut deploy_request = Eip712TransactionRequest::new()
                 .r#type(EIP712_TX_TYPE)
@@ -659,26 +659,30 @@ impl ScriptArgs {
                 .to(*legacy_or_1559.to().and_then(|to| to.as_address()).unwrap())
                 .chain_id(legacy_or_1559.chain_id().unwrap().as_u64())
                 .nonce(legacy_or_1559.nonce().unwrap())
-                .gas_price(legacy_or_1559.gas_price().unwrap())
+                .gas_price(gas_price)
                 .max_fee_per_gas(legacy_or_1559.max_cost().unwrap())
                 .data(legacy_or_1559.data().cloned().unwrap_or_default())
                 .custom_data(custom_data);
 
-            let gas_price = provider.get_gas_price().await?;
             let fee: zksync_web3_rs::zks_provider::types::Fee =
                 provider.request("zks_estimateFee", [deploy_request.clone()]).await.unwrap();
+
             deploy_request = deploy_request
                 .gas_limit(fee.gas_limit)
                 .max_fee_per_gas(fee.max_fee_per_gas)
-                .max_priority_fee_per_gas(fee.max_priority_fee_per_gas)
-                .gas_price(gas_price);
+                .max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
+            deploy_request.custom_data.gas_per_pubdata = fee.gas_per_pubdata_limit;
 
-            let signable: Eip712Transaction =
+            // TODO: This is a work around as try_into is not propagating
+            // gas_per_pubdata_byte_limit. It always set the default We would need to
+            // fix that library or add EIP712 to alloy with correct implementation.
+            let mut signable: Eip712Transaction =
                 deploy_request.clone().try_into().expect("converting deploy request");
-            debug!("sending transaction: {:?}", signable);
+            signable.gas_per_pubdata_byte_limit = deploy_request.custom_data.gas_per_pubdata;
 
             let signature =
                 signer.sign_typed_data(&signable).await.wrap_err("Failed to sign typed data")?;
+            debug!("sending transaction: {:?}", signable);
 
             let encoded_rlp =
                 &*deploy_request.rlp_signed(signature).expect("able to rlp encode deploy request");
