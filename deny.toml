@@ -7,7 +7,9 @@ unmaintained = "warn"
 yanked = "warn"
 notice = "warn"
 ignore = [
-    "RUSTSEC-2023-0018",
+    # https://github.com/watchexec/watchexec/issues/852
+    "RUSTSEC-2024-0350",
+    "RUSTSEC-2024-0351",
 ]
 
 # This section is considered when running `cargo deny check bans`.
@@ -20,7 +22,6 @@ multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
 # List of crates to deny
-deny = [{ name = "openssl" }]
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = []
 # Similarly to `skip` allows you to skip certain crates during duplicate
@@ -98,4 +99,11 @@ allow-git = [
     "https://github.com/alloy-rs/alloy",
     "https://github.com/paradigmxyz/revm-inspectors",
     "https://github.com/bluealloy/revm",
+    "https://github.com/lambdaclass/zksync-web3-rs",
+    "https://github.com/Moonsong-Labs/compilers",
+    "https://github.com/Moonsong-Labs/block-explorers",
+    "https://github.com/RustCrypto/hashes",
 ]
+
+[sources.allow-org]
+github = ["matter-labs"]

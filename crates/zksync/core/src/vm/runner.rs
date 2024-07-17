@@ -1,11 +1,9 @@
 use foundry_zksync_compiler::DualCompiledContract;
+use itertools::Itertools;
 use revm::{
     interpreter::{CallInputs, CallScheme, CallValue, CreateInputs},
-    precompile::{PrecompileSpecId, Precompiles},
-    primitives::{
-        Address, CreateScheme, Env, ResultAndState, SpecId, TransactTo, B256, U256 as rU256,
-    },
-    Database, EvmContext, JournaledState,
+    primitives::{Address, CreateScheme, Env, ResultAndState, TransactTo, B256, U256 as rU256},
+    Database, EvmContext,
 };
 use tracing::{debug, error, info};
 use zksync_basic_types::H256;
@@ -37,11 +35,7 @@ where
     DB: Database + Send,
     <DB as Database>::Error: Send + Debug,
 {
-    debug!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|v| v.len()).unwrap_or_default(), "zk transact");
-    let mut journaled_state = JournaledState::new(
-        SpecId::LATEST,
-        Precompiles::new(PrecompileSpecId::LATEST).addresses().copied().collect(),
-    );
+    info!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
 
     let mut ecx = EvmContext::new_with_env(db, Box::new(env.clone()));
     let caller = env.tx.caller;
@@ -85,7 +79,7 @@ where
 
     match inspect::<_, DB::Error>(tx, &mut ecx, &mut ccx, call_ctx) {
         Ok(ZKVMExecutionResult { execution_result: result, .. }) => {
-            Ok(ResultAndState { result, state: journaled_state.finalize().0 })
+            Ok(ResultAndState { result, state: ecx.journaled_state.finalize().0 })
         }
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
