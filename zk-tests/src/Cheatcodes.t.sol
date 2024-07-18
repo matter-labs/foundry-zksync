@@ -227,7 +227,7 @@ contract ZkCheatcodesTest is Test {
         );
 
         vm.createSelectFork(
-            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", //trufflehog:ignore
+            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", // trufflehog:ignore
             ETH_FORK_BLOCK
         );
         assertEq(
