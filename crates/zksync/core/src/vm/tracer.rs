@@ -109,7 +109,8 @@ pub struct CallContext {
     pub is_create: bool,
     /// Whether the current call is a static call.
     pub is_static: bool,
-    /// Blockhashes
+    /// L1 blockhashes to ensure consistency when returning environment data in L2, similar to
+    /// other cases (e.g., Block number, Block timestamp)
     pub blockhashes: HashMap<alloy_primitives::U256, alloy_primitives::FixedBytes<32>>,
 }
 
