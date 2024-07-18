@@ -221,12 +221,24 @@ contract ZkCheatcodesTest is Test {
     }
 
     function testZkCheatcodesCanBeUsedAfterFork() public {
-        assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
+        assertEq(
+            0,
+            address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance
+        );
 
-        vm.createSelectFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
-        assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
-        
+        vm.createSelectFork(
+            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", //trufflehog:ignore
+            ETH_FORK_BLOCK
+        );
+        assertEq(
+            0,
+            address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance
+        );
+
         vm.deal(0x4e59b44847b379578588920cA78FbF26c0B4956C, 1 ether);
-        assertEq(1 ether, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
+        assertEq(
+            1 ether,
+            address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance
+        );
     }
 }
