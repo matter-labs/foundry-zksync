@@ -63,6 +63,21 @@ where
         PaymasterParams::default(),
     );
 
+    let current_block_number = ecx.env.block.number;
+
+    let blockhashes = (0..=255)
+        .map(|i| current_block_number - alloy_primitives::U256::from(i))
+        .map(|index| {
+            let block_hash = ecx.block_hash(index);
+            block_hash.map(|block_hash| (index, block_hash))
+        })
+        .take_while(|result| match result {
+            Ok((_, block_hash)) => !block_hash.is_zero(),
+            Err(_) => false,
+        })
+        .filter_map(Result::ok)
+        .collect();
+
     let call_ctx = CallContext {
         tx_caller: env.tx.caller,
         msg_sender: env.tx.caller,
@@ -70,6 +85,7 @@ where
         delegate_as: None,
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
+        blockhashes,
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create,
         is_static: false,
@@ -151,6 +167,21 @@ where
         PaymasterParams::default(),
     );
 
+    let current_block_number = ecx.env.block.number;
+
+    let blockhashes = (0..=255)
+        .map(|i| current_block_number - alloy_primitives::U256::from(i))
+        .map(|index| {
+            let block_hash = ecx.block_hash(index);
+            block_hash.map(|block_hash| (index, block_hash))
+        })
+        .take_while(|result| match result {
+            Ok((_, block_hash)) => !block_hash.is_zero(),
+            Err(_) => false,
+        })
+        .filter_map(Result::ok)
+        .collect();
+
     let call_ctx = CallContext {
         tx_caller: ecx.env.tx.caller,
         msg_sender: call.caller,
@@ -159,6 +190,7 @@ where
         block_number: ecx.env.block.number,
         block_timestamp: ecx.env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
+        blockhashes,
         is_create: true,
         is_static: false,
     };
@@ -201,6 +233,21 @@ where
         PaymasterParams::default(),
     );
 
+    let current_block_number = ecx.env.block.number;
+
+    let blockhashes = (0..=255)
+        .map(|i| current_block_number - alloy_primitives::U256::from(i))
+        .map(|index| {
+            let block_hash = ecx.block_hash(index);
+            block_hash.map(|block_hash| (index, block_hash))
+        })
+        .take_while(|result| match result {
+            Ok((_, block_hash)) => !block_hash.is_zero(),
+            Err(_) => false,
+        })
+        .filter_map(Result::ok)
+        .collect();
+
     // address and caller are specific to the type of call:
     // Call | StaticCall => { address: to, caller: contract.address }
     // CallCode          => { address: contract.address, caller: contract.address }
@@ -215,6 +262,7 @@ where
         },
         block_number: ecx.env.block.number,
         block_timestamp: ecx.env.block.timestamp,
+        blockhashes,
         block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
         is_create: false,
         is_static: call.is_static,

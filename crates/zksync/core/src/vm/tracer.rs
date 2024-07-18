@@ -109,6 +109,8 @@ pub struct CallContext {
     pub is_create: bool,
     /// Whether the current call is a static call.
     pub is_static: bool,
+    /// Blockhashes
+    pub blockhashes: HashMap<alloy_primitives::U256, alloy_primitives::FixedBytes<32>>,
 }
 
 /// A tracer to allow for foundry-specific functionality.
@@ -295,17 +297,20 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
         }
 
         // Override blockhash
-        // if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-        //     let calldata = get_calldata(&state, memory);
-        //     let current = state.vm_local_state.callstack.current;
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let calldata = get_calldata(&state, memory);
+            let current = state.vm_local_state.callstack.current;
 
-        //     if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
-        //         calldata.starts_with(&SELECTOR_BLOCK_HASH)
-        //     {
-        //         self.farcall_handler.set_immediate_return(rU256::ZERO.to_be_bytes_vec());
-        //         return
-        //     }
-        // }
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
+                calldata.starts_with(&SELECTOR_BLOCK_HASH)
+            {
+                let index = U256::from_big_endian(&calldata[calldata.len() - 4..]);
+                if let Some(blockhash) = self.call_context.blockhashes.get(&index.to_ru256()) {
+                    self.farcall_handler.set_immediate_return(blockhash.to_vec());
+                    return;
+                }
+            }
+        }
 
         if let Some(delegate_as) = self.call_context.delegate_as {
             if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
