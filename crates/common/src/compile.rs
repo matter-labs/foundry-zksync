@@ -416,13 +416,19 @@ impl ProjectCompiler {
                 }
             })
             .collect();
+
         if !missing_libs.is_empty() {
             libraries::add_dependencies_to_missing_libraries_cache(
                 root_path,
                 missing_libs.as_slice(),
             )
             .expect("Error while adding missing libraries");
-            eyre::bail!("Missing libraries detected {:?}\n\nRun the following command in order to deploy the missing libraries:\nforge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync", missing_libs);
+            let missing_libs_list = missing_libs
+                .iter()
+                .map(|ml| format!("{}:{}", ml.contract_path, ml.contract_name))
+                .collect::<Vec<String>>()
+                .join(", ");
+            eyre::bail!("Missing libraries detected: {missing_libs_list}\n\nRun the following command in order to deploy each missing library:\n\nforge create <LIBRARY> --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync\n\nThen pass the library addresses using the --libraries option");
         }
 
         // print any sizes or names
