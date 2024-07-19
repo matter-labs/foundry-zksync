@@ -109,9 +109,9 @@ pub struct CallContext {
     pub is_create: bool,
     /// Whether the current call is a static call.
     pub is_static: bool,
-    /// L1 blockhashes to ensure consistency when returning environment data in L2, similar to
-    /// other cases (e.g., Block number, Block timestamp)
-    pub blockhashes: HashMap<alloy_primitives::U256, alloy_primitives::FixedBytes<32>>,
+    /// L1 block hashes to return when `BLOCKHASH` opcode is encountered. This ensures consistency
+    /// when returning environment data in L2.
+    pub block_hashes: HashMap<alloy_primitives::U256, alloy_primitives::FixedBytes<32>>,
 }
 
 /// A tracer to allow for foundry-specific functionality.
@@ -305,9 +305,12 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
             if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
                 calldata.starts_with(&SELECTOR_BLOCK_HASH)
             {
-                let index = U256::from_big_endian(&calldata[calldata.len() - 4..]);
-                if let Some(blockhash) = self.call_context.blockhashes.get(&index.to_ru256()) {
-                    self.farcall_handler.set_immediate_return(blockhash.to_vec());
+                let block_number = U256::from(&calldata[4..36]);
+                println!("BLOCKHASH {}", block_number);
+                if let Some(block_hash) =
+                    self.call_context.block_hashes.get(&block_number.to_ru256())
+                {
+                    self.farcall_handler.set_immediate_return(block_hash.to_vec());
                     return;
                 }
             }
