@@ -306,7 +306,6 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                 calldata.starts_with(&SELECTOR_BLOCK_HASH)
             {
                 let block_number = U256::from(&calldata[4..36]);
-                println!("BLOCKHASH {}", block_number);
                 if let Some(block_hash) =
                     self.call_context.block_hashes.get(&block_number.to_ru256())
                 {
