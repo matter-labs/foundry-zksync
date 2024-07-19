@@ -117,7 +117,9 @@ impl CreateArgs {
 
             let config = self.opts.try_load_config_emit_warnings()?;
             let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
-            let zk_compiler = ProjectCompiler::new().quiet(self.json || self.opts.silent);
+            let zk_compiler = ProjectCompiler::new()
+                .quiet(self.json || self.opts.silent)
+                .files([target_path.clone()]);
             let mut zk_output =
                 zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
 
