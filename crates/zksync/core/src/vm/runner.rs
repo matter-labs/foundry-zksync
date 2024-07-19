@@ -70,6 +70,7 @@ where
         delegate_as: None,
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
+        block_hashes: get_historical_block_hashes(&mut ecx),
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create,
         is_static: false,
@@ -159,6 +160,7 @@ where
         block_number: ecx.env.block.number,
         block_timestamp: ecx.env.block.timestamp,
         block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
+        block_hashes: get_historical_block_hashes(ecx),
         is_create: true,
         is_static: false,
     };
@@ -215,6 +217,7 @@ where
         },
         block_number: ecx.env.block.number,
         block_timestamp: ecx.env.block.timestamp,
+        block_hashes: get_historical_block_hashes(ecx),
         block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
         is_create: false,
         is_static: call.is_static,
@@ -269,4 +272,23 @@ pub fn encode_create_params(
     ]);
 
     signature.iter().copied().chain(params).collect()
+}
+
+/// Get last 256 block hashes mapped to block numbers
+fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMap<rU256, B256> {
+    let mut block_hashes = HashMap::default();
+    for i in 0..256u32 {
+        let (block_number, overflow) = ecx.env.block.number.overflowing_sub(rU256::from(i));
+        if overflow {
+            break
+        }
+        match ecx.block_hash(block_number) {
+            Ok(block_hash) => {
+                block_hashes.insert(block_number, block_hash);
+            }
+            Err(_) => break,
+        }
+    }
+
+    block_hashes
 }
