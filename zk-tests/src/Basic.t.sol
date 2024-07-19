@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract BlockEnv {
     uint256 public number;
@@ -96,13 +97,20 @@ contract ZkBasicTest is Test {
             be.chainid() == block.chainid,
             "propagated block chainid is the same as current"
         );
+
         require(
             be.ZkBlockhash(block.number) == blockhash(block.number),
-            "propagated blockhash is the same as current"
+            "Blockhash of the current block should be zero"
         );
+
         require(
-            be.ZkBlockhash(block.number) == bytes32(0),
-            "blockhash mismatch"
+            be.ZkBlockhash(block.number - 1) == blockhash(block.number - 1),
+            "Blockhash of the previous block should be equal"
+        );
+
+        require(
+            be.ZkBlockhash(0) == blockhash(0),
+            "Blockhash of the genesis block should be equal"
         );
 
         be = new BlockEnv();

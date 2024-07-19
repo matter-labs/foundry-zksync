@@ -310,8 +310,10 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
                     self.call_context.block_hashes.get(&block_number.to_ru256())
                 {
                     self.farcall_handler.set_immediate_return(block_hash.to_vec());
-                    return;
+                } else {
+                    self.farcall_handler.set_immediate_return(rU256::ZERO.to_be_bytes_vec());
                 }
+                return;
             }
         }
 
