@@ -48,7 +48,7 @@ Forge is quite fast at both compiling (leveraging [ethers-solc]) and testing.
 While `foundry-zksync` is **alpha stage**, there are some limitations to be aware of:
 
 - **Compile Time**: Some users may experience slower compile times.
-- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration. For more information please refer to [official docs](https://docs.zksync.io/build/developer-reference/ethereum-differences/libraries).
+- **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration or the command line with the `--libraries` argument. For more information please refer to [official docs](https://docs.zksync.io/build/developer-reference/ethereum-differences/libraries).
 
     ```
     libraries = [
@@ -193,15 +193,12 @@ Compiling smart contracts...
 Compiled Successfully
 ```
 
-#### Deploying missing libraries
+#### Listing missing libraries
 
-In case missing libraries are detected during the compilation, we can deploy them using the following command:
+To scan missing non-inlinable libraries, you can build the project using the `--zk-detect-missing-libraries-flag`. This will give a list of the libraries that need to be deployed and their addresses
+provided via the `libraries` option for the contracts to compile.
+Metadata about the libraries will be saved in `.zksolc-libraries-cache/missing_library_dependencies.json`.
 
-```
-$ forge create --deploy-missing-libraries --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync
-```
-
-After deployment is done, the configuration file will be updated and contracts will be automatically compiled again.
 
 #### Running Tests
 
