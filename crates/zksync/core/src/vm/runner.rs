@@ -274,10 +274,10 @@ pub fn encode_create_params(
     signature.iter().copied().chain(params).collect()
 }
 
-/// Get last 256 block hashes mapped to block numbers
+/// Get last 256 block hashes mapped to block numbers. This excludes the current block.
 fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMap<rU256, B256> {
     let mut block_hashes = HashMap::default();
-    for i in 0..256u32 {
+    for i in 1..=256u32 {
         let (block_number, overflow) = ecx.env.block.number.overflowing_sub(rU256::from(i));
         if overflow {
             break
