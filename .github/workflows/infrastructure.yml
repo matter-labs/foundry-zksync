@@ -24,7 +24,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-            toolchain: nightly-2024-02-06
+            toolchain: nightly-2024-04-28
 
       - name: Build forge binary
         run: cargo build --release --bin forge

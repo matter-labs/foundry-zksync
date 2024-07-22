@@ -1,40 +1,38 @@
 use clap::Parser;
 use forge::TestFilter;
-use foundry_cli::utils::FoundryPathExt;
-use foundry_common::glob::GlobMatcher;
 use foundry_compilers::{FileFilter, ProjectPathsConfig};
-use foundry_config::Config;
+use foundry_config::{filter::GlobMatcher, Config};
 use std::{fmt, path::Path};
 
 /// The filter to use during testing.
 ///
 /// See also `FileFilter`.
 #[derive(Clone, Parser)]
-#[clap(next_help_heading = "Test filtering")]
+#[command(next_help_heading = "Test filtering")]
 pub struct FilterArgs {
     /// Only run test functions matching the specified regex pattern.
-    #[clap(long = "match-test", visible_alias = "mt", value_name = "REGEX")]
+    #[arg(long = "match-test", visible_alias = "mt", value_name = "REGEX")]
     pub test_pattern: Option<regex::Regex>,
 
     /// Only run test functions that do not match the specified regex pattern.
-    #[clap(long = "no-match-test", visible_alias = "nmt", value_name = "REGEX")]
+    #[arg(long = "no-match-test", visible_alias = "nmt", value_name = "REGEX")]
     pub test_pattern_inverse: Option<regex::Regex>,
 
     /// Only run tests in contracts matching the specified regex pattern.
-    #[clap(long = "match-contract", visible_alias = "mc", value_name = "REGEX")]
+    #[arg(long = "match-contract", visible_alias = "mc", value_name = "REGEX")]
     pub contract_pattern: Option<regex::Regex>,
 
     /// Only run tests in contracts that do not match the specified regex pattern.
-    #[clap(long = "no-match-contract", visible_alias = "nmc", value_name = "REGEX")]
+    #[arg(long = "no-match-contract", visible_alias = "nmc", value_name = "REGEX")]
     pub contract_pattern_inverse: Option<regex::Regex>,
 
     /// Only run tests in source files matching the specified glob pattern.
-    #[clap(long = "match-path", visible_alias = "mp", value_name = "GLOB")]
+    #[arg(long = "match-path", visible_alias = "mp", value_name = "GLOB")]
     pub path_pattern: Option<GlobMatcher>,
 
     /// Only run tests in source files that do not match the specified glob pattern.
-    #[clap(
-        name = "no-match-path",
+    #[arg(
+        id = "no-match-path",
         long = "no-match-path",
         visible_alias = "nmp",
         value_name = "GLOB"
@@ -93,16 +91,9 @@ impl fmt::Debug for FilterArgs {
 impl FileFilter for FilterArgs {
     /// Returns true if the file regex pattern match the `file`
     ///
-    /// If no file regex is set this returns true if the file ends with `.t.sol`, see
-    /// [`FoundryPathExt::is_sol_test()`].
+    /// If no file regex is set this returns true by default
     fn is_match(&self, file: &Path) -> bool {
-        if let Some(glob) = &self.path_pattern {
-            return glob.is_match(file)
-        }
-        if let Some(glob) = &self.path_pattern_inverse {
-            return !glob.is_match(file)
-        }
-        file.is_sol_test()
+        self.matches_path(file)
     }
 }
 
@@ -172,8 +163,6 @@ pub struct ProjectPathsAwareFilter {
     paths: ProjectPathsConfig,
 }
 
-// === impl ProjectPathsAwareFilter ===
-
 impl ProjectPathsAwareFilter {
     /// Returns true if the filter is empty.
     pub fn is_empty(&self) -> bool {
@@ -194,9 +183,9 @@ impl ProjectPathsAwareFilter {
 impl FileFilter for ProjectPathsAwareFilter {
     /// Returns true if the file regex pattern match the `file`
     ///
-    /// If no file regex is set this returns true if the file ends with `.t.sol`, see
-    /// [FoundryPathExr::is_sol_test()]
-    fn is_match(&self, file: &Path) -> bool {
+    /// If no file regex is set this returns true by default
+    fn is_match(&self, mut file: &Path) -> bool {
+        file = file.strip_prefix(&self.paths.root).unwrap_or(file);
         self.args_filter.is_match(file)
     }
 }
@@ -210,8 +199,9 @@ impl TestFilter for ProjectPathsAwareFilter {
         self.args_filter.matches_contract(contract_name)
     }
 
-    fn matches_path(&self, path: &Path) -> bool {
+    fn matches_path(&self, mut path: &Path) -> bool {
         // we don't want to test files that belong to a library
+        path = path.strip_prefix(&self.paths.root).unwrap_or(path);
         self.args_filter.matches_path(path) && !self.paths.has_library_ancestor(path)
     }
 }

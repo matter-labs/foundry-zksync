@@ -1,13 +1,13 @@
-use alloy_primitives::{Address, Signature};
-use alloy_signer::{
-    coins_bip39::{English, Mnemonic},
-    LocalWallet, MnemonicBuilder, Signer as AlloySigner,
+use alloy_dyn_abi::TypedData;
+use alloy_primitives::{Address, Signature, B256};
+use alloy_signer::Signer;
+use alloy_signer_local::{
+    coins_bip39::{English, Entropy, Mnemonic},
+    MnemonicBuilder, PrivateKeySigner,
 };
 use clap::Parser;
-use ethers_core::types::transaction::eip712::TypedData;
-use ethers_signers::Signer;
 use eyre::{Context, Result};
-use foundry_common::{fs, types::ToAlloy};
+use foundry_common::fs;
 use foundry_config::Config;
 use foundry_wallets::{RawWalletOpts, WalletOpts, WalletSigner};
 use rand::thread_rng;
@@ -25,7 +25,7 @@ use list::ListArgs;
 #[derive(Debug, Parser)]
 pub enum WalletSubcommands {
     /// Create a new random keypair.
-    #[clap(visible_alias = "n")]
+    #[command(visible_alias = "n")]
     New {
         /// If provided, then keypair will be written to an encrypted JSON keystore.
         path: Option<String>,
@@ -33,53 +33,57 @@ pub enum WalletSubcommands {
         /// Triggers a hidden password prompt for the JSON keystore.
         ///
         /// Deprecated: prompting for a hidden password is now the default.
-        #[clap(long, short, requires = "path", conflicts_with = "unsafe_password")]
+        #[arg(long, short, requires = "path", conflicts_with = "unsafe_password")]
         password: bool,
 
         /// Password for the JSON keystore in cleartext.
         ///
         /// This is UNSAFE to use and we recommend using the --password.
-        #[clap(long, requires = "path", env = "CAST_PASSWORD", value_name = "PASSWORD")]
+        #[arg(long, requires = "path", env = "CAST_PASSWORD", value_name = "PASSWORD")]
         unsafe_password: Option<String>,
 
         /// Number of wallets to generate.
-        #[clap(long, short, default_value = "1")]
+        #[arg(long, short, default_value = "1")]
         number: u32,
 
         /// Output generated wallets as JSON.
-        #[clap(long, short, default_value = "false")]
+        #[arg(long, short, default_value = "false")]
         json: bool,
     },
 
     /// Generates a random BIP39 mnemonic phrase
-    #[clap(visible_alias = "nm")]
+    #[command(visible_alias = "nm")]
     NewMnemonic {
         /// Number of words for the mnemonic
-        #[clap(long, short, default_value = "12")]
+        #[arg(long, short, default_value = "12")]
         words: usize,
 
         /// Number of accounts to display
-        #[clap(long, short, default_value = "1")]
+        #[arg(long, short, default_value = "1")]
         accounts: u8,
+
+        /// Entropy to use for the mnemonic
+        #[arg(long, short, conflicts_with = "words")]
+        entropy: Option<String>,
     },
 
     /// Generate a vanity address.
-    #[clap(visible_alias = "va")]
+    #[command(visible_alias = "va")]
     Vanity(VanityArgs),
 
     /// Convert a private key to an address.
-    #[clap(visible_aliases = &["a", "addr"])]
+    #[command(visible_aliases = &["a", "addr"])]
     Address {
         /// If provided, the address will be derived from the specified private key.
-        #[clap(value_name = "PRIVATE_KEY")]
+        #[arg(value_name = "PRIVATE_KEY")]
         private_key_override: Option<String>,
 
-        #[clap(flatten)]
+        #[command(flatten)]
         wallet: WalletOpts,
     },
 
     /// Sign a message or typed data.
-    #[clap(visible_alias = "s")]
+    #[command(visible_alias = "s")]
     Sign {
         /// The message, typed data, or hash to sign.
         ///
@@ -97,23 +101,23 @@ pub enum WalletSubcommands {
         message: String,
 
         /// Treat the message as JSON typed data.
-        #[clap(long)]
+        #[arg(long)]
         data: bool,
 
         /// Treat the message as a file containing JSON typed data. Requires `--data`.
-        #[clap(long, requires = "data")]
+        #[arg(long, requires = "data")]
         from_file: bool,
 
         /// Treat the message as a raw 32-byte hash and sign it directly without hashing it again.
-        #[clap(long, conflicts_with = "data")]
+        #[arg(long, conflicts_with = "data")]
         no_hash: bool,
 
-        #[clap(flatten)]
+        #[command(flatten)]
         wallet: WalletOpts,
     },
 
     /// Verify the signature of a message.
-    #[clap(visible_alias = "v")]
+    #[command(visible_alias = "v")]
     Verify {
         /// The original message.
         message: String,
@@ -122,35 +126,73 @@ pub enum WalletSubcommands {
         signature: Signature,
 
         /// The address of the message signer.
-        #[clap(long, short)]
+        #[arg(long, short)]
         address: Address,
     },
+
     /// Import a private key into an encrypted keystore.
-    #[clap(visible_alias = "i")]
+    #[command(visible_alias = "i")]
     Import {
         /// The name for the account in the keystore.
-        #[clap(value_name = "ACCOUNT_NAME")]
+        #[arg(value_name = "ACCOUNT_NAME")]
         account_name: String,
         /// If provided, keystore will be saved here instead of the default keystores directory
         /// (~/.foundry/keystores)
-        #[clap(long, short)]
+        #[arg(long, short)]
         keystore_dir: Option<String>,
-        #[clap(flatten)]
+        /// Password for the JSON keystore in cleartext
+        /// This is unsafe, we recommend using the default hidden password prompt
+        #[arg(long, env = "CAST_UNSAFE_PASSWORD", value_name = "PASSWORD")]
+        unsafe_password: Option<String>,
+        #[command(flatten)]
         raw_wallet_options: RawWalletOpts,
     },
+
     /// List all the accounts in the keystore default directory
-    #[clap(visible_alias = "ls")]
+    #[command(visible_alias = "ls")]
     List(ListArgs),
 
     /// Derives private key from mnemonic
-    #[clap(name = "derive-private-key", visible_aliases = &["--derive-private-key"])]
-    DerivePrivateKey { mnemonic: String, mnemonic_index: Option<u8> },
+    #[command(name = "private-key", visible_alias = "pk", aliases = &["derive-private-key", "--derive-private-key"])]
+    PrivateKey {
+        /// If provided, the private key will be derived from the specified menomonic phrase.
+        #[arg(value_name = "MNEMONIC")]
+        mnemonic_override: Option<String>,
+
+        /// If provided, the private key will be derived using the
+        /// specified mnemonic index (if integer) or derivation path.
+        #[arg(value_name = "MNEMONIC_INDEX_OR_DERIVATION_PATH")]
+        mnemonic_index_or_derivation_path_override: Option<String>,
+
+        /// Verbose mode, print the address and private key.
+        #[arg(short = 'v', long)]
+        verbose: bool,
+
+        #[command(flatten)]
+        wallet: WalletOpts,
+    },
+
+    /// Decrypt a keystore file to get the private key
+    #[command(name = "decrypt-keystore", visible_alias = "dk")]
+    DecryptKeystore {
+        /// The name for the account in the keystore.
+        #[arg(value_name = "ACCOUNT_NAME")]
+        account_name: String,
+        /// If not provided, keystore will try to be located at the default keystores directory
+        /// (~/.foundry/keystores)
+        #[arg(long, short)]
+        keystore_dir: Option<String>,
+        /// Password for the JSON keystore in cleartext
+        /// This is unsafe, we recommend using the default hidden password prompt
+        #[arg(long, env = "CAST_UNSAFE_PASSWORD", value_name = "PASSWORD")]
+        unsafe_password: Option<String>,
+    },
 }
 
 impl WalletSubcommands {
     pub async fn run(self) -> Result<()> {
         match self {
-            WalletSubcommands::New { path, unsafe_password, number, json, .. } => {
+            Self::New { path, unsafe_password, number, json, .. } => {
                 let mut rng = thread_rng();
 
                 let mut json_values = if json { Some(vec![]) } else { None };
@@ -176,8 +218,12 @@ impl WalletSubcommands {
                     };
 
                     for _ in 0..number {
-                        let (wallet, uuid) =
-                            LocalWallet::new_keystore(&path, &mut rng, password.clone(), None)?;
+                        let (wallet, uuid) = PrivateKeySigner::new_keystore(
+                            &path,
+                            &mut rng,
+                            password.clone(),
+                            None,
+                        )?;
 
                         if let Some(json) = json_values.as_mut() {
                             json.push(json!({
@@ -199,17 +245,20 @@ impl WalletSubcommands {
                     }
                 } else {
                     for _ in 0..number {
-                        let wallet = LocalWallet::random_with(&mut rng);
+                        let wallet = PrivateKeySigner::random_with(&mut rng);
 
                         if let Some(json) = json_values.as_mut() {
                             json.push(json!({
                                 "address": wallet.address().to_checksum(None),
-                                "private_key": format!("0x{}", hex::encode(wallet.signer().to_bytes())),
+                                "private_key": format!("0x{}", hex::encode(wallet.credential().to_bytes())),
                             }))
                         } else {
                             println!("Successfully created new keypair.");
                             println!("Address:     {}", wallet.address().to_checksum(None));
-                            println!("Private key: 0x{}", hex::encode(wallet.signer().to_bytes()));
+                            println!(
+                                "Private key: 0x{}",
+                                hex::encode(wallet.credential().to_bytes())
+                            );
                         }
                     }
 
@@ -218,9 +267,15 @@ impl WalletSubcommands {
                     }
                 }
             }
-            WalletSubcommands::NewMnemonic { words, accounts } => {
-                let mut rng = thread_rng();
-                let phrase = Mnemonic::<English>::new_with_count(&mut rng, words)?.to_phrase();
+            Self::NewMnemonic { words, accounts, entropy } => {
+                let phrase = if let Some(entropy) = entropy {
+                    let entropy = Entropy::from_slice(hex::decode(entropy)?)?;
+                    println!("{}", "Generating mnemonic from provided entropy...".yellow());
+                    Mnemonic::<English>::new_from_entropy(entropy).to_phrase()
+                } else {
+                    let mut rng = thread_rng();
+                    Mnemonic::<English>::new_with_count(&mut rng, words)?.to_phrase()
+                };
 
                 let builder = MnemonicBuilder::<English>::default().phrase(phrase.as_str());
                 let derivation_path = "m/44'/60'/0'/0/";
@@ -230,19 +285,19 @@ impl WalletSubcommands {
                 let wallets =
                     wallets.into_iter().map(|b| b.build()).collect::<Result<Vec<_>, _>>()?;
 
-                println!("{}", Paint::green("Successfully generated a new mnemonic."));
+                println!("{}", "Successfully generated a new mnemonic.".green());
                 println!("Phrase:\n{phrase}");
                 println!("\nAccounts:");
                 for (i, wallet) in wallets.iter().enumerate() {
                     println!("- Account {i}:");
                     println!("Address:     {}", wallet.address());
-                    println!("Private key: 0x{}\n", hex::encode(wallet.signer().to_bytes()));
+                    println!("Private key: 0x{}\n", hex::encode(wallet.credential().to_bytes()));
                 }
             }
-            WalletSubcommands::Vanity(cmd) => {
+            Self::Vanity(cmd) => {
                 cmd.run()?;
             }
-            WalletSubcommands::Address { wallet, private_key_override } => {
+            Self::Address { wallet, private_key_override } => {
                 let wallet = private_key_override
                     .map(|pk| WalletOpts {
                         raw: RawWalletOpts { private_key: Some(pk), ..Default::default() },
@@ -252,9 +307,9 @@ impl WalletSubcommands {
                     .signer()
                     .await?;
                 let addr = wallet.address();
-                println!("{}", addr.to_alloy().to_checksum(None));
+                println!("{}", addr.to_checksum(None));
             }
-            WalletSubcommands::Sign { message, data, from_file, no_hash, wallet } => {
+            Self::Sign { message, data, from_file, no_hash, wallet } => {
                 let wallet = wallet.signer().await?;
                 let sig = if data {
                     let typed_data: TypedData = if from_file {
@@ -264,23 +319,23 @@ impl WalletSubcommands {
                         // data is a json string
                         serde_json::from_str(&message)?
                     };
-                    wallet.sign_typed_data(&typed_data).await?
+                    wallet.sign_dynamic_typed_data(&typed_data).await?
                 } else if no_hash {
-                    wallet.sign_hash(&message.parse()?).await?
+                    wallet.sign_hash(&hex::decode(&message)?[..].try_into()?).await?
                 } else {
-                    wallet.sign_message(Self::hex_str_to_bytes(&message)?).await?
+                    wallet.sign_message(&Self::hex_str_to_bytes(&message)?).await?
                 };
-                println!("0x{sig}");
+                println!("0x{}", hex::encode(sig.as_bytes()));
             }
-            WalletSubcommands::Verify { message, signature, address } => {
+            Self::Verify { message, signature, address } => {
                 let recovered_address = Self::recover_address_from_message(&message, &signature)?;
                 if address == recovered_address {
                     println!("Validation succeeded. Address {address} signed this message.");
                 } else {
-                    println!("Validation failed. Address {address} did not sign this message.");
+                    eyre::bail!("Validation failed. Address {address} did not sign this message.");
                 }
             }
-            WalletSubcommands::Import { account_name, keystore_dir, raw_wallet_options } => {
+            Self::Import { account_name, keystore_dir, unsafe_password, raw_wallet_options } => {
                 // Set up keystore directory
                 let dir = if let Some(path) = keystore_dir {
                     Path::new(&path).to_path_buf()
@@ -315,15 +370,20 @@ flag to set your key via:
                         )
                     })?;
 
-                let private_key = wallet.signer().to_bytes();
-                let password = rpassword::prompt_password("Enter password: ")?;
+                let private_key = wallet.credential().to_bytes();
+                let password = if let Some(password) = unsafe_password {
+                    password
+                } else {
+                    // if no --unsafe-password was provided read via stdin
+                    rpassword::prompt_password("Enter password: ")?
+                };
 
                 let mut rng = thread_rng();
-                eth_keystore::encrypt_key(
-                    &dir,
+                let (wallet, _) = PrivateKeySigner::encrypt_keystore(
+                    dir,
                     &mut rng,
                     private_key,
-                    &password,
+                    password,
                     Some(&account_name),
                 )?;
                 let address = wallet.address();
@@ -331,23 +391,84 @@ flag to set your key via:
                     "`{}` keystore was saved successfully. Address: {:?}",
                     &account_name, address,
                 );
-                println!("{}", Paint::green(success_message));
+                println!("{}", success_message.green());
             }
-            WalletSubcommands::List(cmd) => {
+            Self::List(cmd) => {
                 cmd.run().await?;
             }
-            WalletSubcommands::DerivePrivateKey { mnemonic, mnemonic_index } => {
-                let phrase = Mnemonic::<English>::new_from_phrase(mnemonic.as_str())?.to_phrase();
-                let builder = MnemonicBuilder::<English>::default().phrase(phrase.as_str());
-                let derivation_path = "m/44'/60'/0'/0/";
-                let index = if let Some(i) = mnemonic_index { i } else { 0 };
-                let wallet = builder
-                    .clone()
-                    .derivation_path(format!("{derivation_path}{index}"))?
-                    .build()?;
-                println!("- Account:");
-                println!("Address:     {}", wallet.address());
-                println!("Private key: 0x{}\n", hex::encode(wallet.signer().to_bytes()));
+            Self::PrivateKey {
+                wallet,
+                mnemonic_override,
+                mnemonic_index_or_derivation_path_override,
+                verbose,
+            } => {
+                let (index_override, derivation_path_override) =
+                    match mnemonic_index_or_derivation_path_override {
+                        Some(value) => match value.parse::<u32>() {
+                            Ok(index) => (Some(index), None),
+                            Err(_) => (None, Some(value)),
+                        },
+                        None => (None, None),
+                    };
+                let wallet = WalletOpts {
+                    raw: RawWalletOpts {
+                        mnemonic: mnemonic_override.or(wallet.raw.mnemonic),
+                        mnemonic_index: index_override.unwrap_or(wallet.raw.mnemonic_index),
+                        hd_path: derivation_path_override.or(wallet.raw.hd_path),
+                        ..wallet.raw
+                    },
+                    ..wallet
+                }
+                .signer()
+                .await?;
+                match wallet {
+                    WalletSigner::Local(wallet) => {
+                        if verbose {
+                            println!("Address:     {}", wallet.address());
+                            println!(
+                                "Private key: 0x{}",
+                                hex::encode(wallet.credential().to_bytes())
+                            );
+                        } else {
+                            println!("0x{}", hex::encode(wallet.credential().to_bytes()));
+                        }
+                    }
+                    _ => {
+                        eyre::bail!("Only local wallets are supported by this command.");
+                    }
+                }
+            }
+            Self::DecryptKeystore { account_name, keystore_dir, unsafe_password } => {
+                // Set up keystore directory
+                let dir = if let Some(path) = keystore_dir {
+                    Path::new(&path).to_path_buf()
+                } else {
+                    Config::foundry_keystores_dir().ok_or_else(|| {
+                        eyre::eyre!("Could not find the default keystore directory.")
+                    })?
+                };
+
+                let keypath = dir.join(&account_name);
+
+                if !keypath.exists() {
+                    eyre::bail!("Keystore file does not exist at {}", keypath.display());
+                }
+
+                let password = if let Some(password) = unsafe_password {
+                    password
+                } else {
+                    // if no --unsafe-password was provided read via stdin
+                    rpassword::prompt_password("Enter password: ")?
+                };
+
+                let wallet = PrivateKeySigner::decrypt_keystore(keypath, password)?;
+
+                let private_key = B256::from_slice(&wallet.credential().to_bytes());
+
+                let success_message =
+                    format!("{}'s private key is: {}", &account_name, private_key);
+
+                println!("{}", success_message.green());
             }
         };
 
@@ -369,11 +490,9 @@ flag to set your key via:
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
-    use alloy_primitives::address;
-
     use super::*;
+    use alloy_primitives::address;
+    use std::str::FromStr;
 
     #[test]
     fn can_parse_wallet_sign_message() {

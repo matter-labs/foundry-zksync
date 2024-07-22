@@ -17,12 +17,13 @@ use multivm::{
 };
 use once_cell::sync::OnceCell;
 use revm::{
+    db::states::StorageSlot,
     primitives::{
-        Address, Bytecode, Bytes, EVMResultGeneric, Env, Eval, ExecutionResult as rExecutionResult,
-        Halt as rHalt, HashMap as rHashMap, Log as rLog, OutOfGasError, Output, StorageSlot, B256,
+        Address, Bytecode, Bytes, EVMResultGeneric, ExecutionResult as rExecutionResult,
+        HaltReason, HashMap as rHashMap, Log as rLog, OutOfGasError, Output, SuccessReason, B256,
         U256 as rU256,
     },
-    Database, JournaledState,
+    Database, EvmContext,
 };
 use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
@@ -67,17 +68,15 @@ pub type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
 /// immediately.
 /// All logs will be collected as they happen, and returned with the final result.
 //TODO: should we make this transparent in `inspect` directly?
-pub fn inspect_as_batch<'a, DB, E>(
+pub fn inspect_as_batch<DB, E>(
     tx: L2Tx,
-    env: &'a mut Env,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
+    ecx: &mut EvmContext<DB>,
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
 where
     DB: Database + Send,
-    <DB as Database>::Error: Debug,
+    <DB as Database>::Error: Send + Debug,
 {
     let txns = split_tx_by_factory_deps(tx);
     let total_txns = txns.len();
@@ -93,8 +92,8 @@ where
         //deducted gas used so far
         tx.common_data.fee.gas_limit -= gas_used;
 
-        info!("executing batched tx ({}/{})", idx, total_txns);
-        let mut result = inspect(tx, env, db, journaled_state, ccx, call_ctx.clone())?;
+        info!("executing batched tx ({}/{})", idx + 1, total_txns);
+        let mut result = inspect(tx, ecx, ccx, call_ctx.clone())?;
 
         match (&mut aggregated_result, result.execution_result) {
             (_, exec @ rExecutionResult::Revert { .. } | exec @ rExecutionResult::Halt { .. }) => {
@@ -135,22 +134,20 @@ where
 /// Processes a [`L2Tx`] with EraVM and returns the final execution result and logs.
 ///
 /// State changes will be reflected in the given `Env`, `DB`, `JournaledState`.
-pub fn inspect<'a, DB, E>(
+pub fn inspect<DB, E>(
     mut tx: L2Tx,
-    env: &'a mut Env,
-    db: &'a mut DB,
-    journaled_state: &'a mut JournaledState,
+    ecx: &mut EvmContext<DB>,
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
 where
     DB: Database + Send,
-    <DB as Database>::Error: Debug,
+    <DB as Database>::Error: Send + Debug,
 {
-    let chain_id = if env.cfg.chain_id <= u32::MAX as u64 {
-        L2ChainId::from(env.cfg.chain_id as u32)
+    let chain_id = if ecx.env.cfg.chain_id <= u32::MAX as u64 {
+        L2ChainId::from(ecx.env.cfg.chain_id as u32)
     } else {
-        warn!(provided = ?env.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
+        warn!(provided = ?ecx.env.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
         L2ChainId::from(DEFAULT_CHAIN_ID)
     };
 
@@ -160,7 +157,8 @@ where
         .map(|factory_deps| (*factory_deps).clone())
         .unwrap_or_default();
 
-    let mut era_db = ZKVMData::new_with_system_contracts(db, journaled_state, chain_id)
+    let env_tx_gas_limit = ecx.env.tx.gas_limit;
+    let mut era_db = ZKVMData::new_with_system_contracts(ecx, chain_id)
         .with_extra_factory_deps(persisted_factory_deps)
         .with_storage_accesses(ccx.accesses.take());
 
@@ -191,10 +189,12 @@ where
         .events
         .clone()
         .into_iter()
-        .map(|event| revm::primitives::Log {
-            address: event.address.to_address(),
-            topics: event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
-            data: event.value.into(),
+        .map(|event| {
+            revm::primitives::Log::new_unchecked(
+                event.address.to_address(),
+                event.indexed_topics.iter().cloned().map(|t| B256::from(t.0)).collect(),
+                event.value.into(),
+            )
         })
         .collect_vec();
 
@@ -221,7 +221,7 @@ where
             ZKVMExecutionResult {
                 logs: logs.clone(),
                 execution_result: rExecutionResult::Success {
-                    reason: Eval::Return,
+                    reason: SuccessReason::Return,
                     gas_used: tx_result.statistics.gas_used,
                     gas_refunded: tx_result.refunds.gas_refunded,
                     logs,
@@ -239,7 +239,7 @@ where
             ZKVMExecutionResult {
                 logs,
                 execution_result: rExecutionResult::Revert {
-                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded,
+                    gas_used: env_tx_gas_limit - tx_result.refunds.gas_refunded,
                     output: Bytes::from(output),
                 },
             }
@@ -247,15 +247,15 @@ where
         ExecutionResult::Halt { reason } => {
             error!("tx execution halted: {}", reason);
             let mapped_reason = match reason {
-                Halt::NotEnoughGasProvided => rHalt::OutOfGas(OutOfGasError::BasicOutOfGas),
-                _ => rHalt::PrecompileError,
+                Halt::NotEnoughGasProvided => HaltReason::OutOfGas(OutOfGasError::Basic),
+                _ => HaltReason::PrecompileError,
             };
 
             ZKVMExecutionResult {
                 logs,
                 execution_result: rExecutionResult::Halt {
                     reason: mapped_reason,
-                    gas_used: env.tx.gas_limit - tx_result.refunds.gas_refunded,
+                    gas_used: env_tx_gas_limit - tx_result.refunds.gas_refunded,
                 },
             }
         }
@@ -309,20 +309,18 @@ where
     }
 
     for (address, storage) in storage {
-        journaled_state.load_account(address, db).expect("account could not be loaded");
-        journaled_state.touch(&address);
+        ecx.load_account(address).expect("account could not be loaded");
+        ecx.touch(&address);
 
         for (key, value) in storage {
-            journaled_state
-                .sstore(address, key, value.present_value, db)
-                .expect("failed writing to slot");
+            ecx.sstore(address, key, value.present_value).expect("failed writing to slot");
         }
     }
 
     for (address, (code_hash, code)) in codes {
-        journaled_state.load_account(address, db).expect("account could not be loaded");
-        journaled_state.touch(&address);
-        let account = journaled_state.state.get_mut(&address).expect("account is loaded");
+        ecx.load_account(address).expect("account could not be loaded");
+        ecx.touch(&address);
+        let account = ecx.journaled_state.state.get_mut(&address).expect("account is loaded");
 
         account.info.code_hash = code_hash;
         account.info.code = Some(code);
@@ -424,13 +422,11 @@ fn inspect_inner<S: ReadStorage + Send>(
         .iter()
         .map(|b| bytecode_to_factory_dep(b.original.clone()))
         .collect();
-
     let modified_keys = if is_static {
         Default::default()
     } else {
         storage.borrow().modified_storage_keys().clone()
     };
-
     (tx_result, bytecodes, modified_keys)
 }
 
@@ -533,7 +529,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     let factory_deps_count = factory_deps.len();
     let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
     let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();
-    tracing::info!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, max=*MAX_FACTORY_DEPENDENCIES_SIZE_BYTES, "optimizing factory_deps");
+    tracing::debug!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, max=*MAX_FACTORY_DEPENDENCIES_SIZE_BYTES, "optimizing factory_deps");
 
     let mut batches = vec![];
     let mut current_batch = vec![];
@@ -563,7 +559,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     let batch_cumulative_sizes =
         batches.iter().map(|deps| deps.iter().map(|dep| dep.len()).sum::<usize>()).collect_vec();
     let batch_total_size = batch_cumulative_sizes.iter().sum::<usize>();
-    tracing::debug!(count=batch_count, total=batch_total_size, sizes=?batch_cumulative_sizes, batched_sizes=?batch_individual_sizes, "optimized factory_deps into batches");
+    tracing::info!(count=batch_count, total=batch_total_size, sizes=?batch_cumulative_sizes, batched_sizes=?batch_individual_sizes, "optimized factory_deps into batches");
 
     batches
 }

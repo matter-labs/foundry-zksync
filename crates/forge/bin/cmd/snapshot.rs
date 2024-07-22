@@ -14,7 +14,6 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use watchexec::config::{InitConfig, RuntimeConfig};
 use yansi::Paint;
 
 /// A regex that matches a basic snapshot entry like
@@ -29,7 +28,7 @@ pub struct SnapshotArgs {
     /// Output a diff against a pre-existing snapshot.
     ///
     /// By default, the comparison is done with .gas-snapshot.
-    #[clap(
+    #[arg(
         conflicts_with = "snap",
         long,
         value_hint = ValueHint::FilePath,
@@ -42,7 +41,7 @@ pub struct SnapshotArgs {
     /// Outputs a diff if the snapshots do not match.
     ///
     /// By default, the comparison is done with .gas-snapshot.
-    #[clap(
+    #[arg(
         conflicts_with = "diff",
         long,
         value_hint = ValueHint::FilePath,
@@ -52,11 +51,11 @@ pub struct SnapshotArgs {
 
     // Hidden because there is only one option
     /// How to format the output.
-    #[clap(long, hide(true))]
+    #[arg(long, hide(true))]
     format: Option<Format>,
 
     /// Output file for the snapshot.
-    #[clap(
+    #[arg(
         long,
         default_value = ".gas-snapshot",
         value_hint = ValueHint::FilePath,
@@ -65,7 +64,7 @@ pub struct SnapshotArgs {
     snap: PathBuf,
 
     /// Tolerates gas deviations up to the specified percentage.
-    #[clap(
+    #[arg(
         long,
         value_parser = RangedU64ValueParser::<u32>::new().range(0..100),
         value_name = "SNAPSHOT_THRESHOLD"
@@ -73,11 +72,11 @@ pub struct SnapshotArgs {
     tolerance: Option<u32>,
 
     /// All test arguments are supported
-    #[clap(flatten)]
+    #[command(flatten)]
     pub(crate) test: test::TestArgs,
 
     /// Additional configs for test results
-    #[clap(flatten)]
+    #[command(flatten)]
     config: SnapshotConfig,
 }
 
@@ -89,7 +88,7 @@ impl SnapshotArgs {
 
     /// Returns the [`watchexec::InitConfig`] and [`watchexec::RuntimeConfig`] necessary to
     /// bootstrap a new [`watchexe::Watchexec`] loop.
-    pub(crate) fn watchexec_config(&self) -> Result<(InitConfig, RuntimeConfig)> {
+    pub(crate) fn watchexec_config(&self) -> Result<watchexec::Config> {
         self.test.watchexec_config()
     }
 
@@ -131,7 +130,7 @@ impl FromStr for Format {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "t" | "table" => Ok(Format::Table),
+            "t" | "table" => Ok(Self::Table),
             _ => Err(format!("Unrecognized format `{s}`")),
         }
     }
@@ -141,19 +140,19 @@ impl FromStr for Format {
 #[derive(Clone, Debug, Default, Parser)]
 struct SnapshotConfig {
     /// Sort results by gas used (ascending).
-    #[clap(long)]
+    #[arg(long)]
     asc: bool,
 
     /// Sort results by gas used (descending).
-    #[clap(conflicts_with = "asc", long)]
+    #[arg(conflicts_with = "asc", long)]
     desc: bool,
 
     /// Only include tests that used more gas that the given amount.
-    #[clap(long, value_name = "MIN_GAS")]
+    #[arg(long, value_name = "MIN_GAS")]
     min: Option<u64>,
 
     /// Only include tests that used less gas that the given amount.
-    #[clap(long, value_name = "MAX_GAS")]
+    #[arg(long, value_name = "MAX_GAS")]
     max: Option<u64>,
 }
 
@@ -211,17 +210,17 @@ impl FromStr for SnapshotEntry {
                 cap.name("file").and_then(|file| {
                     cap.name("sig").and_then(|sig| {
                         if let Some(gas) = cap.name("gas") {
-                            Some(SnapshotEntry {
+                            Some(Self {
                                 contract_name: file.as_str().to_string(),
                                 signature: sig.as_str().to_string(),
-                                gas_used: TestKindReport::Standard {
+                                gas_used: TestKindReport::Unit {
                                     gas: gas.as_str().parse().unwrap(),
                                 },
                             })
                         } else if let Some(runs) = cap.name("runs") {
                             cap.name("avg")
                                 .and_then(|avg| cap.name("med").map(|med| (runs, avg, med)))
-                                .map(|(runs, avg, med)| SnapshotEntry {
+                                .map(|(runs, avg, med)| Self {
                                     contract_name: file.as_str().to_string(),
                                     signature: sig.as_str().to_string(),
                                     gas_used: TestKindReport::Fuzz {
@@ -237,7 +236,7 @@ impl FromStr for SnapshotEntry {
                                         cap.name("reverts").map(|med| (runs, avg, med))
                                     })
                                 })
-                                .map(|(runs, calls, reverts)| SnapshotEntry {
+                                .map(|(runs, calls, reverts)| Self {
                                     contract_name: file.as_str().to_string(),
                                     signature: sig.as_str().to_string(),
                                     gas_used: TestKindReport::Invariant {
@@ -398,21 +397,21 @@ fn diff(tests: Vec<SuiteTestResult>, snaps: Vec<SnapshotEntry>) -> Result<()> {
 fn fmt_pct_change(change: f64) -> String {
     let change_pct = change * 100.0;
     match change.partial_cmp(&0.0).unwrap_or(Ordering::Equal) {
-        Ordering::Less => Paint::green(format!("{change_pct:.3}%")).to_string(),
+        Ordering::Less => format!("{change_pct:.3}%").green().to_string(),
         Ordering::Equal => {
             format!("{change_pct:.3}%")
         }
-        Ordering::Greater => Paint::red(format!("{change_pct:.3}%")).to_string(),
+        Ordering::Greater => format!("{change_pct:.3}%").red().to_string(),
     }
 }
 
 fn fmt_change(change: i128) -> String {
     match change.cmp(&0) {
-        Ordering::Less => Paint::green(format!("{change}")).to_string(),
+        Ordering::Less => format!("{change}").green().to_string(),
         Ordering::Equal => {
             format!("{change}")
         }
-        Ordering::Greater => Paint::red(format!("{change}")).to_string(),
+        Ordering::Greater => format!("{change}").red().to_string(),
     }
 }
 
@@ -455,7 +454,7 @@ mod tests {
             SnapshotEntry {
                 contract_name: "Test".to_string(),
                 signature: "deposit()".to_string(),
-                gas_used: TestKindReport::Standard { gas: 7222 }
+                gas_used: TestKindReport::Unit { gas: 7222 }
             }
         );
     }

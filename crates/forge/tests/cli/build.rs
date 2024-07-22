@@ -1,5 +1,8 @@
-use foundry_test_utils::{forgetest, util::OutputExt};
-use std::path::PathBuf;
+use foundry_common::fs::read_json_file;
+use foundry_config::Config;
+use foundry_test_utils::forgetest;
+use globset::Glob;
+use std::{collections::BTreeMap, path::PathBuf};
 
 // tests that json is printed when --json is passed
 forgetest!(compile_json, |prj, cmd| {
@@ -19,29 +22,58 @@ contract Dummy {
     // set up command
     cmd.args(["compile", "--format-json"]);
 
-    // run command and assert
-    cmd.unchecked_output().stdout_matches_path(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/compile_json.stdout"),
-    );
+    // Exclude build_infos from output as IDs depend on root dir and are not deterministic.
+    let mut output: BTreeMap<String, serde_json::Value> =
+        serde_json::from_str(&cmd.stdout_lossy()).unwrap();
+    output.remove("build_infos");
+
+    let expected: BTreeMap<String, serde_json::Value> = read_json_file(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/compile_json.stdout"),
+    )
+    .unwrap();
+
+    similar_asserts::assert_eq!(output, expected);
 });
 
 // tests build output is as expected
 forgetest_init!(exact_build_output, |prj, cmd| {
     cmd.args(["build", "--force"]);
-    let (stdout, _) = cmd.unchecked_output_lossy();
-    // Expected output from build
-    let expected = r#"Compiling 24 files with 0.8.23
-Solc 0.8.23 finished in 2.36s
-Compiler run successful!
-"#;
+    let stdout = cmd.stdout_lossy();
+    assert!(stdout.contains("Compiling"), "\n{stdout}");
+});
 
-    // skip all dynamic parts of the output (numbers)
-    let expected_words =
-        expected.split(|c: char| c == ' ').filter(|w| !w.chars().next().unwrap().is_numeric());
-    let output_words =
-        stdout.split(|c: char| c == ' ').filter(|w| !w.chars().next().unwrap().is_numeric());
+// tests build output is as expected
+forgetest_init!(build_sizes_no_forge_std, |prj, cmd| {
+    cmd.args(["build", "--sizes"]);
+    let stdout = cmd.stdout_lossy();
+    assert!(!stdout.contains("console"), "\n{stdout}");
+    assert!(!stdout.contains("std"), "\n{stdout}");
+    assert!(stdout.contains("Counter"), "\n{stdout}");
+});
 
-    for (expected, output) in expected_words.zip(output_words) {
-        assert_eq!(expected, output, "expected: {}, output: {}", expected, output);
-    }
+// tests that skip key in config can be used to skip non-compilable contract
+forgetest_init!(test_can_skip_contract, |prj, cmd| {
+    prj.add_source(
+        "InvalidContract",
+        r"
+contract InvalidContract {
+    some_invalid_syntax
+}
+",
+    )
+    .unwrap();
+
+    prj.add_source(
+        "ValidContract",
+        r"
+contract ValidContract {}
+",
+    )
+    .unwrap();
+
+    let config =
+        Config { skip: vec![Glob::new("src/InvalidContract.sol").unwrap()], ..Default::default() };
+    prj.write_config(config);
+
+    cmd.args(["build"]).assert_success();
 });

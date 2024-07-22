@@ -1,7 +1,8 @@
 use foundry_compilers::{
-    artifacts::Libraries,
-    zksync::artifacts::{BytecodeHash, Optimizer, OptimizerDetails, Settings, SettingsMetadata},
-    EvmVersion,
+    artifacts::{EvmVersion, Libraries},
+    zksolc::settings::{
+        BytecodeHash, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings,
+    },
 };
 
 use serde::{Deserialize, Serialize};
@@ -91,7 +92,7 @@ impl ZkSyncConfig {
         libraries: Libraries,
         evm_version: EvmVersion,
         via_ir: bool,
-    ) -> Settings {
+    ) -> ZkSolcSettings {
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
             mode: Some(self.optimizer_mode),
@@ -101,7 +102,7 @@ impl ZkSyncConfig {
             jump_table_density_threshold: None,
         };
 
-        Settings {
+        ZkSolcSettings {
             libraries,
             optimizer,
             evm_version: Some(evm_version),
@@ -116,5 +117,14 @@ impl ZkSyncConfig {
             output_selection: Default::default(),
             solc: self.solc_path.clone(),
         }
+    }
+
+    pub fn avoid_contracts(&self) -> Option<Vec<globset::GlobMatcher>> {
+        self.avoid_contracts.clone().map(|patterns| {
+            patterns
+                .into_iter()
+                .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
+                .collect::<Vec<_>>()
+        })
     }
 }

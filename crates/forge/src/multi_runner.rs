@@ -1,39 +1,45 @@
 //! Forge test runner for multiple contracts.
 
 use crate::{
-    link::{LinkOutput, Linker},
-    result::SuiteResult,
-    ContractRunner, TestFilter, TestOptions,
+    progress::TestsProgress, result::SuiteResult, runner::LIBRARY_DEPLOYER, ContractRunner,
+    TestFilter, TestOptions,
 };
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    contracts::ArtifactContracts,
-    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact, ArtifactId,
-    ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput,
+    artifacts::{CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Libraries},
+    compilers::Compiler,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
+    Artifact, ArtifactId, ProjectCompileOutput,
 };
+use foundry_config::Config;
 use foundry_evm::{
-    backend::Backend,
-    decode::RevertDecoder,
-    executors::{Executor, ExecutorBuilder},
-    fork::CreateFork,
-    inspectors::CheatsConfig,
-    opts::EvmOpts,
-    revm,
+    backend::Backend, decode::RevertDecoder, executors::ExecutorBuilder, fork::CreateFork,
+    inspectors::CheatsConfig, opts::EvmOpts, revm,
 };
+use foundry_linking::{LinkOutput, Linker};
+use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
 
 use std::{
+    borrow::Borrow,
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
     sync::{mpsc, Arc},
+    time::Instant,
 };
 
-pub type DeployableContracts = BTreeMap<ArtifactId, (JsonAbi, Bytes, Vec<Bytes>)>;
+#[derive(Debug, Clone)]
+pub struct TestContract {
+    pub abi: JsonAbi,
+    pub bytecode: Bytes,
+}
+
+pub type DeployableContracts = BTreeMap<ArtifactId, TestContract>;
 
 /// A multi contract runner receives a set of contracts deployed in an EVM instance and proceeds
 /// to run all test functions in these contracts.
@@ -41,8 +47,6 @@ pub struct MultiContractRunner {
     /// Mapping of contract name to JsonAbi, creation bytecode and library bytecode which
     /// needs to be deployed & linked against
     pub contracts: DeployableContracts,
-    /// Compiled contracts by name that have an JsonAbi and runtime bytecode
-    pub known_contracts: ContractsByArtifact,
     /// The EVM instance used in the test runner
     pub evm_opts: EvmOpts,
     /// The configured evm
@@ -53,12 +57,10 @@ pub struct MultiContractRunner {
     pub revert_decoder: RevertDecoder,
     /// The address which will be used as the `from` field in all EVM calls
     pub sender: Option<Address>,
-    /// A map of contract names to absolute source file paths
-    pub source_paths: BTreeMap<String, String>,
     /// The fork to use at launch
     pub fork: Option<CreateFork>,
-    /// Additional cheatcode inspector related settings derived from the `Config`
-    pub cheats_config: Arc<CheatsConfig>,
+    /// Project config.
+    pub config: Arc<Config>,
     /// Whether to collect coverage info
     pub coverage: bool,
     /// Whether to collect debug info
@@ -67,61 +69,62 @@ pub struct MultiContractRunner {
     pub test_options: TestOptions,
     /// Whether to enable call isolation
     pub isolation: bool,
+    /// Known contracts linked with computed library addresses.
+    pub known_contracts: ContractsByArtifact,
+    /// Libraries to deploy.
+    pub libs_to_deploy: Vec<Bytes>,
+    /// Library addresses used to link contracts.
+    pub libraries: Libraries,
+    /// Dual compiled contracts
+    pub dual_compiled_contracts: DualCompiledContracts,
+    /// Use zk runner.
     pub use_zk: bool,
 }
 
 impl MultiContractRunner {
-    /// Returns the number of matching tests
-    pub fn matching_test_function_count(&self, filter: &dyn TestFilter) -> usize {
-        self.matching_test_functions(filter).count()
+    /// Returns an iterator over all contracts that match the filter.
+    pub fn matching_contracts<'a>(
+        &'a self,
+        filter: &'a dyn TestFilter,
+    ) -> impl Iterator<Item = (&ArtifactId, &TestContract)> {
+        self.contracts
+            .iter()
+            .filter(|&(id, TestContract { abi, .. })| matches_contract(id, abi, filter))
     }
 
-    /// Returns all test functions matching the filter
+    /// Returns an iterator over all test functions that match the filter.
     pub fn matching_test_functions<'a>(
+        &'a self,
+        filter: &'a dyn TestFilter,
+    ) -> impl Iterator<Item = &Function> {
+        self.matching_contracts(filter)
+            .flat_map(|(_, TestContract { abi, .. })| abi.functions())
+            .filter(|func| is_matching_test(func, filter))
+    }
+
+    /// Returns an iterator over all test functions in contracts that match the filter.
+    pub fn all_test_functions<'a>(
         &'a self,
         filter: &'a dyn TestFilter,
     ) -> impl Iterator<Item = &Function> {
         self.contracts
             .iter()
             .filter(|(id, _)| filter.matches_path(&id.source) && filter.matches_contract(&id.name))
-            .flat_map(|(_, (abi, _, _))| {
-                abi.functions().filter(|func| filter.matches_test(&func.signature()))
-            })
-    }
-
-    /// Get an iterator over all test contract functions that matches the filter path and contract
-    /// name
-    fn filtered_tests<'a>(&'a self, filter: &'a dyn TestFilter) -> impl Iterator<Item = &Function> {
-        self.contracts
-            .iter()
-            .filter(|(id, _)| filter.matches_path(&id.source) && filter.matches_contract(&id.name))
-            .flat_map(|(_, (abi, _, _))| abi.functions())
-    }
-
-    /// Get all test names matching the filter
-    pub fn get_tests(&self, filter: &dyn TestFilter) -> Vec<String> {
-        self.filtered_tests(filter)
-            .map(|func| func.name.clone())
-            .filter(|name| name.is_test())
-            .collect()
+            .flat_map(|(_, TestContract { abi, .. })| abi.functions())
+            .filter(|func| func.is_test() || func.is_invariant_test())
     }
 
     /// Returns all matching tests grouped by contract grouped by file (file -> (contract -> tests))
     pub fn list(&self, filter: &dyn TestFilter) -> BTreeMap<String, BTreeMap<String, Vec<String>>> {
-        self.contracts
-            .iter()
-            .filter(|(id, _)| filter.matches_path(&id.source) && filter.matches_contract(&id.name))
-            .filter(|(_, (abi, _, _))| abi.functions().any(|func| filter.matches_test(&func.name)))
-            .map(|(id, (abi, _, _))| {
+        self.matching_contracts(filter)
+            .map(|(id, TestContract { abi, .. })| {
                 let source = id.source.as_path().display().to_string();
                 let name = id.name.clone();
                 let tests = abi
                     .functions()
-                    .filter(|func| func.name.is_test())
-                    .filter(|func| filter.matches_test(&func.signature()))
+                    .filter(|func| is_matching_test(func, filter))
                     .map(|func| func.name.clone())
                     .collect::<Vec<_>>();
-
                 (source, name, tests)
             })
             .fold(BTreeMap::new(), |mut acc, (source, name, tests)| {
@@ -135,12 +138,8 @@ impl MultiContractRunner {
     /// The same as [`test`](Self::test), but returns the results instead of streaming them.
     ///
     /// Note that this method returns only when all tests have been executed.
-    pub async fn test_collect(
-        &mut self,
-        filter: &dyn TestFilter,
-        test_options: TestOptions,
-    ) -> BTreeMap<String, SuiteResult> {
-        self.test_iter(filter, test_options).await.collect()
+    pub fn test_collect(&mut self, filter: &dyn TestFilter) -> BTreeMap<String, SuiteResult> {
+        self.test_iter(filter).collect()
     }
 
     /// Executes _all_ tests that match the given `filter`.
@@ -148,13 +147,12 @@ impl MultiContractRunner {
     /// The same as [`test`](Self::test), but returns the results instead of streaming them.
     ///
     /// Note that this method returns only when all tests have been executed.
-    pub async fn test_iter(
+    pub fn test_iter(
         &mut self,
         filter: &dyn TestFilter,
-        test_options: TestOptions,
     ) -> impl Iterator<Item = (String, SuiteResult)> {
         let (tx, rx) = mpsc::channel();
-        self.test(filter, tx, test_options).await;
+        self.test(filter, tx, false);
         rx.into_iter()
     }
 
@@ -164,92 +162,134 @@ impl MultiContractRunner {
     /// before executing all contracts and their tests in _parallel_.
     ///
     /// Each Executor gets its own instance of the `Backend`.
-    pub async fn test(
+    pub fn test(
         &mut self,
         filter: &dyn TestFilter,
-        stream_result: mpsc::Sender<(String, SuiteResult)>,
-        test_options: TestOptions,
+        tx: mpsc::Sender<(String, SuiteResult)>,
+        show_progress: bool,
     ) {
+        let handle = tokio::runtime::Handle::current();
         trace!("running all tests");
 
-        // the db backend that serves all the data, each contract gets its own instance
-        let mut db = Backend::spawn(self.fork.take()).await;
-        db.is_zk = self.cheats_config.use_zk;
+        // The DB backend that serves all the data.
+        let mut db = Backend::spawn(self.fork.take());
+        db.is_zk = self.use_zk;
 
-        self.contracts
-            .par_iter()
-            .filter(|(id, _)| filter.matches_path(&id.source) && filter.matches_contract(&id.name))
-            .filter(|(_, (abi, _, _))| abi.functions().any(|func| filter.matches_test(&func.name)))
-            .for_each_with(stream_result, |stream_result, (id, (abi, deploy_code, libs))| {
-                let executor = ExecutorBuilder::new()
-                    .inspectors(|stack| {
-                        stack
-                            .cheatcodes(self.cheats_config.clone())
-                            .trace(self.evm_opts.verbosity >= 3 || self.debug)
-                            .debug(self.debug)
-                            .coverage(self.coverage)
-                            .enable_isolation(self.isolation)
-                    })
-                    .spec(self.evm_spec)
-                    .gas_limit(self.evm_opts.gas_limit())
-                    .use_zk_vm(self.use_zk)
-                    .build(self.env.clone(), db.clone());
-                let identifier = id.identifier();
-                trace!(contract=%identifier, "start executing all tests in contract");
+        let find_timer = Instant::now();
+        let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
+        let find_time = find_timer.elapsed();
+        debug!(
+            "Found {} test contracts out of {} in {:?}",
+            contracts.len(),
+            self.contracts.len(),
+            find_time,
+        );
 
-                let result = self.run_tests(
-                    &identifier,
-                    abi,
-                    executor,
-                    deploy_code.clone(),
-                    libs,
-                    filter,
-                    test_options.clone(),
-                );
-                trace!(contract=?identifier, "executed all tests in contract");
+        if show_progress {
+            let tests_progress = TestsProgress::new(contracts.len(), rayon::current_num_threads());
+            // Collect test suite results to stream at the end of test run.
+            let results: Vec<(String, SuiteResult)> = contracts
+                .par_iter()
+                .map(|&(id, contract)| {
+                    let _guard = handle.enter();
+                    tests_progress.inner.lock().start_suite_progress(&id.identifier());
 
-                let _ = stream_result.send((identifier, result));
+                    let result = self.run_test_suite(
+                        id,
+                        contract,
+                        db.clone(),
+                        filter,
+                        &handle,
+                        Some(&tests_progress),
+                    );
+
+                    tests_progress
+                        .inner
+                        .lock()
+                        .end_suite_progress(&id.identifier(), result.summary());
+
+                    (id.identifier(), result)
+                })
+                .collect();
+
+            tests_progress.inner.lock().clear();
+
+            results.iter().for_each(|result| {
+                let _ = tx.send(result.to_owned());
+            });
+        } else {
+            contracts.par_iter().for_each(|&(id, contract)| {
+                let _guard = handle.enter();
+                let result = self.run_test_suite(id, contract, db.clone(), filter, &handle, None);
+                let _ = tx.send((id.identifier(), result));
             })
+        }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn run_tests(
+    fn run_test_suite(
         &self,
-        name: &str,
-        contract: &JsonAbi,
-        executor: Executor,
-        deploy_code: Bytes,
-        libs: &[Bytes],
+        artifact_id: &ArtifactId,
+        contract: &TestContract,
+        db: Backend,
         filter: &dyn TestFilter,
-        test_options: TestOptions,
+        handle: &tokio::runtime::Handle,
+        progress: Option<&TestsProgress>,
     ) -> SuiteResult {
-        let span = info_span!("run_tests");
-        if !span.is_disabled() {
-            if enabled!(tracing::Level::TRACE) {
-                span.record("contract", name);
-            } else {
-                span.record("contract", get_contract_name(name));
-            }
+        let identifier = artifact_id.identifier();
+        let mut span_name = identifier.as_str();
+
+        let cheats_config = CheatsConfig::new(
+            &self.config,
+            self.evm_opts.clone(),
+            Some(self.known_contracts.clone()),
+            None,
+            Some(artifact_id.version.clone()),
+            self.dual_compiled_contracts.clone(),
+            self.use_zk,
+        );
+
+        let executor = ExecutorBuilder::new()
+            .inspectors(|stack| {
+                stack
+                    .cheatcodes(Arc::new(cheats_config))
+                    .trace(self.evm_opts.verbosity >= 3 || self.debug)
+                    .debug(self.debug)
+                    .coverage(self.coverage)
+                    .enable_isolation(self.isolation)
+            })
+            .spec(self.evm_spec)
+            .gas_limit(self.evm_opts.gas_limit())
+            .build(self.env.clone(), db);
+
+        if !enabled!(tracing::Level::TRACE) {
+            span_name = get_contract_name(&identifier);
         }
-        let _guard = span.enter();
+        let _guard = debug_span!("suite", name = span_name).entered();
+
+        debug!("start executing all tests in contract");
 
         let runner = ContractRunner::new(
-            name,
+            &identifier,
             executor,
             contract,
-            deploy_code,
+            &self.libs_to_deploy,
             self.evm_opts.initial_balance,
             self.sender,
             &self.revert_decoder,
-            libs,
             self.debug,
+            progress,
         );
-        runner.run_tests(filter, test_options, Some(&self.known_contracts))
+
+        let r = runner.run_tests(filter, &self.test_options, self.known_contracts.clone(), handle);
+
+        debug!(duration=?r.duration, "executed all tests in contract");
+
+        r
     }
 }
 
 /// Builder used for instantiating the multi-contract runner
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[must_use = "builders do nothing unless you call `build` on them"]
 pub struct MultiContractRunnerBuilder {
     /// The address which will be used to deploy the initial contracts and send all
@@ -261,8 +301,8 @@ pub struct MultiContractRunnerBuilder {
     pub evm_spec: Option<SpecId>,
     /// The fork to use at launch
     pub fork: Option<CreateFork>,
-    /// Additional cheatcode inspector related settings derived from the `Config`
-    pub cheats_config: Option<CheatsConfig>,
+    /// Project config.
+    pub config: Arc<Config>,
     /// Whether or not to collect coverage info
     pub coverage: bool,
     /// Whether or not to collect debug info
@@ -273,22 +313,21 @@ pub struct MultiContractRunnerBuilder {
     pub test_options: Option<TestOptions>,
 }
 
-#[derive(Debug)]
-pub struct ProjectCompileDualOutput<A: ArtifactOutput = ConfigurableArtifacts> {
-    pub zk_output: Option<ProjectCompileOutput<A>>,
-    pub solc_output: Option<ProjectCompileOutput<A>>,
-}
-
-impl<A: ArtifactOutput> ProjectCompileDualOutput<A> {
-    pub fn only_zk(zk_output: ProjectCompileOutput<A>) -> Self {
-        ProjectCompileDualOutput { zk_output: Some(zk_output), solc_output: None }
-    }
-    pub fn only_evm(solc_output: ProjectCompileOutput<A>) -> Self {
-        ProjectCompileDualOutput { zk_output: None, solc_output: Some(solc_output) }
-    }
-}
-
 impl MultiContractRunnerBuilder {
+    pub fn new(config: Arc<Config>) -> Self {
+        Self {
+            config,
+            sender: Default::default(),
+            initial_balance: Default::default(),
+            evm_spec: Default::default(),
+            fork: Default::default(),
+            coverage: Default::default(),
+            debug: Default::default(),
+            isolation: Default::default(),
+            test_options: Default::default(),
+        }
+    }
+
     pub fn sender(mut self, sender: Address) -> Self {
         self.sender = Some(sender);
         self
@@ -306,11 +345,6 @@ impl MultiContractRunnerBuilder {
 
     pub fn with_fork(mut self, fork: Option<CreateFork>) -> Self {
         self.fork = fork;
-        self
-    }
-
-    pub fn with_cheats_config(mut self, cheats_config: CheatsConfig) -> Self {
-        self.cheats_config = Some(cheats_config);
         self
     }
 
@@ -336,73 +370,63 @@ impl MultiContractRunnerBuilder {
 
     /// Given an EVM, proceeds to return a runner which is able to execute all tests
     /// against that evm
-    pub fn build(
+    pub fn build<C: Compiler>(
         self,
         root: &Path,
-        output: ProjectCompileOutput,
+        output: ProjectCompileOutput<C>,
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
+        dual_compiled_contracts: DualCompiledContracts,
     ) -> Result<MultiContractRunner> {
         let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
+        let output = output.with_stripped_file_prefixes(root);
+        let linker = Linker::new(root, output.artifact_ids().collect());
 
-        // This is just the contracts compiled, but we need to merge this with the read cached
-        // artifacts.
-        let contracts = output
-            .with_stripped_file_prefixes(root)
-            .into_artifacts()
-            .map(|(i, c)| (i, c.into_contract_bytecode()))
-            .collect::<ArtifactContracts>();
-
-        let source_paths = contracts
+        // Build revert decoder from ABIs of all artifacts.
+        let abis = linker
+            .contracts
             .iter()
-            .map(|(i, _)| (i.identifier(), root.join(&i.source).to_string_lossy().into()))
-            .collect::<BTreeMap<String, String>>();
+            .filter_map(|(_, contract)| contract.abi.as_ref().map(|abi| abi.borrow()));
+        let revert_decoder = RevertDecoder::new().with_abis(abis);
 
-        let linker = Linker::new(root, contracts);
+        let LinkOutput { libraries, libs_to_deploy } = linker.link_with_nonce_or_address(
+            Default::default(),
+            LIBRARY_DEPLOYER,
+            0,
+            linker.contracts.keys(),
+        )?;
+
+        let linked_contracts = linker.get_linked_artifacts(&libraries)?;
 
         // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
         let mut deployable_contracts = DeployableContracts::default();
 
-        for (id, contract) in &linker.contracts.0 {
-            let Some(abi) = contract.abi.as_ref() else {
-                continue;
-            };
+        for (id, contract) in linked_contracts.iter() {
+            let Some(abi) = &contract.abi else { continue };
 
-            let LinkOutput { libs_to_deploy, libraries } =
-                linker.link_with_nonce_or_address(Default::default(), evm_opts.sender, 1, id)?;
-
-            let linked_contract = linker.link(id, &libraries)?;
-
-            // get bytes if deployable, else add to known contracts and continue.
-            // interfaces and abstract contracts should be known to enable fuzzing of their ABI
-            // but they should not be deployable and their source code should be skipped by the
-            // debugger and linker.
-            let Some(bytecode) = linked_contract
-                .get_bytecode_bytes()
-                .map(|b| b.into_owned())
-                .filter(|b| !b.is_empty())
-            else {
-                known_contracts.insert(id.clone(), (abi.clone(), vec![]));
-                continue;
-            };
-
-            // if it's a test, add it to deployable contracts
+            // if it's a test, link it and add to deployable contracts
             if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true) &&
                 abi.functions().any(|func| func.name.is_test() || func.name.is_invariant_test())
             {
-                deployable_contracts.insert(id.clone(), (abi.clone(), bytecode, libs_to_deploy));
-            }
+                let Some(bytecode) =
+                    contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
+                else {
+                    continue;
+                };
 
-            if !use_zk {
-                if let Some(bytes) = linked_contract.get_deployed_bytecode_bytes() {
-                    known_contracts.insert(id.clone(), (abi.clone(), bytes.to_vec()));
-                }
+                deployable_contracts
+                    .insert(id.clone(), TestContract { abi: abi.clone(), bytecode });
             }
         }
-        if let Some(zk_output) = zk_output {
+
+        if !use_zk {
+            known_contracts = ContractsByArtifact::new(linked_contracts);
+        } else if let Some(zk_output) = zk_output {
             let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
+            let mut zk_contracts_map = BTreeMap::new();
+
             for (id, contract) in zk_contracts {
                 if let Some(metadata) = contract.metadata {
                     if let Some(solc_metadata_value) =
@@ -411,39 +435,62 @@ impl MultiContractRunnerBuilder {
                         if let Ok(solc_metadata_json) =
                             serde_json::from_str::<serde_json::Value>(solc_metadata_value)
                         {
-                            let abi_json = &solc_metadata_json["output"]["abi"];
-                            let abi_string = abi_json.to_string();
-                            let abi: JsonAbi = JsonAbi::from_json_str(&abi_string)?;
-                            let bytecode = contract
-                                .bytecode
-                                .as_ref()
-                                .and_then(|b| b.object.as_bytes())
-                                .map_or_else(Vec::new, |b| b.to_vec());
-                            known_contracts.insert(id, (abi.clone(), bytecode));
+                            let abi: JsonAbi = JsonAbi::from_json_str(
+                                &solc_metadata_json["output"]["abi"].to_string(),
+                            )?;
+                            let bytecode = contract.bytecode.as_ref();
+
+                            if let Some(bytecode_object) = bytecode.map(|b| b.object.clone()) {
+                                let compact_bytecode = CompactBytecode {
+                                    object: bytecode_object.clone(),
+                                    source_map: None,
+                                    link_references: BTreeMap::new(),
+                                };
+                                let compact_contract = CompactContractBytecode {
+                                    abi: Some(abi),
+                                    bytecode: Some(compact_bytecode.clone()),
+                                    deployed_bytecode: Some(CompactDeployedBytecode {
+                                        bytecode: Some(compact_bytecode),
+                                        immutable_references: BTreeMap::new(),
+                                    }),
+                                };
+                                zk_contracts_map.insert(id.clone(), compact_contract);
+                            }
                         }
                     }
                 }
             }
+            known_contracts = ContractsByArtifact::new(zk_contracts_map);
         }
 
-        let revert_decoder =
-            RevertDecoder::new().with_abis(known_contracts.values().map(|(abi, _)| abi));
         Ok(MultiContractRunner {
             contracts: deployable_contracts,
-            known_contracts,
             evm_opts,
             env,
             evm_spec: self.evm_spec.unwrap_or(SpecId::MERGE),
             sender: self.sender,
             revert_decoder,
-            source_paths,
             fork: self.fork,
-            cheats_config: self.cheats_config.unwrap_or_default().into(),
+            config: self.config,
             coverage: self.coverage,
             debug: self.debug,
             test_options: self.test_options.unwrap_or_default(),
             isolation: self.isolation,
+            known_contracts,
+            libs_to_deploy,
+            libraries,
+            dual_compiled_contracts,
             use_zk,
         })
     }
+}
+
+pub fn matches_contract(id: &ArtifactId, abi: &JsonAbi, filter: &dyn TestFilter) -> bool {
+    (filter.matches_path(&id.source) && filter.matches_contract(&id.name)) &&
+        abi.functions().any(|func| is_matching_test(func, filter))
+}
+
+/// Returns `true` if the function is a test function that matches the given filter.
+pub(crate) fn is_matching_test(func: &Function, filter: &dyn TestFilter) -> bool {
+    (func.is_test() || func.is_invariant_test()) && filter.matches_test(&func.signature())
 }

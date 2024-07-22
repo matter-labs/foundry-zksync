@@ -8,7 +8,7 @@ SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
 SOLC="solc-${SOLC_VERSION}"
 FORGE="${REPO_ROOT}/target/release/forge"
 CAST="${REPO_ROOT}/target/release/cast"
-ERA_TEST_NODE_VERSION="v0.1.0-alpha.15"
+ERA_TEST_NODE_VERSION="v0.1.0-alpha.25"
 ERA_TEST_NODE_PID=0
 RPC_URL="http://localhost:8011"
 PRIVATE_KEY="0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e"
@@ -126,17 +126,6 @@ build_forge "${REPO_ROOT}"
 "${FORGE}" install transmissions11/solmate Openzeppelin/openzeppelin-contracts --no-commit
 
 start_era_test_node
-
-# Test missing libraries detection and deploy
-output=$(RUST_LOG=warn "${FORGE}" build --zk-compile 2>&1 || true)
-
-if echo "$output" | grep -q "Missing libraries detected"; then
-    RUST_LOG=warn "${FORGE}" create --deploy-missing-libraries --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zk-compile
-    RUST_LOG=warn "${FORGE}" script ./src/MissingLibraries.sol:MathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zk-startup --chain 260 --use "./${SOLC}" -vvv || fail "forge script with libs failed"
-    RUST_LOG=warn "${FORGE}" script ./src/NestedMissingLibraries.sol:NestedMathematicianScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --zk-startup --chain 260 --use "./${SOLC}" -vvv || fail "forge script with nested libs failed"
-else
-    echo "No missing libraries detected."
-fi
 
 echo "Running tests..."
 RUST_LOG=warn "${FORGE}" test --use "./${SOLC}" --chain 300 -vvv --zk-compile || fail "forge test failed"

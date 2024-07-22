@@ -1,13 +1,14 @@
 //! Test outcomes.
 
-use alloy_primitives::{Address, Log};
+use crate::gas_report::GasReport;
+use alloy_primitives::{Address, Bytes, Log};
 use foundry_common::{evm::Breakpoints, get_contract_name, get_file_name, shell};
 use foundry_evm::{
     coverage::HitMaps,
     debug::DebugArena,
     executors::EvmError,
-    fuzz::{CounterExample, FuzzCase},
-    traces::{CallTraceDecoder, TraceKind, Traces},
+    fuzz::{CounterExample, FuzzCase, FuzzFixtures},
+    traces::{CallTraceArena, CallTraceDecoder, TraceKind, Traces},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -31,13 +32,15 @@ pub struct TestOutcome {
     /// This is `None` if traces and logs were not decoded.
     ///
     /// Note that `Address` fields only contain the last executed test case's data.
-    pub decoder: Option<CallTraceDecoder>,
+    pub last_run_decoder: Option<CallTraceDecoder>,
+    /// The gas report, if requested.
+    pub gas_report: Option<GasReport>,
 }
 
 impl TestOutcome {
     /// Creates a new test outcome with the given results.
     pub fn new(results: BTreeMap<String, SuiteResult>, allow_failure: bool) -> Self {
-        Self { results, allow_failure, decoder: None }
+        Self { results, allow_failure, last_run_decoder: None, gas_report: None }
     }
 
     /// Creates a new empty test outcome.
@@ -133,9 +136,9 @@ impl TestOutcome {
             suites,
             wall_clock_time,
             self.total_time(),
-            Paint::green(total_passed),
-            Paint::red(total_failed),
-            Paint::yellow(total_skipped),
+            total_passed.green(),
+            total_failed.red(),
+            total_skipped.yellow(),
             total_tests
         )
     }
@@ -171,8 +174,8 @@ impl TestOutcome {
         let successes = outcome.passed();
         shell::println(format!(
             "Encountered a total of {} failing tests, {} tests succeeded",
-            Paint::red(failures.to_string()),
-            Paint::green(successes.to_string())
+            failures.to_string().red(),
+            successes.to_string().green()
         ))?;
 
         // TODO: Avoid process::exit
@@ -184,6 +187,7 @@ impl TestOutcome {
 #[derive(Clone, Debug, Serialize)]
 pub struct SuiteResult {
     /// Wall clock time it took to execute all tests in this suite.
+    #[serde(with = "humantime_serde")]
     pub duration: Duration,
     /// Individual test results: `test fn signature -> TestResult`.
     pub test_results: BTreeMap<String, TestResult>,
@@ -255,13 +259,13 @@ impl SuiteResult {
     /// Returns the summary of a single test suite.
     pub fn summary(&self) -> String {
         let failed = self.failed();
-        let result = if failed == 0 { Paint::green("ok") } else { Paint::red("FAILED") };
+        let result = if failed == 0 { "ok".green() } else { "FAILED".red() };
         format!(
             "Suite result: {}. {} passed; {} failed; {} skipped; finished in {:.2?} ({:.2?} CPU time)",
             result,
-            Paint::green(self.passed()),
-            Paint::red(failed),
-            Paint::yellow(self.skipped()),
+            self.passed().green(),
+            failed.red(),
+            self.skipped().yellow(),
             self.duration,
             self.total_time(),
         )
@@ -358,6 +362,10 @@ pub struct TestResult {
     #[serde(skip)]
     pub traces: Traces,
 
+    /// Additional traces to use for gas report.
+    #[serde(skip)]
+    pub gas_report_traces: Vec<Vec<CallTraceArena>>,
+
     /// Raw coverage info
     #[serde(skip)]
     pub coverage: Option<HitMaps>,
@@ -377,8 +385,8 @@ pub struct TestResult {
 impl fmt::Display for TestResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.status {
-            TestStatus::Success => Paint::green("[PASS]").fmt(f),
-            TestStatus::Skipped => Paint::yellow("[SKIP]").fmt(f),
+            TestStatus::Success => "[PASS]".green().fmt(f),
+            TestStatus::Skipped => "[SKIP]".yellow().fmt(f),
             TestStatus::Failure => {
                 let mut s = String::from("[FAIL. Reason: ");
 
@@ -401,7 +409,7 @@ impl fmt::Display for TestResult {
                     s.push(']');
                 }
 
-                Paint::red(s).fmt(f)
+                s.red().fmt(f)
             }
         }
     }
@@ -426,21 +434,21 @@ impl TestResult {
 /// Data report by a test.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TestKindReport {
-    Standard { gas: u64 },
+    Unit { gas: u64 },
     Fuzz { runs: usize, mean_gas: u64, median_gas: u64 },
     Invariant { runs: usize, calls: usize, reverts: usize },
 }
 
 impl fmt::Display for TestKindReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TestKindReport::Standard { gas } => {
+        match *self {
+            Self::Unit { gas } => {
                 write!(f, "(gas: {gas})")
             }
-            TestKindReport::Fuzz { runs, mean_gas, median_gas } => {
+            Self::Fuzz { runs, mean_gas, median_gas } => {
                 write!(f, "(runs: {runs}, μ: {mean_gas}, ~: {median_gas})")
             }
-            TestKindReport::Invariant { runs, calls, reverts } => {
+            Self::Invariant { runs, calls, reverts } => {
                 write!(f, "(runs: {runs}, calls: {calls}, reverts: {reverts})")
             }
         }
@@ -450,12 +458,12 @@ impl fmt::Display for TestKindReport {
 impl TestKindReport {
     /// Returns the main gas value to compare against
     pub fn gas(&self) -> u64 {
-        match self {
-            TestKindReport::Standard { gas } => *gas,
+        match *self {
+            Self::Unit { gas } => gas,
             // We use the median for comparisons
-            TestKindReport::Fuzz { median_gas, .. } => *median_gas,
+            Self::Fuzz { median_gas, .. } => median_gas,
             // We return 0 since it's not applicable
-            TestKindReport::Invariant { .. } => 0,
+            Self::Invariant { .. } => 0,
         }
     }
 }
@@ -463,11 +471,9 @@ impl TestKindReport {
 /// Various types of tests
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TestKind {
-    /// A standard test that consists of calling the defined solidity function
-    ///
-    /// Holds the consumed gas
-    Standard(u64),
-    /// A solidity fuzz test, that stores all test cases
+    /// A unit test.
+    Unit { gas: u64 },
+    /// A fuzz test.
     Fuzz {
         /// we keep this for the debugger
         first_case: FuzzCase,
@@ -475,26 +481,26 @@ pub enum TestKind {
         mean_gas: u64,
         median_gas: u64,
     },
-    /// A solidity invariant test, that stores all test cases
+    /// An invariant test.
     Invariant { runs: usize, calls: usize, reverts: usize },
 }
 
 impl Default for TestKind {
     fn default() -> Self {
-        Self::Standard(0)
+        Self::Unit { gas: 0 }
     }
 }
 
 impl TestKind {
     /// The gas consumed by this test
     pub fn report(&self) -> TestKindReport {
-        match self {
-            TestKind::Standard(gas) => TestKindReport::Standard { gas: *gas },
-            TestKind::Fuzz { runs, mean_gas, median_gas, .. } => {
-                TestKindReport::Fuzz { runs: *runs, mean_gas: *mean_gas, median_gas: *median_gas }
+        match *self {
+            Self::Unit { gas } => TestKindReport::Unit { gas },
+            Self::Fuzz { first_case: _, runs, mean_gas, median_gas } => {
+                TestKindReport::Fuzz { runs, mean_gas, median_gas }
             }
-            TestKind::Invariant { runs, calls, reverts } => {
-                TestKindReport::Invariant { runs: *runs, calls: *calls, reverts: *reverts }
+            Self::Invariant { runs, calls, reverts } => {
+                TestKindReport::Invariant { runs, calls, reverts }
             }
         }
     }
@@ -502,6 +508,8 @@ impl TestKind {
 
 #[derive(Clone, Debug, Default)]
 pub struct TestSetup {
+    /// Deployments generated during the setup
+    pub deployments: HashMap<Address, Bytes>,
     /// The address at which the test contract was deployed
     pub address: Address,
     /// The logs emitted during setup
@@ -514,6 +522,8 @@ pub struct TestSetup {
     pub reason: Option<String>,
     /// Coverage info during setup
     pub coverage: Option<HitMaps>,
+    /// Defined fuzz test fixtures
+    pub fuzz_fixtures: FuzzFixtures,
 }
 
 impl TestSetup {
@@ -526,9 +536,9 @@ impl TestSetup {
         match error {
             EvmError::Execution(err) => {
                 // force the tracekind to be setup so a trace is shown.
-                traces.extend(err.traces.map(|traces| (TraceKind::Setup, traces)));
-                logs.extend(err.logs);
-                labeled_addresses.extend(err.labels);
+                traces.extend(err.raw.traces.map(|traces| (TraceKind::Setup, traces)));
+                logs.extend(err.raw.logs);
+                labeled_addresses.extend(err.raw.labels);
                 Self::failed_with(logs, traces, labeled_addresses, err.reason)
             }
             e => Self::failed_with(
@@ -541,13 +551,24 @@ impl TestSetup {
     }
 
     pub fn success(
+        deployments: HashMap<Address, Bytes>,
         address: Address,
         logs: Vec<Log>,
         traces: Traces,
         labeled_addresses: HashMap<Address, String>,
         coverage: Option<HitMaps>,
+        fuzz_fixtures: FuzzFixtures,
     ) -> Self {
-        Self { address, logs, traces, labeled_addresses, reason: None, coverage }
+        Self {
+            deployments,
+            address,
+            logs,
+            traces,
+            labeled_addresses,
+            reason: None,
+            coverage,
+            fuzz_fixtures,
+        }
     }
 
     pub fn failed_with(
@@ -557,12 +578,14 @@ impl TestSetup {
         reason: String,
     ) -> Self {
         Self {
+            deployments: HashMap::new(),
             address: Address::ZERO,
             logs,
             traces,
             labeled_addresses,
             reason: Some(reason),
             coverage: None,
+            fuzz_fixtures: FuzzFixtures::default(),
         }
     }
 
