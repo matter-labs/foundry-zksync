@@ -16,7 +16,7 @@ contract BlockEnv {
         chainid = block.chainid;
     }
 
-    function ZkBlockhash(uint256 _blockNumber) public view returns (bytes32) {
+    function zkBlockhash(uint256 _blockNumber) public view returns (bytes32) {
         return blockhash(_blockNumber);
     }
 }
@@ -98,18 +98,19 @@ contract ZkBasicTest is Test {
         );
 
         require(
-            be.ZkBlockhash(block.number) == blockhash(block.number),
-            "Blockhash of the current block should be zero"
+            be.zkBlockhash(block.number) == blockhash(block.number),
+            "blockhash of the current block should be zero"
+        );
+
+        // this corresponds to the the genesis block since the test runs in block #1
+        require(
+            be.zkBlockhash(block.number - 1) == blockhash(block.number - 1),
+            "blockhash of the previous block should be equal"
         );
 
         require(
-            be.ZkBlockhash(block.number - 1) == blockhash(block.number - 1),
-            "Blockhash of the previous block should be equal"
-        );
-
-        require(
-            be.ZkBlockhash(0) == blockhash(0),
-            "Blockhash of the genesis block should be equal"
+            be.zkBlockhash(0) == blockhash(0),
+            "blockhash of the genesis block should be equal"
         );
 
         be = new BlockEnv();
@@ -164,11 +165,11 @@ contract ZkBasicTest is Test {
         );
     }
 
-    function testZkBlockhashWithNewerBlocks() public {
+    function testzkBlockhashWithNewerBlocks() public {
         vm.selectFork(latestForkEth);
         BlockEnv be = new BlockEnv();
         require(
-            be.ZkBlockhash(block.number) == blockhash(block.number),
+            be.zkBlockhash(block.number) == blockhash(block.number),
             "blockhash mismatch"
         );
     }
