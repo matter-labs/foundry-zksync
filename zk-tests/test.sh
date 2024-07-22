@@ -4,7 +4,7 @@
 set -o pipefail -e
 
 REPO_ROOT=".."
-SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
+SOLC_VERSION=${SOLC_VERSION:-"v0.8.26"}
 SOLC="solc-${SOLC_VERSION}"
 FORGE="${REPO_ROOT}/target/release/forge"
 CAST="${REPO_ROOT}/target/release/cast"
