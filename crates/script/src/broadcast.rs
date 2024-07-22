@@ -120,6 +120,17 @@ pub async fn send_transaction(
     // Chains which use `eth_estimateGas` are being sent sequentially and require their
     // gas to be re-estimated right before broadcasting.
     if !is_fixed_gas_limit && estimate_via_rpc {
+        // manually add factory_deps to estimate_gas
+        if let Some(zk) = zk {
+            tx.other.insert(
+                "eip712Meta".into(),
+                serde_json::to_value(&Eip712Meta {
+                    factory_deps: zk.factory_deps.clone(),
+                    ..Default::default()
+                })
+                .expect("failed serializing json"),
+            );
+        }
         estimate_gas(&mut tx, &provider, estimate_multiplier).await?;
     }
 
