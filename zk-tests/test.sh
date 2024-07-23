@@ -4,7 +4,7 @@
 set -o pipefail -e
 
 REPO_ROOT=".."
-SOLC_VERSION=${SOLC_VERSION:-"v0.8.20"}
+SOLC_VERSION=${SOLC_VERSION:-"v0.8.26"}
 SOLC="solc-${SOLC_VERSION}"
 FORGE="${REPO_ROOT}/target/release/forge"
 CAST="${REPO_ROOT}/target/release/cast"
@@ -142,14 +142,14 @@ RUST_LOG=warn "${FORGE}" script ./script/Deploy.s.sol:DeployScript --broadcast -
 # RUST_LOG=warn "${FORGE}" script ./src/LargeFactoryDependencies.t.sol:ZkLargeFactoryDependenciesScript --broadcast --private-key "$PRIVATE_KEY" --chain 260 --gas-estimate-multiplier 310 --rpc-url "$RPC_URL" --use "./${SOLC}" --slow -vvv --zk-startup || fail "forge script failed"
 
 echo "Running NFT script"
-RUST_LOG=warn "${FORGE}" script ./script/NFT.s.sol:MyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.20 --zk-startup || fail "forge script failed"
+RUST_LOG=warn "${FORGE}" script ./script/NFT.s.sol:MyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.26 --zk-startup || fail "forge script failed"
 
 echo "Running Proxy script"
-RUST_LOG=warn "${FORGE}" script ./script/Proxy.s.sol:ProxyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.20 --zk-startup  || fail "forge proxy script failed"
+RUST_LOG=warn "${FORGE}" script ./script/Proxy.s.sol:ProxyScript --broadcast --private-key $PRIVATE_KEY --rpc-url $RPC_URL --use 0.8.26 --zk-startup  || fail "forge proxy script failed"
 
 # Deploy ERC20
 echo "Deploying MyToken..."
-MYTOKEN_DEPLOYMENT=$(RUST_LOG=warn "${FORGE}" create ./src/ERC20.sol:MyToken --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use 0.8.20 --zk-startup) || fail "forge script failed"
+MYTOKEN_DEPLOYMENT=$(RUST_LOG=warn "${FORGE}" create ./src/ERC20.sol:MyToken --rpc-url $RPC_URL --private-key $PRIVATE_KEY --use 0.8.26 --zk-startup) || fail "forge script failed"
 MYTOKEN_ADDRESS=$(echo $MYTOKEN_DEPLOYMENT | awk '/Deployed to:/ {for (i=1; i<=NF; i++) if ($i == "to:") print $(i+1)}')
 echo "MyToken deployed at: $MYTOKEN_ADDRESS"
 
