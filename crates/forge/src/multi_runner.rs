@@ -428,36 +428,27 @@ impl MultiContractRunnerBuilder {
             let mut zk_contracts_map = BTreeMap::new();
 
             for (id, contract) in zk_contracts {
-                if let Some(metadata) = contract.metadata {
-                    if let Some(solc_metadata_value) =
-                        metadata.get("solc_metadata").and_then(serde_json::Value::as_str)
-                    {
-                        if let Ok(solc_metadata_json) =
-                            serde_json::from_str::<serde_json::Value>(solc_metadata_value)
-                        {
-                            let abi: JsonAbi = JsonAbi::from_json_str(
-                                &solc_metadata_json["output"]["abi"].to_string(),
-                            )?;
-                            let bytecode = contract.bytecode.as_ref();
+                if let Some(abi) = contract.abi {
+                    let bytecode = contract.bytecode.as_ref();
 
-                            if let Some(bytecode_object) = bytecode.map(|b| b.object.clone()) {
-                                let compact_bytecode = CompactBytecode {
-                                    object: bytecode_object.clone(),
-                                    source_map: None,
-                                    link_references: BTreeMap::new(),
-                                };
-                                let compact_contract = CompactContractBytecode {
-                                    abi: Some(abi),
-                                    bytecode: Some(compact_bytecode.clone()),
-                                    deployed_bytecode: Some(CompactDeployedBytecode {
-                                        bytecode: Some(compact_bytecode),
-                                        immutable_references: BTreeMap::new(),
-                                    }),
-                                };
-                                zk_contracts_map.insert(id.clone(), compact_contract);
-                            }
-                        }
+                    if let Some(bytecode_object) = bytecode.map(|b| b.object.clone()) {
+                        let compact_bytecode = CompactBytecode {
+                            object: bytecode_object.clone(),
+                            source_map: None,
+                            link_references: BTreeMap::new(),
+                        };
+                        let compact_contract = CompactContractBytecode {
+                            abi: Some(abi),
+                            bytecode: Some(compact_bytecode.clone()),
+                            deployed_bytecode: Some(CompactDeployedBytecode {
+                                bytecode: Some(compact_bytecode),
+                                immutable_references: BTreeMap::new(),
+                            }),
+                        };
+                        zk_contracts_map.insert(id.clone(), compact_contract);
                     }
+                } else {
+                    warn!("Abi not found for contract {}", id.identifier());
                 }
             }
             known_contracts = ContractsByArtifact::new(zk_contracts_map);

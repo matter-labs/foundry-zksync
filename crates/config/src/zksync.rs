@@ -1,5 +1,8 @@
 use foundry_compilers::{
-    artifacts::{EvmVersion, Libraries},
+    artifacts::{
+        zksolc::output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
+        EvmVersion, Libraries,
+    },
     zksolc::settings::{
         BytecodeHash, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings,
     },
@@ -116,8 +119,12 @@ impl ZkSyncConfig {
             enable_eravm_extensions: self.enable_eravm_extensions,
             force_evmla: self.force_evmla,
             llvm_options: self.llvm_options.clone(),
-            // TODO: See if we need to set this from here
-            output_selection: Default::default(),
+            output_selection: OutputSelection {
+                all: Some(FileOutputSelection {
+                    per_file: None,
+                    per_contract: Some([OutputSelectionFlag::ABI].into()),
+                }),
+            },
             solc: self.solc_path.clone(),
         }
     }
