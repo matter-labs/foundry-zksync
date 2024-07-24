@@ -1,5 +1,8 @@
 use foundry_compilers::{
-    artifacts::{EvmVersion, Libraries},
+    artifacts::{
+        zksolc::output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
+        EvmVersion, Libraries,
+    },
     zksolc::settings::{
         BytecodeHash, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings,
     },
@@ -32,11 +35,12 @@ pub struct ZkSyncConfig {
     pub fallback_oz: bool,
 
     /// Whether to support compilation of zkSync-specific simulations
-    pub eravm_extensions: bool,
+    pub enable_eravm_extensions: bool,
 
     /// Force evmla for zkSync
     pub force_evmla: bool,
 
+    pub llvm_options: Vec<String>,
     /// Detect missing libraries, instead of erroring
     ///
     /// Currently unused
@@ -64,9 +68,10 @@ impl Default for ZkSyncConfig {
             solc_path: Default::default(),
             bytecode_hash: Default::default(),
             fallback_oz: Default::default(),
-            eravm_extensions: Default::default(),
+            enable_eravm_extensions: Default::default(),
             force_evmla: Default::default(),
             detect_missing_libraries: Default::default(),
+            llvm_options: Default::default(),
             avoid_contracts: Default::default(),
             optimizer: true,
             optimizer_mode: '3',
@@ -111,10 +116,15 @@ impl ZkSyncConfig {
             // Set in project paths.
             remappings: Vec::new(),
             detect_missing_libraries: self.detect_missing_libraries,
-            system_mode: self.eravm_extensions,
+            enable_eravm_extensions: self.enable_eravm_extensions,
             force_evmla: self.force_evmla,
-            // TODO: See if we need to set this from here
-            output_selection: Default::default(),
+            llvm_options: self.llvm_options.clone(),
+            output_selection: OutputSelection {
+                all: Some(FileOutputSelection {
+                    per_file: None,
+                    per_contract: Some([OutputSelectionFlag::ABI].into()),
+                }),
+            },
             solc: self.solc_path.clone(),
         }
     }

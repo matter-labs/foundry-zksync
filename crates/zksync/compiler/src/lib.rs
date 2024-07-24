@@ -102,7 +102,7 @@ pub fn create_project(
         // if none is found, but maybe we should mirror auto detect settings
         // as done with solc
         if !config.offline {
-            let default_version = semver::Version::new(1, 5, 0);
+            let default_version = semver::Version::new(1, 5, 1);
             let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
             if zksolc.is_none() {
                 ZkSolc::blocking_install(&default_version)?;
