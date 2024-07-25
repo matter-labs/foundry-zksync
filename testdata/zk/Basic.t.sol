@@ -34,16 +34,10 @@ contract ZkBasicTest is DSTest {
 
     function testZkBasicBlockTimestamp() public {
         vm.selectFork(forkEra);
-        require(
-            block.timestamp == ERA_FORK_BLOCK_TS,
-            "era block timestamp mismatch"
-        );
+        require(block.timestamp == ERA_FORK_BLOCK_TS, "era block timestamp mismatch");
 
         vm.selectFork(forkEth);
-        require(
-            block.timestamp == ETH_FORK_BLOCK_TS,
-            "eth block timestamp mismatch"
-        );
+        require(block.timestamp == ETH_FORK_BLOCK_TS, "eth block timestamp mismatch");
     }
 
     function testZkBasicAddressBalance() public {
