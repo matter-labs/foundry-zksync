@@ -5,6 +5,7 @@ import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 
 import {ConstantNumber} from "./ConstantNumber.sol";
+import {Globals} from "./Globals.sol";
 
 contract Greeter {
     string name;
@@ -105,14 +106,8 @@ contract ZkContractsTest is DSTest {
         vm.makePersistent(address(number));
         vm.makePersistent(address(customNumber));
 
-        forkEra = vm.createFork(
-            "https://mainnet.era.zksync.io", // trufflehog:ignore
-            ERA_FORK_BLOCK
-        );
-        forkEth = vm.createFork(
-            "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", // trufflehog:ignore
-            ETH_FORK_BLOCK
-        );
+        forkEra = vm.createFork(Globals.ZKSYNC_MAINNET_URL, ERA_FORK_BLOCK);
+        forkEth = vm.createFork(Globals.ETHEREUM_MAINNET_URL, ETH_FORK_BLOCK);
     }
 
     function testZkContractsPersistedDeployedContractNoArgs() public {
@@ -200,17 +195,6 @@ contract ZkContractsTest is DSTest {
     function testZkContractsCreate2() public {
         vm.selectFork(forkEra);
 
-        // bytes32 bytecodeHash = 0x0100000fbb43aa073340811284a4666183e306fbe9c950df1d05ac3210ef9fc5;
-        // address sender = address(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
-        // bytes32 salt = "12345";
-        // bytes32 constructorInputHash = keccak256(abi.encode());
-        // address expectedDeployedAddress =
-        //     _computeCreate2Address(sender, salt, bytes32(bytecodeHash), constructorInputHash);
-
-        // // deploy via create2
-        // address actualDeployedAddress = address(new ConstantNumber{salt: salt}());
-
-        // ConstantNumber zksolc hash obtained from zkout/ConstantNumber.sol/artifacts.json
         string memory artifact = vm.readFile(
             "zk/zkout/ConstantNumber.sol/ConstantNumber.json"
         );
