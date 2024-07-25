@@ -248,8 +248,6 @@ impl ForgeTestData {
         let zk_test_data = {
             let zk_config = profile.zk_config();
             let zk_project = profile.zk_project();
-            println!("{:?}", zk_project.paths.zksync_artifacts);
-            println!("{:?}", zk_project.paths.zksync_cache);
 
             let project = zk_config.project().expect("failed obtaining project");
             let output = get_compiled(&project);
