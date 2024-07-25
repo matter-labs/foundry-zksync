@@ -10,7 +10,6 @@ use std::{
 
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
-use tower::Service;
 
 use super::{
     retry::{RateLimitRetryPolicy, RetryPolicy},
@@ -32,7 +31,7 @@ pub struct RetryBackoffLayer {
 }
 
 impl RetryBackoffLayer {
-    /// Creates a new [RetryWithPolicyLayer] with the given parameters
+    /// Creates a new retry layer with the given parameters.
     pub fn new(
         max_rate_limit_retries: u32,
         max_timeout_retries: u32,
@@ -56,7 +55,7 @@ impl<S> tower::layer::Layer<S> for RetryBackoffLayer {
             inner,
             policy: RateLimitRetryPolicy,
             max_rate_limit_retries: self.max_rate_limit_retries,
-            max_timeout_retries: self.max_timeout_retries,
+            _max_timeout_retries: self.max_timeout_retries,
             initial_backoff: self.initial_backoff,
             compute_units_per_second: self.compute_units_per_second,
             requests_enqueued: Arc::new(AtomicU32::new(0)),
@@ -65,7 +64,7 @@ impl<S> tower::layer::Layer<S> for RetryBackoffLayer {
 }
 
 /// An Alloy Tower Service that is responsible for retrying requests based on the
-/// error type. See [TransportError] and [RetryWithPolicyLayer].
+/// error type. See [TransportError] and [RateLimitRetryPolicy].
 #[derive(Debug, Clone)]
 pub struct RetryBackoffService<S> {
     /// The inner service
@@ -75,7 +74,7 @@ pub struct RetryBackoffService<S> {
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
     /// The maximum number of retries for timeout errors
-    max_timeout_retries: u32,
+    _max_timeout_retries: u32,
     /// The initial backoff in milliseconds
     initial_backoff: u64,
     /// The number of compute units per second for this service
@@ -85,7 +84,7 @@ pub struct RetryBackoffService<S> {
 }
 
 // impl tower service
-impl Service<RequestPacket> for RetryBackoffService<RuntimeTransport> {
+impl tower::Service<RequestPacket> for RetryBackoffService<RuntimeTransport> {
     type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
@@ -101,7 +100,6 @@ impl Service<RequestPacket> for RetryBackoffService<RuntimeTransport> {
         Box::pin(async move {
             let ahead_in_queue = this.requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
             let mut rate_limit_retry_number: u32 = 0;
-            let mut timeout_retries: u32 = 0;
             loop {
                 let err;
                 let fut = this.inner.call(request.clone()).await;
@@ -158,11 +156,7 @@ impl Service<RequestPacket> for RetryBackoffService<RuntimeTransport> {
 
                     tokio::time::sleep(total_backoff).await;
                 } else {
-                    if timeout_retries < this.max_timeout_retries {
-                        timeout_retries += 1;
-                        continue;
-                    }
-
+                    trace!("encountered non retryable error {err:?}");
                     this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                     return Err(err)
                 }

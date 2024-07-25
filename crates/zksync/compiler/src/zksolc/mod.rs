@@ -70,7 +70,7 @@ impl DualCompiledContracts {
                 .strip_prefix(&layout.artifacts)
                 .unwrap_or_else(|_| {
                     panic!(
-                        "failed stripping artifact path '{:?}' from '{:?}'",
+                        "failed stripping solc artifact path '{:?}' from '{:?}'",
                         layout.artifacts, artifact_path
                     )
                 })
@@ -108,7 +108,7 @@ impl DualCompiledContracts {
                 .strip_prefix(&layout.zksync_artifacts)
                 .unwrap_or_else(|_| {
                     panic!(
-                        "failed stripping artifact path '{:?}' from '{:?}'",
+                        "failed stripping zksolc artifact path '{:?}' from '{:?}'",
                         layout.zksync_artifacts, artifact_path
                     )
                 })
@@ -117,6 +117,7 @@ impl DualCompiledContracts {
             let maybe_bytecode = &artifact.bytecode;
             let maybe_hash = &artifact.hash;
             let maybe_factory_deps = &artifact.factory_dependencies;
+
             if let (Some(bytecode), Some(hash), Some(factory_deps_map)) =
                 (maybe_bytecode, maybe_hash, maybe_factory_deps)
             {

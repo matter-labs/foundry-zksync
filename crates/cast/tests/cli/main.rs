@@ -1,8 +1,12 @@
 //! Contains various tests for checking cast commands
 
-use foundry_common::rpc::{next_http_rpc_endpoint, next_ws_rpc_endpoint};
-use foundry_test_utils::{casttest, util::OutputExt};
-use std::{fs, io::Write, path::Path};
+use alloy_primitives::{address, b256, Address, B256};
+use foundry_test_utils::{
+    casttest,
+    rpc::{next_http_rpc_endpoint, next_ws_rpc_endpoint},
+    util::OutputExt,
+};
+use std::{fs, io::Write, path::Path, str::FromStr};
 
 // tests `--help` is printed to std out
 casttest!(print_help, |_prj, cmd| {
@@ -73,15 +77,22 @@ casttest!(wallet_address_keystore_with_password_file, |_prj, cmd| {
 
 // tests that `cast wallet sign message` outputs the expected signature
 casttest!(wallet_sign_message_utf8_data, |_prj, cmd| {
-    cmd.args([
-        "wallet",
-        "sign",
-        "--private-key",
-        "0x0000000000000000000000000000000000000000000000000000000000000001",
-        "test",
-    ]);
+    let pk = "0x0000000000000000000000000000000000000000000000000000000000000001";
+    let address = "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf";
+    let msg = "test";
+    let expected = "0xfe28833983d6faa0715c7e8c3873c725ddab6fa5bf84d40e780676e463e6bea20fc6aea97dc273a98eb26b0914e224c8dd5c615ceaab69ddddcf9b0ae3de0e371c";
+
+    cmd.args(["wallet", "sign", "--private-key", pk, msg]);
     let output = cmd.stdout_lossy();
-    assert_eq!(output.trim(), "0xfe28833983d6faa0715c7e8c3873c725ddab6fa5bf84d40e780676e463e6bea20fc6aea97dc273a98eb26b0914e224c8dd5c615ceaab69ddddcf9b0ae3de0e371c");
+    assert_eq!(output.trim(), expected);
+
+    // Success.
+    cmd.cast_fuse()
+        .args(["wallet", "verify", "-a", address, msg, expected])
+        .assert_non_empty_stdout();
+
+    // Fail.
+    cmd.cast_fuse().args(["wallet", "verify", "-a", address, "other msg", expected]).assert_err();
 });
 
 // tests that `cast wallet sign message` outputs the expected signature, given a 0x-prefixed data
@@ -150,6 +161,106 @@ casttest!(wallet_list_local_accounts, |prj, cmd| {
     cmd.cast_fuse().args(["wallet", "list", "--dir", "keystore"]);
     let list_output = cmd.stdout_lossy();
     assert_eq!(list_output.matches('\n').count(), 10);
+});
+
+// tests that `cast wallet new-mnemonic --entropy` outputs the expected mnemonic
+casttest!(wallet_mnemonic_from_entropy, |_prj, cmd| {
+    cmd.args(["wallet", "new-mnemonic", "--entropy", "0xdf9bf37e6fcdf9bf37e6fcdf9bf37e3c"]);
+    let output = cmd.stdout_lossy();
+    assert!(output.contains("test test test test test test test test test test test junk"));
+});
+
+// tests that `cast wallet private-key` with arguments outputs the private key
+casttest!(wallet_private_key_from_mnemonic_arg, |_prj, cmd| {
+    cmd.args([
+        "wallet",
+        "private-key",
+        "test test test test test test test test test test test junk",
+        "1",
+    ]);
+    let output = cmd.stdout_lossy();
+    assert_eq!(output.trim(), "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
+});
+
+// tests that `cast wallet private-key` with options outputs the private key
+casttest!(wallet_private_key_from_mnemonic_option, |_prj, cmd| {
+    cmd.args([
+        "wallet",
+        "private-key",
+        "--mnemonic",
+        "test test test test test test test test test test test junk",
+        "--mnemonic-index",
+        "1",
+    ]);
+    let output = cmd.stdout_lossy();
+    assert_eq!(output.trim(), "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
+});
+
+// tests that `cast wallet private-key` with derivation path outputs the private key
+casttest!(wallet_private_key_with_derivation_path, |_prj, cmd| {
+    cmd.args([
+        "wallet",
+        "private-key",
+        "--mnemonic",
+        "test test test test test test test test test test test junk",
+        "--mnemonic-derivation-path",
+        "m/44'/60'/0'/0/1",
+    ]);
+    let output = cmd.stdout_lossy();
+    assert_eq!(output.trim(), "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
+});
+
+// tests that `cast wallet import` creates a keystore for a private key and that `cast wallet
+// decrypt-keystore` can access it
+casttest!(wallet_import_and_decrypt, |prj, cmd| {
+    let keystore_path = prj.root().join("keystore");
+
+    cmd.set_current_dir(prj.root());
+
+    let account_name = "testAccount";
+
+    // Default Anvil private key
+    let test_private_key =
+        b256!("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+
+    // import private key
+    cmd.cast_fuse().args([
+        "wallet",
+        "import",
+        account_name,
+        "--private-key",
+        &test_private_key.to_string(),
+        "-k",
+        "keystore",
+        "--unsafe-password",
+        "test",
+    ]);
+
+    cmd.assert_non_empty_stdout();
+
+    // check that the keystore file was created
+    let keystore_file = keystore_path.join(account_name);
+
+    assert!(keystore_file.exists());
+
+    // decrypt the keystore file
+    let decrypt_output = cmd.cast_fuse().args([
+        "wallet",
+        "decrypt-keystore",
+        account_name,
+        "-k",
+        "keystore",
+        "--unsafe-password",
+        "test",
+    ]);
+
+    // get the PK out of the output (last word in the output)
+    let decrypt_output = decrypt_output.stdout_lossy();
+    let private_key_string = decrypt_output.split_whitespace().last().unwrap();
+    // check that the decrypted private key matches the imported private key
+    let decrypted_private_key = B256::from_str(private_key_string).unwrap();
+    // the form
+    assert_eq!(decrypted_private_key, test_private_key);
 });
 
 // tests that `cast estimate` is working correctly.
@@ -514,6 +625,89 @@ casttest!(logs_sig_2, |_prj, cmd| {
     );
 });
 
+casttest!(mktx, |_prj, cmd| {
+    cmd.args([
+        "mktx",
+        "--private-key",
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "--chain",
+        "1",
+        "--nonce",
+        "0",
+        "--value",
+        "100",
+        "--gas-limit",
+        "21000",
+        "--gas-price",
+        "10000000000",
+        "--priority-gas-price",
+        "1000000000",
+        "0x0000000000000000000000000000000000000001",
+    ]);
+    let output = cmd.stdout_lossy();
+    assert_eq!(
+        output.trim(),
+        "0x02f86b0180843b9aca008502540be4008252089400000000000000000000000000000000000000016480c001a070d55e79ed3ac9fc8f51e78eb91fd054720d943d66633f2eb1bc960f0126b0eca052eda05a792680de3181e49bab4093541f75b49d1ecbe443077b3660c836016a"
+    );
+});
+
+// ensure recipient or code is required
+casttest!(mktx_requires_to, |_prj, cmd| {
+    cmd.args([
+        "mktx",
+        "--private-key",
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+    ]);
+    let output = cmd.stderr_lossy();
+    assert_eq!(
+        output.trim(),
+        "Error: \nMust specify a recipient address or contract code to deploy"
+    );
+});
+
+casttest!(mktx_signer_from_mismatch, |_prj, cmd| {
+    cmd.args([
+        "mktx",
+        "--private-key",
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "--from",
+        "0x0000000000000000000000000000000000000001",
+        "--chain",
+        "1",
+        "0x0000000000000000000000000000000000000001",
+    ]);
+    let output = cmd.stderr_lossy();
+    assert!(
+        output.contains("The specified sender via CLI/env vars does not match the sender configured via\nthe hardware wallet's HD Path.")
+    );
+});
+
+casttest!(mktx_signer_from_match, |_prj, cmd| {
+    cmd.args([
+        "mktx",
+        "--private-key",
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "--from",
+        "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+        "--chain",
+        "1",
+        "--nonce",
+        "0",
+        "--gas-limit",
+        "21000",
+        "--gas-price",
+        "10000000000",
+        "--priority-gas-price",
+        "1000000000",
+        "0x0000000000000000000000000000000000000001",
+    ]);
+    let output = cmd.stdout_lossy();
+    assert_eq!(
+        output.trim(),
+        "0x02f86b0180843b9aca008502540be4008252089400000000000000000000000000000000000000018080c001a0cce9a61187b5d18a89ecd27ec675e3b3f10d37f165627ef89a15a7fe76395ce8a07537f5bffb358ffbef22cda84b1c92f7211723f9e09ae037e81686805d3e5505"
+    );
+});
+
 // tests that the raw encoded transaction is returned
 casttest!(tx_raw, |_prj, cmd| {
     let rpc = next_http_rpc_endpoint();
@@ -673,4 +867,109 @@ casttest!(balance, |_prj, cmd| {
 
     assert_ne!(usdt_result, "0x0000000000000000000000000000000000000000000000000000000000000000");
     assert_eq!(alias_result, usdt_result);
+});
+
+// tests that `cast interface` excludes the constructor
+// <https://github.com/alloy-rs/core/issues/555>
+casttest!(interface_no_constructor, |prj, cmd| {
+    let interface = include_str!("../fixtures/interface.json");
+
+    let path = prj.root().join("interface.json");
+    fs::write(&path, interface).unwrap();
+    // Call `cast find-block`
+    cmd.args(["interface"]).arg(&path);
+    let output = cmd.stdout_lossy();
+
+    let s = r#"// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.4;
+
+interface Interface {
+    type SpendAssetsHandleType is uint8;
+
+    function getIntegrationManager() external view returns (address integrationManager_);
+    function lend(address _vaultProxy, bytes memory, bytes memory _assetData) external;
+    function parseAssetsForAction(address, bytes4 _selector, bytes memory _actionData)
+        external
+        view
+        returns (
+            SpendAssetsHandleType spendAssetsHandleType_,
+            address[] memory spendAssets_,
+            uint256[] memory spendAssetAmounts_,
+            address[] memory incomingAssets_,
+            uint256[] memory minIncomingAssetAmounts_
+        );
+    function redeem(address _vaultProxy, bytes memory, bytes memory _assetData) external;
+}"#;
+    assert_eq!(output.trim(), s);
+});
+
+const ENS_NAME: &str = "emo.eth";
+const ENS_NAMEHASH: B256 =
+    b256!("0a21aaf2f6414aa664deb341d1114351fdb023cad07bf53b28e57c26db681910");
+const ENS_ADDRESS: Address = address!("28679A1a632125fbBf7A68d850E50623194A709E");
+
+casttest!(ens_namehash, |_prj, cmd| {
+    cmd.args(["namehash", ENS_NAME]);
+    let out = cmd.stdout_lossy().trim().parse::<B256>();
+    assert_eq!(out, Ok(ENS_NAMEHASH));
+});
+
+casttest!(ens_lookup, |_prj, cmd| {
+    let eth_rpc_url = next_http_rpc_endpoint();
+    cmd.args(["lookup-address", &ENS_ADDRESS.to_string(), "--rpc-url", &eth_rpc_url, "--verify"]);
+    let out = cmd.stdout_lossy();
+    assert_eq!(out.trim(), ENS_NAME);
+});
+
+casttest!(ens_resolve, |_prj, cmd| {
+    let eth_rpc_url = next_http_rpc_endpoint();
+    cmd.args(["resolve-name", ENS_NAME, "--rpc-url", &eth_rpc_url, "--verify"]);
+    let out = cmd.stdout_lossy().trim().parse::<Address>();
+    assert_eq!(out, Ok(ENS_ADDRESS));
+});
+
+casttest!(ens_resolve_no_dot_eth, |_prj, cmd| {
+    let eth_rpc_url = next_http_rpc_endpoint();
+    let name = ENS_NAME.strip_suffix(".eth").unwrap();
+    cmd.args(["resolve-name", name, "--rpc-url", &eth_rpc_url, "--verify"]);
+    let (_out, err) = cmd.unchecked_output_lossy();
+    assert!(err.contains("not found"), "{err:?}");
+});
+
+casttest!(index7201, |_prj, cmd| {
+    let tests =
+        [("example.main", "0x183a6125c38840424c4a85fa12bab2ab606c4b6d0e7cc73c0c06ba5300eab500")];
+    for (id, expected) in tests {
+        cmd.cast_fuse();
+        assert_eq!(cmd.args(["index-erc7201", id]).stdout_lossy().trim(), expected);
+    }
+});
+
+casttest!(index7201_unknown_formula_id, |_prj, cmd| {
+    cmd.args(["index-7201", "test", "--formula-id", "unknown"]).assert_err();
+});
+
+casttest!(block_number, |_prj, cmd| {
+    let eth_rpc_url = next_http_rpc_endpoint();
+    let s = cmd.args(["block-number", "--rpc-url", eth_rpc_url.as_str()]).stdout_lossy();
+    assert!(s.trim().parse::<u64>().unwrap() > 0, "{s}")
+});
+
+casttest!(block_number_latest, |_prj, cmd| {
+    let eth_rpc_url = next_http_rpc_endpoint();
+    let s = cmd.args(["block-number", "--rpc-url", eth_rpc_url.as_str(), "latest"]).stdout_lossy();
+    assert!(s.trim().parse::<u64>().unwrap() > 0, "{s}")
+});
+
+casttest!(block_number_hash, |_prj, cmd| {
+    let eth_rpc_url = next_http_rpc_endpoint();
+    let s = cmd
+        .args([
+            "block-number",
+            "--rpc-url",
+            eth_rpc_url.as_str(),
+            "0x88e96d4537bea4d9c05d12549907b32561d3bf31f45aae734cdc119f13406cb6",
+        ])
+        .stdout_lossy();
+    assert_eq!(s.trim().parse::<u64>().unwrap(), 1, "{s}")
 });

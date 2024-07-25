@@ -14,24 +14,21 @@ impl Cheatcode for clearMockedCallsCall {
 impl Cheatcode for mockCall_0Call {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { callee, data, returnData } = self;
-        let (acc, _) = ccx.data.journaled_state.load_account(*callee, ccx.data.db)?;
+        // TODO: use ecx.load_account
+        let (acc, _) = ccx.ecx.journaled_state.load_account(*callee, &mut ccx.ecx.db)?;
 
         // Etches a single byte onto the account if it is empty to circumvent the `extcodesize`
         // check Solidity might perform.
         let empty_bytecode = acc.info.code.as_ref().map_or(true, Bytecode::is_empty);
         if empty_bytecode {
-            let code = Bytecode::new_raw(Bytes::copy_from_slice(&foundry_zksync_core::EMPTY_CODE))
-                .to_checked();
-            ccx.data.journaled_state.set_code(*callee, code.clone());
+            let code = revm::interpreter::analysis::to_analysed(Bytecode::new_raw(
+                Bytes::copy_from_slice(&foundry_zksync_core::EMPTY_CODE),
+            ));
+            ccx.ecx.journaled_state.set_code(*callee, code.clone());
         }
 
         if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_mocked_account(
-                *callee,
-                ccx.data.db,
-                &mut ccx.data.journaled_state,
-                ccx.caller,
-            );
+            foundry_zksync_core::cheatcodes::set_mocked_account(*callee, ccx.ecx, ccx.caller);
         }
 
         mock_call(ccx.state, callee, data, None, returnData, InstructionResult::Return);
@@ -42,7 +39,7 @@ impl Cheatcode for mockCall_0Call {
 impl Cheatcode for mockCall_1Call {
     fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { callee, msgValue, data, returnData } = self;
-        ccx.data.journaled_state.load_account(*callee, ccx.data.db)?;
+        ccx.ecx.load_account(*callee)?;
         mock_call(ccx.state, callee, data, Some(msgValue), returnData, InstructionResult::Return);
         Ok(Default::default())
     }
@@ -68,9 +65,9 @@ impl Cheatcode for mockCallRevert_1Call {
 fn mock_call(
     state: &mut Cheatcodes,
     callee: &Address,
-    cdata: &Vec<u8>,
+    cdata: &Bytes,
     value: Option<&U256>,
-    rdata: &Vec<u8>,
+    rdata: &Bytes,
     ret_type: InstructionResult,
 ) {
     state.mocked_calls.entry(*callee).or_default().insert(

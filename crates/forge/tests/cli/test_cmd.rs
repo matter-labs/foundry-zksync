@@ -1,7 +1,11 @@
-//! Contains various tests for checking `forge test`
-use foundry_common::rpc;
-use foundry_config::Config;
-use foundry_test_utils::util::{OutputExt, OTHER_SOLC_VERSION, SOLC_VERSION};
+//! Contains various tests for `forge test`.
+
+use alloy_primitives::U256;
+use foundry_config::{Config, FuzzConfig};
+use foundry_test_utils::{
+    rpc,
+    util::{OutputExt, OTHER_SOLC_VERSION, SOLC_VERSION},
+};
 use std::{path::PathBuf, str::FromStr};
 
 // tests that test filters are handled correctly
@@ -262,6 +266,7 @@ contract ContractTest is DSTest {
 // tests that libraries are handled correctly in multiforking mode
 forgetest_init!(can_use_libs_in_multi_fork, |prj, cmd| {
     prj.wipe_contracts();
+
     prj.add_source(
         "Contract.sol",
         r"
@@ -358,10 +363,10 @@ interface IERC20 {
     function name() external view returns (string memory);
 }
 
-contract USDCCallingTest is Test {
+contract USDTCallingTest is Test {
     function test() public {
         vm.createSelectFork("<url>");
-        IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).name();
+        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7).name();
     }
 }
    "#
@@ -489,4 +494,103 @@ contract TransientTest is Test {
     .unwrap();
 
     cmd.args(["test", "-vvvv", "--isolate", "--evm-version", "cancun"]).assert_success();
+});
+
+forgetest_init!(can_disable_block_gas_limit, |prj, cmd| {
+    prj.wipe_contracts();
+
+    let endpoint = rpc::next_http_archive_rpc_endpoint();
+
+    prj.add_test(
+        "Contract.t.sol",
+        &r#"pragma solidity 0.8.24;
+import {Test} from "forge-std/Test.sol";
+
+contract C is Test {}
+
+contract GasWaster {
+    function waste() public {
+        for (uint256 i = 0; i < 100; i++) {
+            new C();
+        }
+    }
+}
+
+contract GasLimitTest is Test {
+    function test() public {
+        vm.createSelectFork("<rpc>");
+        
+        GasWaster waster = new GasWaster();
+        waster.waste();
+    }
+}
+   "#
+        .replace("<rpc>", &endpoint),
+    )
+    .unwrap();
+
+    cmd.args(["test", "-vvvv", "--isolate", "--disable-block-gas-limit"]).assert_success();
+});
+
+forgetest!(test_match_path, |prj, cmd| {
+    prj.add_source(
+        "dummy",
+        r"  
+contract Dummy {
+    function testDummy() public {}
+}
+",
+    )
+    .unwrap();
+
+    cmd.args(["test", "--match-path", "src/dummy.sol"]);
+    cmd.assert_success()
+});
+
+forgetest_init!(should_not_shrink_fuzz_failure, |prj, cmd| {
+    prj.wipe_contracts();
+
+    // deterministic test so we always have 54 runs until test fails with overflow
+    let config = Config {
+        fuzz: { FuzzConfig { runs: 256, seed: Some(U256::from(100)), ..Default::default() } },
+        ..Default::default()
+    };
+    prj.write_config(config);
+
+    prj.add_test(
+        "CounterFuzz.t.sol",
+        r#"pragma solidity 0.8.24;
+import {Test} from "forge-std/Test.sol";
+
+contract Counter {
+    uint256 public number = 0;
+
+    function addOne(uint256 x) external pure returns (uint256) {
+        return x + 100_000_000;
+    }
+}
+
+contract CounterTest is Test {
+    Counter public counter;
+
+    function setUp() public {
+        counter = new Counter();
+    }
+
+    function testAddOne(uint256 x) public view {
+        assertEq(counter.addOne(x), x + 100_000_000);
+    }
+}
+     "#,
+    )
+    .unwrap();
+
+    cmd.args(["test"]);
+    let (stderr, _) = cmd.unchecked_output_lossy();
+    let runs = stderr.find("runs:").and_then(|start_runs| {
+        let runs_split = &stderr[start_runs + 6..];
+        runs_split.find(',').map(|end_runs| &runs_split[..end_runs])
+    });
+    // make sure there are only 61 runs (with proptest shrinking same test results in 298 runs)
+    assert_eq!(runs.unwrap().parse::<usize>().unwrap(), 61);
 });

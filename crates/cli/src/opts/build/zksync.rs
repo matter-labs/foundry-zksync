@@ -40,7 +40,7 @@ pub struct ZkSyncArgs {
     /// A flag indicating whether to enable the system contract compilation mode.
     #[clap(
         help = "Enable the system contract compilation mode.",
-        long = "zk-eravm-extensions",
+        long = "zk-enable-eravm-extensions",
         visible_alias = "enable-eravm-extensions",
         visible_alias = "system-mode",
         value_name = "ENABLE_ERAVM_EXTENSIONS",
@@ -49,7 +49,7 @@ pub struct ZkSyncArgs {
         default_missing_value = "true"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub eravm_extensions: Option<bool>,
+    pub enable_eravm_extensions: Option<bool>,
 
     /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
     #[clap(
@@ -63,6 +63,11 @@ pub struct ZkSyncArgs {
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub force_evmla: Option<bool>,
+
+    /// ZkSolc extra LLVM options
+    #[clap(help = "ZkSolc extra LLVM options", long = "zk-llvm-options")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub llvm_options: Option<Vec<String>>,
 
     /// Try to recompile with -Oz if the bytecode is too large.
     #[clap(
@@ -120,7 +125,8 @@ impl ZkSyncArgs {
         set_if_some!(self.compile, zksync.compile);
         set_if_some!(self.startup, zksync.startup);
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
-        set_if_some!(self.eravm_extensions, zksync.eravm_extensions);
+        set_if_some!(self.enable_eravm_extensions, zksync.enable_eravm_extensions);
+        set_if_some!(self.llvm_options.clone(), zksync.llvm_options);
         set_if_some!(self.force_evmla, zksync.force_evmla);
         set_if_some!(self.fallback_oz, zksync.fallback_oz);
         set_if_some!(

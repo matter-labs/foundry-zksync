@@ -1,7 +1,9 @@
 use crate::init_tracing;
 use eyre::{Result, WrapErr};
 use foundry_compilers::{
-    cache::SolFilesCache,
+    artifacts::Settings,
+    cache::CompilerCache,
+    compilers::multi::MultiCompiler,
     error::Result as SolcResult,
     project_util::{copy_dir, TempProject},
     ArtifactOutput, ConfigurableArtifacts, PathStyle, ProjectPathsConfig,
@@ -13,9 +15,8 @@ use regex::Regex;
 use std::{
     env,
     ffi::OsStr,
-    fs,
-    fs::File,
-    io::{BufWriter, IsTerminal, Write},
+    fs::{self, File},
+    io::{BufWriter, IsTerminal, Read, Seek, Write},
     path::{Path, PathBuf},
     process::{ChildStdin, Command, Output, Stdio},
     sync::{
@@ -51,7 +52,7 @@ pub const OTHER_SOLC_VERSION: &str = "0.8.22";
 
 /// External test builder
 #[derive(Clone, Debug)]
-#[must_use = "call run()"]
+#[must_use = "ExtTester does nothing unless you `run` it"]
 pub struct ExtTester {
     pub org: &'static str,
     pub name: &'static str,
@@ -195,10 +196,10 @@ impl ExtTester {
 
         test_cmd.envs(self.envs.iter().map(|(k, v)| (k, v)));
         if let Some(fork_block) = self.fork_block {
-            test_cmd
-                .env("FOUNDRY_ETH_RPC_URL", foundry_common::rpc::next_http_archive_rpc_endpoint());
+            test_cmd.env("FOUNDRY_ETH_RPC_URL", crate::rpc::next_http_archive_rpc_endpoint());
             test_cmd.env("FOUNDRY_FORK_BLOCK_NUMBER", fork_block.to_string());
         }
+        test_cmd.env("FOUNDRY_INVARIANT_DEPTH", "15");
 
         test_cmd.assert_non_empty_stdout();
     }
@@ -237,21 +238,31 @@ pub fn initialize(target: &Path) {
 
         // Release the read lock and acquire a write lock, initializing the lock file.
         _read = None;
+
         let mut write = lock.write().unwrap();
-        write.write_all(b"1").unwrap();
 
-        // Initialize and build.
-        let (prj, mut cmd) = setup_forge("template", foundry_compilers::PathStyle::Dapptools);
-        eprintln!("- initializing template dir in {}", prj.root().display());
+        let mut data = String::new();
+        write.read_to_string(&mut data).unwrap();
 
-        cmd.args(["init", "--force"]).assert_success();
-        cmd.forge_fuse().args(["build", "--use", SOLC_VERSION]).assert_success();
+        if data != "1" {
+            // Initialize and build.
+            let (prj, mut cmd) = setup_forge("template", foundry_compilers::PathStyle::Dapptools);
+            eprintln!("- initializing template dir in {}", prj.root().display());
 
-        // Remove the existing template, if any.
-        let _ = fs::remove_dir_all(tpath);
+            cmd.args(["init", "--force"]).assert_success();
+            cmd.forge_fuse().args(["build", "--use", SOLC_VERSION]).assert_success();
 
-        // Copy the template to the global template path.
-        pretty_err(tpath, copy_dir(prj.root(), tpath));
+            // Remove the existing template, if any.
+            let _ = fs::remove_dir_all(tpath);
+
+            // Copy the template to the global template path.
+            pretty_err(tpath, copy_dir(prj.root(), tpath));
+
+            // Update lockfile to mark that template is initialized.
+            write.set_len(0).unwrap();
+            write.seek(std::io::SeekFrom::Start(0)).unwrap();
+            write.write_all(b"1").unwrap();
+        }
 
         // Release the write lock and acquire a new read lock.
         drop(write);
@@ -399,7 +410,7 @@ pub struct TestProject<T: ArtifactOutput = ConfigurableArtifacts> {
     /// The directory in which this test executable is running.
     exe_root: PathBuf,
     /// The project in which the test should run.
-    inner: Arc<TempProject<T>>,
+    inner: Arc<TempProject<MultiCompiler, T>>,
 }
 
 impl TestProject {
@@ -442,6 +453,12 @@ impl TestProject {
     /// Returns the path to the project's artifacts directory.
     pub fn artifacts(&self) -> &PathBuf {
         &self.paths().artifacts
+    }
+
+    /// Removes the project's cache and artifacts directory.
+    pub fn clear(&self) {
+        self.clear_cache();
+        self.clear_artifacts();
     }
 
     /// Removes this project's cache file.
@@ -518,7 +535,9 @@ impl TestProject {
     #[track_caller]
     pub fn assert_create_dirs_exists(&self) {
         self.paths().create_all().unwrap_or_else(|_| panic!("Failed to create project paths"));
-        SolFilesCache::default().write(&self.paths().cache).expect("Failed to create cache");
+        CompilerCache::<Settings>::default()
+            .write(&self.paths().cache)
+            .expect("Failed to create cache");
         self.assert_all_paths_exist();
     }
 
@@ -562,7 +581,7 @@ impl TestProject {
 
     /// Adds `console.sol` as a source under "console.sol"
     pub fn insert_console(&self) -> PathBuf {
-        let s = include_str!("../../../testdata/logs/console.sol");
+        let s = include_str!("../../../testdata/default/logs/console.sol");
         self.add_source("console.sol", s).unwrap()
     }
 
@@ -714,18 +733,18 @@ impl TestCommand {
     }
 
     /// Replaces the underlying command.
-    pub fn set_cmd(&mut self, cmd: Command) -> &mut TestCommand {
+    pub fn set_cmd(&mut self, cmd: Command) -> &mut Self {
         self.cmd = cmd;
         self
     }
 
     /// Resets the command to the default `forge` command.
-    pub fn forge_fuse(&mut self) -> &mut TestCommand {
+    pub fn forge_fuse(&mut self) -> &mut Self {
         self.set_cmd(self.project.forge_bin())
     }
 
     /// Resets the command to the default `cast` command.
-    pub fn cast_fuse(&mut self) -> &mut TestCommand {
+    pub fn cast_fuse(&mut self) -> &mut Self {
         self.set_cmd(self.project.cast_bin())
     }
 
@@ -739,13 +758,13 @@ impl TestCommand {
     }
 
     /// Add an argument to pass to the command.
-    pub fn arg<A: AsRef<OsStr>>(&mut self, arg: A) -> &mut TestCommand {
+    pub fn arg<A: AsRef<OsStr>>(&mut self, arg: A) -> &mut Self {
         self.cmd.arg(arg);
         self
     }
 
     /// Add any number of arguments to the command.
-    pub fn args<I, A>(&mut self, args: I) -> &mut TestCommand
+    pub fn args<I, A>(&mut self, args: I) -> &mut Self
     where
         I: IntoIterator<Item = A>,
         A: AsRef<OsStr>,
@@ -754,13 +773,13 @@ impl TestCommand {
         self
     }
 
-    pub fn stdin(&mut self, fun: impl FnOnce(ChildStdin) + 'static) -> &mut TestCommand {
+    pub fn stdin(&mut self, fun: impl FnOnce(ChildStdin) + 'static) -> &mut Self {
         self.stdin_fun = Some(Box::new(fun));
         self
     }
 
     /// Convenience function to add `--root project.root()` argument
-    pub fn root_arg(&mut self) -> &mut TestCommand {
+    pub fn root_arg(&mut self) -> &mut Self {
         let root = self.project.root().to_path_buf();
         self.arg("--root").arg(root)
     }
@@ -790,7 +809,7 @@ impl TestCommand {
     /// Note that this does not need to be called normally, since the creation
     /// of this TestCommand causes its working directory to be set to the
     /// test's directory automatically.
-    pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut TestCommand {
+    pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Self {
         self.cmd.current_dir(dir);
         self
     }
@@ -942,7 +961,7 @@ impl TestCommand {
         fs::write(format!("{}.stderr", name.display()), &output.stderr).unwrap();
     }
 
-    /// Runs the command and asserts that it resulted in an error exit code.
+    /// Runs the command and asserts that it **failed** (resulted in an error exit code).
     #[track_caller]
     pub fn assert_err(&mut self) {
         let out = self.execute();
@@ -951,7 +970,7 @@ impl TestCommand {
         }
     }
 
-    /// Runs the command and asserts that something was printed to stderr.
+    /// Runs the command and asserts that it **failed** and something was printed to stderr.
     #[track_caller]
     pub fn assert_non_empty_stderr(&mut self) {
         let out = self.execute();
@@ -960,7 +979,7 @@ impl TestCommand {
         }
     }
 
-    /// Runs the command and asserts that something was printed to stdout.
+    /// Runs the command and asserts that it **succeeded** and something was printed to stdout.
     #[track_caller]
     pub fn assert_non_empty_stdout(&mut self) {
         let out = self.execute();
@@ -969,7 +988,7 @@ impl TestCommand {
         }
     }
 
-    /// Runs the command and asserts that nothing was printed to stdout.
+    /// Runs the command and asserts that it **failed** nothing was printed to stdout.
     #[track_caller]
     pub fn assert_empty_stdout(&mut self) {
         let out = self.execute();
@@ -1050,7 +1069,7 @@ static IGNORE_IN_FIXTURES: Lazy<Regex> = Lazy::new(|| {
     let re = &[
         // solc version
         r" ?Solc(?: version)? \d+.\d+.\d+",
-        r" with \d+.\d+.\d+",
+        r" with(?: Solc)? \d+.\d+.\d+",
         // solc runs
         r"runs: \d+, μ: \d+, ~: \d+",
         // elapsed time
@@ -1064,7 +1083,7 @@ static IGNORE_IN_FIXTURES: Lazy<Regex> = Lazy::new(|| {
     Regex::new(&format!("({})", re.join("|"))).unwrap()
 });
 
-fn normalize_output(s: &str) -> String {
+pub fn normalize_output(s: &str) -> String {
     let s = s.replace("\r\n", "\n").replace('\\', "/");
     IGNORE_IN_FIXTURES.replace_all(&s, "").into_owned()
 }
@@ -1073,7 +1092,7 @@ impl OutputExt for Output {
     #[track_caller]
     fn stdout_matches_content(&self, expected: &str) {
         let out = lossy_string(&self.stdout);
-        pretty_assertions::assert_eq!(normalize_output(&out), normalize_output(expected));
+        similar_asserts::assert_eq!(normalize_output(&out), normalize_output(expected));
     }
 
     #[track_caller]
@@ -1086,7 +1105,7 @@ impl OutputExt for Output {
     fn stderr_matches_path(&self, expected_path: impl AsRef<Path>) {
         let expected = fs::read_to_string(expected_path).unwrap();
         let err = lossy_string(&self.stderr);
-        pretty_assertions::assert_eq!(normalize_output(&err), normalize_output(&expected));
+        similar_asserts::assert_eq!(normalize_output(&err), normalize_output(&expected));
     }
 }
 

@@ -21,10 +21,10 @@ jobs:
         runs-on: ubuntu-22.04-github-hosted-16core
         timeout-minutes: 60
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@nightly
               with:
-                toolchain: nightly-2024-02-06
+                toolchain: nightly-2024-04-28
             - uses: Swatinem/rust-cache@v2
               with:
                 cache-on-failure: true
@@ -38,7 +38,7 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 60
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@clippy
             - uses: Swatinem/rust-cache@v2
               with:
@@ -52,10 +52,10 @@ jobs:
         runs-on: ubuntu-22.04-github-hosted-16core
         timeout-minutes: 60
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@nightly
               with:
-                  toolchain: nightly-2024-02-06
+                  toolchain: nightly-2024-04-28
                   components: rustfmt
             - run: cargo fmt --all --check
 
@@ -64,10 +64,10 @@ jobs:
         runs-on: ubuntu-22.04-github-hosted-16core
         timeout-minutes: 60
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@nightly
               with:
-                  toolchain: nightly-2024-02-06
+                  toolchain: nightly-2024-04-28
             - uses: Swatinem/rust-cache@v2
               with:
                   cache-on-failure: true
@@ -79,10 +79,10 @@ jobs:
         runs-on: ubuntu-22.04-github-hosted-16core
         timeout-minutes: 60
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@nightly
               with:
-                toolchain: nightly-2024-02-06
+                toolchain: nightly-2024-04-28
             - uses: taiki-e/install-action@cargo-hack
             - uses: Swatinem/rust-cache@v2
               with:
@@ -103,7 +103,7 @@ jobs:
     #     - name: Install Rust
     #       uses: actions-rust-lang/setup-rust-toolchain@v1
     #       with:
-    #         toolchain: nightly-2024-02-06
+    #         toolchain: nightly-2024-04-28
 
 
     #     - name: Get solc
@@ -130,7 +130,7 @@ jobs:
         - name: Install Rust
           uses: actions-rust-lang/setup-rust-toolchain@v1
           with:
-            toolchain: nightly-2024-02-06
+            toolchain: nightly-2024-04-28
   
         - name: Run smoke-test
           env:

@@ -36,8 +36,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
             max_virtual_blocks_to_create: 1,
         }
     };
-    let (mut batch_number, mut batch_timestamp) =
-        if let Some(batch) = load_last_l1_batch(storage) { batch } else { (0, 0) };
+    let (mut batch_number, mut batch_timestamp) = load_last_l1_batch(storage).unwrap_or_default();
 
     batch_number += 1;
 
