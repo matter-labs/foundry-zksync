@@ -268,7 +268,7 @@ impl ForgeTestData {
                 allowed_paths: zk_project.paths.allowed_paths.clone(),
                 zksync_artifacts: zk_project.paths.zksync_artifacts.clone(),
                 zksync_cache: zk_project.paths.zksync_cache.clone(),
-                _l: std::marker::PhantomData::<MultiCompilerLanguage>::default(),
+                _l: std::marker::PhantomData::<MultiCompilerLanguage>,
             };
             let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output, &layout);
             ZkTestData { dual_compiled_contracts, zk_config, zk_project, output, zk_output }

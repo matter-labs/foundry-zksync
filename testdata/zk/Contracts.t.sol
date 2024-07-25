@@ -126,38 +126,24 @@ contract ZkContractsTest is DSTest {
     }
 
     function testZkContractsPersistedDeployedContractArgs() public {
-        require(
-            customNumber.number() == 20,
-            "base setUp contract value mismatch"
-        );
+        require(customNumber.number() == 20, "base setUp contract value mismatch");
 
         vm.selectFork(forkEra);
-        require(
-            customNumber.number() == 20,
-            "era setUp contract value mismatch"
-        );
+        require(customNumber.number() == 20, "era setUp contract value mismatch");
 
         vm.selectFork(forkEth);
-        require(
-            customNumber.number() == 20,
-            "eth setUp contract value mismatch"
-        );
+        require(customNumber.number() == 20, "eth setUp contract value mismatch");
     }
 
     function testZkContractsInlineDeployedContractNoArgs() public {
         vm.selectFork(forkEra);
         FixedNumber fixedNumber = new FixedNumber();
-        require(
-            fixedNumber.five() == 5,
-            "era deployed contract value mismatch"
-        );
+        require(fixedNumber.five() == 5, "era deployed contract value mismatch");
     }
 
     function testZkContractsInlineDeployedContractBalance() public {
         vm.selectFork(forkEra);
-        PayableFixedNumber payableFixedNumber = new PayableFixedNumber{
-            value: 10
-        }();
+        PayableFixedNumber payableFixedNumber = new PayableFixedNumber{value: 10}();
         require(address(payableFixedNumber).balance == 10, "incorrect balance");
     }
 
@@ -165,36 +151,24 @@ contract ZkContractsTest is DSTest {
         CustomStorage customStorage = new CustomStorage("hello", 10);
         vm.makePersistent(address(customStorage));
         require(
-            keccak256(abi.encodePacked(customStorage.getStr())) ==
-                keccak256(abi.encodePacked("hello")),
+            keccak256(abi.encodePacked(customStorage.getStr())) == keccak256(abi.encodePacked("hello")),
             "base inline contract value mismatch (complex args)"
         );
-        require(
-            customStorage.getNum() == 10,
-            "base inline contract value mismatch (complex args)"
-        );
+        require(customStorage.getNum() == 10, "base inline contract value mismatch (complex args)");
 
         vm.selectFork(forkEra);
         require(
-            keccak256(abi.encodePacked(customStorage.getStr())) ==
-                keccak256(abi.encodePacked("hello")),
+            keccak256(abi.encodePacked(customStorage.getStr())) == keccak256(abi.encodePacked("hello")),
             "era inline contract value mismatch (complex args)"
         );
-        require(
-            customStorage.getNum() == 10,
-            "era inline contract value mismatch (complex args)"
-        );
+        require(customStorage.getNum() == 10, "era inline contract value mismatch (complex args)");
 
         vm.selectFork(forkEth);
         require(
-            keccak256(abi.encodePacked(customStorage.getStr())) ==
-                keccak256(abi.encodePacked("hello")),
+            keccak256(abi.encodePacked(customStorage.getStr())) == keccak256(abi.encodePacked("hello")),
             "eth inline contract value mismatch (complex args)"
         );
-        require(
-            customStorage.getNum() == 10,
-            "era inline contract value mismatch (complex args)"
-        );
+        require(customStorage.getNum() == 10, "era inline contract value mismatch (complex args)");
     }
 
     function testZkContractsCreate2() public {
@@ -211,24 +185,16 @@ contract ZkContractsTest is DSTest {
         // address actualDeployedAddress = address(new ConstantNumber{salt: salt}());
 
         // ConstantNumber zksolc hash obtained from zkout/ConstantNumber.sol/artifacts.json
-        string memory artifact = vm.readFile(
-            "zk/zkout/ConstantNumber.sol/ConstantNumber.json"
-        );
+        string memory artifact = vm.readFile("zk/zkout/ConstantNumber.sol/ConstantNumber.json");
         bytes32 bytecodeHash = vm.parseJsonBytes32(artifact, ".hash");
         address sender = address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496);
         bytes32 salt = "12345";
         bytes32 constructorInputHash = keccak256(abi.encode());
-        address expectedDeployedAddress = _computeCreate2Address(
-            sender,
-            salt,
-            bytes32(bytecodeHash),
-            constructorInputHash
-        );
+        address expectedDeployedAddress =
+            _computeCreate2Address(sender, salt, bytes32(bytecodeHash), constructorInputHash);
 
         // deploy via create2
-        address actualDeployedAddress = address(
-            new ConstantNumber{salt: salt}()
-        );
+        address actualDeployedAddress = address(new ConstantNumber{salt: salt}());
 
         assertEq(expectedDeployedAddress, actualDeployedAddress);
     }
@@ -252,11 +218,7 @@ contract ZkContractsTest is DSTest {
         bytes32 zksync_create2_prefix = keccak256("zksyncCreate2");
         bytes32 address_hash = keccak256(
             bytes.concat(
-                zksync_create2_prefix,
-                bytes32(uint256(uint160(sender))),
-                salt,
-                creationCodeHash,
-                constructorInputHash
+                zksync_create2_prefix, bytes32(uint256(uint160(sender))), salt, creationCodeHash, constructorInputHash
             )
         );
 
