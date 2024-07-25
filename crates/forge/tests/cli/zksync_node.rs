@@ -203,6 +203,8 @@ impl ZkSyncNode {
 
     /// Stop the running era-test-node.
     pub fn stop(&mut self) {
-        let _ = self.close_tx.send(());
+        futures::executor::block_on(async {
+            let _ = self.close_tx.send(()).await;
+        });
     }
 }
