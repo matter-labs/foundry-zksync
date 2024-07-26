@@ -200,9 +200,6 @@ impl ForgeTestProfile {
         zk_config.test = self.root().join("./zk");
         zk_config.out = self.root().join("zk").join("out");
         zk_config.cache_path = self.root().join("zk").join("cache");
-        zk_config.libraries = vec![
-            "fork/Fork.t.sol:DssExecLib:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4".to_string(),
-        ];
         zk_config.evm_version = EvmVersion::London;
 
         zk_config.zksync.startup = true;
