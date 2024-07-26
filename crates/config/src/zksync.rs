@@ -3,6 +3,7 @@ use foundry_compilers::{
         zksolc::output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
         EvmVersion, Libraries,
     },
+    solc::CliSettings,
     zksolc::settings::{
         BytecodeHash, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings,
     },
@@ -126,6 +127,7 @@ impl ZkSyncConfig {
                 }),
             },
             solc: self.solc_path.clone(),
+            cli_settings: CliSettings::default(),
         }
     }
 

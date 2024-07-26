@@ -6,7 +6,7 @@ use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
     compilers::{multi::MultiCompilerLanguage, Language},
     utils::source_files_iter,
-    Project,
+    Project, ProjectCompileOutput,
 };
 use foundry_config::{
     figment::{

@@ -1,5 +1,4 @@
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
-use alloy_primitives::U256;
 use foundry_evm_core::backend::Backend;
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
 
@@ -16,11 +15,12 @@ pub struct ExecutorBuilder {
     /// The configuration used to build an `InspectorStack`.
     stack: InspectorStackBuilder,
     /// The gas limit.
-    gas_limit: Option<U256>,
+    gas_limit: Option<u64>,
     /// The spec ID.
     spec_id: SpecId,
 
     use_zk: bool,
+    legacy_assertions: bool,
 }
 
 impl Default for ExecutorBuilder {
@@ -31,6 +31,7 @@ impl Default for ExecutorBuilder {
             gas_limit: None,
             spec_id: SpecId::LATEST,
             use_zk: false,
+            legacy_assertions: false,
         }
     }
 }
@@ -61,7 +62,7 @@ impl ExecutorBuilder {
 
     /// Sets the executor gas limit.
     #[inline]
-    pub fn gas_limit(mut self, gas_limit: U256) -> Self {
+    pub fn gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = Some(gas_limit);
         self
     }
@@ -73,19 +74,26 @@ impl ExecutorBuilder {
         self
     }
 
+    /// Sets the `legacy_assertions` flag.
+    #[inline]
+    pub fn legacy_assertions(mut self, legacy_assertions: bool) -> Self {
+        self.legacy_assertions = legacy_assertions;
+        self
+    }
+
     /// Builds the executor as configured.
     #[inline]
     pub fn build(self, env: Env, db: Backend) -> Executor {
-        let Self { mut stack, gas_limit, spec_id, use_zk } = self;
-        stack.block = Some(env.block.clone());
-        stack.gas_price = Some(env.tx.gas_price);
-        let gas_limit = gas_limit.unwrap_or(env.block.gas_limit);
-        let mut exec = Executor::new(
-            db,
-            EnvWithHandlerCfg::new_with_spec_id(Box::new(env), spec_id),
-            stack.build(),
-            gas_limit,
-        );
+        let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
+        if stack.block.is_none() {
+            stack.block = Some(env.block.clone());
+        }
+        if stack.gas_price.is_none() {
+            stack.gas_price = Some(env.tx.gas_price);
+        }
+        let gas_limit = gas_limit.unwrap_or_else(|| env.block.gas_limit.saturating_to());
+        let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(env), spec_id);
+        Executor::new(db, env, stack.build(), gas_limit, legacy_assertions);
         exec.use_zk = use_zk;
         exec
     }

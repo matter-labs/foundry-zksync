@@ -17,12 +17,12 @@ foundry-block-explorers = { workspace = true, features = [
     "foundry-compilers",
 ] }
 foundry-zksync-compiler.workspace = true
+foundry-common-fmt.workspace = true
 foundry-compilers.workspace = true
 foundry-config.workspace = true
 foundry-macros.workspace = true
 foundry-linking.workspace = true
 
-alloy-consensus.workspace = true
 alloy-contract.workspace = true
 alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }
 alloy-json-abi.workspace = true
@@ -36,10 +36,9 @@ alloy-primitives = { workspace = true, features = [
 alloy-provider.workspace = true
 alloy-pubsub.workspace = true
 alloy-rpc-client.workspace = true
-alloy-rpc-types = { workspace = true, features = ["eth"] }
-alloy-rpc-types-engine.workspace = true
+alloy-rpc-types = { workspace = true, features = ["eth", "engine"] }
 alloy-serde.workspace = true
-alloy-sol-types = { workspace = true, features = ["json"] }
+alloy-sol-types.workspace = true
 alloy-transport-http = { workspace = true, features = [
     "reqwest",
     "reqwest-rustls-tls",
@@ -48,29 +47,19 @@ alloy-transport-ipc.workspace = true
 alloy-transport-ws.workspace = true
 alloy-transport.workspace = true
 
-revm = { workspace = true, features = [
-    "std",
-    "serde",
-    "memory_limit",
-    "optional_eip3607",
-    "optional_block_gas_limit",
-    "optional_no_base_fee",
-    "arbitrary",
-    "optimism",
-    "c-kzg",
-] }
-
 tower.workspace = true
 derive_more.workspace = true
 itertools.workspace = true
 
 async-trait.workspace = true
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
-comfy-table = "7"
+comfy-table.workspace = true
 dunce.workspace = true
 eyre.workspace = true
+num-format.workspace = true
 once_cell.workspace = true
 reqwest.workspace = true
+rustc-hash.workspace = true
 semver.workspace = true
 serde_json.workspace = true
 serde.workspace = true
@@ -80,9 +69,6 @@ tracing.workspace = true
 url.workspace = true
 walkdir.workspace = true
 yansi.workspace = true
-rustc-hash.workspace = true
-num-format.workspace = true
-chrono.workspace = true
 
 # zksync
 globset = "0.4"

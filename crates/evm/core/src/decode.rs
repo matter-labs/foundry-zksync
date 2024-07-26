@@ -2,7 +2,7 @@
 
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::{Error, JsonAbi};
-use alloy_primitives::{Log, Selector};
+use alloy_primitives::{hex, Log, Selector};
 use alloy_sol_types::{SolCall, SolError, SolEventInterface, SolInterface, SolValue};
 use foundry_cheatcodes_spec::Vm;
 use foundry_common::{Console, SELECTOR_LEN};

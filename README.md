@@ -30,6 +30,19 @@ To use for zkSync environments, include `--zksync` when running `forge` or `vm.z
 ### Features
 
 `Foundry-zksync` offers a set of features designed to work with zkSync Era, providing a comprehensive toolkit for smart contract deployment and interaction:
+-   **Fast & flexible compilation pipeline**
+    -   Automatic Solidity compiler version detection & installation
+    -   **Incremental compilation & caching**: Only changed files are re-compiled
+    -   Parallel compilation
+    -   Non-standard directory structures support (e.g. [Hardhat repos](https://twitter.com/gakonst/status/1461289225337421829))
+-   **Tests are written in Solidity** (like in DappTools)
+-   **Fast fuzz testing** with shrinking of inputs & printing of counter-examples
+-   **Fast remote RPC forking mode**, leveraging Rust's async infrastructure like tokio
+-   **Flexible debug logging**
+    -   DappTools-style, using `DsTest`'s emitted logs
+    -   Hardhat-style, using the popular `console.sol` contract
+-   **Portable (5-10MB) & easy to install** without requiring Nix or any other package manager
+-   **Fast CI** with the [Foundry GitHub action][foundry-gha].
 
 - **Smart Contract Deployment**: Easily deploy smart contracts to zkSync Era mainnet, testnet, or a local test node.
 - **Contract Interaction**: Call and send transactions to deployed contracts on zkSync Era testnet or local test node.

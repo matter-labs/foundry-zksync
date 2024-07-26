@@ -8,7 +8,7 @@ FOUNDRY_MAN_DIR="$FOUNDRY_DIR/share/man/man1"
 
 FOUNDRYUP_JOBS=""
 
-BINS=(forge cast)
+BINS=(forge cast anvil chisel)
 
 export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
 
@@ -235,6 +235,8 @@ Update or revert to a specific Foundry-zksync version with ease.
 
 By default, the latest nightly version is installed from built binaries.
 
+By default, the latest nightly version is installed from built binaries.
+
 USAGE:
     foundryup-zksync <OPTIONS>
 
@@ -316,9 +318,11 @@ banner() {
 
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 
-Fork of    : https://github.com/foundry-rs/
-Repo       : https://github.com/foundry-zksync/
-Book       : https://book.getfoundry.sh/                                     
+Repo       : https://github.com/foundry-rs/
+Book       : https://book.getfoundry.sh/
+Chat       : https://t.me/foundry_rs/
+Support    : https://t.me/foundry_support/
+Contribute : https://github.com/orgs/foundry-rs/projects/2/
 
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 

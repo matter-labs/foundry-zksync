@@ -57,6 +57,8 @@ pub struct CheatsConfig {
     pub dual_compiled_contracts: DualCompiledContracts,
     /// Use ZK-VM on startup
     pub use_zk: bool,
+    /// Whether to enable legacy (non-reverting) assertions.
+    pub assertions_revert: bool,
 }
 
 impl CheatsConfig {
@@ -97,8 +99,9 @@ impl CheatsConfig {
             script_wallets,
             available_artifacts,
             running_version,
-            dual_compiled_contracts,
-            use_zk,
+            dual_compiled_contracts: Default::default(),
+            use_zk: false,
+            assertions_revert: config.assertions_revert,
         }
     }
 
@@ -228,6 +231,7 @@ impl Default for CheatsConfig {
             running_version: Default::default(),
             dual_compiled_contracts: Default::default(),
             use_zk: false,
+            assertions_revert: true,
         }
     }
 }

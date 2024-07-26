@@ -1,17 +1,12 @@
 //! Genesis settings
 
-use crate::eth::backend::db::{Db, MaybeFullDatabase};
+use crate::eth::backend::db::Db;
 use alloy_genesis::{Genesis, GenesisAccount};
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, U256};
 use foundry_evm::{
-    backend::{DatabaseError, DatabaseResult, StateSnapshot},
-    revm::{
-        db::DatabaseRef,
-        primitives::{AccountInfo, Bytecode, KECCAK_EMPTY},
-    },
+    backend::DatabaseResult,
+    revm::primitives::{AccountInfo, Bytecode, KECCAK_EMPTY},
 };
-use parking_lot::Mutex;
-use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLockWriteGuard;
 
 /// Genesis settings
@@ -23,11 +18,6 @@ pub struct GenesisConfig {
     pub balance: U256,
     /// All accounts that should be initialised at genesis
     pub accounts: Vec<Address>,
-    /// The account object stored in the [`revm::Database`]
-    ///
-    /// We store this for forking mode so we can cheaply reset the dev accounts and don't
-    /// need to fetch them again.
-    pub fork_genesis_account_infos: Arc<Mutex<Vec<AccountInfo>>>,
     /// The `genesis.json` if provided
     pub genesis_init: Option<Genesis>,
 }

@@ -290,7 +290,7 @@ pub async fn watch_test(args: TestArgs) -> Result<()> {
                 if last.is_empty() {
                     return;
                 }
-                changed_sol_test_files.clone_from(&last);
+                changed_sol_test_files = last.clone();
             }
 
             // append `--match-path` glob

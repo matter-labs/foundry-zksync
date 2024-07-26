@@ -16,7 +16,7 @@ use foundry_cli::{
     utils::{self, read_constructor_args_file, remove_contract, remove_zk_contract, LoadConfig},
 };
 use foundry_common::{
-    compile::{self, ProjectCompiler},
+    compile::{self},
     fmt::parse_tokens,
 };
 use foundry_compilers::{
@@ -107,6 +107,7 @@ impl CreateArgs {
     pub async fn run(mut self) -> Result<()> {
         // Find Project & Compile
         let project = self.opts.project()?;
+
         let zksync = self.opts.compiler.zk.enabled();
         if zksync {
             let target_path = if let Some(ref mut path) = self.contract.path {
@@ -969,6 +970,19 @@ where
             _t: PhantomData,
         })
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+/// An Error which is thrown when interacting with a smart contract
+pub enum ContractDeploymentError {
+    #[error("constructor is not defined in the ABI")]
+    ConstructorError,
+    #[error(transparent)]
+    DetokenizationError(#[from] alloy_dyn_abi::Error),
+    #[error("contract was not deployed")]
+    ContractNotDeployed,
+    #[error(transparent)]
+    RpcError(#[from] TransportError),
 }
 
 #[derive(thiserror::Error, Debug)]
