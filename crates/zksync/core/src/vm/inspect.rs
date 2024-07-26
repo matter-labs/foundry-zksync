@@ -420,7 +420,10 @@ fn inspect_inner<S: ReadStorage + Send>(
     let bytecodes = vm
         .get_last_tx_compressed_bytecodes()
         .iter()
-        .map(|b| bytecode_to_factory_dep(b.original.clone()))
+        .map(|b| {
+            bytecode_to_factory_dep(b.original.clone())
+                .expect("failed converting bytecode to factory dep")
+        })
         .collect();
     let modified_keys = if is_static {
         Default::default()

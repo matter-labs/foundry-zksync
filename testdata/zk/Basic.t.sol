@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 import "ds-test/test.sol";
 import "../cheats/Vm.sol";
+import {Globals} from "./Globals.sol";
 
 contract ZkBasicTest is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
@@ -19,8 +20,8 @@ contract ZkBasicTest is DSTest {
     uint256 forkEth;
 
     function setUp() public {
-        forkEra = vm.createFork("https://mainnet.era.zksync.io", ERA_FORK_BLOCK);
-        forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
+        forkEra = vm.createFork(Globals.ZKSYNC_MAINNET_URL, ERA_FORK_BLOCK);
+        forkEth = vm.createFork(Globals.ETHEREUM_MAINNET_URL, ETH_FORK_BLOCK);
     }
 
     function testZkBasicBlockNumber() public {

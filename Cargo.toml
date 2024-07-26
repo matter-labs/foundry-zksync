@@ -213,7 +213,7 @@ alloy-rlp = "0.3.3"
 alloy-trie = "0.4.1"
 
 ## zksync
-era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "1d72eae6e9400b5b6caed5e60093e7c32eee8abb" }
+era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "dd6d2f463eb9697dc2365899a72ae12dae3ec809" }
 zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "fd7adf634c016f40ea01f702e0e05f57aa5ba614"}
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
