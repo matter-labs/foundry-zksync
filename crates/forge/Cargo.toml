@@ -124,6 +124,11 @@ tikv-jemallocator = { workspace = true, optional = true }
 anvil.workspace = true
 foundry-test-utils.workspace = true
 
+# zk
+era_test_node.workspace = true
+jsonrpc-core = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
+jsonrpc-http-server = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
+
 mockall = "0.12"
 criterion = "0.5"
 paste = "1.0"

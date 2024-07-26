@@ -3801,8 +3801,8 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "era_test_node"
-version = "0.1.0-alpha.21"
-source = "git+https://github.com/matter-labs/era-test-node.git?rev=1d72eae6e9400b5b6caed5e60093e7c32eee8abb#1d72eae6e9400b5b6caed5e60093e7c32eee8abb"
+version = "0.1.0-alpha.23"
+source = "git+https://github.com/matter-labs/era-test-node.git?rev=dd6d2f463eb9697dc2365899a72ae12dae3ec809#dd6d2f463eb9697dc2365899a72ae12dae3ec809"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -3832,6 +3832,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "zkevm_opcode_defs 1.5.0",
  "zksync_basic_types",
  "zksync_contracts",
  "zksync_node_fee_model",
@@ -4577,6 +4578,7 @@ dependencies = [
  "criterion",
  "dialoguer",
  "dunce",
+ "era_test_node",
  "ethers-contract-abigen",
  "evm-disassembler",
  "eyre",
@@ -4603,6 +4605,8 @@ dependencies = [
  "hyper 1.4.0",
  "indicatif",
  "itertools 0.13.0",
+ "jsonrpc-core",
+ "jsonrpc-http-server",
  "mockall",
  "once_cell",
  "opener",

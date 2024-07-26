@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import "ds-test/test.sol";
 import "../cheats/Vm.sol";
-import "../logs/console.sol";
+import "../default/logs/console.sol";
 
 contract Printer {
     function print() public view {

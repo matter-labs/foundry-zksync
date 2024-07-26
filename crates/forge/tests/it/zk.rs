@@ -2,21 +2,16 @@
 
 use std::collections::BTreeMap;
 
-use crate::{
-    config::*,
-    test_helpers::{RE_PATH_SEPARATOR, TEST_DATA_DEFAULT},
-};
+use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use forge::revm::primitives::SpecId;
-use foundry_config::{fs_permissions::PathPermission, FsPermissions};
+use foundry_config::fs_permissions::PathPermission;
 use foundry_test_utils::Filter;
 
 /// Executes all zk basic tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_basic() {
-    let mut config = TEST_DATA_DEFAULT.config.clone();
-    config.fs_permissions = FsPermissions::new(vec![PathPermission::read_write("./")]);
-    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(config);
-    let filter = Filter::new(".*", "ZkBasicTest", &format!(".*zk{RE_PATH_SEPARATOR}*"));
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new(".*", "ZkBasicTest", ".*");
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
@@ -24,10 +19,10 @@ async fn test_zk_basic() {
 /// Executes all zk contract tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contracts() {
-    let mut config = TEST_DATA_DEFAULT.config.clone();
-    config.fs_permissions = FsPermissions::new(vec![PathPermission::read_write("./")]);
-    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(config);
-    let filter = Filter::new(".*", "ZkContractsTest", &format!(".*zk{RE_PATH_SEPARATOR}*"));
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    zk_config.fs_permissions.add(PathPermission::read_write("./zk/zkout/ConstantNumber.sol"));
+    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
+    let filter = Filter::new(".*", "ZkContractsTest", ".*");
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
@@ -35,10 +30,10 @@ async fn test_zk_contracts() {
 /// Executes all zk cheatcode tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheats() {
-    let mut config = TEST_DATA_DEFAULT.config.clone();
-    config.fs_permissions = FsPermissions::new(vec![PathPermission::read_write("./")]);
-    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(config);
-    let filter = Filter::new(".*", "ZkCheatcodesTest", &format!(".*zk{RE_PATH_SEPARATOR}*"));
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    zk_config.fs_permissions.add(PathPermission::read_write("./zk/zkout/ConstantNumber.sol"));
+    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
+    let filter = Filter::new(".*", "ZkCheatcodesTest", ".*");
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
@@ -46,13 +41,10 @@ async fn test_zk_cheats() {
 /// Executes all zk console tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_logs() {
-    let mut config = TEST_DATA_DEFAULT.config.clone();
-    config.fs_permissions = FsPermissions::new(vec![PathPermission::read_write("./")]);
-    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(config);
-    let filter = Filter::new(".*", "ZkConsoleTest", &format!(".*zk{RE_PATH_SEPARATOR}*"));
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new(".*", "ZkConsoleTest", ".*");
 
     let results = TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).test();
-
     assert_multiple(
         &results,
         BTreeMap::from([(
