@@ -473,7 +473,7 @@ impl Cheatcodes {
         data.env.block.timestamp = U256::from(block_timestamp);
 
         let test_contract = data.db.get_test_contract_address();
-        for address in data.db.persistent_accounts() {
+        for address in data.db.persistent_accounts().into_iter().chain([data.env.tx.caller]) {
             info!(?address, "importing to evm state");
 
             let zk_address = address.to_h160();
@@ -546,7 +546,7 @@ impl Cheatcodes {
         let mut known_codes_storage: rHashMap<U256, EvmStorageSlot> = Default::default();
         let mut deployed_codes: HashMap<Address, AccountInfo> = Default::default();
 
-        for address in data.db.persistent_accounts() {
+        for address in data.db.persistent_accounts().into_iter().chain([data.env.tx.caller]) {
             info!(?address, "importing to zk state");
 
             let account = journaled_account(data, address).expect("failed to load account");
