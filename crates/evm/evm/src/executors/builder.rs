@@ -84,7 +84,7 @@ impl ExecutorBuilder {
     /// Builds the executor as configured.
     #[inline]
     pub fn build(self, env: Env, db: Backend) -> Executor {
-        let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
+        let Self { mut stack, gas_limit, spec_id, legacy_assertions, use_zk } = self;
         if stack.block.is_none() {
             stack.block = Some(env.block.clone());
         }

@@ -10,21 +10,22 @@ use crate::{
     inspector::utils::CommonCreateInput,
     script::{Broadcast, ScriptWallets},
     test::expect::{
-        self, ExpectedCallData, ExpectedCallTracker, ExpectedCallType, ExpectedEmit,
+        self, ExpectedEmit,
         ExpectedRevert, ExpectedRevertKind,
     },
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result, Vm,
     Vm::AccountAccess,
 };
-use alloy_primitives::{hex, Address, Bytes, Log, TxKind, B256, U256};
+use alloy_primitives::{hex, keccak256, Address, Bytes, Log, TxKind, B256, U256};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
+use foundry_cheatcodes_common::{expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType}, mock::{MockCallDataContext, MockCallReturnData}, record::RecordAccess};
 use foundry_common::{evm::Breakpoints, SELECTOR_LEN};
 use foundry_config::Config;
 use foundry_evm_core::{
-    abi::Vm::stopExpectSafeMemoryCall,
-    backend::{DatabaseExt, RevertDiagnostic},
-    constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS},
+    abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
+    backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
+    constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER_CODE},
     utils::new_evm_with_existing_context,
     InspectorExt,
 };
@@ -36,21 +37,17 @@ use foundry_zksync_core::{
 use itertools::Itertools;
 use revm::{
     interpreter::{
-        opcode, CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome, EOFCreateInputs,
-        Gas, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
+        opcode, CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome, EOFCreateInputs, Gas, InstructionResult, Interpreter, InterpreterAction, InterpreterResult
     },
-    primitives::{BlockEnv, CreateScheme, EVMError},
+    primitives::{
+        AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot, ExecutionResult, HashMap as rHashMap, Output, TransactTo, KECCAK_EMPTY
+    },
     EvmContext, InnerEvmContext, Inspector,
 };
 use rustc_hash::FxHashMap;
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
-    fs::File,
-    io::BufReader,
-    ops::Range,
-    path::PathBuf,
-    sync::Arc,
+    cell::RefCell, collections::{BTreeMap, HashMap, VecDeque}, fs::File, io::BufReader, ops::Range, path::PathBuf, rc::Rc, sync::Arc
 };
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
@@ -352,15 +349,6 @@ pub struct Cheatcodes {
     /// This can be done as each test runs with its own [Cheatcodes] instance, thereby
     /// providing the necessary level of isolation.
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
-}
-
-// This is not derived because calling this in `fn new` with `..Default::default()` creates a second
-// `CheatsConfig` which is unused, and inside it `ProjectPathsConfig` is relatively expensive to
-// create.
-impl Default for Cheatcodes {
-    fn default() -> Self {
-        Self::new(Arc::default())
-    }
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
@@ -734,10 +722,9 @@ impl Cheatcodes {
         mut input: Input,
     ) -> Option<CreateOutcome>
     where
-        DB: DatabaseExt,
+        DB: DatabaseExt + Send,
         Input: CommonCreateInput<DB>,
     {
-        let ecx = &mut ecx.inner;
         let gas = Gas::new(input.gas_limit());
 
         // Apply our prank
@@ -780,23 +767,26 @@ impl Cheatcodes {
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(ecx, input.gas_limit());
 
                     let account = &ecx.journaled_state.state()[&broadcast.new_origin];
+                    let mut to = None;
+                    let mut nonce = account.info.nonce;
+                    let mut call_init_code = input.init_code().clone();
                     let mut zk_tx = if self.use_zk_vm {
                         to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
                         nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx) as u64;
                         let contract = self
                             .dual_compiled_contracts
-                            .find_by_evm_bytecode(&call.init_code.0)
+                            .find_by_evm_bytecode(&input.init_code().0)
                             .unwrap_or_else(|| {
-                                panic!("failed finding contract for {:?}", call.init_code)
+                                panic!("failed finding contract for {:?}", input.init_code())
                             });
                         let factory_deps =
                             self.dual_compiled_contracts.fetch_all_factory_deps(contract);
 
                         let constructor_input =
-                            call.init_code[contract.evm_bytecode.len()..].to_vec();
+                            call_init_code[contract.evm_bytecode.len()..].to_vec();
 
                         let create_input = foundry_zksync_core::encode_create_params(
-                            &call.scheme,
+                            &input.scheme().unwrap_or(CreateScheme::Create),
                             contract.zk_bytecode_hash,
                             constructor_input,
                         );
@@ -806,6 +796,7 @@ impl Cheatcodes {
                     } else {
                         None
                     };
+                    let rpc = ecx.db.active_fork_url();
                     if let Some(factory_deps) = zk_tx {
                         let mut batched =
                             foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
@@ -819,7 +810,7 @@ impl Cheatcodes {
                                 transaction: TransactionRequest {
                                     from: Some(broadcast.new_origin),
                                     to: Some(TxKind::Call(Address::ZERO)),
-                                    value: Some(call.value),
+                                    value: Some(input.value()),
                                     nonce: Some(nonce),
                                     ..Default::default()
                                 },
@@ -831,7 +822,7 @@ impl Cheatcodes {
                         }
                     }
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc: ecx.db.active_fork_url(),
+                        rpc,
                         transaction: TransactionRequest {
                             from: Some(broadcast.new_origin),
                             to: None,
@@ -880,15 +871,15 @@ impl Cheatcodes {
 
         if self.use_zk_vm {
             info!("running create in zk vm");
-            if call.init_code.0 == DEFAULT_CREATE2_DEPLOYER_CODE {
+            if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
                 info!("ignoring DEFAULT_CREATE2_DEPLOYER_CODE for zk");
                 return None
             }
 
             let zk_contract = self
                 .dual_compiled_contracts
-                .find_by_evm_bytecode(&call.init_code.0)
-                .unwrap_or_else(|| panic!("failed finding contract for {:?}", call.init_code));
+                .find_by_evm_bytecode(&input.init_code().0)
+                .unwrap_or_else(|| panic!("failed finding contract for {:?}", input.init_code()));
 
             let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
             tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
@@ -899,8 +890,15 @@ impl Cheatcodes {
                 accesses: self.accesses.as_mut(),
                 persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             };
+            let create_inputs = CreateInputs {
+                scheme: input.scheme().unwrap_or(CreateScheme::Create),
+                init_code: input.init_code(),
+                value: input.value(),
+                caller: input.caller(),
+                gas_limit: input.gas_limit(),
+            };
             if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
-                call,
+                &create_inputs,
                 zk_contract,
                 factory_deps,
                 ecx,
@@ -1125,7 +1123,6 @@ impl Cheatcodes {
             };
         }
 
-        let ecx = &mut ecx.inner;
 
         if call.target_address == HARDHAT_CONSOLE_ADDRESS {
             self.combined_logs.push(None);
@@ -1425,6 +1422,10 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         if let Some(gas_price) = self.gas_price.take() {
             ecx.env.tx.gas_price = gas_price;
         }
+        if self.startup_zk && !self.use_zk_vm {
+            self.startup_zk = false; // We only do this once.
+            self.select_zk_vm(ecx, None);
+        }
     }
 
     #[inline]
@@ -1457,6 +1458,38 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         }
     }
 
+    #[inline]
+    fn step_end(&mut self, interpreter: &mut Interpreter, ecx: &mut EvmContext<DB>) {
+        // ovverride address(x).balance retrieval to make it consistent between EraVM and EVM
+        if self.use_zk_vm {
+            let address = match interpreter.current_opcode() {
+                opcode::SELFBALANCE => interpreter.contract().target_address,
+                opcode::BALANCE => {
+                    if interpreter.stack.is_empty() {
+                        interpreter.instruction_result = InstructionResult::StackUnderflow;
+                        return;
+                    }
+
+                    Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }))
+                }
+                _ => return,
+            };
+
+            // Safety: Length is checked above.
+            let balance = foundry_zksync_core::balance(address, ecx);
+
+            // Skip the current BALANCE instruction since we've already handled it
+            match interpreter.stack.push(balance) {
+                Ok(_) => unsafe {
+                    interpreter.instruction_pointer = interpreter.instruction_pointer.add(1);
+                },
+                Err(e) => {
+                    interpreter.instruction_result = e;
+                }
+            }
+        }
+    }
+
     fn log(&mut self, _interpreter: &mut Interpreter, _context: &mut EvmContext<DB>, log: &Log) {
         if !self.expected_emits.is_empty() {
             expect::handle_expect_emit(self, log);
@@ -1470,6 +1503,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 emitter: log.address,
             });
         }
+        self.combined_logs.push(None);
     }
 
     fn call(
@@ -2215,29 +2249,6 @@ impl Cheatcodes {
             (RETURN, 0, 1, false),
             (REVERT, 0, 1, false),
         );
-    }
-}
-
-impl<DB: DatabaseExt + Send> InspectorExt<DB> for Cheatcodes {
-    fn should_use_create2_factory(
-        &mut self,
-        ecx: &mut EvmContext<DB>,
-        inputs: &mut CreateInputs,
-    ) -> bool {
-        if let CreateScheme::Create2 { .. } = inputs.scheme {
-            let target_depth = if let Some(prank) = &self.prank {
-                prank.depth
-            } else if let Some(broadcast) = &self.broadcast {
-                broadcast.depth
-            } else {
-                1
-            };
-
-            ecx.journaled_state.depth() == target_depth &&
-                (self.broadcast.is_some() || self.config.always_use_create_2_factory)
-        } else {
-            false
-        }
     }
 }
 

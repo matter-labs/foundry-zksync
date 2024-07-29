@@ -465,8 +465,11 @@ impl<'a> InvariantExecutor<'a> {
             self.select_contracts_and_senders(invariant_contract.address)?;
 
         // Stores fuzz state for use with [fuzz_calldata_from_state].
-        let fuzz_state =
-            EvmFuzzState::new(self.executor.backend().mem_db(), self.config.dictionary);
+        let fuzz_state = EvmFuzzState::new(
+            self.executor.backend().mem_db(),
+            self.config.dictionary,
+            self.config.no_zksync_reserved_addresses,
+        );
 
         // Creates the invariant strategy.
         let strat = invariant_strat(

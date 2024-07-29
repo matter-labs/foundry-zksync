@@ -47,7 +47,6 @@ pub use script::{ScriptWallets, ScriptWalletsInner};
 mod string;
 
 mod test;
-pub use test::expect::ExpectedCallTracker;
 
 mod toml;
 

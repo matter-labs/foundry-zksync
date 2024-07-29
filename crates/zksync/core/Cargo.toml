@@ -13,6 +13,7 @@ exclude.workspace = true
 
 [dependencies]
 foundry-common.workspace = true
+foundry-evm-abi.workspace = true
 foundry-cheatcodes-common.workspace = true
 foundry-zksync-compiler.workspace = true
 alloy-primitives.workspace = true

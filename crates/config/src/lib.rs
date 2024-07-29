@@ -877,8 +877,8 @@ impl Config {
                     ZkSolc::blocking_install(&default_version)?;
                     zksolc = ZkSolc::find_installed_version(&default_version)?;
                 }
-                project.zksync_zksolc = zksolc
-                    .unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"));
+                project.zksync_zksolc =
+                    zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"));
             }
         }
 

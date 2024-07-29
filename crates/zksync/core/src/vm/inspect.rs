@@ -1,11 +1,10 @@
-use alloy_primitives::Log;
+use alloy_primitives::{hex, Log};
 use era_test_node::{
     formatter,
     node::ShowCalls,
     system_contracts::{Options, SystemContracts},
     utils::bytecode_to_factory_dep,
 };
-use foundry_common::{Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS};
 use itertools::Itertools;
 use multivm::{
     interface::{Halt, VmInterface, VmRevertReason},
@@ -45,6 +44,9 @@ use crate::{
         storage_view::StorageView,
         tracer::{CallContext, CheatcodeTracer, CheatcodeTracerContext},
     },
+};
+use foundry_evm_abi::{
+    patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS,
 };
 
 /// Maximum gas price allowed for L1.
@@ -472,7 +474,7 @@ impl ConsoleLogParser {
         let mut input = current_call.input.clone();
 
         // Patch the Hardhat-style selector (`uint` instead of `uint256`)
-        foundry_common::patch_hh_console_selector(&mut input);
+        patch_hh_console_selector(&mut input);
 
         // Decode the call
         let Ok(call) = HardhatConsole::HardhatConsoleCalls::abi_decode(&input, false) else {

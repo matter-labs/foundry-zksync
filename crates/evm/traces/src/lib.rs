@@ -8,6 +8,9 @@
 #[macro_use]
 extern crate tracing;
 
+use std::collections::HashMap;
+
+use alloy_primitives::{Address, Bytes};
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use revm::interpreter::OpCode;
 use revm_inspectors::tracing::OpcodeFilter;
@@ -94,6 +97,7 @@ impl TraceKind {
 pub fn load_contracts<'a>(
     traces: impl IntoIterator<Item = &'a CallTraceArena>,
     known_contracts: &ContractsByArtifact,
+    deployments: &HashMap<Address, Bytes>,
 ) -> ContractsByAddress {
     let mut local_identifier = LocalTraceIdentifier::new(known_contracts);
     local_identifier.deployments.clone_from(deployments);

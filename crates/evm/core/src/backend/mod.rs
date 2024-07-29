@@ -355,6 +355,9 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         Ok(())
     }
 
+    /// Retrieves test contract's address
+    fn get_test_contract_address(&self) -> Option<Address>;
+
     /// Set the blockhash for a given block number.
     ///
     /// # Arguments
@@ -610,6 +613,11 @@ impl Backend {
         trace!(?spec_id, "setting spec ID");
         self.inner.spec_id = spec_id;
         self
+    }
+
+    /// Returns the address of the set `DSTest` contract
+    pub fn test_contract_address(&self) -> Option<Address> {
+        self.inner.test_contract_address
     }
 
     /// Returns the set caller address
@@ -1488,6 +1496,10 @@ impl DatabaseExt for Backend {
         self.inner.cheatcode_access_accounts.contains(account)
     }
 
+    fn get_test_contract_address(&self) -> Option<Address> {
+        self.test_contract_address()
+    }
+
     fn set_blockhash(&mut self, block_number: U256, block_hash: B256) {
         if let Some(db) = self.active_fork_db_mut() {
             db.block_hashes.insert(block_number, block_hash);
@@ -1644,6 +1656,11 @@ pub struct BackendInner {
     /// check if the `_failed` variable is set,
     /// additionally
     pub has_snapshot_failure: bool,
+    /// Tracks the address of a Test contract
+    ///
+    /// This address can be used to inspect the state of the contract when a test is being
+    /// executed. E.g. the `_failed` variable of `DSTest`
+    pub test_contract_address: Option<Address>,
     /// Tracks the caller of the test function
     pub caller: Option<Address>,
     /// Tracks numeric identifiers for forks
@@ -1832,6 +1849,7 @@ impl Default for BackendInner {
             forks: vec![],
             snapshots: Default::default(),
             has_snapshot_failure: false,
+            test_contract_address: None,
             caller: None,
             next_fork_id: Default::default(),
             persistent_accounts: Default::default(),

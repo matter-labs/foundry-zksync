@@ -10,7 +10,7 @@ pub(crate) mod assert;
 pub(crate) mod expect;
 
 impl Cheatcode for zkVmCall {
-    fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { enable } = *self;
 
         if enable {
@@ -24,7 +24,7 @@ impl Cheatcode for zkVmCall {
 }
 
 impl Cheatcode for zkRegisterContractCall {
-    fn apply_full<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self {
             name,
             evmBytecodeHash,

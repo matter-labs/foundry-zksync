@@ -1,4 +1,4 @@
-use alloy_primitives::Selector;
+use alloy_primitives::{address, Address, Selector};
 use alloy_sol_types::sol;
 use foundry_common_fmt::*;
 use foundry_macros::ConsoleFmt;
@@ -11,6 +11,11 @@ sol!(
     HardhatConsole,
     "src/HardhatConsole.json"
 );
+
+/// The Hardhat console address.
+///
+/// See: <https://github.com/nomiclabs/hardhat/blob/master/packages/hardhat-core/console.sol>
+pub const HARDHAT_CONSOLE_ADDRESS: Address = address!("000000000000000000636F6e736F6c652e6c6f67");
 
 /// Patches the given Hardhat `console` function selector to its ABI-normalized form.
 ///

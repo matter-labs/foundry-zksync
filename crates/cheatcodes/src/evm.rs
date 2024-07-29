@@ -6,46 +6,20 @@ use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_sol_types::SolValue;
 use foundry_common::fs::{read_json_file, write_json_file};
 use foundry_evm_core::{
+    abi::HARDHAT_CONSOLE_ADDRESS,
     backend::{DatabaseExt, RevertSnapshotAction},
-    constants::{CALLER, CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, TEST_CONTRACT_ADDRESS},
+    constants::{CALLER, CHEATCODE_ADDRESS, TEST_CONTRACT_ADDRESS},
 };
 use revm::{
     primitives::{Account, Bytecode, SpecId, KECCAK_EMPTY},
     InnerEvmContext,
 };
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::Path,
-};
+use std::{collections::BTreeMap, path::Path};
 
 mod fork;
 pub(crate) mod mapping;
 pub(crate) mod mock;
 pub(crate) mod prank;
-
-/// Records storage slots reads and writes.
-#[derive(Clone, Debug, Default)]
-pub struct RecordAccess {
-    /// Storage slots reads.
-    pub reads: HashMap<Address, Vec<U256>>,
-    /// Storage slots writes.
-    pub writes: HashMap<Address, Vec<U256>>,
-}
-
-impl RecordAccess {
-    /// Records a read access to a storage slot.
-    pub fn record_read(&mut self, target: Address, slot: U256) {
-        self.reads.entry(target).or_default().push(slot);
-    }
-
-    /// Records a write access to a storage slot.
-    ///
-    /// This also records a read internally as `SSTORE` does an implicit `SLOAD`.
-    pub fn record_write(&mut self, target: Address, slot: U256) {
-        self.record_read(target, slot);
-        self.writes.entry(target).or_default().push(slot);
-    }
-}
 
 /// Records `deal` cheatcodes
 #[derive(Clone, Debug)]
@@ -420,8 +394,12 @@ impl Cheatcode for getBlobBaseFeeCall {
 impl Cheatcode for dealCall {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { account: address, newBalance: new_balance } = *self;
-        let account = journaled_account(ccx.ecx, address)?;
-        let old_balance = std::mem::replace(&mut account.info.balance, new_balance);
+        let old_balance = if ccx.state.use_zk_vm {
+            foundry_zksync_core::cheatcodes::deal(address, new_balance, ccx.ecx)
+        } else {
+            let account = journaled_account(ccx.ecx, address)?;
+            std::mem::replace(&mut account.info.balance, new_balance)
+        };
         let record = DealRecord { address, old_balance, new_balance };
         ccx.state.eth_deals.push(record);
         Ok(Default::default())

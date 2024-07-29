@@ -334,14 +334,6 @@ impl Cheatcode for serializeUintToHexCall {
     }
 }
 
-impl Cheatcode for serializeUintToHexCall {
-    fn apply(&self, state: &mut Cheatcodes) -> Result {
-        let Self { objectKey, valueKey, value } = self;
-        let hex = format!("0x{value:x}");
-        serialize_json(state, objectKey, Some(valueKey), &hex)
-    }
-}
-
 impl Cheatcode for writeJson_0Call {
     fn apply(&self, state: &mut Cheatcodes) -> Result {
         let Self { json, path } = self;

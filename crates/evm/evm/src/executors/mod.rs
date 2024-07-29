@@ -202,7 +202,7 @@ impl Executor {
 
     /// Set the balance of an account.
     pub fn set_balance(&mut self, address: Address, amount: U256) -> BackendResult<()> {
-        trace!(?address, ?amount, "setting account balance");
+        trace!(?address, ?amount, "setting account balance ZK={}", self.use_zk);
         let mut account = self.backend().basic_ref(address)?.unwrap_or_default();
         account.balance = amount;
         self.backend_mut().insert_account_info(address, account);

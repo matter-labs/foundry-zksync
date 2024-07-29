@@ -5,7 +5,8 @@
 
 use super::CreateFork;
 use alloy_primitives::U256;
-use alloy_transport::layers::RetryBackoffService;
+use alloy_provider::{Provider, RootProvider};
+use alloy_transport::{layers::RetryBackoffService, TransportResult};
 use foundry_common::provider::{
     runtime_transport::RuntimeTransport, ProviderBuilder, RetryProvider,
 };

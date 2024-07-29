@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, default, fmt::Debug};
 
-use alloy_primitives::Address;
+use alloy_primitives::{hex, Address};
 use itertools::Itertools;
 use multivm::{
     vm_1_3_2::zk_evm_1_3_3::zkevm_opcode_defs::RetABI,

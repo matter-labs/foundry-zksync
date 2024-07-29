@@ -7,14 +7,14 @@ use forge::{
 };
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
-    utils::RuntimeOrHandle,
     multi::MultiCompilerLanguage,
     solc::SolcCompiler,
+    utils::RuntimeOrHandle,
     zksync::{
         cache::ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME,
         compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     },
-    Project, ProjectCompileOutput, SolcConfig, Vyper, ProjectPathsConfig
+    Project, ProjectCompileOutput, ProjectPathsConfig, SolcConfig, Vyper,
 };
 use foundry_config::{
     fs_permissions::PathPermission, Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig,
@@ -251,8 +251,8 @@ impl ForgeTestData {
             let zk_config = profile.zk_config();
             let zk_project = profile.zk_project();
 
-            let project = zk_config.project().expect("failed obtaining project");
-            let output = get_compiled(&project);
+            let mut project = zk_config.project().expect("failed obtaining project");
+            let output = get_compiled(&mut project);
             let zk_output = get_zk_compiled(&zk_project);
             let layout = ProjectPathsConfig {
                 root: zk_project.paths.root.clone(),
@@ -330,7 +330,7 @@ impl ForgeTestData {
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(self.test_opts.clone())
-            .build(root, &self.output, opts.local_evm_env(), opts)
+            .build(root, &self.output, None, opts.local_evm_env(), opts, Default::default())
             .unwrap()
     }
 
@@ -372,7 +372,14 @@ impl ForgeTestData {
         let mut opts = self.evm_opts.clone();
         opts.verbosity = 5;
         self.base_runner()
-            .build(self.project.root(), &self.output, opts.local_evm_env(), opts)
+            .build(
+                self.project.root(),
+                &self.output,
+                None,
+                opts.local_evm_env(),
+                opts,
+                Default::default(),
+            )
             .unwrap()
     }
 
@@ -388,7 +395,7 @@ impl ForgeTestData {
 
         self.base_runner()
             .with_fork(fork)
-            .build(self.project.root(), &self.output, env, opts)
+            .build(self.project.root(), &self.output, None, env, opts, Default::default())
             .unwrap()
     }
 }
@@ -474,21 +481,24 @@ pub fn get_zk_compiled(zk_project: &ZkProject) -> ZkProjectCompileOutput {
     let read = lock.read().unwrap();
     let out;
 
+    let mut write = None;
+
     let zk_compiler = foundry_common::compile::ProjectCompiler::new();
-    if zk_project.paths.zksync_cache.exists() && std::fs::read(&lock_file_path).unwrap() == b"1" {
-        out = zk_compiler.zksync_compile(zk_project, None);
+    if zk_project.paths.zksync_cache.exists() || std::fs::read(&lock_file_path).unwrap() == b"1" {
         drop(read);
-    } else {
-        drop(read);
-        let mut write = lock.write().unwrap();
-        write.write_all(b"1").unwrap();
-        out = zk_compiler.zksync_compile(zk_project, None);
-        drop(write);
+        write = Some(lock.write().unwrap());
     }
 
-    let out = out.expect("failed compiling zksync project");
-    if out.has_compiler_errors() {
-        panic!("Compiled with errors:\n{out}");
+    out = zk_compiler.zksync_compile(zk_project, None);
+
+    if let Some(ref mut write) = write {
+        write.write_all(b"1").unwrap();
+    }
+
+    let out: ZkProjectCompileOutput = out.expect("failed compiling zksync project");
+
+    if let Some(ref mut write) = write {
+        write.write_all(b"1").unwrap();
     }
     out
 }
