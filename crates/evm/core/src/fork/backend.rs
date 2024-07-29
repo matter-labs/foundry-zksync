@@ -1,5 +1,5 @@
 //! Smart caching and deduplication of requests when using a forking provider
-use crate::backend::{BackendError, DatabaseError, DatabaseResult};
+use crate::backend::{BackendError, BackendResult};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_provider::{network::AnyNetwork, Provider};
 use alloy_rpc_types::{Block, BlockId, Transaction};
@@ -47,12 +47,12 @@ type TransactionFuture<Err> = Pin<
 type BytecodeHashFuture<Err> =
     Pin<Box<dyn Future<Output = (ByteCodeHashSender, Result<Option<Bytecode>, Err>, B256)> + Send>>;
 
-type AccountInfoSender = OneshotSender<DatabaseResult<AccountInfo>>;
-type StorageSender = OneshotSender<DatabaseResult<U256>>;
-type BlockHashSender = OneshotSender<DatabaseResult<B256>>;
-type FullBlockSender = OneshotSender<DatabaseResult<Block>>;
-type TransactionSender = OneshotSender<DatabaseResult<WithOtherFields<Transaction>>>;
-type ByteCodeHashSender = OneshotSender<DatabaseResult<Bytecode>>;
+type AccountInfoSender = OneshotSender<BackendResult<AccountInfo>>;
+type StorageSender = OneshotSender<BackendResult<U256>>;
+type BlockHashSender = OneshotSender<BackendResult<B256>>;
+type FullBlockSender = OneshotSender<BackendResult<Block>>;
+type TransactionSender = OneshotSender<BackendResult<WithOtherFields<Transaction>>>;
+type ByteCodeHashSender = OneshotSender<BackendResult<Bytecode>>;
 
 /// Request variants that are executed by the provider
 enum ProviderRequest<Err> {
@@ -372,7 +372,7 @@ where
                                     let err = Arc::new(err);
                                     if let Some(listeners) = pin.account_requests.remove(&addr) {
                                         listeners.into_iter().for_each(|l| {
-                                            let _ = l.send(Err(DatabaseError::GetAccount(
+                                            let _ = l.send(Err(BackendError::GetAccount(
                                                 addr,
                                                 Arc::clone(&err),
                                             )));
@@ -418,7 +418,7 @@ where
                                         pin.storage_requests.remove(&(addr, idx))
                                     {
                                         listeners.into_iter().for_each(|l| {
-                                            let _ = l.send(Err(DatabaseError::GetStorage(
+                                            let _ = l.send(Err(BackendError::GetStorage(
                                                 addr,
                                                 idx,
                                                 Arc::clone(&err),
@@ -450,7 +450,7 @@ where
                                     // notify all listeners
                                     if let Some(listeners) = pin.block_requests.remove(&number) {
                                         listeners.into_iter().for_each(|l| {
-                                            let _ = l.send(Err(DatabaseError::GetBlockHash(
+                                            let _ = l.send(Err(BackendError::GetBlockHash(
                                                 number,
                                                 Arc::clone(&err),
                                             )));
@@ -476,10 +476,10 @@ where
                         if let Poll::Ready((sender, resp, number)) = fut.poll_unpin(cx) {
                             let msg = match resp {
                                 Ok(Some(block)) => Ok(block),
-                                Ok(None) => Err(DatabaseError::BlockNotFound(number)),
+                                Ok(None) => Err(BackendError::BlockNotFound(number)),
                                 Err(err) => {
                                     let err = Arc::new(err);
-                                    Err(DatabaseError::GetFullBlock(number, err))
+                                    Err(BackendError::GetFullBlock(number, err))
                                 }
                             };
                             let _ = sender.send(msg);
@@ -492,7 +492,7 @@ where
                                 Ok(tx) => Ok(tx),
                                 Err(err) => {
                                     let err = Arc::new(err);
-                                    Err(DatabaseError::GetTransaction(tx_hash, err))
+                                    Err(BackendError::GetTransaction(tx_hash, err))
                                 }
                             };
                             let _ = sender.send(msg);
@@ -503,11 +503,10 @@ where
                         if let Poll::Ready((sender, bytecode, code_hash)) = fut.poll_unpin(cx) {
                             let msg = match bytecode {
                                 Ok(Some(bytecode)) => Ok(bytecode),
-                                Ok(None) => Err(DatabaseError::MissingCode(code_hash)),
+                                Ok(None) => Err(BackendError::MissingCode(code_hash)),
                                 Err(err) => {
-                                    let _err = Arc::new(err);
-                                    // TODO: fix this
-                                    Err(DatabaseError::MissingCode(code_hash))
+                                    let err = Arc::new(err);
+                                    Err(BackendError::GetBytecode(code_hash, err))
                                 }
                             };
                             let _ = sender.send(msg);
@@ -645,7 +644,7 @@ impl SharedBackend {
     }
 
     /// Returns the full block for the given block identifier
-    pub fn get_full_block(&self, block: impl Into<BlockId>) -> DatabaseResult<Block> {
+    pub fn get_full_block(&self, block: impl Into<BlockId>) -> BackendResult<Block> {
         tokio::task::block_in_place(|| {
             let (sender, rx) = oneshot_channel();
             let req = BackendRequest::FullBlock(block.into(), sender);
@@ -655,7 +654,7 @@ impl SharedBackend {
     }
 
     /// Returns the transaction for the hash
-    pub fn get_transaction(&self, tx: B256) -> DatabaseResult<WithOtherFields<Transaction>> {
+    pub fn get_transaction(&self, tx: B256) -> BackendResult<WithOtherFields<Transaction>> {
         tokio::task::block_in_place(|| {
             let (sender, rx) = oneshot_channel();
             let req = BackendRequest::Transaction(tx, sender);
@@ -664,7 +663,7 @@ impl SharedBackend {
         })
     }
 
-    fn do_get_basic(&self, address: Address) -> DatabaseResult<Option<AccountInfo>> {
+    fn do_get_basic(&self, address: Address) -> BackendResult<Option<AccountInfo>> {
         tokio::task::block_in_place(|| {
             let (sender, rx) = oneshot_channel();
             let req = BackendRequest::Basic(address, sender);
@@ -673,7 +672,7 @@ impl SharedBackend {
         })
     }
 
-    fn do_get_storage(&self, address: Address, index: U256) -> DatabaseResult<U256> {
+    fn do_get_storage(&self, address: Address, index: U256) -> BackendResult<U256> {
         tokio::task::block_in_place(|| {
             let (sender, rx) = oneshot_channel();
             let req = BackendRequest::Storage(address, index, sender);
@@ -682,7 +681,7 @@ impl SharedBackend {
         })
     }
 
-    fn do_get_block_hash(&self, number: u64) -> DatabaseResult<B256> {
+    fn do_get_block_hash(&self, number: u64) -> BackendResult<B256> {
         tokio::task::block_in_place(|| {
             let (sender, rx) = oneshot_channel();
             let req = BackendRequest::BlockHash(number, sender);
@@ -691,7 +690,7 @@ impl SharedBackend {
         })
     }
 
-    fn do_get_bytecode(&self, hash: B256) -> DatabaseResult<Bytecode> {
+    fn do_get_bytecode(&self, hash: B256) -> BackendResult<Bytecode> {
         tokio::task::block_in_place(|| {
             let (sender, rx) = oneshot_channel();
             let req = BackendRequest::ByteCodeHash(hash, sender);
@@ -707,7 +706,7 @@ impl SharedBackend {
 }
 
 impl DatabaseRef for SharedBackend {
-    type Error = DatabaseError;
+    type Error = BackendError;
 
     fn basic_ref(&self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
         trace!(target: "sharedbackend", %address, "request basic");

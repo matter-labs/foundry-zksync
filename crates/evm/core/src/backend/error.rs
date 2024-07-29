@@ -1,7 +1,7 @@
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::BlockId;
 pub use foundry_fork_db::{DatabaseError, DatabaseResult};
-use futures::channel::mpsc::SendError;
+use futures::channel::mpsc::{SendError, TrySendError};
 use revm::primitives::EVMError;
 use std::{
     convert::Infallible,
@@ -65,11 +65,50 @@ impl BackendError {
     pub fn display(msg: impl std::fmt::Display) -> Self {
         Self::Message(msg.to_string())
     }
+
+    fn get_rpc_error(&self) -> Option<&eyre::Error> {
+        match self {
+            Self::GetAccount(_, err) => Some(err),
+            Self::Database(_) => None, // TODO: Revisit this case
+            Self::GetStorage(_, _, err) => Some(err),
+            Self::GetBlockHash(_, err) => Some(err),
+            Self::GetFullBlock(_, err) => Some(err),
+            Self::GetTransaction(_, err) => Some(err),
+            // Enumerate explicitly to make sure errors are updated if a new one is added.
+            Self::NoCheats(_) |
+            Self::MissingAccount(_) |
+            Self::MissingCode(_) |
+            Self::Recv(_) |
+            Self::Send(_) |
+            Self::Message(_) |
+            Self::BlockNotFound(_) |
+            Self::TransactionNotFound(_) |
+            Self::MissingCreate2Deployer => None,
+            Self::GetBytecode(_, err) => Some(err),
+            Self::Other(_) => None,
+        }
+    }
+
+    /// Whether the error is potentially caused by the user forking from an older block in a
+    /// non-archive node.
+    pub fn is_possibly_non_archive_node_error(&self) -> bool {
+        static GETH_MESSAGE: &str = "missing trie node";
+
+        self.get_rpc_error()
+            .map(|err| err.to_string().to_lowercase().contains(GETH_MESSAGE))
+            .unwrap_or(false)
+    }
 }
 
 impl From<tokio::task::JoinError> for BackendError {
     fn from(value: tokio::task::JoinError) -> Self {
         Self::display(value)
+    }
+}
+
+impl<T> From<TrySendError<T>> for BackendError {
+    fn from(value: TrySendError<T>) -> Self {
+        value.into_send_error().into()
     }
 }
 

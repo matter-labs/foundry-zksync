@@ -9,17 +9,18 @@ use crate::{
     },
     inspector::utils::CommonCreateInput,
     script::{Broadcast, ScriptWallets},
-    test::expect::{
-        self, ExpectedEmit,
-        ExpectedRevert, ExpectedRevertKind,
-    },
+    test::expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result, Vm,
     Vm::AccountAccess,
 };
 use alloy_primitives::{hex, keccak256, Address, Bytes, Log, TxKind, B256, U256};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
-use foundry_cheatcodes_common::{expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType}, mock::{MockCallDataContext, MockCallReturnData}, record::RecordAccess};
+use foundry_cheatcodes_common::{
+    expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
+    mock::{MockCallDataContext, MockCallReturnData},
+    record::RecordAccess,
+};
 use foundry_common::{evm::Breakpoints, SELECTOR_LEN};
 use foundry_config::Config;
 use foundry_evm_core::{
@@ -37,17 +38,24 @@ use foundry_zksync_core::{
 use itertools::Itertools;
 use revm::{
     interpreter::{
-        opcode, CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome, EOFCreateInputs, Gas, InstructionResult, Interpreter, InterpreterAction, InterpreterResult
+        opcode, CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome, EOFCreateInputs,
+        Gas, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
     },
     primitives::{
-        AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot, ExecutionResult, HashMap as rHashMap, Output, TransactTo, KECCAK_EMPTY
+        AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot,
+        ExecutionResult, HashMap as rHashMap, Output, TransactTo, KECCAK_EMPTY,
     },
     EvmContext, InnerEvmContext, Inspector,
 };
 use rustc_hash::FxHashMap;
 use serde_json::Value;
 use std::{
-    cell::RefCell, collections::{BTreeMap, HashMap, VecDeque}, fs::File, io::BufReader, ops::Range, path::PathBuf, rc::Rc, sync::Arc
+    collections::{BTreeMap, HashMap, VecDeque},
+    fs::File,
+    io::BufReader,
+    ops::Range,
+    path::PathBuf,
+    sync::Arc,
 };
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
@@ -1122,7 +1130,6 @@ impl Cheatcodes {
                 }),
             };
         }
-
 
         if call.target_address == HARDHAT_CONSOLE_ADDRESS {
             self.combined_logs.push(None);
