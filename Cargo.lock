@@ -1748,31 +1748,7 @@ source = "git+https://github.com/matter-labs/bellman?branch=dev#5520aa2274afe73d
 dependencies = [
  "arrayvec 0.7.4",
  "bit-vec",
- "blake2s_const 0.6.0",
- "blake2s_simd",
- "byteorder",
- "cfg-if 1.0.0",
- "crossbeam 0.7.3",
- "futures 0.3.30",
- "hex",
- "lazy_static",
- "num_cpus",
- "pairing_ce 0.28.6",
- "rand 0.4.6",
- "serde",
- "smallvec",
- "tiny-keccak 1.5.0",
-]
-
-[[package]]
-name = "bellman_ce"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ea340d5c1394ee4daf4415dd80e06f74e0ad9b08e21f73f6bb1fa3a9dfae80d"
-dependencies = [
- "arrayvec 0.7.4",
- "bit-vec",
- "blake2s_const 0.7.0",
+ "blake2s_const",
  "blake2s_simd",
  "byteorder",
  "cfg-if 1.0.0",
@@ -1923,17 +1899,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blake2s_const"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f39d933cb38939f885001867874c65699c36f30f0c78aae9f4c9f01b3e4b306a"
-dependencies = [
- "arrayref",
- "arrayvec 0.5.2",
- "constant_time_eq",
-]
-
-[[package]]
 name = "blake2s_simd"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1997,37 +1962,6 @@ dependencies = [
 [[package]]
 name = "boojum"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f0c2cba247d620ff76123efb335401aa05ec5639551e6ef4e5f977c0809b5cb"
-dependencies = [
- "arrayvec 0.7.4",
- "bincode",
- "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "const_format",
- "convert_case 0.6.0",
- "crossbeam 0.8.4",
- "crypto-bigint 0.5.5",
- "cs_derive 0.2.0",
- "derivative",
- "ethereum-types 0.14.1",
- "firestorm",
- "itertools 0.10.5",
- "lazy_static",
- "num-modular",
- "num_cpus",
- "pairing_ce 0.28.6",
- "rand 0.8.5",
- "rayon",
- "serde",
- "sha2 0.10.8",
- "sha3_ce",
- "smallvec",
- "unroll",
-]
-
-[[package]]
-name = "boojum"
-version = "0.2.0"
 source = "git+https://github.com/matter-labs/era-boojum.git?branch=main#4bcb11f0610302110ae8109af01d5b652191b2f6"
 dependencies = [
  "arrayvec 0.7.4",
@@ -2037,7 +1971,7 @@ dependencies = [
  "convert_case 0.6.0",
  "crossbeam 0.8.4",
  "crypto-bigint 0.5.5",
- "cs_derive 0.1.0",
+ "cs_derive",
  "derivative",
  "ethereum-types 0.14.1",
  "firestorm",
@@ -2516,13 +2450,13 @@ dependencies = [
 
 [[package]]
 name = "circuit_encodings"
-version = "0.150.2-rc.1"
-source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.5.0#b3d45e8cfe96167cda5c8b3775a20a96b36948c5"
+version = "0.1.50"
+source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.5.0#5d6a06c37f4656d26a4170d22f2298cd7716c070"
 dependencies = [
  "derivative",
  "serde",
- "zk_evm 0.150.0",
- "zkevm_circuits 0.150.0",
+ "zk_evm 1.5.0",
+ "zkevm_circuits 1.5.0",
 ]
 
 [[package]]
@@ -2530,7 +2464,7 @@ name = "circuit_sequencer_api"
 version = "0.1.0"
 source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.3.3#aba8f2a32767b79838aca7d7d00d9d23144df32f"
 dependencies = [
- "bellman_ce 0.3.2",
+ "bellman_ce",
  "derivative",
  "rayon",
  "serde",
@@ -2542,7 +2476,7 @@ name = "circuit_sequencer_api"
 version = "0.1.40"
 source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.4.0#39665dffd576cff5007c80dd0e1b5334e230bd3b"
 dependencies = [
- "bellman_ce 0.3.2",
+ "bellman_ce",
  "circuit_encodings 0.1.40",
  "derivative",
  "rayon",
@@ -2555,7 +2489,7 @@ name = "circuit_sequencer_api"
 version = "0.1.41"
 source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.4.1#f7bd71fd4216e2c51ab7b09a95909fe48c75f35b"
 dependencies = [
- "bellman_ce 0.3.2",
+ "bellman_ce",
  "circuit_encodings 0.1.41",
  "derivative",
  "rayon",
@@ -2568,7 +2502,7 @@ name = "circuit_sequencer_api"
 version = "0.1.42"
 source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.4.2#3149a162a729581005fbad6dbcef027a3ee1b214"
 dependencies = [
- "bellman_ce 0.3.2",
+ "bellman_ce",
  "circuit_encodings 0.1.42",
  "derivative",
  "rayon",
@@ -2578,11 +2512,11 @@ dependencies = [
 
 [[package]]
 name = "circuit_sequencer_api"
-version = "0.150.2-rc.1"
-source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.5.0#b3d45e8cfe96167cda5c8b3775a20a96b36948c5"
+version = "0.1.50"
+source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.5.0#5d6a06c37f4656d26a4170d22f2298cd7716c070"
 dependencies = [
- "bellman_ce 0.7.0",
- "circuit_encodings 0.150.2-rc.1",
+ "bellman_ce",
+ "circuit_encodings 0.1.50",
  "derivative",
  "rayon",
  "serde",
@@ -3261,18 +3195,6 @@ dependencies = [
 name = "cs_derive"
 version = "0.1.0"
 source = "git+https://github.com/matter-labs/era-boojum.git?branch=main#4bcb11f0610302110ae8109af01d5b652191b2f6"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "cs_derive"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faa0b8f9fdb5c91dcd5569cc7cbc11f514fd784a34988ead8455db0db2cfc1c7"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -7810,7 +7732,7 @@ dependencies = [
  "circuit_sequencer_api 0.1.40",
  "circuit_sequencer_api 0.1.41",
  "circuit_sequencer_api 0.1.42",
- "circuit_sequencer_api 0.150.2-rc.1",
+ "circuit_sequencer_api 0.1.50",
  "hex",
  "itertools 0.10.5",
  "once_cell",
@@ -11081,16 +11003,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha3_ce"
-version = "0.10.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34c9a08202c50378d8a07a5f458193a5f542d2828ac6640263dbc0c2533ea25e"
-dependencies = [
- "digest 0.10.7",
- "keccak",
-]
-
-[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13686,21 +13598,6 @@ dependencies = [
 
 [[package]]
 name = "zk_evm"
-version = "0.150.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5bf91304aa14827758afa3def8cf622f9a7f9fb65fe5d5099018dbacf0c5984"
-dependencies = [
- "anyhow",
- "lazy_static",
- "num",
- "serde",
- "serde_json",
- "static_assertions",
- "zk_evm_abstractions 0.150.0",
-]
-
-[[package]]
-name = "zk_evm"
 version = "1.3.1"
 source = "git+https://github.com/matter-labs/era-zk_evm.git?tag=v1.3.1-rc2#0a7c775932db4839ff6b7fb0db9bdb3583ab54c0"
 dependencies = [
@@ -13804,19 +13701,6 @@ dependencies = [
 
 [[package]]
 name = "zk_evm_abstractions"
-version = "0.150.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc313cea4ac9ef6b855264b1425cbe9de30dd8f009559dabcb6b2896122da5db"
-dependencies = [
- "anyhow",
- "num_enum 0.6.1",
- "serde",
- "static_assertions",
- "zkevm_opcode_defs 0.150.0",
-]
-
-[[package]]
-name = "zk_evm_abstractions"
 version = "1.4.1"
 source = "git+https://github.com/matter-labs/era-zk_evm_abstractions.git?branch=v1.4.1#0aac08c3b097ee8147e748475117ac46bddcdcef"
 dependencies = [
@@ -13841,33 +13725,13 @@ dependencies = [
 
 [[package]]
 name = "zkevm_circuits"
-version = "0.150.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4691ca0faeb666120ad48fb1a45750c5bacc90118a851f4450f3e1e903f9b2e3"
-dependencies = [
- "arrayvec 0.7.4",
- "boojum 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cs_derive 0.2.0",
- "derivative",
- "hex",
- "itertools 0.10.5",
- "rand 0.4.6",
- "rand 0.8.5",
- "seq-macro",
- "serde",
- "smallvec",
- "zkevm_opcode_defs 0.150.0",
-]
-
-[[package]]
-name = "zkevm_circuits"
 version = "1.4.0"
 source = "git+https://github.com/matter-labs/era-zkevm_circuits.git?branch=v1.4.0#fb3e2574b5c890342518fc930c145443f039a105"
 dependencies = [
  "arrayvec 0.7.4",
  "bincode",
- "boojum 0.2.0 (git+https://github.com/matter-labs/era-boojum.git?branch=main)",
- "cs_derive 0.1.0",
+ "boojum",
+ "cs_derive",
  "derivative",
  "hex",
  "itertools 0.10.5",
@@ -13887,8 +13751,8 @@ source = "git+https://github.com/matter-labs/era-zkevm_circuits.git?branch=v1.4.
 dependencies = [
  "arrayvec 0.7.4",
  "bincode",
- "boojum 0.2.0 (git+https://github.com/matter-labs/era-boojum.git?branch=main)",
- "cs_derive 0.1.0",
+ "boojum",
+ "cs_derive",
  "derivative",
  "hex",
  "itertools 0.10.5",
@@ -13902,20 +13766,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "zkevm_opcode_defs"
-version = "0.150.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3328c012d444bdbfadb754a72c01a56879eb66584efc71eac457e89e7843608"
+name = "zkevm_circuits"
+version = "1.5.0"
+source = "git+https://github.com/matter-labs/era-zkevm_circuits.git?branch=v1.5.0#b7a86c739e8a8f88e788e90893c6e7496f6d7dfc"
 dependencies = [
- "bitflags 2.6.0",
- "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "ethereum-types 0.14.1",
- "k256 0.13.3",
- "lazy_static",
- "p256",
+ "arrayvec 0.7.4",
+ "boojum",
+ "cs_derive",
+ "derivative",
+ "hex",
+ "itertools 0.10.5",
+ "rand 0.4.6",
+ "rand 0.8.5",
+ "seq-macro",
  "serde",
- "sha2 0.10.8",
- "sha3 0.10.8",
+ "smallvec",
+ "zkevm_opcode_defs 1.5.0",
 ]
 
 [[package]]
