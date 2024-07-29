@@ -99,8 +99,8 @@ impl CheatsConfig {
             script_wallets,
             available_artifacts,
             running_version,
-            dual_compiled_contracts: Default::default(),
-            use_zk: false,
+            dual_compiled_contracts,
+            use_zk,
             assertions_revert: config.assertions_revert,
         }
     }
