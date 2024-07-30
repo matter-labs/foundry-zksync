@@ -37,17 +37,10 @@ impl CachedForkType {
 
         let is_zk_url = foundry_common::provider::try_get_http_provider(fork_url)
             .map(|provider| {
-                let is_zk_url = std::thread::spawn(move || {
-                    tokio::runtime::Builder::new_multi_thread()
-                        .enable_all()
-                        .build()
-                        .unwrap()
-                        .block_on(provider.raw_request("zks_L1ChainId".into(), ()))
+                let is_zk_url =
+                    futures::executor::block_on(provider.raw_request("zks_L1ChainId".into(), ()))
                         .map(|_: String| true)
-                        .unwrap_or_default()
-                })
-                .join()
-                .expect("failed checking if url is zk");
+                        .unwrap_or_default();
 
                 is_zk_url
             })
