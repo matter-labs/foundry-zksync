@@ -73,15 +73,13 @@ async fn test_zk_cheat_mock_with_value_function() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheat_mock_calls() {
-    let mut runner = TEST_DATA_DEFAULT.runner_zksync();
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new(
         "testZkCheatcodesCanMockCallTestContract|testZkCheatcodesCanMockCall",
         "ZkCheatcodesTest",
         ".*",
     );
 
-    // let results = runner.test_collect(&filter);
-    // println!("{results:?}");
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
