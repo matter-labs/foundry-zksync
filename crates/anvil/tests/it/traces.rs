@@ -4,7 +4,7 @@ use crate::{
     utils::http_provider_with_signer,
 };
 use alloy_network::{EthereumWallet, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{hex, Address, Bytes, U256};
 use alloy_provider::{
     ext::{DebugApi, TraceApi},
     Provider,

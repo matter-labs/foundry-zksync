@@ -80,7 +80,7 @@ pub fn remove_zk_contract(
     path: &Path,
     name: &str,
 ) -> Result<ZkContractArtifact> {
-    let contract = if let Some(contract) = output.remove(path.to_string_lossy(), name) {
+    let contract = if let Some(contract) = output.remove(path, name) {
         contract
     } else {
         let mut err = format!("could not find artifact: `{name}`");

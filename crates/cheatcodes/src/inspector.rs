@@ -730,7 +730,7 @@ impl Cheatcodes {
         mut input: Input,
     ) -> Option<CreateOutcome>
     where
-        DB: DatabaseExt + Send,
+        DB: DatabaseExt,
         Input: CommonCreateInput<DB>,
     {
         let ecx_inner = &mut ecx.inner;
@@ -777,13 +777,14 @@ impl Cheatcodes {
                     input.set_caller(broadcast.new_origin);
                     let is_fixed_gas_limit = check_if_fixed_gas_limit(ecx_inner, input.gas_limit());
 
-                    let account = &ecx_inner.journaled_state.state()[&broadcast.new_origin];
                     let mut to = None;
-                    let mut nonce = account.info.nonce;
-                    let mut call_init_code = input.init_code().clone();
+                    let mut nonce: u64 =
+                        ecx_inner.journaled_state.state()[&broadcast.new_origin].info.nonce;
+                    //drop the mutable borrow of account
+                    let mut call_init_code = input.init_code();
                     let mut zk_tx = if self.use_zk_vm {
                         to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
-                        nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx) as u64;
+                        nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as u64;
                         let contract = self
                             .dual_compiled_contracts
                             .find_by_evm_bytecode(&input.init_code().0)
@@ -836,10 +837,10 @@ impl Cheatcodes {
                         rpc,
                         transaction: TransactionRequest {
                             from: Some(broadcast.new_origin),
-                            to: None,
+                            to,
                             value: Some(input.value()),
-                            input: TransactionInput::new(input.init_code()),
-                            nonce: Some(account.info.nonce),
+                            input: TransactionInput::new(call_init_code),
+                            nonce: Some(nonce),
                             gas: if is_fixed_gas_limit {
                                 Some(input.gas_limit() as u128)
                             } else {
@@ -1085,15 +1086,16 @@ impl Cheatcodes {
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
     ) -> Option<CallOutcome> {
+        let ecx_inner = &mut ecx.inner;
         let gas = Gas::new(call.gas_limit);
 
         // At the root call to test function or script `run()`/`setUp()` functions, we are
         // decreasing sender nonce to ensure that it matches on-chain nonce once we start
         // broadcasting.
-        if ecx.journaled_state.depth == 0 {
-            let sender = ecx.env.tx.caller;
+        if ecx_inner.journaled_state.depth == 0 {
+            let sender = ecx_inner.env.tx.caller;
             if sender != Config::DEFAULT_SENDER {
-                let account = match super::evm::journaled_account(ecx, sender) {
+                let account = match super::evm::journaled_account(ecx_inner, sender) {
                     Ok(account) => account,
                     Err(err) => {
                         return Some(CallOutcome {
@@ -1190,18 +1192,19 @@ impl Cheatcodes {
 
         // Apply our prank
         if let Some(prank) = &self.prank {
-            if ecx.journaled_state.depth() >= prank.depth && call.caller == prank.prank_caller {
+            if ecx_inner.journaled_state.depth() >= prank.depth && call.caller == prank.prank_caller
+            {
                 let mut prank_applied = false;
 
                 // At the target depth we set `msg.sender`
-                if ecx.journaled_state.depth() == prank.depth {
+                if ecx_inner.journaled_state.depth() == prank.depth {
                     call.caller = prank.new_caller;
                     prank_applied = true;
                 }
 
                 // At the target depth, or deeper, we set `tx.origin`
                 if let Some(new_origin) = prank.new_origin {
-                    ecx.env.tx.caller = new_origin;
+                    ecx_inner.env.tx.caller = new_origin;
                     prank_applied = true;
                 }
 
@@ -1220,13 +1223,13 @@ impl Cheatcodes {
             //
             // We do this because any subsequent contract calls *must* exist on chain and
             // we only want to grab *this* call, not internal ones
-            if ecx.journaled_state.depth() == broadcast.depth &&
+            if ecx_inner.journaled_state.depth() == broadcast.depth &&
                 call.caller == broadcast.original_caller
             {
                 // At the target depth we set `msg.sender` & tx.origin.
                 // We are simulating the caller as being an EOA, so *both* must be set to the
                 // broadcast.origin.
-                ecx.env.tx.caller = broadcast.new_origin;
+                ecx_inner.env.tx.caller = broadcast.new_origin;
 
                 call.caller = broadcast.new_origin;
                 // Add a `legacy` transaction to the VecDeque. We use a legacy transaction here
@@ -1234,7 +1237,7 @@ impl Cheatcodes {
                 // into 1559, in the cli package, relatively easily once we
                 // know the target chain supports EIP-1559.
                 if !call.is_static {
-                    if let Err(err) = ecx.load_account(broadcast.new_origin) {
+                    if let Err(err) = ecx_inner.load_account(broadcast.new_origin) {
                         return Some(CallOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
@@ -1245,19 +1248,19 @@ impl Cheatcodes {
                         })
                     }
 
-                    let is_fixed_gas_limit = check_if_fixed_gas_limit(&ecx.inner, call.gas_limit);
+                    let is_fixed_gas_limit = check_if_fixed_gas_limit(ecx_inner, call.gas_limit);
 
                     let account =
-                        ecx.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
+                        ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let nonce = if self.use_zk_vm {
-                        foundry_zksync_core::nonce(broadcast.new_origin, ecx) as u64
+                        foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as u64
                     } else {
                         account.info.nonce
                     };
 
                     let account =
-                        ecx.inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
+                        ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let zk_tx = if self.use_zk_vm {
                         // We shouldn't need factory_deps for CALLs
@@ -1267,7 +1270,7 @@ impl Cheatcodes {
                     };
 
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc: ecx.db.active_fork_url(),
+                        rpc: ecx_inner.db.active_fork_url(),
                         transaction: TransactionRequest {
                             from: Some(broadcast.new_origin),
                             to: Some(TxKind::from(Some(call.target_address))),

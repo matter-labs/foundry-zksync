@@ -20,7 +20,6 @@ foundry-zksync-compiler.workspace = true
 foundry-common-fmt.workspace = true
 foundry-compilers.workspace = true
 foundry-config.workspace = true
-foundry-macros.workspace = true
 foundry-linking.workspace = true
 
 alloy-contract.workspace = true
@@ -48,8 +47,6 @@ alloy-transport-ws.workspace = true
 alloy-transport.workspace = true
 
 tower.workspace = true
-derive_more.workspace = true
-itertools.workspace = true
 
 async-trait.workspace = true
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
@@ -74,6 +71,5 @@ yansi.workspace = true
 globset = "0.4"
 
 [dev-dependencies]
-foundry-macros.workspace = true
 similar-asserts.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

@@ -77,8 +77,8 @@ pub fn inspect_as_batch<DB, E>(
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database + Send,
-    <DB as Database>::Error: Send + Debug,
+    DB: Database,
+    <DB as Database>::Error: Debug,
 {
     let txns = split_tx_by_factory_deps(tx);
     let total_txns = txns.len();
@@ -143,8 +143,8 @@ pub fn inspect<DB, E>(
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database + Send,
-    <DB as Database>::Error: Send + Debug,
+    DB: Database,
+    <DB as Database>::Error: Debug,
 {
     let chain_id = if ecx.env.cfg.chain_id <= u32::MAX as u64 {
         L2ChainId::from(ecx.env.cfg.chain_id as u32)
@@ -331,7 +331,7 @@ where
     Ok(execution_result)
 }
 
-fn inspect_inner<S: ReadStorage + Send>(
+fn inspect_inner<S: ReadStorage>(
     l2_tx: L2Tx,
     storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,

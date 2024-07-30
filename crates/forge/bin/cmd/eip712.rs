@@ -228,7 +228,7 @@ fn parse_array_length(type_description: &TypeDescriptions) -> Result<Option<&str
     let type_string =
         type_description.type_string.as_ref().ok_or_eyre("missing typeString for array type")?;
     let Some(inside_brackets) =
-        type_string.rsplit_once("[").and_then(|(_, right)| right.split("]").next())
+        type_string.rsplit_once('[').and_then(|(_, right)| right.split(']').next())
     else {
         eyre::bail!("failed to parse array type string: {type_string}")
     };

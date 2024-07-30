@@ -4,7 +4,7 @@ use itertools::Itertools;
 use revm::{
     interpreter::{CallInputs, CallScheme, CallValue, CreateInputs},
     primitives::{Address, CreateScheme, Env, ResultAndState, TransactTo, B256, U256 as rU256},
-    Database, EvmContext,
+    Database, EvmContext, InnerEvmContext,
 };
 use tracing::{debug, error, info};
 use zksync_basic_types::H256;
@@ -33,8 +33,8 @@ pub fn transact<'a, DB>(
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
 where
-    DB: Database + Send,
-    <DB as Database>::Error: Send + Debug,
+    DB: Database,
+    <DB as Database>::Error: Debug,
 {
     info!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
 
@@ -108,7 +108,7 @@ where
 }
 
 /// Retrieves nonce for a given address.
-pub fn nonce<DB>(address: Address, ecx: &mut EvmContext<DB>) -> u32
+pub fn nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u32
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -125,8 +125,8 @@ pub fn create<DB, E>(
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database + Send,
-    <DB as Database>::Error: Send + Debug,
+    DB: Database,
+    <DB as Database>::Error: Debug,
 {
     info!(?call, "create tx {}", hex::encode(&call.init_code));
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
@@ -176,8 +176,8 @@ pub fn call<DB, E>(
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database + Send,
-    <DB as Database>::Error: Send + Debug,
+    DB: Database,
+    <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
     let caller = ecx.env.tx.caller;
@@ -230,7 +230,7 @@ where
 /// Assign gas parameters that satisfy zkSync's fee model.
 fn gas_params<DB>(ecx: &mut EvmContext<DB>, caller: Address) -> (U256, U256)
 where
-    DB: Database + Send,
+    DB: Database,
     <DB as Database>::Error: Debug,
 {
     let value = ecx.env.tx.value.to_u256();

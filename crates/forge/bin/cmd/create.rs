@@ -16,7 +16,7 @@ use foundry_cli::{
     utils::{self, read_constructor_args_file, remove_contract, remove_zk_contract, LoadConfig},
 };
 use foundry_common::{
-    compile::{self},
+    compile::{self, ProjectCompiler},
     fmt::parse_tokens,
 };
 use foundry_compilers::{
@@ -180,9 +180,8 @@ impl CreateArgs {
                         let mut abs_path_buf = PathBuf::new();
                         abs_path_buf.push(project.root());
                         abs_path_buf.push(contract_path);
-                        let abs_path_str = abs_path_buf.to_string_lossy();
                         let fdep_art =
-                            zk_output.find(abs_path_str, contract_name).unwrap_or_else(|| {
+                            zk_output.find(&abs_path_buf, contract_name).unwrap_or_else(|| {
                                 panic!(
                                     "Could not find contract {contract_name} at path {contract_path} for compilation output",
                                 )
@@ -970,19 +969,6 @@ where
             _t: PhantomData,
         })
     }
-}
-
-#[derive(thiserror::Error, Debug)]
-/// An Error which is thrown when interacting with a smart contract
-pub enum ContractDeploymentError {
-    #[error("constructor is not defined in the ABI")]
-    ConstructorError,
-    #[error(transparent)]
-    DetokenizationError(#[from] alloy_dyn_abi::Error),
-    #[error("contract was not deployed")]
-    ContractNotDeployed,
-    #[error(transparent)]
-    RpcError(#[from] TransportError),
 }
 
 #[derive(thiserror::Error, Debug)]

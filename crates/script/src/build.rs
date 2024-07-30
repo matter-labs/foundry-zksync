@@ -208,7 +208,7 @@ impl PreprocessedState {
             )?;
             let sources_to_compile =
                 source_files_iter(project.paths.sources.as_path(), SolcLanguage::FILE_EXTENSIONS)
-                    .chain([target_path.to_path_buf()]);
+                    .chain([target_path.clone()]);
 
             let zk_compiler =
                 ProjectCompiler::new().quiet_if(args.opts.silent).files(sources_to_compile);

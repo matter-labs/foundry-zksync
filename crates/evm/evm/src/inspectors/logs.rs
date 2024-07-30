@@ -2,8 +2,7 @@ use alloy_primitives::{Bytes, Log};
 use alloy_sol_types::{SolEvent, SolInterface, SolValue};
 use foundry_common::{fmt::ConsoleFmt, ErrorExt};
 use foundry_evm_core::{
-    abi::{patch_hh_console_selector, Console, HardhatConsole},
-    constants::HARDHAT_CONSOLE_ADDRESS,
+    abi::{patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS},
     InspectorExt,
 };
 use revm::{

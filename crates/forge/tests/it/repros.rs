@@ -11,10 +11,8 @@ use alloy_json_abi::Event;
 use alloy_primitives::{address, b256, Address, U256};
 use forge::{decode::decode_console_logs, result::TestStatus};
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
-use foundry_evm::{
-    constants::HARDHAT_CONSOLE_ADDRESS,
-    traces::{CallKind, CallTraceDecoder, DecodedCallData, TraceKind},
-};
+use foundry_evm::traces::{CallKind, CallTraceDecoder, DecodedCallData, TraceKind};
+use foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS;
 use foundry_test_utils::Filter;
 
 /// Creates a test that runs `testdata/repros/Issue{issue}.t.sol`.

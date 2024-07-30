@@ -322,6 +322,9 @@ impl ForgeTestData {
             opts.isolate = true;
         }
 
+        let env = opts.local_evm_env();
+        let output = self.output.clone();
+
         let sender = config.sender;
 
         let mut builder = self.base_runner();
@@ -330,7 +333,7 @@ impl ForgeTestData {
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(self.test_opts.clone())
-            .build(root, &self.output, None, opts.local_evm_env(), opts, Default::default())
+            .build(root, output, None, env, opts, Default::default())
             .unwrap()
     }
 
@@ -363,7 +366,7 @@ impl ForgeTestData {
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(self.test_opts.clone())
-            .build(root, output, Some(zk_output), env, opts.clone(), dual_compiled_contracts)
+            .build(root, output, Some(zk_output), env, opts, dual_compiled_contracts)
             .unwrap()
     }
 
@@ -374,7 +377,7 @@ impl ForgeTestData {
         self.base_runner()
             .build(
                 self.project.root(),
-                &self.output,
+                self.output.clone(),
                 None,
                 opts.local_evm_env(),
                 opts,
@@ -395,7 +398,7 @@ impl ForgeTestData {
 
         self.base_runner()
             .with_fork(fork)
-            .build(self.project.root(), &self.output, None, env, opts, Default::default())
+            .build(self.project.root(), self.output.clone(), None, env, opts, Default::default())
             .unwrap()
     }
 }

@@ -9,7 +9,6 @@ use eyre::Result;
 use foundry_cli::{opts::EthereumOpts, utils};
 use foundry_common::ens::NameOrAddress;
 use foundry_config::Config;
-use hex::FromHex;
 use itertools::Itertools;
 use std::{io, str::FromStr};
 

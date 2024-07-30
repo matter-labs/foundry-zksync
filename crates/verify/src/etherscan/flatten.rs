@@ -178,10 +178,10 @@ Diagnostics: {diags}",
         let zksolc = ZkSolc::find_installed_version(&version)?
             .unwrap_or(ZkSolc::blocking_install(&version)?);
 
-        let mut input = ZkSolcVersionedInput {
+        let input = ZkSolcVersionedInput {
             input: ZkSolcInput {
                 language: SolcLanguage::Solidity,
-                sources: BTreeMap::from([("contract.sol".into(), Source::new(content))]),
+                sources: Sources::from([("contract.sol".into(), Source::new(content))]),
                 ..Default::default()
             },
             solc_version: version.clone(),
@@ -190,10 +190,10 @@ Diagnostics: {diags}",
             include_paths: Default::default(),
         };
 
-        let out = zksolc.compile(&mut input)?;
+        let out = zksolc.compile(&input)?;
         if out.has_error() {
             let mut o = ZkAggregatedCompilerOutput::default();
-            o.extend(version.clone(), raw_build_info_new(&input, &out, false)?, out);
+            o.extend(version, raw_build_info_new(&input, &out, false)?, out);
             let diags = o.diagnostics(&[], &[], Default::default());
 
             eyre::bail!(

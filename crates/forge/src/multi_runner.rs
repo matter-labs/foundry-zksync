@@ -9,9 +9,10 @@ use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    artifacts::Libraries, compilers::Compiler,
-    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact, ArtifactId,
-    ProjectCompileOutput,
+    artifacts::{CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Libraries},
+    compilers::Compiler,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
+    Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm::{
@@ -178,7 +179,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let db = Backend::spawn(self.fork.take());
+        let mut db = Backend::spawn(self.fork.take());
         db.is_zk = self.use_zk;
 
         let find_timer = Instant::now();
@@ -406,22 +407,6 @@ impl MultiContractRunnerBuilder {
         let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);
         let linker = Linker::new(root, output.artifact_ids().collect());
-
-        // Build revert decoder from ABIs of all artifacts.
-        let abis = linker
-            .contracts
-            .iter()
-            .filter_map(|(_, contract)| contract.abi.as_ref().map(|abi| abi.borrow()));
-        let revert_decoder = RevertDecoder::new().with_abis(abis);
-
-        let LinkOutput { libraries, libs_to_deploy } = linker.link_with_nonce_or_address(
-            Default::default(),
-            LIBRARY_DEPLOYER,
-            0,
-            linker.contracts.keys(),
-        )?;
-
-        let linked_contracts = linker.get_linked_artifacts(&libraries)?;
 
         // Build revert decoder from ABIs of all artifacts.
         let abis = linker

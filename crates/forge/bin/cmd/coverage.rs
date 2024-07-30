@@ -249,7 +249,7 @@ impl CoverageArgs {
                 ..Default::default()
             })
             .set_coverage(true)
-            .build(&root, output, None, env, evm_opts, DualCompiledContracts::default())?;
+            .build(&root, output.clone(), None, env, evm_opts, DualCompiledContracts::default())?;
 
         let known_contracts = runner.known_contracts.clone();
 

@@ -10,12 +10,6 @@ use alloy_signer_aws::AwsSignerError;
 #[cfg(feature = "gcp-kms")]
 use alloy_signer_gcp::GcpSignerError;
 
-#[cfg(feature = "aws-kms")]
-use alloy_signer_aws::AwsSignerError;
-
-#[cfg(feature = "gcp-kms")]
-use alloy_signer_gcp::GcpSignerError;
-
 #[derive(Debug, thiserror::Error)]
 pub enum PrivateKeyError {
     #[error("Failed to create wallet from private key. Private key is invalid hex: {0}")]

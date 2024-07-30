@@ -8,9 +8,8 @@ use eyre::{eyre, ContextCompat, Result};
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use foundry_config::InvariantConfig;
 use foundry_evm_core::{
-    constants::{
-        CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME,
-    },
+    abi::HARDHAT_CONSOLE_ADDRESS,
+    constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, MAGIC_ASSUME},
     precompiles::PRECOMPILES,
 };
 use foundry_evm_fuzz::{
@@ -420,14 +419,6 @@ impl<'a> InvariantExecutor<'a> {
 
             // End current invariant test run.
             invariant_test.end_run(current_run, self.config.gas_report_samples as usize);
-
-            // If running with progress then increment completed runs.
-            if let Some(progress) = progress {
-                progress.inc(1);
-            }
-
-            // Revert state to not persist values between runs.
-            fuzz_state.revert();
 
             // If running with progress then increment completed runs.
             if let Some(progress) = progress {

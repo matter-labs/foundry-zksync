@@ -631,7 +631,6 @@ impl<'a, DB: DatabaseExt> Inspector<DB> for InspectorStackRefMut<'a> {
 
     fn step(&mut self, interpreter: &mut Interpreter, ecx: &mut EvmContext<DB>) {
         call_inspectors_adjust_depth!(
-            #[no_ret]
             [
                 &mut self.fuzzer,
                 &mut self.tracer,

@@ -587,9 +587,12 @@ impl ScriptConfig {
 
         // We need to enable tracing to decode contract names: local or external.
         let mut builder = ExecutorBuilder::new()
-            .inspectors(|stack| stack.trace(true))
+            .inspectors(|stack| {
+                stack.trace_mode(if debug { TraceMode::Debug } else { TraceMode::Call })
+            })
             .spec(self.config.evm_spec_id())
-            .gas_limit(self.evm_opts.gas_limit());
+            .gas_limit(self.evm_opts.gas_limit())
+            .legacy_assertions(self.config.legacy_assertions);
 
         let use_zk = self.config.zksync.run_in_zk_mode();
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
@@ -598,7 +601,6 @@ impl ScriptConfig {
             builder = builder
                 .inspectors(|stack| {
                     stack
-                        .debug(debug)
                         .cheatcodes(
                             CheatsConfig::new(
                                 &self.config,

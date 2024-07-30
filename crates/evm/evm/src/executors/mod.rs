@@ -74,11 +74,11 @@ pub struct Executor {
     // only interested in the database. REVM's `EVM` is a thin
     // wrapper around spawning a new EVM on every call anyway,
     // so the performance difference should be negligible.
-    backend: Backend,
+    pub backend: Backend,
     /// The EVM environment.
-    env: EnvWithHandlerCfg,
+    pub env: EnvWithHandlerCfg,
     /// The Revm inspector stack.
-    inspector: InspectorStack,
+    pub inspector: InspectorStack,
     /// The gas limit for calls and deployments. This is different from the gas limit imposed by
     /// the passed in environment, as those limits are used by the EVM for certain opcodes like
     /// `gaslimit`.
@@ -244,11 +244,6 @@ impl Executor {
     /// Returns `true` if the account has no code.
     pub fn is_empty_code(&self, address: Address) -> BackendResult<bool> {
         Ok(self.backend().basic_ref(address)?.map(|acc| acc.is_empty_code_hash()).unwrap_or(true))
-    }
-
-    /// Returns `true` if the account has no code.
-    pub fn is_empty_code(&self, address: Address) -> DatabaseResult<bool> {
-        Ok(self.backend.basic_ref(address)?.map(|acc| acc.is_empty_code_hash()).unwrap_or(true))
     }
 
     #[inline]
@@ -449,8 +444,8 @@ impl Executor {
     /// Execute the transaction configured in `env.tx`.
     #[instrument(name = "transact", level = "debug", skip_all)]
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
-        let mut inspector = self.inspector().clone();
-        let backend = self.backend_mut();
+        let mut inspector = self.inspector.clone();
+        let backend = &mut self.backend;
         let result_and_state = match self.zk_tx.take() {
             None => backend.inspect(&mut env, &mut inspector)?,
             Some(zk_tx) => {
@@ -473,7 +468,7 @@ impl Executor {
             result_and_state.clone(),
             backend.has_snapshot_failure(),
         )?;
-        let state = result_and_state.state.clone();
+        let state = result_and_state.state;
         if let Some(traces) = &mut result.traces {
             for trace_node in traces.nodes() {
                 if let Some(account_info) = state.get(&trace_node.trace.address) {
@@ -484,6 +479,7 @@ impl Executor {
                 }
             }
         }
+
         self.commit(&mut result);
         Ok(result)
     }
@@ -645,7 +641,6 @@ impl Executor {
                 }
             }
         }
-        success
     }
 
     pub fn setup_zk_tx(&mut self, zk_tx: ZkTransactionMetadata) {
@@ -916,7 +911,7 @@ fn convert_executed_result(
     ResultAndState { result, state: state_changeset }: ResultAndState,
     has_snapshot_failure: bool,
 ) -> eyre::Result<RawCallResult> {
-    let (exit_reason, gas_refunded, gas_used, out, exec_logs) = match result {
+    let (exit_reason, gas_refunded, gas_used, out, _exec_logs) = match result {
         ExecutionResult::Success { reason, gas_used, gas_refunded, output, logs, .. } => {
             (reason.into(), gas_refunded, gas_used, Some(output), logs)
         }
@@ -943,7 +938,7 @@ fn convert_executed_result(
 
     let combined_logs =
         inspector.cheatcodes.as_ref().map(|cheatcodes| cheatcodes.combined_logs.clone());
-    let InspectorData { mut logs, labels, traces, coverage, debug, cheatcodes, chisel_state } =
+    let InspectorData { mut logs, labels, traces, coverage, cheatcodes, chisel_state } =
         inspector.collect();
 
     let logs = match combined_logs {

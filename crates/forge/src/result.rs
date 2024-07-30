@@ -4,7 +4,7 @@ use crate::{
     fuzz::{BaseCounterExample, FuzzedCases},
     gas_report::GasReport,
 };
-use alloy_primitives::{Address, Log};
+use alloy_primitives::{Address, Bytes, Log};
 use eyre::Report;
 use foundry_common::{evm::Breakpoints, get_contract_name, get_file_name, shell};
 use foundry_evm::{
@@ -717,7 +717,16 @@ impl TestSetup {
         coverage: Option<HitMaps>,
         fuzz_fixtures: FuzzFixtures,
     ) -> Self {
-        Self { address, logs, traces, labeled_addresses, reason: None, coverage, fuzz_fixtures }
+        Self {
+            deployments,
+            address,
+            logs,
+            traces,
+            labeled_addresses,
+            reason: None,
+            coverage,
+            fuzz_fixtures,
+        }
     }
 
     pub fn failed_with(

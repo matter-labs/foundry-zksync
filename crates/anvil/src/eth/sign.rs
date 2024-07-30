@@ -131,10 +131,6 @@ pub fn build_typed_transaction(
         TypedTransactionRequest::EIP4844(tx) => {
             TypedTransaction::EIP4844(tx.into_signed(signature))
         }
-        TypedTransactionRequest::EIP4844(tx) => {
-            let sighash = tx.signature_hash();
-            TypedTransaction::EIP4844(Signed::new_unchecked(tx, signature, sighash))
-        }
         TypedTransactionRequest::Deposit(tx) => {
             let DepositTransactionRequest {
                 from,

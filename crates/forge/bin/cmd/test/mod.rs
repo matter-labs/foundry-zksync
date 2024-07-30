@@ -23,7 +23,6 @@ use foundry_common::{compile::ProjectCompiler, evm::EvmArgs, fs, shell};
 use foundry_compilers::{
     artifacts::output_selection::OutputSelection,
     compilers::{multi::MultiCompilerLanguage, CompilerSettings, Language},
-    solc::SolcLanguage,
     utils::source_files_iter,
     ProjectCompileOutput,
 };
@@ -160,10 +159,6 @@ pub struct TestArgs {
     /// Print detailed test summary table.
     #[arg(long, help_heading = "Display options", requires = "summary")]
     pub detailed: bool,
-
-    /// Show test execution progress.
-    #[arg(long)]
-    pub show_progress: bool,
 }
 
 impl TestArgs {
@@ -301,8 +296,7 @@ impl TestArgs {
         let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
             let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
 
-            let sources_to_compile =
-                self.get_sources_to_compile::<SolcLanguage>(&config, &filter)?;
+            let sources_to_compile = self.get_sources_to_compile(&config, &filter)?;
             let zk_compiler = ProjectCompiler::new()
                 .quiet_if(self.json || self.opts.silent)
                 .files(sources_to_compile);
@@ -368,7 +362,7 @@ impl TestArgs {
             .enable_isolation(evm_opts.isolate)
             .build(
                 project_root,
-                output,
+                output.clone(),
                 zk_output,
                 env,
                 evm_opts,
@@ -766,7 +760,7 @@ fn persist_run_failures(config: &Config, outcome: &TestOutcome) {
         let mut filter = String::new();
         let mut failures = outcome.failures().peekable();
         while let Some((test_name, _)) = failures.next() {
-            if let Some(test_match) = test_name.split("(").next() {
+            if let Some(test_match) = test_name.split('(').next() {
                 filter.push_str(test_match);
                 if failures.peek().is_some() {
                     filter.push('|');

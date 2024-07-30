@@ -17,7 +17,6 @@ workspace = true
 foundry-cheatcodes-spec.workspace = true
 foundry-common.workspace = true
 foundry-config.workspace = true
-foundry-macros.workspace = true
 foundry-zksync-core.workspace = true
 foundry-evm-abi.workspace = true
 

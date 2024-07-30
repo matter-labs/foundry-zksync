@@ -93,7 +93,7 @@ impl ExecutorBuilder {
         }
         let gas_limit = gas_limit.unwrap_or_else(|| env.block.gas_limit.saturating_to());
         let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(env), spec_id);
-        Executor::new(db, env, stack.build(), gas_limit, legacy_assertions);
+        let mut exec = Executor::new(db, env, stack.build(), gas_limit, legacy_assertions);
         exec.use_zk = use_zk;
         exec
     }

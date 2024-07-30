@@ -16,7 +16,7 @@ use foundry_common::{
     retry::{Retry, RetryError},
     shell,
 };
-use foundry_compilers::{artifacts::BytecodeObject, Artifact};
+use foundry_compilers::{artifacts::BytecodeObject, solc::Solc, Artifact};
 use foundry_config::{Chain, Config};
 use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
 use futures::FutureExt;
@@ -180,7 +180,7 @@ impl VerificationProvider for EtherscanVerificationProvider {
                     }
 
                     if resp.result == "In progress" {
-                        return Err(eyre!("Verification is in progress...",))
+                        return Err(RetryError::Retry(eyre!("Verification is in progress...",)))
                     }
 
                     if resp.result == "Unable to verify" {

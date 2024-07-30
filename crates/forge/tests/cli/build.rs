@@ -1,8 +1,6 @@
-use foundry_common::fs::read_json_file;
 use foundry_config::Config;
 use foundry_test_utils::forgetest;
 use globset::Glob;
-use std::{collections::BTreeMap, path::PathBuf};
 
 // tests that json is printed when --json is passed
 forgetest!(compile_json, |prj, cmd| {

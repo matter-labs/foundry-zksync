@@ -6,7 +6,7 @@ use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
     compilers::{multi::MultiCompilerLanguage, Language},
     utils::source_files_iter,
-    Project, ProjectCompileOutput,
+    Project,
 };
 use foundry_config::{
     figment::{
@@ -93,7 +93,10 @@ impl BuildArgs {
             let mut files = vec![];
             if let Some(paths) = self.paths {
                 for path in paths {
-                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
+                    files.extend(source_files_iter(
+                        path.as_path(),
+                        MultiCompilerLanguage::FILE_EXTENSIONS,
+                    ));
                 }
             }
 

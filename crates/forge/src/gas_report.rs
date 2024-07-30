@@ -1,12 +1,13 @@
 //! Gas reports.
 
 use crate::{
-    constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS},
+    constants::CHEATCODE_ADDRESS,
     traces::{CallTraceArena, CallTraceDecoder, CallTraceNode, DecodedCallData},
 };
 use comfy_table::{presets::ASCII_MARKDOWN, *};
 use foundry_common::{calc, TestFunctionExt};
 use foundry_evm::traces::CallKind;
+use foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
