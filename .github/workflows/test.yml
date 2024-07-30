@@ -140,7 +140,7 @@ jobs:
             log: info
             logFilePath: era_test_node.log
             target: x86_64-unknown-linux-gnu
-            releaseTag: latest
+            releaseTag: v0.1.0-alpha.25
   
         - name: Run zk tests
           env:
