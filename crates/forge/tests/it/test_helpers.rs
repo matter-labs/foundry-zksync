@@ -206,6 +206,7 @@ impl ForgeTestProfile {
         zk_config.zksync.fallback_oz = true;
         zk_config.zksync.optimizer_mode = '3';
         zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 1)));
+        zk_config.fuzz.no_zksync_reserved_addresses = true;
 
         zk_config
     }
@@ -352,7 +353,8 @@ impl ForgeTestData {
         let output = self.zk_test_data.output.clone();
         let zk_output = self.zk_test_data.zk_output.clone();
         let dual_compiled_contracts = self.zk_test_data.dual_compiled_contracts.clone();
-
+        let mut test_opts = self.test_opts.clone();
+        test_opts.fuzz.no_zksync_reserved_addresses = zk_config.fuzz.no_zksync_reserved_addresses;
         let sender = zk_config.sender;
 
         let mut builder = self.base_runner();
@@ -360,7 +362,7 @@ impl ForgeTestData {
         builder
             .enable_isolation(opts.isolate)
             .sender(sender)
-            .with_test_options(self.test_opts.clone())
+            .with_test_options(test_opts)
             .build(root, output, Some(zk_output), env, opts.clone(), dual_compiled_contracts)
             .unwrap()
     }
