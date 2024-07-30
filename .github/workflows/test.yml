@@ -135,7 +135,7 @@ jobs:
         - name: Run zk tests
           env:
             RUST_BACKTRACE: full
-          run: cargo test zk
+          run: RUST_LOG=trace cargo test zk
 
     zk-smoke-test:
         name: zk-smoke-test
