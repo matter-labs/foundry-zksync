@@ -151,7 +151,7 @@ impl FarCallHandler {
 
     /// Attempts to return the preset data ignoring any following opcodes, if set.
     /// Must be called during `finish_cycle`.
-    pub(crate) fn maybe_return_early<S: WriteStorage + Send, H: HistoryMode>(
+    pub(crate) fn maybe_return_early<S: WriteStorage, H: HistoryMode>(
         &mut self,
         state: &mut ZkSyncVmState<S, H>,
         _bootloader_state: &mut BootloaderState,
@@ -211,7 +211,7 @@ impl FarCallHandler {
 
     /// Returns immediate [CallAction]s for the currently active FarCall.
     /// Must be called during `finish_cycle`.
-    pub(crate) fn take_immediate_actions<S: WriteStorage + Send, H: HistoryMode>(
+    pub(crate) fn take_immediate_actions<S: WriteStorage, H: HistoryMode>(
         &mut self,
         state: &mut ZkSyncVmState<S, H>,
         _bootloader_state: &mut BootloaderState,
@@ -220,7 +220,7 @@ impl FarCallHandler {
     }
 }
 
-fn populate_page_with_data<S: WriteStorage + Send, H: HistoryMode>(
+fn populate_page_with_data<S: WriteStorage, H: HistoryMode>(
     state: &mut ZkSyncVmState<S, H>,
     page: MemoryPage,
     data: Vec<u8>,
