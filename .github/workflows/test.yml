@@ -133,7 +133,7 @@ jobs:
             toolchain: nightly-2024-04-28
 
         - name: Run era-test-node
-          uses: dutterbutter/era-test-node-action@latest
+          uses: dutterbutter/era-test-node-action@v1
           with:
             mode: fork
             network: mainnet
