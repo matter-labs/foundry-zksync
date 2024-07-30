@@ -146,7 +146,7 @@ jobs:
           env:
             RUST_BACKTRACE: full
             TEST_MAINNET_URL: http://localhost:8011
-          run: RUST_LOG=trace cargo test zk
+          run: cargo test zk
 
     zk-smoke-test:
         name: zk-smoke-test
