@@ -733,30 +733,33 @@ impl Cheatcodes {
         DB: DatabaseExt + Send,
         Input: CommonCreateInput<DB>,
     {
+        let ecx_inner = &mut ecx.inner;
         let gas = Gas::new(input.gas_limit());
 
         // Apply our prank
         if let Some(prank) = &self.prank {
-            if ecx.journaled_state.depth() >= prank.depth && input.caller() == prank.prank_caller {
+            if ecx_inner.journaled_state.depth() >= prank.depth &&
+                input.caller() == prank.prank_caller
+            {
                 // At the target depth we set `msg.sender`
-                if ecx.journaled_state.depth() == prank.depth {
+                if ecx_inner.journaled_state.depth() == prank.depth {
                     input.set_caller(prank.new_caller);
                 }
 
                 // At the target depth, or deeper, we set `tx.origin`
                 if let Some(new_origin) = prank.new_origin {
-                    ecx.env.tx.caller = new_origin;
+                    ecx_inner.env.tx.caller = new_origin;
                 }
             }
         }
 
         // Apply our broadcast
         if let Some(broadcast) = &self.broadcast {
-            if ecx.journaled_state.depth() >= broadcast.depth &&
+            if ecx_inner.journaled_state.depth() >= broadcast.depth &&
                 input.caller() == broadcast.original_caller
             {
                 if let Err(err) =
-                    ecx.journaled_state.load_account(broadcast.new_origin, &mut ecx.db)
+                    ecx_inner.journaled_state.load_account(broadcast.new_origin, &mut ecx_inner.db)
                 {
                     return Some(CreateOutcome {
                         result: InterpreterResult {
@@ -768,13 +771,13 @@ impl Cheatcodes {
                     });
                 }
 
-                ecx.env.tx.caller = broadcast.new_origin;
+                ecx_inner.env.tx.caller = broadcast.new_origin;
 
-                if ecx.journaled_state.depth() == broadcast.depth {
+                if ecx_inner.journaled_state.depth() == broadcast.depth {
                     input.set_caller(broadcast.new_origin);
-                    let is_fixed_gas_limit = check_if_fixed_gas_limit(ecx, input.gas_limit());
+                    let is_fixed_gas_limit = check_if_fixed_gas_limit(ecx_inner, input.gas_limit());
 
-                    let account = &ecx.journaled_state.state()[&broadcast.new_origin];
+                    let account = &ecx_inner.journaled_state.state()[&broadcast.new_origin];
                     let mut to = None;
                     let mut nonce = account.info.nonce;
                     let mut call_init_code = input.init_code().clone();
@@ -804,7 +807,7 @@ impl Cheatcodes {
                     } else {
                         None
                     };
-                    let rpc = ecx.db.active_fork_url();
+                    let rpc = ecx_inner.db.active_fork_url();
                     if let Some(factory_deps) = zk_tx {
                         let mut batched =
                             foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
