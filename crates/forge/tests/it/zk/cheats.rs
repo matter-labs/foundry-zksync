@@ -5,7 +5,7 @@ use forge::revm::primitives::SpecId;
 use foundry_config::fs_permissions::PathPermission;
 use foundry_test_utils::Filter;
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_roll_works() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkCheatcodesRoll", "ZkCheatcodesTest", ".*");
@@ -13,7 +13,7 @@ async fn test_zk_cheat_roll_works() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_warp_works() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkCheatcodesWarp", "ZkCheatcodesTest", ".*");
@@ -21,7 +21,7 @@ async fn test_zk_cheat_warp_works() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_deal_works() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkCheatcodesDeal", "ZkCheatcodesTest", ".*");
@@ -29,7 +29,7 @@ async fn test_zk_cheat_deal_works() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_set_nonce_works() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkCheatcodesSetNonce", "ZkCheatcodesTest", ".*");
@@ -37,7 +37,7 @@ async fn test_zk_cheat_set_nonce_works() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_etch_works() {
     let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
     zk_config.fs_permissions.add(PathPermission::read_write("./zk/zkout/ConstantNumber.sol"));
@@ -47,7 +47,7 @@ async fn test_zk_cheat_etch_works() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_record_works() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testRecord", "ZkCheatcodesTest", ".*");
@@ -55,7 +55,7 @@ async fn test_zk_cheat_record_works() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_expect_emit_works() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testExpectEmit|testExpectEmitOnCreate", "ZkCheatcodesTest", ".*");
@@ -63,7 +63,7 @@ async fn test_zk_cheat_expect_emit_works() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_mock_with_value_function() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkCheatcodesValueFunctionMockReturn", "ZkCheatcodesTest", ".*");
@@ -71,7 +71,7 @@ async fn test_zk_cheat_mock_with_value_function() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_mock_calls() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new(
@@ -83,7 +83,7 @@ async fn test_zk_cheat_mock_calls() {
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_zk_cheat_works_after_fork() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkCheatcodesCanBeUsedAfterFork", "ZkCheatcodesTest", ".*");
