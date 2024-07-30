@@ -6,7 +6,7 @@ use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use forge::revm::primitives::SpecId;
 use foundry_test_utils::Filter;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_zk_logs_work() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new(".*", "ZkConsoleTest", ".*");
