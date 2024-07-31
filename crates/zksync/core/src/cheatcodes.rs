@@ -161,7 +161,9 @@ where
     <DB as Database>::Error: Debug,
 {
     if address == caller {
-        tracing::error!("using `mockCall` cheatcode on caller isn't supported in zkVM");
+        tracing::error!(
+            "using `mockCall` cheatcode on caller ({address:?}) isn't supported in zkVM"
+        );
     }
 
     let account_code_addr = zksync_types::ACCOUNT_CODE_STORAGE_ADDRESS.to_address();

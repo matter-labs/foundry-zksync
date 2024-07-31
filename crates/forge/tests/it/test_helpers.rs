@@ -209,6 +209,7 @@ impl ForgeTestProfile {
         zk_config.zksync.fallback_oz = true;
         zk_config.zksync.optimizer_mode = '3';
         zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 1)));
+        zk_config.fuzz.no_zksync_reserved_addresses = true;
 
         zk_config
     }
@@ -340,7 +341,7 @@ impl ForgeTestData {
     /// Builds a non-tracing runner with zksync
     /// TODO: This needs to be added as currently it is a copy of the original function
     pub fn runner_with_zksync_config(&self, mut zk_config: Config) -> MultiContractRunner {
-        zk_config.rpc_endpoints = rpc_endpoints();
+        zk_config.rpc_endpoints = rpc_endpoints_zk();
         zk_config.allow_paths.push(manifest_root().to_path_buf());
 
         // no prompt testing
@@ -357,7 +358,8 @@ impl ForgeTestData {
         let output = self.zk_test_data.output.clone();
         let zk_output = self.zk_test_data.zk_output.clone();
         let dual_compiled_contracts = self.zk_test_data.dual_compiled_contracts.clone();
-
+        let mut test_opts = self.test_opts.clone();
+        test_opts.fuzz.no_zksync_reserved_addresses = zk_config.fuzz.no_zksync_reserved_addresses;
         let sender = zk_config.sender;
 
         let mut builder = self.base_runner();
@@ -558,6 +560,29 @@ pub fn rpc_endpoints() -> RpcEndpoints {
             "rpcAliasSepolia",
             RpcEndpoint::Url(
                 "https://eth-sepolia.g.alchemy.com/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf".to_string(),
+            ),
+        ),
+        ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".to_string())),
+    ])
+}
+
+/// the RPC endpoints used during tests
+pub fn rpc_endpoints_zk() -> RpcEndpoints {
+    // use mainnet url from env to avoid rate limiting in CI
+    let mainnet_url =
+        std::env::var("TEST_MAINNET_URL").unwrap_or("https://mainnet.era.zksync.io".to_string()); // trufflehog:ignore
+    RpcEndpoints::new([
+        ("mainnet", RpcEndpoint::Url(mainnet_url)),
+        (
+            "rpcAlias",
+            RpcEndpoint::Url(
+                "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf".to_string(), /* trufflehog:ignore */
+            ),
+        ),
+        (
+            "rpcAliasSepolia",
+            RpcEndpoint::Url(
+                "https://eth-sepolia.g.alchemy.com/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf".to_string(), /* trufflehog:ignore */
             ),
         ),
         ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".to_string())),

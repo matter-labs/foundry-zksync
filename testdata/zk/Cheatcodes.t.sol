@@ -4,10 +4,71 @@ pragma solidity ^0.8.18;
 import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 import {Globals} from "./Globals.sol";
+import "../default/logs/console.sol";
+
+contract FixedSlot {
+    uint8 num; // slot index: 0
+
+    function setSlot0(uint8 _num) public {
+        num = _num;
+    }
+}
+
+contract InnerMock {
+    function getBytes() public payable returns (bytes memory) {
+        bytes memory r = bytes(hex"abcd");
+        return r;
+    }
+}
+
+contract Mock {
+    InnerMock private inner;
+
+    constructor(InnerMock _inner) payable {
+        inner = _inner;
+    }
+
+    function getBytes() public returns (bytes memory) {
+        return inner.getBytes{value: 10}();
+    }
+}
+
+interface IMyProxyCaller {
+    function transact(uint8 _data) external;
+}
+
+contract MyProxyCaller {
+    address inner;
+
+    constructor(address _inner) {
+        inner = _inner;
+    }
+
+    function transact() public {
+        IMyProxyCaller(inner).transact(10);
+    }
+}
+
+contract Emitter {
+    event EventConstructor(string message);
+    event EventFunction(string message);
+
+    constructor() {
+        emit EventConstructor("constructor");
+    }
+
+    function functionEmit() public {
+        emit EventFunction("function");
+    }
+}
 
 contract ZkCheatcodesTest is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
 
+    event EventConstructor(string message);
+    event EventFunction(string message);
+
+    uint256 testSlot = 0; //0x000000000000000000000000000000000000000000000000000000000000001e slot
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
 
@@ -41,7 +102,7 @@ contract ZkCheatcodesTest is DSTest {
     }
 
     function testZkCheatcodesDeal() public {
-        vm.zkVm(true);
+        vm.selectFork(forkEra);
         require(TEST_ADDRESS.balance == 0, "era balance mismatch");
 
         vm.deal(TEST_ADDRESS, 100);
@@ -49,7 +110,7 @@ contract ZkCheatcodesTest is DSTest {
     }
 
     function testZkCheatcodesSetNonce() public {
-        vm.zkVm(true);
+        vm.selectFork(forkEra);
         require(vm.getNonce(TEST_ADDRESS) == 0, "era nonce mismatch");
 
         vm.setNonce(TEST_ADDRESS, 10);
@@ -60,21 +121,85 @@ contract ZkCheatcodesTest is DSTest {
     }
 
     function testZkCheatcodesEtch() public {
-        vm.zkVm(true);
+        vm.selectFork(forkEra);
 
-        bytes32 emptyHash = hex"0000000000000000000000000000000000000000000000000000000000000000";
-        bytes memory emptyBytes = hex"00";
-        bytes32 zkBytecodeHash = hex"0100000f6d092b2cd44547a312320ad99c9587b40e0d03b0c17f09afd286d660";
-        bytes memory zkDeployedBytecode =
-            hex"0000008003000039000000400030043f0000000102200190000000120000c13d000000000201001900000009022001980000001a0000613d000000000101043b0000000a011001970000000b0110009c0000001a0000c13d0000000001000416000000000101004b0000001a0000c13d0000000a01000039000000800010043f0000000c010000410000001d0001042e0000000001000416000000000101004b0000001a0000c13d00000020010000390000010000100443000001200000044300000008010000410000001d0001042e00000000010000190000001e000104300000001c000004320000001d0001042e0000001e000104300000000000000000000000020000000000000000000000000000004000000100000000000000000000000000000000000000000000000000fffffffc000000000000000000000000ffffffff00000000000000000000000000000000000000000000000000000000643ceff9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000800000000000000000000000000000000000000000000000000000000000000000000000000000000075b6ac057b6098db0e2fae836aa00e54c6eec4973fc9e5e2b4c8baee23515b65";
-        vm.zkRegisterContract("ConstantNumber", emptyHash, emptyBytes, emptyBytes, zkBytecodeHash, zkDeployedBytecode);
-
-        vm.etch(TEST_ADDRESS, zkDeployedBytecode);
+        string memory artifact = vm.readFile("./zk/zkout/ConstantNumber.sol/ConstantNumber.json");
+        bytes memory constantNumberCode = vm.parseJsonBytes(artifact, ".bytecode.object");
+        vm.etch(TEST_ADDRESS, constantNumberCode);
 
         (bool success, bytes memory output) = TEST_ADDRESS.call(abi.encodeWithSignature("ten()"));
         require(success, "ten() call failed");
 
         uint8 number = abi.decode(output, (uint8));
         require(number == 10, "era etched code incorrect");
+    }
+
+    function testRecord() public {
+        FixedSlot fs = new FixedSlot();
+        vm.record();
+        fs.setSlot0(10);
+        (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(address(fs));
+        bytes32 keySlot0 = bytes32(uint256(0));
+        assertEq(reads[0], keySlot0);
+        assertEq(writes[0], keySlot0);
+    }
+
+    function testExpectEmit() public {
+        vm.expectEmit(true, true, true, true);
+        emit EventFunction("function");
+        Emitter emitter = new Emitter();
+        emitter.functionEmit();
+    }
+
+    function testExpectEmitOnCreate() public {
+        vm.expectEmit(true, true, true, true);
+        emit EventConstructor("constructor");
+        new Emitter();
+    }
+
+    function testZkCheatcodesValueFunctionMockReturn() public {
+        InnerMock inner = new InnerMock();
+        // Send some funds to so it can pay for the inner call
+        Mock target = new Mock{value: 50}(inner);
+
+        bytes memory dataBefore = target.getBytes();
+        assertEq(dataBefore, bytes(hex"abcd"));
+
+        vm.mockCall(address(inner), abi.encodeWithSelector(inner.getBytes.selector), abi.encode(bytes(hex"a1b1")));
+
+        bytes memory dataAfter = target.getBytes();
+        assertEq(dataAfter, bytes(hex"a1b1"));
+    }
+
+    function testZkCheatcodesCanMockCallTestContract() public {
+        address thisAddress = address(this);
+        MyProxyCaller transactor = new MyProxyCaller(thisAddress);
+
+        vm.mockCall(thisAddress, abi.encodeWithSelector(IMyProxyCaller.transact.selector), abi.encode());
+
+        transactor.transact();
+    }
+
+    function testZkCheatcodesCanMockCall(address mockMe) public {
+        vm.assume(mockMe != address(vm));
+
+        // zkVM currently doesn't support mocking the transaction sender
+        vm.assume(mockMe != msg.sender);
+
+        MyProxyCaller transactor = new MyProxyCaller(mockMe);
+
+        vm.mockCall(mockMe, abi.encodeWithSelector(IMyProxyCaller.transact.selector), abi.encode());
+
+        transactor.transact();
+    }
+
+    function testZkCheatcodesCanBeUsedAfterFork() public {
+        assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
+
+        vm.createSelectFork(Globals.ETHEREUM_MAINNET_URL, ETH_FORK_BLOCK);
+        assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
+
+        vm.deal(0x4e59b44847b379578588920cA78FbF26c0B4956C, 1 ether);
+        assertEq(1 ether, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
     }
 }

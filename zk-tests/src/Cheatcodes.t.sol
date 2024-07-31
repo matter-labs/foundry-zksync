@@ -207,7 +207,7 @@ contract ZkCheatcodesTest is Test {
         vm.assume(mockMe != address(vm));
 
         //zkVM currently doesn't support mocking the transaction sender
-        vm.assume(mockMe != tx.origin);
+        vm.assume(mockMe != msg.sender);
 
         MyProxyCaller transactor = new MyProxyCaller(mockMe);
 
