@@ -8,6 +8,9 @@ ignore = [
     # https://github.com/watchexec/watchexec/issues/852
     "RUSTSEC-2024-0350",
     "RUSTSEC-2024-0351",
+    "RUSTSEC-2022-0041",
+    "RUSTSEC-2023-0045",
+    "RUSTSEC-2020-0016",
 ]
 
 # This section is considered when running `cargo deny check bans`.

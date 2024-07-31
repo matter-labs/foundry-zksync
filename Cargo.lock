@@ -753,10 +753,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
+name = "ansiterm"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
+checksum = "4ab587f5395da16dd2e6939adf53dede583221b320cadfb94e02b5b7b9bf24cc"
 dependencies = [
  "winapi",
 ]
@@ -2093,9 +2093,9 @@ checksum = "5ce89b21cab1437276d2650d57e971f9d548a2d9037cc231abdc0562b97498ce"
 
 [[package]]
 name = "bytemuck"
-version = "1.16.1"
+version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b236fc92302c97ed75b38da1f4917b5cdda4984745740f153a5d3059e48d725e"
+checksum = "102087e286b4677862ea56cf8fc58bb2cdfa8725c40ffb80fe3a008eb7f2fc83"
 
 [[package]]
 name = "byteorder"
@@ -4622,6 +4622,7 @@ dependencies = [
  "foundry-config",
  "foundry-debugger",
  "foundry-evm",
+ "foundry-evm-abi",
  "foundry-linking",
  "foundry-test-utils",
  "foundry-wallets",
@@ -4956,7 +4957,6 @@ dependencies = [
  "async-trait",
  "clap",
  "comfy-table",
- "derive_more 0.99.18",
  "dunce",
  "eyre",
  "foundry-block-explorers",
@@ -4964,10 +4964,8 @@ dependencies = [
  "foundry-compilers",
  "foundry-config",
  "foundry-linking",
- "foundry-macros",
  "foundry-zksync-compiler",
  "globset",
- "itertools 0.13.0",
  "num-format",
  "once_cell",
  "reqwest 0.12.5",
@@ -5204,6 +5202,7 @@ dependencies = [
  "foundry-evm-traces",
  "foundry-zksync-core",
  "indicatif",
+ "itertools 0.13.0",
  "parking_lot 0.12.3",
  "proptest",
  "revm",
@@ -5247,7 +5246,6 @@ dependencies = [
  "foundry-config",
  "foundry-evm-abi",
  "foundry-fork-db",
- "foundry-macros",
  "foundry-test-utils",
  "foundry-zksync-core",
  "futures 0.3.30",
@@ -5462,11 +5460,12 @@ dependencies = [
  "alloy-signer",
  "alloy-sol-types",
  "alloy-transport",
- "ansi_term",
+ "ansiterm",
  "era_test_node",
  "eyre",
  "foundry-cheatcodes-common",
  "foundry-common",
+ "foundry-evm-abi",
  "foundry-zksync-compiler",
  "itertools 0.13.0",
  "lazy_static",
@@ -8146,9 +8145,9 @@ dependencies = [
 
 [[package]]
 name = "openssl"
-version = "0.10.65"
+version = "0.10.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2823eb4c6453ed64055057ea8bd416eda38c71018723869dd043a3b1186115e"
+checksum = "9529f4786b70a3e8c61e11179af17ab6188ad8d0ded78c5529441ed39d4bd9c1"
 dependencies = [
  "bitflags 2.6.0",
  "cfg-if 1.0.0",
@@ -14352,23 +14351,3 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
-
-[[patch.unused]]
-name = "revm"
-version = "9.0.0"
-source = "git+https://github.com/bluealloy/revm.git?rev=41e2f7f#41e2f7f9740c0fb70c5ba888a36453712b6de39c"
-
-[[patch.unused]]
-name = "revm-interpreter"
-version = "5.0.0"
-source = "git+https://github.com/bluealloy/revm.git?rev=41e2f7f#41e2f7f9740c0fb70c5ba888a36453712b6de39c"
-
-[[patch.unused]]
-name = "revm-precompile"
-version = "7.0.0"
-source = "git+https://github.com/bluealloy/revm.git?rev=41e2f7f#41e2f7f9740c0fb70c5ba888a36453712b6de39c"
-
-[[patch.unused]]
-name = "revm-primitives"
-version = "4.0.0"
-source = "git+https://github.com/bluealloy/revm.git?rev=41e2f7f#41e2f7f9740c0fb70c5ba888a36453712b6de39c"
