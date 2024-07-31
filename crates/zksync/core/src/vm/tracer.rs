@@ -141,7 +141,7 @@ impl CheatcodeTracer {
     }
 }
 
-impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
+impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
     fn before_decoding(&mut self, _state: VmLocalStateData<'_>, _memory: &SimpleMemory<H>) {}
 
     fn after_decoding(
@@ -328,7 +328,7 @@ impl<S: Send, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer 
     }
 }
 
-impl<S: WriteStorage + Send, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
+impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
     fn initialize_tracer(&mut self, _state: &mut ZkSyncVmState<S, H>) {}
 
     fn finish_cycle(
