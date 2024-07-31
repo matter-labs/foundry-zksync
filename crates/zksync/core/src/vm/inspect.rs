@@ -485,7 +485,7 @@ impl ConsoleLogParser {
         logs.push(log);
 
         if print {
-            info!("{}", ansi_term::Color::Cyan.paint(message));
+            info!("{}", ansiterm::Color::Cyan.paint(message));
         }
     }
 }
