@@ -1,4 +1,4 @@
-use alloy_primitives::hex;
+use alloy_primitives::{hex, Log};
 use era_test_node::{
     formatter,
     node::ShowCalls,
@@ -28,14 +28,15 @@ use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    l2::L2Tx, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
+    l2::L2Tx, vm_trace::Call, PackedEthSignature, StorageKey, Transaction,
+    ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use crate::{
-    convert::{ConvertH160, ConvertH256, ConvertU256},
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
     is_system_address,
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
@@ -43,6 +44,9 @@ use crate::{
         storage_view::StorageView,
         tracer::{CallContext, CheatcodeTracer, CheatcodeTracerContext},
     },
+};
+use foundry_evm_abi::{
+    patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS,
 };
 
 /// Maximum gas price allowed for L1.
@@ -390,6 +394,11 @@ fn inspect_inner<S: ReadStorage>(
 
     formatter::print_vm_details(&tx_result);
 
+    info!("=== Console Logs: ");
+    let log_parser = ConsoleLogParser::new();
+    // get_logs prints the logs
+    log_parser.get_logs(&call_traces, true);
+
     let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
     let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
     info!("=== Calls: ");
@@ -416,6 +425,69 @@ fn inspect_inner<S: ReadStorage>(
         storage.borrow().modified_storage_keys().clone()
     };
     (tx_result, bytecodes, modified_keys)
+}
+
+/// Parse solidity's `console.log` events
+struct ConsoleLogParser {
+    hardhat_console_address: H160,
+}
+
+impl ConsoleLogParser {
+    fn new() -> Self {
+        Self { hardhat_console_address: HARDHAT_CONSOLE_ADDRESS.to_h160() }
+    }
+
+    pub fn get_logs(&self, call_traces: &[Call], print: bool) -> Vec<Log> {
+        let mut logs = vec![];
+        for call in call_traces {
+            self.parse_call_recursive(call, &mut logs, print);
+        }
+        logs
+    }
+
+    fn parse_call_recursive(&self, current_call: &Call, logs: &mut Vec<Log>, print: bool) {
+        self.parse_call(current_call, logs, print);
+        for call in &current_call.calls {
+            self.parse_call_recursive(call, logs, print);
+        }
+    }
+
+    fn parse_call(&self, current_call: &Call, logs: &mut Vec<Log>, print: bool) {
+        use alloy_sol_types::{SolEvent, SolInterface, SolValue};
+        use foundry_common::fmt::ConsoleFmt;
+
+        if current_call.to != self.hardhat_console_address {
+            return;
+        }
+        if current_call.input.len() < 4 {
+            return;
+        }
+
+        let mut input = current_call.input.clone();
+
+        // Patch the Hardhat-style selector (`uint` instead of `uint256`)
+        patch_hh_console_selector(&mut input);
+
+        // Decode the call
+        let Ok(call) = HardhatConsole::HardhatConsoleCalls::abi_decode(&input, false) else {
+            return;
+        };
+
+        // Convert the parameters of the call to their string representation using `ConsoleFmt`.
+        let message = call.fmt(Default::default());
+        let log = Log::new(
+            Address::default(),
+            vec![Console::log::SIGNATURE_HASH],
+            message.abi_encode().into(),
+        )
+        .unwrap_or_else(|| Log { ..Default::default() });
+
+        logs.push(log);
+
+        if print {
+            info!("{}", ansi_term::Color::Cyan.paint(message));
+        }
+    }
 }
 
 fn get_env_var<T>(name: &str) -> T
