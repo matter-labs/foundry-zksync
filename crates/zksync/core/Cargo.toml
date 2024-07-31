@@ -12,8 +12,6 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-foundry-common.workspace = true
-foundry-evm-abi.workspace = true
 foundry-cheatcodes-common.workspace = true
 foundry-zksync-compiler.workspace = true
 alloy-primitives.workspace = true
@@ -50,7 +48,6 @@ zksync_utils.workspace = true
 zksync_contracts.workspace = true
 zksync_state.workspace = true
 
-ansi_term = "0.12.1"
 once_cell = "1"
 eyre = "0.6"
 url = "2"

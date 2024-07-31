@@ -281,12 +281,6 @@ soldeer = "0.2.19"
 proptest = "1"
 comfy-table = "7"
 
-[patch.crates-io]
-revm = { git = "https://github.com/bluealloy/revm.git", rev = "41e2f7f" }
-revm-interpreter = { git = "https://github.com/bluealloy/revm.git", rev = "41e2f7f" }
-revm-precompile = { git = "https://github.com/bluealloy/revm.git", rev = "41e2f7f" }
-revm-primitives = { git = "https://github.com/bluealloy/revm.git", rev = "41e2f7f" }
-
 # revm-interpreter = { path = "../revm/crates/interpreter" }
 # revm-primitives = { path = "../revm/crates/primitives" }
 # revm = { path = "../revm/crates/revm" }

@@ -597,6 +597,7 @@ impl Backend {
         trace!(?acc, "setting test account");
         self.add_persistent_account(acc);
         self.allow_cheatcode_access(acc);
+        self.inner.test_contract_address = Some(acc);
         self
     }
 

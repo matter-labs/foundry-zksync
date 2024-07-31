@@ -1473,7 +1473,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
 
     #[inline]
     fn step_end(&mut self, interpreter: &mut Interpreter, ecx: &mut EvmContext<DB>) {
-        // ovverride address(x).balance retrieval to make it consistent between EraVM and EVM
+        // override address(x).balance retrieval to make it consistent between EraVM and EVM
         if self.use_zk_vm {
             let address = match interpreter.current_opcode() {
                 opcode::SELFBALANCE => interpreter.contract().target_address,
