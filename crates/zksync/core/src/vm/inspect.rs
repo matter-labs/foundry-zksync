@@ -28,8 +28,7 @@ use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    l2::L2Tx, PackedEthSignature, StorageKey, Transaction,
-    ACCOUNT_CODE_STORAGE_ADDRESS,
+    l2::L2Tx, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
 
