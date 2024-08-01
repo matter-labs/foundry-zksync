@@ -367,7 +367,7 @@ impl ForgeTestData {
         builder
             .enable_isolation(opts.isolate)
             .sender(sender)
-            .with_test_options(self.test_opts.clone())
+            .with_test_options(test_opts)
             .build(root, output, Some(zk_output), env, opts, dual_compiled_contracts)
             .unwrap()
     }
