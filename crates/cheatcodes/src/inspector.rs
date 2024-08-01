@@ -626,7 +626,7 @@ impl Cheatcodes {
     }
 }
 
-impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
+impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
     #[inline]
     fn initialize_interp(&mut self, _: &mut Interpreter, ecx: &mut EvmContext<DB>) {
         // When the first interpreter is initialized we've circumvented the balance and gas checks,
@@ -2083,7 +2083,7 @@ impl<DB: DatabaseExt + Send> Inspector<DB> for Cheatcodes {
     }
 }
 
-impl<DB: DatabaseExt + Send> InspectorExt<DB> for Cheatcodes {
+impl<DB: DatabaseExt> InspectorExt<DB> for Cheatcodes {
     fn should_use_create2_factory(
         &mut self,
         ecx: &mut EvmContext<DB>,
