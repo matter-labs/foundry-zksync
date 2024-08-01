@@ -30,7 +30,7 @@ pub struct ZkSyncConfig {
     pub solc_path: Option<PathBuf>,
 
     /// Whether to include the metadata hash for zksolc compiled bytecode.
-    pub bytecode_hash: BytecodeHash,
+    pub bytecode_hash: Option<BytecodeHash>,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
     pub fallback_oz: bool,
@@ -112,7 +112,7 @@ impl ZkSyncConfig {
             libraries,
             optimizer,
             evm_version: Some(evm_version),
-            metadata: Some(SettingsMetadata { bytecode_hash: Some(self.bytecode_hash) }),
+            metadata: Some(SettingsMetadata { bytecode_hash: self.bytecode_hash }),
             via_ir: Some(via_ir),
             // Set in project paths.
             remappings: Vec::new(),
