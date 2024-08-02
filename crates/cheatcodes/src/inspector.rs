@@ -281,14 +281,23 @@ impl Cheatcodes {
             evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
             evm_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
         });
+
+        let cheatcodes_bytecode = {
+            let mut bytecode = CHEATCODE_ADDRESS.abi_encode_packed();
+            bytecode.append(&mut [0; 12].to_vec());
+            bytecode
+        };
+        let cheatcodes_bytecode_bytes = Bytes::from(cheatcodes_bytecode);
         dual_compiled_contracts.push(DualCompiledContract {
             name: String::from("CheatcodeBytecode"),
-            zk_bytecode_hash,
-            zk_deployed_bytecode: zk_deployed_bytecode.clone(),
+            // we put a different bytecode hash here so when importing back to EVM
+            // we avoid collision with EmptyEVMBytecode for the cheatcodes
+            zk_bytecode_hash: foundry_zksync_core::hash_bytecode(CHEATCODE_CONTRACT_HASH.as_ref()),
+            zk_deployed_bytecode: cheatcodes_bytecode_bytes.to_vec(),
             zk_factory_deps: Default::default(),
             evm_bytecode_hash: CHEATCODE_CONTRACT_HASH,
-            evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
-            evm_bytecode: Bytecode::new_raw(empty_bytes).bytecode().to_vec(),
+            evm_deployed_bytecode: cheatcodes_bytecode_bytes.to_vec(),
+            evm_bytecode: cheatcodes_bytecode_bytes.to_vec(),
         });
 
         let mut persisted_factory_deps = HashMap::new();
