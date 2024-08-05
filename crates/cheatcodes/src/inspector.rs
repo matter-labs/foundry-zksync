@@ -34,7 +34,7 @@ use foundry_evm_core::{
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    ZkTransactionMetadata,
+    get_account_code_key, get_balance_key, get_nonce_key, ZkTransactionMetadata,
 };
 use itertools::Itertools;
 use revm::{
@@ -60,8 +60,7 @@ use std::{
 };
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
-    get_code_key, get_nonce_key,
-    utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
+    utils::{decompose_full_nonce, nonces_to_full_nonce},
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
     H256, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
@@ -486,15 +485,15 @@ impl Cheatcodes {
             info!(?address, "importing to evm state");
 
             let zk_address = address.to_h160();
-            let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
-            let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
+            let balance_key = get_balance_key(address);
+            let nonce_key = get_nonce_key(address);
 
             let (balance, _) = data.sload(balance_account, balance_key).unwrap_or_default();
             let (full_nonce, _) = data.sload(nonce_account, nonce_key).unwrap_or_default();
             let (tx_nonce, _deployment_nonce) = decompose_full_nonce(full_nonce.to_u256());
             let nonce = tx_nonce.as_u64();
 
-            let account_code_key = get_code_key(&zk_address).key().to_ru256();
+            let account_code_key = get_account_code_key(address);
             let (code_hash, code) = data
                 .sload(account_code_account, account_code_key)
                 .map(|(value, _)| value)
@@ -562,19 +561,20 @@ impl Cheatcodes {
             let info = &account.info;
             let zk_address = address.to_h160();
 
-            let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
-            let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
+            let balance_key = get_balance_key(address);
             l2_eth_storage.insert(balance_key, EvmStorageSlot::new(info.balance));
 
             // TODO we need to find a proper way to handle deploy nonces instead of replicating
             let full_nonce = nonces_to_full_nonce(info.nonce.into(), info.nonce.into());
+
+            let nonce_key = get_nonce_key(address);
             nonce_storage.insert(nonce_key, EvmStorageSlot::new(full_nonce.to_ru256()));
 
             if let Some(contract) = self.dual_compiled_contracts.iter().find(|contract| {
                 info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
             }) {
                 account_code_storage.insert(
-                    zk_address.to_h256().to_ru256(),
+                    get_account_code_key(address),
                     EvmStorageSlot::new(contract.zk_bytecode_hash.to_ru256()),
                 );
                 known_codes_storage

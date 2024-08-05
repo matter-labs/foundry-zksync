@@ -13,7 +13,9 @@ use alloy_rpc_types::{Block, BlockNumberOrTag, BlockTransactions, Transaction};
 use alloy_serde::WithOtherFields;
 use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
-use foundry_zksync_core::{convert::ConvertH160, L2_BASE_TOKEN_ADDRESS};
+use foundry_zksync_core::{
+    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+};
 use itertools::Itertools;
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -1975,31 +1977,31 @@ fn merge_zk_account_data<ExtDB: DatabaseRef>(
 ) {
     trace!(?addr, "merging zk database data");
 
-    // TODO: do the same for nonce and codes
-    let balance_addr = L2_BASE_TOKEN_ADDRESS.to_address();
-    let mut acc = if let Some(acc) = active.accounts.get(&balance_addr).cloned() {
-        acc
-    } else {
-        // Account does not exist
-        return;
+    let mut merge_entry = |system_contract: Address, slot: U256| {
+        let Some(active_system) = active.accounts.get(&system_contract).cloned() else { return };
+        let Some(active_slot_value) = active_system.storage.get(&slot) else { return };
+
+        use std::collections::hash_map::Entry;
+        match fork_db.accounts.entry(system_contract) {
+            Entry::Vacant(vacant) => {
+                // if the fork_db doesn't have system,
+                // just import the active one
+                vacant.insert(active_system);
+            }
+            Entry::Occupied(mut occupied) => {
+                // if the fork_db does have the system,
+                // only override the target slot
+                occupied.get_mut().storage.insert(slot, *active_slot_value);
+            }
+        }
     };
 
-    let mut balances = Map::<U256, U256>::default();
-    let slot = foundry_zksync_core::get_balance_key(addr);
-    if let Some(value) = acc.storage.get(&slot) {
-        balances.insert(slot, *value);
-    }
-
-    if let Some(fork_account) = fork_db.accounts.get_mut(&balance_addr) {
-        // This will merge the fork's tracked storage with active storage and update values
-        fork_account.storage.extend(balances);
-        // swap them so we can insert the account as whole in the next step
-        std::mem::swap(&mut fork_account.storage, &mut acc.storage);
-    } else {
-        std::mem::swap(&mut balances, &mut acc.storage)
-    }
-
-    fork_db.accounts.insert(balance_addr, acc);
+    merge_entry(L2_BASE_TOKEN_ADDRESS.to_address(), foundry_zksync_core::get_balance_key(addr));
+    merge_entry(
+        ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
+        foundry_zksync_core::get_account_code_key(addr),
+    );
+    merge_entry(NONCE_HOLDER_ADDRESS.to_address(), foundry_zksync_core::get_nonce_key(addr));
 }
 
 /// Returns true of the address is a contract

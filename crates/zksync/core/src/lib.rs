@@ -58,6 +58,16 @@ pub fn get_balance_key(address: Address) -> rU256 {
     storage_key_for_eth_balance(&address.to_h160()).key().to_ru256()
 }
 
+/// Returns the account code storage key for a provided account address.
+pub fn get_account_code_key(address: Address) -> rU256 {
+    zksync_types::get_code_key(&address.to_h160()).key().to_ru256()
+}
+
+/// Returns the account nonce key for a provided account address.
+pub fn get_nonce_key(address: Address) -> rU256 {
+    zksync_types::get_nonce_key(&address.to_h160()).key().to_ru256()
+}
+
 /// Represents additional data for ZK transactions.
 #[derive(Clone, Debug, Default)]
 pub struct ZkTransactionMetadata {
