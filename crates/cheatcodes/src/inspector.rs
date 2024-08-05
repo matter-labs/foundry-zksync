@@ -484,7 +484,6 @@ impl Cheatcodes {
         for address in data.db.persistent_accounts().into_iter().chain([data.env.tx.caller]) {
             info!(?address, "importing to evm state");
 
-            let zk_address = address.to_h160();
             let balance_key = get_balance_key(address);
             let nonce_key = get_nonce_key(address);
 
@@ -559,7 +558,6 @@ impl Cheatcodes {
 
             let account = journaled_account(data, address).expect("failed to load account");
             let info = &account.info;
-            let zk_address = address.to_h160();
 
             let balance_key = get_balance_key(address);
             l2_eth_storage.insert(balance_key, EvmStorageSlot::new(info.balance));
