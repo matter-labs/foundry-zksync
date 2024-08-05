@@ -76,22 +76,22 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
         if key.address() == &ACCOUNT_CODE_STORAGE_ADDRESS && key.key() == &self.caller.to_h256() {
             let value = StorageValue::zero();
             tracing::trace!(
-                "override read value {:?} {:?} ({:?}/{:?})",
-                key.hashed_key(),
-                value,
-                key.address(),
-                key.key()
+                hash = ?key.hashed_key(),
+                ?value,
+                address = ?key.address(),
+                key = ?key.key(),
+                "override read value",
             );
 
             return value
         }
 
         tracing::trace!(
-            "read value {:?} {:?} ({:?}/{:?})",
-            key.hashed_key(),
-            value,
-            key.address(),
-            key.key()
+            hash = ?key.hashed_key(),
+            ?value,
+            address = ?key.address(),
+            key = ?key.key(),
+            "read value",
         );
 
         value
@@ -127,12 +127,12 @@ impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
         let original = self.get_value_no_log(&key);
 
         tracing::trace!(
-            "write value {:?} value: {:?} original value: {:?} ({:?}/{:?})",
-            key.hashed_key(),
-            value,
-            original,
-            key.address(),
-            key.key()
+            hash = ?key.hashed_key(),
+            ?value,
+            ?original,
+            address = ?key.address(),
+            key = ?key.key(),
+            "write value",
         );
         self.modified_storage_keys.insert(key, value);
 

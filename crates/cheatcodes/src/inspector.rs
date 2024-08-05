@@ -593,7 +593,7 @@ impl Cheatcodes {
                     },
                 );
             } else {
-                tracing::debug!("no zk contract found for {:?}", info.code_hash)
+                tracing::debug!(code_hash = ?info.code_hash, ?address, "no zk contract found")
             }
         }
 
