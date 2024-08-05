@@ -1941,12 +1941,12 @@ fn merge_journaled_state_data(
 }
 
 /// Clones the account data from the `active` db into the `ForkDB`
+#[tracing::instrument(level = "trace", skip(active, fork_db))]
 fn merge_db_account_data<ExtDB: DatabaseRef>(
     addr: Address,
     active: &CacheDB<ExtDB>,
     fork_db: &mut ForkDB,
 ) {
-    trace!(?addr, "merging database data");
 
     let mut acc = if let Some(acc) = active.accounts.get(&addr).cloned() {
         acc
@@ -1970,20 +1970,23 @@ fn merge_db_account_data<ExtDB: DatabaseRef>(
 }
 
 /// Clones the zk account data from the `active` db into the `ForkDB`
+#[tracing::instrument(level = "trace", skip(active, fork_db))]
 fn merge_zk_account_data<ExtDB: DatabaseRef>(
     addr: Address,
     active: &CacheDB<ExtDB>,
     fork_db: &mut ForkDB,
 ) {
-    trace!(?addr, "merging zk database data");
-
     let mut merge_entry = |system_contract: Address, slot: U256| {
         let Some(active_system) = active.accounts.get(&system_contract) else { return };
         let Some(active_slot_value) = active_system.storage.get(&slot) else { return };
 
+        use foundry_zksync_core::convert::ConvertRU256;
+        tracing::trace_span!("merge_entry", ?system_contract, slot = ?slot.to_h256(), value = ?active_slot_value.to_h256());
+
         use std::collections::hash_map::Entry;
         match fork_db.accounts.entry(system_contract) {
             Entry::Vacant(vacant) => {
+                trace!("system contract not present - inserting from active");
                 // if the fork_db doesn't have system,
                 // import the active one, and only populate the slot we are processing
                 let imported_system = revm::db::DbAccount {
@@ -1994,6 +1997,7 @@ fn merge_zk_account_data<ExtDB: DatabaseRef>(
                 vacant.insert(imported_system);
             }
             Entry::Occupied(mut occupied) => {
+                trace!("system contract present - merging slot");
                 // if the fork_db does have the system,
                 // only override the target slot
                 occupied.get_mut().storage.insert(slot, *active_slot_value);
