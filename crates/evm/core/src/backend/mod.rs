@@ -1978,15 +1978,20 @@ fn merge_zk_account_data<ExtDB: DatabaseRef>(
     trace!(?addr, "merging zk database data");
 
     let mut merge_entry = |system_contract: Address, slot: U256| {
-        let Some(active_system) = active.accounts.get(&system_contract).cloned() else { return };
+        let Some(active_system) = active.accounts.get(&system_contract) else { return };
         let Some(active_slot_value) = active_system.storage.get(&slot) else { return };
 
         use std::collections::hash_map::Entry;
         match fork_db.accounts.entry(system_contract) {
             Entry::Vacant(vacant) => {
                 // if the fork_db doesn't have system,
-                // just import the active one
-                vacant.insert(active_system);
+                // import the active one, and only populate the slot we are processing
+                let imported_system = revm::db::DbAccount {
+                    info: active_system.info.clone(),
+                    account_state: active_system.account_state.clone(),
+                    storage: [(slot, *active_slot_value)].into_iter().collect(),
+                };
+                vacant.insert(imported_system);
             }
             Entry::Occupied(mut occupied) => {
                 // if the fork_db does have the system,
