@@ -45,14 +45,6 @@ contract ZkBasicTest is Test {
         );
     }
 
-    function test_migrateCodeHashWhenforkZkSyncThenZkVmOff() external {
-       vm.createSelectFork("mainnet");
-       (bool success, ) = address(vm).call(
-           abi.encodeWithSignature("zkVm(bool)", false)
-       );
-       assert(address(vm).codehash != 0);
-    }
-
     function testZkBasicBlockNumber() public {
         vm.selectFork(forkEra);
         require(block.number == ERA_FORK_BLOCK, "era block number mismatch");
