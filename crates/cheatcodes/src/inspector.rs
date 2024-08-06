@@ -33,7 +33,7 @@ use foundry_evm_core::{
 };
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
-    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key, ZkTransactionMetadata,
 };
 use itertools::Itertools;
@@ -284,19 +284,18 @@ impl Cheatcodes {
         let cheatcodes_bytecode = {
             let mut bytecode = CHEATCODE_ADDRESS.abi_encode_packed();
             bytecode.append(&mut [0; 12].to_vec());
-            bytecode
+            Bytes::from(bytecode)
         };
-        let cheatcodes_bytecode_bytes = Bytes::from(cheatcodes_bytecode);
         dual_compiled_contracts.push(DualCompiledContract {
             name: String::from("CheatcodeBytecode"),
             // we put a different bytecode hash here so when importing back to EVM
             // we avoid collision with EmptyEVMBytecode for the cheatcodes
             zk_bytecode_hash: foundry_zksync_core::hash_bytecode(CHEATCODE_CONTRACT_HASH.as_ref()),
-            zk_deployed_bytecode: cheatcodes_bytecode_bytes.to_vec(),
+            zk_deployed_bytecode: cheatcodes_bytecode.to_vec(),
             zk_factory_deps: Default::default(),
             evm_bytecode_hash: CHEATCODE_CONTRACT_HASH,
-            evm_deployed_bytecode: cheatcodes_bytecode_bytes.to_vec(),
-            evm_bytecode: cheatcodes_bytecode_bytes.to_vec(),
+            evm_deployed_bytecode: cheatcodes_bytecode.to_vec(),
+            evm_bytecode: cheatcodes_bytecode.to_vec(),
         });
 
         let mut persisted_factory_deps = HashMap::new();

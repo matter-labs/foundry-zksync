@@ -76,7 +76,7 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
         if key.address() == &ACCOUNT_CODE_STORAGE_ADDRESS && key.key() == &self.caller.to_h256() {
             let value = StorageValue::zero();
             tracing::trace!(
-                hash = ?key.hashed_key(),
+                hashed_key = ?key.hashed_key(),
                 ?value,
                 address = ?key.address(),
                 key = ?key.key(),
@@ -87,7 +87,7 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
         }
 
         tracing::trace!(
-            hash = ?key.hashed_key(),
+            hashed_key = ?key.hashed_key(),
             ?value,
             address = ?key.address(),
             key = ?key.key(),
@@ -127,7 +127,7 @@ impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
         let original = self.get_value_no_log(&key);
 
         tracing::trace!(
-            hash = ?key.hashed_key(),
+            hashed_key = ?key.hashed_key(),
             ?value,
             ?original,
             address = ?key.address(),

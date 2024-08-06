@@ -14,7 +14,8 @@ use alloy_serde::WithOtherFields;
 use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 use foundry_zksync_core::{
-    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    convert::{ConvertH160, ConvertRU256},
+    ACCOUNT_CODE_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use itertools::Itertools;
 use revm::{
@@ -28,7 +29,7 @@ use revm::{
     Database, DatabaseCommit, JournaledState,
 };
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
     time::Instant,
 };
 
@@ -1941,81 +1942,75 @@ fn merge_journaled_state_data(
 }
 
 /// Clones the account data from the `active` db into the `ForkDB`
-#[tracing::instrument(level = "trace", skip(active, fork_db))]
 fn merge_db_account_data<ExtDB: DatabaseRef>(
     addr: Address,
     active: &CacheDB<ExtDB>,
     fork_db: &mut ForkDB,
 ) {
-    let Some(acc) = active.accounts.get(&addr) else { return };
+    let mut acc = if let Some(acc) = active.accounts.get(&addr).cloned() {
+        acc
+    } else {
+        // Account does not exist
+        return;
+    };
 
-    // port contract cache over
-    if let Some(code) = active.contracts.get(&acc.info.code_hash) {
-        trace!("merging contract cache");
-        fork_db.contracts.insert(acc.info.code_hash, code.clone());
+    if let Some(code) = active.contracts.get(&acc.info.code_hash).cloned() {
+        fork_db.contracts.insert(acc.info.code_hash, code);
     }
 
-    // port account storage over
-    use std::collections::hash_map::Entry;
-    match fork_db.accounts.entry(addr) {
-        Entry::Vacant(vacant) => {
-            trace!("target account not present - inserting from active");
-            // if the fork_db doesn't have the target account
-            // insert the entire thing
-            vacant.insert(acc.clone());
-        }
-        Entry::Occupied(mut occupied) => {
-            trace!("target account present - merging storage slots");
-            // if the fork_db does have the system,
-            // extend the existing storage (overriding)
-            let fork_account = occupied.get_mut();
-            fork_account.storage.extend(&acc.storage);
-        }
+    if let Some(fork_account) = fork_db.accounts.get_mut(&addr) {
+        // This will merge the fork's tracked storage with active storage and update values
+        fork_account.storage.extend(std::mem::take(&mut acc.storage));
+        // swap them so we can insert the account as whole in the next step
+        std::mem::swap(&mut fork_account.storage, &mut acc.storage);
     }
+
+    fork_db.accounts.insert(addr, acc);
 }
 
 /// Clones the zk account data from the `active` db into the `ForkDB`
-#[tracing::instrument(level = "trace", skip(active, fork_db))]
 fn merge_zk_account_data<ExtDB: DatabaseRef>(
     addr: Address,
     active: &CacheDB<ExtDB>,
     fork_db: &mut ForkDB,
 ) {
-    let mut merge_entry = |system_contract: Address, slot: U256| {
-        let Some(active_system) = active.accounts.get(&system_contract) else { return };
-        let Some(active_slot_value) = active_system.storage.get(&slot) else { return };
+    let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
+        let mut acc = if let Some(acc) = active.accounts.get(&system_contract).cloned() {
+            acc
+        } else {
+            // Account does not exist
+            return;
+        };
 
-        use foundry_zksync_core::convert::ConvertRU256;
-        tracing::trace_span!("merge_entry", ?system_contract, slot = ?slot.to_h256(), value = ?active_slot_value.to_h256());
-
-        use std::collections::hash_map::Entry;
-        match fork_db.accounts.entry(system_contract) {
-            Entry::Vacant(vacant) => {
-                trace!("system contract not present - inserting from active");
-                // if the fork_db doesn't have system,
-                // import the active one, and only populate the slot we are processing
-                let imported_system = revm::db::DbAccount {
-                    info: active_system.info.clone(),
-                    account_state: active_system.account_state.clone(),
-                    storage: [(slot, *active_slot_value)].into_iter().collect(),
-                };
-                vacant.insert(imported_system);
-            }
-            Entry::Occupied(mut occupied) => {
-                trace!("system contract present - merging slot");
-                // if the fork_db does have the system,
-                // only override the target slot
-                occupied.get_mut().storage.insert(slot, *active_slot_value);
-            }
+        let mut storage = Map::<U256, U256>::default();
+        if let Some(value) = acc.storage.get(&slot) {
+            storage.insert(slot, *value);
         }
+
+        if let Some(fork_account) = fork_db.accounts.get_mut(&system_contract) {
+            // This will merge the fork's tracked storage with active storage and update values
+            fork_account.storage.extend(storage);
+            // swap them so we can insert the account as whole in the next step
+            std::mem::swap(&mut fork_account.storage, &mut acc.storage);
+        } else {
+            std::mem::swap(&mut storage, &mut acc.storage)
+        }
+
+        fork_db.accounts.insert(system_contract, acc);
     };
 
-    merge_entry(L2_BASE_TOKEN_ADDRESS.to_address(), foundry_zksync_core::get_balance_key(addr));
-    merge_entry(
+    merge_system_contract_entry(
+        L2_BASE_TOKEN_ADDRESS.to_address(),
+        foundry_zksync_core::get_balance_key(addr),
+    );
+    merge_system_contract_entry(
         ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
         foundry_zksync_core::get_account_code_key(addr),
     );
-    merge_entry(NONCE_HOLDER_ADDRESS.to_address(), foundry_zksync_core::get_nonce_key(addr));
+    merge_system_contract_entry(
+        NONCE_HOLDER_ADDRESS.to_address(),
+        foundry_zksync_core::get_nonce_key(addr),
+    );
 }
 
 /// Returns true of the address is a contract
