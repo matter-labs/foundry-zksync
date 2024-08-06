@@ -16,7 +16,7 @@ use futures::{SinkExt, StreamExt};
 use jsonrpc_core::IoHandler;
 use zksync_types::H160;
 
-const DEFAULT_PORT: u16 = 8011;
+const DEFAULT_PORT: u16 = 108011;
 
 /// List of legacy wallets (address, private key) that we seed with tokens at start.
 const LEGACY_RICH_WALLETS: [(&str, &str); 10] = [
