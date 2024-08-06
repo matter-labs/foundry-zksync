@@ -1452,7 +1452,7 @@ forgetest_async!(can_deploy_library_create2_different_sender, |prj, cmd| {
         .await;
 });
 
-forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
+forgetest_async!(test_zk_dbg_can_execute_script_with_arguments, |prj, cmd| {
     #[derive(serde::Deserialize, Debug)]
     #[allow(dead_code)]
     struct ZkTransactions {
