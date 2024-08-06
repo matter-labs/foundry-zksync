@@ -5,27 +5,14 @@ import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 
 import {ConstantNumber} from "./ConstantNumber.sol";
+import {Greeter} from "./Greeter.sol";
+import {Globals} from "./Globals.sol";
 
-contract Greeter {
-    string name;
-    uint256 age;
-
-    event Greet(string greet);
-
-    function greeting(string memory _name) public returns (string memory) {
-        name = _name;
-        string memory greet = string(abi.encodePacked("Hello ", _name));
-        emit Greet(greet);
-        return greet;
-    }
-
-    function setAge(uint256 _age) public {
-        age = _age;
-    }
-
-    function getAge() public view returns (uint256) {
-        return age;
-    }
+interface ISystemContractDeployer {
+    function getNewAddressCreate2(address _sender, bytes32 _bytecodeHash, bytes32 _salt, bytes calldata _input)
+        external
+        view
+        returns (address newAddress);
 }
 
 contract Number {
@@ -40,13 +27,37 @@ contract FixedNumber {
     }
 }
 
+contract FixedGreeter {
+    function greet(string memory _name) public pure returns (string memory) {
+        string memory greeting = string(abi.encodePacked("Hello ", _name));
+        return greeting;
+    }
+}
+
+contract MultiNumber {
+    function one() public pure returns (uint8) {
+        return 1;
+    }
+
+    function two() public pure returns (uint8) {
+        return 2;
+    }
+}
+
 contract PayableFixedNumber {
     address sender;
     uint256 value;
 
+    receive() external payable {}
+
     constructor() payable {
         sender = msg.sender;
         value = msg.value;
+    }
+
+    function transfer(address payable dest, uint256 amt) public {
+        (bool success,) = dest.call{value: amt}("");
+        require(success);
     }
 
     function five() public pure returns (uint8) {
@@ -89,6 +100,7 @@ contract ZkContractsTest is DSTest {
 
     Number number;
     CustomNumber customNumber;
+    MultiNumber multiNumber;
 
     uint256 constant ERA_FORK_BLOCK = 19579636;
     uint256 constant ERA_FORK_BLOCK_TS = 1700601590;
@@ -102,11 +114,29 @@ contract ZkContractsTest is DSTest {
     function setUp() public {
         number = new Number();
         customNumber = new CustomNumber(20);
+        multiNumber = new MultiNumber();
         vm.makePersistent(address(number));
         vm.makePersistent(address(customNumber));
 
-        forkEra = vm.createFork("https://mainnet.era.zksync.io", ERA_FORK_BLOCK);
-        forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
+        forkEra = vm.createFork(Globals.ZKSYNC_MAINNET_URL, ERA_FORK_BLOCK);
+        forkEth = vm.createFork(Globals.ETHEREUM_MAINNET_URL, ETH_FORK_BLOCK);
+    }
+
+    function testZkContractCanCallMethod() public {
+        FixedGreeter g = new FixedGreeter();
+        vm.makePersistent(address(g));
+        vm.selectFork(forkEra);
+        assertEq("Hello hi", g.greet("hi"));
+    }
+
+    function testZkContractsMultipleTransactions() external {
+        vm.zkVm(true);
+        Greeter greeter = new Greeter();
+        greeter.setAge(10);
+        string memory greeting = greeter.greeting("john");
+        assertEq("Hello john", greeting);
+        greeter.setAge(60);
+        assertEq(60, greeter.getAge());
     }
 
     function testZkContractsPersistedDeployedContractNoArgs() public {
@@ -141,6 +171,20 @@ contract ZkContractsTest is DSTest {
         require(address(payableFixedNumber).balance == 10, "incorrect balance");
     }
 
+    function testZkContractsExpectedBalances() public {
+        vm.selectFork(forkEra);
+        uint256 balanceBefore = address(this).balance;
+
+        PayableFixedNumber one = new PayableFixedNumber{value: 10}();
+
+        PayableFixedNumber two = new PayableFixedNumber();
+        one.transfer(payable(address(two)), 5);
+
+        require(address(one).balance == 5, "first contract's balance not decreased");
+        require(address(two).balance == 5, "second contract's balance not increased");
+        require(address(this).balance == balanceBefore - 10, "test address balance not decreased");
+    }
+
     function testZkContractsInlineDeployedContractComplexArgs() public {
         CustomStorage customStorage = new CustomStorage("hello", 10);
         vm.makePersistent(address(customStorage));
@@ -168,8 +212,9 @@ contract ZkContractsTest is DSTest {
     function testZkContractsCreate2() public {
         vm.selectFork(forkEra);
 
-        bytes32 bytecodeHash = 0x0100000fbb43aa073340811284a4666183e306fbe9c950df1d05ac3210ef9fc5;
-        address sender = address(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        string memory artifact = vm.readFile("zk/zkout/ConstantNumber.sol/ConstantNumber.json");
+        bytes32 bytecodeHash = vm.parseJsonBytes32(artifact, ".hash");
+        address sender = address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496);
         bytes32 salt = "12345";
         bytes32 constructorInputHash = keccak256(abi.encode());
         address expectedDeployedAddress =
@@ -181,14 +226,53 @@ contract ZkContractsTest is DSTest {
         assertEq(expectedDeployedAddress, actualDeployedAddress);
     }
 
-    function testZkContractsMultipleTransactions() external {
-        vm.zkVm(true);
+    function testZkContractsCallSystemContract() public {
+        (bool success,) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
+        require(success, "zkVm() call failed");
+
+        ISystemContractDeployer deployer = ISystemContractDeployer(address(0x0000000000000000000000000000000000008006));
+
+        address addr = deployer.getNewAddressCreate2(
+            address(this),
+            0x0100000781e55a60f3f14fd7dd67e3c8caab896b7b0fca4a662583959299eede,
+            0x0100000781e55a60f3f14fd7dd67e3c8caab896b7b0fca4a662583959299eede,
+            ""
+        );
+
+        assertEq(address(0x46efB6258A2A539f7C8b44e2EF659D778fb5BAAd), addr);
+    }
+
+    function testZkContractsDeployedInSetupAreMockable() public {
+        vm.mockCall(address(multiNumber), abi.encodeWithSelector(MultiNumber.one.selector), abi.encode(42));
+
+        assertEq(42, multiNumber.one());
+        assertEq(2, multiNumber.two());
+    }
+
+    function testZkStaticCalls() public {
+        (bool success,) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
+        require(success, "zkVm() call failed");
+        address sender = address(this);
+        uint64 startingNonce = vm.getNonce(sender);
+
+        //this ensures calls & deployments increase the nonce
+        vm.startBroadcast(sender);
+
         Greeter greeter = new Greeter();
-        greeter.setAge(10);
-        string memory greeting = greeter.greeting("john");
-        assertEq("Hello john", greeting);
-        greeter.setAge(60);
-        assertEq(60, greeter.getAge());
+        assert(vm.getNonce(sender) == startingNonce + 1);
+
+        greeter.setAge(42);
+        assert(vm.getNonce(sender) == startingNonce + 2);
+
+        // static-call, nonce shouldn't change
+        uint256 age = greeter.getAge();
+        assert(age == 42);
+        assert(vm.getNonce(sender) == startingNonce + 2);
+
+        uint256 num = greeter.greeting2("zksync", 2);
+        assert(num == 4);
+        assert(vm.getNonce(sender) == startingNonce + 3);
+        vm.stopBroadcast();
     }
 
     function _computeCreate2Address(

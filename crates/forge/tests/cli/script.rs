@@ -1,6 +1,6 @@
 //! Contains various tests related to `forge script`.
 
-use crate::constants::TEMPLATE_CONTRACT;
+use crate::{constants::TEMPLATE_CONTRACT, zksync_node};
 use alloy_primitives::{Address, Bytes};
 use anvil::{spawn, NodeConfig};
 use foundry_test_utils::{rpc, util::OutputExt, ScriptOutcome, ScriptTester};
@@ -1452,39 +1452,35 @@ forgetest_async!(can_deploy_library_create2_different_sender, |prj, cmd| {
         .await;
 });
 
-// ignoring test as it requires a local era-test-node to be running on port 8011
-forgetest_async!(
-    #[ignore]
-    can_execute_zk_script_with_arguments,
-    |prj, cmd| {
-        #[derive(serde::Deserialize, Debug)]
-        #[allow(dead_code)]
-        struct ZkTransactions {
-            transactions: Vec<ZkTransaction>,
-        }
+forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
+    #[derive(serde::Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct ZkTransactions {
+        transactions: Vec<ZkTransaction>,
+    }
 
-        #[derive(serde::Deserialize, Debug)]
-        #[allow(dead_code)]
-        struct ZkTransaction {
-            zk: Zk,
-        }
+    #[derive(serde::Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct ZkTransaction {
+        zk: Zk,
+    }
 
-        #[derive(serde::Deserialize, Debug)]
-        #[serde(rename_all = "camelCase")]
-        #[allow(dead_code)]
-        struct Zk {
-            factory_deps: Vec<Vec<u8>>,
-        }
+    #[derive(serde::Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    #[allow(dead_code)]
+    struct Zk {
+        factory_deps: Vec<Vec<u8>>,
+    }
 
-        cmd.args(["init", "--force"]).arg(prj.root());
-        cmd.assert_non_empty_stdout();
-        cmd.forge_fuse();
+    let node = zksync_node::ZkSyncNode::start();
 
-        let (_api, _handle) = spawn(NodeConfig::test()).await;
-        let script = prj
-            .add_script(
-                "Deploy.s.sol",
-                r#"
+    cmd.args(["init", "--force"]).arg(prj.root());
+    cmd.assert_non_empty_stdout();
+    cmd.forge_fuse();
+
+    prj.add_script(
+        "Deploy.s.sol",
+        r#"
 pragma solidity ^0.8.18;
 
 import {Script} from "forge-std/Script.sol";
@@ -1527,34 +1523,33 @@ contract DeployScript is Script {
     }
 }
    "#,
-            )
-            .unwrap();
+    )
+    .unwrap();
 
-        cmd.arg("script").arg(script).args([
-            "--tc",
-            "DeployScript",
-            "--broadcast",
-            "--private-key",
-            "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e",
-            "--chain",
-            "260",
-            "--gas-estimate-multiplier",
-            "310",
-            "--rpc-url",
-            "http://localhost:8011",
-            "--slow",
-        ]);
+    cmd.arg("script").args([
+        "--zksync",
+        "DeployScript",
+        "--broadcast",
+        "--private-key",
+        "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e",
+        "--chain",
+        "260",
+        "--gas-estimate-multiplier",
+        "310",
+        "--rpc-url",
+        node.url().as_str(),
+        "--slow",
+    ]);
 
-        assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+    assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
 
-        let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
-            .find(|file| file.ends_with("run-latest.json"))
-            .expect("No broadcast artifacts");
+    let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
+        .find(|file| file.ends_with("run-latest.json"))
+        .expect("No broadcast artifacts");
 
-        let content = foundry_common::fs::read_to_string(run_latest).unwrap();
+    let content = foundry_common::fs::read_to_string(run_latest).unwrap();
 
-        let transactions: ZkTransactions = serde_json::from_str(&content).unwrap();
-        let transactions = transactions.transactions;
-        assert_eq!(transactions.len(), 3);
-    }
-);
+    let transactions: ZkTransactions = serde_json::from_str(&content).unwrap();
+    let transactions = transactions.transactions;
+    assert_eq!(transactions.len(), 3);
+});

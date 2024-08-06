@@ -3,6 +3,25 @@ pragma solidity ^0.8.18;
 
 import "ds-test/test.sol";
 import "../cheats/Vm.sol";
+import {Globals} from "./Globals.sol";
+
+contract BlockEnv {
+    uint256 public number;
+    uint256 public timestamp;
+    uint256 public basefee;
+    uint256 public chainid;
+
+    constructor() {
+        number = block.number;
+        timestamp = block.timestamp;
+        basefee = block.basefee;
+        chainid = block.chainid;
+    }
+
+    function zkBlockhash(uint256 _blockNumber) public view returns (bytes32) {
+        return blockhash(_blockNumber);
+    }
+}
 
 contract ZkBasicTest is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
@@ -17,10 +36,12 @@ contract ZkBasicTest is DSTest {
 
     uint256 forkEra;
     uint256 forkEth;
+    uint256 latestForkEth;
 
     function setUp() public {
-        forkEra = vm.createFork("https://mainnet.era.zksync.io", ERA_FORK_BLOCK);
-        forkEth = vm.createFork("https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf", ETH_FORK_BLOCK);
+        forkEra = vm.createFork(Globals.ZKSYNC_MAINNET_URL, ERA_FORK_BLOCK);
+        forkEth = vm.createFork(Globals.ETHEREUM_MAINNET_URL, ETH_FORK_BLOCK);
+        latestForkEth = vm.createFork(Globals.ETHEREUM_MAINNET_URL);
     }
 
     function testZkBasicBlockNumber() public {
@@ -48,5 +69,55 @@ contract ZkBasicTest is DSTest {
 
         vm.selectFork(forkEth);
         require(TEST_ADDRESS.balance == 100, "eth balance mismatch");
+    }
+
+    function testZkPropagatedBlockEnv() public {
+        BlockEnv be = new BlockEnv();
+        require(be.number() == block.number, "propagated block number is the same as current");
+        require(be.timestamp() == block.timestamp, "propagated block timestamp is the same as current");
+        require(be.basefee() == block.basefee, "propagated block basefee is the same as current");
+        require(be.chainid() == block.chainid, "propagated block chainid is the same as current");
+
+        require(
+            be.zkBlockhash(block.number) == blockhash(block.number), "blockhash of the current block should be zero"
+        );
+
+        // this corresponds to the the genesis block since the test runs in block #1
+        require(
+            be.zkBlockhash(block.number - 1) == blockhash(block.number - 1),
+            "blockhash of the previous block should be equal"
+        );
+
+        require(be.zkBlockhash(0) == blockhash(0), "blockhash of the genesis block should be equal");
+
+        be = new BlockEnv();
+        require(be.number() == block.number, "propagated block number stays constant");
+        require(be.timestamp() == block.timestamp, "propagated block timestamp stays constant");
+        require(be.basefee() == block.basefee, "propagated block basefee stays constant");
+        require(be.chainid() == block.chainid, "propagated block chainid stays constant");
+
+        vm.roll(42);
+        vm.warp(42);
+
+        be = new BlockEnv();
+        require(be.number() == block.number, "propagated block number rolls");
+        require(be.timestamp() == block.timestamp, "propagated block timestamp warps");
+        require(be.basefee() == block.basefee, "propagated block basefee warps");
+    }
+
+    function testZkBasicBlockBaseFee() public {
+        BlockEnv beBefore = new BlockEnv();
+        require(beBefore.basefee() == block.basefee, "propagated block basefee is the same as current");
+
+        vm.selectFork(forkEra);
+        BlockEnv beAfter = new BlockEnv();
+        require(beAfter.basefee() == block.basefee, "propagated block basefee is the same as before");
+        require(beAfter.basefee() == block.basefee, "propagated block basefee is the same as before");
+    }
+
+    function testZkBlockHashWithNewerBlocks() public {
+        vm.selectFork(latestForkEth);
+        BlockEnv be = new BlockEnv();
+        require(be.zkBlockhash(block.number) == blockhash(block.number), "blockhash mismatch");
     }
 }

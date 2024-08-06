@@ -116,6 +116,38 @@ jobs:
     #     - name: Test ZK VM
     #       run: RUST_LOG=1 cargo test --package forge --test it --jobs=1 -- zk
     
+    zk-cargo-test:
+        name: zk-cargo-test
+        runs-on: ubuntu-22.04-github-hosted-16core
+  
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            submodules: recursive
+            ref: ${{ github.event.pull_request.head.sha }}
+  
+        - name: Install Rust
+          uses: actions-rust-lang/setup-rust-toolchain@v1
+          with:
+            toolchain: nightly-2024-04-28
+
+        - name: Run era-test-node
+          uses: dutterbutter/era-test-node-action@v1
+          with:
+            mode: fork
+            network: mainnet
+            log: info
+            logFilePath: era_test_node.log
+            target: x86_64-unknown-linux-gnu
+            releaseTag: v0.1.0-alpha.25
+  
+        - name: Run zk tests
+          env:
+            RUST_BACKTRACE: full
+            TEST_MAINNET_URL: http://localhost:8011
+          run: cargo test zk
+
     zk-smoke-test:
         name: zk-smoke-test
         runs-on: ubuntu-22.04-github-hosted-16core
