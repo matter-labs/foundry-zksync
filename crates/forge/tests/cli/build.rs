@@ -53,7 +53,7 @@ forgetest_init!(build_sizes_no_forge_std, |prj, cmd| {
 
 // tests build output is as expected in zksync mode
 forgetest_init!(test_zk_build_sizes, |prj, cmd| {
-    cmd.args(["build", "--sizes", "--zksync"]);
+    cmd.args(["build", "--sizes", "--zksync", "--evm-version", "shanghai"]);
     let stdout = cmd.stdout_lossy();
     assert!(stdout.contains("| Counter        |      800 |    450,199 |"), "\n{stdout}");
 });
