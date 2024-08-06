@@ -18,8 +18,8 @@ contract Issue497 is DSTest {
     }
 
     function testZkEnsureContractMigratedWhenForkZkSyncThenZkVmOff() external {
-       vm.selectFork(forkEra);
-       vm.zkVm(false);
-       assert(address(vm).codehash != 0);
+        vm.selectFork(forkEra);
+        vm.zkVm(false);
+        assert(address(vm).codehash != 0);
     }
 }
