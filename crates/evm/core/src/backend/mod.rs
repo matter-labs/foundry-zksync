@@ -14,7 +14,7 @@ use alloy_serde::WithOtherFields;
 use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 use foundry_zksync_core::{
-    convert::{ConvertH160, ConvertRU256},
+    convert::{ConvertH160},
     ACCOUNT_CODE_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use itertools::Itertools;
@@ -29,7 +29,7 @@ use revm::{
     Database, DatabaseCommit, JournaledState,
 };
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     time::Instant,
 };
 
