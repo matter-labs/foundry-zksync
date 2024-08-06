@@ -296,11 +296,14 @@ impl ProjectCompiler {
         // for filtering artifacts in missing libraries detection
         let files = self.files.clone();
 
-        {
-            Report::new(SpinnerReporter::spawn_with(format!(
-                "Using zksolc-{}",
-                project.zksync_zksolc.version()?
-            )));
+        let try_version = project.zksync_zksolc.version();
+        match try_version {
+            Ok(version) => {
+                Report::new(SpinnerReporter::spawn_with(format!("Using zksolc-{}", version)));
+            }
+            Err(_) => {
+                Report::new(SpinnerReporter::spawn_with(format!("Using zksolc")));
+            }
         }
         self.zksync_compile_with(&project.paths.root, || {
             let files_to_compile =
