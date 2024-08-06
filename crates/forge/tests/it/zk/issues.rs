@@ -9,7 +9,7 @@ use foundry_test_utils::Filter;
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_issue497() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
-    let filter = Filter::new("*", "Issue497", ".*");
+    let filter = Filter::new(".*", "Issue497", ".*");
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
