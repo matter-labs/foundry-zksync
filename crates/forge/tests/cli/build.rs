@@ -53,6 +53,14 @@ forgetest_init!(build_sizes_no_forge_std, |prj, cmd| {
 
 // tests build output is as expected in zksync mode
 forgetest_init!(test_zk_build_sizes, |prj, cmd| {
+    use std::process::Command;
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg("ls -l /home/runner/.zksync/zksolc-linux-amd64-musl-v1.5.1")
+        .output()
+        .expect("failed to execute process");
+    println!("{output:?}");
+
     cmd.args(["build", "--sizes", "--zksync", "--evm-version", "shanghai"]);
     let stdout = cmd.stdout_lossy();
     assert!(stdout.contains("| Counter        |      800 |    450,199 |"), "\n{stdout}");
