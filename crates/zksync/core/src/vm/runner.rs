@@ -32,8 +32,8 @@ pub fn transact<'a, DB>(
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
 where
-    DB: Database + Send,
-    <DB as Database>::Error: Send + Debug,
+    DB: Database,
+    <DB as Database>::Error: Debug,
 {
     info!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
 
@@ -124,8 +124,8 @@ pub fn create<DB, E>(
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database + Send,
-    <DB as Database>::Error: Send + Debug,
+    DB: Database,
+    <DB as Database>::Error: Debug,
 {
     info!(?call, "create tx {}", hex::encode(&call.init_code));
     let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
@@ -175,8 +175,8 @@ pub fn call<DB, E>(
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
-    DB: Database + Send,
-    <DB as Database>::Error: Send + Debug,
+    DB: Database,
+    <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
     let caller = ecx.env.tx.caller;
@@ -229,7 +229,7 @@ where
 /// Assign gas parameters that satisfy zkSync's fee model.
 fn gas_params<DB>(ecx: &mut EvmContext<DB>, caller: Address) -> (U256, U256)
 where
-    DB: Database + Send,
+    DB: Database,
     <DB as Database>::Error: Debug,
 {
     let value = ecx.env.tx.value.to_u256();
