@@ -37,12 +37,12 @@ impl CachedForkType {
 
         let is_zk_url = foundry_common::provider::try_get_http_provider(fork_url)
             .map(|provider| {
-                let is_zk_url =
-                    futures::executor::block_on(provider.raw_request("zks_L1ChainId".into(), ()))
-                        .map(|_: String| true)
-                        .unwrap_or_default();
-
-                is_zk_url
+                tokio::task::block_in_place(move || {
+                    tokio::runtime::Handle::current()
+                        .block_on(provider.raw_request::<_, String>("zks_L1ChainId".into(), ()))
+                        .map(|_| true)
+                })
+                .unwrap_or_default()
             })
             .unwrap_or_default();
 
