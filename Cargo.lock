@@ -4966,7 +4966,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#07d7c7525f989db4192a004bc2a23fc3be32a8ce"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#c25c4016bf7b9afe7a0f98320ec7981f69e8323e"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5005,7 +5005,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#07d7c7525f989db4192a004bc2a23fc3be32a8ce"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#c25c4016bf7b9afe7a0f98320ec7981f69e8323e"
 dependencies = [
  "foundry-compilers-artifacts-solc",
  "foundry-compilers-artifacts-vyper",
@@ -5015,7 +5015,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-solc"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#07d7c7525f989db4192a004bc2a23fc3be32a8ce"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#c25c4016bf7b9afe7a0f98320ec7981f69e8323e"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5037,7 +5037,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-vyper"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#07d7c7525f989db4192a004bc2a23fc3be32a8ce"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#c25c4016bf7b9afe7a0f98320ec7981f69e8323e"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5049,7 +5049,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-zksolc"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#07d7c7525f989db4192a004bc2a23fc3be32a8ce"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#c25c4016bf7b9afe7a0f98320ec7981f69e8323e"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5070,7 +5070,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-core"
 version = "0.8.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#07d7c7525f989db4192a004bc2a23fc3be32a8ce"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=elfedy-compiler-lock#c25c4016bf7b9afe7a0f98320ec7981f69e8323e"
 dependencies = [
  "alloy-primitives",
  "cfg-if 1.0.0",
