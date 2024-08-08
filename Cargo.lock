@@ -5005,7 +5005,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#aa24a0d8eb638cb2a2abe1d9534d4db3cc744919"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#07b1b367b28affacc5542c59053c4dff67f26507"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5015,6 +5015,7 @@ dependencies = [
  "dyn-clone",
  "foundry-compilers-artifacts",
  "foundry-compilers-core",
+ "fs4",
  "fs_extra",
  "futures-util",
  "home",
@@ -5043,7 +5044,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#aa24a0d8eb638cb2a2abe1d9534d4db3cc744919"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#07b1b367b28affacc5542c59053c4dff67f26507"
 dependencies = [
  "foundry-compilers-artifacts-solc",
  "foundry-compilers-artifacts-vyper",
@@ -5053,7 +5054,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-solc"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#aa24a0d8eb638cb2a2abe1d9534d4db3cc744919"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#07b1b367b28affacc5542c59053c4dff67f26507"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5076,7 +5077,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-vyper"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#aa24a0d8eb638cb2a2abe1d9534d4db3cc744919"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#07b1b367b28affacc5542c59053c4dff67f26507"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5090,7 +5091,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-zksolc"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#aa24a0d8eb638cb2a2abe1d9534d4db3cc744919"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#07b1b367b28affacc5542c59053c4dff67f26507"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5111,7 +5112,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-core"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#aa24a0d8eb638cb2a2abe1d9534d4db3cc744919"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#07b1b367b28affacc5542c59053c4dff67f26507"
 dependencies = [
  "alloy-primitives",
  "cfg-if 1.0.0",
@@ -8045,7 +8046,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "681030a937600a36906c185595136d26abfebb4aa9c65701cefcaf8578bb982b"
 dependencies = [
- "proc-macro-crate 3.1.0",
+ "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 2.0.71",
@@ -9227,7 +9228,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18bec9b0adc4eba778b33684b7ba3e7137789434769ee3ce3930463ef904cfca"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.71",
