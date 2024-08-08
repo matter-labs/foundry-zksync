@@ -51,6 +51,13 @@ forgetest_init!(build_sizes_no_forge_std, |prj, cmd| {
     assert!(stdout.contains("Counter"), "\n{stdout}");
 });
 
+// tests build output is as expected in zksync mode
+forgetest_init!(test_zk_build_sizes, |prj, cmd| {
+    cmd.args(["build", "--sizes", "--zksync", "--evm-version", "shanghai"]);
+    let stdout = cmd.stdout_lossy();
+    assert!(stdout.contains("| Counter        |      800 |    450,199 |"), "\n{stdout}");
+});
+
 // tests that skip key in config can be used to skip non-compilable contract
 forgetest_init!(test_can_skip_contract, |prj, cmd| {
     prj.add_source(

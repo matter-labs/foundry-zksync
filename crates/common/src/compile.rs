@@ -54,6 +54,9 @@ pub struct ProjectCompiler {
 
     /// Extra files to include, that are not necessarily in the project's source dir.
     files: Vec<PathBuf>,
+
+    /// Set zksync specific settings based on context
+    zksync: bool,
 }
 
 impl Default for ProjectCompiler {
@@ -74,6 +77,7 @@ impl ProjectCompiler {
             quiet: Some(crate::shell::verbosity().is_silent()),
             bail: None,
             files: Vec::new(),
+            zksync: false,
         }
     }
 
@@ -126,6 +130,13 @@ impl ProjectCompiler {
     #[inline]
     pub fn files(mut self, files: impl IntoIterator<Item = PathBuf>) -> Self {
         self.files.extend(files);
+        self
+    }
+
+    /// Enables zksync contract sizes.
+    #[inline]
+    pub fn zksync_sizes(mut self) -> Self {
+        self.zksync = true;
         self
     }
 
@@ -228,7 +239,7 @@ impl ProjectCompiler {
                 println!();
             }
 
-            let mut size_report = SizeReport { contracts: BTreeMap::new() };
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
 
             let artifacts: BTreeMap<_, _> = output
                 .artifact_ids()
@@ -454,7 +465,7 @@ impl ProjectCompiler {
                 println!();
             }
 
-            let mut size_report = SizeReport { contracts: BTreeMap::new() };
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
             let artifacts: BTreeMap<_, _> = output.artifacts().collect();
             for (name, artifact) in artifacts {
                 let bytecode = artifact.get_bytecode_object().unwrap_or_default();
@@ -620,10 +631,15 @@ impl ContractSources {
 // https://eips.ethereum.org/EIPS/eip-170
 const CONTRACT_SIZE_LIMIT: usize = 24576;
 
+// https://docs.zksync.io/build/developer-reference/ethereum-differences/contract-deployment#contract-size-limit-and-format-of-bytecode-hash
+const ZKSYNC_CONTRACT_SIZE_LIMIT: usize = 450999;
+
 /// Contracts with info about their size
 pub struct SizeReport {
     /// `contract name -> info`
     pub contracts: BTreeMap<String, ContractInfo>,
+    /// Using zksync size report
+    pub zksync: bool,
 }
 
 impl SizeReport {
@@ -640,7 +656,11 @@ impl SizeReport {
 
     /// Returns true if any contract exceeds the size limit, excluding test contracts.
     pub fn exceeds_size_limit(&self) -> bool {
-        self.max_size() > CONTRACT_SIZE_LIMIT
+        if self.zksync {
+            self.max_size() > ZKSYNC_CONTRACT_SIZE_LIMIT
+        } else {
+            self.max_size() > CONTRACT_SIZE_LIMIT
+        }
     }
 }
 
@@ -657,11 +677,22 @@ impl Display for SizeReport {
         // filters out non dev contracts (Test or Script)
         let contracts = self.contracts.iter().filter(|(_, c)| !c.is_dev_contract && c.size > 0);
         for (name, contract) in contracts {
-            let margin = CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
-            let color = match contract.size {
-                0..=17999 => Color::Reset,
-                18000..=CONTRACT_SIZE_LIMIT => Color::Yellow,
-                _ => Color::Red,
+            let (margin, color) = if self.zksync {
+                let margin = ZKSYNC_CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
+                let color = match contract.size {
+                    0..=329999 => Color::Reset,
+                    330000..=ZKSYNC_CONTRACT_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
+                (margin, color)
+            } else {
+                let margin = CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
+                let color = match contract.size {
+                    0..=17999 => Color::Reset,
+                    18000..=CONTRACT_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
+                (margin, color)
             };
 
             let locale = &Locale::en;
