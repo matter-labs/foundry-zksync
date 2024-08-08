@@ -4,7 +4,7 @@ This repository enhances Foundry to support zkSync Era, enabling Solidity-based 
 
 > 🔧 **Fork Notice:** This is a Foundry fork with added zkSync support.
 > 
-> ⚠️ **Alpha Stage:** The project is in alpha, so you might encounter issues.
+> ⚠️ **Alpha Stage:** The project is in alpha, so you might encounter issues. For more information, please review [Limitations](#limitations) section.
 > 
 > 🐞 **Found an Issue?** Please report it to help us improve.
 
@@ -72,6 +72,7 @@ While `foundry-zksync` is **alpha stage**, there are some limitations to be awar
 - **Contract Verification**: Currently contract verification via the `--verify` flag do not work as expected but will be added shortly.  
 - **Specific Foundry Features**: Currently features such as `--gas-report`, `--coverage` may not work as intended. We are actively working on providing support for these feature types.
 - **Solc Compatibility**: `zksolc` requires a `solc` binary to be run as a child process. The version/path to use for each can be specified by the `zksolc` and `solc` options in `foundry.toml`. Not all `solc` versions are supported by all `zksolc` versions, compiling with a `solc` version higher than the one supported may lead to unexpected errors. [Read the docs](https://docs.zksync.io/zk-stack/components/compiler/toolchain/solidity.html#limitations) about version limitations and check the [zksolc changelog](https://github.com/matter-labs/era-compiler-solidity/blob/main/CHANGELOG.md) to see the latest supported `solc` version.
+- **Windows Compatibility**: Windows is not officially supported yet. The reported issues would be investigated on a best-effort basis. 
 
 For the most effective use of our library, we recommend familiarizing yourself with these features and limitations.
 

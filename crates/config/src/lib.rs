@@ -29,13 +29,11 @@ use foundry_compilers::{
         multi::{MultiCompiler, MultiCompilerSettings},
         solc::{Solc, SolcCompiler},
         vyper::{Vyper, VyperSettings},
-        zksolc::ZkSolc,
         Compiler,
     },
     error::SolcError,
     solc::{CliSettings, SolcSettings},
     zksolc::ZkSolcSettings,
-    zksync::config::ZkSolcConfig,
     ConfigurableArtifacts, Project, ProjectPathsConfig, VyperLanguage,
 };
 use inflector::Inflector;
@@ -852,34 +850,10 @@ impl Config {
             builder = builder.sparse_output(filter);
         }
 
-        let mut project = builder.build(self.compiler()?)?;
+        let project = builder.build(self.compiler()?)?;
 
         if self.force {
             self.cleanup(&project)?;
-        }
-
-        // Set up zksolc project values
-        // TODO: maybe some of these could be included
-        // when setting up the builder for the sake of consistency (requires dedicated
-        // builder methods)
-        project.zksync_zksolc_config = ZkSolcConfig { settings: self.zksync_zksolc_settings()? };
-
-        if let Some(zksolc) = self.zksync_ensure_zksolc()? {
-            project.zksync_zksolc = zksolc;
-        } else {
-            // TODO: we automatically install a zksolc version
-            // if none is found, but maybe we should mirror auto detect settings
-            // as done with solc
-            if !self.offline {
-                let default_version = Version::new(1, 4, 1);
-                let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
-                if zksolc.is_none() {
-                    ZkSolc::blocking_install(&default_version)?;
-                    zksolc = ZkSolc::find_installed_version(&default_version)?;
-                }
-                project.zksync_zksolc =
-                    zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"));
-            }
         }
 
         Ok(project)
@@ -939,44 +913,6 @@ impl Config {
                 }
             };
             return Ok(Some(solc))
-        }
-
-        Ok(None)
-    }
-
-    /// Ensures that the configured version is installed if explicitly set
-    ///
-    /// If `zksolc` is [`SolcReq::Version`] then this will download and install the solc version if
-    /// it's missing, unless the `offline` flag is enabled, in which case an error is thrown.
-    ///
-    /// If `zksolc` is [`SolcReq::Local`] then this will ensure that the path exists.
-    fn zksync_ensure_zksolc(&self) -> Result<Option<ZkSolc>, SolcError> {
-        if let Some(ref zksolc) = self.zksync.zksolc {
-            let zksolc = match zksolc {
-                SolcReq::Version(version) => {
-                    let mut zksolc = ZkSolc::find_installed_version(version)?;
-                    if zksolc.is_none() {
-                        if self.offline {
-                            return Err(SolcError::msg(format!(
-                                "can't install missing zksolc {version} in offline mode"
-                            )))
-                        }
-                        ZkSolc::blocking_install(version)?;
-                        zksolc = ZkSolc::find_installed_version(version)?;
-                    }
-                    zksolc
-                }
-                SolcReq::Local(zksolc) => {
-                    if !zksolc.is_file() {
-                        return Err(SolcError::msg(format!(
-                            "`zksolc` {} does not exist",
-                            zksolc.display()
-                        )))
-                    }
-                    Some(ZkSolc::new(zksolc))
-                }
-            };
-            return Ok(zksolc)
         }
 
         Ok(None)

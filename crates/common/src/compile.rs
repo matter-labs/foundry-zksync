@@ -55,6 +55,9 @@ pub struct ProjectCompiler {
 
     /// Extra files to include, that are not necessarily in the project's source dir.
     files: Vec<PathBuf>,
+
+    /// Set zksync specific settings based on context
+    zksync: bool,
 }
 
 impl Default for ProjectCompiler {
@@ -75,6 +78,7 @@ impl ProjectCompiler {
             quiet: Some(crate::shell::verbosity().is_silent()),
             bail: None,
             files: Vec::new(),
+            zksync: false,
         }
     }
 
@@ -127,6 +131,13 @@ impl ProjectCompiler {
     #[inline]
     pub fn files(mut self, files: impl IntoIterator<Item = PathBuf>) -> Self {
         self.files.extend(files);
+        self
+    }
+
+    /// Enables zksync contract sizes.
+    #[inline]
+    pub fn zksync_sizes(mut self) -> Self {
+        self.zksync = true;
         self
     }
 
@@ -229,7 +240,7 @@ impl ProjectCompiler {
                 println!();
             }
 
-            let mut size_report = SizeReport { contracts: BTreeMap::new() };
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
 
             let artifacts: BTreeMap<_, _> = output
                 .artifact_ids()
@@ -307,6 +318,60 @@ impl ProjectCompiler {
             .compile()
             .map_err(Into::into)
         })
+    }
+
+    #[instrument(target = "forge::compile", skip_all)]
+    fn zksync_compile_with<F>(
+        self,
+        root_path: impl AsRef<Path>,
+        f: F,
+    ) -> Result<ZkProjectCompileOutput>
+    where
+        F: FnOnce() -> Result<ZkProjectCompileOutput>,
+    {
+        let quiet = self.quiet.unwrap_or(false);
+        let bail = self.bail.unwrap_or(true);
+        #[allow(clippy::collapsible_else_if)]
+        let reporter = if quiet {
+            Report::new(NoReporter::default())
+        } else {
+            if std::io::stdout().is_terminal() {
+                Report::new(SpinnerReporter::spawn_with("Compiling (zksync)"))
+            } else {
+                Report::new(BasicStdoutReporter::default())
+            }
+        };
+
+        let output = foundry_compilers::report::with_scoped(&reporter, || {
+            tracing::debug!("compiling project");
+
+            let timer = std::time::Instant::now();
+            let r = f();
+            let elapsed = timer.elapsed();
+
+            tracing::debug!("finished compiling in {:.3}s", elapsed.as_secs_f64());
+            r
+        })?;
+
+        // need to drop the reporter here, so that the spinner terminates
+        drop(reporter);
+
+        if bail && output.has_compiler_errors() {
+            eyre::bail!("{output}")
+        }
+
+        if !quiet {
+            if output.is_unchanged() {
+                println!("No files changed, compilation skipped");
+            } else {
+                // print the compiler output / warnings
+                println!("{output}");
+            }
+
+            self.zksync_handle_output(root_path, &output)?;
+        }
+
+        Ok(output)
     }
 
     /// If configured, this will print sizes or names
@@ -400,7 +465,7 @@ impl ProjectCompiler {
                 println!();
             }
 
-            let mut size_report = SizeReport { contracts: BTreeMap::new() };
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
 
             let artifacts: BTreeMap<_, _> = output
                 .artifact_ids()
@@ -443,60 +508,6 @@ impl ProjectCompiler {
             }
         }
         Ok(())
-    }
-
-    #[instrument(target = "forge::compile", skip_all)]
-    fn zksync_compile_with<F>(
-        self,
-        root_path: impl AsRef<Path>,
-        f: F,
-    ) -> Result<ZkProjectCompileOutput>
-    where
-        F: FnOnce() -> Result<ZkProjectCompileOutput>,
-    {
-        let quiet = self.quiet.unwrap_or(false);
-        let bail = self.bail.unwrap_or(true);
-        #[allow(clippy::collapsible_else_if)]
-        let reporter = if quiet {
-            Report::new(NoReporter::default())
-        } else {
-            if std::io::stdout().is_terminal() {
-                Report::new(SpinnerReporter::spawn_with("Compiling (zksync)"))
-            } else {
-                Report::new(BasicStdoutReporter::default())
-            }
-        };
-
-        let output = foundry_compilers::report::with_scoped(&reporter, || {
-            tracing::debug!("compiling project");
-
-            let timer = std::time::Instant::now();
-            let r = f();
-            let elapsed = timer.elapsed();
-
-            tracing::debug!("finished compiling in {:.3}s", elapsed.as_secs_f64());
-            r
-        })?;
-
-        // need to drop the reporter here, so that the spinner terminates
-        drop(reporter);
-
-        if bail && output.has_compiler_errors() {
-            eyre::bail!("{output}")
-        }
-
-        if !quiet {
-            if output.is_unchanged() {
-                println!("No files changed, compilation skipped");
-            } else {
-                // print the compiler output / warnings
-                println!("{output}");
-            }
-
-            self.zksync_handle_output(root_path, &output)?;
-        }
-
-        Ok(output)
     }
 }
 
@@ -629,10 +640,15 @@ impl ContractSources {
 // https://eips.ethereum.org/EIPS/eip-170
 const CONTRACT_SIZE_LIMIT: usize = 24576;
 
+// https://docs.zksync.io/build/developer-reference/ethereum-differences/contract-deployment#contract-size-limit-and-format-of-bytecode-hash
+const ZKSYNC_CONTRACT_SIZE_LIMIT: usize = 450999;
+
 /// Contracts with info about their size
 pub struct SizeReport {
     /// `contract name -> info`
     pub contracts: BTreeMap<String, ContractInfo>,
+    /// Using zksync size report
+    pub zksync: bool,
 }
 
 impl SizeReport {
@@ -649,7 +665,11 @@ impl SizeReport {
 
     /// Returns true if any contract exceeds the size limit, excluding test contracts.
     pub fn exceeds_size_limit(&self) -> bool {
-        self.max_size() > CONTRACT_SIZE_LIMIT
+        if self.zksync {
+            self.max_size() > ZKSYNC_CONTRACT_SIZE_LIMIT
+        } else {
+            self.max_size() > CONTRACT_SIZE_LIMIT
+        }
     }
 }
 
@@ -666,11 +686,22 @@ impl Display for SizeReport {
         // filters out non dev contracts (Test or Script)
         let contracts = self.contracts.iter().filter(|(_, c)| !c.is_dev_contract && c.size > 0);
         for (name, contract) in contracts {
-            let margin = CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
-            let color = match contract.size {
-                0..=17999 => Color::Reset,
-                18000..=CONTRACT_SIZE_LIMIT => Color::Yellow,
-                _ => Color::Red,
+            let (margin, color) = if self.zksync {
+                let margin = ZKSYNC_CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
+                let color = match contract.size {
+                    0..=329999 => Color::Reset,
+                    330000..=ZKSYNC_CONTRACT_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
+                (margin, color)
+            } else {
+                let margin = CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
+                let color = match contract.size {
+                    0..=17999 => Color::Reset,
+                    18000..=CONTRACT_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
+                (margin, color)
             };
 
             let locale = &Locale::en;

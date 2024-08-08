@@ -1539,6 +1539,8 @@ contract DeployScript is Script {
         "--rpc-url",
         node.url().as_str(),
         "--slow",
+        "--evm-version",
+        "shanghai",
     ]);
 
     assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));

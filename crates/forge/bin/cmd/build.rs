@@ -115,6 +115,7 @@ impl BuildArgs {
             let zk_compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)
+                .zksync_sizes()
                 .quiet(self.format_json)
                 .bail(!self.format_json);
 
