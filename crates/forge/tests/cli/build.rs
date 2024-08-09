@@ -1,6 +1,7 @@
 use foundry_config::Config;
 use foundry_test_utils::forgetest;
 use globset::Glob;
+use regex::Regex;
 
 // tests that json is printed when --json is passed
 forgetest!(compile_json, |prj, cmd| {
@@ -41,7 +42,9 @@ forgetest_init!(build_sizes_no_forge_std, |prj, cmd| {
 forgetest_init!(test_zk_build_sizes, |prj, cmd| {
     cmd.args(["build", "--sizes", "--zksync", "--evm-version", "shanghai"]);
     let stdout = cmd.stdout_lossy();
-    assert!(stdout.contains("| Counter        |      800 |    450,199 |"), "\n{stdout}");
+    let pattern = Regex::new(r"\|\s*Counter\s*\|\s*800\s*\|\s*450,199\s*\|").unwrap();
+
+    assert!(pattern.is_match(&stdout), "Unexpected size output:\n{stdout}");
 });
 
 // tests that skip key in config can be used to skip non-compilable contract
