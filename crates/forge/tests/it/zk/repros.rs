@@ -11,7 +11,7 @@ use alloy_primitives::Address;
 use foundry_config::{fs_permissions::PathPermission, FsPermissions};
 use foundry_test_utils::Filter;
 
-//zk-specific repros configuration
+// zk-specific repros configuration
 async fn repro_config(
     issue: usize,
     should_fail: bool,
@@ -41,8 +41,9 @@ test_repro!(497);
 foundry_test_utils::forgetest_async!(issue_478, |prj, cmd| {
     foundry_test_utils::util::initialize(prj.root());
 
-    prj.add_test("Issue478.t.sol",
-                 r#"
+    prj.add_test(
+        "Issue478.t.sol",
+        r#"
 import "forge-std/Test.sol";
 
 // https://github.com/matter-labs/foundry-zksync/issues/478
@@ -59,7 +60,9 @@ contract Issue478 is Test {
         require(keccak256(ret) == keccak256(abi.encode(42)), "return not as expected");
     }
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     cmd.args(["test", "--zksync", "--evm-version", "shanghai"]);
 
     let output = cmd.stdout_lossy();
