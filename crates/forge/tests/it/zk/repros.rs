@@ -36,3 +36,32 @@ async fn repro_config(
 
 // https://github.com/matter-labs/foundry-zksync/issues/497
 test_repro!(497);
+
+// https://github.com/matter-labs/foundry-zksync/issues/478
+foundry_test_utils::forgetest_async!(issue_478, |prj, cmd| {
+    foundry_test_utils::util::initialize(prj.root());
+
+    prj.add_test("Issue478.t.sol",
+                 r#"
+import "forge-std/Test.sol";
+
+// https://github.com/matter-labs/foundry-zksync/issues/478
+contract Issue478 is Test {
+    // This test should make our EraVM tracer print out an ERROR trace
+    function testFailDetectEmptyCodeContracts() external {
+        address mockMe = address(123456789);
+
+        vm.mockCall(mockMe, abi.encodeWithSignature("foo()"), abi.encode(42));
+
+        (bool success, bytes memory ret) = mockMe.call(abi.encodeWithSignature("bar()"));
+
+        require(success, "callMethod failed");
+        require(keccak256(ret) == keccak256(abi.encode(42)), "return not as expected");
+    }
+}
+"#).unwrap();
+    cmd.args(["test", "--zksync", "--evm-version", "shanghai"]);
+
+    let output = cmd.stdout_lossy();
+    assert!(output.contains("call may fail or behave unexpectedly due to empty code"));
+});
