@@ -4,7 +4,7 @@ This repository enhances Foundry to support zkSync Era, enabling Solidity-based 
 
 > 🔧 **Fork Notice:** This is a Foundry fork with added zkSync support.
 > 
-> ⚠️ **Alpha Stage:** The project is in alpha, so you might encounter issues. For more information, please review [Limitations](#limitations) section.
+> ⚠️ **Alpha Stage:** The project is in alpha, so you might encounter issues. For more information, please review [Limitations](#limitations) section❗
 > 
 > 🐞 **Found an Issue?** Please report it to help us improve.
 
@@ -47,6 +47,7 @@ Forge is quite fast at both compiling (leveraging [ethers-solc]) and testing.
 
 While `foundry-zksync` is **alpha stage**, there are some limitations to be aware of:
 
+- **Cheatcodes in External Contracts**: Currently the use of cheatcodes in external contracts is not supported. For more innformation, please review [the following issue](https://github.com/matter-labs/foundry-zksync/issues/497#issuecomment-2267629273).
 - **Compile Time**: Some users may experience slower compile times.
 - **Compiling Libraries**: Compiling non-inlinable libraries requires deployment and adding to configuration or the command line with the `--libraries` argument. For more information please refer to [official docs](https://docs.zksync.io/build/developer-reference/ethereum-differences/libraries).
 
