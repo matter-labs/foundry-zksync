@@ -20,7 +20,7 @@ use multivm::{
 use once_cell::sync::OnceCell;
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    get_code_key, StorageKey, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,
+    get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,
     SYSTEM_CONTEXT_ADDRESS, U256,
 };
 use zksync_utils::bytecode::hash_bytecode;
@@ -143,14 +143,17 @@ impl CheatcodeTracer {
         CheatcodeTracer { mocked_calls, expected_calls, call_context, result, ..Default::default() }
     }
 
-    /// Returns true if the given `target`'s code storage should result empty
-    fn is_code_expected_empty(&self, target: Address) -> bool {
-        target == foundry_common::HARDHAT_CONSOLE_ADDRESS || target == self.call_context.tx_caller
-    }
+    /// Check if the given address's code is empty
+    fn has_empty_code<S: ReadStorage>(&self, storage: StoragePtr<S>, target: Address) -> bool {
+        // The following addresses are expected to have empty bytecode
+        let ignored_known_addresses =
+            [foundry_common::HARDHAT_CONSOLE_ADDRESS, self.call_context.tx_caller];
 
-    /// Load the specified storage slot
-    pub fn sload<S: ReadStorage>(ptr: StoragePtr<S>, key: StorageKey) -> StorageValue {
-        ptr.borrow_mut().read_value(&key)
+        let contract_code = storage.borrow_mut().read_value(&get_code_key(&target.to_h160()));
+
+        !ignored_known_addresses.contains(&target) &&
+            (contract_code == hash_bytecode(&EMPTY_CODE) ||
+                contract_code == StorageValue::zero())
     }
 }
 
@@ -242,13 +245,9 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                 }
             }
 
-            let contract_code = Self::sload(storage, get_code_key(&current.code_address));
-            let is_empty_code = contract_code == hash_bytecode(&EMPTY_CODE) ||
-                contract_code == StorageValue::zero();
-
             // if we get here there was no matching mock call,
             // so we check if there's no code at the mocked address
-            if !self.is_code_expected_empty(call_contract) && is_empty_code {
+            if self.has_empty_code(storage, call_contract) {
                 // issue a more targeted
                 // error if we already had some mocks there
                 let had_mocks_message = if mocks.is_some() {
