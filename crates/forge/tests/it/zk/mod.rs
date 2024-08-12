@@ -2,5 +2,5 @@
 mod basic;
 mod cheats;
 mod contracts;
-mod issues;
 mod logs;
+mod repros;
