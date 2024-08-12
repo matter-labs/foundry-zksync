@@ -2,8 +2,8 @@
 pragma solidity ^0.8.18;
 
 import "ds-test/test.sol";
-import "../cheats/Vm.sol";
-import {Globals} from "./Globals.sol";
+import "cheats/Vm.sol";
+import {Globals} from "../Globals.sol";
 
 // https://github.com/matter-labs/foundry-zksync/issues/497
 contract Issue497 is DSTest {

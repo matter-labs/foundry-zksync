@@ -18,14 +18,17 @@ use multivm::{
     },
 };
 use once_cell::sync::OnceCell;
-use zksync_state::WriteStorage;
+use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, SYSTEM_CONTEXT_ADDRESS, U256,
+    get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,
+    SYSTEM_CONTEXT_ADDRESS, U256,
 };
+use zksync_utils::bytecode::hash_bytecode;
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
     vm::farcall::{CallAction, CallDepth},
+    EMPTY_CODE,
 };
 
 use super::farcall::FarCallHandler;
@@ -139,9 +142,22 @@ impl CheatcodeTracer {
     ) -> Self {
         CheatcodeTracer { mocked_calls, expected_calls, call_context, result, ..Default::default() }
     }
+
+    /// Check if the given address's code is empty
+    fn has_empty_code<S: ReadStorage>(&self, storage: StoragePtr<S>, target: Address) -> bool {
+        // The following addresses are expected to have empty bytecode
+        let ignored_known_addresses =
+            [foundry_common::HARDHAT_CONSOLE_ADDRESS, self.call_context.tx_caller];
+
+        let contract_code = storage.borrow_mut().read_value(&get_code_key(&target.to_h160()));
+
+        !ignored_known_addresses.contains(&target) &&
+            (contract_code == hash_bytecode(&EMPTY_CODE) ||
+                contract_code == StorageValue::zero())
+    }
 }
 
-impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
+impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
     fn before_decoding(&mut self, _state: VmLocalStateData<'_>, _memory: &SimpleMemory<H>) {}
 
     fn after_decoding(
@@ -157,7 +173,7 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
         _state: VmLocalStateData<'_>,
         _data: BeforeExecutionData,
         _memory: &SimpleMemory<H>,
-        _storage: zksync_state::StoragePtr<S>,
+        _storage: StoragePtr<S>,
     ) {
     }
 
@@ -166,7 +182,7 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
         state: VmLocalStateData<'_>,
         data: AfterExecutionData,
         memory: &SimpleMemory<H>,
-        _storage: zksync_state::StoragePtr<S>,
+        storage: StoragePtr<S>,
     ) {
         self.farcall_handler.track_call_actions(&state, &data);
 
@@ -203,7 +219,8 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
             let call_contract = current.code_address.to_address();
             let call_value = U256::from(current.context_u128_value).to_ru256();
 
-            if let Some(mocks) = self.mocked_calls.get(&call_contract) {
+            let mocks = self.mocked_calls.get(&call_contract);
+            if let Some(mocks) = &mocks {
                 let ctx = MockCallDataContext {
                     calldata: Bytes::from(call_input.clone()),
                     value: Some(call_value),
@@ -226,6 +243,25 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
                     self.farcall_handler.set_immediate_return(return_data);
                     return;
                 }
+            }
+
+            // if we get here there was no matching mock call,
+            // so we check if there's no code at the mocked address
+            if self.has_empty_code(storage, call_contract) {
+                // issue a more targeted
+                // error if we already had some mocks there
+                let had_mocks_message = if mocks.is_some() {
+                    " - please ensure the current calldata is mocked"
+                } else {
+                    ""
+                };
+
+                tracing::error!(
+                    target = ?call_contract,
+                    calldata = hex::encode(&call_input),
+                    "call may fail or behave unexpectedly due to empty code{}",
+                    had_mocks_message
+                );
             }
         }
 
