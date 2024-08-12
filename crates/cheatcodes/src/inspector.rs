@@ -1144,6 +1144,7 @@ impl Cheatcodes {
 
         if call.target_address == HARDHAT_CONSOLE_ADDRESS {
             self.combined_logs.push(None);
+            return None;
         }
 
         // Handle expected calls

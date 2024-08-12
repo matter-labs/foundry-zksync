@@ -28,7 +28,7 @@ use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    l2::L2Tx, vm_trace::Call, PackedEthSignature, StorageKey, Transaction,
+    l2::L2Tx, vm_trace::Call, PackedEthSignature, StorageKey, Transaction, VmEvent,
     ACCOUNT_CODE_STORAGE_ADDRESS,
 };
 use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
@@ -369,7 +369,7 @@ fn inspect_inner<S: ReadStorage>(
         )
         .into_tracer_pointer(),
     ];
-    let tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
+    let mut tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
     let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
     trace!(?tx_result.result, "zk vm result");
 
@@ -396,9 +396,16 @@ fn inspect_inner<S: ReadStorage>(
 
     info!("=== Console Logs: ");
     let log_parser = ConsoleLogParser::new();
-    // get_logs prints the logs
-    log_parser.get_logs(&call_traces, true);
+    let console_logs = log_parser.get_logs(&call_traces, true);
 
+    for log in console_logs {
+        tx_result.logs.events.push(VmEvent {
+            location: Default::default(),
+            address: H160::zero(),
+            indexed_topics: log.topics().iter().map(|topic| H256::from(topic.0)).collect(),
+            value: log.data.data.to_vec(),
+        });
+    }
     let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
     let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
     info!("=== Calls: ");
