@@ -44,11 +44,7 @@ contract ZkRetTest is DSTest {
     function testZkForcedRetOverrideWorks() public {
         Number inner = new Number();
         NumberFactory target = new NumberFactory(inner);
-        vm.mockCall(
-            address(inner),
-            abi.encodeWithSelector(inner.one.selector),
-            abi.encode(42)
-        );
+        vm.mockCall(address(inner), abi.encodeWithSelector(inner.one.selector), abi.encode(42));
 
         (uint8 mockedOne, uint8 two) = target.oneAndTwo();
 
@@ -60,11 +56,7 @@ contract ZkRetTest is DSTest {
     function testZkForcedRetOverrideWorksWithConstructorArgs() public {
         Number inner = new Number();
         NumberFactory target = new NumberFactory(inner);
-        vm.mockCall(
-            address(inner),
-            abi.encodeWithSelector(inner.echo.selector, 1),
-            abi.encode(42)
-        );
+        vm.mockCall(address(inner), abi.encodeWithSelector(inner.echo.selector, 1), abi.encode(42));
 
         (uint8 mockedOne, uint8 two) = target.echoOneAndTwo();
 
