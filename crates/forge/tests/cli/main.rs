@@ -20,6 +20,4 @@ mod svm;
 mod test_cmd;
 mod verify;
 
-mod zksync_node;
-
 mod ext_integration;

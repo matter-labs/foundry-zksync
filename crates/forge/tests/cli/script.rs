@@ -1,6 +1,6 @@
 //! Contains various tests related to `forge script`.
 
-use crate::{constants::TEMPLATE_CONTRACT, zksync_node};
+use crate::constants::TEMPLATE_CONTRACT;
 use alloy_primitives::{Address, Bytes};
 use anvil::{spawn, NodeConfig};
 use foundry_test_utils::{rpc, util::OutputExt, ScriptOutcome, ScriptTester};
@@ -1472,7 +1472,7 @@ forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
         factory_deps: Vec<Vec<u8>>,
     }
 
-    let node = zksync_node::ZkSyncNode::start();
+    let node = foundry_test_utils::ZkSyncNode::start();
 
     cmd.args(["init", "--force"]).arg(prj.root());
     cmd.assert_non_empty_stdout();
