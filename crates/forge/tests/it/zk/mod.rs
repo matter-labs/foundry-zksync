@@ -37,4 +37,4 @@ macro_rules! test_zk {
         });
     };
 }
-pub(self) use test_zk;
+pub(crate) use test_zk;
