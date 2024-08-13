@@ -12,7 +12,7 @@ contract Deposit {
     function withdraw() external {
         uint256 amount = balance[msg.sender];
         balance[msg.sender] = 0;
-        (bool s, ) = msg.sender.call{value: amount}("");
+        (bool s,) = msg.sender.call{value: amount}("");
         require(s, "failed to send");
     }
 }
