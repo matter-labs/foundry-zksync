@@ -127,7 +127,7 @@ fn convex_shutdown_simulation() {
 }
 
 #[test]
-fn aave_di() {
+fn test_zk_aave_di() {
     ExtTester::new("Moonsong-Labs", "aave-delivery-infrastructure", "ci")
         .args(["--zksync", "--avoid-contracts", "\"*/PayloadScripts.t.sol\""])
         .run()
