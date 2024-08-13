@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 
-import './Factory.sol';
+import "./Factory.sol";
 
 contract ZkFactoryTest is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
@@ -17,9 +17,9 @@ contract ZkFactoryTest is DSTest {
     }
 
     function testConstructorFactory() public {
-       MyConstructorFactory factory = new MyConstructorFactory(42);
+        MyConstructorFactory factory = new MyConstructorFactory(42);
 
-       assert(factory.getNumber() == 42);
+        assert(factory.getNumber() == 42);
     }
 
     function testNestedFactory() public {
