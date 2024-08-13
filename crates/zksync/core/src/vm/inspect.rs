@@ -418,13 +418,13 @@ fn inspect_inner<S: ReadStorage>(
         formatter::print_event(event, resolve_hashes);
     }
 
-    let bytecodes = l2_tx
-        .execute
-        .factory_deps
-        .clone()
+    let bytecodes = vm
+        .get_last_tx_compressed_bytecodes()
         .iter()
-        .flatten()
-        .flat_map(|dep| bytecode_to_factory_dep(dep.clone()).ok())
+        .map(|b| {
+            bytecode_to_factory_dep(b.original.clone())
+                .expect("failed converting bytecode to factory dep")
+        })
         .collect();
     let modified_keys = if is_static {
         Default::default()
