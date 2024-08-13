@@ -3,6 +3,7 @@ mod basic;
 mod cheats;
 mod contracts;
 mod factory;
+mod factory_deps;
 mod fuzz;
 mod invariant;
 mod logs;
