@@ -125,3 +125,10 @@ fn convex_shutdown_simulation() {
     .fork_block(14445961)
     .run();
 }
+
+#[test]
+fn aave_di() {
+    ExtTester::new("Moonsong-Labs", "aave-delivery-infrastructure", "ci")
+        .args(["--zksync", "--avoid-contracts", "\"*/PayloadScripts.t.sol\""])
+        .run()
+}
