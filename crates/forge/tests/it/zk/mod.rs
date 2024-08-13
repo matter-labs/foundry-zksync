@@ -2,6 +2,7 @@
 mod basic;
 mod cheats;
 mod contracts;
+mod factory;
 mod fuzz;
 mod logs;
 mod repros;
