@@ -5310,7 +5310,6 @@ dependencies = [
  "foundry-common",
  "foundry-compilers",
  "foundry-config",
- "futures 0.3.30",
  "jsonrpc-core",
  "jsonrpc-http-server",
  "once_cell",
