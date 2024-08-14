@@ -12,11 +12,8 @@ use era_test_node::{
     },
     node::InMemoryNode,
 };
-use futures::{SinkExt, StreamExt};
 use jsonrpc_core::IoHandler;
 use zksync_types::H160;
-
-const DEFAULT_PORT: u16 = 18011;
 
 /// List of legacy wallets (address, private key) that we seed with tokens at start.
 const LEGACY_RICH_WALLETS: [(&str, &str); 10] = [
@@ -118,26 +115,22 @@ const RICH_WALLETS: [(&str, &str, &str); 10] = [
 
 /// In-memory era-test-node that is stopped when dropped.
 pub struct ZkSyncNode {
-    close_tx: futures::channel::mpsc::Sender<()>,
-}
-
-impl Drop for ZkSyncNode {
-    fn drop(&mut self) {
-        self.stop();
-    }
+    port: u16,
+    _guard: tokio::sync::oneshot::Sender<()>,
 }
 
 impl ZkSyncNode {
     /// Returns the server url.
     #[inline]
     pub fn url(&self) -> String {
-        format!("http://127.0.0.1:{DEFAULT_PORT}")
+        format!("http://127.0.0.1:{}", self.port)
     }
 
-    /// Start era-test-node in memory at the [DEFAULT_PORT]. The server is automatically stopped
-    /// when the instance is dropped.
+    /// Start era-test-node in memory, binding a random available port
+    ///
+    /// The server is automatically stopped when the instance is dropped.
     pub fn start() -> Self {
-        let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
+        let (_guard, _guard_rx) = tokio::sync::oneshot::channel::<()>();
 
         let io_handler = {
             let node: InMemoryNode<HttpForkSource> =
@@ -165,37 +158,36 @@ impl ZkSyncNode {
             io.extend_with(ZksNamespaceT::to_delegate(node));
             io
         };
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .worker_threads(1)
-            .build()
-            .unwrap();
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+        let (port_tx, port) = tokio::sync::oneshot::channel();
 
-        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), DEFAULT_PORT);
         std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .worker_threads(2)
+                .build()
+                .unwrap();
+
             let server = jsonrpc_http_server::ServerBuilder::new(io_handler)
                 .threads(1)
                 .event_loop_executor(runtime.handle().clone())
                 .start_http(&addr)
                 .unwrap();
 
-            futures::executor::block_on(async {
-                let _ = rx.next().await;
-            });
+            // if no receiver was ready to receive the spawning thread died
+            _ = port_tx.send(server.address().port());
+            // we only care that the channel is alive
+            _ = tokio::task::block_in_place(move || runtime.block_on(_guard_rx));
 
             server.close();
         });
 
         // wait for server to start
         std::thread::sleep(std::time::Duration::from_millis(600));
+        let port =
+            tokio::task::block_in_place(move || tokio::runtime::Handle::current().block_on(port))
+                .expect("failed to start server");
 
-        Self { close_tx: tx }
-    }
-
-    /// Stop the running era-test-node.
-    pub fn stop(&mut self) {
-        futures::executor::block_on(async {
-            let _ = self.close_tx.send(()).await;
-        });
+        Self { _guard, port }
     }
 }

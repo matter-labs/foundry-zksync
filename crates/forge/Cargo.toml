@@ -114,8 +114,8 @@ opener = "0.7"
 soldeer.workspace = true
 
 # zk
-zksync-web3-rs = { workspace = true }
-zksync_types = { workspace = true }
+zksync-web3-rs.workspace = true
+zksync_types.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 tikv-jemallocator = { workspace = true, optional = true }
@@ -123,11 +123,6 @@ tikv-jemallocator = { workspace = true, optional = true }
 [dev-dependencies]
 anvil.workspace = true
 foundry-test-utils.workspace = true
-
-# zk
-era_test_node.workspace = true
-jsonrpc-core = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
-jsonrpc-http-server = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
 
 mockall = "0.12"
 criterion = "0.5"
