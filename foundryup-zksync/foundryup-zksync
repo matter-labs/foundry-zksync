@@ -235,6 +235,8 @@ Update or revert to a specific Foundry-zksync version with ease.
 
 By default, the latest nightly version is installed from built binaries.
 
+By default, the latest nightly version is installed from built binaries.
+
 USAGE:
     foundryup-zksync <OPTIONS>
 
@@ -318,7 +320,7 @@ banner() {
 
 Fork of    : https://github.com/foundry-rs/
 Repo       : https://github.com/foundry-zksync/
-Book       : https://book.getfoundry.sh/                                     
+Book       : https://book.getfoundry.sh/       
 
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 

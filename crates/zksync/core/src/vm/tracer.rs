@@ -147,7 +147,7 @@ impl CheatcodeTracer {
     fn has_empty_code<S: ReadStorage>(&self, storage: StoragePtr<S>, target: Address) -> bool {
         // The following addresses are expected to have empty bytecode
         let ignored_known_addresses =
-            [foundry_common::HARDHAT_CONSOLE_ADDRESS, self.call_context.tx_caller];
+            [foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS, self.call_context.tx_caller];
 
         let contract_code = storage.borrow_mut().read_value(&get_code_key(&target.to_h160()));
 

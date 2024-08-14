@@ -14,8 +14,12 @@ pub use zksolc::*;
 pub mod libraries;
 
 use foundry_compilers::{
-    artifacts::Severity, error::SolcError, solc::SolcCompiler, zksolc::ZkSolc,
-    zksync::config::ZkSolcConfig, Compiler, Project, ProjectBuilder,
+    artifacts::Severity,
+    error::SolcError,
+    solc::{SolcCompiler, SolcSettings},
+    zksolc::ZkSolc,
+    zksync::config::ZkSolcConfig,
+    Compiler, Project, ProjectBuilder,
 };
 
 /// Ensures that the configured version is installed if explicitly set
@@ -122,9 +126,9 @@ pub fn standard_json_input<C: Compiler>(
     target_path: impl AsRef<Path>,
 ) -> Result<serde_json::Value, SolcError>
 where
-    C::Settings: Into<foundry_compilers::artifacts::Settings>,
+    C::Settings: Into<SolcSettings>,
 {
-    let mut input = project.standard_json_input(target_path)?;
+    let mut input = project.standard_json_input(target_path.as_ref())?;
     tracing::debug!(?input.settings.remappings, "standard_json_input for zksync");
 
     let mut settings = project.zksync_zksolc_config.settings.clone();

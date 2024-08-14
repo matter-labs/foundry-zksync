@@ -26,7 +26,6 @@ foundry-linking.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compiler.workspace = true
 
-hex.workspace = true
 serde.workspace = true
 eyre.workspace = true
 serde_json.workspace = true
