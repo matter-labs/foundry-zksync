@@ -53,6 +53,7 @@ macro_rules! test_repro {
         }
     };
 }
+pub(crate) use test_repro;
 
 async fn repro_config(
     issue: usize,
