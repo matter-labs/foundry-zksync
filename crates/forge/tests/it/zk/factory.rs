@@ -1,18 +1,40 @@
 //! Forge tests for zksync factory contracts.
 
-use foundry_test_utils::{forgetest_async, util, TestCommand, TestProject, ZkSyncNode};
+use forge::revm::primitives::SpecId;
+use foundry_test_utils::{forgetest_async, util, Filter, TestCommand, TestProject, ZkSyncNode};
 
-use super::test_zk;
+use crate::{config::TestConfig, test_helpers::TEST_DATA_DEFAULT};
 
-test_zk!(can_deploy_in_method, "testClassicFactory|testNestedFactory", "ZkFactoryTest");
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_can_deploy_in_method() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    {
+        let filter = Filter::new("testClassicFactory|testNestedFactory", "ZkFactoryTest", ".*");
+        TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    }
+}
 
-test_zk!(
-    can_deploy_in_constructor,
-    "testConstructorFactory|testNestedConstructorFactory",
-    "ZkFactoryTest"
-);
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_can_deploy_in_constructor() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    {
+        let filter = Filter::new(
+            "testConstructorFactory|testNestedConstructorFactory",
+            "ZkFactoryTest",
+            ".*",
+        );
+        TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    }
+}
 
-test_zk!(can_use_predeployed_factory, "testUser.*", "ZkFactoryTest");
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_can_use_predeployed_factory() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    {
+        let filter = Filter::new("testUser.*", "ZkFactoryTest", ".*");
+        TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    }
+}
 
 forgetest_async!(script_zk_can_deploy_in_method, |prj, cmd| {
     setup_factory_prj(&mut prj);
