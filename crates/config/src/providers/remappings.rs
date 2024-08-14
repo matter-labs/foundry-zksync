@@ -151,7 +151,7 @@ impl<'a> RemappingsProvider<'a> {
         let mut all_remappings = Remappings::new_with_remappings(user_remappings);
 
         // scan all library dirs and autodetect remappings
-        // todo: if a lib specifies contexts for remappings manually, we need to figure out how to
+        // TODO: if a lib specifies contexts for remappings manually, we need to figure out how to
         // resolve that
         if self.auto_detect_remappings {
             let mut lib_remappings = BTreeMap::new();
@@ -164,10 +164,8 @@ impl<'a> RemappingsProvider<'a> {
                 .lib_paths
                 .iter()
                 .map(|lib| self.root.join(lib))
-                .inspect(|lib| {
-                    trace!("find all remappings in lib path: {:?}", lib);
-                })
-                .flat_map(Remapping::find_many)
+                .inspect(|lib| trace!(?lib, "find all remappings"))
+                .flat_map(|lib| Remapping::find_many(&lib))
             {
                 // this is an additional safety check for weird auto-detected remappings
                 if ["lib/", "src/", "contracts/"].contains(&r.name.as_str()) {

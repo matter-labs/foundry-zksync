@@ -9,11 +9,12 @@ use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
     multi::MultiCompilerLanguage,
     solc::SolcCompiler,
+    utils::RuntimeOrHandle,
     zksync::{
         cache::ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME,
         compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     },
-    Project, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
+    Project, ProjectCompileOutput, ProjectPathsConfig, SolcConfig, Vyper,
 };
 use foundry_config::{
     fs_permissions::PathPermission, Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig,
@@ -38,6 +39,7 @@ type ZkProject = Project<SolcCompiler>;
 
 pub const RE_PATH_SEPARATOR: &str = "/";
 const TESTDATA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata");
+static VYPER: Lazy<PathBuf> = Lazy::new(|| std::env::temp_dir().join("vyper"));
 
 /// Profile for the tests group. Used to configure separate configurations for test runs.
 pub enum ForgeTestProfile {
@@ -118,6 +120,7 @@ impl ForgeTestProfile {
                 failure_persist_dir: Some(tempfile::tempdir().unwrap().into_path()),
                 failure_persist_file: Some("testfailure".to_string()),
                 no_zksync_reserved_addresses: false,
+                show_logs: false,
             })
             .invariant(InvariantConfig {
                 runs: 256,
@@ -237,8 +240,10 @@ impl ForgeTestData {
     ///
     /// Uses [get_compiled] to lazily compile the project.
     pub fn new(profile: ForgeTestProfile) -> Self {
-        let project = profile.project();
-        let output = get_compiled(&project);
+        init_tracing();
+
+        let mut project = profile.project();
+        let output = get_compiled(&mut project);
         let test_opts = profile.test_opts(&output);
         let config = profile.config();
         let evm_opts = profile.evm_opts();
@@ -247,8 +252,8 @@ impl ForgeTestData {
             let zk_config = profile.zk_config();
             let zk_project = profile.zk_project();
 
-            let project = zk_config.project().expect("failed obtaining project");
-            let output = get_compiled(&project);
+            let mut project = zk_config.project().expect("failed obtaining project");
+            let output = get_compiled(&mut project);
             let zk_output = get_zk_compiled(&zk_project);
             let layout = ProjectPathsConfig {
                 root: zk_project.paths.root.clone(),
@@ -329,7 +334,7 @@ impl ForgeTestData {
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(self.test_opts.clone())
-            .build(root, output, None, env, opts.clone(), Default::default())
+            .build(root, output, None, env, opts, Default::default())
             .unwrap()
     }
 
@@ -363,7 +368,7 @@ impl ForgeTestData {
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(test_opts)
-            .build(root, output, Some(zk_output), env, opts.clone(), dual_compiled_contracts)
+            .build(root, output, Some(zk_output), env, opts, dual_compiled_contracts)
             .unwrap()
     }
 
@@ -400,7 +405,45 @@ impl ForgeTestData {
     }
 }
 
-pub fn get_compiled(project: &Project) -> ProjectCompileOutput {
+/// Installs Vyper if it's not already present.
+pub fn get_vyper() -> Vyper {
+    if let Ok(vyper) = Vyper::new("vyper") {
+        return vyper;
+    }
+    if let Ok(vyper) = Vyper::new(&*VYPER) {
+        return vyper;
+    }
+    RuntimeOrHandle::new().block_on(async {
+        #[cfg(target_family = "unix")]
+        use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+
+        let suffix = match svm::platform() {
+            svm::Platform::MacOsAarch64 => "darwin",
+            svm::Platform::LinuxAmd64 => "linux",
+            svm::Platform::WindowsAmd64 => "windows.exe",
+            platform => panic!(
+                "unsupported platform {platform:?} for installing vyper, \
+                 install it manually and add it to $PATH"
+            ),
+        };
+        let url = format!("https://github.com/vyperlang/vyper/releases/download/v0.4.0/vyper.0.4.0+commit.e9db8d9f.{suffix}");
+
+        let res = reqwest::Client::builder().build().unwrap().get(url).send().await.unwrap();
+
+        assert!(res.status().is_success());
+
+        let bytes = res.bytes().await.unwrap();
+
+        std::fs::write(&*VYPER, bytes).unwrap();
+
+        #[cfg(target_family = "unix")]
+        std::fs::set_permissions(&*VYPER, Permissions::from_mode(0o755)).unwrap();
+
+        Vyper::new(&*VYPER).unwrap()
+    })
+}
+
+pub fn get_compiled(project: &mut Project) -> ProjectCompileOutput {
     let lock_file_path = project.sources_path().join(".lock");
     // Compile only once per test run.
     // We need to use a file lock because `cargo-nextest` runs tests in different processes.
@@ -409,21 +452,27 @@ pub fn get_compiled(project: &Project) -> ProjectCompileOutput {
     let mut lock = fd_lock::new_lock(&lock_file_path);
     let read = lock.read().unwrap();
     let out;
-    if project.cache_path().exists() && std::fs::read(&lock_file_path).unwrap() == b"1" {
-        out = project.compile();
+
+    let mut write = None;
+    if !project.cache_path().exists() || std::fs::read(&lock_file_path).unwrap() != b"1" {
         drop(read);
-    } else {
-        drop(read);
-        let mut write = lock.write().unwrap();
-        write.write_all(b"1").unwrap();
-        out = project.compile();
-        drop(write);
+        write = Some(lock.write().unwrap());
     }
 
-    let out = out.unwrap();
+    if project.compiler.vyper.is_none() {
+        project.compiler.vyper = Some(get_vyper());
+    }
+
+    out = project.compile().unwrap();
+
     if out.has_compiler_errors() {
         panic!("Compiled with errors:\n{out}");
     }
+
+    if let Some(ref mut write) = write {
+        write.write_all(b"1").unwrap();
+    }
+
     out
 }
 
@@ -437,21 +486,24 @@ pub fn get_zk_compiled(zk_project: &ZkProject) -> ZkProjectCompileOutput {
     let read = lock.read().unwrap();
     let out;
 
+    let mut write = None;
+
     let zk_compiler = foundry_common::compile::ProjectCompiler::new();
-    if zk_project.paths.zksync_cache.exists() && std::fs::read(&lock_file_path).unwrap() == b"1" {
-        out = zk_compiler.zksync_compile(zk_project, None);
+    if zk_project.paths.zksync_cache.exists() || std::fs::read(&lock_file_path).unwrap() == b"1" {
         drop(read);
-    } else {
-        drop(read);
-        let mut write = lock.write().unwrap();
-        write.write_all(b"1").unwrap();
-        out = zk_compiler.zksync_compile(zk_project, None);
-        drop(write);
+        write = Some(lock.write().unwrap());
     }
 
-    let out = out.expect("failed compiling zksync project");
-    if out.has_compiler_errors() {
-        panic!("Compiled with errors:\n{out}");
+    out = zk_compiler.zksync_compile(zk_project, None);
+
+    if let Some(ref mut write) = write {
+        write.write_all(b"1").unwrap();
+    }
+
+    let out: ZkProjectCompileOutput = out.expect("failed compiling zksync project");
+
+    if let Some(ref mut write) = write {
+        write.write_all(b"1").unwrap();
     }
     out
 }

@@ -88,9 +88,6 @@ pub struct ContractsByArtifact(Arc<BTreeMap<ArtifactId, ContractData>>);
 
 impl ContractsByArtifact {
     /// Creates a new instance by collecting all artifacts with present bytecode from an iterator.
-    ///
-    /// It is recommended to use this method with an output of
-    /// [foundry_linking::Linker::get_linked_artifacts].
     pub fn new(artifacts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>) -> Self {
         let map = artifacts
             .into_iter()
@@ -118,29 +115,40 @@ impl ContractsByArtifact {
 
     /// Finds a contract which has a similar bytecode as `code`.
     pub fn find_by_creation_code(&self, code: &[u8]) -> Option<ArtifactWithContractRef<'_>> {
-        self.iter().find(|(_, contract)| {
-            if let Some(bytecode) = contract.bytecode() {
-                bytecode_diff_score(bytecode.as_ref(), code) <= 0.1
-            } else {
-                false
-            }
-        })
+        self.find_by_code(code, ContractData::bytecode)
     }
 
     /// Finds a contract which has a similar deployed bytecode as `code`.
     pub fn find_by_deployed_code(&self, code: &[u8]) -> Option<ArtifactWithContractRef<'_>> {
-        self.iter().find(|(_, contract)| {
-            if let Some(deployed_bytecode) = contract.deployed_bytecode() {
-                bytecode_diff_score(deployed_bytecode.as_ref(), code) <= 0.1
-            } else {
-                false
-            }
-        })
+        self.find_by_code(code, ContractData::deployed_bytecode)
+    }
+
+    fn find_by_code(
+        &self,
+        code: &[u8],
+        get: impl Fn(&ContractData) -> Option<&Bytes>,
+    ) -> Option<ArtifactWithContractRef<'_>> {
+        self.iter()
+            .filter_map(|(id, contract)| {
+                if let Some(deployed_bytecode) = get(contract) {
+                    let score = bytecode_diff_score(deployed_bytecode.as_ref(), code);
+                    (score <= 0.1).then_some((score, (id, contract)))
+                } else {
+                    None
+                }
+            })
+            .min_by(|(score1, _), (score2, _)| score1.partial_cmp(score2).unwrap())
+            .map(|(_, data)| data)
     }
 
     /// Finds a contract which deployed bytecode exactly matches the given code. Accounts for link
     /// references and immutables.
     pub fn find_by_deployed_code_exact(&self, code: &[u8]) -> Option<ArtifactWithContractRef<'_>> {
+        // Immediately return None if the code is empty.
+        if code.is_empty() {
+            return None;
+        }
+
         self.iter().find(|(_, contract)| {
             let Some(deployed_bytecode) = &contract.deployed_bytecode else {
                 return false;
@@ -396,5 +404,12 @@ mod tests {
 
         let a_99 = &b"a".repeat(99)[..];
         assert!(bytecode_diff_score(a_100, a_99) <= 0.01);
+    }
+
+    #[test]
+    fn find_by_deployed_code_exact_with_empty_deployed() {
+        let contracts = ContractsByArtifact::new(vec![]);
+
+        assert!(contracts.find_by_deployed_code_exact(&[]).is_none());
     }
 }

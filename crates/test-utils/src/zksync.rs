@@ -136,22 +136,13 @@ impl ZkSyncNode {
             let node: InMemoryNode<HttpForkSource> =
                 InMemoryNode::new(None, None, Default::default());
 
-            tracing::info!("");
-            tracing::info!("Rich Accounts");
-            tracing::info!("=============");
             for wallet in LEGACY_RICH_WALLETS.iter() {
                 let address = wallet.0;
                 node.set_rich_account(H160::from_str(address).unwrap());
             }
-            for (index, wallet) in RICH_WALLETS.iter().enumerate() {
+            for wallet in RICH_WALLETS.iter() {
                 let address = wallet.0;
-                let private_key = wallet.1;
-                let mnemonic_phrase = wallet.2;
                 node.set_rich_account(H160::from_str(address).unwrap());
-                tracing::info!("Account #{}: {} ({})", index, address, "1_000_000_000_000 ETH");
-                tracing::info!("Private Key: {}", private_key);
-                tracing::info!("Mnemonic: {}", &mnemonic_phrase);
-                tracing::info!("");
             }
 
             let mut io = IoHandler::default();

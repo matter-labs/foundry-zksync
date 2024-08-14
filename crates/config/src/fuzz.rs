@@ -32,11 +32,13 @@ pub struct FuzzConfig {
     pub failure_persist_file: Option<String>,
     /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
     pub no_zksync_reserved_addresses: bool,
+    /// show `console.log` in fuzz test, defaults to `false`
+    pub show_logs: bool,
 }
 
 impl Default for FuzzConfig {
     fn default() -> Self {
-        FuzzConfig {
+        Self {
             runs: 256,
             max_test_rejects: 65536,
             seed: None,
@@ -45,6 +47,7 @@ impl Default for FuzzConfig {
             failure_persist_dir: None,
             failure_persist_file: None,
             no_zksync_reserved_addresses: false,
+            show_logs: false,
         }
     }
 }
@@ -52,7 +55,7 @@ impl Default for FuzzConfig {
 impl FuzzConfig {
     /// Creates fuzz configuration to write failures in `{PROJECT_ROOT}/cache/fuzz` dir.
     pub fn new(cache_dir: PathBuf) -> Self {
-        FuzzConfig {
+        Self {
             runs: 256,
             max_test_rejects: 65536,
             seed: None,
@@ -61,6 +64,7 @@ impl FuzzConfig {
             failure_persist_dir: Some(cache_dir),
             failure_persist_file: Some("failures".to_string()),
             no_zksync_reserved_addresses: false,
+            show_logs: false,
         }
     }
 }
@@ -92,6 +96,7 @@ impl InlineConfigParser for FuzzConfig {
                 "no-zksync-reserved-addresses" => {
                     conf_clone.no_zksync_reserved_addresses = parse_config_bool(key, value)?
                 }
+                "show-logs" => conf_clone.show_logs = parse_config_bool(key, value)?,
                 _ => Err(InlineConfigParserError::InvalidConfigProperty(key))?,
             }
         }
@@ -123,7 +128,7 @@ pub struct FuzzDictionaryConfig {
 
 impl Default for FuzzDictionaryConfig {
     fn default() -> Self {
-        FuzzDictionaryConfig {
+        Self {
             dictionary_weight: 40,
             include_storage: true,
             include_push_bytes: true,

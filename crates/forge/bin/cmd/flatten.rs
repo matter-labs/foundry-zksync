@@ -45,9 +45,8 @@ impl FlattenArgs {
 
         let target_path = dunce::canonicalize(target_path)?;
 
-        let flattener = with_compilation_reporter(build_args.silent, || {
-            Flattener::new(project.clone(), &target_path)
-        });
+        let flattener =
+            with_compilation_reporter(true, || Flattener::new(project.clone(), &target_path));
 
         let flattened = match flattener {
             Ok(flattener) => Ok(flattener.flatten()),
@@ -55,7 +54,7 @@ impl FlattenArgs {
                 // Fallback to the old flattening implementation if we couldn't compile the target
                 // successfully. This would be the case if the target has invalid
                 // syntax. (e.g. Solang)
-                project.paths.clone().with_language::<SolcLanguage>().flatten(&target_path)
+                project.paths.with_language::<SolcLanguage>().flatten(&target_path)
             }
             Err(FlattenerError::Other(err)) => Err(err),
         }
