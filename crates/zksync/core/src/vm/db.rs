@@ -8,7 +8,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use alloy_primitives::{Address, U256 as rU256};
 use foundry_cheatcodes_common::record::RecordAccess;
-use revm::{primitives::Account, Database, EvmContext};
+use revm::{primitives::Account, Database, EvmContext, InnerEvmContext};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::ReadStorage;
 use zksync_types::{
@@ -27,7 +27,7 @@ pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
 pub struct ZKVMData<'a, DB: Database> {
     // pub db: &'a mut DB,
     // pub journaled_state: &'a mut JournaledState,
-    ecx: &'a mut EvmContext<DB>,
+    ecx: &'a mut InnerEvmContext<DB>,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: HashMap<StorageKey, StorageValue>,
     pub accesses: Option<&'a mut RecordAccess>,
@@ -53,7 +53,7 @@ where
     <DB as Database>::Error: Debug,
 {
     /// Create a new instance of [ZKEVMData].
-    pub fn new(ecx: &'a mut EvmContext<DB>) -> Self {
+    pub fn new(ecx: &'a mut InnerEvmContext<DB>) -> Self {
         // load all deployed contract bytecodes from the JournaledState as factory deps
         let mut factory_deps = ecx
             .journaled_state

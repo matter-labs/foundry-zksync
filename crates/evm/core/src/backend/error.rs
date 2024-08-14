@@ -1,5 +1,6 @@
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::BlockId;
+pub use foundry_fork_db::{DatabaseError, DatabaseResult};
 use futures::channel::mpsc::{SendError, TrySendError};
 use revm::primitives::EVMError;
 use std::{
@@ -7,17 +8,18 @@ use std::{
     sync::{mpsc::RecvError, Arc},
 };
 
-/// Result alias with `DatabaseError` as error
-pub type DatabaseResult<T> = Result<T, DatabaseError>;
+pub type BackendResult<T> = Result<T, BackendError>;
 
 /// Errors that can happen when working with [`revm::Database`]
 #[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
-pub enum DatabaseError {
+pub enum BackendError {
     #[error("{0}")]
     Message(String),
     #[error("cheatcodes are not enabled for {0}; see `vm.allowCheatcodes(address)`")]
     NoCheats(Address),
+    #[error(transparent)]
+    Database(#[from] DatabaseError),
     #[error("failed to fetch account info for {0}")]
     MissingAccount(Address),
     #[error("missing bytecode for code hash {0}")]
@@ -53,7 +55,7 @@ pub enum DatabaseError {
     Other(String),
 }
 
-impl DatabaseError {
+impl BackendError {
     /// Create a new error with a message
     pub fn msg(msg: impl Into<String>) -> Self {
         Self::Message(msg.into())
@@ -67,6 +69,7 @@ impl DatabaseError {
     fn get_rpc_error(&self) -> Option<&eyre::Error> {
         match self {
             Self::GetAccount(_, err) => Some(err),
+            Self::Database(_) => None, // TODO: Revisit this case
             Self::GetStorage(_, _, err) => Some(err),
             Self::GetBlockHash(_, err) => Some(err),
             Self::GetFullBlock(_, err) => Some(err),
@@ -97,30 +100,33 @@ impl DatabaseError {
     }
 }
 
-impl From<tokio::task::JoinError> for DatabaseError {
+impl From<tokio::task::JoinError> for BackendError {
     fn from(value: tokio::task::JoinError) -> Self {
         Self::display(value)
     }
 }
 
-impl<T> From<TrySendError<T>> for DatabaseError {
+impl<T> From<TrySendError<T>> for BackendError {
     fn from(value: TrySendError<T>) -> Self {
         value.into_send_error().into()
     }
 }
 
-impl From<Infallible> for DatabaseError {
+impl From<Infallible> for BackendError {
     fn from(value: Infallible) -> Self {
         match value {}
     }
 }
 
 // Note: this is mostly necessary to use some revm internals that return an [EVMError]
-impl From<EVMError<Self>> for DatabaseError {
-    fn from(err: EVMError<Self>) -> Self {
+impl<T: Into<Self>> From<EVMError<T>> for BackendError {
+    fn from(err: EVMError<T>) -> Self {
         match err {
-            EVMError::Database(err) => err,
-            err => Self::Other(err.to_string()),
+            EVMError::Database(err) => err.into(),
+            EVMError::Custom(err) => Self::msg(err),
+            EVMError::Header(err) => Self::msg(err.to_string()),
+            EVMError::Precompile(err) => Self::msg(err),
+            EVMError::Transaction(err) => Self::msg(err.to_string()),
         }
     }
 }

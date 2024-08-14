@@ -33,6 +33,7 @@ foundry-common.workspace = true
 foundry-compilers = { workspace = true, features = ["full"] }
 foundry-config.workspace = true
 foundry-evm.workspace = true
+foundry-evm-abi.workspace = true
 foundry-wallets.workspace = true
 foundry-linking.workspace = true
 foundry-zksync-core.workspace = true
@@ -42,9 +43,9 @@ ethers-contract-abigen = { workspace = true, features = ["providers"] }
 
 revm-inspectors.workspace = true
 
-comfy-table = "7"
+comfy-table.workspace = true
 eyre.workspace = true
-proptest = "1"
+proptest.workspace = true
 rayon.workspace = true
 serde.workspace = true
 tracing.workspace = true
@@ -81,7 +82,6 @@ clap_complete_fig = "4"
 dialoguer = { version = "0.11", default-features = false }
 dunce.workspace = true
 futures.workspace = true
-hex.workspace = true
 indicatif = "0.17"
 itertools.workspace = true
 once_cell.workspace = true
@@ -138,7 +138,7 @@ svm = { package = "svm-rs", version = "0.5", default-features = false, features 
     "rustls",
 ] }
 tempfile.workspace = true
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 alloy-signer-local.workspace = true
 
@@ -154,6 +154,7 @@ openssl = ["foundry-cli/openssl", "reqwest/default-tls"]
 asm-keccak = ["alloy-primitives/asm-keccak"]
 jemalloc = ["dep:tikv-jemallocator"]
 aws-kms = ["foundry-wallets/aws-kms"]
+isolate-by-default = ["foundry-config/isolate-by-default"]
 
 [[bench]]
 name = "test"

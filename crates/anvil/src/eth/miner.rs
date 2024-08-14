@@ -12,10 +12,10 @@ use std::{
     fmt,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
-use tokio::time::Interval;
+use tokio::time::{Interval, MissedTickBehavior};
 
 #[derive(Clone, Debug)]
 pub struct Miner {
@@ -25,12 +25,32 @@ pub struct Miner {
     ///
     /// This will register the task so we can manually wake it up if the mining mode was changed
     inner: Arc<MinerInner>,
+    /// Transactions included into the pool before any others are.
+    /// Done once on startup.
+    force_transactions: Option<Vec<Arc<PoolTransaction>>>,
 }
 
 impl Miner {
-    /// Returns a new miner with that operates in the given `mode`
+    /// Returns a new miner with that operates in the given `mode`.
     pub fn new(mode: MiningMode) -> Self {
-        Self { mode: Arc::new(RwLock::new(mode)), inner: Default::default() }
+        Self {
+            mode: Arc::new(RwLock::new(mode)),
+            inner: Default::default(),
+            force_transactions: None,
+        }
+    }
+
+    /// Provide transactions that will cause a block to be mined with transactions
+    /// as soon as the miner is polled.
+    /// Providing an empty list of transactions will cause the miner to mine an empty block assuming
+    /// there are not other transactions in the pool.
+    pub fn with_forced_transactions(
+        mut self,
+        force_transactions: Option<Vec<PoolTransaction>>,
+    ) -> Self {
+        self.force_transactions =
+            force_transactions.map(|tx| tx.into_iter().map(Arc::new).collect());
+        self
     }
 
     /// Returns the write lock of the mining mode
@@ -67,7 +87,13 @@ impl Miner {
         cx: &mut Context<'_>,
     ) -> Poll<Vec<Arc<PoolTransaction>>> {
         self.inner.register(cx);
-        self.mode.write().poll(pool, cx)
+        let next = ready!(self.mode.write().poll(pool, cx));
+        if let Some(mut transactions) = self.force_transactions.take() {
+            transactions.extend(next);
+            Poll::Ready(transactions)
+        } else {
+            Poll::Ready(next)
+        }
     }
 }
 
@@ -149,7 +175,11 @@ impl FixedBlockTimeMiner {
     /// Creates a new instance with an interval of `duration`
     pub fn new(duration: Duration) -> Self {
         let start = tokio::time::Instant::now() + duration;
-        Self { interval: tokio::time::interval_at(start, duration) }
+        let mut interval = tokio::time::interval_at(start, duration);
+        // we use delay here, to ensure ticks are not shortened and to tick at multiples of interval
+        // from when tick was called rather than from start
+        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        Self { interval }
     }
 
     fn poll(&mut self, pool: &Arc<Pool>, cx: &mut Context<'_>) -> Poll<Vec<Arc<PoolTransaction>>> {
