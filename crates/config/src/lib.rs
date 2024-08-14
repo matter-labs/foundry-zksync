@@ -20,7 +20,7 @@ use foundry_compilers::{
     artifacts::{
         output_selection::{ContractOutputSelection, OutputSelection},
         remappings::{RelativeRemapping, Remapping},
-        serde_helpers, BytecodeHash, DebuggingSettings, EvmVersion, Libraries,
+        serde_helpers, BytecodeHash, DebuggingSettings, EofVersion, EvmVersion, Libraries,
         ModelCheckerSettings, ModelCheckerTarget, Optimizer, OptimizerDetails, RevertStrings,
         Settings, SettingsMetadata, Severity,
     },
@@ -32,14 +32,15 @@ use foundry_compilers::{
         Compiler,
     },
     error::SolcError,
+    solc::{CliSettings, SolcSettings},
     zksolc::ZkSolcSettings,
-    ConfigurableArtifacts, Project, ProjectPathsConfig,
+    ConfigurableArtifacts, Project, ProjectPathsConfig, VyperLanguage,
 };
 use inflector::Inflector;
 use regex::Regex;
 use revm_primitives::{FixedBytes, SpecId};
 use semver::Version;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -113,6 +114,8 @@ use vyper::VyperConfig;
 
 mod zksync;
 pub use zksync::*;
+mod bind_json;
+use bind_json::BindJsonConfig;
 
 /// Foundry configuration
 ///
@@ -256,6 +259,15 @@ pub struct Config {
     /// Only run tests in source files that do not match the specified glob pattern.
     #[serde(rename = "no_match_path", with = "from_opt_glob")]
     pub path_pattern_inverse: Option<globset::Glob>,
+    /// Only show coverage for files that do not match the specified regex pattern.
+    #[serde(rename = "no_match_coverage")]
+    pub coverage_pattern_inverse: Option<RegexWrapper>,
+    /// Path where last test run failures are recorded.
+    pub test_failures_file: PathBuf,
+    /// Max concurrent threads to use.
+    pub threads: Option<usize>,
+    /// Whether to show test execution progress.
+    pub show_progress: bool,
     /// Configuration for fuzz testing
     pub fuzz: FuzzConfig,
     /// Configuration for invariant testing
@@ -298,7 +310,7 @@ pub struct Config {
     pub block_difficulty: u64,
     /// Before merge the `block.max_hash`, after merge it is `block.prevrandao`.
     pub block_prevrandao: B256,
-    /// the `block.gaslimit` value during EVM execution
+    /// The `block.gaslimit` value during EVM execution.
     pub block_gas_limit: Option<GasLimit>,
     /// The memory limit per EVM execution in bytes.
     /// If this limit is exceeded, a `MemoryLimitOOG` result is thrown.
@@ -384,6 +396,8 @@ pub struct Config {
     pub fmt: FormatterConfig,
     /// Configuration for `forge doc`
     pub doc: DocConfig,
+    /// Configuration for `forge bind-json`
+    pub bind_json: BindJsonConfig,
     /// Configures the permissions of cheat codes that touch the file system.
     ///
     /// This includes what operations can be executed (read, write)
@@ -424,6 +438,22 @@ pub struct Config {
     // override it.
     #[serde(default, skip_serializing)]
     pub root: RootPath,
+
+    /// Whether failed assertions should revert.
+    ///
+    /// Note that this only applies to native (cheatcode) assertions, invoked on Vm contract.
+    pub assertions_revert: bool,
+
+    /// Whether `failed()` should be invoked to check if the test have failed.
+    pub legacy_assertions: bool,
+
+    /// Optional additional CLI arguments to pass to `solc` binary.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extra_args: Vec<String>,
+
+    /// Optional EOF version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eof_version: Option<EofVersion>,
 
     /// Warnings gathered when loading the Config. See [`WarningsProvider`] for more information
     #[serde(rename = "__warnings", default, skip_serializing)]
@@ -474,6 +504,7 @@ impl Config {
         "labels",
         "dependencies",
         "vyper",
+        "bind_json",
     ];
 
     /// File name of config toml file
@@ -495,7 +526,7 @@ impl Config {
     /// See `Config::figment`
     #[track_caller]
     pub fn load() -> Self {
-        Config::from_provider(Config::figment())
+        Self::from_provider(Self::figment())
     }
 
     /// Returns the current `Config` with the given `providers` preset
@@ -503,7 +534,7 @@ impl Config {
     /// See `Config::to_figment`
     #[track_caller]
     pub fn load_with_providers(providers: FigmentProviders) -> Self {
-        Config::default().to_figment(providers).extract().unwrap()
+        Self::default().to_figment(providers).extract().unwrap()
     }
 
     /// Returns the current `Config`
@@ -511,7 +542,7 @@ impl Config {
     /// See `Config::figment_with_root`
     #[track_caller]
     pub fn load_with_root(root: impl Into<PathBuf>) -> Self {
-        Config::from_provider(Config::figment_with_root(root))
+        Self::from_provider(Self::figment_with_root(root))
     }
 
     /// Extract a `Config` from `provider`, panicking if extraction fails.
@@ -565,22 +596,21 @@ impl Config {
     /// This will merge various providers, such as env,toml,remappings into the figment.
     pub fn to_figment(self, providers: FigmentProviders) -> Figment {
         let mut c = self;
-        let profile = Config::selected_profile();
+        let profile = Self::selected_profile();
         let mut figment = Figment::default().merge(DappHardhatDirProvider(&c.root.0));
 
         // merge global foundry.toml file
-        if let Some(global_toml) = Config::foundry_dir_toml().filter(|p| p.exists()) {
-            figment = Config::merge_toml_provider(
+        if let Some(global_toml) = Self::foundry_dir_toml().filter(|p| p.exists()) {
+            figment = Self::merge_toml_provider(
                 figment,
                 TomlFileProvider::new(None, global_toml).cached(),
                 profile.clone(),
             );
         }
         // merge local foundry.toml file
-        figment = Config::merge_toml_provider(
+        figment = Self::merge_toml_provider(
             figment,
-            TomlFileProvider::new(Some("FOUNDRY_CONFIG"), c.root.0.join(Config::FILE_NAME))
-                .cached(),
+            TomlFileProvider::new(Some("FOUNDRY_CONFIG"), c.root.0.join(Self::FILE_NAME)).cached(),
             profile.clone(),
         );
 
@@ -603,7 +633,7 @@ impl Config {
                     .ignore(&["PROFILE", "REMAPPINGS", "LIBRARIES", "FFI", "FS_PERMISSIONS"])
                     .map(|key| {
                         let key = key.as_str();
-                        if Config::STANDALONE_SECTIONS.iter().any(|section| {
+                        if Self::STANDALONE_SECTIONS.iter().any(|section| {
                             key.starts_with(&format!("{}_", section.to_ascii_uppercase()))
                         }) {
                             key.replacen('_', ".", 1).into()
@@ -833,6 +863,9 @@ impl Config {
     pub fn cleanup<C: Compiler>(&self, project: &Project<C>) -> Result<(), SolcError> {
         project.cleanup()?;
 
+        // Remove last test run failures file.
+        let _ = fs::remove_file(&self.test_failures_file);
+
         // Remove fuzz and invariant cache directories.
         let remove_test_dir = |test_dir: &Option<PathBuf>| {
             if let Some(test_dir) = test_dir {
@@ -889,7 +922,7 @@ impl Config {
     #[inline]
     pub fn evm_spec_id(&self) -> SpecId {
         if self.prague {
-            return SpecId::PRAGUE
+            return SpecId::PRAGUE_EOF
         }
         evm_spec_id(&self.evm_version)
     }
@@ -957,6 +990,10 @@ impl Config {
 
     /// Returns configured [Vyper] compiler.
     pub fn vyper_compiler(&self) -> Result<Option<Vyper>, SolcError> {
+        // Only instantiate Vyper if there are any Vyper files in the project.
+        if self.project_paths::<VyperLanguage>().input_files_iter().next().is_none() {
+            return Ok(None)
+        }
         let vyper = if let Some(path) = &self.vyper.path {
             Some(Vyper::new(path)?)
         } else {
@@ -1012,7 +1049,7 @@ impl Config {
     /// let rpc_jwt = config.get_rpc_jwt_secret().unwrap().unwrap();
     /// # }
     /// ```
-    pub fn get_rpc_jwt_secret(&self) -> Result<Option<Cow<str>>, UnresolvedEnvVarError> {
+    pub fn get_rpc_jwt_secret(&self) -> Result<Option<Cow<'_, str>>, UnresolvedEnvVarError> {
         Ok(self.eth_rpc_jwt.as_ref().map(|jwt| Cow::Borrowed(jwt.as_str())))
     }
 
@@ -1031,7 +1068,7 @@ impl Config {
     /// let rpc_url = config.get_rpc_url().unwrap().unwrap();
     /// # }
     /// ```
-    pub fn get_rpc_url(&self) -> Option<Result<Cow<str>, UnresolvedEnvVarError>> {
+    pub fn get_rpc_url(&self) -> Option<Result<Cow<'_, str>, UnresolvedEnvVarError>> {
         let maybe_alias = self.eth_rpc_url.as_ref().or(self.etherscan_api_key.as_ref())?;
         if let Some(alias) = self.get_rpc_url_with_alias(maybe_alias) {
             Some(alias)
@@ -1058,7 +1095,7 @@ impl Config {
     pub fn get_rpc_url_with_alias(
         &self,
         maybe_alias: &str,
-    ) -> Option<Result<Cow<str>, UnresolvedEnvVarError>> {
+    ) -> Option<Result<Cow<'_, str>, UnresolvedEnvVarError>> {
         let mut endpoints = self.rpc_endpoints.clone().resolved();
         Some(endpoints.remove(maybe_alias)?.map(Cow::Owned))
     }
@@ -1077,7 +1114,7 @@ impl Config {
     pub fn get_rpc_url_or<'a>(
         &'a self,
         fallback: impl Into<Cow<'a, str>>,
-    ) -> Result<Cow<str>, UnresolvedEnvVarError> {
+    ) -> Result<Cow<'_, str>, UnresolvedEnvVarError> {
         if let Some(url) = self.get_rpc_url() {
             url
         } else {
@@ -1096,7 +1133,7 @@ impl Config {
     /// let rpc_url = config.get_rpc_url_or_localhost_http().unwrap();
     /// # }
     /// ```
-    pub fn get_rpc_url_or_localhost_http(&self) -> Result<Cow<str>, UnresolvedEnvVarError> {
+    pub fn get_rpc_url_or_localhost_http(&self) -> Result<Cow<'_, str>, UnresolvedEnvVarError> {
         self.get_rpc_url_or("http://localhost:8545")
     }
 
@@ -1255,7 +1292,7 @@ impl Config {
     /// - all libraries
     /// - the optimizer (including details, if configured)
     /// - evm version
-    pub fn solc_settings(&self) -> Result<Settings, SolcError> {
+    pub fn solc_settings(&self) -> Result<SolcSettings, SolcError> {
         // By default if no targets are specifically selected the model checker uses all targets.
         // This might be too much here, so only enable assertion checks.
         // If users wish to enable all options they need to do so explicitly.
@@ -1288,6 +1325,7 @@ impl Config {
             remappings: Vec::new(),
             // Set with `with_extra_output` below.
             output_selection: Default::default(),
+            eof_version: self.eof_version,
         }
         .with_extra_output(self.configured_artifacts_handler().output_selection());
 
@@ -1296,20 +1334,10 @@ impl Config {
             settings = settings.with_ast();
         }
 
-        Ok(settings)
-    }
+        let cli_settings =
+            CliSettings { extra_args: self.extra_args.clone(), ..Default::default() };
 
-    /// Returns the configured `zksolc` `Settings` that includes:
-    /// - all libraries
-    /// - the optimizer (including details, if configured)
-    /// - evm version
-    pub fn zksync_zksolc_settings(&self) -> Result<ZkSolcSettings, SolcError> {
-        let libraries = match self.parsed_libraries() {
-            Ok(libs) => self.project_paths::<ProjectPathsConfig>().apply_lib_remappings(libs),
-            Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {}", e))),
-        };
-
-        Ok(self.zksync.settings(libraries, self.evm_version, self.via_ir))
+        Ok(SolcSettings { settings, cli_settings })
     }
 
     /// Returns the configured [VyperSettings] that includes:
@@ -1326,7 +1354,21 @@ impl Config {
                 "evm.bytecode".to_string(),
                 "evm.deployedBytecode".to_string(),
             ]),
+            search_paths: None,
         })
+    }
+
+    /// Returns the configured `zksolc` `Settings` that includes:
+    /// - all libraries
+    /// - the optimizer (including details, if configured)
+    /// - evm version
+    pub fn zksync_zksolc_settings(&self) -> Result<ZkSolcSettings, SolcError> {
+        let libraries = match self.parsed_libraries() {
+            Ok(libs) => self.project_paths::<ProjectPathsConfig>().apply_lib_remappings(libs),
+            Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {e}"))),
+        };
+
+        Ok(self.zksync.settings(libraries, self.evm_version, self.via_ir))
     }
 
     /// Returns the default figment
@@ -1350,7 +1392,7 @@ impl Config {
     /// let my_config = Config::figment().extract::<Config>();
     /// ```
     pub fn figment() -> Figment {
-        Config::default().into()
+        Self::default().into()
     }
 
     /// Returns the default figment enhanced with additional context extracted from the provided
@@ -1381,7 +1423,7 @@ impl Config {
         let root = root.into();
         let paths = ProjectPathsConfig::builder().build_with_root::<()>(&root);
         let artifacts: PathBuf = paths.artifacts.file_name().unwrap().into();
-        Config {
+        Self {
             root: paths.root.into(),
             src: paths.sources.file_name().unwrap().into(),
             out: artifacts.clone(),
@@ -1392,27 +1434,27 @@ impl Config {
                 .map(|r| RelativeRemapping::new(r, &root))
                 .collect(),
             fs_permissions: FsPermissions::new([PathPermission::read(artifacts)]),
-            ..Config::default()
+            ..Self::default()
         }
     }
 
     /// Returns the default config but with hardhat paths
     pub fn hardhat() -> Self {
-        Config {
+        Self {
             src: "contracts".into(),
             out: "artifacts".into(),
             libs: vec!["node_modules".into()],
-            ..Config::default()
+            ..Self::default()
         }
     }
 
     /// Returns the default config that uses dapptools style paths
     pub fn dapptools() -> Self {
-        Config {
+        Self {
             chain: Some(Chain::from_id(99)),
             block_timestamp: 0,
             block_number: 0,
-            ..Config::default()
+            ..Self::default()
         }
     }
 
@@ -1440,7 +1482,7 @@ impl Config {
     /// [Self::get_config_path()] and if the closure returns `true`.
     pub fn update_at<F>(root: impl Into<PathBuf>, f: F) -> eyre::Result<()>
     where
-        F: FnOnce(&Config, &mut toml_edit::DocumentMut) -> bool,
+        F: FnOnce(&Self, &mut toml_edit::DocumentMut) -> bool,
     {
         let config = Self::load_with_root(root).sanitized();
         config.update(|doc| f(&config, doc))
@@ -1485,7 +1527,7 @@ impl Config {
                 })
                 .collect();
             let libs = toml_edit::value(libs);
-            doc[Config::PROFILE_SECTION][profile]["libs"] = libs;
+            doc[Self::PROFILE_SECTION][profile]["libs"] = libs;
             true
         })
     }
@@ -1507,7 +1549,7 @@ impl Config {
         // Config map always gets serialized as a table
         let value_table = value.as_table_mut().unwrap();
         // remove standalone sections from inner table
-        let standalone_sections = Config::STANDALONE_SECTIONS
+        let standalone_sections = Self::STANDALONE_SECTIONS
             .iter()
             .filter_map(|section| {
                 let section = section.to_string();
@@ -1516,7 +1558,7 @@ impl Config {
             .collect::<Vec<_>>();
         // wrap inner table in [profile.<profile>]
         let mut wrapping_table = [(
-            Config::PROFILE_SECTION.into(),
+            Self::PROFILE_SECTION.into(),
             toml::Value::Table([(self.profile.to_string(), value)].into_iter().collect()),
         )]
         .into_iter()
@@ -1531,7 +1573,7 @@ impl Config {
 
     /// Returns the path to the `foundry.toml` of this `Config`.
     pub fn get_config_path(&self) -> PathBuf {
-        self.root.0.join(Config::FILE_NAME)
+        self.root.0.join(Self::FILE_NAME)
     }
 
     /// Sets the non-inlinable libraries inside a `foundry.toml` file but only if it exists the
@@ -1546,26 +1588,26 @@ impl Config {
             let libraries: toml_edit::Value =
                 self.libraries.iter().map(toml_edit::Value::from).collect();
             let libraries = toml_edit::value(libraries);
-            doc[Config::PROFILE_SECTION][profile]["libraries"] = libraries;
+            doc[Self::PROFILE_SECTION][profile]["libraries"] = libraries;
             true
         })
     }
 
-    /// Returns the selected profile
+    /// Returns the selected profile.
     ///
     /// If the `FOUNDRY_PROFILE` env variable is not set, this returns the `DEFAULT_PROFILE`.
     pub fn selected_profile() -> Profile {
-        Profile::from_env_or("FOUNDRY_PROFILE", Config::DEFAULT_PROFILE)
+        Profile::from_env_or("FOUNDRY_PROFILE", Self::DEFAULT_PROFILE)
     }
 
     /// Returns the path to foundry's global TOML file: `~/.foundry/foundry.toml`.
     pub fn foundry_dir_toml() -> Option<PathBuf> {
-        Self::foundry_dir().map(|p| p.join(Config::FILE_NAME))
+        Self::foundry_dir().map(|p| p.join(Self::FILE_NAME))
     }
 
     /// Returns the path to foundry's config dir: `~/.foundry/`.
     pub fn foundry_dir() -> Option<PathBuf> {
-        dirs_next::home_dir().map(|p| p.join(Config::FOUNDRY_DIR_NAME))
+        dirs_next::home_dir().map(|p| p.join(Self::FOUNDRY_DIR_NAME))
     }
 
     /// Returns the path to foundry's cache dir: `~/.foundry/cache`.
@@ -1647,13 +1689,13 @@ impl Config {
                 cwd = cwd.parent()?;
             }
         }
-        find(Env::var_or("FOUNDRY_CONFIG", Config::FILE_NAME).as_ref())
+        find(Env::var_or("FOUNDRY_CONFIG", Self::FILE_NAME).as_ref())
             .or_else(|| Self::foundry_dir_toml().filter(|p| p.exists()))
     }
 
     /// Clears the foundry cache.
     pub fn clean_foundry_cache() -> eyre::Result<()> {
-        if let Some(cache_dir) = Config::foundry_cache_dir() {
+        if let Some(cache_dir) = Self::foundry_cache_dir() {
             let path = cache_dir.as_path();
             let _ = fs::remove_dir_all(path);
         } else {
@@ -1665,7 +1707,7 @@ impl Config {
 
     /// Clears the foundry cache for `chain`.
     pub fn clean_foundry_chain_cache(chain: Chain) -> eyre::Result<()> {
-        if let Some(cache_dir) = Config::foundry_chain_cache_dir(chain) {
+        if let Some(cache_dir) = Self::foundry_chain_cache_dir(chain) {
             let path = cache_dir.as_path();
             let _ = fs::remove_dir_all(path);
         } else {
@@ -1677,7 +1719,7 @@ impl Config {
 
     /// Clears the foundry cache for `chain` and `block`.
     pub fn clean_foundry_block_cache(chain: Chain, block: u64) -> eyre::Result<()> {
-        if let Some(cache_dir) = Config::foundry_block_cache_dir(chain, block) {
+        if let Some(cache_dir) = Self::foundry_block_cache_dir(chain, block) {
             let path = cache_dir.as_path();
             let _ = fs::remove_dir_all(path);
         } else {
@@ -1689,7 +1731,7 @@ impl Config {
 
     /// Clears the foundry etherscan cache.
     pub fn clean_foundry_etherscan_cache() -> eyre::Result<()> {
-        if let Some(cache_dir) = Config::foundry_etherscan_cache_dir() {
+        if let Some(cache_dir) = Self::foundry_etherscan_cache_dir() {
             let path = cache_dir.as_path();
             let _ = fs::remove_dir_all(path);
         } else {
@@ -1701,7 +1743,7 @@ impl Config {
 
     /// Clears the foundry etherscan cache for `chain`.
     pub fn clean_foundry_etherscan_chain_cache(chain: Chain) -> eyre::Result<()> {
-        if let Some(cache_dir) = Config::foundry_etherscan_chain_cache_dir(chain) {
+        if let Some(cache_dir) = Self::foundry_etherscan_chain_cache_dir(chain) {
             let path = cache_dir.as_path();
             let _ = fs::remove_dir_all(path);
         } else {
@@ -1713,7 +1755,7 @@ impl Config {
 
     /// List the data in the foundry cache.
     pub fn list_foundry_cache() -> eyre::Result<Cache> {
-        if let Some(cache_dir) = Config::foundry_rpc_cache_dir() {
+        if let Some(cache_dir) = Self::foundry_rpc_cache_dir() {
             let mut cache = Cache { chains: vec![] };
             if !cache_dir.exists() {
                 return Ok(cache)
@@ -1736,7 +1778,7 @@ impl Config {
 
     /// List the cached data for `chain`.
     pub fn list_foundry_chain_cache(chain: Chain) -> eyre::Result<ChainCache> {
-        let block_explorer_data_size = match Config::foundry_etherscan_chain_cache_dir(chain) {
+        let block_explorer_data_size = match Self::foundry_etherscan_chain_cache_dir(chain) {
             Some(cache_dir) => Self::get_cached_block_explorer_data(&cache_dir)?,
             None => {
                 warn!("failed to access foundry_etherscan_chain_cache_dir");
@@ -1744,7 +1786,7 @@ impl Config {
             }
         };
 
-        if let Some(cache_dir) = Config::foundry_chain_cache_dir(chain) {
+        if let Some(cache_dir) = Self::foundry_chain_cache_dir(chain) {
             let blocks = Self::get_cached_blocks(&cache_dir)?;
             Ok(ChainCache {
                 name: chain.to_string(),
@@ -1813,8 +1855,8 @@ impl Config {
         };
 
         // use [profile.<profile>] as [<profile>]
-        let mut profiles = vec![Config::DEFAULT_PROFILE];
-        if profile != Config::DEFAULT_PROFILE {
+        let mut profiles = vec![Self::DEFAULT_PROFILE];
+        if profile != Self::DEFAULT_PROFILE {
             profiles.push(profile.clone());
         }
         let provider = toml_provider.strict_select(profiles);
@@ -1823,11 +1865,11 @@ impl Config {
         let provider = BackwardsCompatTomlProvider(ForcedSnakeCaseData(provider));
 
         // merge the default profile as a base
-        if profile != Config::DEFAULT_PROFILE {
-            figment = figment.merge(provider.rename(Config::DEFAULT_PROFILE, profile.clone()));
+        if profile != Self::DEFAULT_PROFILE {
+            figment = figment.merge(provider.rename(Self::DEFAULT_PROFILE, profile.clone()));
         }
         // merge special keys into config
-        for standalone_key in Config::STANDALONE_SECTIONS {
+        for standalone_key in Self::STANDALONE_SECTIONS {
             if let Some((_, fallback)) =
                 STANDALONE_FALLBACK_SECTIONS.iter().find(|(key, _)| standalone_key == key)
             {
@@ -1871,7 +1913,7 @@ impl Config {
 }
 
 impl From<Config> for Figment {
-    fn from(c: Config) -> Figment {
+    fn from(c: Config) -> Self {
         c.to_figment(FigmentProviders::All)
     }
 }
@@ -1934,7 +1976,7 @@ impl From<RegexWrapper> for regex::Regex {
 
 impl From<regex::Regex> for RegexWrapper {
     fn from(re: Regex) -> Self {
-        RegexWrapper { inner: re }
+        Self { inner: re }
     }
 }
 
@@ -2001,7 +2043,7 @@ impl Default for RootPath {
 
 impl<P: Into<PathBuf>> From<P> for RootPath {
     fn from(p: P) -> Self {
-        RootPath(p.into())
+        Self(p.into())
     }
 }
 
@@ -2061,7 +2103,10 @@ impl Default for Config {
             profile: Self::DEFAULT_PROFILE,
             fs_permissions: FsPermissions::new([PathPermission::read("out")]),
             prague: false,
+            #[cfg(not(feature = "isolate-by-default"))]
             isolate: false,
+            #[cfg(feature = "isolate-by-default")]
+            isolate: true,
             root: Default::default(),
             src: "src".into(),
             test: "test".into(),
@@ -2095,18 +2140,22 @@ impl Default for Config {
             contract_pattern_inverse: None,
             path_pattern: None,
             path_pattern_inverse: None,
+            coverage_pattern_inverse: None,
+            test_failures_file: "cache/test-failures".into(),
+            threads: None,
+            show_progress: false,
             fuzz: FuzzConfig::new("cache/fuzz".into()),
             invariant: InvariantConfig::new("cache/invariant".into()),
             always_use_create_2_factory: false,
             ffi: false,
             prompt_timeout: 120,
-            sender: Config::DEFAULT_SENDER,
-            tx_origin: Config::DEFAULT_SENDER,
-            initial_balance: U256::from(0xffffffffffffffffffffffffu128),
+            sender: Self::DEFAULT_SENDER,
+            tx_origin: Self::DEFAULT_SENDER,
+            initial_balance: U256::from((1u128 << 96) - 1),
             block_number: 1,
             fork_block_number: None,
             chain: None,
-            gas_limit: i64::MAX.into(),
+            gas_limit: (1u64 << 30).into(), // ~1B
             code_size_limit: None,
             gas_price: None,
             block_base_fee_per_gas: 0,
@@ -2148,12 +2197,17 @@ impl Default for Config {
             build_info_path: None,
             fmt: Default::default(),
             doc: Default::default(),
+            bind_json: Default::default(),
             labels: Default::default(),
             unchecked_cheatcode_artifacts: false,
-            create2_library_salt: Config::DEFAULT_CREATE2_LIBRARY_SALT,
+            create2_library_salt: Self::DEFAULT_CREATE2_LIBRARY_SALT,
             skip: vec![],
             dependencies: Default::default(),
+            assertions_revert: true,
+            legacy_assertions: false,
             warnings: vec![],
+            extra_args: vec![],
+            eof_version: None,
             _non_exhaustive: (),
             zksync: Default::default(),
         }
@@ -2164,27 +2218,12 @@ impl Default for Config {
 ///
 /// Due to this limitation this type will be serialized/deserialized as String if it's larger than
 /// `i64`
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct GasLimit(pub u64);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+pub struct GasLimit(#[serde(deserialize_with = "crate::deserialize_u64_or_max")] pub u64);
 
 impl From<u64> for GasLimit {
     fn from(gas: u64) -> Self {
         Self(gas)
-    }
-}
-impl From<i64> for GasLimit {
-    fn from(gas: i64) -> Self {
-        Self(gas as u64)
-    }
-}
-impl From<i32> for GasLimit {
-    fn from(gas: i32) -> Self {
-        Self(gas as u64)
-    }
-}
-impl From<u32> for GasLimit {
-    fn from(gas: u32) -> Self {
-        Self(gas as u64)
     }
 }
 
@@ -2199,37 +2238,13 @@ impl Serialize for GasLimit {
     where
         S: Serializer,
     {
-        if self.0 > i64::MAX as u64 {
+        if self.0 == u64::MAX {
+            serializer.serialize_str("max")
+        } else if self.0 > i64::MAX as u64 {
             serializer.serialize_str(&self.0.to_string())
         } else {
             serializer.serialize_u64(self.0)
         }
-    }
-}
-
-impl<'de> Deserialize<'de> for GasLimit {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error;
-
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Gas {
-            Number(u64),
-            Text(String),
-        }
-
-        let gas = match Gas::deserialize(deserializer)? {
-            Gas::Number(num) => GasLimit(num),
-            Gas::Text(s) => match s.as_str() {
-                "max" | "MAX" | "Max" | "u64::MAX" | "u64::Max" => GasLimit(u64::MAX),
-                s => GasLimit(s.parse().map_err(D::Error::custom)?),
-            },
-        };
-
-        Ok(gas)
     }
 }
 
@@ -2251,8 +2266,8 @@ impl SolcReq {
     /// will try to get the version from the binary.
     fn try_version(&self) -> Result<Version, SolcError> {
         match self {
-            SolcReq::Version(version) => Ok(version.clone()),
-            SolcReq::Local(path) => Solc::new(path).map(|solc| solc.version),
+            Self::Version(version) => Ok(version.clone()),
+            Self::Local(path) => Solc::new(path).map(|solc| solc.version),
         }
     }
 }
@@ -2261,9 +2276,9 @@ impl<T: AsRef<str>> From<T> for SolcReq {
     fn from(s: T) -> Self {
         let s = s.as_ref();
         if let Ok(v) = Version::from_str(s) {
-            SolcReq::Version(v)
+            Self::Version(v)
         } else {
-            SolcReq::Local(s.into())
+            Self::Local(s.into())
         }
     }
 }
@@ -2529,7 +2544,7 @@ impl Provider for DappEnvCompatProvider {
     }
 }
 
-/// Renames a profile from `from` to `to
+/// Renames a profile from `from` to `to`.
 ///
 /// For example given:
 ///
