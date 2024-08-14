@@ -205,7 +205,7 @@ contract ZkCheatcodesTest is DSTest {
 
     function testRecordLogsInZkVm() public {
         // ensure we are in zkvm
-        (bool _success, bytes memory _ret) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
+        vm.zkVm(true);
         vm.recordLogs();
         Emitter emitter = new Emitter(); // +7 logs from system contracts
         emitter.functionEmit(); // +3 from system contracts
