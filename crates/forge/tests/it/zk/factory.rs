@@ -1,5 +1,7 @@
 //! Forge tests for zksync factory contracts.
 
+use foundry_test_utils::{forgetest_async, util, TestCommand, TestProject, ZkSyncNode};
+
 use super::test_zk;
 
 test_zk!(can_deploy_in_method, "testClassicFactory|testNestedFactory", "ZkFactoryTest");
@@ -12,37 +14,37 @@ test_zk!(
 
 test_zk!(can_use_predeployed_factory, "testUser.*", "ZkFactoryTest");
 
-foundry_test_utils::forgetest_async!(script_zk_can_deploy_in_method, |prj, cmd| {
+forgetest_async!(script_zk_can_deploy_in_method, |prj, cmd| {
     setup_factory_prj(&mut prj);
-    execute_factory_script(prj.root(), &mut cmd, "ZkClassicFactoryScript", 2);
-    execute_factory_script(prj.root(), &mut cmd, "ZkNestedFactoryScript", 2);
+    run_factory_script_test(prj.root(), &mut cmd, "ZkClassicFactoryScript", 2);
+    run_factory_script_test(prj.root(), &mut cmd, "ZkNestedFactoryScript", 2);
 });
 
-foundry_test_utils::forgetest_async!(script_zk_can_deploy_in_constructor, |prj, cmd| {
+forgetest_async!(script_zk_can_deploy_in_constructor, |prj, cmd| {
     setup_factory_prj(&mut prj);
-    execute_factory_script(prj.root(), &mut cmd, "ZkConstructorFactoryScript", 1);
-    execute_factory_script(prj.root(), &mut cmd, "ZkNestedConstructorFactoryScript", 1);
+    run_factory_script_test(prj.root(), &mut cmd, "ZkConstructorFactoryScript", 1);
+    run_factory_script_test(prj.root(), &mut cmd, "ZkNestedConstructorFactoryScript", 1);
 });
 
-foundry_test_utils::forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
+forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
     setup_factory_prj(&mut prj);
-    execute_factory_script(prj.root(), &mut cmd, "ZkUserFactoryScript", 3);
-    execute_factory_script(prj.root(), &mut cmd, "ZkUserConstructorFactoryScript", 2);
+    run_factory_script_test(prj.root(), &mut cmd, "ZkUserFactoryScript", 3);
+    run_factory_script_test(prj.root(), &mut cmd, "ZkUserConstructorFactoryScript", 2);
 });
 
-fn setup_factory_prj(prj: &mut foundry_test_utils::TestProject) {
-    foundry_test_utils::util::initialize(prj.root());
+fn setup_factory_prj(prj: &mut TestProject) {
+    util::initialize(prj.root());
     prj.add_source("Factory.sol", include_str!("../../../../../testdata/zk/Factory.sol")).unwrap();
     prj.add_script("Factory.s.sol", include_str!("../../fixtures/zk/Factory.s.sol")).unwrap();
 }
 
-fn execute_factory_script(
+fn run_factory_script_test(
     root: impl AsRef<std::path::Path>,
-    cmd: &mut foundry_test_utils::TestCommand,
+    cmd: &mut TestCommand,
     name: &str,
-    expected_txs: usize,
+    expected_broadcastable_txs: usize,
 ) {
-    let node = foundry_test_utils::ZkSyncNode::start();
+    let node = ZkSyncNode::start();
 
     cmd.arg("script").args([
         "--zk-startup",
@@ -70,6 +72,9 @@ fn execute_factory_script(
     let content = foundry_common::fs::read_to_string(run_latest).unwrap();
 
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
-    assert_eq!(json["transactions"].as_array().expect("broadcastable txs").len(), expected_txs);
+    assert_eq!(
+        json["transactions"].as_array().expect("broadcastable txs").len(),
+        expected_broadcastable_txs
+    );
     cmd.forge_fuse();
 }
