@@ -164,7 +164,7 @@ foundry-zksync-compiler = { path = "crates/zksync/compiler" }
 # foundry-compilers = { version = "0.8.0", default-features = false }
 foundry-block-explorers = { git = "https://github.com/Moonsong-Labs/block-explorers", branch = "zksync-v0.5.1", default-features = false }
 foundry-compilers = { git = "https://github.com/Moonsong-Labs/compilers", branch = "zksync-v0.10.0" }
-foundry-fork-db = "0.2"
+foundry-fork-db = { git = "https://github.com/Moonsong-Labs/foundry-zksync-fork-db", branch = "zksync-v0.2.0" }
 solang-parser = "=0.3.3"
 
 ## revm

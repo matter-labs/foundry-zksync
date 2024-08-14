@@ -5,8 +5,8 @@
 
 use super::CreateFork;
 use alloy_primitives::U256;
-use alloy_provider::{Provider, RootProvider};
-use alloy_transport::{layers::RetryBackoffService, TransportResult};
+use alloy_provider::RootProvider;
+use alloy_transport::layers::RetryBackoffService;
 use foundry_common::provider::{
     runtime_transport::RuntimeTransport, ProviderBuilder, RetryProvider,
 };
@@ -542,28 +542,4 @@ async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork,
     let fork_id = ForkId::new(&fork.opts.url, number.into());
 
     Ok((fork_id, fork, handler))
-}
-
-impl<T: alloy_transport::Transport + Clone> super::backend::ZkSyncMiddleware
-    for RootProvider<T, alloy_provider::network::AnyNetwork>
-{
-    async fn get_bytecode_by_hash(
-        &self,
-        hash: alloy_primitives::B256,
-    ) -> TransportResult<Option<revm::primitives::Bytecode>> {
-        let bytecode: Option<alloy_primitives::Bytes> =
-            self.raw_request("zks_getBytecodeByHash".into(), vec![hash]).await?;
-        Ok(bytecode.map(revm::primitives::Bytecode::new_raw))
-    }
-}
-
-impl<T: alloy_transport::Transport + Clone> super::backend::ZkSyncMiddleware
-    for Arc<RootProvider<T, alloy_provider::network::AnyNetwork>>
-{
-    async fn get_bytecode_by_hash(
-        &self,
-        hash: alloy_primitives::B256,
-    ) -> TransportResult<Option<revm::primitives::Bytecode>> {
-        self.as_ref().get_bytecode_by_hash(hash).await
-    }
 }
