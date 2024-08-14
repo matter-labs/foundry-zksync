@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use alloy_primitives::{Bytes, B256};
+use alloy_primitives::{hex, Bytes, B256};
 use revm::{
     primitives::{Address, Bytecode, U256 as rU256},
     Database, InnerEvmContext,

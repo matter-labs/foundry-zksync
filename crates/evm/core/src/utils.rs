@@ -1,7 +1,7 @@
 pub use crate::ic::*;
 use crate::{constants::DEFAULT_CREATE2_DEPLOYER, InspectorExt};
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_primitives::{Address, Selector, U256};
+use alloy_primitives::{Address, Selector, TxKind, U256};
 use alloy_rpc_types::{Block, Transaction};
 use foundry_config::NamedChain;
 use revm::{
@@ -11,7 +11,7 @@ use revm::{
         return_ok, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome,
         Gas, InstructionResult, InterpreterResult,
     },
-    primitives::{CreateScheme, EVMError, SpecId, TransactTo, KECCAK_EMPTY},
+    primitives::{CreateScheme, EVMError, HandlerCfg, SpecId, KECCAK_EMPTY},
     FrameOrResult, FrameResult,
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -77,25 +77,10 @@ pub fn configure_tx_env(env: &mut revm::primitives::Env, tx: &Transaction) {
     env.tx.gas_price = U256::from(tx.gas_price.unwrap_or_default());
     env.tx.gas_priority_fee = tx.max_priority_fee_per_gas.map(U256::from);
     env.tx.nonce = Some(tx.nonce);
-    env.tx.access_list = tx
-        .access_list
-        .clone()
-        .unwrap_or_default()
-        .0
-        .into_iter()
-        .map(|item| {
-            (
-                item.address,
-                item.storage_keys
-                    .into_iter()
-                    .map(|key| alloy_primitives::U256::from_be_bytes(key.0))
-                    .collect(),
-            )
-        })
-        .collect();
+    env.tx.access_list = tx.access_list.clone().unwrap_or_default().0.into_iter().collect();
     env.tx.value = tx.value.to();
     env.tx.data = alloy_primitives::Bytes(tx.input.0.clone());
-    env.tx.transact_to = tx.to.map(TransactTo::Call).unwrap_or_else(TransactTo::create)
+    env.tx.transact_to = tx.to.map(TxKind::Call).unwrap_or(TxKind::Create)
 }
 
 /// Get the gas used, accounting for refunds
@@ -156,11 +141,6 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
                 .borrow_mut()
                 .push((ctx.evm.journaled_state.depth(), call_inputs.clone()));
 
-            // Handle potential inspector override.
-            if let Some(outcome) = outcome {
-                return Ok(FrameOrResult::Result(FrameResult::Call(outcome)));
-            }
-
             // Sanity check that CREATE2 deployer exists.
             let code_hash = ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.0.info.code_hash;
             if code_hash == KECCAK_EMPTY {
@@ -174,6 +154,11 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
                 })))
             }
 
+            // Handle potential inspector override.
+            if let Some(outcome) = outcome {
+                return Ok(FrameOrResult::Result(FrameResult::Call(outcome)));
+            }
+
             // Create CALL frame for CREATE2 factory invocation.
             let mut frame_or_result = ctx.evm.make_call_frame(&call_inputs);
 
@@ -184,9 +169,8 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
             frame_or_result
         });
 
-    let create2_overrides_inner = create2_overrides.clone();
+    let create2_overrides_inner = create2_overrides;
     let old_handle = handler.execution.insert_call_outcome.clone();
-
     handler.execution.insert_call_outcome =
         Arc::new(move |ctx, frame, shared_memory, mut outcome| {
             // If we are on the depth of the latest override, handle the outcome.
@@ -266,6 +250,23 @@ where
     I: InspectorExt<WrapDatabaseRef<DB>>,
 {
     new_evm_with_inspector(WrapDatabaseRef(db), env, inspector)
+}
+
+pub fn new_evm_with_existing_context<'a, DB, I>(
+    inner: revm::InnerEvmContext<DB>,
+    inspector: I,
+) -> revm::Evm<'a, I, DB>
+where
+    DB: revm::Database,
+    I: InspectorExt<DB>,
+{
+    let handler_cfg = HandlerCfg::new(inner.spec_id());
+    let context =
+        revm::Context::new(revm::EvmContext { inner, precompiles: Default::default() }, inspector);
+    let mut handler = revm::Handler::new(handler_cfg);
+    handler.append_handler_register_plain(revm::inspector_handle_register);
+    handler.append_handler_register_plain(create2_handler_register);
+    revm::Evm::new(context, handler)
 }
 
 #[cfg(test)]
