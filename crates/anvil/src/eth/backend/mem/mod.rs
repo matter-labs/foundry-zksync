@@ -942,7 +942,6 @@ impl Backend {
             env.block.number = env.block.number.saturating_add(U256::from(1));
             env.block.basefee = U256::from(current_base_fee);
             env.block.blob_excess_gas_and_price = current_excess_blob_gas_and_price;
-            env.block.timestamp = U256::from(self.time.next_timestamp());
 
             // pick a random value for prevrandao
             env.block.prevrandao = Some(B256::random());
