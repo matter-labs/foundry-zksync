@@ -107,6 +107,7 @@ impl CreateArgs {
     pub async fn run(mut self) -> Result<()> {
         // Find Project & Compile
         let project = self.opts.project()?;
+
         let zksync = self.opts.compiler.zk.enabled();
         if zksync {
             let target_path = if let Some(ref mut path) = self.contract.path {
@@ -179,9 +180,8 @@ impl CreateArgs {
                         let mut abs_path_buf = PathBuf::new();
                         abs_path_buf.push(project.root());
                         abs_path_buf.push(contract_path);
-                        let abs_path_str = abs_path_buf.to_string_lossy();
                         let fdep_art =
-                            zk_output.find(abs_path_str, contract_name).unwrap_or_else(|| {
+                            zk_output.find(&abs_path_buf, contract_name).unwrap_or_else(|| {
                                 panic!(
                                     "Could not find contract {contract_name} at path {contract_path} for compilation output",
                                 )

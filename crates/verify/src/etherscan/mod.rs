@@ -1,6 +1,7 @@
 use super::{provider::VerificationProvider, VerifyArgs, VerifyCheckArgs};
 use crate::{provider::VerificationContext, retry::RETRY_CHECK_ON_VERIFY};
 use alloy_json_abi::Function;
+use alloy_primitives::hex;
 use alloy_provider::Provider;
 use eyre::{eyre, Context, OptionExt, Result};
 use foundry_block_explorers::{
@@ -10,7 +11,11 @@ use foundry_block_explorers::{
     Client,
 };
 use foundry_cli::utils::{self, read_constructor_args_file, LoadConfig};
-use foundry_common::{abi::encode_function_args, retry::Retry, shell};
+use foundry_common::{
+    abi::encode_function_args,
+    retry::{Retry, RetryError},
+    shell,
+};
 use foundry_compilers::{artifacts::BytecodeObject, solc::Solc, Artifact};
 use foundry_config::{Chain, Config};
 use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
@@ -18,7 +23,6 @@ use futures::FutureExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::{BuildMetadata, Version};
-
 use std::fmt::Debug;
 
 mod flatten;
@@ -156,12 +160,13 @@ impl VerificationProvider for EtherscanVerificationProvider {
         )?;
         let retry: Retry = args.retry.into();
         retry
-            .run_async(|| {
+            .run_async_until_break(|| {
                 async {
                     let resp = etherscan
                         .check_contract_verification_status(args.id.clone())
                         .await
-                        .wrap_err("Failed to request verification status")?;
+                        .wrap_err("Failed to request verification status")
+                        .map_err(RetryError::Retry)?;
 
                     trace!(target: "forge::verify", ?resp, "Received verification response");
 
@@ -171,15 +176,15 @@ impl VerificationProvider for EtherscanVerificationProvider {
                     );
 
                     if resp.result == "Pending in queue" {
-                        return Err(eyre!("Verification is still pending...",))
+                        return Err(RetryError::Retry(eyre!("Verification is still pending...",)))
                     }
 
                     if resp.result == "In progress" {
-                        return Err(eyre!("Verification is in progress...",))
+                        return Err(RetryError::Retry(eyre!("Verification is in progress...",)))
                     }
 
                     if resp.result == "Unable to verify" {
-                        return Err(eyre!("Unable to verify.",))
+                        return Err(RetryError::Retry(eyre!("Unable to verify.",)))
                     }
 
                     if resp.result == "Already Verified" {
@@ -188,8 +193,7 @@ impl VerificationProvider for EtherscanVerificationProvider {
                     }
 
                     if resp.status == "0" {
-                        println!("Contract failed to verify.");
-                        std::process::exit(1);
+                        return Err(RetryError::Break(eyre!("Contract failed to verify.",)))
                     }
 
                     if resp.result == "Pass - Verified" {
@@ -201,7 +205,7 @@ impl VerificationProvider for EtherscanVerificationProvider {
                 .boxed()
             })
             .await
-            .wrap_err("Checking verification result failed:")
+            .wrap_err("Checking verification result failed")
     }
 }
 
@@ -463,7 +467,7 @@ impl EtherscanVerificationProvider {
 
         let output = context.project.compile_file(&context.target_path)?;
         let artifact = output
-            .find(context.target_path.to_string_lossy(), &context.target_name)
+            .find(&context.target_path, &context.target_name)
             .ok_or_eyre("Contract artifact wasn't found locally")?;
         let bytecode = artifact
             .get_bytecode_object()

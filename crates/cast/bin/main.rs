@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate tracing;
 
-use alloy_primitives::{keccak256, Address, B256};
+use alloy_primitives::{hex, keccak256, Address, B256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, BlockNumberOrTag::Latest};
 use cast::{Cast, SimpleCast};
@@ -566,6 +566,10 @@ async fn main() -> Result<()> {
             let tx = SimpleCast::decode_raw_transaction(&tx)?;
 
             println!("{}", serde_json::to_string_pretty(&tx)?);
+        }
+        CastSubcommand::DecodeEof { eof } => {
+            let eof = stdin::unwrap_line(eof)?;
+            println!("{}", SimpleCast::decode_eof(&eof)?);
         }
     };
     Ok(())
