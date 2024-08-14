@@ -7,4 +7,5 @@ mod fork;
 mod fuzz;
 mod invariant;
 mod logs;
+mod ownership;
 mod repros;
