@@ -435,7 +435,13 @@ impl<'a> ContractRunner<'a> {
         let address = setup.address;
         let test_result = TestResult::new(setup);
 
-        println!("> running unit test {} {:?}", func.name, func.selector());
+        println!("> running unit test {} {:?} {:?} {:?}", func.name, func.inputs, func.selector(), func.signature());
+        println!("\tcalc sig");
+        let sig =  signature(&func.name, &func.inputs, None);
+        println!("\tsig = {sig}, calc selector");
+        let sel =  selector(&sig);
+        println!("\tsel = {sel}");
+
         // Run unit test
         let (mut raw_call_result, reason) = match self.executor.call(
             self.sender,
@@ -660,5 +666,56 @@ impl<'a> ContractRunner<'a> {
             return test_result.single_skip()
         }
         test_result.fuzz_result(result)
+    }
+}
+
+
+use alloy_json_abi::Param;
+macro_rules! signature {
+    ($inputs:expr, $preimage:expr) => {
+        $preimage.push('(');
+        for (i, input) in $inputs.iter().enumerate() {
+            if i > 0 {
+                $preimage.push(',');
+            }
+            input.selector_type_raw($preimage);
+        }
+        $preimage.push(')');
+    };
+}
+
+const PARAM: usize = 32;
+fn signature(name: &str, inputs: &[Param], outputs: Option<&[Param]>) -> String {
+    let parens = 2 + outputs.is_some() as usize * 2;
+    let n_outputs = outputs.map(<[_]>::len).unwrap_or(0);
+    let cap = name.len() + parens + (inputs.len() + n_outputs) * PARAM;
+    let mut preimage = String::with_capacity(cap);
+    preimage.push_str(name);
+    println!("\tpreimage1 = {preimage}");
+    signature_raw(inputs, &mut preimage);
+    println!("\tpreimage2 = {preimage}");
+    if let Some(outputs) = outputs {
+        signature_raw(outputs, &mut preimage);
+        println!("\tpreimage3 = {preimage}");
+    }
+    println!("\tpreimage = {preimage}");
+    preimage
+}
+
+
+fn signature_raw(params: &[Param], preimage: &mut String) {
+    signature!(params, preimage);
+}
+
+fn selector(preimage: &str) -> alloy_primitives::Selector {
+    println!("\tselector: bytes {:?}", preimage.as_bytes());
+    println!("\tselector: keccak {:?}", alloy_primitives::keccak256(preimage.as_bytes()));
+    // SAFETY: splitting an array
+    unsafe {
+        alloy_primitives::keccak256(preimage.as_bytes())
+            .0
+            .get_unchecked(..4)
+            .try_into()
+            .unwrap_unchecked()
     }
 }
