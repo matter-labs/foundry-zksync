@@ -435,6 +435,7 @@ impl<'a> ContractRunner<'a> {
         let address = setup.address;
         let test_result = TestResult::new(setup);
 
+        println!("> running unit test {} {:?}", func.name, func.selector());
         // Run unit test
         let (mut raw_call_result, reason) = match self.executor.call(
             self.sender,

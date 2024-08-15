@@ -11,7 +11,7 @@ use crate::inspectors::{
 };
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_primitives::{Address, Bytes, Log, U256};
+use alloy_primitives::{hex, Address, Bytes, Log, U256};
 use alloy_sol_types::{sol, SolCall};
 use foundry_evm_core::{
     backend::{Backend, BackendError, BackendResult, CowBackend, DatabaseExt, GLOBAL_FAIL_SLOT},
@@ -359,6 +359,7 @@ impl Executor {
         rd: Option<&RevertDecoder>,
     ) -> Result<CallResult, EvmError> {
         let calldata = Bytes::from(func.abi_encode_input(args)?);
+        println!("\tcalldata {:?}", calldata);
         let result = self.call_raw(from, to, calldata, value)?;
         result.into_decoded_result(func, rd)
     }
