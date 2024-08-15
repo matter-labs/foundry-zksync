@@ -140,29 +140,29 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: forge
-          path: ./target/release/forge
+          path: ./target/x86_64-unknown-linux-gnu/release/forge
 
-  cleanup:
-    name: Release cleanup
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: release
-    if: always()
-    steps:
-      - uses: actions/checkout@v4
+  # cleanup:
+  #   name: Release cleanup
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #   needs: release
+  #   if: always()
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      # Moves the `nightly` tag to `HEAD`
-      - name: Move nightly tag
-        if: ${{ env.IS_NIGHTLY }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const moveTag = require('./.github/scripts/move-tag.js')
-            await moveTag({ github, context }, 'nightly')
+  #     # Moves the `nightly` tag to `HEAD`
+  #     - name: Move nightly tag
+  #       if: ${{ env.IS_NIGHTLY }}
+  #       uses: actions/github-script@v7
+  #       with:
+  #         script: |
+  #           const moveTag = require('./.github/scripts/move-tag.js')
+  #           await moveTag({ github, context }, 'nightly')
 
-      - name: Delete old nightlies
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prunePrereleases = require('./.github/scripts/prune-prereleases.js')
-            await prunePrereleases({github, context})
+  #     - name: Delete old nightlies
+  #       uses: actions/github-script@v7
+  #       with:
+  #         script: |
+  #           const prunePrereleases = require('./.github/scripts/prune-prereleases.js')
+  #           await prunePrereleases({github, context})
