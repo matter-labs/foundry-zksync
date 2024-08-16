@@ -6,5 +6,7 @@ mod factory;
 mod fuzz;
 mod invariant;
 mod logs;
+mod nft;
 mod ownership;
+mod proxy;
 mod repros;
