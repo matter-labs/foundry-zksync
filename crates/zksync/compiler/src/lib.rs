@@ -48,7 +48,7 @@ pub fn config_create_project(
 ) -> Result<Project<ZkSolcCompiler, ZkArtifactOutput>, SolcError> {
     let mut builder = ProjectBuilder::<ZkSolcCompiler>::default()
         .artifacts(ZkArtifactOutput {})
-        .paths(config.project_paths())
+        .paths(config_project_paths(config))
         .settings(config_zksolc_settings(config)?)
         .ignore_error_codes(config.ignored_error_codes.iter().copied().map(Into::into))
         .ignore_paths(config.ignored_file_paths.clone())
