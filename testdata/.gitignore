@@ -2,5 +2,6 @@
 cache/
 out/
 zkout/
+zk_build_infos/
 .lock
 .lock-zk

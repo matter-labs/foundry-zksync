@@ -102,14 +102,14 @@ pub fn config_project_paths(config: &Config) -> ProjectPathsConfig<SolcLanguage>
         .sources(&config.src)
         .tests(&config.test)
         .scripts(&config.script)
-        .artifacts("zkout")
+        .artifacts(config.root.0.join("zkout"))
         .libs(config.libs.iter())
         .remappings(config.get_all_remappings())
         .allowed_path(&config.root.0)
         .allowed_paths(&config.libs)
         .allowed_paths(&config.allow_paths)
         .include_paths(&config.include_paths)
-        .build_infos("zk_build_infos");
+        .build_infos(config.root.0.join("zk_build_infos"));
 
     /*
     if let Some(build_info_path) = &config.build_info_path {
@@ -117,7 +117,8 @@ pub fn config_project_paths(config: &Config) -> ProjectPathsConfig<SolcLanguage>
     }
     */
 
-    builder.build_with_root(&config.root.0)
+    let ret = builder.build_with_root(&config.root.0);
+    ret
 }
 
 /// Ensures that the configured version is installed if explicitly set
