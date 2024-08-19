@@ -4,6 +4,7 @@ mod cheats;
 mod contracts;
 mod factory;
 mod factory_deps;
+mod fork;
 mod fuzz;
 mod invariant;
 mod logs;
