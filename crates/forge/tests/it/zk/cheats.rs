@@ -92,6 +92,13 @@ async fn test_zk_cheat_works_after_fork() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_zk_eravm_force_return_feature() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new(".*", "ZkRetTest", ".*");
+    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_zk_can_mock_modifiers() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new(".*", "MockedModifierTest", ".*");
