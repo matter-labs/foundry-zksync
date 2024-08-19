@@ -1,16 +1,17 @@
 use foundry_test_utils::{forgetest_async, util, TestProject};
 
-use crate::test_helpers::run_script_test;
+use crate::test_helpers::run_zk_script_test;
 
 forgetest_async!(script_zk_can_deploy_proxy, |prj, cmd| {
     setup_proxy_prj(&mut prj);
-    run_script_test(
+    run_zk_script_test(
         prj.root(),
         &mut cmd,
-        "Proxy",
+        "./script/Proxy.s.sol",
         "ProxyScript",
-        Some("OpenZeppelin/openzeppelin-contracts"),
+        Some(&["OpenZeppelin/openzeppelin-contracts"]),
         4,
+        None,
     );
 });
 

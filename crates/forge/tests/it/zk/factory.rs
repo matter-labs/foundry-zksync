@@ -5,7 +5,7 @@ use foundry_test_utils::{forgetest_async, util, Filter, TestProject};
 
 use crate::{
     config::TestConfig,
-    test_helpers::{run_script_test, TEST_DATA_DEFAULT},
+    test_helpers::{run_zk_script_test, TEST_DATA_DEFAULT},
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -41,20 +41,68 @@ async fn test_zk_can_use_predeployed_factory() {
 
 forgetest_async!(script_zk_can_deploy_in_method, |prj, cmd| {
     setup_factory_prj(&mut prj);
-    run_script_test(prj.root(), &mut cmd, "Factory", "ZkClassicFactoryScript", None, 2);
-    run_script_test(prj.root(), &mut cmd, "Factory", "ZkNestedFactoryScript", None, 2);
+    run_zk_script_test(
+        prj.root(),
+        &mut cmd,
+        "./script/Factory.s.sol",
+        "ZkClassicFactoryScript",
+        None,
+        2,
+        None,
+    );
+    run_zk_script_test(
+        prj.root(),
+        &mut cmd,
+        "./script/Factory.s.sol",
+        "ZkNestedFactoryScript",
+        None,
+        2,
+        None,
+    );
 });
 
 forgetest_async!(script_zk_can_deploy_in_constructor, |prj, cmd| {
     setup_factory_prj(&mut prj);
-    run_script_test(prj.root(), &mut cmd, "Factory", "ZkConstructorFactoryScript", None, 1);
-    run_script_test(prj.root(), &mut cmd, "Factory", "ZkNestedConstructorFactoryScript", None, 1);
+    run_zk_script_test(
+        prj.root(),
+        &mut cmd,
+        "./script/Factory.s.sol",
+        "ZkConstructorFactoryScript",
+        None,
+        1,
+        None,
+    );
+    run_zk_script_test(
+        prj.root(),
+        &mut cmd,
+        "./script/Factory.s.sol",
+        "ZkNestedConstructorFactoryScript",
+        None,
+        1,
+        None,
+    );
 });
 
 forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
     setup_factory_prj(&mut prj);
-    run_script_test(prj.root(), &mut cmd, "Factory", "ZkUserFactoryScript", None, 3);
-    run_script_test(prj.root(), &mut cmd, "Factory", "ZkUserConstructorFactoryScript", None, 2);
+    run_zk_script_test(
+        prj.root(),
+        &mut cmd,
+        "./script/Factory.s.sol",
+        "ZkUserFactoryScript",
+        None,
+        3,
+        None,
+    );
+    run_zk_script_test(
+        prj.root(),
+        &mut cmd,
+        "./script/Factory.s.sol",
+        "ZkUserConstructorFactoryScript",
+        None,
+        2,
+        None,
+    );
 });
 
 fn setup_factory_prj(prj: &mut TestProject) {
