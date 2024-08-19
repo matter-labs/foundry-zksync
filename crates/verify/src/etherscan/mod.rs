@@ -452,12 +452,12 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<String> {
-        let provider = utils::get_provider(&context.config())?;
+        let provider = utils::get_provider(context.config())?;
         let client = self.client(
             args.etherscan.chain.unwrap_or_default(),
             args.verifier.verifier_url.as_deref(),
             args.etherscan.key.as_deref(),
-            &context.config(),
+            context.config(),
         )?;
 
         //TODO: zk support
