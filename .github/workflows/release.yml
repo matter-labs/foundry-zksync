@@ -141,10 +141,11 @@ jobs:
           target="${{ matrix.target }}"
           flags=()
 
-          # Remove jemalloc, only keep `asm-keccak` if applicable
-          if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
-              flags+=(--features asm-keccak)
-          fi
+          # Disable asm-keccak, see https://github.com/alloy-rs/core/issues/711
+          # # Remove jemalloc, only keep `asm-keccak` if applicable
+          # if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
+          #     flags+=(--features asm-keccak)
+          # fi
 
           cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
 
