@@ -24,7 +24,7 @@ use foundry_evm::{
     constants::CALLER,
     opts::{Env, EvmOpts},
 };
-use foundry_test_utils::{fd_lock, init_tracing};
+use foundry_test_utils::{fd_lock, init_tracing, TestCommand, ZkSyncNode};
 use foundry_zksync_compiler::DualCompiledContracts;
 use once_cell::sync::Lazy;
 use semver::Version;
@@ -587,4 +587,56 @@ pub fn rpc_endpoints_zk() -> RpcEndpoints {
         ),
         ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".to_string())),
     ])
+}
+
+pub fn run_script_test(
+    root: impl AsRef<std::path::Path>,
+    cmd: &mut TestCommand,
+    script_name: &str,
+    contract_name: &str,
+    dependency: Option<&str>,
+    expected_broadcastable_txs: usize,
+) {
+    let node = ZkSyncNode::start();
+
+    if let Some(dep) = dependency {
+        cmd.args(["install", dep])
+            .args(["--no-commit"])
+            .ensure_execute_success()
+            .expect("Installed successfully");
+    }
+
+    cmd.forge_fuse();
+
+    cmd.arg("script").args([
+        "--zk-startup",
+        &format!("./script/{script_name}.s.sol:{contract_name}"),
+        "--broadcast",
+        "--private-key",
+        "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e",
+        "--chain",
+        "260",
+        "--gas-estimate-multiplier",
+        "310",
+        "--rpc-url",
+        node.url().as_str(),
+        "--slow",
+        "--evm-version",
+        "shanghai",
+    ]);
+
+    assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+
+    let run_latest = foundry_common::fs::json_files(root.as_ref().join("broadcast").as_path())
+        .find(|file| file.ends_with("run-latest.json"))
+        .expect("No broadcast artifacts");
+
+    let content = foundry_common::fs::read_to_string(run_latest).unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(
+        json["transactions"].as_array().expect("broadcastable txs").len(),
+        expected_broadcastable_txs
+    );
+    cmd.forge_fuse();
 }
