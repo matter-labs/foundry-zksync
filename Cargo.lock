@@ -4606,7 +4606,6 @@ dependencies = [
  "criterion",
  "dialoguer",
  "dunce",
- "era_test_node",
  "ethers-contract-abigen",
  "evm-disassembler",
  "eyre",
@@ -4634,8 +4633,6 @@ dependencies = [
  "hyper 1.4.1",
  "indicatif",
  "itertools 0.13.0",
- "jsonrpc-core",
- "jsonrpc-http-server",
  "mockall",
  "once_cell",
  "opener",
@@ -5385,11 +5382,14 @@ version = "0.0.2"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
+ "era_test_node",
  "eyre",
  "fd-lock 4.0.2",
  "foundry-common",
  "foundry-compilers",
  "foundry-config",
+ "jsonrpc-core",
+ "jsonrpc-http-server",
  "once_cell",
  "parking_lot 0.12.3",
  "rand 0.8.5",
@@ -5397,9 +5397,11 @@ dependencies = [
  "serde_json",
  "similar-asserts",
  "snapbox",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "walkdir",
+ "zksync_types",
 ]
 
 [[package]]
