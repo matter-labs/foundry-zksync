@@ -6,7 +6,7 @@ use foundry_test_utils::{forgetest_async, util, Filter, ZkSyncNode};
 use crate::{config::TestConfig, test_helpers::TEST_DATA_DEFAULT};
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "disabled since #476"] //FIXME
+#[ignore = "disabled since #476"]
 async fn test_zk_can_deploy_large_factory_deps() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     {
