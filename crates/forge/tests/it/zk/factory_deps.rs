@@ -16,7 +16,7 @@ async fn test_zk_can_deploy_large_factory_deps() {
 }
 
 forgetest_async!(
-    #[ignore = "disabled since #476"] //FIXME
+    #[ignore = "disabled since #476"]
     script_zk_can_deploy_large_factory_deps,
     |prj, cmd| {
         util::initialize(prj.root());
