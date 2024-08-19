@@ -33,8 +33,7 @@ use foundry_compilers::{
     },
     error::SolcError,
     solc::{CliSettings, SolcSettings},
-    zksolc::ZkSolcSettings,
-    ConfigurableArtifacts, Project, ProjectPathsConfig, VyperLanguage,
+    ArtifactOutput, ConfigurableArtifacts, Project, ProjectPathsConfig, VyperLanguage,
 };
 use inflector::Inflector;
 use regex::Regex;
@@ -860,7 +859,10 @@ impl Config {
     }
 
     /// Cleans the project.
-    pub fn cleanup<C: Compiler>(&self, project: &Project<C>) -> Result<(), SolcError> {
+    pub fn cleanup<C: Compiler, T: ArtifactOutput>(
+        &self,
+        project: &Project<C, T>,
+    ) -> Result<(), SolcError> {
         project.cleanup()?;
 
         // Remove last test run failures file.
@@ -1356,19 +1358,6 @@ impl Config {
             ]),
             search_paths: None,
         })
-    }
-
-    /// Returns the configured `zksolc` `Settings` that includes:
-    /// - all libraries
-    /// - the optimizer (including details, if configured)
-    /// - evm version
-    pub fn zksync_zksolc_settings(&self) -> Result<ZkSolcSettings, SolcError> {
-        let libraries = match self.parsed_libraries() {
-            Ok(libs) => self.project_paths::<ProjectPathsConfig>().apply_lib_remappings(libs),
-            Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {e}"))),
-        };
-
-        Ok(self.zksync.settings(libraries, self.evm_version, self.via_ir))
     }
 
     /// Returns the default figment

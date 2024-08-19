@@ -1,5 +1,5 @@
 use super::{EtherscanSourceProvider, VerifyArgs};
-use crate::provider::VerificationContext;
+use crate::{provider::VerificationContext, zk_provider::ZkVerificationContext};
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
 use foundry_compilers::{
@@ -65,9 +65,9 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
     fn zk_source(
         &self,
         args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)> {
-        let metadata = context.project.zksync_zksolc_config.settings.metadata.as_ref();
+        let metadata = context.project.settings.metadata.as_ref();
         let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
 
         eyre::ensure!(
@@ -190,7 +190,7 @@ Diagnostics: {diags}",
             include_paths: Default::default(),
         };
 
-        let out = zksolc.compile(&input)?;
+        let out = zksolc.compile(&input.input)?;
         if out.has_error() {
             let mut o = ZkAggregatedCompilerOutput::default();
             o.extend(version, raw_build_info_new(&input, &out, false)?, out);

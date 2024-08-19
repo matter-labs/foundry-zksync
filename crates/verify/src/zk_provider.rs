@@ -1,40 +1,42 @@
-use super::{
-    etherscan::EtherscanVerificationProvider, sourcify::SourcifyVerificationProvider, VerifyArgs,
-    VerifyCheckArgs,
-};
-use crate::zk_provider::CompilerVerificationContext;
+use crate::provider::VerificationContext;
+
+use super::{VerifyArgs, VerifyCheckArgs};
 use alloy_json_abi::JsonAbi;
 use async_trait::async_trait;
 use eyre::{OptionExt, Result};
 use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
-    artifacts::{output_selection::OutputSelection, Metadata, Source},
-    compilers::{multi::MultiCompilerParsedSource, solc::SolcCompiler, CompilerSettings},
+    artifacts::{output_selection::OutputSelection, Source},
+    compilers::{solc::SolcCompiler, CompilerSettings},
+    resolver::parse::SolData,
     solc::Solc,
+    zksolc::ZkSolcCompiler,
+    zksync::artifact_output::zk::ZkArtifactOutput,
     Graph, Project,
 };
 use foundry_config::Config;
 use semver::Version;
-use std::{fmt, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 /// Container with data required for contract verification.
 #[derive(Debug, Clone)]
-pub struct VerificationContext {
+pub struct ZkVerificationContext {
     pub config: Config,
-    pub project: Project,
+    pub project: Project<ZkSolcCompiler, ZkArtifactOutput>,
     pub target_path: PathBuf,
     pub target_name: String,
     pub compiler_version: Version,
 }
 
-impl VerificationContext {
+impl ZkVerificationContext {
     pub fn new(
         target_path: PathBuf,
         target_name: String,
         compiler_version: Version,
         config: Config,
     ) -> Result<Self> {
-        let mut project = config.project()?;
+        let mut project =
+            foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
         project.no_artifacts = true;
 
         let solc = Solc::find_or_install(&compiler_version)?;
@@ -53,7 +55,7 @@ impl VerificationContext {
         let output = ProjectCompiler::new()
             .quiet(true)
             .files([self.target_path.clone()])
-            .compile(&project)?;
+            .zksync_compile(&project, None)?;
 
         let artifact = output
             .find(&self.target_path, &self.target_name)
@@ -63,7 +65,7 @@ impl VerificationContext {
     }
 
     /// Compiles target file requesting only metadata and returns it.
-    pub fn get_target_metadata(&self) -> Result<Metadata> {
+    pub fn get_target_metadata(&self) -> Result<serde_json::Value> {
         let mut project = self.project.clone();
         project.settings.update_output_selection(|selection| {
             *selection = OutputSelection::common_output_selection(["metadata".to_string()]);
@@ -72,7 +74,7 @@ impl VerificationContext {
         let output = ProjectCompiler::new()
             .quiet(true)
             .files([self.target_path.clone()])
-            .compile(&project)?;
+            .zksync_compile(&project, None)?;
 
         let artifact = output
             .find(&self.target_path, &self.target_name)
@@ -85,8 +87,7 @@ impl VerificationContext {
     pub fn get_target_imports(&self) -> Result<Vec<PathBuf>> {
         let mut sources = self.project.paths.read_input_files()?;
         sources.insert(self.target_path.clone(), Source::read(&self.target_path)?);
-        let graph =
-            Graph::<MultiCompilerParsedSource>::resolve_sources(&self.project.paths, sources)?;
+        let graph = Graph::<SolData>::resolve_sources(&self.project.paths, sources)?;
 
         Ok(graph.imports(&self.target_path).into_iter().cloned().collect())
     }
@@ -94,7 +95,7 @@ impl VerificationContext {
 
 /// An abstraction for various verification providers such as etherscan, sourcify, blockscout
 #[async_trait]
-pub trait VerificationProvider {
+pub trait ZkVerificationProvider {
     /// This should ensure the verify request can be prepared successfully.
     ///
     /// Caution: Implementers must ensure that this _never_ sends the actual verify request
@@ -105,76 +106,69 @@ pub trait VerificationProvider {
     async fn preflight_check(
         &mut self,
         args: VerifyArgs,
-        context: CompilerVerificationContext,
+        context: ZkVerificationContext,
     ) -> Result<()>;
 
     /// Sends the actual verify request for the targeted contract.
-    async fn verify(
-        &mut self,
-        args: VerifyArgs,
-        context: CompilerVerificationContext,
-    ) -> Result<()>;
+    async fn verify(&mut self, args: VerifyArgs, context: ZkVerificationContext) -> Result<()>;
 
     /// Checks whether the contract is verified.
     async fn check(&self, args: VerifyCheckArgs) -> Result<()>;
 }
 
-impl FromStr for VerificationProviderType {
-    type Err = String;
+#[derive(Debug)]
+pub enum CompilerVerificationContext {
+    Solc(VerificationContext),
+    ZkSolc(ZkVerificationContext),
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "e" | "etherscan" => Ok(Self::Etherscan),
-            "s" | "sourcify" => Ok(Self::Sourcify),
-            "b" | "blockscout" => Ok(Self::Blockscout),
-            "o" | "oklink" => Ok(Self::Oklink),
-            _ => Err(format!("Unknown provider: {s}")),
+impl CompilerVerificationContext {
+    pub fn config(&self) -> &Config {
+        match self {
+            Self::Solc(c) => &c.config,
+            Self::ZkSolc(c) => &c.config,
         }
     }
-}
 
-impl fmt::Display for VerificationProviderType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub fn target_path(&self) -> &PathBuf {
         match self {
-            Self::Etherscan => {
-                write!(f, "etherscan")?;
-            }
-            Self::Sourcify => {
-                write!(f, "sourcify")?;
-            }
-            Self::Blockscout => {
-                write!(f, "blockscout")?;
-            }
-            Self::Oklink => {
-                write!(f, "oklink")?;
-            }
-        };
-        Ok(())
+            Self::Solc(c) => &c.target_path,
+            Self::ZkSolc(c) => &c.target_path,
+        }
     }
-}
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
-pub enum VerificationProviderType {
-    #[default]
-    Etherscan,
-    Sourcify,
-    Blockscout,
-    Oklink,
-}
-
-impl VerificationProviderType {
-    /// Returns the corresponding `VerificationProvider` for the key
-    pub fn client(&self, key: &Option<String>) -> Result<Box<dyn VerificationProvider>> {
+    pub fn target_name(&self) -> &str {
         match self {
-            Self::Etherscan => {
-                if key.as_ref().map_or(true, |key| key.is_empty()) {
-                    eyre::bail!("ETHERSCAN_API_KEY must be set")
-                }
-                Ok(Box::<EtherscanVerificationProvider>::default())
+            Self::Solc(c) => &c.target_name,
+            Self::ZkSolc(c) => &c.target_name,
+        }
+    }
+
+    pub fn compiler_version(&self) -> &Version {
+        match self {
+            Self::Solc(c) => &c.compiler_version,
+            Self::ZkSolc(c) => &c.compiler_version,
+        }
+    }
+    pub fn get_target_abi(&self) -> Result<JsonAbi> {
+        match self {
+            Self::Solc(c) => c.get_target_abi(),
+            Self::ZkSolc(c) => c.get_target_abi(),
+        }
+    }
+    pub fn get_target_imports(&self) -> Result<Vec<PathBuf>> {
+        match self {
+            Self::Solc(c) => c.get_target_imports(),
+            Self::ZkSolc(c) => c.get_target_imports(),
+        }
+    }
+    pub fn get_target_metadata(&self) -> Result<serde_json::Value> {
+        match self {
+            Self::Solc(c) => {
+                let m = c.get_target_metadata()?;
+                Ok(serde_json::to_value(m)?)
             }
-            Self::Sourcify => Ok(Box::<SourcifyVerificationProvider>::default()),
-            Self::Blockscout => Ok(Box::<EtherscanVerificationProvider>::default()),
-            Self::Oklink => Ok(Box::<EtherscanVerificationProvider>::default()),
+            Self::ZkSolc(c) => c.get_target_metadata(),
         }
     }
 }

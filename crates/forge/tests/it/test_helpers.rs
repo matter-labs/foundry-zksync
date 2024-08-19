@@ -7,14 +7,13 @@ use forge::{
 };
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
-    multi::MultiCompilerLanguage,
-    solc::SolcCompiler,
     utils::RuntimeOrHandle,
+    zksolc::ZkSolcCompiler,
     zksync::{
-        cache::ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME,
+        artifact_output::zk::ZkArtifactOutput,
         compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     },
-    Project, ProjectCompileOutput, ProjectPathsConfig, SolcConfig, Vyper,
+    Project, ProjectCompileOutput, SolcConfig, Vyper,
 };
 use foundry_config::{
     fs_permissions::PathPermission, Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig,
@@ -25,7 +24,7 @@ use foundry_evm::{
     opts::{Env, EvmOpts},
 };
 use foundry_test_utils::{fd_lock, init_tracing};
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compiler::{DualCompiledContracts, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME};
 use once_cell::sync::Lazy;
 use semver::Version;
 use std::{
@@ -35,7 +34,7 @@ use std::{
     sync::Arc,
 };
 
-type ZkProject = Project<SolcCompiler>;
+type ZkProject = Project<ZkSolcCompiler, ZkArtifactOutput>;
 
 pub const RE_PATH_SEPARATOR: &str = "/";
 const TESTDATA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata");
@@ -90,10 +89,10 @@ impl ForgeTestProfile {
     pub fn zk_project(&self) -> ZkProject {
         let zk_config = self.zk_config();
         let mut zk_project =
-            foundry_zksync_compiler::create_project(&zk_config, zk_config.cache, false)
+            foundry_zksync_compiler::config_create_project(&zk_config, zk_config.cache, false)
                 .expect("failed creating zksync project");
-        zk_project.paths.zksync_artifacts = zk_config.root.as_ref().join("zk").join("zkout");
-        zk_project.paths.zksync_cache = zk_config
+        zk_project.paths.artifacts = zk_config.root.as_ref().join("zk").join("zkout");
+        zk_project.paths.cache = zk_config
             .root
             .as_ref()
             .join("zk")
@@ -255,23 +254,8 @@ impl ForgeTestData {
             let mut project = zk_config.project().expect("failed obtaining project");
             let output = get_compiled(&mut project);
             let zk_output = get_zk_compiled(&zk_project);
-            let layout = ProjectPathsConfig {
-                root: zk_project.paths.root.clone(),
-                cache: zk_project.paths.cache.clone(),
-                artifacts: zk_project.paths.artifacts.clone(),
-                build_infos: zk_project.paths.build_infos.clone(),
-                sources: zk_project.paths.sources.clone(),
-                tests: zk_project.paths.tests.clone(),
-                scripts: zk_project.paths.scripts.clone(),
-                libraries: zk_project.paths.libraries.clone(),
-                remappings: zk_project.paths.remappings.clone(),
-                include_paths: zk_project.paths.include_paths.clone(),
-                allowed_paths: zk_project.paths.allowed_paths.clone(),
-                zksync_artifacts: zk_project.paths.zksync_artifacts.clone(),
-                zksync_cache: zk_project.paths.zksync_cache.clone(),
-                _l: std::marker::PhantomData::<MultiCompilerLanguage>,
-            };
-            let dual_compiled_contracts = DualCompiledContracts::new(&output, &zk_output, &layout);
+            let dual_compiled_contracts =
+                DualCompiledContracts::new(&output, &zk_output, &project.paths, &zk_project.paths);
             ZkTestData { dual_compiled_contracts, zk_config, zk_project, output, zk_output }
         };
 
@@ -489,7 +473,7 @@ pub fn get_zk_compiled(zk_project: &ZkProject) -> ZkProjectCompileOutput {
     let mut write = None;
 
     let zk_compiler = foundry_common::compile::ProjectCompiler::new();
-    if zk_project.paths.zksync_cache.exists() || std::fs::read(&lock_file_path).unwrap() == b"1" {
+    if zk_project.paths.cache.exists() || std::fs::read(&lock_file_path).unwrap() == b"1" {
         drop(read);
         write = Some(lock.write().unwrap());
     }
