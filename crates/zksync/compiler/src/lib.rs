@@ -108,17 +108,9 @@ pub fn config_project_paths(config: &Config) -> ProjectPathsConfig<SolcLanguage>
         .allowed_path(&config.root.0)
         .allowed_paths(&config.libs)
         .allowed_paths(&config.allow_paths)
-        .include_paths(&config.include_paths)
-        .build_infos(config.root.0.join("zk_build_infos"));
+        .include_paths(&config.include_paths);
 
-    /*
-    if let Some(build_info_path) = &config.build_info_path {
-        builder = builder.build_infos(build_info_path);
-    }
-    */
-
-    let ret = builder.build_with_root(&config.root.0);
-    ret
+    builder.build_with_root(&config.root.0)
 }
 
 /// Ensures that the configured version is installed if explicitly set
