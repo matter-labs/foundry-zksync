@@ -105,3 +105,11 @@ async fn test_zk_can_mock_modifiers() {
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_record_logs() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new("RecordLogs", "ZkCheatcodesTest", ".*");
+
+    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+}
