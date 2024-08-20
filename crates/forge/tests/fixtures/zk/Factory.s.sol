@@ -22,7 +22,7 @@ contract ZkConstructorFactoryScript is Script {
     }
 }
 
-contract ZkNestedFactoryScript is Script{
+contract ZkNestedFactoryScript is Script {
     function run() external {
         vm.startBroadcast();
         MyNestedFactory factory = new MyNestedFactory();
@@ -33,7 +33,7 @@ contract ZkNestedFactoryScript is Script{
     }
 }
 
-contract ZkNestedConstructorFactoryScript is Script{
+contract ZkNestedConstructorFactoryScript is Script {
     function run() external {
         vm.startBroadcast();
         MyNestedConstructorFactory factory = new MyNestedConstructorFactory(42);
@@ -55,7 +55,7 @@ contract ZkUserFactoryScript is Script {
     }
 }
 
-contract ZkUserConstructorFactoryScript is Script{
+contract ZkUserConstructorFactoryScript is Script {
     function run() external {
         vm.startBroadcast();
         MyConstructorFactory factory = new MyConstructorFactory(42);
