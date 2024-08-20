@@ -7,16 +7,23 @@ use eyre::{OptionExt, Result};
 use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
     artifacts::{output_selection::OutputSelection, Source},
-    compilers::{solc::SolcCompiler, CompilerSettings},
+    compilers::CompilerSettings,
     resolver::parse::SolData,
-    solc::Solc,
-    zksolc::ZkSolcCompiler,
+    solc::{Solc, SolcCompiler},
+    zksolc::{ZkSolc, ZkSolcCompiler},
     zksync::artifact_output::zk::ZkArtifactOutput,
     Graph, Project,
 };
 use foundry_config::Config;
 use semver::Version;
 use std::path::PathBuf;
+
+#[derive(Debug, Clone)]
+pub struct ZkVersion {
+    pub zksolc: Version,
+    pub solc: Version,
+    pub is_zksync_solc: bool,
+}
 
 /// Container with data required for contract verification.
 #[derive(Debug, Clone)]
@@ -25,22 +32,46 @@ pub struct ZkVerificationContext {
     pub project: Project<ZkSolcCompiler, ZkArtifactOutput>,
     pub target_path: PathBuf,
     pub target_name: String,
-    pub compiler_version: Version,
+    pub compiler_version: ZkVersion,
 }
 
 impl ZkVerificationContext {
     pub fn new(
         target_path: PathBuf,
         target_name: String,
-        compiler_version: Version,
+        context_solc_version: Version,
         config: Config,
     ) -> Result<Self> {
         let mut project =
             foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
         project.no_artifacts = true;
+        let zksolc_version = ZkSolc::new(project.compiler.zksolc.clone()).version()?;
+        let mut is_zksync_solc = false;
 
-        let solc = Solc::find_or_install(&compiler_version)?;
-        project.compiler.solc = SolcCompiler::Specific(solc);
+        let solc_version = if let Some(solc) = &config.zksync.solc_path {
+            let solc = Solc::new(solc)?;
+            //TODO: determine if this solc is zksync or not
+            solc.version
+        } else {
+            //if there's no `solc_path` specified then we use the same
+            // as the project version
+            let maybe_solc_path =
+                ZkSolc::find_solc_installed_version(&context_solc_version.to_string())?;
+            let solc_path = if let Some(p) = maybe_solc_path {
+                p
+            } else {
+                ZkSolc::solc_blocking_install(&context_solc_version.to_string())?
+            };
+
+            let solc = Solc::new_with_version(solc_path, context_solc_version.clone());
+            project.compiler.solc = SolcCompiler::Specific(solc);
+
+            is_zksync_solc = true;
+            context_solc_version
+        };
+
+        let compiler_version =
+            ZkVersion { zksolc: zksolc_version, solc: solc_version, is_zksync_solc };
 
         Ok(Self { config, project, target_name, target_path, compiler_version })
     }
@@ -147,7 +178,10 @@ impl CompilerVerificationContext {
     pub fn compiler_version(&self) -> &Version {
         match self {
             Self::Solc(c) => &c.compiler_version,
-            Self::ZkSolc(c) => &c.compiler_version,
+            // TODO: will refer to the solc version here. Analyze if we can remove
+            // this ambiguity somehow (e.g: by having sepparate paths for solc/zksolc
+            // and remove this method alltogether)
+            Self::ZkSolc(c) => &c.compiler_version.solc,
         }
     }
     pub fn get_target_abi(&self) -> Result<JsonAbi> {

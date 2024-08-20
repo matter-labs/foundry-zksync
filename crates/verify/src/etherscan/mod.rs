@@ -20,7 +20,7 @@ use foundry_common::{
     retry::{Retry, RetryError},
     shell,
 };
-use foundry_compilers::{artifacts::BytecodeObject, solc::Solc, zksolc::ZkSolc, Artifact};
+use foundry_compilers::{artifacts::BytecodeObject, Artifact};
 use foundry_config::{Chain, Config};
 use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
 use futures::FutureExt;
@@ -315,7 +315,6 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<VerifyContract> {
-        let zk_compiler_version = self.zk_compiler_version(args, context)?;
         let (source, contract_name, code_format) = match context {
             CompilerVerificationContext::Solc(context) => {
                 self.source_provider(args).source(args, context)?
@@ -331,20 +330,21 @@ impl EtherscanVerificationProvider {
             _ => BuildMetadata::EMPTY,
         };
 
-        let zk_args = match zk_compiler_version {
-            None => vec![],
-            Some(zk) => {
-                if let Some(solc) = zk.solc {
-                    compiler_version = Version::new(solc.major, solc.minor, solc.patch);
-                }
-
-                let compiler_mode = if zk.is_zksync_solc { "zksync" } else { "solc" }.to_string();
+        let zk_args = match context {
+            CompilerVerificationContext::ZkSolc(zk_context) => {
+                let compiler_mode =
+                    if zk_context.compiler_version.is_zksync_solc { "zksync" } else { "solc" }
+                        .to_string();
 
                 vec![
                     ("compilermode".to_string(), compiler_mode),
-                    ("zksolcVersion".to_string(), format!("v{}", zk.zksolc)),
+                    (
+                        "zksolcVersion".to_string(),
+                        format!("v{}", zk_context.compiler_version.zksolc),
+                    ),
                 ]
             }
+            _ => vec![],
         };
 
         let compiler_version =
@@ -375,38 +375,6 @@ impl EtherscanVerificationProvider {
         }
 
         Ok(verify_args)
-    }
-
-    fn zk_compiler_version(
-        &mut self,
-        args: &VerifyArgs,
-        vm_context: &CompilerVerificationContext,
-    ) -> Result<Option<ZkVersion>> {
-        if !args.zksync {
-            return Ok(None);
-        }
-
-        match vm_context {
-            CompilerVerificationContext::Solc(_) => Ok(None),
-            CompilerVerificationContext::ZkSolc(context) => {
-                let zksolc = ZkSolc::new(context.project.compiler.zksolc.clone()).version()?;
-                let mut is_zksync_solc = false;
-
-                let solc = if let Some(solc) = &context.config.zksync.solc_path {
-                    let solc = Solc::new(solc)?;
-                    let version = solc.version;
-                    //TODO: determine if this solc is zksync or not
-                    Some(version)
-                } else {
-                    //if there's no `solc_path` specified then we use the same
-                    // as the project version, but the zksync fork
-                    is_zksync_solc = true;
-                    Some(context.compiler_version.clone())
-                };
-
-                Ok(Some(ZkVersion { zksolc, solc, is_zksync_solc }))
-            }
-        }
     }
 
     /// Return the optional encoded constructor arguments. If the path to
@@ -522,7 +490,7 @@ impl EtherscanVerificationProvider {
                     )),
                 }?;
 
-                if maybe_creation_code.starts_with(bytecode) {
+                if maybe_creation_code.starts_with(&bytecode) {
                     let constructor_args = &maybe_creation_code[bytecode.len()..];
                     let constructor_args = hex::encode(constructor_args);
                     shell::println(format!(
@@ -553,13 +521,6 @@ async fn ensure_solc_build_metadata(version: Version) -> Result<Version> {
     } else {
         Ok(lookup_compiler_version(&version).await?)
     }
-}
-
-#[derive(Debug)]
-pub struct ZkVersion {
-    zksolc: Version,
-    solc: Option<Version>,
-    is_zksync_solc: bool,
 }
 
 #[cfg(test)]
