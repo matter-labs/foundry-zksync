@@ -11,6 +11,9 @@ ignore = [
     "RUSTSEC-2022-0041",
     "RUSTSEC-2023-0045",
     "RUSTSEC-2020-0016",
+    # https://github.com/launchbadge/sqlx/issues/3440
+    # Should remove once we can update sqlx which is used by some zksync dependencies
+    "RUSTSEC-2024-0363",
 ]
 
 # This section is considered when running `cargo deny check bans`.
