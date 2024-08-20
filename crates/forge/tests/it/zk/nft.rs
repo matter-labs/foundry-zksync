@@ -9,7 +9,7 @@ forgetest_async!(script_zk_can_deploy_nft, |prj, cmd| {
         &mut cmd,
         "./script/NFT.s.sol",
         "MyScript",
-        Some(&["transmissions11/solmate"]),
+        Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts"),
         1,
         Some(&["-vvvvv"]),
     );

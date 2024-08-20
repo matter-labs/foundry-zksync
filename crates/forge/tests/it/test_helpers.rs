@@ -594,7 +594,7 @@ pub fn run_zk_script_test(
     cmd: &mut TestCommand,
     script_path: &str,
     contract_name: &str,
-    dependencies: Option<&[&str]>,
+    dependencies: Option<&str>,
     expected_broadcastable_txs: usize,
     extra_args: Option<&[&str]>,
 ) {
@@ -602,13 +602,10 @@ pub fn run_zk_script_test(
     let url = node.url();
 
     if let Some(deps) = dependencies {
-        for (index, dep) in deps.iter().enumerate() {
-            let mut install_cmd = cmd.args(["install", dep]);
-            if index == 0 {
-                install_cmd = install_cmd.args(["--no-commit"]);
-            }
-            install_cmd.ensure_execute_success().expect("Installed successfully");
-        }
+        let mut install_args = vec!["install"];
+        install_args.extend(deps.split_whitespace());
+        install_args.push("--no-commit");
+        cmd.args(&install_args).ensure_execute_success().expect("Installed successfully");
     }
 
     cmd.forge_fuse();

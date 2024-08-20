@@ -9,7 +9,7 @@ forgetest_async!(script_zk_can_deploy_proxy, |prj, cmd| {
         &mut cmd,
         "./script/Proxy.s.sol",
         "ProxyScript",
-        Some(&["OpenZeppelin/openzeppelin-contracts"]),
+        Some("OpenZeppelin/openzeppelin-contracts"),
         4,
         None,
     );
