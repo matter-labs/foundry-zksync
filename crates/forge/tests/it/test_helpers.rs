@@ -23,7 +23,7 @@ use foundry_evm::{
     constants::CALLER,
     opts::{Env, EvmOpts},
 };
-use foundry_test_utils::{fd_lock, init_tracing};
+use foundry_test_utils::{fd_lock, init_tracing, TestCommand, ZkSyncNode};
 use foundry_zksync_compiler::{DualCompiledContracts, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME};
 use once_cell::sync::Lazy;
 use semver::Version;
@@ -571,4 +571,67 @@ pub fn rpc_endpoints_zk() -> RpcEndpoints {
         ),
         ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".to_string())),
     ])
+}
+
+pub fn run_zk_script_test(
+    root: impl AsRef<std::path::Path>,
+    cmd: &mut TestCommand,
+    script_path: &str,
+    contract_name: &str,
+    dependencies: Option<&str>,
+    expected_broadcastable_txs: usize,
+    extra_args: Option<&[&str]>,
+) {
+    let node = ZkSyncNode::start();
+    let url = node.url();
+
+    if let Some(deps) = dependencies {
+        let mut install_args = vec!["install"];
+        install_args.extend(deps.split_whitespace());
+        install_args.push("--no-commit");
+        cmd.args(&install_args).ensure_execute_success().expect("Installed successfully");
+    }
+
+    cmd.forge_fuse();
+
+    let script_path_contract = format!("{script_path}:{contract_name}");
+    let private_key =
+        ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
+    let mut script_args = vec![
+        "--zk-startup",
+        &script_path_contract,
+        "--broadcast",
+        "--private-key",
+        private_key,
+        "--chain",
+        "260",
+        "--gas-estimate-multiplier",
+        "310",
+        "--rpc-url",
+        url.as_str(),
+        "--slow",
+        "--evm-version",
+        "shanghai",
+    ];
+
+    if let Some(args) = extra_args {
+        script_args.extend_from_slice(args);
+    }
+
+    cmd.arg("script").args(&script_args);
+
+    assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+
+    let run_latest = foundry_common::fs::json_files(root.as_ref().join("broadcast").as_path())
+        .find(|file| file.ends_with("run-latest.json"))
+        .expect("No broadcast artifacts");
+
+    let content = foundry_common::fs::read_to_string(run_latest).unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(
+        json["transactions"].as_array().expect("broadcastable txs").len(),
+        expected_broadcastable_txs
+    );
+    cmd.forge_fuse();
 }

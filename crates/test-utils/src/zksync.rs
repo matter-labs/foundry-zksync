@@ -190,4 +190,8 @@ impl ZkSyncNode {
 
         Self { _guard, port }
     }
+
+    pub fn rich_wallets() -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {
+        RICH_WALLETS.iter().copied()
+    }
 }
