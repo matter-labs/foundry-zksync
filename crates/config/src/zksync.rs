@@ -126,7 +126,6 @@ impl ZkSyncConfig {
                     per_contract: Some([OutputSelectionFlag::ABI].into()),
                 }),
             },
-            solc: self.solc_path.clone(),
             cli_settings: CliSettings::default(),
         }
     }

@@ -294,7 +294,8 @@ impl TestArgs {
         let output = compiler.compile(&project)?;
 
         let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
-            let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
+            let zk_project =
+                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
 
             let sources_to_compile = self.get_sources_to_compile(&config, &filter)?;
             let zk_compiler = ProjectCompiler::new()
@@ -304,7 +305,7 @@ impl TestArgs {
             let zk_output =
                 zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
             let dual_compiled_contracts =
-                DualCompiledContracts::new(&output, &zk_output, &project.paths);
+                DualCompiledContracts::new(&output, &zk_output, &project.paths, &zk_project.paths);
 
             (Some(zk_output), Some(dual_compiled_contracts))
         } else {

@@ -201,7 +201,7 @@ impl PreprocessedState {
 
         // ZK
         let dual_compiled_contracts = if script_config.config.zksync.should_compile() {
-            let zk_project = foundry_zksync_compiler::create_project(
+            let zk_project = foundry_zksync_compiler::config_create_project(
                 &script_config.config,
                 script_config.config.cache,
                 false,
@@ -215,7 +215,7 @@ impl PreprocessedState {
 
             let zk_output = zk_compiler
                 .zksync_compile(&zk_project, script_config.config.zksync.avoid_contracts())?;
-            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
+            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths, &zk_project.paths))
         } else {
             None
         };
