@@ -202,4 +202,26 @@ contract ZkCheatcodesTest is DSTest {
         vm.deal(0x4e59b44847b379578588920cA78FbF26c0B4956C, 1 ether);
         assertEq(1 ether, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
     }
+
+    function testRecordLogsInZkVm() public {
+        // ensure we are in zkvm
+        vm.zkVm(true);
+        vm.recordLogs();
+        Emitter emitter = new Emitter(); // +7 logs from system contracts
+        emitter.functionEmit(); // +3 from system contracts
+
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        assertEq(entries.length, 12);
+        // 0,1: EthToken, 2,3: L1 Messanger, 4: Known Code Storage
+        assertEq(entries[5].topics.length, 1);
+        assertEq(entries[5].topics[0], keccak256("EventConstructor(string)"));
+        assertEq(entries[5].data, abi.encode("constructor"));
+        // 6: L2 Deployer, 7: EthToken
+
+        // 8,9: EthToken
+        assertEq(entries[10].topics.length, 1);
+        assertEq(entries[10].topics[0], keccak256("EventFunction(string)"));
+        assertEq(entries[10].data, abi.encode("function"));
+        // 11: EthToken
+    }
 }

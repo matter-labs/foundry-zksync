@@ -922,6 +922,13 @@ impl Cheatcodes {
                 ecx,
                 ccx,
             ) {
+                if let Some(recorded_logs) = &mut self.recorded_logs {
+                    recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
+                        topics: log.data.topics().to_vec(),
+                        data: log.data.data.clone(),
+                        emitter: log.address,
+                    }));
+                }
                 self.combined_logs.extend(result.logs.clone().into_iter().map(Some));
 
                 // for each log in cloned logs call handle_expect_emit
@@ -1380,6 +1387,13 @@ impl Cheatcodes {
                 persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
+                if let Some(recorded_logs) = &mut self.recorded_logs {
+                    recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
+                        topics: log.data.topics().to_vec(),
+                        data: log.data.data.clone(),
+                        emitter: log.address,
+                    }));
+                }
                 self.combined_logs.extend(result.logs.clone().into_iter().map(Some));
                 //for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
