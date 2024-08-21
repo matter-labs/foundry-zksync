@@ -113,3 +113,11 @@ async fn test_zk_record_logs() {
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_cheatcodes_in_zkvm() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new(".*", "ZkCheatcodesInZkVmTest", ".*");
+
+    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+}
