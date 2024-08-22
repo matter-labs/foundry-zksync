@@ -225,3 +225,56 @@ contract ZkCheatcodesTest is DSTest {
         // 11: EthToken
     }
 }
+
+contract UsesCheatcodes {
+    function getNonce(Vm vm, address target) public view returns (uint64) {
+        return vm.getNonce(target);
+    }
+
+    function getZkBalance(Vm vm, address target) public view returns (uint256) {
+        vm.zkVm(true);
+        getNonce(vm, target);
+        return target.balance;
+    }
+}
+
+contract ZkCheatcodesInZkVmTest is DSTest {
+    Vm constant vm = Vm(HEVM_ADDRESS);
+    UsesCheatcodes helper;
+
+    function setUp() external {
+        vm.zkVm(true);
+        helper = new UsesCheatcodes();
+        // ensure we can call cheatcodes from the helper
+        vm.allowCheatcodes(address(helper));
+        // and that the contract is kept between vm switches
+        vm.makePersistent(address(helper));
+    }
+
+    function testCallVmInZkVm() external {
+        address target = address(this);
+
+        vm.expectRevert();
+        helper.getNonce(vm, target);
+    }
+
+    function testCallVmAfterDisableZkVm() external {
+        address target = address(this);
+        uint64 expected = vm.getNonce(target);
+
+        vm.zkVm(false);
+        uint64 got = helper.getNonce(vm, target);
+
+        assertEq(expected, got);
+    }
+
+    function testCallVmAfterDisableZkVmAndReEnable() external {
+        address target = address(this);
+        uint256 expected = target.balance;
+
+        vm.zkVm(false);
+        uint256 got = helper.getZkBalance(vm, target);
+
+        assertEq(expected, got);
+    }
+}
