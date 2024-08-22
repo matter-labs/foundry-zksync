@@ -111,7 +111,8 @@ impl BuildArgs {
                 println!("{}", serde_json::to_string_pretty(&output.output())?);
             }
         } else {
-            let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
+            let zk_project =
+                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
             let zk_compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)

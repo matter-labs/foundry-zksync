@@ -2,6 +2,7 @@ use super::{
     etherscan::EtherscanVerificationProvider, sourcify::SourcifyVerificationProvider, VerifyArgs,
     VerifyCheckArgs,
 };
+use crate::zk_provider::CompilerVerificationContext;
 use alloy_json_abi::JsonAbi;
 use async_trait::async_trait;
 use eyre::{OptionExt, Result};
@@ -104,11 +105,15 @@ pub trait VerificationProvider {
     async fn preflight_check(
         &mut self,
         args: VerifyArgs,
-        context: VerificationContext,
+        context: CompilerVerificationContext,
     ) -> Result<()>;
 
     /// Sends the actual verify request for the targeted contract.
-    async fn verify(&mut self, args: VerifyArgs, context: VerificationContext) -> Result<()>;
+    async fn verify(
+        &mut self,
+        args: VerifyArgs,
+        context: CompilerVerificationContext,
+    ) -> Result<()>;
 
     /// Checks whether the contract is verified.
     async fn check(&self, args: VerifyCheckArgs) -> Result<()>;

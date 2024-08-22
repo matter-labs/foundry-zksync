@@ -13,8 +13,9 @@ use foundry_compilers::{
     multi::MultiCompilerLanguage,
     report::{BasicStdoutReporter, NoReporter, Report},
     solc::SolcSettings,
+    zksolc::{ZkSolc, ZkSolcCompiler},
     zksync::{
-        artifact_output::Artifact as ZkArtifact,
+        artifact_output::zk::ZkArtifactOutput,
         compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     },
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
@@ -280,7 +281,7 @@ impl ProjectCompiler {
     /// Compiles the project.
     pub fn zksync_compile(
         self,
-        project: &Project<SolcCompiler>,
+        project: &Project<ZkSolcCompiler, ZkArtifactOutput>,
         maybe_avoid_contracts: Option<Vec<globset::GlobMatcher>>,
     ) -> Result<ZkProjectCompileOutput> {
         // TODO: Avoid process::exit
@@ -298,10 +299,8 @@ impl ProjectCompiler {
         let files = self.files.clone();
 
         {
-            Report::new(SpinnerReporter::spawn_with(format!(
-                "Using zksolc-{}",
-                project.zksync_zksolc.version()?
-            )));
+            let zksolc_version = ZkSolc::new(project.compiler.zksolc.clone()).version()?;
+            Report::new(SpinnerReporter::spawn_with(format!("Using zksolc-{zksolc_version}")));
         }
         self.zksync_compile_with(&project.paths.root, || {
             let files_to_compile =
