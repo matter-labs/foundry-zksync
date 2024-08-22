@@ -134,7 +134,7 @@ impl ZkSyncNode {
 
         let io_handler = {
             let node: InMemoryNode<HttpForkSource> =
-                InMemoryNode::new(None, None, Default::default());
+                InMemoryNode::new(None, None, Default::default(), None);
 
             for wallet in LEGACY_RICH_WALLETS.iter() {
                 let address = wallet.0;

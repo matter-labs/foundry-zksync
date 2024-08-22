@@ -60,7 +60,7 @@ where
         },
         caller.to_h160(),
         env.tx.value.to_u256(),
-        factory_deps,
+        factory_deps.unwrap_or_default(),
         PaymasterParams::default(),
     );
 
@@ -149,7 +149,7 @@ where
         },
         caller.to_h160(),
         call.value.to_u256(),
-        Some(factory_deps),
+        factory_deps,
         PaymasterParams::default(),
     );
 
@@ -200,7 +200,7 @@ where
             CallValue::Transfer(value) => value.to_u256(),
             _ => U256::zero(),
         },
-        None,
+        Default::default(),
         PaymasterParams::default(),
     );
 
