@@ -228,7 +228,7 @@ contract ZkCheatcodesTest is DSTest {
 
 contract UsesCheatcodes {
     function getNonce(Vm vm, address target) public view returns (uint64) {
-       return vm.getNonce(target);
+        return vm.getNonce(target);
     }
 
     function getZkBalance(Vm vm, address target) public view returns (uint256) {
