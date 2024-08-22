@@ -216,15 +216,15 @@ alloy-rlp = "0.3.3"
 alloy-trie = "0.4.1"
 
 ## zksync
-era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "dd6d2f463eb9697dc2365899a72ae12dae3ec809" }
-zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "fd7adf634c016f40ea01f702e0e05f57aa5ba614"}
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
-multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
-zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "e10bbdd1e863962552f37e768ae6af649353e4ea" }
+era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "2041018903aa7e00e74c450f8c0baf799c056d86" }
+zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "2da644f5b8fc48a129e80fe0653e5334701c059b"}
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "0d51cd6f3e65eef1bda981fe96f3026d8e12156d" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "0d51cd6f3e65eef1bda981fe96f3026d8e12156d" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "0d51cd6f3e65eef1bda981fe96f3026d8e12156d" }
+multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "0d51cd6f3e65eef1bda981fe96f3026d8e12156d" }
+zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "0d51cd6f3e65eef1bda981fe96f3026d8e12156d" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "0d51cd6f3e65eef1bda981fe96f3026d8e12156d" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "0d51cd6f3e65eef1bda981fe96f3026d8e12156d" }
 
 ## misc
 async-trait = "0.1"
