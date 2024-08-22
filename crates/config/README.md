@@ -237,7 +237,7 @@ bytecode_hash = "none"
 # size limitations
 fallback_oz = false 
 # Enable EraVM extensions (ex system-mode)
-eravm_extensions = false
+enable_eravm_extensions = false
 # Force compilation via EVMLA instead of Yul codegen pipeline
 force_evmla = false 
 # List of globs that match contracts to avoid compiling with zksolc
