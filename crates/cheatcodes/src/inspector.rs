@@ -46,7 +46,7 @@ use revm::{
         AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot,
         ExecutionResult, HashMap as rHashMap, Output, TransactTo, KECCAK_EMPTY,
     },
-    EvmContext, GetInspector, InnerEvmContext, Inspector,
+    EvmContext, InnerEvmContext, Inspector,
 };
 use rustc_hash::FxHashMap;
 use serde_json::Value;
