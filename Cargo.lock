@@ -5237,7 +5237,6 @@ dependencies = [
  "foundry-evm-traces",
  "foundry-zksync-core",
  "indicatif",
- "itertools 0.13.0",
  "parking_lot 0.12.3",
  "proptest",
  "revm",
