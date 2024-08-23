@@ -27,6 +27,7 @@ use foundry_evm_core::{
     abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER_CODE},
+    decode::decode_console_log,
     utils::new_evm_with_existing_context,
     InspectorExt,
 };
@@ -45,7 +46,7 @@ use revm::{
         AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot,
         ExecutionResult, HashMap as rHashMap, Output, TransactTo, KECCAK_EMPTY,
     },
-    EvmContext, InnerEvmContext, Inspector,
+    EvmContext, GetInspector, InnerEvmContext, Inspector,
 };
 use rustc_hash::FxHashMap;
 use serde_json::Value;
@@ -341,11 +342,6 @@ pub struct Cheatcodes {
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
 
-    /// Logs printed during ZK-VM execution.
-    /// EVM logs have the value `None` so they can be interpolated later, since
-    /// they are recorded by [foundry_evm::inspectors::LogCollector] tracer.
-    pub combined_logs: Vec<Option<Log>>,
-
     /// Starts the cheatcode inspector in ZK mode.
     /// This is set to `false`, once the startup migration is completed.
     pub startup_zk: bool,
@@ -438,7 +434,6 @@ impl Cheatcodes {
             mapping_slots: Default::default(),
             pc: Default::default(),
             breakpoints: Default::default(),
-            combined_logs: Default::default(),
             use_zk_vm: Default::default(),
             persisted_factory_deps: Default::default(),
         }
@@ -929,7 +924,23 @@ impl Cheatcodes {
                         emitter: log.address,
                     }));
                 }
-                self.combined_logs.extend(result.logs.clone().into_iter().map(Some));
+
+                // append console logs from zkEVM to the current executor's LogTracer
+                let executor = &mut TransparentCheatcodesExecutor;
+                result.logs.iter().filter_map(|log| decode_console_log(&log)).for_each(
+                    |decoded_log| {
+                        executor.console_log(
+                            &mut CheatsCtxt {
+                                state: self,
+                                ecx: &mut ecx.inner,
+                                precompiles: &mut ecx.precompiles,
+                                gas_limit: create_inputs.gas_limit,
+                                caller: create_inputs.caller,
+                            },
+                            decoded_log,
+                        );
+                    },
+                );
 
                 // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
@@ -1150,7 +1161,6 @@ impl Cheatcodes {
         }
 
         if call.target_address == HARDHAT_CONSOLE_ADDRESS {
-            self.combined_logs.push(None);
             return None;
         }
 
@@ -1394,8 +1404,24 @@ impl Cheatcodes {
                         emitter: log.address,
                     }));
                 }
-                self.combined_logs.extend(result.logs.clone().into_iter().map(Some));
-                //for each log in cloned logs call handle_expect_emit
+
+                // append console logs from zkEVM to the current executor's LogTracer
+                result.logs.iter().filter_map(|log| decode_console_log(&log)).for_each(
+                    |decoded_log| {
+                        executor.console_log(
+                            &mut CheatsCtxt {
+                                state: self,
+                                ecx: &mut ecx.inner,
+                                precompiles: &mut ecx.precompiles,
+                                gas_limit: call.gas_limit,
+                                caller: call.caller,
+                            },
+                            decoded_log,
+                        );
+                    },
+                );
+
+                // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
                     for log in result.logs {
                         expect::handle_expect_emit(self, &log);
@@ -1537,7 +1563,6 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 emitter: log.address,
             });
         }
-        self.combined_logs.push(None);
     }
 
     fn call(
