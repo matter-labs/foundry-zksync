@@ -927,7 +927,7 @@ impl Cheatcodes {
 
                 // append console logs from zkEVM to the current executor's LogTracer
                 let executor = &mut TransparentCheatcodesExecutor;
-                result.logs.iter().filter_map(|log| decode_console_log).for_each(|decoded_log| {
+                result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
                     executor.console_log(
                         &mut CheatsCtxt {
                             state: self,
@@ -1404,7 +1404,7 @@ impl Cheatcodes {
                 }
 
                 // append console logs from zkEVM to the current executor's LogTracer
-                result.logs.iter().filter_map(|log| decode_console_log).for_each(|decoded_log| {
+                result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
                     executor.console_log(
                         &mut CheatsCtxt {
                             state: self,
