@@ -25,7 +25,6 @@ use foundry_evm_core::{
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{CallTraceArena, TraceMode};
 use foundry_zksync_core::ZkTransactionMetadata;
-use itertools::Itertools;
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
     interpreter::{return_ok, InstructionResult},
@@ -936,31 +935,8 @@ fn convert_executed_result(
         _ => Bytes::new(),
     };
 
-    let combined_logs =
-        inspector.cheatcodes.as_ref().map(|cheatcodes| cheatcodes.combined_logs.clone());
-    let InspectorData { mut logs, labels, traces, coverage, cheatcodes, chisel_state } =
+    let InspectorData { logs, labels, traces, coverage, cheatcodes, chisel_state } =
         inspector.collect();
-
-    let logs = match combined_logs {
-        Some(combined_logs) => {
-            let new_logs = combined_logs
-                .into_iter()
-                // .map(|log| log.unwrap_or_else(|| logs.remove(0)))
-                .map(|log| {
-                    log.unwrap_or_else(|| {
-                        if !logs.is_empty() {
-                            logs.remove(0)
-                        } else {
-                            Default::default()
-                        }
-                    })
-                })
-                .collect_vec();
-            assert!(logs.is_empty(), "logs were not fully combined");
-            new_logs
-        }
-        None => logs,
-    };
 
     let transactions = cheatcodes
         .as_ref()
