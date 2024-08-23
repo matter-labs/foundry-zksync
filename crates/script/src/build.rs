@@ -10,9 +10,7 @@ use alloy_provider::Provider;
 use eyre::{OptionExt, Result};
 use foundry_cheatcodes::ScriptWallets;
 use foundry_common::{
-    compile::{ContractSources, ProjectCompiler},
-    provider::try_get_http_provider,
-    ContractData, ContractsByArtifact,
+    compile::ProjectCompiler, provider::try_get_http_provider, ContractData, ContractsByArtifact,
 };
 use foundry_compilers::{
     artifacts::{BytecodeObject, Libraries},
@@ -22,7 +20,7 @@ use foundry_compilers::{
     utils::source_files_iter,
     ArtifactId, ProjectCompileOutput,
 };
-use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
+use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, traces::debug::ContractSources};
 use foundry_linking::Linker;
 use foundry_zksync_compiler::DualCompiledContracts;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
@@ -189,6 +187,7 @@ impl PreprocessedState {
             }
         };
 
+        #[allow(clippy::redundant_clone)]
         let sources_to_compile = source_files_iter(
             project.paths.sources.as_path(),
             MultiCompilerLanguage::FILE_EXTENSIONS,
@@ -202,21 +201,21 @@ impl PreprocessedState {
 
         // ZK
         let dual_compiled_contracts = if script_config.config.zksync.should_compile() {
-            let zk_project = foundry_zksync_compiler::create_project(
+            let zk_project = foundry_zksync_compiler::config_create_project(
                 &script_config.config,
                 script_config.config.cache,
                 false,
             )?;
             let sources_to_compile =
                 source_files_iter(project.paths.sources.as_path(), SolcLanguage::FILE_EXTENSIONS)
-                    .chain([target_path.to_path_buf()]);
+                    .chain([target_path.clone()]);
 
             let zk_compiler =
                 ProjectCompiler::new().quiet_if(args.opts.silent).files(sources_to_compile);
 
             let zk_output = zk_compiler
                 .zksync_compile(&zk_project, script_config.config.zksync.avoid_contracts())?;
-            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths))
+            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths, &zk_project.paths))
         } else {
             None
         };

@@ -54,7 +54,6 @@ chrono.workspace = true
 evm-disassembler.workspace = true
 eyre.workspace = true
 futures.workspace = true
-hex.workspace = true
 rand.workspace = true
 rayon.workspace = true
 serde_json.workspace = true
@@ -69,7 +68,7 @@ foundry-cli.workspace = true
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
 clap_complete = "4"
 clap_complete_fig = "4"
-comfy-table = "7"
+comfy-table.workspace = true
 dunce.workspace = true
 indicatif = "0.17"
 itertools.workspace = true
@@ -97,6 +96,7 @@ openssl = ["foundry-cli/openssl"]
 asm-keccak = ["alloy-primitives/asm-keccak"]
 jemalloc = ["dep:tikv-jemallocator"]
 aws-kms = ["foundry-wallets/aws-kms", "dep:aws-sdk-kms"]
+isolate-by-default = ["foundry-config/isolate-by-default"]
 
 [[bench]]
 name = "vanity"

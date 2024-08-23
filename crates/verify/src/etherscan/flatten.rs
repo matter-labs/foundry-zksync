@@ -1,9 +1,12 @@
 use super::{EtherscanSourceProvider, VerifyArgs};
-use crate::provider::VerificationContext;
+use crate::{
+    provider::VerificationContext,
+    zk_provider::{ZkVerificationContext, ZkVersion},
+};
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
 use foundry_compilers::{
-    artifacts::{BytecodeHash, Source},
+    artifacts::{BytecodeHash, Source, Sources},
     buildinfo::RawBuildInfo,
     compilers::{
         solc::{SolcCompiler, SolcLanguage, SolcVersionedInput},
@@ -12,7 +15,7 @@ use foundry_compilers::{
     solc::Solc,
     zksolc::{
         input::{ZkSolcInput, ZkSolcVersionedInput},
-        ZkSolc,
+        ZkSolc, ZkSolcCompiler,
     },
     zksync::{
         compile::output::AggregatedCompilerOutput as ZkAggregatedCompilerOutput, raw_build_info_new,
@@ -20,8 +23,7 @@ use foundry_compilers::{
     AggregatedCompilerOutput,
 };
 use semver::{BuildMetadata, Version};
-
-use std::{collections::BTreeMap, path::Path};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct EtherscanFlattenedSource;
@@ -66,9 +68,9 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
     fn zk_source(
         &self,
         args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)> {
-        let metadata = context.project.zksync_zksolc_config.settings.metadata.as_ref();
+        let metadata = context.project.settings.metadata.as_ref();
         let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
 
         eyre::ensure!(
@@ -130,7 +132,7 @@ impl EtherscanFlattenedSource {
         let solc = Solc::find_or_install(&version)?;
 
         let input = SolcVersionedInput::build(
-            BTreeMap::from([("contract.sol".into(), Source::new(content))]),
+            Sources::from([("contract.sol".into(), Source::new(content))]),
             Default::default(),
             SolcLanguage::Solidity,
             version.clone(),
@@ -139,7 +141,7 @@ impl EtherscanFlattenedSource {
         let out = SolcCompiler::Specific(solc).compile(&input)?;
         if out.errors.iter().any(|e| e.is_error()) {
             let mut o = AggregatedCompilerOutput::<SolcCompiler>::default();
-            o.extend(version.clone(), RawBuildInfo::new(&input, &out, false)?, out);
+            o.extend(version, RawBuildInfo::new(&input, &out, false)?, out);
             let diags = o.diagnostics(&[], &[], Default::default());
 
             eyre::bail!(
@@ -155,7 +157,8 @@ Diagnostics: {diags}",
         Ok(())
     }
 
-    /// Attempts to compile the flattened content locally with the zksolc compiler version.
+    /// Attempts to compile the flattened content locally with the zksolc and solc compiler
+    /// versions.
     ///
     /// This expects the completely flattened `content´ and will try to compile it using the
     /// provided compiler. If the compiler is missing it will be installed.
@@ -166,35 +169,47 @@ Diagnostics: {diags}",
     ///
     /// # Exits
     ///
-    /// If the solc compiler output contains errors, this could either be due to a bug in the
+    /// If the zksolc compiler output contains errors, this could either be due to a bug in the
     /// flattening code or could to conflict in the flattened code, for example if there are
     /// multiple interfaces with the same name.
     fn zk_check_flattened(
         &self,
         content: impl Into<String>,
-        version: &Version,
+        compiler_version: &ZkVersion,
         contract_path: &Path,
     ) -> Result<()> {
-        let version = strip_build_meta(version.clone());
-        let zksolc = ZkSolc::find_installed_version(&version)?
-            .unwrap_or(ZkSolc::blocking_install(&version)?);
+        let solc_version = strip_build_meta(compiler_version.solc.clone());
+        let zksolc_version = strip_build_meta(compiler_version.zksolc.clone());
+        let zksolc = ZkSolc::find_installed_version(&zksolc_version)?
+            .unwrap_or(ZkSolc::blocking_install(&solc_version)?);
 
-        let mut input = ZkSolcVersionedInput {
+        let input = ZkSolcVersionedInput {
             input: ZkSolcInput {
                 language: SolcLanguage::Solidity,
-                sources: BTreeMap::from([("contract.sol".into(), Source::new(content))]),
+                sources: Sources::from([("contract.sol".into(), Source::new(content))]),
                 ..Default::default()
             },
-            solc_version: version.clone(),
+            solc_version: solc_version.clone(),
             allow_paths: Default::default(),
             base_path: Default::default(),
             include_paths: Default::default(),
         };
 
-        let out = zksolc.compile(&mut input)?;
+        let solc_compiler = if compiler_version.is_zksync_solc {
+            // AutoDetect given a specific solc version on the input, will
+            // find or install the solc version
+            SolcCompiler::AutoDetect
+        } else {
+            let solc = Solc::find_or_install(&solc_version)?;
+            SolcCompiler::Specific(solc)
+        };
+
+        let zksolc_compiler = ZkSolcCompiler { zksolc: zksolc.zksolc, solc: solc_compiler };
+
+        let out = zksolc_compiler.zksync_compile(&input)?;
         if out.has_error() {
             let mut o = ZkAggregatedCompilerOutput::default();
-            o.extend(version.clone(), raw_build_info_new(&input, &out, false)?, out);
+            o.extend(solc_version, raw_build_info_new(&input, &out, false)?, out);
             let diags = o.diagnostics(&[], &[], Default::default());
 
             eyre::bail!(

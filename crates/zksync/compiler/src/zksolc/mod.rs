@@ -5,8 +5,8 @@ use std::{
 };
 
 use foundry_compilers::{
-    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact,
-    ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput, ProjectPathsConfig,
+    solc::SolcLanguage, zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
+    Artifact, ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput, ProjectPathsConfig,
 };
 
 use alloy_primitives::{keccak256, B256};
@@ -44,6 +44,7 @@ impl DualCompiledContracts {
         output: &ProjectCompileOutput,
         zk_output: &ZkProjectCompileOutput,
         layout: &ProjectPathsConfig,
+        zk_layout: &ProjectPathsConfig<SolcLanguage>,
     ) -> Self {
         let mut dual_compiled_contracts = vec![];
         let mut solc_bytecodes = HashMap::new();
@@ -105,11 +106,11 @@ impl DualCompiledContracts {
 
         for (contract_name, (artifact_path, artifact)) in zk_output_artifacts {
             let contract_file = artifact_path
-                .strip_prefix(&layout.zksync_artifacts)
+                .strip_prefix(&zk_layout.artifacts)
                 .unwrap_or_else(|_| {
                     panic!(
                         "failed stripping zksolc artifact path '{:?}' from '{:?}'",
-                        layout.zksync_artifacts, artifact_path
+                        zk_layout.artifacts, artifact_path
                     )
                 })
                 .to_path_buf();

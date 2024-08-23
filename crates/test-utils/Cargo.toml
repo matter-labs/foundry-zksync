@@ -30,9 +30,17 @@ similar-asserts.workspace = true
 regex = "1"
 serde_json.workspace = true
 tracing.workspace = true
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 walkdir.workspace = true
 rand.workspace = true
+snapbox = { version = "0.6.9", features = ["json"] }
+tokio.workspace = true
+
+# zk
+zksync_types.workspace = true
+era_test_node.workspace = true
+jsonrpc-core = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
+jsonrpc-http-server = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
 
 [features]
 # feature for integration tests that test external projects

@@ -11,7 +11,7 @@ extern crate tracing;
 use self::transaction::AdditionalContract;
 use crate::runner::ScriptRunner;
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_primitives::{Address, Bytes, Log, TxKind, U256};
+use alloy_primitives::{hex, Address, Bytes, Log, TxKind, U256};
 use alloy_signer::Signer;
 use broadcast::next_nonce;
 use build::PreprocessedState;
@@ -37,14 +37,13 @@ use foundry_config::{
 use foundry_evm::{
     backend::Backend,
     constants::DEFAULT_CREATE2_DEPLOYER,
-    debug::DebugArena,
     executors::ExecutorBuilder,
     inspectors::{
         cheatcodes::{BroadcastableTransactions, ScriptWallets},
         CheatsConfig,
     },
     opts::EvmOpts,
-    traces::Traces,
+    traces::{TraceMode, Traces},
 };
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
@@ -236,7 +235,7 @@ impl ScriptArgs {
                 .await?;
 
             if pre_simulation.args.debug {
-                pre_simulation.run_debugger()?;
+                return pre_simulation.run_debugger()
             }
 
             if pre_simulation.args.json {
@@ -465,7 +464,6 @@ pub struct ScriptResult {
     pub success: bool,
     pub logs: Vec<Log>,
     pub traces: Traces,
-    pub debug: Option<Vec<DebugArena>>,
     pub gas_used: u64,
     pub labeled_addresses: HashMap<Address, String>,
     pub transactions: Option<BroadcastableTransactions>,
@@ -589,9 +587,12 @@ impl ScriptConfig {
 
         // We need to enable tracing to decode contract names: local or external.
         let mut builder = ExecutorBuilder::new()
-            .inspectors(|stack| stack.trace(true))
+            .inspectors(|stack| {
+                stack.trace_mode(if debug { TraceMode::Debug } else { TraceMode::Call })
+            })
             .spec(self.config.evm_spec_id())
-            .gas_limit(self.evm_opts.gas_limit());
+            .gas_limit(self.evm_opts.gas_limit())
+            .legacy_assertions(self.config.legacy_assertions);
 
         let use_zk = self.config.zksync.run_in_zk_mode();
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
@@ -600,7 +601,6 @@ impl ScriptConfig {
             builder = builder
                 .inspectors(|stack| {
                     stack
-                        .debug(debug)
                         .cheatcodes(
                             CheatsConfig::new(
                                 &self.config,

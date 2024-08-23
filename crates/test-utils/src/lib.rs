@@ -25,8 +25,14 @@ pub use util::{TestCommand, TestProject};
 mod script;
 pub use script::{ScriptOutcome, ScriptTester};
 
+// TODO: remove once anvil supports zksync node
+mod zksync;
+pub use zksync::ZkSyncNode;
+
 // re-exports for convenience
 pub use foundry_compilers;
+
+pub use snapbox::{assert_data_eq, file, str};
 
 /// Initializes tracing for tests.
 pub fn init_tracing() {

@@ -7,13 +7,15 @@ use foundry_block_explorers::contract::Metadata;
 use foundry_compilers::{
     artifacts::{remappings::Remapping, BytecodeObject, ContractBytecodeSome, Libraries, Source},
     compilers::{
-        multi::MultiCompilerLanguage,
         solc::{Solc, SolcCompiler},
         Compiler,
     },
+    multi::MultiCompilerLanguage,
     report::{BasicStdoutReporter, NoReporter, Report},
+    solc::SolcSettings,
+    zksolc::{ZkSolc, ZkSolcCompiler},
     zksync::{
-        artifact_output::Artifact as ZkArtifact,
+        artifact_output::zk::ZkArtifactOutput,
         compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     },
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
@@ -54,6 +56,9 @@ pub struct ProjectCompiler {
 
     /// Extra files to include, that are not necessarily in the project's source dir.
     files: Vec<PathBuf>,
+
+    /// Set zksync specific settings based on context
+    zksync: bool,
 }
 
 impl Default for ProjectCompiler {
@@ -74,6 +79,7 @@ impl ProjectCompiler {
             quiet: Some(crate::shell::verbosity().is_silent()),
             bail: None,
             files: Vec::new(),
+            zksync: false,
         }
     }
 
@@ -126,6 +132,13 @@ impl ProjectCompiler {
     #[inline]
     pub fn files(mut self, files: impl IntoIterator<Item = PathBuf>) -> Self {
         self.files.extend(files);
+        self
+    }
+
+    /// Enables zksync contract sizes.
+    #[inline]
+    pub fn zksync_sizes(mut self) -> Self {
+        self.zksync = true;
         self
     }
 
@@ -228,7 +241,7 @@ impl ProjectCompiler {
                 println!();
             }
 
-            let mut size_report = SizeReport { contracts: BTreeMap::new() };
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
 
             let artifacts: BTreeMap<_, _> = output
                 .artifact_ids()
@@ -245,7 +258,7 @@ impl ProjectCompiler {
                 let dev_functions =
                     artifact.abi.as_ref().map(|abi| abi.functions()).into_iter().flatten().filter(
                         |func| {
-                            func.name.is_test() ||
+                            func.name.is_any_test() ||
                                 func.name.eq("IS_TEST") ||
                                 func.name.eq("IS_SCRIPT")
                         },
@@ -268,7 +281,7 @@ impl ProjectCompiler {
     /// Compiles the project.
     pub fn zksync_compile(
         self,
-        project: &Project<SolcCompiler>,
+        project: &Project<ZkSolcCompiler, ZkArtifactOutput>,
         maybe_avoid_contracts: Option<Vec<globset::GlobMatcher>>,
     ) -> Result<ZkProjectCompileOutput> {
         // TODO: Avoid process::exit
@@ -286,10 +299,8 @@ impl ProjectCompiler {
         let files = self.files.clone();
 
         {
-            Report::new(SpinnerReporter::spawn_with(format!(
-                "Using zksolc-{}",
-                project.zksync_zksolc.version()?
-            )));
+            let zksolc_version = ZkSolc::new(project.compiler.zksolc.clone()).version()?;
+            Report::new(SpinnerReporter::spawn_with(format!("Using zksolc-{zksolc_version}")));
         }
         self.zksync_compile_with(&project.paths.root, || {
             let files_to_compile =
@@ -401,9 +412,8 @@ impl ProjectCompiler {
                 let mut abs_path_buf = PathBuf::new();
                 abs_path_buf.push(root_path.as_ref());
                 abs_path_buf.push(contract_path);
-                let abs_path_str = abs_path_buf.to_string_lossy();
 
-                let art = output.find(abs_path_str, contract_name).unwrap_or_else(|| {
+                let art = output.find(abs_path_buf.as_path(), contract_name).unwrap_or_else(|| {
                     panic!(
                         "Could not find contract {contract_name} at path {contract_path} for compilation output"
                     )
@@ -454,8 +464,17 @@ impl ProjectCompiler {
                 println!();
             }
 
-            let mut size_report = SizeReport { contracts: BTreeMap::new() };
-            let artifacts: BTreeMap<_, _> = output.artifacts().collect();
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
+
+            let artifacts: BTreeMap<_, _> = output
+                .artifact_ids()
+                .filter(|(id, _)| {
+                    // filter out forge-std specific contracts
+                    !id.source.to_string_lossy().contains("/forge-std/src/")
+                })
+                .map(|(id, artifact)| (id.name, artifact))
+                .collect();
+
             for (name, artifact) in artifacts {
                 let bytecode = artifact.get_bytecode_object().unwrap_or_default();
                 let size = match bytecode.as_ref() {
@@ -466,16 +485,16 @@ impl ProjectCompiler {
                     }
                 };
 
-                let dev_functions =
-                    artifact.abi.as_ref().map(|abi| abi.functions()).into_iter().flatten().filter(
-                        |func| {
-                            func.name.is_test() ||
-                                func.name.eq("IS_TEST") ||
-                                func.name.eq("IS_SCRIPT")
-                        },
-                    );
-
-                let is_dev_contract = dev_functions.count() > 0;
+                let is_dev_contract = artifact
+                    .abi
+                    .as_ref()
+                    .map(|abi| {
+                        abi.functions().any(|f| {
+                            f.test_function_kind().is_known() ||
+                                matches!(f.name.as_str(), "IS_TEST" | "IS_SCRIPT")
+                        })
+                    })
+                    .unwrap_or(false);
                 size_report.contracts.insert(name, ContractInfo { size, is_dev_contract });
             }
 
@@ -620,10 +639,15 @@ impl ContractSources {
 // https://eips.ethereum.org/EIPS/eip-170
 const CONTRACT_SIZE_LIMIT: usize = 24576;
 
+// https://docs.zksync.io/build/developer-reference/ethereum-differences/contract-deployment#contract-size-limit-and-format-of-bytecode-hash
+const ZKSYNC_CONTRACT_SIZE_LIMIT: usize = 450999;
+
 /// Contracts with info about their size
 pub struct SizeReport {
     /// `contract name -> info`
     pub contracts: BTreeMap<String, ContractInfo>,
+    /// Using zksync size report
+    pub zksync: bool,
 }
 
 impl SizeReport {
@@ -640,7 +664,11 @@ impl SizeReport {
 
     /// Returns true if any contract exceeds the size limit, excluding test contracts.
     pub fn exceeds_size_limit(&self) -> bool {
-        self.max_size() > CONTRACT_SIZE_LIMIT
+        if self.zksync {
+            self.max_size() > ZKSYNC_CONTRACT_SIZE_LIMIT
+        } else {
+            self.max_size() > CONTRACT_SIZE_LIMIT
+        }
     }
 }
 
@@ -657,11 +685,22 @@ impl Display for SizeReport {
         // filters out non dev contracts (Test or Script)
         let contracts = self.contracts.iter().filter(|(_, c)| !c.is_dev_contract && c.size > 0);
         for (name, contract) in contracts {
-            let margin = CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
-            let color = match contract.size {
-                0..=17999 => Color::Reset,
-                18000..=CONTRACT_SIZE_LIMIT => Color::Yellow,
-                _ => Color::Red,
+            let (margin, color) = if self.zksync {
+                let margin = ZKSYNC_CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
+                let color = match contract.size {
+                    0..=329999 => Color::Reset,
+                    330000..=ZKSYNC_CONTRACT_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
+                (margin, color)
+            } else {
+                let margin = CONTRACT_SIZE_LIMIT as isize - contract.size as isize;
+                let color = match contract.size {
+                    0..=17999 => Color::Reset,
+                    18000..=CONTRACT_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
+                (margin, color)
             };
 
             let locale = &Locale::en;
@@ -733,7 +772,7 @@ pub fn etherscan_project(
     let sources_path = target_path.join(&metadata.contract_name);
     metadata.source_tree().write_to(&target_path)?;
 
-    let mut settings = metadata.source_code.settings()?.unwrap_or_default();
+    let mut settings = metadata.settings()?;
 
     // make remappings absolute with our root
     for remapping in settings.remappings.iter_mut() {
@@ -765,7 +804,10 @@ pub fn etherscan_project(
     let compiler = SolcCompiler::Specific(solc);
 
     Ok(ProjectBuilder::<SolcCompiler>::default()
-        .settings(SolcConfig::builder().settings(settings).build().settings)
+        .settings(SolcSettings {
+            settings: SolcConfig::builder().settings(settings).build().settings,
+            ..Default::default()
+        })
         .paths(paths)
         .ephemeral()
         .no_artifacts()

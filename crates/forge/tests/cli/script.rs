@@ -1,7 +1,7 @@
 //! Contains various tests related to `forge script`.
 
-use crate::{constants::TEMPLATE_CONTRACT, zksync_node};
-use alloy_primitives::{Address, Bytes};
+use crate::constants::TEMPLATE_CONTRACT;
+use alloy_primitives::{hex, Address, Bytes};
 use anvil::{spawn, NodeConfig};
 use foundry_test_utils::{rpc, util::OutputExt, ScriptOutcome, ScriptTester};
 use regex::Regex;
@@ -1472,7 +1472,7 @@ forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
         factory_deps: Vec<Vec<u8>>,
     }
 
-    let node = zksync_node::ZkSyncNode::start();
+    let node = foundry_test_utils::ZkSyncNode::start();
 
     cmd.args(["init", "--force"]).arg(prj.root());
     cmd.assert_non_empty_stdout();
@@ -1539,6 +1539,8 @@ contract DeployScript is Script {
         "--rpc-url",
         node.url().as_str(),
         "--slow",
+        "--evm-version",
+        "shanghai",
     ]);
 
     assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));

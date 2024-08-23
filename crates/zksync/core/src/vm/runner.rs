@@ -1,9 +1,10 @@
+use alloy_primitives::hex;
 use foundry_zksync_compiler::DualCompiledContract;
 use itertools::Itertools;
 use revm::{
     interpreter::{CallInputs, CallScheme, CallValue, CreateInputs},
     primitives::{Address, CreateScheme, Env, ResultAndState, TransactTo, B256, U256 as rU256},
-    Database, EvmContext,
+    Database, EvmContext, InnerEvmContext,
 };
 use tracing::{debug, error, info};
 use zksync_basic_types::H256;
@@ -59,7 +60,7 @@ where
         },
         caller.to_h160(),
         env.tx.value.to_u256(),
-        factory_deps,
+        factory_deps.unwrap_or_default(),
         PaymasterParams::default(),
     );
 
@@ -107,7 +108,7 @@ where
 }
 
 /// Retrieves nonce for a given address.
-pub fn nonce<DB>(address: Address, ecx: &mut EvmContext<DB>) -> u32
+pub fn nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u32
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -148,7 +149,7 @@ where
         },
         caller.to_h160(),
         call.value.to_u256(),
-        Some(factory_deps),
+        factory_deps,
         PaymasterParams::default(),
     );
 
@@ -199,7 +200,7 @@ where
             CallValue::Transfer(value) => value.to_u256(),
             _ => U256::zero(),
         },
-        None,
+        Default::default(),
         PaymasterParams::default(),
     );
 
@@ -278,11 +279,12 @@ pub fn encode_create_params(
 fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMap<rU256, B256> {
     let mut block_hashes = HashMap::default();
     for i in 1..=256u32 {
-        let (block_number, overflow) = ecx.env.block.number.overflowing_sub(rU256::from(i));
+        let (block_number, overflow) =
+            ecx.env.block.number.overflowing_sub(alloy_primitives::U256::from(i));
         if overflow {
             break
         }
-        match ecx.block_hash(block_number) {
+        match ecx.block_hash(block_number.to_u256().as_u64()) {
             Ok(block_hash) => {
                 block_hashes.insert(block_number, block_hash);
             }

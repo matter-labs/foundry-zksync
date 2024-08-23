@@ -1,8 +1,8 @@
 use super::{EtherscanSourceProvider, VerifyArgs};
-use crate::provider::VerificationContext;
+use crate::{provider::VerificationContext, zk_provider::ZkVerificationContext};
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
-use foundry_compilers::artifacts::StandardJsonCompilerInput;
+use foundry_compilers::{artifacts::StandardJsonCompilerInput, solc::SolcLanguage};
 
 #[derive(Debug)]
 pub struct EtherscanStandardJsonSource;
@@ -29,7 +29,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
             .collect();
 
         // remove all incompatible settings
-        input.settings.sanitize(&context.compiler_version);
+        input.settings.sanitize(&context.compiler_version, SolcLanguage::Solidity);
 
         let source =
             serde_json::to_string(&input).wrap_err("Failed to parse standard json input")?;
@@ -51,11 +51,13 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
     fn zk_source(
         &self,
         _args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)> {
-        let input =
-            foundry_zksync_compiler::standard_json_input(&context.project, &context.target_path)
-                .wrap_err("failed to get zksolc standard json")?;
+        let input = foundry_compilers::zksync::project_standard_json_input(
+            &context.project,
+            &context.target_path,
+        )
+        .wrap_err("failed to get zksolc standard json")?;
 
         let source =
             serde_json::to_string(&input).wrap_err("Failed to parse zksync standard json input")?;

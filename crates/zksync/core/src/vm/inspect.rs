@@ -1,11 +1,10 @@
-use alloy_primitives::Log;
+use alloy_primitives::{hex, Log};
 use era_test_node::{
+    config::node::ShowCalls,
     formatter,
-    node::ShowCalls,
     system_contracts::{Options, SystemContracts},
     utils::bytecode_to_factory_dep,
 };
-use foundry_common::{Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS};
 use itertools::Itertools;
 use multivm::{
     interface::{Halt, VmInterface, VmRevertReason},
@@ -45,6 +44,9 @@ use crate::{
         storage_view::StorageView,
         tracer::{CallContext, CheatcodeTracer, CheatcodeTracerContext},
     },
+};
+use foundry_evm_abi::{
+    patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS,
 };
 
 /// Maximum gas price allowed for L1.
@@ -404,7 +406,6 @@ fn inspect_inner<S: ReadStorage>(
             value: log.data.data.to_vec(),
         });
     }
-
     let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
     let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
     info!("=== Calls: ");
@@ -472,7 +473,7 @@ impl ConsoleLogParser {
         let mut input = current_call.input.clone();
 
         // Patch the Hardhat-style selector (`uint` instead of `uint256`)
-        foundry_common::patch_hh_console_selector(&mut input);
+        patch_hh_console_selector(&mut input);
 
         // Decode the call
         let Ok(call) = HardhatConsole::HardhatConsoleCalls::abi_decode(&input, false) else {
@@ -491,7 +492,7 @@ impl ConsoleLogParser {
         logs.push(log);
 
         if print {
-            info!("{}", ansi_term::Color::Cyan.paint(message));
+            info!("{}", ansiterm::Color::Cyan.paint(message));
         }
     }
 }
@@ -569,24 +570,26 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
 
 /// Transforms a given L2Tx into multiple txs if the factory deps need to be batched
 fn split_tx_by_factory_deps(mut tx: L2Tx) -> Vec<L2Tx> {
-    let Some(factory_deps) = tx.execute.factory_deps.take() else { return vec![tx] };
+    if tx.execute.factory_deps.is_empty() {
+        return vec![tx]
+    }
 
-    let mut batched = batch_factory_dependencies(factory_deps);
-    let last_deps = batched.pop();
+    let mut batched = batch_factory_dependencies(tx.execute.factory_deps);
+    let last_deps = batched.pop().unwrap_or_default();
 
     let mut txs = Vec::with_capacity(batched.len() + 1);
     for deps in batched.into_iter() {
         txs.push(L2Tx::new(
             H160::zero(),
             Vec::default(),
-            tx.nonce(),
+            tx.common_data.nonce,
             tx.common_data.fee.clone(),
             tx.common_data.initiator_address,
             Default::default(),
-            Some(deps),
+            deps,
             tx.common_data.paymaster_params.clone(),
         ));
-        tx.common_data.nonce = Nonce(tx.nonce().0.saturating_add(1));
+        tx.common_data.nonce = Nonce(tx.common_data.nonce.0.saturating_add(1));
     }
 
     tx.execute.factory_deps = last_deps;

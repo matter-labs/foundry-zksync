@@ -10,7 +10,7 @@ use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
 use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
-use forge_verify::RetryArgs;
+use forge_verify::{zk_provider::CompilerVerificationContext, RetryArgs};
 use foundry_cli::{
     opts::{CoreBuildArgs, EthereumOpts, EtherscanOpts, TransactionOpts},
     utils::{self, read_constructor_args_file, remove_contract, remove_zk_contract, LoadConfig},
@@ -107,6 +107,7 @@ impl CreateArgs {
     pub async fn run(mut self) -> Result<()> {
         // Find Project & Compile
         let project = self.opts.project()?;
+
         let zksync = self.opts.compiler.zk.enabled();
         if zksync {
             let target_path = if let Some(ref mut path) = self.contract.path {
@@ -116,7 +117,8 @@ impl CreateArgs {
             };
 
             let config = self.opts.try_load_config_emit_warnings()?;
-            let zk_project = foundry_zksync_compiler::create_project(&config, config.cache, false)?;
+            let zk_project =
+                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
             let zk_compiler = ProjectCompiler::new()
                 .quiet(self.json || self.opts.silent)
                 .files([target_path.clone()]);
@@ -179,9 +181,8 @@ impl CreateArgs {
                         let mut abs_path_buf = PathBuf::new();
                         abs_path_buf.push(project.root());
                         abs_path_buf.push(contract_path);
-                        let abs_path_str = abs_path_buf.to_string_lossy();
                         let fdep_art =
-                            zk_output.find(abs_path_str, contract_name).unwrap_or_else(|| {
+                            zk_output.find(&abs_path_buf, contract_name).unwrap_or_else(|| {
                                 panic!(
                                     "Could not find contract {contract_name} at path {contract_path} for compilation output",
                                 )
@@ -352,7 +353,11 @@ impl CreateArgs {
         verify.etherscan.key =
             config.get_etherscan_config_with_chain(Some(chain.into()))?.map(|c| c.key);
 
-        let context = verify.resolve_context().await?;
+        let context = if verify.zksync {
+            CompilerVerificationContext::Solc(verify.resolve_context().await?)
+        } else {
+            CompilerVerificationContext::ZkSolc(verify.zk_resolve_context().await?)
+        };
 
         verify.verification_provider()?.preflight_check(verify, context).await?;
         Ok(())

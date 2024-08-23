@@ -289,6 +289,8 @@ impl CloneArgs {
 /// - `auto_detect_solc` to `false`
 /// - `solc_version` to the value from the metadata
 /// - `evm_version` to the value from the metadata
+/// - `evm_version` to the value from the metadata, if the metadata's evm_version is "Default", then
+///   this is derived from the solc version this contract was compiled with.
 /// - `via_ir` to the value from the metadata
 /// - `libraries` to the value from the metadata
 /// - `metadata` to the value from the metadata
@@ -571,7 +573,7 @@ pub fn find_main_contract<'a>(
             rv = Some((PathBuf::from(f), a));
         }
     }
-    rv.ok_or(eyre::eyre!("contract not found"))
+    rv.ok_or_else(|| eyre::eyre!("contract not found"))
 }
 
 #[cfg(test)]
@@ -611,9 +613,9 @@ impl EtherscanClient for Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::hex;
     use foundry_compilers::Artifact;
     use foundry_test_utils::rpc::next_etherscan_api_key;
-    use hex::ToHex;
     use std::collections::BTreeMap;
 
     fn assert_successful_compilation(root: &PathBuf) -> ProjectCompileOutput {
@@ -631,9 +633,9 @@ mod tests {
                 if name == contract_name {
                     let compiled_creation_code =
                         contract.get_bytecode_object().expect("creation code not found");
-                    let compiled_creation_code: String = compiled_creation_code.encode_hex();
                     assert!(
-                        compiled_creation_code.starts_with(stripped_creation_code),
+                        hex::encode(compiled_creation_code.as_ref())
+                            .starts_with(stripped_creation_code),
                         "inconsistent creation code"
                     );
                 }

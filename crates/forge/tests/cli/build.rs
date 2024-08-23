@@ -1,8 +1,7 @@
-use foundry_common::fs::read_json_file;
 use foundry_config::Config;
 use foundry_test_utils::forgetest;
 use globset::Glob;
-use std::{collections::BTreeMap, path::PathBuf};
+use regex::Regex;
 
 // tests that json is printed when --json is passed
 forgetest!(compile_json, |prj, cmd| {
@@ -20,26 +19,14 @@ contract Dummy {
     .unwrap();
 
     // set up command
-    cmd.args(["compile", "--format-json"]);
-
-    // Exclude build_infos from output as IDs depend on root dir and are not deterministic.
-    let mut output: BTreeMap<String, serde_json::Value> =
-        serde_json::from_str(&cmd.stdout_lossy()).unwrap();
-    output.remove("build_infos");
-
-    let expected: BTreeMap<String, serde_json::Value> = read_json_file(
-        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/compile_json.stdout"),
-    )
-    .unwrap();
-
-    similar_asserts::assert_eq!(output, expected);
+    cmd.args(["compile", "--format-json"])
+        .assert()
+        .stdout_eq(file!["../fixtures/compile_json.stdout": Json]);
 });
 
 // tests build output is as expected
 forgetest_init!(exact_build_output, |prj, cmd| {
-    cmd.args(["build", "--force"]);
-    let stdout = cmd.stdout_lossy();
-    assert!(stdout.contains("Compiling"), "\n{stdout}");
+    cmd.args(["build", "--force"]).assert_success().stdout_eq(str!["Compiling[..]\n..."]);
 });
 
 // tests build output is as expected
@@ -49,6 +36,15 @@ forgetest_init!(build_sizes_no_forge_std, |prj, cmd| {
     assert!(!stdout.contains("console"), "\n{stdout}");
     assert!(!stdout.contains("std"), "\n{stdout}");
     assert!(stdout.contains("Counter"), "\n{stdout}");
+});
+
+// tests build output is as expected in zksync mode
+forgetest_init!(test_zk_build_sizes, |prj, cmd| {
+    cmd.args(["build", "--sizes", "--zksync", "--evm-version", "shanghai"]);
+    let stdout = cmd.stdout_lossy();
+    let pattern = Regex::new(r"\|\s*Counter\s*\|\s*800\s*\|\s*450,199\s*\|").unwrap();
+
+    assert!(pattern.is_match(&stdout), "Unexpected size output:\n{stdout}");
 });
 
 // tests that skip key in config can be used to skip non-compilable contract

@@ -1,6 +1,11 @@
 use super::{provider::VerificationProvider, VerifyArgs, VerifyCheckArgs};
-use crate::{provider::VerificationContext, retry::RETRY_CHECK_ON_VERIFY};
+use crate::{
+    provider::VerificationContext,
+    retry::RETRY_CHECK_ON_VERIFY,
+    zk_provider::{CompilerVerificationContext, ZkVerificationContext},
+};
 use alloy_json_abi::Function;
+use alloy_primitives::hex;
 use alloy_provider::Provider;
 use eyre::{eyre, Context, OptionExt, Result};
 use foundry_block_explorers::{
@@ -10,15 +15,18 @@ use foundry_block_explorers::{
     Client,
 };
 use foundry_cli::utils::{self, read_constructor_args_file, LoadConfig};
-use foundry_common::{abi::encode_function_args, retry::Retry, shell};
-use foundry_compilers::{artifacts::BytecodeObject, solc::Solc, Artifact};
+use foundry_common::{
+    abi::encode_function_args,
+    retry::{Retry, RetryError},
+    shell,
+};
+use foundry_compilers::{artifacts::BytecodeObject, Artifact};
 use foundry_config::{Chain, Config};
 use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
 use futures::FutureExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use semver::{BuildMetadata, Version};
-
 use std::fmt::Debug;
 
 mod flatten;
@@ -44,7 +52,7 @@ trait EtherscanSourceProvider: Send + Sync + Debug {
     fn zk_source(
         &self,
         args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)>;
 }
 
@@ -53,13 +61,17 @@ impl VerificationProvider for EtherscanVerificationProvider {
     async fn preflight_check(
         &mut self,
         args: VerifyArgs,
-        context: VerificationContext,
+        context: CompilerVerificationContext,
     ) -> Result<()> {
         let _ = self.prepare_request(&args, &context).await?;
         Ok(())
     }
 
-    async fn verify(&mut self, args: VerifyArgs, context: VerificationContext) -> Result<()> {
+    async fn verify(
+        &mut self,
+        args: VerifyArgs,
+        context: CompilerVerificationContext,
+    ) -> Result<()> {
         let (etherscan, verify_args) = self.prepare_request(&args, &context).await?;
 
         if !args.skip_is_verified_check &&
@@ -156,12 +168,13 @@ impl VerificationProvider for EtherscanVerificationProvider {
         )?;
         let retry: Retry = args.retry.into();
         retry
-            .run_async(|| {
+            .run_async_until_break(|| {
                 async {
                     let resp = etherscan
                         .check_contract_verification_status(args.id.clone())
                         .await
-                        .wrap_err("Failed to request verification status")?;
+                        .wrap_err("Failed to request verification status")
+                        .map_err(RetryError::Retry)?;
 
                     trace!(target: "forge::verify", ?resp, "Received verification response");
 
@@ -171,15 +184,15 @@ impl VerificationProvider for EtherscanVerificationProvider {
                     );
 
                     if resp.result == "Pending in queue" {
-                        return Err(eyre!("Verification is still pending...",))
+                        return Err(RetryError::Retry(eyre!("Verification is still pending...",)))
                     }
 
                     if resp.result == "In progress" {
-                        return Err(eyre!("Verification is in progress...",))
+                        return Err(RetryError::Retry(eyre!("Verification is in progress...",)))
                     }
 
                     if resp.result == "Unable to verify" {
-                        return Err(eyre!("Unable to verify.",))
+                        return Err(RetryError::Retry(eyre!("Unable to verify.",)))
                     }
 
                     if resp.result == "Already Verified" {
@@ -188,8 +201,7 @@ impl VerificationProvider for EtherscanVerificationProvider {
                     }
 
                     if resp.status == "0" {
-                        println!("Contract failed to verify.");
-                        std::process::exit(1);
+                        return Err(RetryError::Break(eyre!("Contract failed to verify.",)))
                     }
 
                     if resp.result == "Pass - Verified" {
@@ -201,7 +213,7 @@ impl VerificationProvider for EtherscanVerificationProvider {
                 .boxed()
             })
             .await
-            .wrap_err("Checking verification result failed:")
+            .wrap_err("Checking verification result failed")
     }
 }
 
@@ -219,7 +231,7 @@ impl EtherscanVerificationProvider {
     async fn prepare_request(
         &mut self,
         args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &CompilerVerificationContext,
     ) -> Result<(Client, VerifyContract)> {
         let config = args.try_load_config_emit_warnings()?;
 
@@ -301,37 +313,38 @@ impl EtherscanVerificationProvider {
     pub async fn create_verify_request(
         &mut self,
         args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &CompilerVerificationContext,
     ) -> Result<VerifyContract> {
-        let zk_compiler_version = self.zk_compiler_version(args, context)?;
-        let (source, contract_name, code_format) = if let Some(zk) = &zk_compiler_version {
-            let mut zk_context = context.clone();
-            zk_context.compiler_version = zk.zksolc.clone();
-            self.source_provider(args).zk_source(args, &zk_context)
-        } else {
-            self.source_provider(args).source(args, context)
-        }?;
+        let (source, contract_name, code_format) = match context {
+            CompilerVerificationContext::Solc(context) => {
+                self.source_provider(args).source(args, context)?
+            }
+            CompilerVerificationContext::ZkSolc(context) => {
+                self.source_provider(args).zk_source(args, context)?
+            }
+        };
 
-        let mut compiler_version = context.compiler_version.clone();
+        let mut compiler_version = context.compiler_version().clone();
         compiler_version.build = match RE_BUILD_COMMIT.captures(compiler_version.build.as_str()) {
             Some(cap) => BuildMetadata::new(cap.name("commit").unwrap().as_str())?,
             _ => BuildMetadata::EMPTY,
         };
 
-        let zk_args = match zk_compiler_version {
-            None => vec![],
-            Some(zk) => {
-                if let Some(solc) = zk.solc {
-                    compiler_version = Version::new(solc.major, solc.minor, solc.patch);
-                }
-
-                let compiler_mode = if zk.is_zksync_solc { "zksync" } else { "solc" }.to_string();
+        let zk_args = match context {
+            CompilerVerificationContext::ZkSolc(zk_context) => {
+                let compiler_mode =
+                    if zk_context.compiler_version.is_zksync_solc { "zksync" } else { "solc" }
+                        .to_string();
 
                 vec![
                     ("compilermode".to_string(), compiler_mode),
-                    ("zksolcVersion".to_string(), format!("v{}", zk.zksolc)),
+                    (
+                        "zksolcVersion".to_string(),
+                        format!("v{}", zk_context.compiler_version.zksolc),
+                    ),
                 ]
             }
+            _ => vec![],
         };
 
         let compiler_version =
@@ -354,8 +367,8 @@ impl EtherscanVerificationProvider {
         if code_format == CodeFormat::SingleFile {
             verify_args = if let Some(optimizations) = args.num_of_optimizations {
                 verify_args.optimized().runs(optimizations as u32)
-            } else if context.config.optimizer {
-                verify_args.optimized().runs(context.config.optimizer_runs.try_into()?)
+            } else if context.config().optimizer {
+                verify_args.optimized().runs(context.config().optimizer_runs.try_into()?)
             } else {
                 verify_args.not_optimized()
             };
@@ -364,40 +377,13 @@ impl EtherscanVerificationProvider {
         Ok(verify_args)
     }
 
-    fn zk_compiler_version(
-        &mut self,
-        args: &VerifyArgs,
-        context: &VerificationContext,
-    ) -> Result<Option<ZkVersion>> {
-        if !args.zksync {
-            return Ok(None);
-        }
-
-        let zksolc = context.project.zksync_zksolc.version()?;
-        let mut is_zksync_solc = false;
-
-        let solc = if let Some(solc) = &context.config.zksync.solc_path {
-            let solc = Solc::new(solc)?;
-            let version = solc.version;
-            //TODO: determine if this solc is zksync or not
-            Some(version)
-        } else {
-            //if there's no `solc_path` specified then we use the same
-            // as the project version, but the zksync fork
-            is_zksync_solc = true;
-            Some(context.compiler_version.clone())
-        };
-
-        Ok(Some(ZkVersion { zksolc, solc, is_zksync_solc }))
-    }
-
     /// Return the optional encoded constructor arguments. If the path to
     /// constructor arguments was provided, read them and encode. Otherwise,
     /// return whatever was set in the [VerifyArgs] args.
     async fn constructor_args(
         &mut self,
         args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &CompilerVerificationContext,
     ) -> Result<Option<String>> {
         if let Some(ref constructor_args_path) = args.constructor_args_path {
             let abi = context.get_target_abi()?;
@@ -432,14 +418,14 @@ impl EtherscanVerificationProvider {
     async fn guess_constructor_args(
         &mut self,
         args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &CompilerVerificationContext,
     ) -> Result<String> {
-        let provider = utils::get_provider(&context.config)?;
+        let provider = utils::get_provider(context.config())?;
         let client = self.client(
             args.etherscan.chain.unwrap_or_default(),
             args.verifier.verifier_url.as_deref(),
             args.etherscan.key.as_deref(),
-            &context.config,
+            context.config(),
         )?;
 
         //TODO: zk support
@@ -461,28 +447,60 @@ impl EtherscanVerificationProvider {
             eyre::bail!("Fetching of constructor arguments is not supported for contracts created by contracts")
         };
 
-        let output = context.project.compile_file(&context.target_path)?;
-        let artifact = output
-            .find(context.target_path.to_string_lossy(), &context.target_name)
-            .ok_or_eyre("Contract artifact wasn't found locally")?;
-        let bytecode = artifact
-            .get_bytecode_object()
-            .ok_or_eyre("Contract artifact does not contain bytecode")?;
+        match context {
+            CompilerVerificationContext::Solc(context) => {
+                let output = context.project.compile_file(&context.target_path)?;
+                let artifact = output
+                    .find(&context.target_path, &context.target_name)
+                    .ok_or_eyre("Contract artifact wasn't found locally")?;
+                let bytecode = artifact
+                    .get_bytecode_object()
+                    .ok_or_eyre("Contract artifact does not contain bytecode")?;
+                let bytecode = match bytecode.as_ref() {
+                    BytecodeObject::Bytecode(bytes) => Ok(bytes),
+                    BytecodeObject::Unlinked(_) => Err(eyre!(
+                        "You have to provide correct libraries to use --guess-constructor-args"
+                    )),
+                }?;
 
-        let bytecode = match bytecode.as_ref() {
-            BytecodeObject::Bytecode(bytes) => Ok(bytes),
-            BytecodeObject::Unlinked(_) => {
-                Err(eyre!("You have to provide correct libraries to use --guess-constructor-args"))
+                if maybe_creation_code.starts_with(bytecode) {
+                    let constructor_args = &maybe_creation_code[bytecode.len()..];
+                    let constructor_args = hex::encode(constructor_args);
+                    shell::println(format!(
+                        "Identified constructor arguments: {constructor_args}"
+                    ))?;
+                    Ok(constructor_args)
+                } else {
+                    eyre::bail!("Local bytecode doesn't match on-chain bytecode")
+                }
             }
-        }?;
+            CompilerVerificationContext::ZkSolc(context) => {
+                let output = context.project.compile_file(&context.target_path)?;
+                let artifact = output
+                    .find(&context.target_path, &context.target_name)
+                    .ok_or_eyre("Contract artifact wasn't found locally")?;
 
-        if maybe_creation_code.starts_with(bytecode) {
-            let constructor_args = &maybe_creation_code[bytecode.len()..];
-            let constructor_args = hex::encode(constructor_args);
-            shell::println(format!("Identified constructor arguments: {constructor_args}"))?;
-            Ok(constructor_args)
-        } else {
-            eyre::bail!("Local bytecode doesn't match on-chain bytecode")
+                let bytecode = artifact
+                    .get_bytecode_object()
+                    .ok_or_eyre("Contract artifact does not contain bytecode")?;
+                let bytecode = match bytecode.as_ref() {
+                    BytecodeObject::Bytecode(bytes) => Ok(bytes),
+                    BytecodeObject::Unlinked(_) => Err(eyre!(
+                        "You have to provide correct libraries to use --guess-constructor-args"
+                    )),
+                }?;
+
+                if maybe_creation_code.starts_with(bytecode) {
+                    let constructor_args = &maybe_creation_code[bytecode.len()..];
+                    let constructor_args = hex::encode(constructor_args);
+                    shell::println(format!(
+                        "Identified constructor arguments: {constructor_args}"
+                    ))?;
+                    Ok(constructor_args)
+                } else {
+                    eyre::bail!("Local bytecode doesn't match on-chain bytecode")
+                }
+            }
         }
     }
 }
@@ -503,13 +521,6 @@ async fn ensure_solc_build_metadata(version: Version) -> Result<Version> {
     } else {
         Ok(lookup_compiler_version(&version).await?)
     }
-}
-
-#[derive(Debug)]
-pub struct ZkVersion {
-    zksolc: Version,
-    solc: Option<Version>,
-    is_zksync_solc: bool,
 }
 
 #[cfg(test)]
@@ -640,6 +651,6 @@ mod tests {
         let context = args.resolve_context().await.unwrap();
 
         let mut etherscan = EtherscanVerificationProvider::default();
-        etherscan.preflight_check(args, context).await.unwrap();
+        etherscan.preflight_check(args, CompilerVerificationContext::Solc(context)).await.unwrap();
     });
 }
