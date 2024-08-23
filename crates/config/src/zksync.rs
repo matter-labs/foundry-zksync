@@ -129,7 +129,7 @@ impl ZkSyncConfig {
             },
         };
 
-         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput` 
+        // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
         ZkSolcSettings { settings: zk_settings, cli_settings: CliSettings::default() }
     }
 
