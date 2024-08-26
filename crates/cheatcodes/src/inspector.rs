@@ -1395,32 +1395,35 @@ impl Cheatcodes {
                 persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
-                if let Some(recorded_logs) = &mut self.recorded_logs {
-                    recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
-                        topics: log.data.topics().to_vec(),
-                        data: log.data.data.clone(),
-                        emitter: log.address,
-                    }));
-                }
+                // skip log processing for static calls
+                if !call.is_static {
+                    if let Some(recorded_logs) = &mut self.recorded_logs {
+                        recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
+                            topics: log.data.topics().to_vec(),
+                            data: log.data.data.clone(),
+                            emitter: log.address,
+                        }));
+                    }
 
-                // append console logs from zkEVM to the current executor's LogTracer
-                result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
-                    executor.console_log(
-                        &mut CheatsCtxt {
-                            state: self,
-                            ecx: &mut ecx.inner,
-                            precompiles: &mut ecx.precompiles,
-                            gas_limit: call.gas_limit,
-                            caller: call.caller,
-                        },
-                        decoded_log,
-                    );
-                });
+                    // append console logs from zkEVM to the current executor's LogTracer
+                    result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
+                        executor.console_log(
+                            &mut CheatsCtxt {
+                                state: self,
+                                ecx: &mut ecx.inner,
+                                precompiles: &mut ecx.precompiles,
+                                gas_limit: call.gas_limit,
+                                caller: call.caller,
+                            },
+                            decoded_log,
+                        );
+                    });
 
-                // for each log in cloned logs call handle_expect_emit
-                if !self.expected_emits.is_empty() {
-                    for log in result.logs {
-                        expect::handle_expect_emit(self, &log);
+                    // for each log in cloned logs call handle_expect_emit
+                    if !self.expected_emits.is_empty() {
+                        for log in result.logs {
+                            expect::handle_expect_emit(self, &log);
+                        }
                     }
                 }
 
