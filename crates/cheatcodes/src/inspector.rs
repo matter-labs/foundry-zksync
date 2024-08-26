@@ -1395,6 +1395,20 @@ impl Cheatcodes {
                 persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             };
             if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
+                // append console logs from zkEVM to the current executor's LogTracer
+                result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
+                    executor.console_log(
+                        &mut CheatsCtxt {
+                            state: self,
+                            ecx: &mut ecx.inner,
+                            precompiles: &mut ecx.precompiles,
+                            gas_limit: call.gas_limit,
+                            caller: call.caller,
+                        },
+                        decoded_log,
+                    );
+                });
+
                 // skip log processing for static calls
                 if !call.is_static {
                     if let Some(recorded_logs) = &mut self.recorded_logs {
@@ -1404,20 +1418,6 @@ impl Cheatcodes {
                             emitter: log.address,
                         }));
                     }
-
-                    // append console logs from zkEVM to the current executor's LogTracer
-                    result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
-                        executor.console_log(
-                            &mut CheatsCtxt {
-                                state: self,
-                                ecx: &mut ecx.inner,
-                                precompiles: &mut ecx.precompiles,
-                                gas_limit: call.gas_limit,
-                                caller: call.caller,
-                            },
-                            decoded_log,
-                        );
-                    });
 
                     // for each log in cloned logs call handle_expect_emit
                     if !self.expected_emits.is_empty() {
@@ -1550,6 +1550,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
     }
 
     fn log(&mut self, _interpreter: &mut Interpreter, _context: &mut EvmContext<DB>, log: &Log) {
+        tracing::error!(?log, "log call");
         if !self.expected_emits.is_empty() {
             expect::handle_expect_emit(self, log);
         }
