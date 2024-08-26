@@ -63,6 +63,10 @@ contract Emitter {
     function functionEmit() public {
         emit EventFunction(FUNCTION_MESSAGE);
     }
+
+    function emitConsole(string memory message) public view {
+        console.log(message);
+    }
 }
 
 contract ZkCheatcodesTest is DSTest {
@@ -234,6 +238,27 @@ contract ZkCheatcodesTest is DSTest {
         assertEq(entries[10].topics[0], keccak256("EventFunction(string)"));
         assertEq(entries[10].data, abi.encode("function"));
         // 11: EthToken
+    }
+
+    function testRecordConsoleLogsLikeEVM() public {
+        Emitter emitter = new Emitter();
+        vm.makePersistent(address(emitter));
+
+        // ensure we are in zkvm
+        (bool _success, bytes memory _ret) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
+
+        vm.recordLogs();
+        emitter.emitConsole("zkvm");
+        Vm.Log[] memory zkvmEntries = vm.getRecordedLogs();
+
+        // ensure we are NOT in zkvm
+        (_success, _ret) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", false));
+
+        vm.recordLogs();
+        emitter.emitConsole("evm");
+        Vm.Log[] memory evmEntries = vm.getRecordedLogs();
+
+        assertEq(zkvmEntries.length, evmEntries.length);
     }
 }
 
