@@ -53,12 +53,15 @@ contract Emitter {
     event EventConstructor(string message);
     event EventFunction(string message);
 
+    string public constant CONSTRUCTOR_MESSAGE = "constructor";
+    string public constant FUNCTION_MESSAGE = "function";
+
     constructor() {
-        emit EventConstructor("constructor");
+        emit EventConstructor(CONSTRUCTOR_MESSAGE);
     }
 
     function functionEmit() public {
-        emit EventFunction("function");
+        emit EventFunction(FUNCTION_MESSAGE);
     }
 }
 
@@ -155,6 +158,14 @@ contract ZkCheatcodesTest is DSTest {
         vm.expectEmit(true, true, true, true);
         emit EventConstructor("constructor");
         new Emitter();
+    }
+
+    function testExpectEmitIgnoresStaticCalls() public {
+        Emitter emitter = new Emitter();
+
+        vm.expectEmit(true, true, true, true);
+        emit EventFunction(emitter.FUNCTION_MESSAGE());
+        emitter.functionEmit();
     }
 
     function testZkCheatcodesValueFunctionMockReturn() public {

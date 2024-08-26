@@ -58,7 +58,7 @@ async fn test_zk_cheat_record_works() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheat_expect_emit_works() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
-    let filter = Filter::new("testExpectEmit|testExpectEmitOnCreate", "ZkCheatcodesTest", ".*");
+    let filter = Filter::new("testExpectEmit", "ZkCheatcodesTest", ".*");
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
