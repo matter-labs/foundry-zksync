@@ -1550,7 +1550,6 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
     }
 
     fn log(&mut self, _interpreter: &mut Interpreter, _context: &mut EvmContext<DB>, log: &Log) {
-        tracing::error!(?log, "log call");
         if !self.expected_emits.is_empty() {
             expect::handle_expect_emit(self, log);
         }
