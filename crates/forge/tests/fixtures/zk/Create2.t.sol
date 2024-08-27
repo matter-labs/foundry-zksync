@@ -25,7 +25,7 @@ contract Create2Test is Test {
             Create2Utils.computeCreate2Address(sender, salt, bytes32(bytecodeHash), constructorInputHash);
 
         // deploy via create2
-        address actualAddress = address(new ConstantNumber{salt: salt}());
+        address actualAddress = address(new Greeter{salt: salt}());
 
         assertEq(actualAddress, expectedAddress);
     }
