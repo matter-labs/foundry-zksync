@@ -21,13 +21,13 @@ contract Create2Test is Test {
         bytes32 salt = "12345";
         bytes32 constructorInputHash = keccak256(abi.encode());
 
-        address expectedAddress =
+        address computedAddress =
             Create2Utils.computeCreate2Address(sender, salt, bytes32(bytecodeHash), constructorInputHash);
 
         // deploy via create2
         address actualAddress = address(new Greeter{salt: salt}());
 
-        assertEq(actualAddress, expectedAddress);
+        assertEq(actualAddress, computedAddress);
     }
 
     function testComputeCreate2WithNoArgs() external {

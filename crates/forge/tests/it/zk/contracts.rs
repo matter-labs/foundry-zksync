@@ -77,7 +77,7 @@ async fn test_zk_contract_create2() {
 
     prj.add_test("Create2.t.sol", include_str!("../../fixtures/zk/Create2.t.sol")).unwrap();
 
-    cmd.args(["test", "--zk-startup", "--mc", "Create2Test"]);
+    cmd.args(["test", "--zk-startup", "--evm-version", "shanghai", "--mc", "Create2Test"]);
     assert!(cmd.stdout_lossy().contains("Suite result: ok"));
 }
 
