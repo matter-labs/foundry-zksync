@@ -635,3 +635,33 @@ pub fn run_zk_script_test(
     );
     cmd.forge_fuse();
 }
+
+pub fn deploy_zk_contract(
+    cmd: &mut TestCommand,
+    url: &str,
+    private_key: &str,
+    contract_path: &str,
+) -> Result<String, String> {
+    cmd.forge_fuse().args([
+        "create",
+        "--zk-startup",
+        contract_path,
+        "--rpc-url",
+        url,
+        "--private-key",
+        private_key,
+    ]);
+
+    let (stdout, stderr) = cmd.output_lossy();
+
+    if stdout.contains("Deployed to:") {
+        stdout
+            .split("Deployed to: ")
+            .nth(1)
+            .and_then(|s| s.split_whitespace().next())
+            .map(|address| address.to_string())
+            .ok_or_else(|| "Failed to extract deployed address".to_string())
+    } else {
+        Err(format!("Deployment failed. Stdout: {stdout}\nStderr: {stderr}"))
+    }
+}
