@@ -12,7 +12,7 @@ use foundry_compilers::{
         solc::{SolcCompiler, SolcLanguage, SolcVersionedInput},
         Compiler, CompilerInput,
     },
-    solc::Solc,
+    solc::{CliSettings, Solc},
     zksolc::{
         input::{ZkSolcInput, ZkSolcVersionedInput},
         ZkSolc, ZkSolcCompiler,
@@ -70,7 +70,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
         args: &VerifyArgs,
         context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)> {
-        let metadata = context.project.settings.metadata.as_ref();
+        let metadata = context.project.settings.settings.metadata.as_ref();
         let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
 
         eyre::ensure!(
@@ -190,9 +190,7 @@ Diagnostics: {diags}",
                 ..Default::default()
             },
             solc_version: solc_version.clone(),
-            allow_paths: Default::default(),
-            base_path: Default::default(),
-            include_paths: Default::default(),
+            cli_settings: CliSettings::default(),
         };
 
         let solc_compiler = if compiler_version.is_zksync_solc {
