@@ -3,7 +3,7 @@
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use forge::revm::primitives::SpecId;
 use foundry_config::fs_permissions::PathPermission;
-use foundry_test_utils::Filter;
+use foundry_test_utils::{util, Filter};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_can_call_function() {
@@ -52,12 +52,33 @@ async fn test_zk_contract_deployment_balance_transfer() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_create2() {
-    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
-    zk_config.fs_permissions.add(PathPermission::read_write("./zk/zkout/ConstantNumber.sol"));
-    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
-    let filter = Filter::new("testZkContractsCreate2", "ZkContractsTest", ".*");
+    let (prj, mut cmd) = util::setup_forge(
+        "test_zk_contract_create2_with_deps",
+        foundry_test_utils::foundry_compilers::PathStyle::Dapptools,
+    );
+    util::initialize(prj.root());
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    cmd.args(["install", "matter-labs/era-contracts", "--no-commit", "--shallow"])
+        .ensure_execute_success()
+        .expect("able to install dependencies");
+    cmd.forge_fuse();
+
+    let mut config = cmd.config();
+    config.fs_permissions.add(PathPermission::read("./zkout"));
+    prj.write_config(config);
+
+    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
+
+    prj.add_source("CustomNumber.sol", include_str!("../../../../../testdata/zk/CustomNumber.sol"))
+        .unwrap();
+
+    prj.add_source("Create2Utils.sol", include_str!("../../../../../testdata/zk/Create2Utils.sol"))
+        .unwrap();
+
+    prj.add_test("Create2.t.sol", include_str!("../../fixtures/zk/Create2.t.sol")).unwrap();
+
+    cmd.args(["test", "--zk-startup", "--evm-version", "shanghai", "--mc", "Create2Test"]);
+    assert!(cmd.stdout_lossy().contains("Suite result: ok"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
