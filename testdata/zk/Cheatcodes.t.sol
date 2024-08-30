@@ -53,12 +53,19 @@ contract Emitter {
     event EventConstructor(string message);
     event EventFunction(string message);
 
+    string public constant CONSTRUCTOR_MESSAGE = "constructor";
+    string public constant FUNCTION_MESSAGE = "function";
+
     constructor() {
-        emit EventConstructor("constructor");
+        emit EventConstructor(CONSTRUCTOR_MESSAGE);
     }
 
     function functionEmit() public {
-        emit EventFunction("function");
+        emit EventFunction(FUNCTION_MESSAGE);
+    }
+
+    function emitConsole(string memory message) public view {
+        console.log(message);
     }
 }
 
@@ -157,6 +164,14 @@ contract ZkCheatcodesTest is DSTest {
         new Emitter();
     }
 
+    function testExpectEmitIgnoresStaticCalls() public {
+        Emitter emitter = new Emitter();
+
+        vm.expectEmit(true, true, true, true);
+        emit EventFunction(emitter.FUNCTION_MESSAGE());
+        emitter.functionEmit();
+    }
+
     function testZkCheatcodesValueFunctionMockReturn() public {
         InnerMock inner = new InnerMock();
         // Send some funds to so it can pay for the inner call
@@ -223,6 +238,27 @@ contract ZkCheatcodesTest is DSTest {
         assertEq(entries[10].topics[0], keccak256("EventFunction(string)"));
         assertEq(entries[10].data, abi.encode("function"));
         // 11: EthToken
+    }
+
+    function testRecordConsoleLogsLikeEVM() public {
+        Emitter emitter = new Emitter();
+        vm.makePersistent(address(emitter));
+
+        // ensure we are in zkvm
+        (bool _success, bytes memory _ret) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
+
+        vm.recordLogs();
+        emitter.emitConsole("zkvm");
+        Vm.Log[] memory zkvmEntries = vm.getRecordedLogs();
+
+        // ensure we are NOT in zkvm
+        (_success, _ret) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", false));
+
+        vm.recordLogs();
+        emitter.emitConsole("evm");
+        Vm.Log[] memory evmEntries = vm.getRecordedLogs();
+
+        assertEq(zkvmEntries.length, evmEntries.length);
     }
 }
 
