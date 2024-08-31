@@ -316,7 +316,7 @@ fn assert_execution_trace(
                 let trace = &actual[*idx];
                 println!(
                     "{}{:?} {:?} {:?} {:?}",
-                    "  ".repeat(depth).collect::<String>(),
+                    "  ".repeat(depth),
                     trace.kind,
                     trace.address,
                     trace.data,
