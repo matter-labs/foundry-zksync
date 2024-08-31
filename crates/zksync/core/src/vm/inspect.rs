@@ -188,7 +188,7 @@ where
     let storage_ptr =
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
-    let (tx_result, bytecodes, modified_storage, call_traces) =
+    let InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces } =
         inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
 
     if let Some(record) = &mut era_db.accesses {
@@ -345,13 +345,20 @@ where
     Ok(execution_result)
 }
 
+struct InnerZkVmResult {
+    tx_result: VmExecutionResultAndLogs,
+    bytecodes: HashMap<U256, Vec<U256>>,
+    modified_storage: HashMap<StorageKey, H256>,
+    call_traces: Vec<Call>,
+}
+
 fn inspect_inner<S: ReadStorage>(
     l2_tx: L2Tx,
     storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
-) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>, Vec<Call>) {
+) -> InnerZkVmResult {
     let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MAX_L1_GAS_PRICE);
     let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price, fair_l2_gas_price);
@@ -445,7 +452,8 @@ fn inspect_inner<S: ReadStorage>(
     } else {
         storage.borrow().modified_storage_keys().clone()
     };
-    (tx_result, bytecodes, modified_keys, call_traces)
+
+    InnerZkVmResult { tx_result, bytecodes, modified_keys, call_traces }
 }
 
 /// Parse solidity's `console.log` events
