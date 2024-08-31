@@ -4,8 +4,9 @@ use foundry_compilers::{
         EvmVersion, Libraries,
     },
     solc::CliSettings,
-    zksolc::settings::{
-        BytecodeHash, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings,
+    zksolc::{
+        settings::{BytecodeHash, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings},
+        ZkSettings,
     },
 };
 
@@ -108,7 +109,7 @@ impl ZkSyncConfig {
             jump_table_density_threshold: None,
         };
 
-        ZkSolcSettings {
+        let zk_settings = ZkSettings {
             libraries,
             optimizer,
             evm_version: Some(evm_version),
@@ -126,8 +127,10 @@ impl ZkSyncConfig {
                     per_contract: Some([OutputSelectionFlag::ABI].into()),
                 }),
             },
-            cli_settings: CliSettings::default(),
-        }
+        };
+
+        // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
+        ZkSolcSettings { settings: zk_settings, cli_settings: CliSettings::default() }
     }
 
     pub fn avoid_contracts(&self) -> Option<Vec<globset::GlobMatcher>> {

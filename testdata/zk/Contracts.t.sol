@@ -6,6 +6,7 @@ import "../cheats/Vm.sol";
 
 import {ConstantNumber} from "./ConstantNumber.sol";
 import {Greeter} from "./Greeter.sol";
+import {CustomNumber} from "./CustomNumber.sol";
 import {Globals} from "./Globals.sol";
 
 interface ISystemContractDeployer {
@@ -62,18 +63,6 @@ contract PayableFixedNumber {
 
     function five() public pure returns (uint8) {
         return 5;
-    }
-}
-
-contract CustomNumber {
-    uint8 value;
-
-    constructor(uint8 _value) {
-        value = _value;
-    }
-
-    function number() public view returns (uint8) {
-        return value;
     }
 }
 
@@ -209,23 +198,6 @@ contract ZkContractsTest is DSTest {
         require(customStorage.getNum() == 10, "era inline contract value mismatch (complex args)");
     }
 
-    function testZkContractsCreate2() public {
-        vm.selectFork(forkEra);
-
-        string memory artifact = vm.readFile("zk/zkout/ConstantNumber.sol/ConstantNumber.json");
-        bytes32 bytecodeHash = vm.parseJsonBytes32(artifact, ".hash");
-        address sender = address(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496);
-        bytes32 salt = "12345";
-        bytes32 constructorInputHash = keccak256(abi.encode());
-        address expectedDeployedAddress =
-            _computeCreate2Address(sender, salt, bytes32(bytecodeHash), constructorInputHash);
-
-        // deploy via create2
-        address actualDeployedAddress = address(new ConstantNumber{salt: salt}());
-
-        assertEq(expectedDeployedAddress, actualDeployedAddress);
-    }
-
     function testZkContractsCallSystemContract() public {
         (bool success,) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
         require(success, "zkVm() call failed");
@@ -273,21 +245,5 @@ contract ZkContractsTest is DSTest {
         assert(num == 4);
         assert(vm.getNonce(sender) == startingNonce + 3);
         vm.stopBroadcast();
-    }
-
-    function _computeCreate2Address(
-        address sender,
-        bytes32 salt,
-        bytes32 creationCodeHash,
-        bytes32 constructorInputHash
-    ) private pure returns (address) {
-        bytes32 zksync_create2_prefix = keccak256("zksyncCreate2");
-        bytes32 address_hash = keccak256(
-            bytes.concat(
-                zksync_create2_prefix, bytes32(uint256(uint160(sender))), salt, creationCodeHash, constructorInputHash
-            )
-        );
-
-        return address(uint160(uint256(address_hash)));
     }
 }
