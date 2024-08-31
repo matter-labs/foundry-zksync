@@ -447,13 +447,13 @@ fn inspect_inner<S: ReadStorage>(
                 .expect("failed converting bytecode to factory dep")
         })
         .collect();
-    let modified_keys = if is_static {
+    let modified_storage = if is_static {
         Default::default()
     } else {
         storage.borrow().modified_storage_keys().clone()
     };
 
-    InnerZkVmResult { tx_result, bytecodes, modified_keys, call_traces }
+    InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces }
 }
 
 /// Parse solidity's `console.log` events
