@@ -86,7 +86,6 @@ async fn test_zk_traces_work_during_call() {
                                     ..Default::default()
                                 },
                             ],
-                            ..Default::default()
                         },
                         TraceAssertion {
                             kind: Some(CallKind::Call),
@@ -110,10 +109,8 @@ async fn test_zk_traces_work_during_call() {
                                     ..Default::default()
                                 },
                             ],
-                            ..Default::default()
                         },
                     ],
-                    ..Default::default()
                 },
                 TraceAssertion {
                     kind: Some(CallKind::StaticCall),
@@ -174,7 +171,6 @@ async fn test_zk_traces_work_during_create() {
                                 ..Default::default()
                             },
                         ],
-                        ..Default::default()
                     },
                     TraceAssertion {
                         kind: Some(CallKind::Call),
@@ -196,7 +192,6 @@ async fn test_zk_traces_work_during_create() {
                                 ..Default::default()
                             },
                         ],
-                        ..Default::default()
                     },
                     TraceAssertion {
                         kind: Some(CallKind::Call),
@@ -223,10 +218,7 @@ struct TraceAssertion {
 }
 
 /// Assert that the execution trace matches the actual trace.
-fn assert_execution_trace(
-    expected: Vec<TraceAssertion>,
-    traces: &Vec<(TraceKind, CallTraceArena)>,
-) {
+fn assert_execution_trace(expected: Vec<TraceAssertion>, traces: &[(TraceKind, CallTraceArena)]) {
     #[allow(dead_code)]
     #[derive(Debug)]
     struct AssertionFailure {
@@ -240,7 +232,7 @@ fn assert_execution_trace(
         expected: &[TraceAssertion],
         actual: &[DecodedTrace],
     ) -> Option<AssertionFailure> {
-        for (idx, expected_node) in expected.into_iter().enumerate() {
+        for (idx, expected_node) in expected.iter().enumerate() {
             let actual_node = match actual.get(idx) {
                 Some(actual) => actual,
                 None => {
@@ -256,7 +248,7 @@ fn assert_execution_trace(
                 if kind != actual_node.kind {
                     return Some(AssertionFailure {
                         field: "kind".to_string(),
-                        expected: format!("{:?}", kind),
+                        expected: format!("{kind:?}"),
                         actual: format!("{:?}", actual_node.kind),
                         path: vec![idx],
                     });
@@ -266,7 +258,7 @@ fn assert_execution_trace(
                 if address != actual_node.address {
                     return Some(AssertionFailure {
                         field: "address".to_string(),
-                        expected: format!("{:?}", address),
+                        expected: format!("{address:?}"),
                         actual: format!("{:?}", actual_node.address),
                         path: vec![idx],
                     });
@@ -276,7 +268,7 @@ fn assert_execution_trace(
                 if data != &actual_node.data {
                     return Some(AssertionFailure {
                         field: "data".to_string(),
-                        expected: format!("{:?}", data),
+                        expected: format!("{data:?}"),
                         actual: format!("{:?}", actual_node.data),
                         path: vec![idx],
                     });
@@ -286,49 +278,45 @@ fn assert_execution_trace(
                 if output != &actual_node.output {
                     return Some(AssertionFailure {
                         field: "output".to_string(),
-                        expected: format!("{:?}", output),
+                        expected: format!("{output:?}"),
                         actual: format!("{:?}", actual_node.output),
                         path: vec![idx],
                     });
                 }
             }
 
-            match assert_recursive(&expected_node.children, &actual_node.children) {
-                Some(mut failure) => {
-                    failure.path.insert(0, idx);
-                    return Some(failure)
-                }
-                None => (),
+            if let Some(mut failure) =
+                assert_recursive(&expected_node.children, &actual_node.children)
+            {
+                failure.path.insert(0, idx);
+                return Some(failure)
             }
         }
-        return None
+        None
     }
 
     let actual = decode_first_execution_trace(traces);
-    match assert_recursive(&expected, &actual) {
-        Some(failure) => {
-            println!("---");
-            println!("{failure:#?}");
-            println!("---");
-            println!("Trace:");
-            let mut actual = &actual;
-            for (depth, idx) in failure.path.iter().enumerate() {
-                let trace = &actual[*idx];
-                println!(
-                    "{}{:?} {:?} {:?} {:?}",
-                    "  ".repeat(depth),
-                    trace.kind,
-                    trace.address,
-                    trace.data,
-                    trace.output
-                );
+    if let Some(failure) = assert_recursive(&expected, &actual) {
+        println!("---");
+        println!("{failure:#?}");
+        println!("---");
+        println!("Trace:");
+        let mut actual = &actual;
+        for (depth, idx) in failure.path.iter().enumerate() {
+            let trace = &actual[*idx];
+            println!(
+                "{}{:?} {:?} {:?} {:?}",
+                "  ".repeat(depth),
+                trace.kind,
+                trace.address,
+                trace.data,
+                trace.output
+            );
 
-                actual = &trace.children;
-            }
-            println!("---\n");
-            panic!("trace assertion failure");
+            actual = &trace.children;
         }
-        None => (),
+        println!("---\n");
+        panic!("trace assertion failure");
     }
 }
 
