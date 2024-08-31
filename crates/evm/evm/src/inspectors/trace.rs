@@ -15,6 +15,7 @@ use revm::{
     Database, EvmContext, Inspector,
 };
 
+/// A Wrapper around [TracingInspector] to allow adding zkEVM traces.
 #[derive(Clone, Debug, Default)]
 pub struct TraceCollector {
     inner: TracingInspector,
@@ -64,22 +65,10 @@ impl TraceCollector {
         self.inner.traces()
     }
 
-    // #[doc(hidden)]
-    // #[deprecated = "use `traces` instead"]
-    // pub const fn get_traces(&self) -> &CallTraceArena {
-    //     self.inner.get_traces()
-    // }
-
     /// Gets a mutable reference to the recorded call traces.
     pub fn traces_mut(&mut self) -> &mut CallTraceArena {
         self.inner.traces_mut()
     }
-
-    // #[doc(hidden)]
-    // #[deprecated = "use `traces_mut` instead"]
-    // pub fn get_traces_mut(&mut self) -> &mut CallTraceArena {
-    //     &mut self.inner.get_traces_mut()
-    // }
 
     /// Consumes the inspector and returns the recorded call traces.
     pub fn into_traces(self) -> CallTraceArena {
