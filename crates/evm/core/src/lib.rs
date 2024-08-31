@@ -6,6 +6,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use auto_impl::auto_impl;
+use foundry_zksync_core::Call;
 use revm::{inspectors::NoOpInspector, interpreter::CreateInputs, Database, EvmContext, Inspector};
 use revm_inspectors::access_list::AccessListInspector;
 
@@ -47,6 +48,9 @@ pub trait InspectorExt<DB: Database>: Inspector<DB> {
 
     // Simulates `console.log` invocation.
     fn console_log(&mut self, _input: String) {}
+
+    // Appends provided zksync traces.
+    fn trace(&mut self, _context: &mut EvmContext<DB>, _call_traces: Vec<Call>) {}
 }
 
 impl<DB: Database> InspectorExt<DB> for NoOpInspector {}

@@ -15,3 +15,6 @@ pub use logs::LogCollector;
 
 mod stack;
 pub use stack::{InspectorData, InspectorStack, InspectorStackBuilder};
+
+mod trace;
+pub use trace::TraceCollector;

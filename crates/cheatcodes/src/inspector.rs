@@ -34,7 +34,7 @@ use foundry_evm_core::{
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, ZkTransactionMetadata,
+    get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
 };
 use itertools::Itertools;
 use revm::{
@@ -157,6 +157,15 @@ pub trait CheatcodesExecutor {
 
     fn console_log<DB: DatabaseExt>(&mut self, ccx: &mut CheatsCtxt<DB>, message: String) {
         self.get_inspector::<DB>(ccx.state).console_log(message);
+    }
+
+    fn trace<DB: DatabaseExt>(
+        &mut self,
+        ccx_state: &mut Cheatcodes,
+        ecx: &mut EvmContext<DB>,
+        call_traces: Vec<Call>,
+    ) {
+        self.get_inspector::<DB>(ccx_state).trace(ecx, call_traces);
     }
 }
 
@@ -729,6 +738,7 @@ impl Cheatcodes {
         &mut self,
         ecx: &mut EvmContext<DB>,
         mut input: Input,
+        executor: &mut impl CheatcodesExecutor,
     ) -> Option<CreateOutcome>
     where
         DB: DatabaseExt,
@@ -926,7 +936,6 @@ impl Cheatcodes {
                 }
 
                 // append console logs from zkEVM to the current executor's LogTracer
-                let executor = &mut TransparentCheatcodesExecutor;
                 result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
                     executor.console_log(
                         &mut CheatsCtxt {
@@ -939,6 +948,9 @@ impl Cheatcodes {
                         decoded_log,
                     );
                 });
+
+                // append traces
+                executor.trace(self, ecx, result.call_traces);
 
                 // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
@@ -1100,6 +1112,15 @@ impl Cheatcodes {
             }
         }
         outcome
+    }
+
+    pub fn create_with_executor<DB: DatabaseExt>(
+        &mut self,
+        ecx: &mut EvmContext<DB>,
+        call: &mut CreateInputs,
+        executor: &mut impl CheatcodesExecutor,
+    ) -> Option<CreateOutcome> {
+        self.create_common(ecx, call, executor)
     }
 
     pub fn call_with_executor<DB: DatabaseExt>(
@@ -1417,6 +1438,9 @@ impl Cheatcodes {
                     );
                 });
 
+                // append traces
+                executor.trace(self, ecx, result.call_traces);
+
                 // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
                     for log in result.logs {
@@ -1425,12 +1449,12 @@ impl Cheatcodes {
                 }
 
                 return match result.execution_result {
-                    ExecutionResult::Success { output, .. } => match output {
+                    ExecutionResult::Success { output, gas_used, .. } => match output {
                         Output::Call(bytes) => Some(CallOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Return,
                                 output: bytes,
-                                gas,
+                                gas: Gas::new_spent(gas_used),
                             },
                             memory_offset: call.return_memory_offset.clone(),
                         }),
@@ -1438,16 +1462,16 @@ impl Cheatcodes {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
                                 output: Bytes::new(),
-                                gas,
+                                gas: Gas::new_spent(gas_used),
                             },
                             memory_offset: call.return_memory_offset.clone(),
                         }),
                     },
-                    ExecutionResult::Revert { output, .. } => Some(CallOutcome {
+                    ExecutionResult::Revert { output, gas_used, .. } => Some(CallOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,
                             output,
-                            gas,
+                            gas: Gas::new_spent(gas_used),
                         },
                         memory_offset: call.return_memory_offset.clone(),
                     }),
@@ -1853,7 +1877,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         ecx: &mut EvmContext<DB>,
         call: &mut CreateInputs,
     ) -> Option<CreateOutcome> {
-        self.create_common(ecx, call)
+        self.create_common(ecx, call, &mut TransparentCheatcodesExecutor)
     }
 
     fn create_end(
@@ -1870,7 +1894,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         ecx: &mut EvmContext<DB>,
         call: &mut EOFCreateInputs,
     ) -> Option<CreateOutcome> {
-        self.create_common(ecx, call)
+        self.create_common(ecx, call, &mut TransparentCheatcodesExecutor)
     }
 
     fn eofcreate_end(
