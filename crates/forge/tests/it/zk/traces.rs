@@ -316,7 +316,7 @@ fn assert_execution_trace(
                 let trace = &actual[*idx];
                 println!(
                     "{}{:?} {:?} {:?} {:?}",
-                    std::iter::repeat("  ").take(depth).collect::<String>(),
+                    "  ".repeat(depth).collect::<String>(),
                     trace.kind,
                     trace.address,
                     trace.data,
@@ -362,7 +362,7 @@ fn decode_first_execution_trace(traces: &[(TraceKind, CallTraceArena)]) -> Vec<D
     }
 
     traces
-        .into_iter()
+        .iter()
         .find(|(kind, _)| matches!(kind, TraceKind::Execution))
         .map(|(_, trace)| {
             let mut decoded_nodes = vec![];

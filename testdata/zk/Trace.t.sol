@@ -36,7 +36,6 @@ contract ConstructorAdder {
     }
 }
 
-
 contract ZkTraceTest is DSTest {
     // The test must be run with parameter `-vvv` to print traces
     function testZkTraceOutputDuringCall() public {
