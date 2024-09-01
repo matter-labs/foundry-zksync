@@ -1452,7 +1452,7 @@ impl Cheatcodes {
                 }
 
                 return match result.execution_result {
-                    ExecutionResult::Success { output, gas_used: _gas_used, .. } => match output {
+                    ExecutionResult::Success { output, gas_used, .. } => match output {
                         Output::Call(bytes) => Some(CallOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Return,
@@ -1470,7 +1470,7 @@ impl Cheatcodes {
                             memory_offset: call.return_memory_offset.clone(),
                         }),
                     },
-                    ExecutionResult::Revert { output, gas_used: _gas_used, .. } => Some(CallOutcome {
+                    ExecutionResult::Revert { output, gas_used, .. } => Some(CallOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,
                             output,
