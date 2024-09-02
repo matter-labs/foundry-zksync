@@ -1452,12 +1452,12 @@ impl Cheatcodes {
                 }
 
                 return match result.execution_result {
-                    ExecutionResult::Success { output, gas_used, .. } => match output {
+                    ExecutionResult::Success { output, .. } => match output {
                         Output::Call(bytes) => Some(CallOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Return,
                                 output: bytes,
-                                gas: Gas::new_spent(gas_used),
+                                gas,
                             },
                             memory_offset: call.return_memory_offset.clone(),
                         }),
@@ -1465,16 +1465,16 @@ impl Cheatcodes {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
                                 output: Bytes::new(),
-                                gas: Gas::new_spent(gas_used),
+                                gas,
                             },
                             memory_offset: call.return_memory_offset.clone(),
                         }),
                     },
-                    ExecutionResult::Revert { output, gas_used, .. } => Some(CallOutcome {
+                    ExecutionResult::Revert { output, .. } => Some(CallOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,
                             output,
-                            gas: Gas::new_spent(gas_used),
+                            gas,
                         },
                         memory_offset: call.return_memory_offset.clone(),
                     }),
