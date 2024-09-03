@@ -655,11 +655,11 @@ pub fn deploy_zk_contract(
     let (stdout, stderr) = cmd.output_lossy();
 
     if stdout.contains("Deployed to:") {
-        stdout
-            .split("Deployed to: ")
-            .nth(1)
-            .and_then(|s| s.split_whitespace().next())
-            .map(|address| address.to_string())
+        let regex = regex::Regex::new(r"Deployed to:\s*(\S+)").unwrap();
+        regex
+            .captures(&stdout)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().to_string())
             .ok_or_else(|| "Failed to extract deployed address".to_string())
     } else {
         Err(format!("Deployment failed. Stdout: {stdout}\nStderr: {stderr}"))
