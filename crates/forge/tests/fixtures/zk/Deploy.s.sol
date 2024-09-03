@@ -5,15 +5,13 @@ import {Script} from "forge-std/Script.sol";
 import {Greeter} from "../src/Greeter.sol";
 
 contract DeployScript is Script {
-    // Vm constant vm = Vm(HEVM_ADDRESS);
+    Vm constant vm = Vm(HEVM_ADDRESS);
 
     Greeter greeter;
     string greeting;
 
     function run() external {
-        // test is using old Vm.sol interface, so we call manually
-        (bool success,) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
-        require(success, "zkVm() call failed");
+        vm.zkVm(true);
         vm.startBroadcast();
 
         greeter = new Greeter();
