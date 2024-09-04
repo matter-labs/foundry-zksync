@@ -11,10 +11,22 @@ contract Printer {
     }
 }
 
+contract ConstructorPrinter {
+    constructor() {
+        Printer printer = new Printer();
+        printer.print();
+        console.log("outer print");
+        console.logAddress(address(this));
+        printer.print();
+        console.logBytes1(0xff);
+        printer.print();
+    }
+}
+
 contract ZkConsoleTest is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
 
-    function testZkConsoleOutput() public {
+    function testZkConsoleOutputDuringCall() public {
         vm.zkVm(true);
 
         Printer printer = new Printer();
@@ -24,5 +36,11 @@ contract ZkConsoleTest is DSTest {
         printer.print();
         console.logBytes1(0xff);
         printer.print();
+    }
+
+    function testZkConsoleOutputDuringCreate() public {
+        vm.zkVm(true);
+
+        new ConstructorPrinter();
     }
 }
