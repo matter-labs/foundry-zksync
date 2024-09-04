@@ -13,3 +13,4 @@ mod nft;
 mod ownership;
 mod proxy;
 mod repros;
+mod traces;
