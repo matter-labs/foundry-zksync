@@ -3,6 +3,7 @@ mod basic;
 mod cheats;
 mod contracts;
 mod create;
+mod deploy;
 mod factory;
 mod factory_deps;
 mod fork;
