@@ -165,7 +165,7 @@ pub trait CheatcodesExecutor {
         ecx: &mut EvmContext<DB>,
         call_traces: Vec<Call>,
     ) {
-        self.get_inspector::<DB>(ccx_state).trace(ecx, call_traces);
+        self.get_inspector::<DB>(ccx_state).trace_zksync(ecx, call_traces);
     }
 }
 

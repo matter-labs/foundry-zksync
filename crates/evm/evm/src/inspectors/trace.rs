@@ -181,7 +181,7 @@ where
 }
 
 impl<DB: Database> InspectorExt<DB> for TraceCollector {
-    fn trace(&mut self, context: &mut EvmContext<DB>, call_traces: Vec<Call>) {
+    fn trace_zksync(&mut self, context: &mut EvmContext<DB>, call_traces: Vec<Call>) {
         fn trace_call_recursive<DB: Database>(
             tracer: &mut TracingInspector,
             context: &mut EvmContext<DB>,

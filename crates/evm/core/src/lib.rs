@@ -50,7 +50,7 @@ pub trait InspectorExt<DB: Database>: Inspector<DB> {
     fn console_log(&mut self, _input: String) {}
 
     // Appends provided zksync traces.
-    fn trace(&mut self, _context: &mut EvmContext<DB>, _call_traces: Vec<Call>) {}
+    fn trace_zksync(&mut self, _context: &mut EvmContext<DB>, _call_traces: Vec<Call>) {}
 }
 
 impl<DB: Database> InspectorExt<DB> for NoOpInspector {}
