@@ -14,6 +14,8 @@ ignore = [
     # https://github.com/launchbadge/sqlx/issues/3440
     # Should remove once we can update sqlx which is used by some zksync dependencies
     "RUSTSEC-2024-0363",
+    # Used by alloy
+    "RUSTSEC-2024-0370",
 ]
 
 # This section is considered when running `cargo deny check bans`.
