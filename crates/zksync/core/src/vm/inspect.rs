@@ -59,6 +59,8 @@ pub struct ZKVMExecutionResult {
     pub logs: Vec<rLog>,
     /// The result of a given execution
     pub execution_result: rExecutionResult,
+    /// Call traces
+    pub call_traces: Vec<Call>,
 }
 
 /// Revm-style result with ZKVM Execution
@@ -99,15 +101,23 @@ where
 
         match (&mut aggregated_result, result.execution_result) {
             (_, exec @ rExecutionResult::Revert { .. } | exec @ rExecutionResult::Halt { .. }) => {
-                return Ok(ZKVMExecutionResult { logs: result.logs, execution_result: exec });
+                return Ok(ZKVMExecutionResult {
+                    logs: result.logs,
+                    call_traces: result.call_traces,
+                    execution_result: exec,
+                });
             }
             (None, exec) => {
-                aggregated_result
-                    .replace(ZKVMExecutionResult { logs: result.logs, execution_result: exec });
+                aggregated_result.replace(ZKVMExecutionResult {
+                    logs: result.logs,
+                    call_traces: result.call_traces,
+                    execution_result: exec,
+                });
             }
             (
                 Some(ZKVMExecutionResult {
                     logs: aggregated_logs,
+                    call_traces: aggregated_call_traces,
                     execution_result:
                         rExecutionResult::Success {
                             reason: agg_reason,
@@ -120,6 +130,7 @@ where
                 rExecutionResult::Success { reason, gas_used, gas_refunded, logs, output },
             ) => {
                 aggregated_logs.append(&mut result.logs);
+                aggregated_call_traces.append(&mut result.call_traces);
                 *agg_reason = reason;
                 *agg_gas_used += gas_used;
                 *agg_gas_refunded += gas_refunded;
@@ -177,7 +188,7 @@ where
     let storage_ptr =
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
-    let (tx_result, bytecodes, modified_storage) =
+    let InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces } =
         inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
 
     if let Some(record) = &mut era_db.accesses {
@@ -222,6 +233,7 @@ where
 
             ZKVMExecutionResult {
                 logs: logs.clone(),
+                call_traces,
                 execution_result: rExecutionResult::Success {
                     reason: SuccessReason::Return,
                     gas_used: tx_result.statistics.gas_used,
@@ -240,6 +252,7 @@ where
 
             ZKVMExecutionResult {
                 logs,
+                call_traces,
                 execution_result: rExecutionResult::Revert {
                     gas_used: env_tx_gas_limit - tx_result.refunds.gas_refunded,
                     output: Bytes::from(output),
@@ -255,6 +268,7 @@ where
 
             ZKVMExecutionResult {
                 logs,
+                call_traces,
                 execution_result: rExecutionResult::Halt {
                     reason: mapped_reason,
                     gas_used: env_tx_gas_limit - tx_result.refunds.gas_refunded,
@@ -331,13 +345,20 @@ where
     Ok(execution_result)
 }
 
+struct InnerZkVmResult {
+    tx_result: VmExecutionResultAndLogs,
+    bytecodes: HashMap<U256, Vec<U256>>,
+    modified_storage: HashMap<StorageKey, H256>,
+    call_traces: Vec<Call>,
+}
+
 fn inspect_inner<S: ReadStorage>(
     l2_tx: L2Tx,
     storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
-) -> (VmExecutionResultAndLogs, HashMap<U256, Vec<U256>>, HashMap<StorageKey, H256>) {
+) -> InnerZkVmResult {
     let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MAX_L1_GAS_PRICE);
     let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price, fair_l2_gas_price);
@@ -426,12 +447,13 @@ fn inspect_inner<S: ReadStorage>(
                 .expect("failed converting bytecode to factory dep")
         })
         .collect();
-    let modified_keys = if is_static {
+    let modified_storage = if is_static {
         Default::default()
     } else {
         storage.borrow().modified_storage_keys().clone()
     };
-    (tx_result, bytecodes, modified_keys)
+
+    InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces }
 }
 
 /// Parse solidity's `console.log` events

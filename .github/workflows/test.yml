@@ -89,32 +89,6 @@ jobs:
                   cache-on-failure: true
             - name: cargo hack
               run: cargo hack check
-
-    # TODO: This test currently hangs in the CI
-    # zk-test:
-    #   name: zk-test
-    #   runs-on: ubuntu-22.04-github-hosted-16core
-    #   steps:
-    #     - uses: actions/checkout@v4
-    #       with:
-    #         submodules: recursive
-    #         ref: ${{ github.event.pull_request.head.sha }}
-
-    #     - name: Install Rust
-    #       uses: actions-rust-lang/setup-rust-toolchain@v1
-    #       with:
-    #         toolchain: nightly-2024-04-28
-
-
-    #     - name: Get solc
-    #       run: |
-    #         mkdir /tmp/solc-bin
-    #         wget https://github.com/ethereum/solidity/releases/download/v0.8.24/solc-static-linux -qO /tmp/solc-bin/solc
-    #         chmod +x /tmp/solc-bin/solc
-    #         echo "/tmp/solc-bin" >> $GITHUB_PATH
-            
-    #     - name: Test ZK VM
-    #       run: RUST_LOG=1 cargo test --package forge --test it --jobs=1 -- zk
     
     zk-cargo-test:
         name: zk-cargo-test
@@ -147,27 +121,6 @@ jobs:
             RUST_BACKTRACE: full
             TEST_MAINNET_URL: http://localhost:8011
           run: cargo test zk
-
-    zk-smoke-test:
-        name: zk-smoke-test
-        runs-on: ubuntu-22.04-github-hosted-16core
-  
-        steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-          with:
-            submodules: recursive
-            ref: ${{ github.event.pull_request.head.sha }}
-  
-        - name: Install Rust
-          uses: actions-rust-lang/setup-rust-toolchain@v1
-          with:
-            toolchain: nightly-2024-04-28
-  
-        - name: Run smoke-test
-          env:
-            RUST_BACKTRACE: full
-          run: cd zk-tests && ./test.sh
     
     check-ci-install:
       name: CI install

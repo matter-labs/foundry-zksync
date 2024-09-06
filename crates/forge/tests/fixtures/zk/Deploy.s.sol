@@ -12,9 +12,7 @@ contract DeployScript is Script {
 
     function run() external {
         // test is using old Vm.sol interface, so we call manually
-        (bool success, ) = address(vm).call(
-            abi.encodeWithSignature("zkVm(bool)", true)
-        );
+        (bool success,) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
         require(success, "zkVm() call failed");
         vm.startBroadcast();
 

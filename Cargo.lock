@@ -5038,7 +5038,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#7719a78a44fa451a84228b68ce0118e08919ed34"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#c10dd5e016f037749de028b8a1efb403aa6d1db7"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5078,7 +5078,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#7719a78a44fa451a84228b68ce0118e08919ed34"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#c10dd5e016f037749de028b8a1efb403aa6d1db7"
 dependencies = [
  "foundry-compilers-artifacts-solc",
  "foundry-compilers-artifacts-vyper",
@@ -5088,7 +5088,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-solc"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#7719a78a44fa451a84228b68ce0118e08919ed34"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#c10dd5e016f037749de028b8a1efb403aa6d1db7"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5111,7 +5111,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-vyper"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#7719a78a44fa451a84228b68ce0118e08919ed34"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#c10dd5e016f037749de028b8a1efb403aa6d1db7"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5125,7 +5125,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-zksolc"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#7719a78a44fa451a84228b68ce0118e08919ed34"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#c10dd5e016f037749de028b8a1efb403aa6d1db7"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5146,7 +5146,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-core"
 version = "0.10.0"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#7719a78a44fa451a84228b68ce0118e08919ed34"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.10.0#c10dd5e016f037749de028b8a1efb403aa6d1db7"
 dependencies = [
  "alloy-primitives",
  "cfg-if 1.0.0",
@@ -5970,9 +5970,9 @@ dependencies = [
 
 [[package]]
 name = "gix-path"
-version = "0.10.9"
+version = "0.10.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d23d5bbda31344d8abc8de7c075b3cf26e5873feba7c4a15d916bce67382bd9"
+checksum = "38d5b8722112fa2fa87135298780bc833b0e9f6c56cc82795d209804b3a03484"
 dependencies = [
  "bstr 1.9.1",
  "gix-trace",
@@ -7317,7 +7317,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]

@@ -1,6 +1,5 @@
 use super::{
-    Cheatcodes, CheatsConfig, ChiselState, CoverageCollector, Fuzzer, LogCollector,
-    TracingInspector,
+    Cheatcodes, CheatsConfig, ChiselState, CoverageCollector, Fuzzer, LogCollector, TraceCollector,
 };
 use alloy_primitives::{Address, Bytes, Log, TxKind, U256};
 use foundry_cheatcodes::CheatcodesExecutor;
@@ -10,6 +9,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{CallTraceArena, TraceMode};
+use foundry_zksync_core::Call;
 use revm::{
     inspectors::CustomPrintTracer,
     interpreter::{
@@ -282,7 +282,7 @@ pub struct InspectorStackInner {
     pub fuzzer: Option<Fuzzer>,
     pub log_collector: Option<LogCollector>,
     pub printer: Option<CustomPrintTracer>,
-    pub tracer: Option<TracingInspector>,
+    pub tracer: Option<TraceCollector>,
     pub enable_isolation: bool,
 
     /// Flag marking if we are in the inner EVM context.
@@ -751,11 +751,22 @@ impl<'a, DB: DatabaseExt> Inspector<DB> for InspectorStackRefMut<'a> {
 
         call_inspectors_adjust_depth!(
             #[ret]
-            [&mut self.tracer, &mut self.coverage, &mut self.cheatcodes],
+            [&mut self.tracer, &mut self.coverage],
             |inspector| inspector.create(ecx, create).map(Some),
             self,
             ecx
         );
+
+        ecx.journaled_state.depth += self.in_inner_context as usize;
+        if let Some(cheatcodes) = self.cheatcodes.as_deref_mut() {
+            if let Some(output) = cheatcodes.create_with_executor(ecx, create, self.inner) {
+                if output.result.result != InstructionResult::Continue {
+                    ecx.journaled_state.depth -= self.in_inner_context as usize;
+                    return Some(output);
+                }
+            }
+        }
+        ecx.journaled_state.depth -= self.in_inner_context as usize;
 
         if !matches!(create.scheme, CreateScheme::Create2 { .. }) &&
             self.enable_isolation &&
@@ -913,6 +924,14 @@ impl<'a, DB: DatabaseExt> InspectorExt<DB> for InspectorStackRefMut<'a> {
     fn console_log(&mut self, input: String) {
         call_inspectors!([&mut self.log_collector], |inspector| InspectorExt::<DB>::console_log(
             inspector, input
+        ));
+    }
+
+    fn trace_zksync(&mut self, ecx: &mut EvmContext<DB>, call_traces: Vec<Call>) {
+        call_inspectors!([&mut self.tracer], |inspector| InspectorExt::<DB>::trace_zksync(
+            inspector,
+            ecx,
+            call_traces
         ));
     }
 }
