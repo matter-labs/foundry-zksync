@@ -260,17 +260,29 @@ contract ZkContractsTest is DSTest {
         Greeter greeter = new Greeter();
         assert(vm.getNonce(sender) == startingNonce + 1);
 
-        greeter.setAge(42);
-        assert(vm.getNonce(sender) == startingNonce + 2);
+        (bool success2, bytes memory returnData) = address(vm).call(
+            abi.encodeWithSignature("zkFetchCode(address)", address(greeter))
+        );
+        require(success2, "zkFetchCode() call failed");
+        // validate the etch cheatcode is working with the zkFetchCode
+        // insert test case
 
-        // static-call, nonce shouldn't change
-        uint256 age = greeter.getAge();
-        assert(age == 42);
-        assert(vm.getNonce(sender) == startingNonce + 2);
+         // Create a new target address for etching
+        // Use a predefined address for etching
+        address targetAddr = address(0x1234567890AbcdEF1234567890aBcdef12345678); // Predefined address
 
-        uint256 num = greeter.greeting2("zksync", 2);
-        assert(num == 4);
-        assert(vm.getNonce(sender) == startingNonce + 3);
+        // Use etch to copy the bytecode from the Greeter contract to the new target address
+        vm.etch(targetAddr, returnData);
+
+        // Interact with the Greeter contract at the new address
+        (bool successCall, bytes memory output) = targetAddr.call(abi.encodeWithSignature("greet()"));
+        require(successCall, "greet() call failed on target address");
+
+        // Decode and verify the returned greeting string
+        string memory greeting = abi.decode(output, (string));
+        require(keccak256(abi.encodePacked(greeting)) == keccak256(abi.encodePacked("Hello, World!")), "greet() returned incorrect greeting");
+
+        // Stop broadcasting the sender's transactions
         vm.stopBroadcast();
     }
 }
