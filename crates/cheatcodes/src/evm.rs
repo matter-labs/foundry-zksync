@@ -598,9 +598,7 @@ impl Cheatcode for setBlockhashCall {
     }
 }
 
-<<<<<<< Updated upstream
-=======
-impl Cheatcode for fetchCodeCall {
+impl Cheatcode for zkFetchCodeCall {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { target } = self;
         if ccx.state.use_zk_vm {
@@ -612,7 +610,6 @@ impl Cheatcode for fetchCodeCall {
     }
 }
 
->>>>>>> Stashed changes
 pub(super) fn get_nonce<DB: DatabaseExt>(ccx: &mut CheatsCtxt<DB>, address: &Address) -> Result {
     let (account, _) = ccx.ecx.journaled_state.load_account(*address, &mut ccx.ecx.db)?;
     Ok(account.info.nonce.abi_encode())

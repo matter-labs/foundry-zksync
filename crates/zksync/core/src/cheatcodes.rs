@@ -199,8 +199,6 @@ where
     }
 }
 
-<<<<<<< Updated upstream
-=======
 /// Retrieves code for a specific address.
 pub fn fetch_code<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> Bytecode
 where
@@ -221,7 +219,6 @@ where
     }
 }
 
->>>>>>> Stashed changes
 #[cfg(test)]
 mod tests {
     use revm::db::EmptyDB;

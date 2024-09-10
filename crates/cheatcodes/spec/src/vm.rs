@@ -465,6 +465,10 @@ interface Vm {
     #[cheatcode(group = Evm, safety = Unsafe, status = Experimental)]
     function cool(address target) external;
 
+    /// Gets the deployed bytecode from state. Takes in the address of the contract.
+    #[cheatcode(group = Evm, safety = Safe)]
+    function zkFetchCode(address target) external view returns (bytes memory runtimeBytecode);
+
     // -------- Call Manipulation --------
     // --- Mocks ---
 
@@ -1530,7 +1534,7 @@ interface Vm {
     /// artifact in the form of <path>:<contract>:<version> where <contract> and <version> parts are optional.
     #[cheatcode(group = Filesystem)]
     function getDeployedCode(string calldata artifactPath) external view returns (bytes memory runtimeBytecode);
-
+    
     // -------- Foreign Function Interface --------
 
     /// Performs a foreign function call via the terminal.
