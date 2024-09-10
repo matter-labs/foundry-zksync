@@ -80,35 +80,25 @@ For the most effective use of our library, we recommend familiarizing yourself w
 
 Follow these steps to quickly install the binaries for `foundry-zksync`:
 
-**Note:** This installation overrides any existing forge and cast binaries in ~/.foundry. You can use forge without the --zksync flag for standard EVM chains. To revert to a previous installation, follow the instructions [here](https://book.getfoundry.sh/getting-started/installation#using-foundryup).
+**Note:** This installation overrides any existing `forge` and `cast` binaries in `~/.foundry`. You can use `forge` without the `--zksync` flag for standard EVM chains. To revert to a previous installation, follow the instructions [here](https://book.getfoundry.sh/getting-started/installation#using-foundryup).
 
-1. **Clone the Repository**:
-   Begin by cloning the `foundry-zksync` repository from GitHub. This will download the latest version of the source code to your local machine.
+### 1. **Run the Installer**
 
-   ```bash
-   git clone git@github.com:matter-labs/foundry-zksync.git
-   ```
+Run the following `curl` command, which downloads and runs the installation script:
 
-2. **Change Directory**:
-   Navigate into the directory where the repository has been cloned. This is where you will run the installation commands.
+```bash
+curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
+```
 
-   ```bash
-   cd foundry-zksync
-   ```
+This command will download the latest `foundry-zksync` binaries (`forge` and `cast`) and set them up on your system.
 
-3. **Run the Installer**:
-   Now, you're ready to execute the installation script. This command initializes the setup and installs `foundry-zksync` binaries `forge` and `cast`.
+### 2. **Verify the Installation** (Recommended)
 
-   ```bash
-   ./install-foundry-zksync
-   ```
+After installation, it's recommended to verify that the binaries have been installed correctly. Run the following command to check the installed version:
 
-4. **Verify the Installation** (Recommended):
-   After installation, it's good practice to verify that the binaries have been installed correctly. Run the following command to check the installed version:
-
-   ```bash
-   forge --version
-   ```
+```bash
+forge --version
+```
 
 This should return the installed version of `forge`, confirming that `foundry-zksync` is installed properly on your system.
 

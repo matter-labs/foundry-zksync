@@ -183,7 +183,7 @@ EOF
   # Install by cloning the repo with the provided branch/tag
   else
     need_cmd cargo
-    FOUNDRYUP_BRANCH=${FOUNDRYUP_BRANCH:-dev}
+    FOUNDRYUP_BRANCH=${FOUNDRYUP_BRANCH:-main}
     REPO_PATH="$FOUNDRY_DIR/$FOUNDRYUP_REPO"
 
     # If repo path does not exist, grab the author from the repo, make a directory in .foundry, cd to it and clone.
