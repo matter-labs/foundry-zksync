@@ -127,7 +127,9 @@ jobs:
       runs-on: ubuntu-latest
       steps:
         - uses: actions/checkout@v4
-        - name: install foundry-zksync
-          run: ./install-foundry-zksync
-        - name: verify
+        - name: Install foundry-zksync
+          run: |
+            curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
+        - name: Verify installation
           run: forge --version
+
