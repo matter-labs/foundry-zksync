@@ -104,3 +104,11 @@ async fn test_zk_contract_static_calls_keep_nonce_consistent() {
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_contract_fetch_code() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new("testZkFetchCode", "ZkContractsTest", ".*");
+
+    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+}
