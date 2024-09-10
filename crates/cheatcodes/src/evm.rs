@@ -598,6 +598,21 @@ impl Cheatcode for setBlockhashCall {
     }
 }
 
+<<<<<<< Updated upstream
+=======
+impl Cheatcode for fetchCodeCall {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { target } = self;
+        if ccx.state.use_zk_vm {
+            let code = foundry_zksync_core::cheatcodes::fetch_code(*target, ccx.ecx);
+            return Ok(code.bytes().abi_encode());
+        }
+
+        Ok(Bytecode::new().bytes().abi_encode())
+    }
+}
+
+>>>>>>> Stashed changes
 pub(super) fn get_nonce<DB: DatabaseExt>(ccx: &mut CheatsCtxt<DB>, address: &Address) -> Result {
     let (account, _) = ccx.ecx.journaled_state.load_account(*address, &mut ccx.ecx.db)?;
     Ok(account.info.nonce.abi_encode())

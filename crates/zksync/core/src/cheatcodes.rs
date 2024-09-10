@@ -199,6 +199,29 @@ where
     }
 }
 
+<<<<<<< Updated upstream
+=======
+/// Retrieves code for a specific address.
+pub fn fetch_code<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> Bytecode
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    info!(?address, "cheatcode fetch_code");
+
+    ecx.load_account(address).expect("account could not be loaded");
+    ecx.touch(&address);
+    let account = ecx.journaled_state.state.get_mut(&address).expect("failed loading account");
+    if let Some(code) = account.info.code.clone() {
+        code
+    } else {
+        // TODO: do something here, but for quick testing we just return empty code
+        println!("No code found for address: {:?}", address);
+        Bytecode::new()
+    }
+}
+
+>>>>>>> Stashed changes
 #[cfg(test)]
 mod tests {
     use revm::db::EmptyDB;
