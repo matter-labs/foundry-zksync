@@ -84,7 +84,7 @@ Follow these steps to quickly install the binaries for `foundry-zksync`:
 
 ### 1. **Run the Installer**
 
-You can now install `foundry-zksync` without needing to clone the repository. Simply run the following `curl` command, which downloads and runs the installation script:
+Run the following `curl` command, which downloads and runs the installation script:
 
 ```bash
 curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
