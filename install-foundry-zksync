@@ -2,8 +2,13 @@
 
 set -e
 
-echo "Navigating to the foundryup-zksync script..."
-cd foundryup-zksync
+# URLs to the raw files on GitHub
+INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/foundryup-zksync/install"
+FOUNDRYUP_ZKSYNC_URL="https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/foundryup-zksync/foundryup-zksync"
+
+# Download the install script
+echo "Downloading the install script..."
+curl -L "$INSTALL_SCRIPT_URL" -o install
 
 echo "Making install script executable..."
 chmod +x ./install
