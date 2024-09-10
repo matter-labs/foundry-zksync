@@ -247,7 +247,6 @@ contract ZkContractsTest is DSTest {
         vm.stopBroadcast();
     }
 
-
     function testZkFetchCode() public {
         (bool success,) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
         require(success, "zkVm() call failed");
@@ -264,17 +263,14 @@ contract ZkContractsTest is DSTest {
             abi.encodeWithSignature("zkFetchCode(address)", address(greeter))
         );
         require(success2, "zkFetchCode() call failed");
-        // validate the etch cheatcode is working with the zkFetchCode
-        // insert test case
 
-         // Create a new target address for etching
-        // Use a predefined address for etching
         address targetAddr = address(0x1234567890AbcdEF1234567890aBcdef12345678); // Predefined address
 
         // Use etch to copy the bytecode from the Greeter contract to the new target address
         vm.etch(targetAddr, returnData);
 
         // Interact with the Greeter contract at the new address
+        // this fails
         (bool successCall, bytes memory output) = targetAddr.call(abi.encodeWithSignature("greet()"));
         require(successCall, "greet() call failed on target address");
 
