@@ -133,7 +133,11 @@ impl DualCompiledContracts {
                     let bytecode_vec = bytecode.object.clone().into_bytes().unwrap().to_vec();
                     let mut factory_deps_vec: Vec<Vec<u8>> = factory_deps_map
                         .keys()
-                        .map(|factory_hash| zksolc_all_bytecodes.get(factory_hash).unwrap())
+                        .map(|factory_hash| {
+                            zksolc_all_bytecodes.get(factory_hash).unwrap_or_else(|| {
+                                panic!("failed to find zksolc artifact with hash {factory_hash:?}")
+                            })
+                        })
                         .cloned()
                         .collect();
 
