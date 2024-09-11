@@ -36,8 +36,22 @@ else
     echo "No shell configuration file detected. Please source your shell manually or start a new terminal session."
 fi
 
+echo "Downloading foundryup-zksync..."
+curl -L "$FOUNDRYUP_ZKSYNC_URL" -o foundryup-zksync
+
+echo "Making foundryup-zksync executable..."
+chmod +x ./foundryup-zksync
+
 echo "Running foundryup-zksync setup..."
 ./foundryup-zksync
+
+# Cleanup: remove install and install.log
+# Keeps foundryup-zksync for ease of use
+echo "Cleaning up installation artifacts..."
+rm -f ./install ./install.log
+echo "Cleanup completed."
+
+echo "Installation completed successfully!"
 
 echo "Verifying installation..."
 if forge --version | grep -q "0.0.2"; then
