@@ -8633,26 +8633,6 @@
     },
     {
       "func": {
-        "id": "zkRegisterContract",
-        "description": "Registers bytecodes for ZK-VM for transact/call and create instructions.",
-        "declaration": "function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;",
-        "visibility": "external",
-        "mutability": "pure",
-        "signature": "zkRegisterContract(string,bytes32,bytes,bytes,bytes32,bytes)",
-        "selector": "0x428cb039",
-        "selectorBytes": [
-          66,
-          140,
-          176,
-          57
-        ]
-      },
-      "group": "testing",
-      "status": "stable",
-      "safety": "safe"
-    },
-    {
-      "func": {
         "id": "writeToml_0",
         "description": "Takes serialized JSON, converts to TOML and write a serialized TOML to a file.",
         "declaration": "function writeToml(string calldata json, string calldata path) external;",
@@ -8668,6 +8648,46 @@
         ]
       },
       "group": "toml",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "writeToml_1",
+        "description": "Takes serialized JSON, converts to TOML and write a serialized TOML table to an **existing** TOML file, replacing a value with key = <value_key.>\nThis is useful to replace a specific value of a TOML file, without having to parse the entire thing.",
+        "declaration": "function writeToml(string calldata json, string calldata path, string calldata valueKey) external;",
+        "visibility": "external",
+        "mutability": "",
+        "signature": "writeToml(string,string,string)",
+        "selector": "0x51ac6a33",
+        "selectorBytes": [
+          81,
+          172,
+          106,
+          51
+        ]
+      },
+      "group": "toml",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkRegisterContract",
+        "description": "Registers bytecodes for ZK-VM for transact/call and create instructions.",
+        "declaration": "function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkRegisterContract(string,bytes32,bytes,bytes,bytes32,bytes)",
+        "selector": "0x428cb039",
+        "selectorBytes": [
+          66,
+          140,
+          176,
+          57
+        ]
+      },
+      "group": "testing",
       "status": "stable",
       "safety": "safe"
     },
@@ -8693,21 +8713,21 @@
     },
     {
       "func": {
-        "id": "writeToml_1",
-        "description": "Takes serialized JSON, converts to TOML and write a serialized TOML table to an **existing** TOML file, replacing a value with key = <value_key.>\nThis is useful to replace a specific value of a TOML file, without having to parse the entire thing.",
-        "declaration": "function writeToml(string calldata json, string calldata path, string calldata valueKey) external;",
+        "id": "zkVmSkip",
+        "description": "When running in zkEVM context, skips the next CREATE or CALL, executing it on the EVM instead.",
+        "declaration": "function zkVmSkip() external pure;",
         "visibility": "external",
-        "mutability": "",
-        "signature": "writeToml(string,string,string)",
-        "selector": "0x51ac6a33",
+        "mutability": "pure",
+        "signature": "zkVmSkip()",
+        "selector": "0x99c48bb9",
         "selectorBytes": [
-          81,
-          172,
-          106,
-          51
+          153,
+          196,
+          139,
+          185
         ]
       },
-      "group": "toml",
+      "group": "testing",
       "status": "stable",
       "safety": "safe"
     }

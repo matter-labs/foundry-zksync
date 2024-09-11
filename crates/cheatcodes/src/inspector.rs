@@ -348,6 +348,9 @@ pub struct Cheatcodes {
     /// Use ZK-VM to execute CALLs and CREATEs.
     pub use_zk_vm: bool,
 
+    /// When in zkEVM context, execute the next CALL or CREATE in the EVM instead.
+    pub skip_zk_vm: bool,
+
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
 
@@ -444,6 +447,7 @@ impl Cheatcodes {
             pc: Default::default(),
             breakpoints: Default::default(),
             use_zk_vm: Default::default(),
+            skip_zk_vm: Default::default(),
             persisted_factory_deps: Default::default(),
         }
     }
@@ -893,107 +897,115 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            info!("running create in zk vm");
-            if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
-                info!("ignoring DEFAULT_CREATE2_DEPLOYER_CODE for zk");
-                return None
-            }
-
-            let zk_contract = self
-                .dual_compiled_contracts
-                .find_by_evm_bytecode(&input.init_code().0)
-                .unwrap_or_else(|| panic!("failed finding contract for {:?}", input.init_code()));
-
-            let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
-            tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
-
-            let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
-                mocked_calls: self.mocked_calls.clone(),
-                expected_calls: Some(&mut self.expected_calls),
-                accesses: self.accesses.as_mut(),
-                persisted_factory_deps: Some(&mut self.persisted_factory_deps),
-            };
-            let create_inputs = CreateInputs {
-                scheme: input.scheme().unwrap_or(CreateScheme::Create),
-                init_code: input.init_code(),
-                value: input.value(),
-                caller: input.caller(),
-                gas_limit: input.gas_limit(),
-            };
-            if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
-                &create_inputs,
-                zk_contract,
-                factory_deps,
-                ecx,
-                ccx,
-            ) {
-                if let Some(recorded_logs) = &mut self.recorded_logs {
-                    recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
-                        topics: log.data.topics().to_vec(),
-                        data: log.data.data.clone(),
-                        emitter: log.address,
-                    }));
+            if self.skip_zk_vm {
+                // reset skip_zk_vm
+                self.skip_zk_vm = false;
+                info!("running create in EVM, instead of zkEVM");
+            } else {
+                info!("running create in zkEVM");
+                if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
+                    info!("ignoring DEFAULT_CREATE2_DEPLOYER_CODE for zk");
+                    return None
                 }
 
-                // append console logs from zkEVM to the current executor's LogTracer
-                result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
-                    executor.console_log(
-                        &mut CheatsCtxt {
-                            state: self,
-                            ecx: &mut ecx.inner,
-                            precompiles: &mut ecx.precompiles,
-                            gas_limit: create_inputs.gas_limit,
-                            caller: create_inputs.caller,
-                        },
-                        decoded_log,
-                    );
-                });
+                let zk_contract = self
+                    .dual_compiled_contracts
+                    .find_by_evm_bytecode(&input.init_code().0)
+                    .unwrap_or_else(|| {
+                        panic!("failed finding contract for {:?}", input.init_code())
+                    });
 
-                // append traces
-                executor.trace(self, ecx, result.call_traces);
+                let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
+                tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
 
-                // for each log in cloned logs call handle_expect_emit
-                if !self.expected_emits.is_empty() {
-                    for log in result.logs {
-                        expect::handle_expect_emit(self, &log);
+                let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
+                    mocked_calls: self.mocked_calls.clone(),
+                    expected_calls: Some(&mut self.expected_calls),
+                    accesses: self.accesses.as_mut(),
+                    persisted_factory_deps: Some(&mut self.persisted_factory_deps),
+                };
+                let create_inputs = CreateInputs {
+                    scheme: input.scheme().unwrap_or(CreateScheme::Create),
+                    init_code: input.init_code(),
+                    value: input.value(),
+                    caller: input.caller(),
+                    gas_limit: input.gas_limit(),
+                };
+                if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
+                    &create_inputs,
+                    zk_contract,
+                    factory_deps,
+                    ecx,
+                    ccx,
+                ) {
+                    if let Some(recorded_logs) = &mut self.recorded_logs {
+                        recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
+                            topics: log.data.topics().to_vec(),
+                            data: log.data.data.clone(),
+                            emitter: log.address,
+                        }));
                     }
-                }
 
-                return match result.execution_result {
-                    ExecutionResult::Success { output, .. } => match output {
-                        Output::Create(bytes, address) => Some(CreateOutcome {
-                            result: InterpreterResult {
-                                result: InstructionResult::Return,
-                                output: bytes,
-                                gas,
+                    // append console logs from zkEVM to the current executor's LogTracer
+                    result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
+                        executor.console_log(
+                            &mut CheatsCtxt {
+                                state: self,
+                                ecx: &mut ecx.inner,
+                                precompiles: &mut ecx.precompiles,
+                                gas_limit: create_inputs.gas_limit,
+                                caller: create_inputs.caller,
                             },
-                            address,
-                        }),
-                        _ => Some(CreateOutcome {
+                            decoded_log,
+                        );
+                    });
+
+                    // append traces
+                    executor.trace(self, ecx, result.call_traces);
+
+                    // for each log in cloned logs call handle_expect_emit
+                    if !self.expected_emits.is_empty() {
+                        for log in result.logs {
+                            expect::handle_expect_emit(self, &log);
+                        }
+                    }
+
+                    return match result.execution_result {
+                        ExecutionResult::Success { output, .. } => match output {
+                            Output::Create(bytes, address) => Some(CreateOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Return,
+                                    output: bytes,
+                                    gas,
+                                },
+                                address,
+                            }),
+                            _ => Some(CreateOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Revert,
+                                    output: Bytes::new(),
+                                    gas,
+                                },
+                                address: None,
+                            }),
+                        },
+                        ExecutionResult::Revert { output, .. } => Some(CreateOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
-                                output: Bytes::new(),
+                                output,
                                 gas,
                             },
                             address: None,
                         }),
-                    },
-                    ExecutionResult::Revert { output, .. } => Some(CreateOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output,
-                            gas,
-                        },
-                        address: None,
-                    }),
-                    ExecutionResult::Halt { .. } => Some(CreateOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output: Bytes::from_iter(String::from("zk vm halted").as_bytes()),
-                            gas,
-                        },
-                        address: None,
-                    }),
+                        ExecutionResult::Halt { .. } => Some(CreateOutcome {
+                            result: InterpreterResult {
+                                result: InstructionResult::Revert,
+                                output: Bytes::from_iter(String::from("zk vm halted").as_bytes()),
+                                gas,
+                            },
+                            address: None,
+                        }),
+                    }
                 }
             }
         }
@@ -1400,92 +1412,102 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            if let TransactTo::Call(test_contract) = ecx.env.tx.transact_to {
-                if call.bytecode_address == test_contract {
-                    info!("using evm for calls to test contract {:?}", ecx.env);
-                    return None
-                }
-            }
-
-            info!("running call in zk vm {:#?}", call);
-
-            let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
-                mocked_calls: self.mocked_calls.clone(),
-                expected_calls: Some(&mut self.expected_calls),
-                accesses: self.accesses.as_mut(),
-                persisted_factory_deps: Some(&mut self.persisted_factory_deps),
-            };
-            if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
-                // append console logs from zkEVM to the current executor's LogTracer
-                result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
-                    executor.console_log(
-                        &mut CheatsCtxt {
-                            state: self,
-                            ecx: &mut ecx.inner,
-                            precompiles: &mut ecx.precompiles,
-                            gas_limit: call.gas_limit,
-                            caller: call.caller,
-                        },
-                        decoded_log,
-                    );
-                });
-
-                // skip log processing for static calls
-                if !call.is_static {
-                    if let Some(recorded_logs) = &mut self.recorded_logs {
-                        recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
-                            topics: log.data.topics().to_vec(),
-                            data: log.data.data.clone(),
-                            emitter: log.address,
-                        }));
+            if self.skip_zk_vm {
+                // reset skip_zk_vm
+                self.skip_zk_vm = false;
+                info!("running call in EVM, instead of zkEVM {:#?}", call);
+            } else {
+                if let TransactTo::Call(test_contract) = ecx.env.tx.transact_to {
+                    if call.bytecode_address == test_contract {
+                        info!("using evm for calls to test contract {:?}", ecx.env);
+                        return None
                     }
+                }
 
-                    // append traces
-                    executor.trace(self, ecx, result.call_traces);
+                info!("running call in zkEVM {:#?}", call);
 
-                    // for each log in cloned logs call handle_expect_emit
-                    if !self.expected_emits.is_empty() {
-                        for log in result.logs {
-                            expect::handle_expect_emit(self, &log);
+                let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
+                    mocked_calls: self.mocked_calls.clone(),
+                    expected_calls: Some(&mut self.expected_calls),
+                    accesses: self.accesses.as_mut(),
+                    persisted_factory_deps: Some(&mut self.persisted_factory_deps),
+                };
+                if let Ok(result) =
+                    foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx)
+                {
+                    // append console logs from zkEVM to the current executor's LogTracer
+                    result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
+                        executor.console_log(
+                            &mut CheatsCtxt {
+                                state: self,
+                                ecx: &mut ecx.inner,
+                                precompiles: &mut ecx.precompiles,
+                                gas_limit: call.gas_limit,
+                                caller: call.caller,
+                            },
+                            decoded_log,
+                        );
+                    });
+
+                    // skip log processing for static calls
+                    if !call.is_static {
+                        if let Some(recorded_logs) = &mut self.recorded_logs {
+                            recorded_logs.extend(result.logs.clone().into_iter().map(|log| {
+                                Vm::Log {
+                                    topics: log.data.topics().to_vec(),
+                                    data: log.data.data.clone(),
+                                    emitter: log.address,
+                                }
+                            }));
+                        }
+
+                        // append traces
+                        executor.trace(self, ecx, result.call_traces);
+
+                        // for each log in cloned logs call handle_expect_emit
+                        if !self.expected_emits.is_empty() {
+                            for log in result.logs {
+                                expect::handle_expect_emit(self, &log);
+                            }
                         }
                     }
-                }
 
-                return match result.execution_result {
-                    ExecutionResult::Success { output, .. } => match output {
-                        Output::Call(bytes) => Some(CallOutcome {
-                            result: InterpreterResult {
-                                result: InstructionResult::Return,
-                                output: bytes,
-                                gas,
-                            },
-                            memory_offset: call.return_memory_offset.clone(),
-                        }),
-                        _ => Some(CallOutcome {
+                    return match result.execution_result {
+                        ExecutionResult::Success { output, .. } => match output {
+                            Output::Call(bytes) => Some(CallOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Return,
+                                    output: bytes,
+                                    gas,
+                                },
+                                memory_offset: call.return_memory_offset.clone(),
+                            }),
+                            _ => Some(CallOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Revert,
+                                    output: Bytes::new(),
+                                    gas,
+                                },
+                                memory_offset: call.return_memory_offset.clone(),
+                            }),
+                        },
+                        ExecutionResult::Revert { output, .. } => Some(CallOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
-                                output: Bytes::new(),
+                                output,
                                 gas,
                             },
                             memory_offset: call.return_memory_offset.clone(),
                         }),
-                    },
-                    ExecutionResult::Revert { output, .. } => Some(CallOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output,
-                            gas,
-                        },
-                        memory_offset: call.return_memory_offset.clone(),
-                    }),
-                    ExecutionResult::Halt { .. } => Some(CallOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output: Bytes::from_iter(String::from("zk vm halted").as_bytes()),
-                            gas,
-                        },
-                        memory_offset: call.return_memory_offset.clone(),
-                    }),
+                        ExecutionResult::Halt { .. } => Some(CallOutcome {
+                            result: InterpreterResult {
+                                result: InstructionResult::Revert,
+                                output: Bytes::from_iter(String::from("zk vm halted").as_bytes()),
+                                gas,
+                            },
+                            memory_offset: call.return_memory_offset.clone(),
+                        }),
+                    }
                 }
             }
         }

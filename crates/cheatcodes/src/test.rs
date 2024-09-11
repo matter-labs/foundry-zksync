@@ -23,6 +23,14 @@ impl Cheatcode for zkVmCall {
     }
 }
 
+impl Cheatcode for zkVmSkipCall {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        ccx.state.skip_zk_vm = ccx.state.use_zk_vm && true;
+
+        Ok(Default::default())
+    }
+}
+
 impl Cheatcode for zkRegisterContractCall {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self {
