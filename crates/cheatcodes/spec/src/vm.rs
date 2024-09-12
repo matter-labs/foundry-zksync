@@ -465,9 +465,9 @@ interface Vm {
     #[cheatcode(group = Evm, safety = Unsafe, status = Experimental)]
     function cool(address target) external;
 
-    /// Gets the deployed bytecode from state. Takes in the address of the contract.
+    /// Gets the deployed bytecodehash from state. Takes in the address of the contract.
     #[cheatcode(group = Evm, safety = Safe)]
-    function zkFetchCode(address target) external view returns (bytes memory runtimeBytecode);
+    function getRawCodeHash(address target) external view returns (bytes memory byteCodeHash);
 
     // -------- Call Manipulation --------
     // --- Mocks ---

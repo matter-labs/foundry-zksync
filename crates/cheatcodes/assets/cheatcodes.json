@@ -5093,6 +5093,26 @@
     },
     {
       "func": {
+        "id": "getRawCodeHash",
+        "description": "Gets the deployed bytecodehash from state. Takes in the address of the contract.",
+        "declaration": "function getRawCodeHash(address target) external view returns (bytes memory byteCodeHash);",
+        "visibility": "external",
+        "mutability": "view",
+        "signature": "getRawCodeHash(address)",
+        "selector": "0x4de2e468",
+        "selectorBytes": [
+          77,
+          226,
+          228,
+          104
+        ]
+      },
+      "group": "evm",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
         "id": "getRecordedLogs",
         "description": "Gets all the recorded logs.",
         "declaration": "function getRecordedLogs() external returns (Log[] memory logs);",
@@ -8668,26 +8688,6 @@
         ]
       },
       "group": "toml",
-      "status": "stable",
-      "safety": "safe"
-    },
-    {
-      "func": {
-        "id": "zkFetchCode",
-        "description": "Gets the deployed bytecode from state. Takes in the address of the contract.",
-        "declaration": "function zkFetchCode(address target) external view returns (bytes memory runtimeBytecode);",
-        "visibility": "external",
-        "mutability": "view",
-        "signature": "zkFetchCode(address)",
-        "selector": "0xfcbe2f62",
-        "selectorBytes": [
-          252,
-          190,
-          47,
-          98
-        ]
-      },
-      "group": "evm",
       "status": "stable",
       "safety": "safe"
     },

@@ -199,24 +199,32 @@ where
     }
 }
 
-/// Retrieves code for a specific address.
-pub fn fetch_code<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> Bytecode
-where
-    DB: Database,
-    <DB as Database>::Error: Debug,
-{
-    info!(?address, "cheatcode fetch_code");
+    /// Retrieves the bytecode hash for a given address.
+    pub fn get_raw_code_hash<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> rU256
+    where
+        DB: Database,
+        <DB as Database>::Error: Debug,
+    {
+    info!(?address, "cheatcode getRawCodeHash");
 
-    ecx.load_account(address).expect("account could not be loaded");
-    ecx.touch(&address);
-    let account = ecx.journaled_state.state.get_mut(&address).expect("failed loading account");
-    if let Some(code) = account.info.code.clone() {
-        code
-    } else {
-        // TODO: do something here, but for quick testing we just return empty code
-        println!("No code found for address: {:?}", address);
-        Bytecode::new()
+    // Load the account code storage system address
+    let account_code_addr = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
+    ecx.load_account(account_code_addr).expect("account 'ACCOUNT_CODE_STORAGE_ADDRESS' could not be loaded");
+
+    // Convert the address to the zkSync H256 format
+    let zk_address = address.to_h160();
+    let account_key = zk_address.to_h256().to_ru256();
+
+    // Load the bytecode hash from the system storage
+    let (bytecode_hash, _) = ecx.sload(account_code_addr, account_key).unwrap_or_default();
+
+    if bytecode_hash.is_zero() {
+        info!(?address, "no bytecode found for address");
+        return rU256::ZERO;
     }
+
+    // Return the bytecode hash
+    bytecode_hash
 }
 
 #[cfg(test)]

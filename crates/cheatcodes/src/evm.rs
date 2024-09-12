@@ -598,12 +598,12 @@ impl Cheatcode for setBlockhashCall {
     }
 }
 
-impl Cheatcode for zkFetchCodeCall {
+impl Cheatcode for getRawCodeHashCall {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { target } = self;
         if ccx.state.use_zk_vm {
-            let code = foundry_zksync_core::cheatcodes::fetch_code(*target, ccx.ecx);
-            return Ok(code.bytes().abi_encode());
+            let code = foundry_zksync_core::cheatcodes::get_raw_code_hash(*target, ccx.ecx);
+            return Ok(code.abi_encode());
         }
 
         Ok(Bytecode::new().bytes().abi_encode())

@@ -250,6 +250,7 @@ interface Vm {
     function getMappingSlotAt(address target, bytes32 mappingSlot, uint256 idx) external returns (bytes32 value);
     function getNonce(address account) external view returns (uint64 nonce);
     function getNonce(Wallet calldata wallet) external returns (uint64 nonce);
+    function getRawCodeHash(address target) external view returns (bytes memory byteCodeHash);
     function getRecordedLogs() external returns (Log[] memory logs);
     function indexOf(string calldata input, string calldata key) external pure returns (uint256);
     function isContext(ForgeContext context) external view returns (bool result);
@@ -429,7 +430,6 @@ interface Vm {
     function writeLine(string calldata path, string calldata data) external;
     function writeToml(string calldata json, string calldata path) external;
     function writeToml(string calldata json, string calldata path, string calldata valueKey) external;
-    function zkFetchCode(address target) external view returns (bytes memory runtimeBytecode);
     function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;
     function zkVm(bool enable) external pure;
 }
