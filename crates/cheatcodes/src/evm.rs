@@ -598,6 +598,18 @@ impl Cheatcode for setBlockhashCall {
     }
 }
 
+impl Cheatcode for getRawCodeHashCall {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { target } = self;
+        if ccx.state.use_zk_vm {
+            let code = foundry_zksync_core::cheatcodes::get_raw_code_hash(*target, ccx.ecx);
+            return Ok(code.abi_encode());
+        }
+
+        Ok(Bytecode::new().bytes().abi_encode())
+    }
+}
+
 pub(super) fn get_nonce<DB: DatabaseExt>(ccx: &mut CheatsCtxt<DB>, address: &Address) -> Result {
     let (account, _) = ccx.ecx.journaled_state.load_account(*address, &mut ccx.ecx.db)?;
     Ok(account.info.nonce.abi_encode())

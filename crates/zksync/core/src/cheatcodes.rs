@@ -199,6 +199,32 @@ where
     }
 }
 
+    /// Retrieves the bytecode hash for a given address.
+    pub fn get_raw_code_hash<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> rU256
+    where
+        DB: Database,
+        <DB as Database>::Error: Debug,
+    {
+    info!(?address, "cheatcode getRawCodeHash");
+
+    // Load the account code storage system address
+    let account_code_addr = ACCOUNT_CODE_STORAGE_ADDRESS.to_address();
+    ecx.load_account(account_code_addr).expect("account 'ACCOUNT_CODE_STORAGE_ADDRESS' could not be loaded");
+
+    let zk_address = address.to_h160();
+    let account_key = zk_address.to_h256().to_ru256();
+
+    // Load the bytecode hash from the system storage
+    let (bytecode_hash, _) = ecx.sload(account_code_addr, account_key).unwrap_or_default();
+
+    if bytecode_hash.is_zero() {
+        info!(?address, "no bytecode found for address");
+        return rU256::ZERO;
+    }
+
+    bytecode_hash
+}
+
 #[cfg(test)]
 mod tests {
     use revm::db::EmptyDB;
