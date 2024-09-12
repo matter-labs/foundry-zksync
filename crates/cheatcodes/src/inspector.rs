@@ -51,7 +51,7 @@ use revm::{
 use rustc_hash::FxHashMap;
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
@@ -351,6 +351,14 @@ pub struct Cheatcodes {
     /// When in zkEVM context, execute the next CALL or CREATE in the EVM instead.
     pub skip_zk_vm: bool,
 
+    /// Any contracts that were deployed in `skip_zk_vm` step.
+    /// This makes it easier to dispatch calls to any of these addresses in zkEVM context, directly
+    /// to EVM. Alternatively, we'd need to add `vm.zkVmSkip()` to these calls manually.
+    pub skip_zk_vm_addresses: HashSet<Address>,
+
+    /// Records the next create address for `skip_zk_vm_addresses`.
+    pub record_next_create_address: bool,
+
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
 
@@ -448,6 +456,8 @@ impl Cheatcodes {
             breakpoints: Default::default(),
             use_zk_vm: Default::default(),
             skip_zk_vm: Default::default(),
+            skip_zk_vm_addresses: Default::default(),
+            record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
         }
     }
@@ -900,6 +910,7 @@ impl Cheatcodes {
             if self.skip_zk_vm {
                 // reset skip_zk_vm
                 self.skip_zk_vm = false;
+                self.record_next_create_address = true;
                 info!("running create in EVM, instead of zkEVM");
             } else {
                 info!("running create in zkEVM");
@@ -1123,6 +1134,14 @@ impl Cheatcodes {
                 }
             }
         }
+
+        if self.record_next_create_address {
+            self.record_next_create_address = false;
+            if let Some(address) = outcome.address {
+                self.skip_zk_vm_addresses.insert(address);
+            }
+        }
+
         outcome
     }
 
@@ -1412,6 +1431,9 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
+            // also skip if the target was created during a zkEVM skip
+            self.skip_zk_vm =
+                self.skip_zk_vm || self.skip_zk_vm_addresses.contains(&call.target_address);
             if self.skip_zk_vm {
                 // reset skip_zk_vm
                 self.skip_zk_vm = false;

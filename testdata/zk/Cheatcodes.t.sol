@@ -360,7 +360,7 @@ contract ZkCheatcodesInZkVmTest is DSTest {
 
 contract Calculator {
     event Added(uint8 indexed sum);
-    
+
     function add(uint8 a, uint8 b) public returns (uint8) {
         uint8 sum = a + b;
         emit Added(sum);
@@ -396,12 +396,20 @@ contract ZkCheatcodeZkVmSkipTest is DSTest {
         vm.makePersistent(address(helper));
     }
 
-    function testFail_ContractDeploysInZkEvmWithoutSkip() external {
+    function testFail_ContractUsesCheatcodesInEvmWithSkip() external {
         helper.exec();
     }
 
-    function testContractDeploysInEvmWithSkip() external {
+    function testContractUsesCheatcodesInEvmWithSkip() external {
         vm.zkVmSkip();
         helper.exec();
+    }
+
+    function testContractDeploysInEvmWithSkipAndCallsAutoSkip() external {
+        vm.zkVmSkip();
+        EvmTargetContract helper2 = new EvmTargetContract();
+
+        // this should auto execute in EVM
+        helper2.exec();
     }
 }
