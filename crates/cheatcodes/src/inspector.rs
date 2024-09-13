@@ -931,15 +931,16 @@ impl Cheatcodes {
         if self.skip_zk_vm {
             self.skip_zk_vm = false; // handled the skip, reset flag
             self.record_next_create_address = true;
-            info!("running create in EVM, instead of zkEVM");
+            info!("running create in EVM, instead of zkEVM (skipped)");
+            return None
+        }
+
+        if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
+            info!("running create in EVM, instead of zkEVM (DEFAULT_CREATE2_DEPLOYER_CODE)");
             return None
         }
 
         info!("running create in zkEVM");
-        if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
-            info!("ignoring DEFAULT_CREATE2_DEPLOYER_CODE for zk");
-            return None
-        }
 
         let zk_contract = self
             .dual_compiled_contracts
@@ -962,84 +963,101 @@ impl Cheatcodes {
             caller: input.caller(),
             gas_limit: input.gas_limit(),
         };
-        if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
+
+        // We currently exhaust the entire gas for the call as zkEVM returns a very high
+        // amount of gas that OOGs revm.
+        let gas = Gas::new(input.gas_limit());
+        match foundry_zksync_core::vm::create::<_, DatabaseError>(
             &create_inputs,
             zk_contract,
             factory_deps,
             ecx,
             ccx,
         ) {
-            if let Some(recorded_logs) = &mut self.recorded_logs {
-                recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
-                    topics: log.data.topics().to_vec(),
-                    data: log.data.data.clone(),
-                    emitter: log.address,
-                }));
-            }
-
-            // append console logs from zkEVM to the current executor's LogTracer
-            result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
-                executor.console_log(
-                    &mut CheatsCtxt {
-                        state: self,
-                        ecx: &mut ecx.inner,
-                        precompiles: &mut ecx.precompiles,
-                        gas_limit: create_inputs.gas_limit,
-                        caller: create_inputs.caller,
-                    },
-                    decoded_log,
-                );
-            });
-
-            // append traces
-            executor.trace(self, ecx, result.call_traces);
-
-            // for each log in cloned logs call handle_expect_emit
-            if !self.expected_emits.is_empty() {
-                for log in result.logs {
-                    expect::handle_expect_emit(self, &log);
+            Ok(result) => {
+                if let Some(recorded_logs) = &mut self.recorded_logs {
+                    recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
+                        topics: log.data.topics().to_vec(),
+                        data: log.data.data.clone(),
+                        emitter: log.address,
+                    }));
                 }
-            }
 
-            // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
-            // of gas that OOGs revm.
-            let gas = Gas::new(input.gas_limit());
-
-            return match result.execution_result {
-                ExecutionResult::Success { output, .. } => match output {
-                    Output::Create(bytes, address) => Some(CreateOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Return,
-                            output: bytes,
-                            gas,
+                // append console logs from zkEVM to the current executor's LogTracer
+                result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
+                    executor.console_log(
+                        &mut CheatsCtxt {
+                            state: self,
+                            ecx: &mut ecx.inner,
+                            precompiles: &mut ecx.precompiles,
+                            gas_limit: create_inputs.gas_limit,
+                            caller: create_inputs.caller,
                         },
-                        address,
-                    }),
-                    _ => Some(CreateOutcome {
+                        decoded_log,
+                    );
+                });
+
+                // append traces
+                executor.trace(self, ecx, result.call_traces);
+
+                // for each log in cloned logs call handle_expect_emit
+                if !self.expected_emits.is_empty() {
+                    for log in result.logs {
+                        expect::handle_expect_emit(self, &log);
+                    }
+                }
+
+                match result.execution_result {
+                    ExecutionResult::Success { output, .. } => match output {
+                        Output::Create(bytes, address) => Some(CreateOutcome {
+                            result: InterpreterResult {
+                                result: InstructionResult::Return,
+                                output: bytes,
+                                gas,
+                            },
+                            address,
+                        }),
+                        _ => Some(CreateOutcome {
+                            result: InterpreterResult {
+                                result: InstructionResult::Revert,
+                                output: Bytes::new(),
+                                gas,
+                            },
+                            address: None,
+                        }),
+                    },
+                    ExecutionResult::Revert { output, .. } => Some(CreateOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,
-                            output: Bytes::new(),
+                            output,
                             gas,
                         },
                         address: None,
                     }),
-                },
-                ExecutionResult::Revert { output, .. } => Some(CreateOutcome {
-                    result: InterpreterResult { result: InstructionResult::Revert, output, gas },
-                    address: None,
-                }),
-                ExecutionResult::Halt { .. } => Some(CreateOutcome {
+                    ExecutionResult::Halt { .. } => Some(CreateOutcome {
+                        result: InterpreterResult {
+                            result: InstructionResult::Revert,
+                            output: Bytes::from_iter(String::from("zk vm halted").as_bytes()),
+                            gas,
+                        },
+                        address: None,
+                    }),
+                }
+            }
+            Err(err) => {
+                error!("error inspecting zkEVM: {err:?}");
+                Some(CreateOutcome {
                     result: InterpreterResult {
                         result: InstructionResult::Revert,
-                        output: Bytes::from_iter(String::from("zk vm halted").as_bytes()),
+                        output: Bytes::from_iter(
+                            format!("error inspecting zkEVM: {err:?}").as_bytes(),
+                        ),
                         gas,
                     },
                     address: None,
-                }),
+                })
             }
         }
-
-        None
     }
 
     // common create_end functionality for both legacy and EOF.
@@ -1474,13 +1492,13 @@ impl Cheatcodes {
             self.skip_zk_vm || self.skip_zk_vm_addresses.contains(&call.target_address);
         if self.skip_zk_vm {
             self.skip_zk_vm = false; // handled the skip, reset flag
-            info!("running call in EVM, instead of zkEVM {:#?}", call);
+            info!("running create in EVM, instead of zkEVM (skipped) {:#?}", call);
             return None;
         }
 
         if let TransactTo::Call(test_contract) = ecx.env.tx.transact_to {
             if call.bytecode_address == test_contract {
-                info!("using evm for calls to test contract {:?}", ecx.env);
+                info!("running call in EVM, instead of zkEVM (Test Contract) {:#?}", ecx.env);
                 return None
             }
         }
@@ -1493,81 +1511,98 @@ impl Cheatcodes {
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
         };
-        if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
-            // append console logs from zkEVM to the current executor's LogTracer
-            result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
-                executor.console_log(
-                    &mut CheatsCtxt {
-                        state: self,
-                        ecx: &mut ecx.inner,
-                        precompiles: &mut ecx.precompiles,
-                        gas_limit: call.gas_limit,
-                        caller: call.caller,
-                    },
-                    decoded_log,
-                );
-            });
 
-            // skip log processing for static calls
-            if !call.is_static {
-                if let Some(recorded_logs) = &mut self.recorded_logs {
-                    recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
-                        topics: log.data.topics().to_vec(),
-                        data: log.data.data.clone(),
-                        emitter: log.address,
-                    }));
-                }
+        // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
+        // of gas that OOGs revm.
+        let gas = Gas::new(call.gas_limit);
+        match foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
+            Ok(result) => {
+                // append console logs from zkEVM to the current executor's LogTracer
+                result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
+                    executor.console_log(
+                        &mut CheatsCtxt {
+                            state: self,
+                            ecx: &mut ecx.inner,
+                            precompiles: &mut ecx.precompiles,
+                            gas_limit: call.gas_limit,
+                            caller: call.caller,
+                        },
+                        decoded_log,
+                    );
+                });
 
-                // append traces
-                executor.trace(self, ecx, result.call_traces);
+                // skip log processing for static calls
+                if !call.is_static {
+                    if let Some(recorded_logs) = &mut self.recorded_logs {
+                        recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
+                            topics: log.data.topics().to_vec(),
+                            data: log.data.data.clone(),
+                            emitter: log.address,
+                        }));
+                    }
 
-                // for each log in cloned logs call handle_expect_emit
-                if !self.expected_emits.is_empty() {
-                    for log in result.logs {
-                        expect::handle_expect_emit(self, &log);
+                    // append traces
+                    executor.trace(self, ecx, result.call_traces);
+
+                    // for each log in cloned logs call handle_expect_emit
+                    if !self.expected_emits.is_empty() {
+                        for log in result.logs {
+                            expect::handle_expect_emit(self, &log);
+                        }
                     }
                 }
-            }
 
-            // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
-            // of gas that OOGs revm.
-            let gas = Gas::new(call.gas_limit);
-
-            return match result.execution_result {
-                ExecutionResult::Success { output, .. } => match output {
-                    Output::Call(bytes) => Some(CallOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Return,
-                            output: bytes,
-                            gas,
-                        },
-                        memory_offset: call.return_memory_offset.clone(),
-                    }),
-                    _ => Some(CallOutcome {
+                match result.execution_result {
+                    ExecutionResult::Success { output, .. } => match output {
+                        Output::Call(bytes) => Some(CallOutcome {
+                            result: InterpreterResult {
+                                result: InstructionResult::Return,
+                                output: bytes,
+                                gas,
+                            },
+                            memory_offset: call.return_memory_offset.clone(),
+                        }),
+                        _ => Some(CallOutcome {
+                            result: InterpreterResult {
+                                result: InstructionResult::Revert,
+                                output: Bytes::new(),
+                                gas,
+                            },
+                            memory_offset: call.return_memory_offset.clone(),
+                        }),
+                    },
+                    ExecutionResult::Revert { output, .. } => Some(CallOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,
-                            output: Bytes::new(),
+                            output,
                             gas,
                         },
                         memory_offset: call.return_memory_offset.clone(),
                     }),
-                },
-                ExecutionResult::Revert { output, .. } => Some(CallOutcome {
-                    result: InterpreterResult { result: InstructionResult::Revert, output, gas },
-                    memory_offset: call.return_memory_offset.clone(),
-                }),
-                ExecutionResult::Halt { .. } => Some(CallOutcome {
+                    ExecutionResult::Halt { .. } => Some(CallOutcome {
+                        result: InterpreterResult {
+                            result: InstructionResult::Revert,
+                            output: Bytes::from_iter(String::from("zk vm halted").as_bytes()),
+                            gas,
+                        },
+                        memory_offset: call.return_memory_offset.clone(),
+                    }),
+                }
+            }
+            Err(err) => {
+                error!("error inspecting zkEVM: {err:?}");
+                Some(CallOutcome {
                     result: InterpreterResult {
                         result: InstructionResult::Revert,
-                        output: Bytes::from_iter(String::from("zk vm halted").as_bytes()),
+                        output: Bytes::from_iter(
+                            format!("error inspecting zkEVM: {err:?}").as_bytes(),
+                        ),
                         gas,
                     },
                     memory_offset: call.return_memory_offset.clone(),
-                }),
+                })
             }
         }
-
-        None
     }
 }
 
