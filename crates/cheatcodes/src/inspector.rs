@@ -907,7 +907,7 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            if let Some(result) = self.zk_handle_create(ecx, input, executor) {
+            if let Some(result) = self.try_create_in_zk(ecx, input, executor) {
                 return Some(result);
             }
         }
@@ -915,8 +915,10 @@ impl Cheatcodes {
         None
     }
 
-    /// Handle the `CREATE` within zkEVM and return the result.
-    fn zk_handle_create<DB, Input>(
+    /// Try handling the `CREATE` within zkEVM.
+    /// If `Some` is returned then the result must be returned immediately, else the call must be
+    /// handled in EVM.
+    fn try_create_in_zk<DB, Input>(
         &mut self,
         ecx: &mut EvmContext<DB>,
         input: Input,
@@ -1447,7 +1449,7 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            if let Some(result) = self.zk_handle_call(ecx, call, executor) {
+            if let Some(result) = self.try_call_in_zk(ecx, call, executor) {
                 return Some(result);
             }
         }
@@ -1455,8 +1457,10 @@ impl Cheatcodes {
         None
     }
 
-    /// Handle the `CALL` within zkEVM and return the result.
-    fn zk_handle_call<DB>(
+    /// Try handling the `CALL` within zkEVM.
+    /// If `Some` is returned then the result must be returned immediately, else the call must be
+    /// handled in EVM.
+    fn try_call_in_zk<DB>(
         &mut self,
         ecx: &mut EvmContext<DB>,
         call: &mut CallInputs,
