@@ -915,7 +915,7 @@ impl Cheatcodes {
         None
     }
 
-    // Handle the `CREATE` within zkEVM and return the result
+    /// Handle the `CREATE` within zkEVM and return the result.
     fn zk_handle_create<DB, Input>(
         &mut self,
         ecx: &mut EvmContext<DB>,
@@ -1455,7 +1455,7 @@ impl Cheatcodes {
         None
     }
 
-    // Handle the `CALL` within zkEVM and return the result
+    /// Handle the `CALL` within zkEVM and return the result.
     fn zk_handle_call<DB>(
         &mut self,
         ecx: &mut EvmContext<DB>,
