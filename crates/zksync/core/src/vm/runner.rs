@@ -297,7 +297,7 @@ fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMa
     block_hashes
 }
 
-/// Get the number of historical blocks to fetch for mapping to block hashes from env. 
+/// Get the number of historical blocks to fetch, from the env.
 /// Default: `256`.
 fn get_env_historical_block_count() -> u32 {
     let name = "ZK_DEBUG_HISTORICAL_BLOCK_HASHES";
