@@ -475,6 +475,12 @@ impl MultiContractRunnerBuilder {
                     warn!("Abi not found for contract {}", id.identifier());
                 }
             }
+
+            // Extend zk contracts with solc contracts as well. This is required for traces to
+            // accurately detect contract names deployed in EVM mode, and when using
+            // `vm.zkVmSkip()` cheatcode.
+            zk_contracts_map.extend(linked_contracts);
+
             known_contracts = ContractsByArtifact::new(zk_contracts_map);
         }
 
