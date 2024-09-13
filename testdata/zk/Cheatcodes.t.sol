@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
+import {Greeter} from "./Greeter.sol";
 import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 import {Globals} from "./Globals.sol";
@@ -312,5 +313,38 @@ contract ZkCheatcodesInZkVmTest is DSTest {
         uint256 got = helper.getZkBalance(vm, target);
 
         assertEq(expected, got);
+    }
+}
+
+contract ZkCheatcodesGetRawCodeHashTest is DSTest {
+    Vm constant vm = Vm(HEVM_ADDRESS);
+    UsesCheatcodes helper;
+
+    function setUp() external {
+        vm.zkVm(true);
+        helper = new UsesCheatcodes();
+        // ensure we can call cheatcodes from the helper
+        vm.allowCheatcodes(address(helper));
+        // and that the contract is kept between vm switches
+        vm.makePersistent(address(helper));
+    }
+
+    function testZkGetRawCodeHash() public {
+        Greeter greet = new Greeter();
+        address deployedAddress = address(greet);
+
+        (bool success, bytes memory returnData) = address(vm).call(
+            abi.encodeWithSignature("getRawCodeHash(address)", deployedAddress)
+        );
+        require(success, "getRawCodeHash call failed");
+
+        bytes32 rawCodeHash = abi.decode(returnData, (bytes32));
+        assertTrue(rawCodeHash != bytes32(0), "The bytecode hash should not be empty");
+
+        // Retrieve the bytecode from the compiled artifact
+        string memory artifact = vm.readFile("./zkout/Greeter.sol/Greeter.0.8.18.json");
+        bytes32 expectedBytecodeHash = vm.parseJsonBytes32(artifact, ".hash");
+
+        assertEq(rawCodeHash, expectedBytecodeHash, "The bytecode hash does not match the expected hash from the artifact");
     }
 }

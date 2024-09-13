@@ -121,3 +121,11 @@ async fn test_zk_cheatcodes_in_zkvm() {
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_contract_get_raw_code_hash() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new("testZkGetRawCodeHash", "ZkCheatcodesGetRawCodeHashTest", ".*");
+
+    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+}
