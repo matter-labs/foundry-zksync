@@ -354,16 +354,16 @@ contract ZkCheatcodeZkVmSkipTest is DSTest {
         vm.makePersistent(address(helper));
     }
 
-    function testFail_ContractUsesCheatcodesInEvmWithSkip() external {
+    function testFail_UseCheatcodesInZkVmWithoutSkip() external {
         helper.exec();
     }
 
-    function testContractUsesCheatcodesInEvmWithSkip() external {
+    function testUseCheatcodesInEvmWithSkip() external {
         vm.zkVmSkip();
         helper.exec();
     }
 
-    function testContractDeploysInEvmWithSkipAndCallsAutoSkip() external {
+    function testAutoSkipAfterDeployInEvmWithSkip() external {
         vm.zkVmSkip();
         EvmTargetContract helper2 = new EvmTargetContract();
 
