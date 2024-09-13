@@ -275,10 +275,12 @@ pub fn encode_create_params(
     signature.iter().copied().chain(params).collect()
 }
 
-/// Get last 256 block hashes mapped to block numbers. This excludes the current block.
+/// Get historical block hashes mapped to block numbers. This excludes the current block.
 fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMap<rU256, B256> {
     let mut block_hashes = HashMap::default();
-    for i in 1..=256u32 {
+    let num_blocks = get_env_historical_block_count();
+    tracing::debug!("fetching last {num_blocks} block hashes");
+    for i in 1..=num_blocks {
         let (block_number, overflow) =
             ecx.env.block.number.overflowing_sub(alloy_primitives::U256::from(i));
         if overflow {
@@ -293,4 +295,17 @@ fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMa
     }
 
     block_hashes
+}
+
+/// Get the number of historical blocks to fetch for mapping to block hashes from env. Default: `256`.
+fn get_env_historical_block_count() -> u32 {
+    let name = "ZK_DEBUG_HISTORICAL_BLOCK_HASHES";
+    std::env::var(name)
+        .map(|value| {
+            value.parse::<u32>().unwrap_or_else(|err| {
+                panic!("failed parsing env variable {}={}, {:?}", name, value, err)
+            })
+        })
+        .map(|num| num.min(256))
+        .unwrap_or(256)
 }
