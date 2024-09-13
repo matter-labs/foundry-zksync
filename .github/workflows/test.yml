@@ -129,7 +129,7 @@ jobs:
         - uses: actions/checkout@v4
         - name: Install foundry-zksync
           run: |
-            curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
+            cd /tmp && curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
         - name: Verify installation
           run: forge --version
 
