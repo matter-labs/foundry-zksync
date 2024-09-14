@@ -1498,7 +1498,7 @@ impl Cheatcodes {
 
         if let TransactTo::Call(test_contract) = ecx.env.tx.transact_to {
             if call.bytecode_address == test_contract {
-                info!("running call in EVM, instead of zkEVM (Test Contract) {:#?}", ecx.env);
+                info!("running call in EVM, instead of zkEVM (Test Contract) {:#?}", ecx.env.tx);
                 return None
             }
         }
