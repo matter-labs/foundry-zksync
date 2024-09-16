@@ -5970,7 +5970,7 @@ dependencies = [
 
 [[package]]
 name = "gix-path"
-version = "0.10.10"
+version = "0.10.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38d5b8722112fa2fa87135298780bc833b0e9f6c56cc82795d209804b3a03484"
 dependencies = [
