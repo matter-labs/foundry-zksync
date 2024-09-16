@@ -142,7 +142,7 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
                 .push((ctx.evm.journaled_state.depth(), call_inputs.clone()));
 
             // Sanity check that CREATE2 deployer exists.
-            let code_hash = ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.0.info.code_hash;
+            let code_hash = ctx.evm.load_account(call_inputs.target_address)?.0.info.code_hash;
             if code_hash == KECCAK_EMPTY {
                 return Ok(FrameOrResult::Result(FrameResult::Call(CallOutcome {
                     result: InterpreterResult {
@@ -184,17 +184,29 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
 
                 // Decode address from output.
                 let address = match outcome.instruction_result() {
-                    return_ok!() => Address::try_from(outcome.output().as_ref())
-                        .map_err(|_| {
+                    return_ok!() => {
+                        let output = outcome.output();
+
+                        // Here we need to handle both evm and zksync return data to parse the
+                        // address
+                        if output.len() == 20 {
+                            Some(Address::from_slice(output))
+                        } else if output.len() >= 32 {
+                            // Address in the last 20 bytes of a 32-byte word due to the zksync
+                            // return data
+                            Some(Address::from_slice(&output[12..32]))
+                        } else {
                             outcome.result = InterpreterResult {
                                 result: InstructionResult::Revert,
                                 output: "invalid CREATE2 factory output".into(),
                                 gas: Gas::new(call_inputs.gas_limit),
                             };
-                        })
-                        .ok(),
+                            None
+                        }
+                    }
                     _ => None,
                 };
+
                 frame
                     .frame_data_mut()
                     .interpreter

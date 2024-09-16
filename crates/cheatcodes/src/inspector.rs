@@ -26,7 +26,10 @@ use foundry_config::Config;
 use foundry_evm_core::{
     abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
-    constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER_CODE},
+    constants::{
+        CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
+        DEFAULT_CREATE2_DEPLOYER_CODE, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+    },
     decode::decode_console_log,
     utils::new_evm_with_existing_context,
     InspectorExt,
@@ -34,7 +37,8 @@ use foundry_evm_core::{
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
+    get_account_code_key, get_balance_key, get_nonce_key, hash_bytecode, Call,
+    ZkTransactionMetadata,
 };
 use itertools::Itertools;
 use revm::{
@@ -1183,6 +1187,37 @@ impl Cheatcodes {
             return None;
         }
 
+        let mut create2_factory_deps = Vec::new();
+
+        if call.target_address == DEFAULT_CREATE2_DEPLOYER && self.use_zk_vm {
+            call.target_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
+            call.bytecode_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
+
+            let (salt, init_code) = call.input.split_at(32);
+            let contract = self
+                .dual_compiled_contracts
+                .find_by_evm_bytecode(init_code)
+                .unwrap_or_else(|| panic!("failed finding contract for {:?}", init_code));
+
+            create2_factory_deps.push(contract.zk_deployed_bytecode.clone());
+
+            let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
+
+            // This is a hack to pass it to the call
+            self.persisted_factory_deps
+                .extend(factory_deps.into_iter().map(|v| (hash_bytecode(&v), v)));
+
+            let constructor_input = init_code[contract.evm_bytecode.len()..].to_vec();
+
+            let create_input = foundry_zksync_core::encode_create_params(
+                &CreateScheme::Create2 { salt: U256::from_be_slice(salt) },
+                contract.zk_bytecode_hash,
+                constructor_input,
+            );
+
+            call.input = create_input.into();
+        }
+
         // Handle expected calls
 
         // Grab the different calldatas expected.
@@ -1307,7 +1342,13 @@ impl Cheatcodes {
 
                     let zk_tx = if self.use_zk_vm {
                         // We shouldn't need factory_deps for CALLs
-                        Some(ZkTransactionMetadata { factory_deps: Default::default() })
+                        if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                            Some(ZkTransactionMetadata {
+                                factory_deps: create2_factory_deps.clone(),
+                            })
+                        } else {
+                            Some(ZkTransactionMetadata { factory_deps: Default::default() })
+                        }
                     } else {
                         None
                     };
@@ -1415,7 +1456,12 @@ impl Cheatcodes {
                 accesses: self.accesses.as_mut(),
                 persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             };
-            if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
+            if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(
+                call,
+                ecx,
+                ccx,
+                create2_factory_deps.clone(),
+            ) {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
                     executor.console_log(

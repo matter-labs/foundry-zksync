@@ -174,6 +174,7 @@ pub fn call<DB, E>(
     call: &CallInputs,
     ecx: &mut EvmContext<DB>,
     mut ccx: CheatcodeTracerContext,
+    factory_deps: Vec<Vec<u8>>,
 ) -> ZKVMResult<E>
 where
     DB: Database,
@@ -200,7 +201,7 @@ where
             CallValue::Transfer(value) => value.to_u256(),
             _ => U256::zero(),
         },
-        Default::default(),
+        factory_deps,
         PaymasterParams::default(),
     );
 
