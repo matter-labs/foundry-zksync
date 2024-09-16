@@ -51,7 +51,7 @@ use revm::{
 use rustc_hash::FxHashMap;
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
@@ -348,6 +348,17 @@ pub struct Cheatcodes {
     /// Use ZK-VM to execute CALLs and CREATEs.
     pub use_zk_vm: bool,
 
+    /// When in zkEVM context, execute the next CALL or CREATE in the EVM instead.
+    pub skip_zk_vm: bool,
+
+    /// Any contracts that were deployed in `skip_zk_vm` step.
+    /// This makes it easier to dispatch calls to any of these addresses in zkEVM context, directly
+    /// to EVM. Alternatively, we'd need to add `vm.zkVmSkip()` to these calls manually.
+    pub skip_zk_vm_addresses: HashSet<Address>,
+
+    /// Records the next create address for `skip_zk_vm_addresses`.
+    pub record_next_create_address: bool,
+
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
 
@@ -444,6 +455,9 @@ impl Cheatcodes {
             pc: Default::default(),
             breakpoints: Default::default(),
             use_zk_vm: Default::default(),
+            skip_zk_vm: Default::default(),
+            skip_zk_vm_addresses: Default::default(),
+            record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
         }
     }
@@ -893,40 +907,74 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            info!("running create in zk vm");
-            if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
-                info!("ignoring DEFAULT_CREATE2_DEPLOYER_CODE for zk");
-                return None
+            if let Some(result) = self.try_create_in_zk(ecx, input, executor) {
+                return Some(result);
             }
+        }
 
-            let zk_contract = self
-                .dual_compiled_contracts
-                .find_by_evm_bytecode(&input.init_code().0)
-                .unwrap_or_else(|| panic!("failed finding contract for {:?}", input.init_code()));
+        None
+    }
 
-            let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
-            tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
+    /// Try handling the `CREATE` within zkEVM.
+    /// If `Some` is returned then the result must be returned immediately, else the call must be
+    /// handled in EVM.
+    fn try_create_in_zk<DB, Input>(
+        &mut self,
+        ecx: &mut EvmContext<DB>,
+        input: Input,
+        executor: &mut impl CheatcodesExecutor,
+    ) -> Option<CreateOutcome>
+    where
+        DB: DatabaseExt,
+        Input: CommonCreateInput<DB>,
+    {
+        if self.skip_zk_vm {
+            self.skip_zk_vm = false; // handled the skip, reset flag
+            self.record_next_create_address = true;
+            info!("running create in EVM, instead of zkEVM (skipped)");
+            return None
+        }
 
-            let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
-                mocked_calls: self.mocked_calls.clone(),
-                expected_calls: Some(&mut self.expected_calls),
-                accesses: self.accesses.as_mut(),
-                persisted_factory_deps: Some(&mut self.persisted_factory_deps),
-            };
-            let create_inputs = CreateInputs {
-                scheme: input.scheme().unwrap_or(CreateScheme::Create),
-                init_code: input.init_code(),
-                value: input.value(),
-                caller: input.caller(),
-                gas_limit: input.gas_limit(),
-            };
-            if let Ok(result) = foundry_zksync_core::vm::create::<_, DatabaseError>(
-                &create_inputs,
-                zk_contract,
-                factory_deps,
-                ecx,
-                ccx,
-            ) {
+        if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
+            info!("running create in EVM, instead of zkEVM (DEFAULT_CREATE2_DEPLOYER_CODE)");
+            return None
+        }
+
+        info!("running create in zkEVM");
+
+        let zk_contract = self
+            .dual_compiled_contracts
+            .find_by_evm_bytecode(&input.init_code().0)
+            .unwrap_or_else(|| panic!("failed finding contract for {:?}", input.init_code()));
+
+        let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
+        tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
+
+        let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
+            mocked_calls: self.mocked_calls.clone(),
+            expected_calls: Some(&mut self.expected_calls),
+            accesses: self.accesses.as_mut(),
+            persisted_factory_deps: Some(&mut self.persisted_factory_deps),
+        };
+        let create_inputs = CreateInputs {
+            scheme: input.scheme().unwrap_or(CreateScheme::Create),
+            init_code: input.init_code(),
+            value: input.value(),
+            caller: input.caller(),
+            gas_limit: input.gas_limit(),
+        };
+
+        // We currently exhaust the entire gas for the call as zkEVM returns a very high
+        // amount of gas that OOGs revm.
+        let gas = Gas::new(input.gas_limit());
+        match foundry_zksync_core::vm::create::<_, DatabaseError>(
+            &create_inputs,
+            zk_contract,
+            factory_deps,
+            ecx,
+            ccx,
+        ) {
+            Ok(result) => {
                 if let Some(recorded_logs) = &mut self.recorded_logs {
                     recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
                         topics: log.data.topics().to_vec(),
@@ -959,7 +1007,7 @@ impl Cheatcodes {
                     }
                 }
 
-                return match result.execution_result {
+                match result.execution_result {
                     ExecutionResult::Success { output, .. } => match output {
                         Output::Create(bytes, address) => Some(CreateOutcome {
                             result: InterpreterResult {
@@ -996,9 +1044,20 @@ impl Cheatcodes {
                     }),
                 }
             }
+            Err(err) => {
+                error!("error inspecting zkEVM: {err:?}");
+                Some(CreateOutcome {
+                    result: InterpreterResult {
+                        result: InstructionResult::Revert,
+                        output: Bytes::from_iter(
+                            format!("error inspecting zkEVM: {err:?}").as_bytes(),
+                        ),
+                        gas,
+                    },
+                    address: None,
+                })
+            }
         }
-
-        None
     }
 
     // common create_end functionality for both legacy and EOF.
@@ -1111,6 +1170,14 @@ impl Cheatcodes {
                 }
             }
         }
+
+        if self.record_next_create_address {
+            self.record_next_create_address = false;
+            if let Some(address) = outcome.address {
+                self.skip_zk_vm_addresses.insert(address);
+            }
+        }
+
         outcome
     }
 
@@ -1400,22 +1467,56 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            if let TransactTo::Call(test_contract) = ecx.env.tx.transact_to {
-                if call.bytecode_address == test_contract {
-                    info!("using evm for calls to test contract {:?}", ecx.env);
-                    return None
-                }
+            if let Some(result) = self.try_call_in_zk(ecx, call, executor) {
+                return Some(result);
             }
+        }
 
-            info!("running call in zk vm {:#?}", call);
+        None
+    }
 
-            let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
-                mocked_calls: self.mocked_calls.clone(),
-                expected_calls: Some(&mut self.expected_calls),
-                accesses: self.accesses.as_mut(),
-                persisted_factory_deps: Some(&mut self.persisted_factory_deps),
-            };
-            if let Ok(result) = foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
+    /// Try handling the `CALL` within zkEVM.
+    /// If `Some` is returned then the result must be returned immediately, else the call must be
+    /// handled in EVM.
+    fn try_call_in_zk<DB>(
+        &mut self,
+        ecx: &mut EvmContext<DB>,
+        call: &mut CallInputs,
+        executor: &mut impl CheatcodesExecutor,
+    ) -> Option<CallOutcome>
+    where
+        DB: DatabaseExt,
+    {
+        // also skip if the target was created during a zkEVM skip
+        self.skip_zk_vm =
+            self.skip_zk_vm || self.skip_zk_vm_addresses.contains(&call.target_address);
+        if self.skip_zk_vm {
+            self.skip_zk_vm = false; // handled the skip, reset flag
+            info!("running create in EVM, instead of zkEVM (skipped) {:#?}", call);
+            return None;
+        }
+
+        if let TransactTo::Call(test_contract) = ecx.env.tx.transact_to {
+            if call.bytecode_address == test_contract {
+                info!("running call in EVM, instead of zkEVM (Test Contract) {:#?}", ecx.env.tx);
+                return None
+            }
+        }
+
+        info!("running call in zkEVM {:#?}", call);
+
+        let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
+            mocked_calls: self.mocked_calls.clone(),
+            expected_calls: Some(&mut self.expected_calls),
+            accesses: self.accesses.as_mut(),
+            persisted_factory_deps: Some(&mut self.persisted_factory_deps),
+        };
+
+        // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
+        // of gas that OOGs revm.
+        let gas = Gas::new(call.gas_limit);
+        match foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
+            Ok(result) => {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
                     executor.console_log(
@@ -1451,7 +1552,7 @@ impl Cheatcodes {
                     }
                 }
 
-                return match result.execution_result {
+                match result.execution_result {
                     ExecutionResult::Success { output, .. } => match output {
                         Output::Call(bytes) => Some(CallOutcome {
                             result: InterpreterResult {
@@ -1488,9 +1589,20 @@ impl Cheatcodes {
                     }),
                 }
             }
+            Err(err) => {
+                error!("error inspecting zkEVM: {err:?}");
+                Some(CallOutcome {
+                    result: InterpreterResult {
+                        result: InstructionResult::Revert,
+                        output: Bytes::from_iter(
+                            format!("error inspecting zkEVM: {err:?}").as_bytes(),
+                        ),
+                        gas,
+                    },
+                    memory_offset: call.return_memory_offset.clone(),
+                })
+            }
         }
-
-        None
     }
 }
 
