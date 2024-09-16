@@ -1197,7 +1197,7 @@ impl Cheatcodes {
             let contract = self
                 .dual_compiled_contracts
                 .find_by_evm_bytecode(init_code)
-                .unwrap_or_else(|| panic!("failed finding contract for {:?}", init_code));
+                .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
 
             create2_factory_deps.push(contract.zk_deployed_bytecode.clone());
 
