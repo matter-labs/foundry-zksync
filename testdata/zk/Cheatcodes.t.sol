@@ -314,3 +314,60 @@ contract ZkCheatcodesInZkVmTest is DSTest {
         assertEq(expected, got);
     }
 }
+
+contract Calculator {
+    event Added(uint8 indexed sum);
+
+    function add(uint8 a, uint8 b) public returns (uint8) {
+        uint8 sum = a + b;
+        emit Added(sum);
+        return sum;
+    }
+}
+
+contract EvmTargetContract is DSTest {
+    Vm constant vm = Vm(HEVM_ADDRESS);
+
+    event Added(uint8 indexed sum);
+
+    function exec() public {
+        // We emit the event we expect to see.
+        vm.expectEmit();
+        emit Added(3);
+
+        Calculator calc = new Calculator(); // deployed on zkEVM
+        uint8 sum = calc.add(1, 2); // deployed on zkEVM
+        assertEq(3, sum);
+    }
+}
+
+contract ZkCheatcodeZkVmSkipTest is DSTest {
+    Vm constant vm = Vm(HEVM_ADDRESS);
+    EvmTargetContract helper;
+
+    function setUp() external {
+        vm.zkVm(true);
+        helper = new EvmTargetContract();
+        // ensure we can call cheatcodes from the helper
+        vm.allowCheatcodes(address(helper));
+        // and that the contract is kept between vm switches
+        vm.makePersistent(address(helper));
+    }
+
+    function testFail_UseCheatcodesInZkVmWithoutSkip() external {
+        helper.exec();
+    }
+
+    function testUseCheatcodesInEvmWithSkip() external {
+        vm.zkVmSkip();
+        helper.exec();
+    }
+
+    function testAutoSkipAfterDeployInEvmWithSkip() external {
+        vm.zkVmSkip();
+        EvmTargetContract helper2 = new EvmTargetContract();
+
+        // this should auto execute in EVM
+        helper2.exec();
+    }
+}

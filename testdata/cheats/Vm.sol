@@ -697,4 +697,5 @@ interface Vm {
         bytes calldata zkDeployedBytecode
     ) external pure;
     function zkVm(bool enable) external pure;
+    function zkVmSkip() external pure;
 }
