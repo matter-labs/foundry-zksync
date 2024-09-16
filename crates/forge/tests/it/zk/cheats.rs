@@ -121,3 +121,11 @@ async fn test_zk_cheatcodes_in_zkvm() {
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_zk_vm_skip_works() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new(".*", "ZkCheatcodeZkVmSkipTest", ".*");
+
+    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+}
