@@ -29,9 +29,9 @@ use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     l2::L2Tx, vm_trace::Call, PackedEthSignature, StorageKey, Transaction, VmEvent,
-    ACCOUNT_CODE_STORAGE_ADDRESS,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
 };
-use zksync_utils::{h256_to_account_address, h256_to_u256, u256_to_h256};
+use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
@@ -188,7 +188,7 @@ where
     let storage_ptr =
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
-    let InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces } =
+    let InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces, create_outcome } =
         inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
 
     if let Some(record) = &mut era_db.accesses {
@@ -225,8 +225,20 @@ where
             } else {
                 None
             };
+            // in zkEVM the output is the 0-padded address, we replace this with the deployed
+            // bytecode so the traces can pick it up correctly
             let output = if is_create {
-                Output::Create(Bytes::from(result), address.map(ConvertH160::to_address))
+                let create_result = match (address, create_outcome) {
+                    (Some(address), Some(create_outcome)) => {
+                        if address == create_outcome.address {
+                            create_outcome.bytecode
+                        } else {
+                            result
+                        }
+                    }
+                    _ => result,
+                };
+                Output::Create(Bytes::from(create_result), address.map(ConvertH160::to_address))
             } else {
                 Output::Call(Bytes::from(result))
             };
@@ -345,11 +357,19 @@ where
     Ok(execution_result)
 }
 
+#[allow(dead_code)]
+struct InnerCreateOutcome {
+    address: H160,
+    hash: H256,
+    bytecode: Vec<u8>,
+}
+
 struct InnerZkVmResult {
     tx_result: VmExecutionResultAndLogs,
     bytecodes: HashMap<U256, Vec<U256>>,
     modified_storage: HashMap<StorageKey, H256>,
     call_traces: Vec<Call>,
+    create_outcome: Option<InnerCreateOutcome>,
 }
 
 fn inspect_inner<S: ReadStorage>(
@@ -380,6 +400,7 @@ fn inspect_inner<S: ReadStorage>(
         }
     }
     let is_static = call_ctx.is_static;
+    let is_create = call_ctx.is_create;
     let tracers = vec![
         CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
         CheatcodeTracer::new(
@@ -391,7 +412,7 @@ fn inspect_inner<S: ReadStorage>(
         .into_tracer_pointer(),
     ];
     let mut tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
-    let call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
+    let mut call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
     trace!(?tx_result.result, "zk vm result");
 
     match &tx_result.result {
@@ -434,8 +455,16 @@ fn inspect_inner<S: ReadStorage>(
         formatter::print_call(call, 0, &ShowCalls::All, show_outputs, resolve_hashes);
     }
 
+    let mut deployed_bytecode_hashes = HashMap::<H160, H256>::default();
     info!("==== {}", format!("{} events", tx_result.logs.events.len()));
     for event in &tx_result.logs.events {
+        if event.address == CONTRACT_DEPLOYER_ADDRESS {
+            deployed_bytecode_hashes.insert(
+                event.indexed_topics.get(3).cloned().unwrap_or_default().to_h160(),
+                event.indexed_topics.get(2).cloned().unwrap_or_default(),
+            );
+        }
+
         formatter::print_event(event, resolve_hashes);
     }
 
@@ -446,16 +475,73 @@ fn inspect_inner<S: ReadStorage>(
             bytecode_to_factory_dep(b.original.clone())
                 .expect("failed converting bytecode to factory dep")
         })
-        .collect();
+        .collect::<HashMap<U256, Vec<U256>>>();
     let modified_storage = if is_static {
         Default::default()
     } else {
         storage.borrow().modified_storage_keys().clone()
     };
 
-    InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces }
+    // patch CREATE traces.
+    for call in call_traces.iter_mut() {
+        call_traces_patch_create(&deployed_bytecode_hashes, &bytecodes, storage.clone(), call);
+    }
+
+    // define a CREATE outcome that contains the additional data necessary for upstream to set up
+    // the output result.
+    let create_outcome = if is_create {
+        match &tx_result.result {
+            ExecutionResult::Success { output } => {
+                let result = ethabi::decode(&[ethabi::ParamType::Bytes], output)
+                    .ok()
+                    .and_then(|result| result.first().cloned())
+                    .and_then(|result| result.into_bytes())
+                    .unwrap_or_default();
+
+                if result.len() == 32 {
+                    let address = h256_to_account_address(&H256::from_slice(&result));
+                    deployed_bytecode_hashes.get(&address).cloned().and_then(|hash| {
+                        bytecodes
+                            .get(&h256_to_u256(hash))
+                            .map(|words| be_words_to_bytes(words))
+                            .or_else(|| storage.borrow_mut().load_factory_dep(hash))
+                            .map(|bytecode| InnerCreateOutcome { address, hash, bytecode })
+                    })
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces, create_outcome }
 }
 
+/// Patch CREATE traces with bytecode as the data is empty bytes.
+fn call_traces_patch_create<S: ReadStorage>(
+    deployed_bytecode_hashes: &HashMap<H160, H256>,
+    bytecodes: &rHashMap<U256, Vec<U256>>,
+    storage: StoragePtr<StorageView<S>>,
+    call: &mut Call,
+) {
+    if matches!(call.r#type, zksync_types::vm_trace::CallType::Create) {
+        if let Some(hash) = deployed_bytecode_hashes.get(&call.to).cloned() {
+            let maybe_bytecode = bytecodes
+                .get(&h256_to_u256(hash))
+                .map(|words| be_words_to_bytes(words))
+                .or_else(|| storage.borrow_mut().load_factory_dep(hash));
+            if let Some(bytecode) = maybe_bytecode {
+                call.output = bytecode;
+            }
+        }
+    }
+    for subcall in &mut call.calls {
+        call_traces_patch_create(deployed_bytecode_hashes, bytecodes, storage.clone(), subcall);
+    }
+}
 /// Parse solidity's `console.log` events
 struct ConsoleLogParser {
     hardhat_console_address: H160,

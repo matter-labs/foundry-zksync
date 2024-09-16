@@ -293,7 +293,7 @@ impl<DB: Database> InspectorExt<DB> for TraceCollector {
                         CreateOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Return,
-                                output: Bytes::from(call.to.to_h256().0),
+                                output: Bytes::from(call.output),
                                 gas: Gas::new_spent(call.gas_used + extra_gas),
                             },
                             address: Some(call.to.to_address()),
