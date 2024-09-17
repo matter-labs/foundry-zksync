@@ -28,7 +28,7 @@ use foundry_evm_core::{
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
         CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
-        DEFAULT_CREATE2_DEPLOYER_CODE, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+        DEFAULT_CREATE2_DEPLOYER_CODE,
     },
     decode::decode_console_log,
     utils::new_evm_with_existing_context,
@@ -38,6 +38,7 @@ use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
 use itertools::Itertools;
 use revm::{
@@ -1499,7 +1500,7 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            if let Some(result) = self.try_call_in_zk(ecx, call, factory_deps, executor) {
+            if let Some(result) = self.try_call_in_zk(factory_deps, ecx, call, executor) {
                 return Some(result);
             }
         }
@@ -1512,10 +1513,10 @@ impl Cheatcodes {
     /// handled in EVM.
     fn try_call_in_zk<DB>(
         &mut self,
+        factory_deps: Vec<Vec<u8>>,
         ecx: &mut EvmContext<DB>,
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
-        factory_deps: Vec<Vec<u8>>,
     ) -> Option<CallOutcome>
     where
         DB: DatabaseExt,

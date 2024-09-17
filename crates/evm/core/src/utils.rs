@@ -1,12 +1,10 @@
 pub use crate::ic::*;
-use crate::{
-    constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_ZKSYNC},
-    InspectorExt,
-};
+use crate::{constants::DEFAULT_CREATE2_DEPLOYER, InspectorExt};
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Selector, TxKind, U256};
 use alloy_rpc_types::{Block, Transaction};
 use foundry_config::NamedChain;
+use foundry_zksync_core::DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
 use revm::{
     db::WrapDatabaseRef,
     handler::register::EvmHandler,
