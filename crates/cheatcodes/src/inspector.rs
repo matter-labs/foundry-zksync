@@ -45,7 +45,7 @@ use revm::{
     },
     primitives::{
         AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot,
-        ExecutionResult, HashMap as rHashMap, Output, TransactTo, KECCAK_EMPTY,
+        ExecutionResult, HashMap as rHashMap, Output, KECCAK_EMPTY,
     },
     EvmContext, InnerEvmContext, Inspector,
 };

@@ -21,34 +21,34 @@ contract Counter is DeployOnlyInZkVm {
 }
 
 contract CounterHandler is DSTest {
-   Vm constant vm = Vm(HEVM_ADDRESS);
+    Vm constant vm = Vm(HEVM_ADDRESS);
 
-   uint256 public incCounter;
-   uint256 public resetCounter;
-   bool public isResetLast;
-   Counter public counter;
+    uint256 public incCounter;
+    uint256 public resetCounter;
+    bool public isResetLast;
+    Counter public counter;
 
-   constructor(Counter _counter) {
-       counter = _counter;
-   }
+    constructor(Counter _counter) {
+        counter = _counter;
+    }
 
-   function inc() public {
-       console.log("inc");
-       incCounter += 1;
-       isResetLast = false;
+    function inc() public {
+        console.log("inc");
+        incCounter += 1;
+        isResetLast = false;
 
-       vm.deal(tx.origin, 1 ether);  // ensure caller has funds
-       counter.inc();
-   }
+        vm.deal(tx.origin, 1 ether); // ensure caller has funds
+        counter.inc();
+    }
 
-   function reset() public {
-       console.log("reset");
-       resetCounter += 1;
-       isResetLast = true;
+    function reset() public {
+        console.log("reset");
+        resetCounter += 1;
+        isResetLast = true;
 
-       vm.deal(tx.origin, 1 ether); // ensure caller has funds
-       counter.reset();
-   }
+        vm.deal(tx.origin, 1 ether); // ensure caller has funds
+        counter.reset();
+    }
 }
 
 // partial from forge-std/StdInvariant.sol
@@ -59,11 +59,13 @@ abstract contract StdInvariant {
     }
 
     address[] internal _targetedContracts;
+
     function targetContracts() public view returns (address[] memory) {
         return _targetedContracts;
     }
 
     FuzzSelector[] internal _targetedSelectors;
+
     function targetSelectors() public view returns (FuzzSelector[] memory) {
         return _targetedSelectors;
     }
@@ -98,7 +100,7 @@ contract Issue565 is DSTest, StdInvariant {
 
         if (handler.resetCounter() == 0) {
             assert(handler.incCounter() == num);
-        } else if (handler.isResetLast()){
+        } else if (handler.isResetLast()) {
             assert(num == 0);
         } else {
             assert(num != 0);

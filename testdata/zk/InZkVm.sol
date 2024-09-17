@@ -5,13 +5,13 @@ import {Globals} from "./Globals.sol";
 
 // excerpt from system-contracts
 interface ISystemContext {
-
-   function chainId() external view returns (uint256);
+    function chainId() external view returns (uint256);
 }
 
 library InZkVmLib {
     function _inZkVm() internal returns (bool) {
-        (bool success, bytes memory retdata) = Globals.SYSTEM_CONTEXT_ADDR.call(abi.encodeWithSelector(ISystemContext.chainId.selector));
+        (bool success, bytes memory retdata) =
+            Globals.SYSTEM_CONTEXT_ADDR.call(abi.encodeWithSelector(ISystemContext.chainId.selector));
 
         return success;
     }

@@ -38,12 +38,12 @@ async fn repro_config(
 test_repro!(497);
 
 #[tokio::test(flavor = "multi_thread")]
-async fn issue_565(){
+async fn issue_565() {
     let mut test_data = ForgeTestData::new(ForgeTestProfile::Default);
     // FIXME: just use the inline config
     test_data.test_opts.invariant.no_zksync_reserved_addresses = true;
     test_data.test_opts.invariant.fail_on_revert = true;
     test_data.test_opts.invariant.runs = 2;
 
-    repro_config(565,false,None.into(), &test_data).await.run().await;
+    repro_config(565, false, None, &test_data).await.run().await;
 }
