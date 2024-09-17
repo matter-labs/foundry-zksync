@@ -287,13 +287,10 @@ impl<DB: Database> InspectorExt<DB> for TraceCollector {
                             address: None,
                         }
                     } else {
-                        // zkEVM traces do not have the create address in output
-                        // it's always an empty slice, so we fill it from the `call.to`
-                        // which contains the correct address
                         CreateOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Return,
-                                output: Bytes::from(call.to.to_h256().0),
+                                output: Bytes::from(call.output),
                                 gas: Gas::new_spent(call.gas_used + extra_gas),
                             },
                             address: Some(call.to.to_address()),

@@ -162,7 +162,7 @@ pub trait CheatcodesExecutor {
         self.get_inspector::<DB>(ccx.state).console_log(message);
     }
 
-    fn trace<DB: DatabaseExt>(
+    fn trace_zksync<DB: DatabaseExt>(
         &mut self,
         ccx_state: &mut Cheatcodes,
         ecx: &mut EvmContext<DB>,
@@ -1001,7 +1001,7 @@ impl Cheatcodes {
                 });
 
                 // append traces
-                executor.trace(self, ecx, result.call_traces);
+                executor.trace_zksync(self, ecx, result.call_traces);
 
                 // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
@@ -1575,7 +1575,7 @@ impl Cheatcodes {
                     }
 
                     // append traces
-                    executor.trace(self, ecx, result.call_traces);
+                    executor.trace_zksync(self, ecx, result.call_traces);
 
                     // for each log in cloned logs call handle_expect_emit
                     if !self.expected_emits.is_empty() {
