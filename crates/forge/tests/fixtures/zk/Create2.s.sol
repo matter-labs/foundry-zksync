@@ -3,7 +3,6 @@ pragma solidity ^0.8.18;
 
 import {Script} from "forge-std/Script.sol";
 import {Greeter} from "../src/Greeter.sol";
-import {CustomNumber} from "../src/CustomNumber.sol";
 
 contract Create2Script is Script {
     function run() external {
@@ -22,14 +21,6 @@ contract Create2Script is Script {
         // Test Greeter functionality
         string memory greeting = greeter.greeting("Alice");
         require(bytes(greeting).length > 0, "Greeter greeting failed");
-
-        // Deploy CustomNumber using create2 with a salt value
-        uint8 customNumberValue = 42;
-        CustomNumber customNumber = new CustomNumber{salt: "123" }(customNumberValue);
-
-        // Verify CustomNumber deployment and initial value
-        require(address(customNumber) != address(0), "CustomNumber deployment failed");
-        require(customNumber.number() == customNumberValue, "CustomNumber initial value mismatch");
 
         vm.stopBroadcast();
     }

@@ -37,7 +37,7 @@ use foundry_evm_core::{
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, hash_bytecode, Call,
+    get_account_code_key, get_balance_key, get_nonce_key, Call,
     ZkTransactionMetadata,
 };
 use itertools::Itertools;
@@ -1254,7 +1254,7 @@ impl Cheatcodes {
             return None;
         }
 
-        let mut create2_factory_deps = Vec::new();
+        let mut factory_deps = Vec::new();
 
         if call.target_address == DEFAULT_CREATE2_DEPLOYER && self.use_zk_vm {
             call.target_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
@@ -1266,13 +1266,7 @@ impl Cheatcodes {
                 .find_by_evm_bytecode(init_code)
                 .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
 
-            create2_factory_deps.push(contract.zk_deployed_bytecode.clone());
-
-            let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
-
-            // This is a hack to pass it to the call
-            self.persisted_factory_deps
-                .extend(factory_deps.into_iter().map(|v| (hash_bytecode(&v), v)));
+            factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
 
             let constructor_input = init_code[contract.evm_bytecode.len()..].to_vec();
 
@@ -1410,9 +1404,7 @@ impl Cheatcodes {
                     let zk_tx = if self.use_zk_vm {
                         // We shouldn't need factory_deps for CALLs
                         if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
-                            Some(ZkTransactionMetadata {
-                                factory_deps: create2_factory_deps.clone(),
-                            })
+                            Some(ZkTransactionMetadata { factory_deps: factory_deps.clone() })
                         } else {
                             Some(ZkTransactionMetadata { factory_deps: Default::default() })
                         }
@@ -1508,9 +1500,7 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            if let Some(result) =
-                self.try_call_in_zk(ecx, call, executor, &mut create2_factory_deps)
-            {
+            if let Some(result) = self.try_call_in_zk(ecx, call, executor, factory_deps) {
                 return Some(result);
             }
         }
@@ -1526,7 +1516,7 @@ impl Cheatcodes {
         ecx: &mut EvmContext<DB>,
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
-        create2_factory_deps: &mut [Vec<u8>],
+        create2_factory_deps: Vec<Vec<u8>>,
     ) -> Option<CallOutcome>
     where
         DB: DatabaseExt,
@@ -1563,7 +1553,7 @@ impl Cheatcodes {
             call,
             ecx,
             ccx,
-            create2_factory_deps.to_owned(),
+            create2_factory_deps,
         ) {
             Ok(result) => {
                 // append console logs from zkEVM to the current executor's LogTracer

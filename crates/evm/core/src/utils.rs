@@ -1,5 +1,8 @@
 pub use crate::ic::*;
-use crate::{constants::DEFAULT_CREATE2_DEPLOYER, InspectorExt};
+use crate::{
+    constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_ZKSYNC},
+    InspectorExt,
+};
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Selector, TxKind, U256};
 use alloy_rpc_types::{Block, Transaction};
@@ -187,21 +190,12 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
                     return_ok!() => {
                         let output = outcome.output();
 
-                        // Here we need to handle both evm and zksync return data to parse the
-                        // address
-                        if output.len() == 20 {
-                            Some(Address::from_slice(output))
-                        } else if output.len() >= 32 {
-                            // Address in the last 20 bytes of a 32-byte word due to the zksync
-                            // return data
+                        if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                            // ZkSync: Address in the last 20 bytes of a 32-byte word
                             Some(Address::from_slice(&output[12..32]))
                         } else {
-                            outcome.result = InterpreterResult {
-                                result: InstructionResult::Revert,
-                                output: "invalid CREATE2 factory output".into(),
-                                gas: Gas::new(call_inputs.gas_limit),
-                            };
-                            None
+                            // Standard EVM: Full output as address
+                            Some(Address::from_slice(output))
                         }
                     }
                     _ => None,
