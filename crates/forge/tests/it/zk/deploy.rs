@@ -28,6 +28,4 @@ fn setup_deploy_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
     prj.add_script("Deploy.s.sol", include_str!("../../fixtures/zk/Deploy.s.sol")).unwrap();
     prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
-    prj.add_source("CustomNumber.sol", include_str!("../../../../../testdata/zk/CustomNumber.sol"))
-        .unwrap();
 }

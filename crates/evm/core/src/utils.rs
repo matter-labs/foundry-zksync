@@ -145,11 +145,12 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
             // Sanity check that CREATE2 deployer exists.
             // We check which deployer we are using to separate the logic for zkSync and original
             // foundry.
-            let code_hash = if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER {
-                ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.0.info.code_hash
-            } else {
-                ctx.evm.load_account(call_inputs.target_address)?.0.info.code_hash
+            let mut code_hash = ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.0.info.code_hash;
+
+            if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                code_hash = ctx.evm.load_account(call_inputs.target_address)?.0.info.code_hash;
             };
+
             if code_hash == KECCAK_EMPTY {
                 return Ok(FrameOrResult::Result(FrameResult::Call(CallOutcome {
                     result: InterpreterResult {
@@ -196,6 +197,8 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
 
                         if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
                             // ZkSync: Address in the last 20 bytes of a 32-byte word
+                            // We want to error out if the address is not valid as
+                            // Address::from_slice() does
                             Some(Address::from_slice(&output[12..32]))
                         } else {
                             // Standard EVM: Full output as address
