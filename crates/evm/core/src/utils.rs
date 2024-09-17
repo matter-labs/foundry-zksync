@@ -145,7 +145,13 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
                 .push((ctx.evm.journaled_state.depth(), call_inputs.clone()));
 
             // Sanity check that CREATE2 deployer exists.
-            let code_hash = ctx.evm.load_account(call_inputs.target_address)?.0.info.code_hash;
+            // We check which deployer we are using to separate the logic for zkSync and original
+            // foundry.
+            let code_hash = if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER {
+                ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.0.info.code_hash
+            } else {
+                ctx.evm.load_account(call_inputs.target_address)?.0.info.code_hash
+            };
             if code_hash == KECCAK_EMPTY {
                 return Ok(FrameOrResult::Result(FrameResult::Call(CallOutcome {
                     result: InterpreterResult {
