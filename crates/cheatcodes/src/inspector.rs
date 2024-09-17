@@ -1499,7 +1499,7 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            if let Some(result) = self.try_call_in_zk(ecx, call, executor, factory_deps) {
+            if let Some(result) = self.try_call_in_zk(ecx, call, factory_deps, executor) {
                 return Some(result);
             }
         }
