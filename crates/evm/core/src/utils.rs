@@ -4,6 +4,7 @@ use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Selector, TxKind, U256};
 use alloy_rpc_types::{Block, Transaction};
 use foundry_config::NamedChain;
+use foundry_zksync_core::DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
 use revm::{
     db::WrapDatabaseRef,
     handler::register::EvmHandler,
@@ -142,7 +143,14 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
                 .push((ctx.evm.journaled_state.depth(), call_inputs.clone()));
 
             // Sanity check that CREATE2 deployer exists.
-            let code_hash = ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.0.info.code_hash;
+            // We check which deployer we are using to separate the logic for zkSync and original
+            // foundry.
+            let mut code_hash = ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.0.info.code_hash;
+
+            if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                code_hash = ctx.evm.load_account(call_inputs.target_address)?.0.info.code_hash;
+            };
+
             if code_hash == KECCAK_EMPTY {
                 return Ok(FrameOrResult::Result(FrameResult::Call(CallOutcome {
                     result: InterpreterResult {
@@ -184,17 +192,22 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
 
                 // Decode address from output.
                 let address = match outcome.instruction_result() {
-                    return_ok!() => Address::try_from(outcome.output().as_ref())
-                        .map_err(|_| {
-                            outcome.result = InterpreterResult {
-                                result: InstructionResult::Revert,
-                                output: "invalid CREATE2 factory output".into(),
-                                gas: Gas::new(call_inputs.gas_limit),
-                            };
-                        })
-                        .ok(),
+                    return_ok!() => {
+                        let output = outcome.output();
+
+                        if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                            // ZkSync: Address in the last 20 bytes of a 32-byte word
+                            // We want to error out if the address is not valid as
+                            // Address::from_slice() does
+                            Some(Address::from_slice(&output[12..32]))
+                        } else {
+                            // Standard EVM: Full output as address
+                            Some(Address::from_slice(output))
+                        }
+                    }
                     _ => None,
                 };
+
                 frame
                     .frame_data_mut()
                     .interpreter

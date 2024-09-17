@@ -54,6 +54,11 @@ pub const EMPTY_CODE: [u8; 32] = [0; 32];
 /// The minimum possible address that is not reserved in the zkSync space.
 const MIN_VALID_ADDRESS: u32 = 2u32.pow(16);
 
+/// The default CREATE2 deployer for zkSync (0x0000000000000000000000000000000000010000)
+/// See: https://github.com/zkSync-Community-Hub/zksync-developers/discussions/519
+pub const DEFAULT_CREATE2_DEPLOYER_ZKSYNC: Address =
+    address!("0000000000000000000000000000000000010000");
+
 /// The default test contract address in zkVM
 pub const TEST_CONTRACT_ADDRESS_ZKSYNC: Address =
     address!("7fa9385be102ac3eac297483dd6233d62b3e1496");

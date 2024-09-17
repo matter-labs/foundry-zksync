@@ -26,7 +26,10 @@ use foundry_config::Config;
 use foundry_evm_core::{
     abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
-    constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER_CODE},
+    constants::{
+        CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
+        DEFAULT_CREATE2_DEPLOYER_CODE,
+    },
     decode::decode_console_log,
     utils::new_evm_with_existing_context,
     InspectorExt,
@@ -35,7 +38,7 @@ use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
-    TEST_CONTRACT_ADDRESS_ZKSYNC,
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, TEST_CONTRACT_ADDRESS_ZKSYNC,
 };
 use itertools::Itertools;
 use revm::{
@@ -160,7 +163,7 @@ pub trait CheatcodesExecutor {
         self.get_inspector::<DB>(ccx.state).console_log(message);
     }
 
-    fn trace<DB: DatabaseExt>(
+    fn trace_zksync<DB: DatabaseExt>(
         &mut self,
         ccx_state: &mut Cheatcodes,
         ecx: &mut EvmContext<DB>,
@@ -999,7 +1002,7 @@ impl Cheatcodes {
                 });
 
                 // append traces
-                executor.trace(self, ecx, result.call_traces);
+                executor.trace_zksync(self, ecx, result.call_traces);
 
                 // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
@@ -1251,6 +1254,31 @@ impl Cheatcodes {
             return None;
         }
 
+        let mut factory_deps = Vec::new();
+
+        if call.target_address == DEFAULT_CREATE2_DEPLOYER && self.use_zk_vm {
+            call.target_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
+            call.bytecode_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
+
+            let (salt, init_code) = call.input.split_at(32);
+            let contract = self
+                .dual_compiled_contracts
+                .find_by_evm_bytecode(init_code)
+                .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
+
+            factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
+
+            let constructor_input = init_code[contract.evm_bytecode.len()..].to_vec();
+
+            let create_input = foundry_zksync_core::encode_create_params(
+                &CreateScheme::Create2 { salt: U256::from_be_slice(salt) },
+                contract.zk_bytecode_hash,
+                constructor_input,
+            );
+
+            call.input = create_input.into();
+        }
+
         // Handle expected calls
 
         // Grab the different calldatas expected.
@@ -1375,7 +1403,11 @@ impl Cheatcodes {
 
                     let zk_tx = if self.use_zk_vm {
                         // We shouldn't need factory_deps for CALLs
-                        Some(ZkTransactionMetadata { factory_deps: Default::default() })
+                        if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                            Some(ZkTransactionMetadata { factory_deps: factory_deps.clone() })
+                        } else {
+                            Some(ZkTransactionMetadata { factory_deps: Default::default() })
+                        }
                     } else {
                         None
                     };
@@ -1468,7 +1500,7 @@ impl Cheatcodes {
         }
 
         if self.use_zk_vm {
-            if let Some(result) = self.try_call_in_zk(ecx, call, executor) {
+            if let Some(result) = self.try_call_in_zk(factory_deps, ecx, call, executor) {
                 return Some(result);
             }
         }
@@ -1481,6 +1513,7 @@ impl Cheatcodes {
     /// handled in EVM.
     fn try_call_in_zk<DB>(
         &mut self,
+        factory_deps: Vec<Vec<u8>>,
         ecx: &mut EvmContext<DB>,
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
@@ -1517,7 +1550,7 @@ impl Cheatcodes {
         // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
         // of gas that OOGs revm.
         let gas = Gas::new(call.gas_limit);
-        match foundry_zksync_core::vm::call::<_, DatabaseError>(call, ecx, ccx) {
+        match foundry_zksync_core::vm::call::<_, DatabaseError>(call, factory_deps, ecx, ccx) {
             Ok(result) => {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {
@@ -1544,7 +1577,7 @@ impl Cheatcodes {
                     }
 
                     // append traces
-                    executor.trace(self, ecx, result.call_traces);
+                    executor.trace_zksync(self, ecx, result.call_traces);
 
                     // for each log in cloned logs call handle_expect_emit
                     if !self.expected_emits.is_empty() {
