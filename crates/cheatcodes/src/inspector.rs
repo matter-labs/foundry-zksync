@@ -35,6 +35,7 @@ use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
+    TEST_CONTRACT_ADDRESS_ZKSYNC,
 };
 use itertools::Itertools;
 use revm::{
@@ -1496,11 +1497,12 @@ impl Cheatcodes {
             return None;
         }
 
-        if let TransactTo::Call(test_contract) = ecx.env.tx.transact_to {
-            if call.bytecode_address == test_contract {
-                info!("running call in EVM, instead of zkEVM (Test Contract) {:#?}", ecx.env.tx);
-                return None
-            }
+        if call.bytecode_address == TEST_CONTRACT_ADDRESS_ZKSYNC {
+            info!(
+                "running call in EVM, instead of zkEVM (Test Contract) {:#?}",
+                call.bytecode_address
+            );
+            return None
         }
 
         info!("running call in zkEVM {:#?}", call);

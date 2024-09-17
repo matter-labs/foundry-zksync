@@ -19,7 +19,7 @@ pub mod vm;
 pub mod state;
 
 use alloy_network::{AnyNetwork, TxSigner};
-use alloy_primitives::{Address, Bytes, U256 as rU256};
+use alloy_primitives::{address, Address, Bytes, U256 as rU256};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
@@ -53,6 +53,10 @@ pub const EMPTY_CODE: [u8; 32] = [0; 32];
 
 /// The minimum possible address that is not reserved in the zkSync space.
 const MIN_VALID_ADDRESS: u32 = 2u32.pow(16);
+
+/// The default test contract address in zkVM
+pub const TEST_CONTRACT_ADDRESS_ZKSYNC: Address =
+    address!("7fa9385be102ac3eac297483dd6233d62b3e1496");
 
 /// Returns the balance key for a provided account address.
 pub fn get_balance_key(address: Address) -> rU256 {
