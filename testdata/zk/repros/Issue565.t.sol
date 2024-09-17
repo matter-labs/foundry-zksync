@@ -4,17 +4,18 @@ pragma solidity ^0.8.18;
 import "ds-test/test.sol";
 import "cheats/Vm.sol";
 import {Globals} from "../Globals.sol";
+import {DeployOnlyInZkVm} from "../InZkVm.sol";
 
 import "../../default/logs/console.sol";
 
-contract Counter {
+contract Counter is DeployOnlyInZkVm {
     uint256 public number;
 
-    function inc() public {
+    function inc() public inZkVm {
         number += 1;
     }
 
-    function reset() public {
+    function reset() public inZkVm {
         number = 0;
     }
 }
@@ -37,7 +38,6 @@ contract CounterHandler is DSTest {
        isResetLast = false;
 
        vm.deal(tx.origin, 1 ether);  // ensure caller has funds
-       vm.zkVm(true);
        counter.inc();
    }
 
@@ -47,7 +47,6 @@ contract CounterHandler is DSTest {
        isResetLast = true;
 
        vm.deal(tx.origin, 1 ether); // ensure caller has funds
-       vm.zkVm(true);
        counter.reset();
    }
 }
@@ -105,4 +104,26 @@ contract Issue565 is DSTest, StdInvariant {
             assert(num != 0);
         }
     }
+}
+
+contract Issue565WithoutHandler is DSTest, StdInvariant {
+    Vm constant vm = Vm(HEVM_ADDRESS);
+    Counter cnt;
+
+    function setUp() public {
+        cnt = new Counter();
+
+        // add the handler selectors to the fuzzing targets
+        bytes4[] memory selectors = new bytes4[](2);
+        selectors[0] = Counter.inc.selector;
+        selectors[1] = Counter.reset.selector;
+
+        _targetedContracts.push(address(cnt));
+        _targetedSelectors.push(FuzzSelector({addr: address(cnt), selectors: selectors}));
+    }
+
+    //FIXME: seems to not be detected, forcing values in test config
+    /// forge-config: default.invariant.fail-on-revert = true
+    /// forge-config: default.invariant.no-zksync-reserved-addresses = true
+    function invariant_itWorks() external {}
 }
