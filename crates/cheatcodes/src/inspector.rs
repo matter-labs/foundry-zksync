@@ -37,8 +37,7 @@ use foundry_evm_core::{
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, Call,
-    ZkTransactionMetadata,
+    get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
 };
 use itertools::Itertools;
 use revm::{
@@ -1516,7 +1515,7 @@ impl Cheatcodes {
         ecx: &mut EvmContext<DB>,
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
-        create2_factory_deps: Vec<Vec<u8>>,
+        factory_deps: Vec<Vec<u8>>,
     ) -> Option<CallOutcome>
     where
         DB: DatabaseExt,
@@ -1549,12 +1548,7 @@ impl Cheatcodes {
         // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
         // of gas that OOGs revm.
         let gas = Gas::new(call.gas_limit);
-        match foundry_zksync_core::vm::call::<_, DatabaseError>(
-            call,
-            ecx,
-            ccx,
-            create2_factory_deps,
-        ) {
+        match foundry_zksync_core::vm::call::<_, DatabaseError>(call, factory_deps, ecx, ccx) {
             Ok(result) => {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(decode_console_log).for_each(|decoded_log| {

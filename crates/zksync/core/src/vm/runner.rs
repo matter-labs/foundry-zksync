@@ -172,9 +172,9 @@ where
 /// Executes a CALL opcode on the ZK-VM.
 pub fn call<DB, E>(
     call: &CallInputs,
+    factory_deps: Vec<Vec<u8>>,
     ecx: &mut EvmContext<DB>,
     mut ccx: CheatcodeTracerContext,
-    factory_deps: Vec<Vec<u8>>,
 ) -> ZKVMResult<E>
 where
     DB: Database,
