@@ -43,6 +43,7 @@ async fn issue_565(){
     // FIXME: just use the inline config
     test_data.test_opts.invariant.no_zksync_reserved_addresses = true;
     test_data.test_opts.invariant.fail_on_revert = true;
+    test_data.test_opts.invariant.runs = 2;
 
     repro_config(565,false,None.into(), &test_data).await.run().await;
 }

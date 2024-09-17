@@ -24,6 +24,7 @@ contract CounterHandler is DSTest {
 
    uint256 public incCounter;
    uint256 public resetCounter;
+   bool public isResetLast;
    Counter public counter;
 
    constructor(Counter _counter) {
@@ -33,6 +34,7 @@ contract CounterHandler is DSTest {
    function inc() public {
        console.log("inc");
        incCounter += 1;
+       isResetLast = false;
 
        vm.deal(tx.origin, 1 ether);  // ensure caller has funds
        vm.zkVm(true);
@@ -42,6 +44,7 @@ contract CounterHandler is DSTest {
    function reset() public {
        console.log("reset");
        resetCounter += 1;
+       isResetLast = true;
 
        vm.deal(tx.origin, 1 ether); // ensure caller has funds
        vm.zkVm(true);
@@ -76,7 +79,7 @@ contract Issue565 is DSTest, StdInvariant {
     function setUp() public {
         cnt = new Counter();
 
-        vm.zkVm(false);
+        vm.zkVmSkip();
         handler = new CounterHandler(cnt);
 
         // add the handler selectors to the fuzzing targets
@@ -92,14 +95,14 @@ contract Issue565 is DSTest, StdInvariant {
     /// forge-config: default.invariant.fail-on-revert = true
     /// forge-config: default.invariant.no-zksync-reserved-addresses = true
     function invariant_ghostVariables() external {
-        vm.zkVm(true);
         uint256 num = cnt.number();
 
-        vm.zkVm(false);
         if (handler.resetCounter() == 0) {
             assert(handler.incCounter() == num);
+        } else if (handler.isResetLast()){
+            assert(num == 0);
         } else {
-            assert(handler.incCounter() != 0);
+            assert(num != 0);
         }
     }
 }
