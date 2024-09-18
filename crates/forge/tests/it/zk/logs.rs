@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use forge::revm::primitives::SpecId;
 use foundry_test_utils::Filter;
-use foundry_zksync_core::TEST_CONTRACT_ADDRESS_ZKSYNC;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_logs_work_in_call() {
@@ -24,7 +23,7 @@ async fn test_zk_logs_work_in_call() {
                 Some(vec![
                     "print".into(),
                     "outer print".into(),
-                    TEST_CONTRACT_ADDRESS_ZKSYNC.to_string(),
+                    "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496".into(),
                     "print".into(),
                     "0xff".into(),
                     "print".into(),
