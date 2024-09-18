@@ -59,10 +59,6 @@ const MIN_VALID_ADDRESS: u32 = 2u32.pow(16);
 pub const DEFAULT_CREATE2_DEPLOYER_ZKSYNC: Address =
     address!("0000000000000000000000000000000000010000");
 
-/// The default test contract address in zkVM
-pub const TEST_CONTRACT_ADDRESS_ZKSYNC: Address =
-    address!("7fa9385be102ac3eac297483dd6233d62b3e1496");
-
 /// Returns the balance key for a provided account address.
 pub fn get_balance_key(address: Address) -> rU256 {
     storage_key_for_eth_balance(&address.to_h160()).key().to_ru256()

@@ -1,9 +1,6 @@
 //! Invariant tests
 
-use crate::{
-    config::*,
-    test_helpers::{TEST_DATA_DEFAULT},
-};
+use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use forge::revm::primitives::SpecId;
 use foundry_test_utils::Filter;
 
