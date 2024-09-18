@@ -69,6 +69,12 @@ abstract contract StdInvariant {
     function targetSelectors() public view returns (FuzzSelector[] memory) {
         return _targetedSelectors;
     }
+
+    address[] internal _targetedSenders;
+
+    function targetSenders() public view returns (address[] memory) {
+        return _targetedSenders;
+    }
 }
 
 // https://github.com/matter-labs/foundry-zksync/issues/565
@@ -112,8 +118,20 @@ contract Issue565WithoutHandler is DSTest, StdInvariant {
     Vm constant vm = Vm(HEVM_ADDRESS);
     Counter cnt;
 
+    uint256 constant dealAmount = 1 ether;
+
     function setUp() public {
         cnt = new Counter();
+
+        // so we can fund them ahead of time for fees
+        _targetedSenders.push(address(65536 + 1));
+        _targetedSenders.push(address(65536 + 12));
+        _targetedSenders.push(address(65536 + 123));
+        _targetedSenders.push(address(65536 + 1234));
+
+        for (uint256 i = 0; i < _targetedSenders.length; i++) {
+            vm.deal(_targetedSenders[i], dealAmount);
+        }
 
         // add the handler selectors to the fuzzing targets
         bytes4[] memory selectors = new bytes4[](2);
