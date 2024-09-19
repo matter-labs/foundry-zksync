@@ -129,6 +129,7 @@ impl ScriptRunner {
         };
 
         let address = CALLER.create(self.executor.get_nonce(CALLER)?);
+        self.executor.backend_mut().set_test_contract(address);
 
         // Set the contracts initial balance before deployment, so it is available during the
         // construction
@@ -147,7 +148,6 @@ impl ScriptRunner {
 
         // Optionally call the `setUp` function
         let (success, gas_used, labeled_addresses, transactions) = if !setup {
-            self.executor.backend_mut().set_test_contract(address);
             (true, 0, Default::default(), Some(library_transactions))
         } else {
             match self.executor.setup(Some(self.evm_opts.sender), address, None) {
