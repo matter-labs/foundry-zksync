@@ -21,7 +21,7 @@ use foundry_cheatcodes_common::{
     mock::{MockCallDataContext, MockCallReturnData},
     record::RecordAccess,
 };
-use foundry_common::{evm::Breakpoints, SELECTOR_LEN};
+use foundry_common::{evm::Breakpoints, TransactionMaybeSigned, SELECTOR_LEN};
 use foundry_config::Config;
 use foundry_evm_core::{
     abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
@@ -219,12 +219,12 @@ impl Context {
 }
 
 /// Helps collecting transactions from different forks.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct BroadcastableTransaction {
     /// The optional RPC URL.
     pub rpc: Option<String>,
     /// The transaction to broadcast.
-    pub transaction: TransactionRequest,
+    pub transaction: TransactionMaybeSigned,
     /// ZK-VM factory deps
     pub zk_tx: Option<ZkTransactionMetadata>,
 }
@@ -854,7 +854,8 @@ impl Cheatcodes {
                                     value: Some(input.value()),
                                     nonce: Some(nonce),
                                     ..Default::default()
-                                },
+                                }
+                                .into(),
                                 zk_tx: Some(ZkTransactionMetadata { factory_deps }),
                             });
 
@@ -862,6 +863,7 @@ impl Cheatcodes {
                             nonce += 1;
                         }
                     }
+
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc,
                         transaction: TransactionRequest {
@@ -876,7 +878,8 @@ impl Cheatcodes {
                                 None
                             },
                             ..Default::default()
-                        },
+                        }
+                        .into(),
                         zk_tx: zk_tx.map(ZkTransactionMetadata::new),
                     });
 
@@ -1426,7 +1429,8 @@ impl Cheatcodes {
                                 None
                             },
                             ..Default::default()
-                        },
+                        }
+                        .into(),
                         zk_tx,
                     });
                     debug!(target: "cheatcodes", tx=?self.broadcastable_transactions.back().unwrap(), "broadcastable call");
