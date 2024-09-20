@@ -44,7 +44,7 @@ pub struct InitArgs {
 impl InitArgs {
     pub fn run(self) -> Result<()> {
         let Self { root, template, branch, opts, offline, force, vscode } = self;
-        let DependencyInstallOpts { shallow, no_git, no_commit, quiet } = opts;
+        let DependencyInstallOpts { shallow, no_git, no_commit, quiet, zksync } = opts;
 
         // create the root dir if it does not exist
         if !root.exists() {
@@ -149,6 +149,17 @@ impl InitArgs {
                     self.opts.install(&mut config, vec![])?;
                 } else {
                     let dep = "https://github.com/foundry-rs/forge-std".parse()?;
+                    self.opts.install(&mut config, vec![dep])?;
+                }
+            }
+
+            // install forge-zksync-std
+            if zksync && !offline {
+                if root.join("lib/forge-zksync-std").exists() {
+                    p_println!(!quiet => "\"lib/forge-zksync-std\" already exists, skipping install....");
+                    self.opts.install(&mut config, vec![])?;
+                } else {
+                    let dep = "https://github.com/Moonsong-Labs/forge-zksync-std".parse()?;
                     self.opts.install(&mut config, vec![dep])?;
                 }
             }
