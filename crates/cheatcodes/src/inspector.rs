@@ -48,7 +48,7 @@ use revm::{
     },
     primitives::{
         AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot,
-        ExecutionResult, HashMap as rHashMap, Output, TransactTo, KECCAK_EMPTY,
+        ExecutionResult, HashMap as rHashMap, Output, KECCAK_EMPTY,
     },
     EvmContext, InnerEvmContext, Inspector,
 };
@@ -1534,11 +1534,17 @@ impl Cheatcodes {
             return None;
         }
 
-        if let TransactTo::Call(test_contract) = ecx.env.tx.transact_to {
-            if call.bytecode_address == test_contract {
-                info!("running call in EVM, instead of zkEVM (Test Contract) {:#?}", ecx.env.tx);
-                return None
-            }
+        if ecx
+            .db
+            .get_test_contract_address()
+            .map(|addr| call.bytecode_address == addr)
+            .unwrap_or_default()
+        {
+            info!(
+                "running call in EVM, instead of zkEVM (Test Contract) {:#?}",
+                call.bytecode_address
+            );
+            return None
         }
 
         info!("running call in zkEVM {:#?}", call);

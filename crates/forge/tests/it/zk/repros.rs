@@ -36,3 +36,10 @@ async fn repro_config(
 
 // https://github.com/matter-labs/foundry-zksync/issues/497
 test_repro!(497);
+
+test_repro!(565; |cfg| {
+    // FIXME: just use the inline config
+    cfg.runner.test_options.invariant.no_zksync_reserved_addresses = true;
+    cfg.runner.test_options.invariant.fail_on_revert = true;
+    cfg.runner.test_options.invariant.runs = 2;
+});

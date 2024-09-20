@@ -1075,7 +1075,7 @@ contract CallEmptyCode is Test {
 "#,
     )
     .unwrap();
-    cmd.args(["test", "--zksync", "--evm-version", "shanghai"]);
+    cmd.args(["test", "--zksync", "--evm-version", "shanghai", "--mc", "CallEmptyCode"]);
 
     let output = cmd.stdout_lossy();
     assert!(output.contains("call may fail or behave unexpectedly due to empty code"));

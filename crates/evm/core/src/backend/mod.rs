@@ -782,18 +782,6 @@ impl Backend {
     pub(crate) fn initialize(&mut self, env: &EnvWithHandlerCfg) {
         self.set_caller(env.tx.caller);
         self.set_spec_id(env.handler_cfg.spec_id);
-
-        let test_contract = match env.tx.transact_to {
-            TxKind::Call(to) => to,
-            TxKind::Create => {
-                let nonce = self
-                    .basic_ref(env.tx.caller)
-                    .map(|b| b.unwrap_or_default().nonce)
-                    .unwrap_or_default();
-                env.tx.caller.create(nonce)
-            }
-        };
-        self.set_test_contract(test_contract);
     }
 
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.

@@ -81,6 +81,10 @@ pub struct DependencyInstallOpts {
     /// Do not print any messages.
     #[arg(short, long)]
     pub quiet: bool,
+
+    /// Install ZKsync specific libraries.
+    #[arg(long)]
+    pub zksync: bool,
 }
 
 impl DependencyInstallOpts {
