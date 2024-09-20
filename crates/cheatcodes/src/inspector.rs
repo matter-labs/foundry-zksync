@@ -1530,7 +1530,11 @@ impl Cheatcodes {
             return None;
         }
 
-        if ecx.db.get_test_contract_address().map(|addr| call.bytecode_address == addr).unwrap_or_default()
+        if ecx
+            .db
+            .get_test_contract_address()
+            .map(|addr| call.bytecode_address == addr)
+            .unwrap_or_default()
         {
             info!(
                 "running call in EVM, instead of zkEVM (Test Contract) {:#?}",
