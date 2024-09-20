@@ -1530,8 +1530,7 @@ impl Cheatcodes {
             return None;
         }
 
-        if let Some(true) =
-            ecx.db.get_test_contract_address().map(|addr| call.bytecode_address == addr)
+        if ecx.db.get_test_contract_address().map(|addr| call.bytecode_address == addr).unwrap_or_default()
         {
             info!(
                 "running call in EVM, instead of zkEVM (Test Contract) {:#?}",
