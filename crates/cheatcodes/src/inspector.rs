@@ -950,7 +950,7 @@ impl Cheatcodes {
                 .info
                 .nonce;
             let address = caller.create(nonce);
-            if let Some(true) = ecx.db.get_test_contract_address().map(|addr| address == addr) {
+            if ecx.db.get_test_contract_address().map(|addr| address == addr).unwrap_or_default() {
                 info!("running create in EVM, instead of zkEVM (Test Contract) {:#?}", address);
                 return None
             }
