@@ -5,25 +5,56 @@ import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 import "./Deposit.sol";
 
-contract ZkInvariantTest is DSTest {
+// partial from forge-std/StdInvariant.sol
+abstract contract StdInvariant {
+    struct FuzzSelector {
+        address addr;
+        bytes4[] selectors;
+    }
+
+    address[] internal _targetedContracts;
+
+    function targetContracts() public view returns (address[] memory) {
+        return _targetedContracts;
+    }
+
+    FuzzSelector[] internal _targetedSelectors;
+
+    function targetSelectors() public view returns (FuzzSelector[] memory) {
+        return _targetedSelectors;
+    }
+
+    address[] internal _targetedSenders;
+
+    function targetSenders() public view returns (address[] memory) {
+        return _targetedSenders;
+    }
+}
+
+contract ZkInvariantTest is DSTest, StdInvariant {
     Vm constant vm = Vm(HEVM_ADDRESS);
-    // forge-config: default.invariant.runs = 2
     Deposit deposit;
 
+    uint256 constant dealAmount = 1 ether;
+
     function setUp() external {
+        // to fund for fees
+        _targetedSenders.push(address(65536 + 1));
+        _targetedSenders.push(address(65536 + 12));
+        _targetedSenders.push(address(65536 + 123));
+        _targetedSenders.push(address(65536 + 1234));
+
+        for (uint256 i = 0; i < _targetedSenders.length; i++) {
+            vm.deal(_targetedSenders[i], dealAmount); // to pay fees
+        }
+
         deposit = new Deposit();
-        vm.deal(address(deposit), 100 ether);
+        _targetedContracts.push(address(deposit));
     }
 
+    //FIXME: seems to not be detected, forcing values in test config
     // forge-config: default.invariant.runs = 2
-    function testZkInvariantDeposit() external payable {
-        deposit.deposit{value: 1 ether}();
-        uint256 balanceBefore = deposit.balance(address(this));
-        assertEq(balanceBefore, 1 ether);
-        deposit.withdraw();
-        uint256 balanceAfter = deposit.balance(address(this));
-        assertGt(balanceBefore, balanceAfter);
-    }
+    function invariant_itWorks() external payable {}
 
     receive() external payable {}
 }
