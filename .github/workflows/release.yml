@@ -139,13 +139,12 @@ jobs:
         run: |
           set -eo pipefail
           target="${{ matrix.target }}"
-          flags=()
+          flags=(--release --bins --no-default-features --features rustls,aws-kms)
 
-          # Disable asm-keccak, see https://github.com/alloy-rs/core/issues/711
-          # # Remove jemalloc, only keep `asm-keccak` if applicable
-          # if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
-          #     flags+=(--features asm-keccak)
-          # fi
+          # `jemalloc` and `keccak-asm` are not supported on MSVC or aarch64 Linux.
+          if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
+            flags+=(--features asm-keccak,jemalloc)
+          fi
 
           cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
 
