@@ -8,7 +8,7 @@ use crate::{
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
-use alloy_primitives::{keccak256, uint, Address, TxKind, B256, U256};
+use alloy_primitives::{keccak256, uint, Address, B256, U256};
 use alloy_rpc_types::{
     Block, BlockNumberOrTag, BlockTransactions, Transaction, TransactionRequest,
 };

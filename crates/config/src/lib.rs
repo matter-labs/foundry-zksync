@@ -402,11 +402,6 @@ pub struct Config {
     /// This includes what operations can be executed (read, write)
     pub fs_permissions: FsPermissions,
 
-    /// Temporary config to enable [SpecId::PRAGUE]
-    ///
-    /// Should be removed once EvmVersion Prague is supported by solc
-    pub prague: bool,
-
     /// Whether to enable call isolation.
     ///
     /// Useful for more correct gas accounting and EVM behavior in general.
@@ -923,9 +918,6 @@ impl Config {
     /// Returns the [SpecId] derived from the configured [EvmVersion]
     #[inline]
     pub fn evm_spec_id(&self) -> SpecId {
-        if self.prague {
-            return SpecId::PRAGUE_EOF
-        }
         evm_spec_id(&self.evm_version)
     }
 
@@ -1007,7 +999,7 @@ impl Config {
 
     /// Returns configuration for a compiler to use when setting up a [Project].
     pub fn compiler(&self) -> Result<MultiCompiler, SolcError> {
-        Ok(MultiCompiler { solc: self.solc_compiler()?, vyper: self.vyper_compiler()? })
+        Ok(MultiCompiler { solc: Some(self.solc_compiler()?), vyper: self.vyper_compiler()? })
     }
 
     /// Returns configured [MultiCompilerSettings].
@@ -1357,6 +1349,7 @@ impl Config {
                 "evm.deployedBytecode".to_string(),
             ]),
             search_paths: None,
+            experimental_codegen: None,
         })
     }
 
@@ -2091,7 +2084,6 @@ impl Default for Config {
         Self {
             profile: Self::DEFAULT_PROFILE,
             fs_permissions: FsPermissions::new([PathPermission::read("out")]),
-            prague: false,
             #[cfg(not(feature = "isolate-by-default"))]
             isolate: false,
             #[cfg(feature = "isolate-by-default")]
