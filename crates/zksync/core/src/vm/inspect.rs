@@ -469,8 +469,7 @@ fn inspect_inner<S: ReadStorage>(
     let bootloader_debug = Arc::try_unwrap(bootloader_debug_tracer_result)
         .unwrap()
         .take()
-        .map(|result| result.ok())
-        .flatten()
+        .and_then(|result| result.ok())
         .expect("failed obtaining bootloader debug info");
     trace!("{bootloader_debug:?}");
 
