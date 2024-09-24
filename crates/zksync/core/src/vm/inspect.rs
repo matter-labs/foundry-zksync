@@ -199,7 +199,7 @@ where
     } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
 
     info!(
-        total=?gas_usage.total_gas_limit, computation=?gas_usage.computation, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
+        total=?gas_usage.limit, computation=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
         "gas usage",
     );
 
@@ -380,11 +380,11 @@ struct InnerCreateOutcome {
 #[derive(Debug)]
 struct ZkVmGasUsage {
     /// Gas limit set for the user excluding the reserved gas.
-    pub total_gas_limit: U256,
+    pub limit: U256,
     /// Gas refunded after transaction execution by the operator.
     pub refunded: U256,
     /// Gas used for only on transaction execution (validation and execution).
-    pub computation: U256,
+    pub execution: U256,
     /// Gas used for publishing pubdata.
     pub pubdata: U256,
     /// Additional bootloader debug info for gas usage.
@@ -472,13 +472,14 @@ fn inspect_inner<S: ReadStorage>(
         .map(|result| result.ok())
         .flatten()
         .expect("failed obtaining bootloader debug info");
+    trace!("{bootloader_debug:?}");
 
     let total_gas_limit =
         bootloader_debug.total_gas_limit_from_user.saturating_sub(bootloader_debug.reserved_gas);
     let intrinsic_gas = total_gas_limit - bootloader_debug.gas_limit_after_intrinsic;
     let gas_for_validation =
         bootloader_debug.gas_limit_after_intrinsic - bootloader_debug.gas_after_validation;
-    let gas_used_computation =
+    let gas_used_tx_execution =
         intrinsic_gas + gas_for_validation + bootloader_debug.gas_spent_on_execution;
 
     let gas_used_pubdata = bootloader_debug
@@ -486,8 +487,8 @@ fn inspect_inner<S: ReadStorage>(
         .saturating_mul(tx_result.statistics.pubdata_published.into());
 
     let gas_usage = ZkVmGasUsage {
-        total_gas_limit,
-        computation: gas_used_computation,
+        limit: total_gas_limit,
+        execution: gas_used_tx_execution,
         pubdata: gas_used_pubdata,
         refunded: bootloader_debug.refund_by_operator,
         bootloader_debug,
