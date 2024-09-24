@@ -30,10 +30,7 @@ contract TestPaymasterFlow is Test {
 
         // Encode paymaster input
         paymaster_encoded_input = abi.encodeWithSelector(
-            bytes4(keccak256("approvalBased(address,uint256,bytes)")),
-            address(erc20),
-            uint256(1),
-            bytes("0x")
+            bytes4(keccak256("approvalBased(address,uint256,bytes)")), address(erc20), uint256(1), bytes("0x")
         );
     }
 
@@ -41,12 +38,8 @@ contract TestPaymasterFlow is Test {
         require(address(do_stuff).balance == 1 ether, "Balance is not 1 ether");
 
         uint256 alice_balance = address(alice).balance;
-        (bool success, ) = address(vm).call(
-            abi.encodeWithSignature(
-                "zkUsePaymaster(address,bytes)",
-                address(paymaster),
-                paymaster_encoded_input
-            )
+        (bool success,) = address(vm).call(
+            abi.encodeWithSignature("zkUsePaymaster(address,bytes)", address(paymaster), paymaster_encoded_input)
         );
         require(success, "zkUsePaymaster call failed");
 
@@ -59,12 +52,8 @@ contract TestPaymasterFlow is Test {
 
     function testCreateWithPaymaster() public {
         uint256 alice_balance = address(alice).balance;
-        (bool success, ) = address(vm).call(
-            abi.encodeWithSignature(
-                "zkUsePaymaster(address,bytes)",
-                address(paymaster),
-                paymaster_encoded_input
-            )
+        (bool success,) = address(vm).call(
+            abi.encodeWithSignature("zkUsePaymaster(address,bytes)", address(paymaster), paymaster_encoded_input)
         );
         require(success, "zkUsePaymaster call failed");
 
@@ -77,12 +66,8 @@ contract TestPaymasterFlow is Test {
     function testFailPaymasterBalanceDoesNotUpdate() public {
         uint256 alice_balance = address(alice).balance;
         uint256 paymaster_balance = address(paymaster).balance;
-        (bool success, ) = address(vm).call(
-            abi.encodeWithSignature(
-                "zkUsePaymaster(address,bytes)",
-                address(paymaster),
-                paymaster_encoded_input
-            )
+        (bool success,) = address(vm).call(
+            abi.encodeWithSignature("zkUsePaymaster(address,bytes)", address(paymaster), paymaster_encoded_input)
         );
         require(success, "zkUsePaymaster call failed");
 
@@ -96,9 +81,7 @@ contract TestPaymasterFlow is Test {
 
 contract DoStuff {
     function do_stuff() public {
-        (bool success, ) = payable(BOOTLOADER_FORMAL_ADDRESS).call{
-            value: address(this).balance
-        }("");
+        (bool success,) = payable(BOOTLOADER_FORMAL_ADDRESS).call{value: address(this).balance}("");
         require(success, "Failed to transfer tx fee to the bootloader. Paymaster balance might not be enough.");
     }
 }
