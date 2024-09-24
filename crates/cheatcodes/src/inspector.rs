@@ -37,8 +37,8 @@ use foundry_evm_core::{
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+    get_account_code_key, get_balance_key, get_nonce_key, Call, ZkPaymasterData,
+    ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
 use itertools::Itertools;
 use revm::{
@@ -360,6 +360,8 @@ pub struct Cheatcodes {
     /// to EVM. Alternatively, we'd need to add `vm.zkVmSkip()` to these calls manually.
     pub skip_zk_vm_addresses: HashSet<Address>,
 
+    pub paymaster_params: Option<ZkPaymasterData>,
+
     /// Records the next create address for `skip_zk_vm_addresses`.
     pub record_next_create_address: bool,
 
@@ -463,6 +465,7 @@ impl Cheatcodes {
             skip_zk_vm_addresses: Default::default(),
             record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
+            paymaster_params: None,
         }
     }
 
@@ -959,6 +962,7 @@ impl Cheatcodes {
             expected_calls: Some(&mut self.expected_calls),
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
+            paymaster_data: self.paymaster_params.take(),
         };
         let create_inputs = CreateInputs {
             scheme: input.scheme().unwrap_or(CreateScheme::Create),
@@ -1550,6 +1554,7 @@ impl Cheatcodes {
             expected_calls: Some(&mut self.expected_calls),
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
+            paymaster_data: self.paymaster_params.take(),
         };
 
         // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
