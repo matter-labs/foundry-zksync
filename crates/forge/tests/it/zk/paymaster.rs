@@ -27,10 +27,8 @@ async fn test_zk_contract_paymaster() {
     config.fs_permissions.add(PathPermission::read("./zkout"));
     prj.write_config(config);
 
-    prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol"))
-        .unwrap();
-    prj.add_source("Paymaster.t.sol", include_str!("../../fixtures/zk/Paymaster.t.sol"))
-        .unwrap();
+    prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol")).unwrap();
+    prj.add_source("Paymaster.t.sol", include_str!("../../fixtures/zk/Paymaster.t.sol")).unwrap();
 
     cmd.args(["test", "--zk-startup", "--evm-version", "shanghai", "--via-ir"]);
     assert!(cmd.stdout_lossy().contains("Suite result: ok"));
