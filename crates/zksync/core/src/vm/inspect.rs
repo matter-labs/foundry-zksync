@@ -199,7 +199,7 @@ where
     } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
 
     info!(
-        total=?gas_usage.limit, computation=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
+        limit=?gas_usage.limit, execution=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
         "gas usage",
     );
 
