@@ -1,5 +1,6 @@
 use alloy_primitives::{hex, Log};
 use era_test_node::{
+    bootloader_debug::{BootloaderDebug, BootloaderDebugTracer},
     config::node::ShowCalls,
     formatter,
     system_contracts::{Options, SystemContracts},
@@ -188,8 +189,19 @@ where
     let storage_ptr =
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
-    let InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces, create_outcome } =
-        inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
+    let InnerZkVmResult {
+        tx_result,
+        bytecodes,
+        modified_storage,
+        call_traces,
+        create_outcome,
+        gas_usage,
+    } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
+
+    info!(
+        total=?gas_usage.total_gas_limit, computation=?gas_usage.computation, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
+        "gas usage",
+    );
 
     if let Some(record) = &mut era_db.accesses {
         for k in modified_storage.keys() {
@@ -364,12 +376,28 @@ struct InnerCreateOutcome {
     bytecode: Vec<u8>,
 }
 
+#[allow(unused)]
+#[derive(Debug)]
+struct ZkVmGasUsage {
+    /// Gas limit set for the user excluding the reserved gas.
+    pub total_gas_limit: U256,
+    /// Gas refunded after transaction execution by the operator.
+    pub refunded: U256,
+    /// Gas used for only on transaction execution (validation and execution).
+    pub computation: U256,
+    /// Gas used for publishing pubdata.
+    pub pubdata: U256,
+    /// Additional bootloader debug info for gas usage.
+    pub bootloader_debug: BootloaderDebug,
+}
+
 struct InnerZkVmResult {
     tx_result: VmExecutionResultAndLogs,
     bytecodes: HashMap<U256, Vec<U256>>,
     modified_storage: HashMap<StorageKey, H256>,
     call_traces: Vec<Call>,
     create_outcome: Option<InnerCreateOutcome>,
+    gas_usage: ZkVmGasUsage,
 }
 
 fn inspect_inner<S: ReadStorage>(
@@ -401,8 +429,11 @@ fn inspect_inner<S: ReadStorage>(
     }
     let is_static = call_ctx.is_static;
     let is_create = call_ctx.is_create;
+    let bootloader_debug_tracer_result = Arc::new(OnceCell::default());
     let tracers = vec![
         CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
+        BootloaderDebugTracer { result: bootloader_debug_tracer_result.clone() }
+            .into_tracer_pointer(),
         CheatcodeTracer::new(
             ccx.mocked_calls.clone(),
             expected_calls,
@@ -433,6 +464,34 @@ fn inspect_inner<S: ReadStorage>(
     if let Some(expected_calls) = ccx.expected_calls.as_mut() {
         expected_calls.extend(cheatcode_result.expected_calls);
     }
+
+    // populate gas usage info
+    let bootloader_debug = Arc::try_unwrap(bootloader_debug_tracer_result)
+        .unwrap()
+        .take()
+        .map(|result| result.ok())
+        .flatten()
+        .expect("failed obtaining bootloader debug info");
+
+    let total_gas_limit =
+        bootloader_debug.total_gas_limit_from_user.saturating_sub(bootloader_debug.reserved_gas);
+    let intrinsic_gas = total_gas_limit - bootloader_debug.gas_limit_after_intrinsic;
+    let gas_for_validation =
+        bootloader_debug.gas_limit_after_intrinsic - bootloader_debug.gas_after_validation;
+    let gas_used_computation =
+        intrinsic_gas + gas_for_validation + bootloader_debug.gas_spent_on_execution;
+
+    let gas_used_pubdata = bootloader_debug
+        .gas_per_pubdata
+        .saturating_mul(tx_result.statistics.pubdata_published.into());
+
+    let gas_usage = ZkVmGasUsage {
+        total_gas_limit,
+        computation: gas_used_computation,
+        pubdata: gas_used_pubdata,
+        refunded: bootloader_debug.refund_by_operator,
+        bootloader_debug,
+    };
 
     formatter::print_vm_details(&tx_result);
 
@@ -517,7 +576,14 @@ fn inspect_inner<S: ReadStorage>(
         None
     };
 
-    InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces, create_outcome }
+    InnerZkVmResult {
+        tx_result,
+        bytecodes,
+        modified_storage,
+        call_traces,
+        create_outcome,
+        gas_usage,
+    }
 }
 
 /// Patch CREATE traces with bytecode as the data is empty bytes.
