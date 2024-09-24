@@ -942,6 +942,23 @@ impl Cheatcodes {
             return None
         }
 
+        if let Some(CreateScheme::Create) = input.scheme() {
+            let caller = input.caller();
+            let nonce = ecx
+                .inner
+                .journaled_state
+                .load_account(input.caller(), &mut ecx.inner.db)
+                .unwrap()
+                .0
+                .info
+                .nonce;
+            let address = caller.create(nonce);
+            if ecx.db.get_test_contract_address().map(|addr| address == addr).unwrap_or_default() {
+                info!("running create in EVM, instead of zkEVM (Test Contract) {:#?}", address);
+                return None
+            }
+        }
+
         if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
             info!("running create in EVM, instead of zkEVM (DEFAULT_CREATE2_DEPLOYER_CODE)");
             return None
