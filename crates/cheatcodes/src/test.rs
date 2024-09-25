@@ -96,7 +96,7 @@ impl Cheatcode for breakpoint_1Call {
 }
 
 impl Cheatcode for getFoundryVersionCall {
-    fn apply(&self, state: &mut Cheatcodes) -> Result {
+    fn apply(&self, _state: &mut Cheatcodes) -> Result {
         let Self {} = self;
         let cargo_version = env!("CARGO_PKG_VERSION");
         let git_sha = env!("VERGEN_GIT_SHA");
@@ -104,8 +104,7 @@ impl Cheatcode for getFoundryVersionCall {
             .expect("Invalid build timestamp format")
             .format("%Y%m%d%H%M")
             .to_string();
-        let zksync = if state.use_zk_vm { "+zksync" } else { "" };
-        let foundry_version = format!("{cargo_version}+{git_sha}+{build_timestamp}{zksync}");
+        let foundry_version = format!("{cargo_version}+{git_sha}+{build_timestamp}");
         Ok(foundry_version.abi_encode())
     }
 }

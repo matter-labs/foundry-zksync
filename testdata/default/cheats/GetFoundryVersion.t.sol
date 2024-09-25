@@ -23,27 +23,5 @@ contract GetFoundryVersionTest is DSTest {
         uint256 buildUnixTimestamp = vm.parseUint(versionComponents[2]);
         uint256 minimumAcceptableTimestamp = 202406111234;
         require(buildUnixTimestamp >= minimumAcceptableTimestamp, "Build timestamp is too old");
-
-    }
-
-    function testGetFoundryZkSyncVersion() public view {
-        vm.zkVm(true);
-        string memory fullVersionString = vm.getFoundryVersion();
-
-        string[] memory versionComponents = vm.split(fullVersionString, "+");
-        require(versionComponents.length == 4, "Invalid version format");
-
-        string memory semanticVersion = versionComponents[0];
-        require(bytes(semanticVersion).length > 0, "Semantic version is empty");
-
-        string memory commitHash = versionComponents[1];
-        require(bytes(commitHash).length > 0, "Commit hash is empty");
-
-        uint256 buildUnixTimestamp = vm.parseUint(versionComponents[2]);
-        uint256 minimumAcceptableTimestamp = 202406111234;
-        require(buildUnixTimestamp >= minimumAcceptableTimestamp, "Build timestamp is too old");
-
-        string memory zksync = versionComponents[3];
-        require(keccak256(bytes(zksync)) == keccak256("zksync"));
     }
 }
