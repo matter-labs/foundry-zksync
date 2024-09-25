@@ -26,20 +26,19 @@ use foundry_evm::{
 };
 use foundry_test_utils::{fd_lock, init_tracing, TestCommand, ZkSyncNode, rpc::next_rpc_endpoint};
 use foundry_zksync_compiler::{DualCompiledContracts, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME};
-use once_cell::sync::Lazy;
 use semver::Version;
 use std::{
     env, fmt,
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 type ZkProject = Project<ZkSolcCompiler, ZkArtifactOutput>;
 
 pub const RE_PATH_SEPARATOR: &str = "/";
 const TESTDATA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata");
-static VYPER: Lazy<PathBuf> = Lazy::new(|| std::env::temp_dir().join("vyper"));
+static VYPER: LazyLock<PathBuf> = LazyLock::new(|| std::env::temp_dir().join("vyper"));
 
 /// Profile for the tests group. Used to configure separate configurations for test runs.
 pub enum ForgeTestProfile {
@@ -511,16 +510,16 @@ pub static EVM_OPTS: Lazy<EvmOpts> = Lazy::new(|| EvmOpts {
 });
 
 /// Default data for the tests group.
-pub static TEST_DATA_DEFAULT: Lazy<ForgeTestData> =
-    Lazy::new(|| ForgeTestData::new(ForgeTestProfile::Default));
+pub static TEST_DATA_DEFAULT: LazyLock<ForgeTestData> =
+    LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::Default));
 
 /// Data for tests requiring Cancun support on Solc and EVM level.
-pub static TEST_DATA_CANCUN: Lazy<ForgeTestData> =
-    Lazy::new(|| ForgeTestData::new(ForgeTestProfile::Cancun));
+pub static TEST_DATA_CANCUN: LazyLock<ForgeTestData> =
+    LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::Cancun));
 
 /// Data for tests requiring Cancun support on Solc and EVM level.
-pub static TEST_DATA_MULTI_VERSION: Lazy<ForgeTestData> =
-    Lazy::new(|| ForgeTestData::new(ForgeTestProfile::MultiVersion));
+pub static TEST_DATA_MULTI_VERSION: LazyLock<ForgeTestData> =
+    LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::MultiVersion));
 
 pub fn manifest_root() -> &'static Path {
     let mut root = Path::new(env!("CARGO_MANIFEST_DIR"));

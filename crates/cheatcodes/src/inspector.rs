@@ -41,6 +41,7 @@ use foundry_zksync_core::{
     DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
 use itertools::Itertools;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use revm::{
     interpreter::{
         opcode, CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome, EOFCreateInputs,
@@ -113,7 +114,6 @@ pub trait CheatcodesExecutor {
             db: &mut ccx.ecx.db as &mut dyn DatabaseExt,
             error,
             l1_block_info,
-            valid_authorizations: std::mem::take(&mut ccx.ecx.valid_authorizations),
         };
 
         let mut evm = new_evm_with_existing_context(inner, &mut inspector as _);
@@ -124,7 +124,6 @@ pub trait CheatcodesExecutor {
         ccx.ecx.env = evm.context.evm.inner.env;
         ccx.ecx.l1_block_info = evm.context.evm.inner.l1_block_info;
         ccx.ecx.error = evm.context.evm.inner.error;
-        ccx.ecx.valid_authorizations = evm.context.evm.inner.valid_authorizations;
 
         Ok(res)
     }
@@ -349,6 +348,9 @@ pub struct Cheatcodes {
     /// `char -> (address, pc)`
     pub breakpoints: Breakpoints,
 
+    /// Optional RNG algorithm.
+    rng: Option<StdRng>,
+
     /// Use ZK-VM to execute CALLs and CREATEs.
     pub use_zk_vm: bool,
 
@@ -463,6 +465,7 @@ impl Cheatcodes {
             skip_zk_vm_addresses: Default::default(),
             record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
+            rng: Default::default(),
         }
     }
 
@@ -594,7 +597,7 @@ impl Cheatcodes {
         // to not lose it across VMs.
 
         let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
-        let (block_info, _) = data.sload(system_account, block_info_key).unwrap_or_default();
+        let block_info = data.sload(system_account, block_info_key).unwrap_or_default();
         let (block_number, block_timestamp) = unpack_block_info(block_info.to_u256());
         data.env.block.number = U256::from(block_number);
         data.env.block.timestamp = U256::from(block_timestamp);
@@ -606,15 +609,14 @@ impl Cheatcodes {
             let balance_key = get_balance_key(address);
             let nonce_key = get_nonce_key(address);
 
-            let (balance, _) = data.sload(balance_account, balance_key).unwrap_or_default();
-            let (full_nonce, _) = data.sload(nonce_account, nonce_key).unwrap_or_default();
+            let balance = data.sload(balance_account, balance_key).unwrap_or_default().data;
+            let full_nonce = data.sload(nonce_account, nonce_key).unwrap_or_default();
             let (tx_nonce, _deployment_nonce) = decompose_full_nonce(full_nonce.to_u256());
             let nonce = tx_nonce.as_u64();
 
             let account_code_key = get_account_code_key(address);
             let (code_hash, code) = data
                 .sload(account_code_account, account_code_key)
-                .map(|(value, _)| value)
                 .ok()
                 .and_then(|zk_bytecode_hash| {
                     self.dual_compiled_contracts
@@ -1109,6 +1111,7 @@ impl Cheatcodes {
             {
                 let expected_revert = std::mem::take(&mut self.expected_revert).unwrap();
                 return match expect::handle_expect_revert(
+                    false,
                     true,
                     expected_revert.reason.as_deref(),
                     outcome.result.result,
@@ -1158,7 +1161,7 @@ impl Cheatcodes {
                         crate::Vm::AccountAccessKind::Create as u8
                     );
                     if let Some(address) = outcome.address {
-                        if let Ok((created_acc, _)) =
+                        if let Ok(created_acc) =
                             ecx.journaled_state.load_account(address, &mut ecx.db)
                         {
                             create_access.newBalance = created_acc.info.balance;
@@ -1462,7 +1465,7 @@ impl Cheatcodes {
             // nonce, a non-zero KECCAK_EMPTY codehash, or non-empty code
             let initialized;
             let old_balance;
-            if let Ok((acc, _)) = ecx.load_account(call.target_address) {
+            if let Ok(acc) = ecx.load_account(call.target_address) {
                 initialized = acc.info.exists();
                 old_balance = acc.info.balance;
             } else {
@@ -1648,6 +1651,13 @@ impl Cheatcodes {
             }
         }
     }
+
+    pub fn rng(&mut self) -> &mut impl Rng {
+        self.rng.get_or_insert_with(|| match self.config.seed {
+            Some(seed) => StdRng::from_seed(seed.to_be_bytes::<32>()),
+            None => StdRng::from_entropy(),
+        })
+    }
 }
 
 impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
@@ -1794,7 +1804,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         // Handle expected reverts
         if let Some(expected_revert) = &self.expected_revert {
             if ecx.journaled_state.depth() <= expected_revert.depth {
-                let needs_processing: bool = match expected_revert.kind {
+                let needs_processing = match expected_revert.kind {
                     ExpectedRevertKind::Default => !cheatcode_call,
                     // `pending_processing` == true means that we're in the `call_end` hook for
                     // `vm.expectCheatcodeRevert` and shouldn't expect revert here
@@ -1806,6 +1816,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 if needs_processing {
                     let expected_revert = std::mem::take(&mut self.expected_revert).unwrap();
                     return match expect::handle_expect_revert(
+                        cheatcode_call,
                         false,
                         expected_revert.reason.as_deref(),
                         outcome.result.result,
@@ -1830,9 +1841,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 if let ExpectedRevertKind::Cheatcode { pending_processing } =
                     &mut self.expected_revert.as_mut().unwrap().kind
                 {
-                    if *pending_processing {
-                        *pending_processing = false;
-                    }
+                    *pending_processing = false;
                 }
             }
         }
@@ -1877,7 +1886,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                 // Depending on the depth the cheat was called at, there may not be any pending
                 // calls to update if execution has percolated up to a higher depth.
                 if call_access.depth == ecx.journaled_state.depth() {
-                    if let Ok((acc, _)) = ecx.load_account(call.target_address) {
+                    if let Ok(acc) = ecx.load_account(call.target_address) {
                         debug_assert!(access_is_call(call_access.kind));
                         call_access.newBalance = acc.info.balance;
                     }
@@ -2185,13 +2194,13 @@ impl Cheatcodes {
                 let target = Address::from_word(B256::from(target));
                 let (initialized, old_balance) = ecx
                     .load_account(target)
-                    .map(|(account, _)| (account.info.exists(), account.info.balance))
+                    .map(|account| (account.info.exists(), account.info.balance))
                     .unwrap_or_default();
 
                 // load balance of this account
                 let value = ecx
                     .balance(interpreter.contract().target_address)
-                    .map(|(b, _)| b)
+                    .map(|b| b.data)
                     .unwrap_or(U256::ZERO);
 
                 // register access for the target account
@@ -2226,8 +2235,8 @@ impl Cheatcodes {
                 let mut present_value = U256::ZERO;
                 // Try to load the account and the slot's present value
                 if ecx.load_account(address).is_ok() {
-                    if let Ok((previous, _)) = ecx.sload(address, key) {
-                        present_value = previous;
+                    if let Ok(previous) = ecx.sload(address, key) {
+                        present_value = previous.data;
                     }
                 }
                 let access = crate::Vm::StorageAccess {
@@ -2250,8 +2259,8 @@ impl Cheatcodes {
                 // not set (zero value)
                 let mut previous_value = U256::ZERO;
                 if ecx.load_account(address).is_ok() {
-                    if let Ok((previous, _)) = ecx.sload(address, key) {
-                        previous_value = previous;
+                    if let Ok(previous) = ecx.sload(address, key) {
+                        previous_value = previous.data;
                     }
                 }
 
@@ -2279,7 +2288,7 @@ impl Cheatcodes {
                     Address::from_word(B256::from(try_or_return!(interpreter.stack().peek(0))));
                 let initialized;
                 let balance;
-                if let Ok((acc, _)) = ecx.load_account(address) {
+                if let Ok(acc) = ecx.load_account(address) {
                     initialized = acc.info.exists();
                     balance = acc.info.balance;
                 } else {
@@ -2606,22 +2615,49 @@ fn apply_dispatch<DB: DatabaseExt, E: CheatcodesExecutor>(
         };
     }
 
-    let _guard = trace_span_and_call(calls);
-    let result = vm_calls!(dispatch);
-    trace_return(&result);
+    let mut dyn_cheat = DynCheatCache::new(calls);
+    let _guard = trace_span_and_call(&mut dyn_cheat);
+    let mut result = vm_calls!(dispatch);
+    fill_and_trace_return(&mut dyn_cheat, &mut result);
     result
 }
 
-fn trace_span_and_call(calls: &Vm::VmCalls) -> tracing::span::EnteredSpan {
-    let mut cheat = None;
-    let mut get_cheat = || *cheat.get_or_insert_with(|| calls_as_dyn_cheatcode(calls));
-    let span = debug_span!(target: "cheatcodes", "apply", id = %get_cheat().id());
+// Caches the result of `calls_as_dyn_cheatcode`.
+// TODO: Remove this once Cheatcode is object-safe, as caching would not be necessary anymore.
+struct DynCheatCache<'a> {
+    calls: &'a Vm::VmCalls,
+    slot: Option<&'a dyn DynCheatcode>,
+}
+
+impl<'a> DynCheatCache<'a> {
+    fn new(calls: &'a Vm::VmCalls) -> Self {
+        Self { calls, slot: None }
+    }
+
+    fn get(&mut self) -> &dyn DynCheatcode {
+        *self.slot.get_or_insert_with(|| calls_as_dyn_cheatcode(self.calls))
+    }
+}
+
+fn trace_span_and_call(dyn_cheat: &mut DynCheatCache) -> tracing::span::EnteredSpan {
+    let span = debug_span!(target: "cheatcodes", "apply", id = %dyn_cheat.get().id());
     let entered = span.entered();
-    trace!(target: "cheatcodes", cheat = ?get_cheat().as_debug(), "applying");
+    trace!(target: "cheatcodes", cheat = ?dyn_cheat.get().as_debug(), "applying");
     entered
 }
 
-fn trace_return(result: &Result) {
+fn fill_and_trace_return(dyn_cheat: &mut DynCheatCache, result: &mut Result) {
+    if let Err(e) = result {
+        if e.is_str() {
+            let name = dyn_cheat.get().name();
+            // Skip showing the cheatcode name for:
+            // - assertions: too verbose, and can already be inferred from the error message
+            // - `rpcUrl`: forge-std relies on it in `getChainWithUpdatedRpcUrl`
+            if !name.contains("assert") && name != "rpcUrl" {
+                *e = fmt_err!("vm.{name}: {e}");
+            }
+        }
+    }
     trace!(
         target: "cheatcodes",
         return = %match result {

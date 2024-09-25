@@ -162,8 +162,16 @@ pub struct NodeArgs {
 
     /// Don't keep full chain history.
     /// If a number argument is specified, at most this number of states is kept in memory.
+    ///
+    /// If enabled, no state will be persisted on disk, so `max_persisted_states` will be 0.
     #[arg(long)]
     pub prune_history: Option<Option<usize>>,
+
+    /// Max number of states to persist on disk.
+    ///
+    /// Note that `prune_history` will overwrite `max_persisted_states` to 0.
+    #[arg(long)]
+    pub max_persisted_states: Option<usize>,
 
     /// Number of blocks with transactions to keep in memory.
     #[arg(long)]
@@ -238,10 +246,13 @@ impl NodeArgs {
             .with_auto_impersonate(self.evm_opts.auto_impersonate)
             .with_ipc(self.ipc)
             .with_code_size_limit(self.evm_opts.code_size_limit)
+            .disable_code_size_limit(self.evm_opts.disable_code_size_limit)
             .set_pruned_history(self.prune_history)
             .with_init_state(self.load_state.or_else(|| self.state.and_then(|s| s.state)))
             .with_transaction_block_keeper(self.transaction_block_keeper)
+            .with_max_persisted_states(self.max_persisted_states)
             .with_optimism(self.evm_opts.optimism)
+            .with_alphanet(self.evm_opts.alphanet)
             .with_disable_default_create2_deployer(self.evm_opts.disable_default_create2_deployer)
             .with_slots_in_an_epoch(self.slots_in_an_epoch)
             .with_memory_limit(self.evm_opts.memory_limit)
@@ -486,10 +497,19 @@ pub struct AnvilEvmArgs {
     )]
     pub disable_block_gas_limit: bool,
 
-    /// EIP-170: Contract code size limit in bytes. Useful to increase this because of tests. By
-    /// default, it is 0x6000 (~25kb).
+    /// EIP-170: Contract code size limit in bytes. Useful to increase this because of tests. To
+    /// disable entirely, use `--disable-code-size-limit`. By default, it is 0x6000 (~25kb).
     #[arg(long, value_name = "CODE_SIZE", help_heading = "Environment config")]
     pub code_size_limit: Option<usize>,
+
+    /// Disable EIP-170: Contract code size limit.
+    #[arg(
+        long,
+        value_name = "DISABLE_CODE_SIZE_LIMIT",
+        conflicts_with = "code_size_limit",
+        help_heading = "Environment config"
+    )]
+    pub disable_code_size_limit: bool,
 
     /// The gas price.
     #[arg(long, help_heading = "Environment config")]
@@ -531,6 +551,10 @@ pub struct AnvilEvmArgs {
     /// The memory limit per EVM execution in bytes.
     #[arg(long)]
     pub memory_limit: Option<u64>,
+
+    /// Enable Alphanet features
+    #[arg(long, visible_alias = "alphanet")]
+    pub alphanet: bool,
 }
 
 /// Resolves an alias passed as fork-url to the matching url defined in the rpc_endpoints section
@@ -781,12 +805,33 @@ mod tests {
     }
 
     #[test]
+    fn can_parse_max_persisted_states_config() {
+        let args: NodeArgs = NodeArgs::parse_from(["anvil", "--max-persisted-states", "500"]);
+        assert_eq!(args.max_persisted_states, (Some(500)));
+    }
+
+    #[test]
     fn can_parse_disable_block_gas_limit() {
         let args: NodeArgs = NodeArgs::parse_from(["anvil", "--disable-block-gas-limit"]);
         assert!(args.evm_opts.disable_block_gas_limit);
 
         let args =
             NodeArgs::try_parse_from(["anvil", "--disable-block-gas-limit", "--gas-limit", "100"]);
+        assert!(args.is_err());
+    }
+
+    #[test]
+    fn can_parse_disable_code_size_limit() {
+        let args: NodeArgs = NodeArgs::parse_from(["anvil", "--disable-code-size-limit"]);
+        assert!(args.evm_opts.disable_code_size_limit);
+
+        let args = NodeArgs::try_parse_from([
+            "anvil",
+            "--disable-code-size-limit",
+            "--code-size-limit",
+            "100",
+        ]);
+        // can't be used together
         assert!(args.is_err());
     }
 

@@ -361,6 +361,7 @@ impl TestArgs {
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
+            .alphanet(evm_opts.alphanet)
             .build(
                 project_root,
                 output.clone(),

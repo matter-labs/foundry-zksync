@@ -77,6 +77,8 @@ pub struct MultiContractRunner {
     pub test_options: TestOptions,
     /// Whether to enable call isolation
     pub isolation: bool,
+    /// Whether to enable Alphanet features.
+    pub alphanet: bool,
     /// Known contracts linked with computed library addresses.
     pub known_contracts: ContractsByArtifact,
     /// Libraries to deploy.
@@ -268,6 +270,7 @@ impl MultiContractRunner {
                     .trace_mode(trace_mode)
                     .coverage(self.coverage)
                     .enable_isolation(self.isolation)
+                    .alphanet(self.alphanet)
             })
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
@@ -327,6 +330,8 @@ pub struct MultiContractRunnerBuilder {
     pub decode_internal: InternalTraceMode,
     /// Whether to enable call isolation
     pub isolation: bool,
+    /// Whether to enable Alphanet features.
+    pub alphanet: bool,
     /// Settings related to fuzz and/or invariant tests
     pub test_options: Option<TestOptions>,
 }
@@ -344,6 +349,7 @@ impl MultiContractRunnerBuilder {
             isolation: Default::default(),
             test_options: Default::default(),
             decode_internal: Default::default(),
+            alphanet: Default::default(),
         }
     }
 
@@ -389,6 +395,11 @@ impl MultiContractRunnerBuilder {
 
     pub fn enable_isolation(mut self, enable: bool) -> Self {
         self.isolation = enable;
+        self
+    }
+
+    pub fn alphanet(mut self, enable: bool) -> Self {
+        self.alphanet = enable;
         self
     }
 
@@ -498,6 +509,7 @@ impl MultiContractRunnerBuilder {
             decode_internal: self.decode_internal,
             test_options: self.test_options.unwrap_or_default(),
             isolation: self.isolation,
+            alphanet: self.alphanet,
             known_contracts,
             libs_to_deploy,
             libraries,

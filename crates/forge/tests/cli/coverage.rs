@@ -464,6 +464,27 @@ contract Foo {
         }
         return true;
     }
+
+    function checkEmptyStatements(uint256 number, uint256[] memory arr) external pure returns (bool) {
+        // Check that empty statements are covered.
+        if (number >= arr[0]) {
+            // Do nothing
+        } else {
+            // Do nothing.
+        }
+        if (number >= arr[0]) {}
+
+        return true;
+    }
+
+    function singlePathCoverage(uint256 number) external pure {
+        if (number < 10) {
+            if (number < 5) {
+                number++;
+            }
+            number++;
+        }
+    }
 }
     "#,
     )
@@ -562,23 +583,70 @@ contract FooTest is DSTest {
         bool result = foo.checkLt(number, arr);
         assertTrue(result);
     }
+
+    function test_issue_4314() external {
+        uint256[] memory arr = new uint256[](1);
+        arr[0] = 1;
+        foo.checkEmptyStatements(0, arr);
+    }
+
+    function test_single_path_child_branch() external {
+        foo.singlePathCoverage(1);
+    }
+
+    function test_single_path_parent_branch() external {
+        foo.singlePathCoverage(9);
+    }
+
+    function test_single_path_branch() external {
+        foo.singlePathCoverage(15);
+    }
 }
     "#,
     )
     .unwrap();
 
-    // TODO: fix following issues for 100% coverage
-    // https://github.com/foundry-rs/foundry/issues/4309
-    // https://github.com/foundry-rs/foundry/issues/4310
-    // https://github.com/foundry-rs/foundry/issues/4315
-    cmd.arg("coverage").args(["--summary".to_string()]).assert_success().stdout_eq(str![[r#"
+    // Assert no coverage for single path branch. 2 branches (parent and child) not covered.
+    cmd.arg("coverage")
+        .args([
+            "--nmt".to_string(),
+            "test_single_path_child_branch|test_single_path_parent_branch".to_string(),
+        ])
+        .assert_success()
+        .stdout_eq(str![[r#"
 ...
-| File        | % Lines         | % Statements    | % Branches     | % Funcs       |
-|-------------|-----------------|-----------------|----------------|---------------|
-| src/Foo.sol | 100.00% (20/20) | 100.00% (23/23) | 83.33% (15/18) | 100.00% (7/7) |
-| Total       | 100.00% (20/20) | 100.00% (23/23) | 83.33% (15/18) | 100.00% (7/7) |
+| File        | % Lines        | % Statements   | % Branches     | % Funcs       |
+|-------------|----------------|----------------|----------------|---------------|
+| src/Foo.sol | 88.89% (24/27) | 90.00% (27/30) | 87.50% (14/16) | 100.00% (9/9) |
+| Total       | 88.89% (24/27) | 90.00% (27/30) | 87.50% (14/16) | 100.00% (9/9) |
 
 "#]]);
+
+    // Assert no coverage for single path child branch. 1 branch (child) not covered.
+    cmd.forge_fuse()
+        .arg("coverage")
+        .args(["--nmt".to_string(), "test_single_path_child_branch".to_string()])
+        .assert_success()
+        .stdout_eq(str![[r#"
+...
+| File        | % Lines        | % Statements   | % Branches     | % Funcs       |
+|-------------|----------------|----------------|----------------|---------------|
+| src/Foo.sol | 96.30% (26/27) | 96.67% (29/30) | 93.75% (15/16) | 100.00% (9/9) |
+| Total       | 96.30% (26/27) | 96.67% (29/30) | 93.75% (15/16) | 100.00% (9/9) |
+
+"#]]);
+
+    // Assert 100% coverage.
+    cmd.forge_fuse().arg("coverage").args(["--summary".to_string()]).assert_success().stdout_eq(
+        str![[r#"
+...
+| File        | % Lines         | % Statements    | % Branches      | % Funcs       |
+|-------------|-----------------|-----------------|-----------------|---------------|
+| src/Foo.sol | 100.00% (27/27) | 100.00% (30/30) | 100.00% (16/16) | 100.00% (9/9) |
+| Total       | 100.00% (27/27) | 100.00% (30/30) | 100.00% (16/16) | 100.00% (9/9) |
+
+"#]],
+    );
 });
 
 forgetest!(test_function_call_coverage, |prj, cmd| {
@@ -961,4 +1029,295 @@ contract FooTest is DSTest {
 
 "#]],
     );
+});
+
+// https://github.com/foundry-rs/foundry/issues/8605
+forgetest!(test_single_statement_coverage, |prj, cmd| {
+    prj.insert_ds_test();
+    prj.add_source(
+        "AContract.sol",
+        r#"
+contract AContract {
+    event IsTrue(bool isTrue);
+    event IsFalse(bool isFalse);
+
+    function ifElseStatementIgnored(bool flag) external {
+        if (flag) emit IsTrue(true);
+        else emit IsFalse(false);
+
+        if (flag) flag = true;
+        else flag = false;
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    prj.add_source(
+        "AContractTest.sol",
+        r#"
+import "./test.sol";
+import {AContract} from "./AContract.sol";
+
+contract AContractTest is DSTest {
+    function testTrueCoverage() external {
+        AContract a = new AContract();
+        a.ifElseStatementIgnored(true);
+    }
+
+    function testFalseCoverage() external {
+        AContract a = new AContract();
+        a.ifElseStatementIgnored(false);
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    // Assert 50% coverage for true branches.
+    cmd.arg("coverage")
+        .args(["--mt".to_string(), "testTrueCoverage".to_string()])
+        .assert_success()
+        .stdout_eq(str![[r#"
+...
+| File              | % Lines      | % Statements | % Branches   | % Funcs       |
+|-------------------|--------------|--------------|--------------|---------------|
+| src/AContract.sol | 50.00% (2/4) | 50.00% (2/4) | 50.00% (2/4) | 100.00% (1/1) |
+| Total             | 50.00% (2/4) | 50.00% (2/4) | 50.00% (2/4) | 100.00% (1/1) |
+
+"#]]);
+
+    // Assert 50% coverage for false branches.
+    cmd.forge_fuse()
+        .arg("coverage")
+        .args(["--mt".to_string(), "testFalseCoverage".to_string()])
+        .assert_success()
+        .stdout_eq(str![[r#"
+...
+| File              | % Lines      | % Statements | % Branches   | % Funcs       |
+|-------------------|--------------|--------------|--------------|---------------|
+| src/AContract.sol | 50.00% (2/4) | 50.00% (2/4) | 50.00% (2/4) | 100.00% (1/1) |
+| Total             | 50.00% (2/4) | 50.00% (2/4) | 50.00% (2/4) | 100.00% (1/1) |
+
+"#]]);
+
+    // Assert 100% coverage (true/false branches properly covered).
+    cmd.forge_fuse().arg("coverage").args(["--summary".to_string()]).assert_success().stdout_eq(
+        str![[r#"
+...
+| File              | % Lines       | % Statements  | % Branches    | % Funcs       |
+|-------------------|---------------|---------------|---------------|---------------|
+| src/AContract.sol | 100.00% (4/4) | 100.00% (4/4) | 100.00% (4/4) | 100.00% (1/1) |
+| Total             | 100.00% (4/4) | 100.00% (4/4) | 100.00% (4/4) | 100.00% (1/1) |
+
+"#]],
+    );
+});
+
+// https://github.com/foundry-rs/foundry/issues/8604
+forgetest!(test_branch_with_calldata_reads, |prj, cmd| {
+    prj.insert_ds_test();
+    prj.add_source(
+        "AContract.sol",
+        r#"
+contract AContract {
+    event IsTrue(bool isTrue);
+    event IsFalse(bool isFalse);
+
+    function execute(bool[] calldata isTrue) external {
+        for (uint256 i = 0; i < isTrue.length; i++) {
+            if (isTrue[i]) {
+                emit IsTrue(isTrue[i]);
+            } else {
+                emit IsFalse(!isTrue[i]);
+            }
+        }
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    prj.add_source(
+        "AContractTest.sol",
+        r#"
+import "./test.sol";
+import {AContract} from "./AContract.sol";
+
+contract AContractTest is DSTest {
+    function testTrueCoverage() external {
+        AContract a = new AContract();
+        bool[] memory isTrue = new bool[](1);
+        isTrue[0] = true;
+        a.execute(isTrue);
+    }
+
+    function testFalseCoverage() external {
+        AContract a = new AContract();
+        bool[] memory isFalse = new bool[](1);
+        isFalse[0] = false;
+        a.execute(isFalse);
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    // Assert 50% coverage for true branches.
+    cmd.arg("coverage")
+        .args(["--mt".to_string(), "testTrueCoverage".to_string()])
+        .assert_success()
+        .stdout_eq(str![[r#"
+...
+| File              | % Lines      | % Statements | % Branches   | % Funcs       |
+|-------------------|--------------|--------------|--------------|---------------|
+| src/AContract.sol | 75.00% (3/4) | 80.00% (4/5) | 50.00% (1/2) | 100.00% (1/1) |
+| Total             | 75.00% (3/4) | 80.00% (4/5) | 50.00% (1/2) | 100.00% (1/1) |
+
+"#]]);
+
+    // Assert 50% coverage for false branches.
+    cmd.forge_fuse()
+        .arg("coverage")
+        .args(["--mt".to_string(), "testFalseCoverage".to_string()])
+        .assert_success()
+        .stdout_eq(str![[r#"
+...
+| File              | % Lines      | % Statements | % Branches   | % Funcs       |
+|-------------------|--------------|--------------|--------------|---------------|
+| src/AContract.sol | 50.00% (2/4) | 80.00% (4/5) | 50.00% (1/2) | 100.00% (1/1) |
+| Total             | 50.00% (2/4) | 80.00% (4/5) | 50.00% (1/2) | 100.00% (1/1) |
+
+"#]]);
+
+    // Assert 100% coverage (true/false branches properly covered).
+    cmd.forge_fuse().arg("coverage").args(["--summary".to_string()]).assert_success().stdout_eq(
+        str![[r#"
+...
+| File              | % Lines       | % Statements  | % Branches    | % Funcs       |
+|-------------------|---------------|---------------|---------------|---------------|
+| src/AContract.sol | 100.00% (4/4) | 100.00% (5/5) | 100.00% (2/2) | 100.00% (1/1) |
+| Total             | 100.00% (4/4) | 100.00% (5/5) | 100.00% (2/2) | 100.00% (1/1) |
+
+"#]],
+    );
+});
+
+forgetest!(test_identical_bytecodes, |prj, cmd| {
+    prj.insert_ds_test();
+    prj.add_source(
+        "AContract.sol",
+        r#"
+contract AContract {
+    uint256 public number;
+    address public immutable usdc1;
+    address public immutable usdc2;
+    address public immutable usdc3;
+    address public immutable usdc4;
+    address public immutable usdc5;
+    address public immutable usdc6;
+
+    constructor() {
+        address a = 0x176211869cA2b568f2A7D4EE941E073a821EE1ff;
+        usdc1 = a;
+        usdc2 = a;
+        usdc3 = a;
+        usdc4 = a;
+        usdc5 = a;
+        usdc6 = a;
+    }
+
+    function setNumber(uint256 newNumber) public {
+        number = newNumber;
+    }
+
+    function increment() public {
+        number++;
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    prj.add_source(
+        "AContractTest.sol",
+        r#"
+import "./test.sol";
+import {AContract} from "./AContract.sol";
+
+contract AContractTest is DSTest {
+    AContract public counter;
+
+    function setUp() public {
+        counter = new AContract();
+        counter.setNumber(0);
+    }
+
+    function test_Increment() public {
+        counter.increment();
+        assertEq(counter.number(), 1);
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    cmd.arg("coverage").args(["--summary".to_string()]).assert_success().stdout_eq(str![[r#"
+...
+| File              | % Lines       | % Statements  | % Branches    | % Funcs       |
+|-------------------|---------------|---------------|---------------|---------------|
+| src/AContract.sol | 100.00% (9/9) | 100.00% (9/9) | 100.00% (0/0) | 100.00% (3/3) |
+| Total             | 100.00% (9/9) | 100.00% (9/9) | 100.00% (0/0) | 100.00% (3/3) |
+
+"#]]);
+});
+
+forgetest!(test_constructors_coverage, |prj, cmd| {
+    prj.insert_ds_test();
+    prj.add_source(
+        "AContract.sol",
+        r#"
+contract AContract {
+    bool public active;
+
+    constructor() {
+        active = true;
+    }
+}
+
+contract BContract {
+    bool public active;
+
+    constructor() {
+        active = true;
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    prj.add_source(
+        "AContractTest.sol",
+        r#"
+import "./test.sol";
+import "./AContract.sol";
+
+contract AContractTest is DSTest {
+    function test_constructors() public {
+        AContract a = new AContract();
+        BContract b = new BContract();
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    cmd.arg("coverage").args(["--summary".to_string()]).assert_success().stdout_eq(str![[r#"
+...
+| File              | % Lines       | % Statements  | % Branches    | % Funcs       |
+|-------------------|---------------|---------------|---------------|---------------|
+| src/AContract.sol | 100.00% (2/2) | 100.00% (2/2) | 100.00% (0/0) | 100.00% (2/2) |
+| Total             | 100.00% (2/2) | 100.00% (2/2) | 100.00% (0/0) | 100.00% (2/2) |
+
+"#]]);
 });

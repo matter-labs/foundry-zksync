@@ -1,6 +1,7 @@
 //! Contains various tests for checking cast commands
 
 use alloy_primitives::{address, b256, Address, B256};
+use anvil::{Hardfork, NodeConfig};
 use foundry_test_utils::{
     casttest,
     rpc::{next_http_rpc_endpoint, next_ws_rpc_endpoint},
@@ -142,6 +143,23 @@ casttest!(wallet_sign_typed_data_file, |_prj, cmd| {
             .as_str(),
     ]).assert_success().stdout_eq(str![[r#"
 0x06c18bdc8163219fddc9afaf5a0550e381326474bb757c86dc32317040cf384e07a2c72ce66c1a0626b6750ca9b6c035bf6f03e7ed67ae2d1134171e9085c0b51b
+
+"#]]);
+});
+
+// tests that `cast wallet sign-auth message` outputs the expected signature
+casttest!(wallet_sign_auth, |_prj, cmd| {
+    cmd.args([
+        "wallet",
+        "sign-auth",
+        "--private-key",
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "--nonce",
+        "100",
+        "--chain",
+        "1",
+        "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf"]).assert_success().stdout_eq(str![[r#"
+0xf85a01947e5f4552091a69125d5dfcb7b8c2659029395bdf6401a0ad489ee0314497c3f06567f3080a46a63908edc1c7cdf2ac2d609ca911212086a065a6ba951c8748dd8634740fe498efb61770097d99ff5fdcb9a863b62ea899f6
 
 "#]]);
 });
@@ -910,6 +928,40 @@ interface Interface {
     assert_eq!(output.trim(), s);
 });
 
+// tests that fetches WETH interface from etherscan
+// <https://etherscan.io/token/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2>
+casttest!(fetch_weth_interface_from_etherscan, |_prj, cmd| {
+    let weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+    let api_key = "ZUB97R31KSYX7NYVW6224Q6EYY6U56H591";
+    cmd.args(["interface", "--etherscan-api-key", api_key, weth_address]);
+    let output = cmd.stdout_lossy();
+
+    let weth_interface = r#"// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.4;
+
+interface WETH9 {
+    event Approval(address indexed src, address indexed guy, uint256 wad);
+    event Deposit(address indexed dst, uint256 wad);
+    event Transfer(address indexed src, address indexed dst, uint256 wad);
+    event Withdrawal(address indexed src, uint256 wad);
+
+    fallback() external payable;
+
+    function allowance(address, address) external view returns (uint256);
+    function approve(address guy, uint256 wad) external returns (bool);
+    function balanceOf(address) external view returns (uint256);
+    function decimals() external view returns (uint8);
+    function deposit() external payable;
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
+    function totalSupply() external view returns (uint256);
+    function transfer(address dst, uint256 wad) external returns (bool);
+    function transferFrom(address src, address dst, uint256 wad) external returns (bool);
+    function withdraw(uint256 wad) external;
+}"#;
+    assert_eq!(output.trim(), weth_interface);
+});
+
 const ENS_NAME: &str = "emo.eth";
 const ENS_NAMEHASH: B256 =
     b256!("0a21aaf2f6414aa664deb341d1114351fdb023cad07bf53b28e57c26db681910");
@@ -979,4 +1031,40 @@ casttest!(block_number_hash, |_prj, cmd| {
         ])
         .stdout_lossy();
     assert_eq!(s.trim().parse::<u64>().unwrap(), 1, "{s}")
+});
+
+casttest!(send_eip7702, async |_prj, cmd| {
+    let (_api, handle) =
+        anvil::spawn(NodeConfig::test().with_hardfork(Some(Hardfork::PragueEOF))).await;
+    let endpoint = handle.http_endpoint();
+    cmd.args([
+        "send",
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "--auth",
+        "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "--private-key",
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        "--rpc-url",
+        &endpoint,
+    ])
+    .assert_success();
+
+    cmd.cast_fuse()
+        .args(["code", "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "--rpc-url", &endpoint])
+        .assert_success()
+        .stdout_eq(str![[r#"
+0xef010070997970c51812dc3a010c7d01b50e0d17dc79c8
+
+"#]]);
+});
+
+casttest!(hash_message, |_prj, cmd| {
+    let tests = [
+        ("hello", "0x50b2c43fd39106bafbba0da34fc430e1f91e3c96ea2acee2bc34119f92b37750"),
+        ("0x68656c6c6f", "0x50b2c43fd39106bafbba0da34fc430e1f91e3c96ea2acee2bc34119f92b37750"),
+    ];
+    for (message, expected) in tests {
+        cmd.cast_fuse();
+        assert_eq!(cmd.args(["hash-message", message]).stdout_lossy().trim(), expected);
+    }
 });
