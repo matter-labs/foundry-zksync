@@ -360,10 +360,11 @@ pub struct Cheatcodes {
     /// to EVM. Alternatively, we'd need to add `vm.zkVmSkip()` to these calls manually.
     pub skip_zk_vm_addresses: HashSet<Address>,
 
-    pub paymaster_params: Option<ZkPaymasterData>,
-
     /// Records the next create address for `skip_zk_vm_addresses`.
     pub record_next_create_address: bool,
+
+    /// Paymaster params
+    pub paymaster_params: Option<ZkPaymasterData>,
 
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,

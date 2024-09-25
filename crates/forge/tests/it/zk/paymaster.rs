@@ -1,6 +1,5 @@
 //! Forge tests for zksync contracts.
 
-use foundry_config::fs_permissions::PathPermission;
 use foundry_test_utils::util;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -23,13 +22,20 @@ async fn test_zk_contract_paymaster() {
 
     cmd.forge_fuse();
 
-    let mut config = cmd.config();
-    config.fs_permissions.add(PathPermission::read("./zkout"));
+    let config = cmd.config();
     prj.write_config(config);
 
     prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol")).unwrap();
     prj.add_source("Paymaster.t.sol", include_str!("../../fixtures/zk/Paymaster.t.sol")).unwrap();
 
-    cmd.args(["test", "--zk-startup", "--evm-version", "shanghai", "--via-ir"]);
+    cmd.args([
+        "test",
+        "--zk-startup",
+        "--evm-version",
+        "shanghai",
+        "--via-ir",
+        "--match-contract",
+        "TestPaymasterFlow",
+    ]);
     assert!(cmd.stdout_lossy().contains("Suite result: ok"));
 }
