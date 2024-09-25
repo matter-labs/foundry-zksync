@@ -985,9 +985,7 @@ impl Cheatcodes {
             gas_limit: input.gas_limit(),
         };
 
-        // We currently exhaust the entire gas for the call as zkEVM returns a very high
-        // amount of gas that OOGs revm.
-        let gas = Gas::new(input.gas_limit());
+        let mut gas = Gas::new(input.gas_limit());
         match foundry_zksync_core::vm::create::<_, DatabaseError>(
             &create_inputs,
             zk_contract,
@@ -1029,32 +1027,39 @@ impl Cheatcodes {
                 }
 
                 match result.execution_result {
-                    ExecutionResult::Success { output, .. } => match output {
-                        Output::Create(bytes, address) => Some(CreateOutcome {
-                            result: InterpreterResult {
-                                result: InstructionResult::Return,
-                                output: bytes,
-                                gas,
-                            },
-                            address,
-                        }),
-                        _ => Some(CreateOutcome {
+                    ExecutionResult::Success { output, gas_used, .. } => {
+                        let _ = gas.record_cost(gas_used);
+                        println!("{gas:?}");
+                        match output {
+                            Output::Create(bytes, address) => Some(CreateOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Return,
+                                    output: bytes,
+                                    gas,
+                                },
+                                address,
+                            }),
+                            _ => Some(CreateOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Revert,
+                                    output: Bytes::new(),
+                                    gas,
+                                },
+                                address: None,
+                            }),
+                        }
+                    }
+                    ExecutionResult::Revert { output, gas_used, .. } => {
+                        let _ = gas.record_cost(gas_used);
+                        Some(CreateOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
-                                output: Bytes::new(),
+                                output,
                                 gas,
                             },
                             address: None,
-                        }),
-                    },
-                    ExecutionResult::Revert { output, .. } => Some(CreateOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output,
-                            gas,
-                        },
-                        address: None,
-                    }),
+                        })
+                    }
                     ExecutionResult::Halt { .. } => Some(CreateOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,
@@ -1569,9 +1574,7 @@ impl Cheatcodes {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
         };
 
-        // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
-        // of gas that OOGs revm.
-        let gas = Gas::new(call.gas_limit);
+        let mut gas = Gas::new(call.gas_limit);
         match foundry_zksync_core::vm::call::<_, DatabaseError>(call, factory_deps, ecx, ccx) {
             Ok(result) => {
                 // append console logs from zkEVM to the current executor's LogTracer
@@ -1610,32 +1613,38 @@ impl Cheatcodes {
                 }
 
                 match result.execution_result {
-                    ExecutionResult::Success { output, .. } => match output {
-                        Output::Call(bytes) => Some(CallOutcome {
-                            result: InterpreterResult {
-                                result: InstructionResult::Return,
-                                output: bytes,
-                                gas,
-                            },
-                            memory_offset: call.return_memory_offset.clone(),
-                        }),
-                        _ => Some(CallOutcome {
+                    ExecutionResult::Success { output, gas_used, .. } => {
+                        let _ = gas.record_cost(gas_used);
+                        match output {
+                            Output::Call(bytes) => Some(CallOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Return,
+                                    output: bytes,
+                                    gas,
+                                },
+                                memory_offset: call.return_memory_offset.clone(),
+                            }),
+                            _ => Some(CallOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Revert,
+                                    output: Bytes::new(),
+                                    gas,
+                                },
+                                memory_offset: call.return_memory_offset.clone(),
+                            }),
+                        }
+                    }
+                    ExecutionResult::Revert { output, gas_used, .. } => {
+                        let _ = gas.record_cost(gas_used);
+                        Some(CallOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
-                                output: Bytes::new(),
+                                output,
                                 gas,
                             },
                             memory_offset: call.return_memory_offset.clone(),
-                        }),
-                    },
-                    ExecutionResult::Revert { output, .. } => Some(CallOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output,
-                            gas,
-                        },
-                        memory_offset: call.return_memory_offset.clone(),
-                    }),
+                        })
+                    }
                     ExecutionResult::Halt { .. } => Some(CallOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,

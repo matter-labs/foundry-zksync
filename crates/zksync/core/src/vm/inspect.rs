@@ -171,7 +171,6 @@ where
         .map(|factory_deps| (*factory_deps).clone())
         .unwrap_or_default();
 
-    let env_tx_gas_limit = ecx.env.tx.gas_limit;
     let mut era_db = ZKVMData::new_with_system_contracts(ecx, chain_id)
         .with_extra_factory_deps(persisted_factory_deps)
         .with_storage_accesses(ccx.accesses.take());
@@ -199,7 +198,7 @@ where
     } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
 
     info!(
-        limit=?gas_usage.limit, execution=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
+        reserved=?gas_usage.bootloader_debug.reserved_gas, limit=?gas_usage.limit, execution=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
         "gas usage",
     );
 
@@ -260,7 +259,7 @@ where
                 call_traces,
                 execution_result: rExecutionResult::Success {
                     reason: SuccessReason::Return,
-                    gas_used: tx_result.statistics.gas_used,
+                    gas_used: gas_usage.gas_used(),
                     gas_refunded: tx_result.refunds.gas_refunded,
                     logs,
                     output,
@@ -278,7 +277,7 @@ where
                 logs,
                 call_traces,
                 execution_result: rExecutionResult::Revert {
-                    gas_used: env_tx_gas_limit - tx_result.refunds.gas_refunded,
+                    gas_used: gas_usage.gas_used(),
                     output: Bytes::from(output),
                 },
             }
@@ -295,7 +294,7 @@ where
                 call_traces,
                 execution_result: rExecutionResult::Halt {
                     reason: mapped_reason,
-                    gas_used: env_tx_gas_limit - tx_result.refunds.gas_refunded,
+                    gas_used: gas_usage.gas_used(),
                 },
             }
         }
@@ -389,6 +388,13 @@ struct ZkVmGasUsage {
     pub pubdata: U256,
     /// Additional bootloader debug info for gas usage.
     pub bootloader_debug: BootloaderDebug,
+}
+
+impl ZkVmGasUsage {
+    pub fn gas_used(&self) -> u64 {
+        // Gas limit is capped by the environment so gas should never reach max u64
+        self.execution.saturating_add(self.pubdata).as_u64()
+    }
 }
 
 struct InnerZkVmResult {
