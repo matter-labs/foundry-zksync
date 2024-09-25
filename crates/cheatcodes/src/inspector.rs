@@ -1029,7 +1029,6 @@ impl Cheatcodes {
                 match result.execution_result {
                     ExecutionResult::Success { output, gas_used, .. } => {
                         let _ = gas.record_cost(gas_used);
-                        println!("{gas:?}");
                         match output {
                             Output::Create(bytes, address) => Some(CreateOutcome {
                                 result: InterpreterResult {
