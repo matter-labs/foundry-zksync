@@ -1,4 +1,5 @@
 use std::{
+    cell::OnceCell,
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
@@ -17,7 +18,6 @@ use multivm::{
         zkevm_opcode_defs::{FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER},
     },
 };
-use once_cell::sync::OnceCell;
 use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,

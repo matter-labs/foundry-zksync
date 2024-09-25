@@ -1,6 +1,7 @@
 //! Forge tests for zksync logs.
 
 use std::path::Path;
+use std::sync::LazyLock;
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::{address, hex, Address, Bytes};
@@ -11,7 +12,6 @@ use forge::{
 use foundry_common::fs;
 use foundry_test_utils::Filter;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 const ADDRESS_ZK_TRACE_TEST: Address = address!("7fa9385be102ac3eac297483dd6233d62b3e1496");
@@ -35,14 +35,14 @@ const VALUE_LOG_UINT_TEN: Bytes = Bytes::from_static(
     hex!("f5b1bba9000000000000000000000000000000000000000000000000000000000000000a").as_slice(),
 ); // selector: log(uint)
 
-static BYTECODE_ADDER: Lazy<Vec<u8>> =
-    Lazy::new(|| get_zk_artifact_bytecode("Trace.t.sol/Adder.json"));
-static BYTECODE_CONSTRUCTOR_ADDER: Lazy<Vec<u8>> =
-    Lazy::new(|| get_zk_artifact_bytecode("Trace.t.sol/ConstructorAdder.json"));
-static BYTECODE_NUMBER: Lazy<Vec<u8>> =
-    Lazy::new(|| get_zk_artifact_bytecode("Trace.t.sol/Number.json"));
-static BYTECODE_INNER_NUMBER: Lazy<Vec<u8>> =
-    Lazy::new(|| get_zk_artifact_bytecode("Trace.t.sol/InnerNumber.json"));
+static BYTECODE_ADDER: LazyLock<Vec<u8>> =
+    LazyLock::new(|| get_zk_artifact_bytecode("Trace.t.sol/Adder.json"));
+static BYTECODE_CONSTRUCTOR_ADDER: LazyLock<Vec<u8>> =
+    LazyLock::new(|| get_zk_artifact_bytecode("Trace.t.sol/ConstructorAdder.json"));
+static BYTECODE_NUMBER: LazyLock<Vec<u8>> =
+    LazyLock::new(|| get_zk_artifact_bytecode("Trace.t.sol/Number.json"));
+static BYTECODE_INNER_NUMBER: LazyLock<Vec<u8>> =
+    LazyLock::new(|| get_zk_artifact_bytecode("Trace.t.sol/InnerNumber.json"));
 
 fn get_zk_artifact_bytecode<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Vec<u8> {
     #[derive(Deserialize)]
@@ -80,7 +80,7 @@ async fn test_zk_traces_work_during_call() {
                 TraceAssertion {
                     kind: Some(CallKind::Create),
                     address: Some(ADDRESS_ADDER),
-                    output: Some(Bytes::from(Lazy::force(&BYTECODE_ADDER).to_owned())),
+                    output: Some(Bytes::from(LazyLock::force(&BYTECODE_ADDER).to_owned())),
                     ..Default::default()
                 },
                 TraceAssertion {
@@ -92,7 +92,7 @@ async fn test_zk_traces_work_during_call() {
                         TraceAssertion {
                             kind: Some(CallKind::Create),
                             address: Some(ADDRESS_NUMBER),
-                            output: Some(Bytes::from(Lazy::force(&BYTECODE_NUMBER).to_owned())),
+                            output: Some(Bytes::from(LazyLock::force(&BYTECODE_NUMBER).to_owned())),
                             ..Default::default()
                         },
                         TraceAssertion {
@@ -105,7 +105,7 @@ async fn test_zk_traces_work_during_call() {
                                     kind: Some(CallKind::Create),
                                     address: Some(ADDRESS_FIRST_INNER_NUMBER),
                                     output: Some(Bytes::from(
-                                        Lazy::force(&BYTECODE_INNER_NUMBER).to_owned(),
+                                        LazyLock::force(&BYTECODE_INNER_NUMBER).to_owned(),
                                     )),
                                     ..Default::default()
                                 },
@@ -128,7 +128,7 @@ async fn test_zk_traces_work_during_call() {
                                     kind: Some(CallKind::Create),
                                     address: Some(ADDRESS_SECOND_INNER_NUMBER),
                                     output: Some(Bytes::from(
-                                        Lazy::force(&BYTECODE_INNER_NUMBER).to_owned(),
+                                        LazyLock::force(&BYTECODE_INNER_NUMBER).to_owned(),
                                     )),
                                     ..Default::default()
                                 },
@@ -174,12 +174,12 @@ async fn test_zk_traces_work_during_create() {
             children: vec![TraceAssertion {
                 kind: Some(CallKind::Create),
                 address: Some(ADDRESS_ADDER),
-                output: Some(Bytes::from(Lazy::force(&BYTECODE_CONSTRUCTOR_ADDER).to_owned())),
+                output: Some(Bytes::from(LazyLock::force(&BYTECODE_CONSTRUCTOR_ADDER).to_owned())),
                 children: vec![
                     TraceAssertion {
                         kind: Some(CallKind::Create),
                         address: Some(ADDRESS_NUMBER),
-                        output: Some(Bytes::from(Lazy::force(&BYTECODE_NUMBER).to_owned())),
+                        output: Some(Bytes::from(LazyLock::force(&BYTECODE_NUMBER).to_owned())),
                         ..Default::default()
                     },
                     TraceAssertion {
@@ -192,7 +192,7 @@ async fn test_zk_traces_work_during_create() {
                                 kind: Some(CallKind::Create),
                                 address: Some(ADDRESS_FIRST_INNER_NUMBER),
                                 output: Some(Bytes::from(
-                                    Lazy::force(&BYTECODE_INNER_NUMBER).to_owned(),
+                                    LazyLock::force(&BYTECODE_INNER_NUMBER).to_owned(),
                                 )),
                                 ..Default::default()
                             },
@@ -215,7 +215,7 @@ async fn test_zk_traces_work_during_create() {
                                 kind: Some(CallKind::Create),
                                 address: Some(ADDRESS_SECOND_INNER_NUMBER),
                                 output: Some(Bytes::from(
-                                    Lazy::force(&BYTECODE_INNER_NUMBER).to_owned(),
+                                    LazyLock::force(&BYTECODE_INNER_NUMBER).to_owned(),
                                 )),
                                 ..Default::default()
                             },
