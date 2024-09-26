@@ -1551,7 +1551,6 @@ contract ContractOneTest is DSTest {
     )
     .unwrap();
 
-    // report for all
     prj.write_config(Config {
         gas_reports: (vec!["*".to_string()]),
         gas_reports_ignore: (vec![]),
