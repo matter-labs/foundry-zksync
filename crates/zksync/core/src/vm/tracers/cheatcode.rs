@@ -28,7 +28,7 @@ use zksync_utils::bytecode::hash_bytecode;
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
     vm::farcall::{CallAction, CallDepth, FarCallHandler},
-    EMPTY_CODE,
+    ZkPaymasterData, EMPTY_CODE,
 };
 
 /// Selector for retrieving account version.
@@ -80,6 +80,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub accesses: Option<&'a mut RecordAccess>,
     /// Factory deps that were persisted across calls
     pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
+    /// Paymaster data
+    pub paymaster_data: Option<ZkPaymasterData>,
 }
 
 /// Tracer result to return back to foundry.

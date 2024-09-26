@@ -700,6 +700,10 @@ interface Vm {
     #[cheatcode(group = Testing, safety = Safe)]
     function zkVmSkip() external pure;
 
+    /// Enables/Disables use of a paymaster for ZK transactions.
+    #[cheatcode(group = Testing, safety = Safe)]
+    function zkUsePaymaster(address paymaster_address, bytes calldata paymaster_input) external pure;
+
     /// Registers bytecodes for ZK-VM for transact/call and create instructions.
     #[cheatcode(group = Testing, safety = Safe)]
     function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;
