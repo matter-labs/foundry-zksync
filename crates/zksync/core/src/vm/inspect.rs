@@ -434,7 +434,7 @@ fn inspect_inner<S: ReadStorage>(
     let is_create = call_ctx.is_create;
     let bootloader_debug_tracer_result = Arc::new(OnceCell::default());
     let tracers = vec![
-        ErrorTracer::default().into_tracer_pointer(),
+        ErrorTracer.into_tracer_pointer(),
         CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
         BootloaderDebugTracer { result: bootloader_debug_tracer_result.clone() }
             .into_tracer_pointer(),
