@@ -137,6 +137,15 @@ where
     let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
+    let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
+        PaymasterParams {
+            paymaster: paymaster_data.address.to_h160(),
+            paymaster_input: paymaster_data.input.to_vec(),
+        }
+    } else {
+        PaymasterParams::default()
+    };
+
     let tx = L2Tx::new(
         CONTRACT_DEPLOYER_ADDRESS,
         calldata,
@@ -150,7 +159,7 @@ where
         caller.to_h160(),
         call.value.to_u256(),
         factory_deps,
-        PaymasterParams::default(),
+        paymaster_params,
     );
 
     let call_ctx = CallContext {
@@ -186,6 +195,16 @@ where
 
     let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
+
+    let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
+        PaymasterParams {
+            paymaster: paymaster_data.address.to_h160(),
+            paymaster_input: paymaster_data.input.to_vec(),
+        }
+    } else {
+        PaymasterParams::default()
+    };
+
     let tx = L2Tx::new(
         call.bytecode_address.to_h160(),
         call.input.to_vec(),
@@ -202,7 +221,7 @@ where
             _ => U256::zero(),
         },
         factory_deps,
-        PaymasterParams::default(),
+        paymaster_params,
     );
 
     // address and caller are specific to the type of call:

@@ -74,6 +74,15 @@ pub fn get_nonce_key(address: Address) -> rU256 {
     zksync_types::get_nonce_key(&address.to_h160()).key().to_ru256()
 }
 
+/// Represents additional data for ZK transactions that require a paymaster.
+#[derive(Clone, Debug, Default)]
+pub struct ZkPaymasterData {
+    /// Paymaster address.
+    pub address: Address,
+    /// Paymaster input.
+    pub input: Bytes,
+}
+
 /// Represents additional data for ZK transactions.
 #[derive(Clone, Debug, Default)]
 pub struct ZkTransactionMetadata {
