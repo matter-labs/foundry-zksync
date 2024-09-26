@@ -28,14 +28,6 @@ async fn test_zk_contract_paymaster() {
     prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol")).unwrap();
     prj.add_source("Paymaster.t.sol", include_str!("../../fixtures/zk/Paymaster.t.sol")).unwrap();
 
-    cmd.args([
-        "test",
-        "--zk-startup",
-        "--evm-version",
-        "shanghai",
-        "--via-ir",
-        "--match-contract",
-        "TestPaymasterFlow",
-    ]);
+    cmd.args(["test", "--zk-startup", "--via-ir", "--match-contract", "TestPaymasterFlow"]);
     assert!(cmd.stdout_lossy().contains("Suite result: ok"));
 }
