@@ -1,6 +1,5 @@
 use alloy_primitives::{hex, Log};
 use era_test_node::{
-    bootloader_debug::{BootloaderDebug, BootloaderDebugTracer},
     config::node::ShowCalls,
     formatter,
     system_contracts::{Options, SystemContracts},
@@ -43,7 +42,11 @@ use crate::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
         env::{create_l1_batch_env, create_system_env},
         storage_view::StorageView,
-        tracer::{CallContext, CheatcodeTracer, CheatcodeTracerContext},
+        tracers::{
+            bootloader::{BootloaderDebug, BootloaderDebugTracer},
+            cheatcode::{CallContext, CheatcodeTracer, CheatcodeTracerContext},
+            error::ErrorTracer,
+        },
     },
 };
 use foundry_evm_abi::{
@@ -431,6 +434,7 @@ fn inspect_inner<S: ReadStorage>(
     let is_create = call_ctx.is_create;
     let bootloader_debug_tracer_result = Arc::new(OnceCell::default());
     let tracers = vec![
+        ErrorTracer::default().into_tracer_pointer(),
         CallTracer::new(call_tracer_result.clone()).into_tracer_pointer(),
         BootloaderDebugTracer { result: bootloader_debug_tracer_result.clone() }
             .into_tracer_pointer(),

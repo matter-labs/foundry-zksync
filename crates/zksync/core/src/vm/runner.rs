@@ -21,7 +21,7 @@ use crate::{
     vm::{
         db::ZKVMData,
         inspect::{inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult},
-        tracer::{CallContext, CheatcodeTracerContext},
+        tracers::cheatcode::{CallContext, CheatcodeTracerContext},
     },
 };
 
