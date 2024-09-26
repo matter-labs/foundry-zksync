@@ -27,11 +27,9 @@ use zksync_utils::bytecode::hash_bytecode;
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
-    vm::farcall::{CallAction, CallDepth},
+    vm::farcall::{CallAction, CallDepth, FarCallHandler},
     ZkPaymasterData, EMPTY_CODE,
 };
-
-use super::farcall::FarCallHandler;
 
 /// Selector for retrieving account version.
 /// This is used to override the caller's account version when deploying a contract
