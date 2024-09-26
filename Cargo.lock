@@ -5354,6 +5354,7 @@ dependencies = [
  "foundry-config",
  "foundry-evm-core",
  "foundry-linking",
+ "foundry-zksync-compiler",
  "futures 0.3.30",
  "itertools 0.13.0",
  "once_cell",

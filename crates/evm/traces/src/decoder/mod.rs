@@ -21,11 +21,12 @@ use foundry_evm_core::{
         RIPEMD_160, SHA_256,
     },
 };
+use foundry_zksync_compiler::ZKSYNC_ARTIFACTS_DIR;
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use revm_inspectors::tracing::types::{DecodedCallLog, DecodedCallTrace};
 use rustc_hash::FxHashMap;
-use std::collections::{hash_map::Entry, BTreeMap, HashMap};
+use std::collections::{hash_map::Entry, BTreeMap, HashMap, HashSet};
 
 mod precompiles;
 
@@ -133,6 +134,9 @@ pub struct CallTraceDecoder {
 
     /// Optional identifier of individual trace steps.
     pub debug_identifier: Option<DebugTraceIdentifier>,
+
+    /// Addresses that are contracts on the ZkVm
+    pub zk_contracts: HashSet<Address>,
 }
 
 impl CallTraceDecoder {
@@ -207,6 +211,8 @@ impl CallTraceDecoder {
             verbosity: 0,
 
             debug_identifier: None,
+
+            zk_contracts: Default::default(),
         }
     }
 
@@ -281,7 +287,7 @@ impl CallTraceDecoder {
         }
 
         trace!(target: "evm::traces", len=identities.len(), "collecting address identities");
-        for AddressIdentity { address, label, contract, abi, artifact_id: _ } in identities {
+        for AddressIdentity { address, label, contract, abi, artifact_id } in identities {
             let _span = trace_span!(target: "evm::traces", "identity", ?contract, ?label).entered();
 
             if let Some(contract) = contract {
@@ -294,6 +300,12 @@ impl CallTraceDecoder {
 
             if let Some(abi) = abi {
                 self.collect_abi(&abi, Some(&address));
+            }
+
+            if let Some(artifact_id) = artifact_id {
+                if artifact_id.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR) {
+                    self.zk_contracts.insert(address);
+                }
             }
         }
     }
