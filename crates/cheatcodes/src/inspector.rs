@@ -36,7 +36,7 @@ use foundry_evm_core::{
 };
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
-    convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key, Call, ZkPaymasterData,
     ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
@@ -69,6 +69,7 @@ use zksync_types::{
     H256, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
 };
+use zksync_web3_rs::eip712::PaymasterParams;
 
 mod utils;
 
@@ -842,6 +843,11 @@ impl Cheatcodes {
                         None
                     };
                     let rpc = ecx_inner.db.active_fork_url();
+                    let paymaster_params =
+                        self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
+                            paymaster: paymaster_data.address.to_h160(),
+                            paymaster_input: paymaster_data.input.to_vec().into(),
+                        });
                     if let Some(factory_deps) = zk_tx {
                         let mut batched =
                             foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
@@ -859,7 +865,10 @@ impl Cheatcodes {
                                     nonce: Some(nonce),
                                     ..Default::default()
                                 },
-                                zk_tx: Some(ZkTransactionMetadata { factory_deps }),
+                                zk_tx: Some(ZkTransactionMetadata {
+                                    factory_deps,
+                                    paymaster_data: paymaster_params.clone(),
+                                }),
                             });
 
                             //update nonce for each tx
@@ -881,7 +890,9 @@ impl Cheatcodes {
                             },
                             ..Default::default()
                         },
-                        zk_tx: zk_tx.map(ZkTransactionMetadata::new),
+                        zk_tx: zk_tx.map(|factory_deps| {
+                            ZkTransactionMetadata::new(factory_deps, paymaster_params)
+                        }),
                     });
 
                     input.log_debug(self, &input.scheme().unwrap_or(CreateScheme::Create));
@@ -1428,11 +1439,22 @@ impl Cheatcodes {
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let zk_tx = if self.use_zk_vm {
+                        let paymaster_params =
+                            self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
+                                paymaster: paymaster_data.address.to_h160(),
+                                paymaster_input: paymaster_data.input.to_vec().into(),
+                            });
                         // We shouldn't need factory_deps for CALLs
                         if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
-                            Some(ZkTransactionMetadata { factory_deps: factory_deps.clone() })
+                            Some(ZkTransactionMetadata {
+                                factory_deps: factory_deps.clone(),
+                                paymaster_data: paymaster_params,
+                            })
                         } else {
-                            Some(ZkTransactionMetadata { factory_deps: Default::default() })
+                            Some(ZkTransactionMetadata {
+                                factory_deps: Default::default(),
+                                paymaster_data: paymaster_params,
+                            })
                         }
                     } else {
                         None

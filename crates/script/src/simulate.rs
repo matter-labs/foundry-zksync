@@ -144,7 +144,10 @@ impl PreSimulationState {
                     &self.execution_artifacts.decoder,
                     created_contracts,
                     is_fixed_gas_limit,
-                    zk.map(|zk_tx| ZkTransaction { factory_deps: zk_tx.factory_deps }),
+                    zk.map(|zk_tx| ZkTransaction {
+                        factory_deps: zk_tx.factory_deps,
+                        paymaster_data: zk_tx.paymaster_data,
+                    }),
                 )?;
 
                 eyre::Ok((Some(tx), result.traces))
@@ -228,8 +231,10 @@ impl PreSimulationState {
             .into_iter()
             .map(|btx| {
                 let mut tx = TransactionWithMetadata::from_tx_request(btx.transaction);
-                tx.zk =
-                    btx.zk_tx.map(|metadata| ZkTransaction { factory_deps: metadata.factory_deps });
+                tx.zk = btx.zk_tx.map(|metadata| ZkTransaction {
+                    factory_deps: metadata.factory_deps,
+                    paymaster_data: metadata.paymaster_data,
+                });
                 tx.rpc = btx.rpc.expect("missing broadcastable tx rpc url");
                 tx
             })
