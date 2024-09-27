@@ -357,11 +357,12 @@ impl<'a> ContractRunner<'a> {
 
         let identified_contracts = has_invariants.then(|| {
             load_contracts(
-                setup.traces.iter().map(|(_, t)| t),
+                setup.traces.iter().map(|(_, t)| &t.arena),
                 &known_contracts,
                 &setup.deployments,
             )
         });
+
         let test_results = functions
             .par_iter()
             .map(|&func| {

@@ -10,6 +10,7 @@ use crate::{
     inspector::utils::CommonCreateInput,
     script::{Broadcast, ScriptWallets},
     test::expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
+    utils::IgnoredTraces,
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result, Vm,
     Vm::AccountAccess,
 };
@@ -40,16 +41,17 @@ use foundry_zksync_core::{
     get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
     DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
+use foundry_zksync_inspectors::TraceCollector;
 use itertools::Itertools;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use revm::{
     interpreter::{
         opcode, CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome, EOFCreateInputs,
-        Gas, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
+        EOFCreateKind, Gas, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
     },
     primitives::{
         AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot,
-        ExecutionResult, HashMap as rHashMap, Output, KECCAK_EMPTY,
+        ExecutionResult, HashMap as rHashMap, Output, SpecId, EOF_MAGIC_BYTES, KECCAK_EMPTY,
     },
     EvmContext, InnerEvmContext, Inspector,
 };
@@ -137,8 +139,19 @@ pub trait CheatcodesExecutor {
         self.with_evm(ccx, |evm| {
             evm.context.evm.inner.journaled_state.depth += 1;
 
-            let first_frame_or_result =
-                evm.handler.execution().create(&mut evm.context, Box::new(inputs))?;
+            // Handle EOF bytecode
+            let first_frame_or_result = if evm.handler.cfg.spec_id.is_enabled_in(SpecId::PRAGUE_EOF)
+                && inputs.scheme == CreateScheme::Create && inputs.init_code.starts_with(&EOF_MAGIC_BYTES)
+            {
+                evm.handler.execution().eofcreate(
+                    &mut evm.context,
+                    Box::new(EOFCreateInputs::new(inputs.caller, inputs.value, inputs.gas_limit, EOFCreateKind::Tx {
+                        initdata: inputs.init_code,
+                    })),
+                )?
+            } else {
+                evm.handler.execution().create(&mut evm.context, Box::new(inputs))?
+            };
 
             let mut result = match first_frame_or_result {
                 revm::FrameOrResult::Frame(first_frame) => evm.run_the_loop(first_frame)?,
@@ -148,8 +161,8 @@ pub trait CheatcodesExecutor {
             evm.handler.execution().last_frame_return(&mut evm.context, &mut result)?;
 
             let outcome = match result {
-                revm::FrameResult::Call(_) | revm::FrameResult::EOFCreate(_) => unreachable!(),
-                revm::FrameResult::Create(create) => create,
+                revm::FrameResult::Call(_) => unreachable!(),
+                revm::FrameResult::Create(create) | revm::FrameResult::EOFCreate(create) => create,
             };
 
             evm.context.evm.inner.journaled_state.depth -= 1;
@@ -160,6 +173,11 @@ pub trait CheatcodesExecutor {
 
     fn console_log<DB: DatabaseExt>(&mut self, ccx: &mut CheatsCtxt<DB>, message: String) {
         self.get_inspector::<DB>(ccx.state).console_log(message);
+    }
+
+    /// Returns a mutable reference to the tracing inspector if it is available.
+    fn tracing_inspector(&mut self) -> Option<&mut Option<TraceCollector>> {
+        None
     }
 
     fn trace_zksync<DB: DatabaseExt>(
@@ -344,6 +362,9 @@ pub struct Cheatcodes {
     /// Optional RNG algorithm.
     rng: Option<StdRng>,
 
+    /// Ignored traces.
+    pub ignored_traces: IgnoredTraces,
+
     /// Use ZK-VM to execute CALLs and CREATEs.
     pub use_zk_vm: bool,
 
@@ -459,6 +480,7 @@ impl Cheatcodes {
             record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
             rng: Default::default(),
+            ignored_traces: Default::default(),
         }
     }
 
