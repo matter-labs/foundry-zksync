@@ -31,6 +31,9 @@ use foundry_compilers::{
 /// Filename for zksync cache
 pub const ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME: &str = "zksync-solidity-files-cache.json";
 
+/// Directory for zksync artifacts
+pub const ZKSYNC_ARTIFACTS_DIR: &str = "zkout";
+
 // Config overrides to create zksync specific foundry-compilers data structures
 
 /// Returns the configured `zksolc` `Settings` that includes:
@@ -160,7 +163,7 @@ pub fn config_project_paths(config: &Config) -> ProjectPathsConfig<SolcLanguage>
         .sources(&config.src)
         .tests(&config.test)
         .scripts(&config.script)
-        .artifacts(config.root.0.join("zkout"))
+        .artifacts(config.root.0.join(ZKSYNC_ARTIFACTS_DIR))
         .libs(config.libs.iter())
         .remappings(config.get_all_remappings())
         .allowed_path(&config.root.0)
