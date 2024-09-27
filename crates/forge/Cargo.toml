@@ -123,7 +123,7 @@ tikv-jemallocator = { workspace = true, optional = true }
 anvil.workspace = true
 foundry-test-utils.workspace = true
 
-mockall = "0.12"
+mockall = "0.13"
 criterion = "0.5"
 paste = "1.0"
 path-slash = "0.2"

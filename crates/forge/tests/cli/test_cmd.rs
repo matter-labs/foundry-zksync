@@ -1270,3 +1270,131 @@ contract DeterministicRandomnessTest is Test {
     assert_ne!(res4, res1);
     assert_ne!(res4, res3);
 });
+
+// tests that `pauseGasMetering` used at the end of test does not produce meaningless values
+// see https://github.com/foundry-rs/foundry/issues/5491
+forgetest_init!(repro_5491, |prj, cmd| {
+    prj.wipe_contracts();
+
+    prj.add_test(
+        "ATest.t.sol",
+        r#"
+import {Test} from "forge-std/Test.sol";
+
+contract ATest is Test {
+    function testWeirdGas1() public {
+        vm.pauseGasMetering();
+    }
+
+    function testWeirdGas2() public {
+        uint256 a = 1;
+        uint256 b = a + 1;
+        require(b == 2, "b is not 2");
+        vm.pauseGasMetering();
+    }
+
+    function testNormalGas() public {
+        vm.pauseGasMetering();
+        vm.resumeGasMetering();
+    }
+
+    function testWithAssembly() public {
+        vm.pauseGasMetering();
+        assembly {
+            return(0, 0)
+        }
+    }
+}
+   "#,
+    )
+    .unwrap();
+
+    cmd.args(["test"]).with_no_redact().assert_success().stdout_eq(str![[r#"
+...
+[PASS] testNormalGas() (gas: 3202)
+[PASS] testWeirdGas1() (gas: 3040)
+[PASS] testWeirdGas2() (gas: 3148)
+[PASS] testWithAssembly() (gas: 3083)
+...
+"#]]);
+});
+
+// see https://github.com/foundry-rs/foundry/issues/5564
+forgetest_init!(repro_5564, |prj, cmd| {
+    prj.wipe_contracts();
+
+    prj.add_test(
+        "ATest.t.sol",
+        r#"
+import {Test} from "forge-std/Test.sol";
+contract ATest is Test {
+    error MyError();
+    function testSelfMeteringRevert() public {
+        vm.pauseGasMetering();
+        vm.expectRevert(MyError.selector);
+        this.selfReverts();
+    }
+    function selfReverts() external {
+        vm.resumeGasMetering();
+        revert MyError();
+    }
+}
+   "#,
+    )
+    .unwrap();
+
+    cmd.args(["test"]).with_no_redact().assert_success().stdout_eq(str![[r#"
+...
+[PASS] testSelfMeteringRevert() (gas: 3299)
+...
+"#]]);
+});
+
+// see https://github.com/foundry-rs/foundry/issues/4523
+forgetest_init!(repro_4523, |prj, cmd| {
+    prj.wipe_contracts();
+
+    prj.add_test(
+        "ATest.t.sol",
+        r#"
+import "forge-std/Test.sol";
+contract ATest is Test {
+    mapping(uint => bytes32) map;
+
+    function test_GasMeter () public {
+        vm.pauseGasMetering();
+        for (uint i = 0; i < 10000; i++) {
+            map[i] = keccak256(abi.encode(i));
+        }
+        vm.resumeGasMetering();
+
+        for (uint i = 0; i < 10000; i++) {
+            map[i] = keccak256(abi.encode(i));
+        }
+    }
+
+    function test_GasLeft () public {
+        for (uint i = 0; i < 10000; i++) {
+            map[i] = keccak256(abi.encode(i));
+        }
+
+        uint start = gasleft();
+        for (uint i = 0; i < 10000; i++) {
+            map[i] = keccak256(abi.encode(i));
+        }
+        console2.log("Gas cost:", start - gasleft());
+    }
+}
+   "#,
+    )
+    .unwrap();
+
+    cmd.args(["test", "-vvvv"]).with_no_redact().assert_success().stdout_eq(str![[r#"
+...
+Logs:
+  Gas cost: 5754479
+...
+[PASS] test_GasMeter() (gas: 5757137)
+...
+"#]]);
+});
