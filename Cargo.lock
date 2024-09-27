@@ -4917,6 +4917,7 @@ dependencies = [
  "foundry-wallets",
  "foundry-zksync-compiler",
  "foundry-zksync-core",
+ "foundry-zksync-inspectors",
  "itertools 0.13.0",
  "jsonpath_lib",
  "k256 0.13.3",
@@ -5258,6 +5259,7 @@ dependencies = [
  "foundry-evm-fuzz",
  "foundry-evm-traces",
  "foundry-zksync-core",
+ "foundry-zksync-inspectors",
  "indicatif",
  "parking_lot 0.12.3",
  "proptest",
@@ -5537,6 +5539,17 @@ dependencies = [
  "zksync_state",
  "zksync_types",
  "zksync_utils 0.1.0 (git+http://github.com/Moonsong-Labs/zksync-era?branch=foundry-zksync)",
+]
+
+[[package]]
+name = "foundry-zksync-inspectors"
+version = "0.0.2"
+dependencies = [
+ "alloy-primitives",
+ "foundry-evm-core",
+ "foundry-evm-traces",
+ "foundry-zksync-core",
+ "revm",
 ]
 
 [[package]]
