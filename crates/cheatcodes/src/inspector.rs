@@ -846,7 +846,7 @@ impl Cheatcodes {
                     let paymaster_params =
                         self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
                             paymaster: paymaster_data.address.to_h160(),
-                            paymaster_input: paymaster_data.input.to_vec().into(),
+                            paymaster_input: paymaster_data.input.to_vec(),
                         });
                     if let Some(factory_deps) = zk_tx {
                         let mut batched =
@@ -1442,7 +1442,7 @@ impl Cheatcodes {
                         let paymaster_params =
                             self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
                                 paymaster: paymaster_data.address.to_h160(),
-                                paymaster_input: paymaster_data.input.to_vec().into(),
+                                paymaster_input: paymaster_data.input.to_vec(),
                             });
                         // We shouldn't need factory_deps for CALLs
                         if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
