@@ -46,7 +46,7 @@ where
         TransactTo::Create => (CONTRACT_DEPLOYER_ADDRESS, true),
     };
 
-    let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller);
+    let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller, &PaymasterParams::default());
     debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         transact_to,
@@ -134,9 +134,6 @@ where
     let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
-    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller);
-    info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
-
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
         PaymasterParams {
             paymaster: paymaster_data.address.to_h160(),
@@ -145,6 +142,9 @@ where
     } else {
         PaymasterParams::default()
     };
+
+    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller, &paymaster_params);
+    info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
     let tx = L2Tx::new(
         CONTRACT_DEPLOYER_ADDRESS,
@@ -193,9 +193,6 @@ where
     let caller = ecx.env.tx.caller;
     let nonce: zksync_types::Nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
-    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller);
-    info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
-
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
         PaymasterParams {
             paymaster: paymaster_data.address.to_h160(),
@@ -204,6 +201,9 @@ where
     } else {
         PaymasterParams::default()
     };
+
+    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller, &paymaster_params);
+    info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
     let tx = L2Tx::new(
         call.bytecode_address.to_h160(),
@@ -248,7 +248,11 @@ where
 }
 
 /// Assign gas parameters that satisfy zkSync's fee model.
-fn gas_params<DB>(ecx: &mut EvmContext<DB>, caller: Address) -> (U256, U256)
+fn gas_params<DB>(
+    ecx: &mut EvmContext<DB>,
+    caller: Address,
+    paymaster_params: &PaymasterParams,
+) -> (U256, U256)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -259,7 +263,13 @@ where
         error!("balance is 0 for {caller:?}, transaction will fail");
     }
     let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
-    let gas_limit = fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
+
+    let gas_limit = if paymaster_params.paymaster != Address::ZERO.to_h160() {
+        // If paymaster is set, use the proposed gas limit
+        ecx.env.tx.gas_limit.into()
+    } else {
+        fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance)
+    };
 
     (gas_limit, max_fee_per_gas)
 }
