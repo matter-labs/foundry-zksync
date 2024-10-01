@@ -53,8 +53,8 @@ use foundry_evm_abi::{
     patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS,
 };
 
-/// Maximum gas price allowed for L1.
-const MAX_L1_GAS_PRICE: u64 = 1000;
+/// Minimum gas price allowed for L1.
+const MIN_L1_GAS_PRICE: u64 = 1000;
 
 /// Represents the result of execution a [`L2Tx`] on EraVM
 #[derive(Debug)]
@@ -416,7 +416,7 @@ fn inspect_inner<S: ReadStorage>(
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> InnerZkVmResult {
-    let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MAX_L1_GAS_PRICE);
+    let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MIN_L1_GAS_PRICE);
     let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price, fair_l2_gas_price);
 
