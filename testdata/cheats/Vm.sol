@@ -420,6 +420,7 @@ interface Vm {
         external;
     function expectEmit() external;
     function expectEmit(address emitter) external;
+    function expectPartialRevert(bytes4 revertData) external;
     function expectRevert() external;
     function expectRevert(bytes4 revertData) external;
     function expectRevert(bytes calldata revertData) external;
@@ -561,10 +562,8 @@ interface Vm {
     function rememberKey(uint256 privateKey) external returns (address keyAddr);
     function removeDir(string calldata path, bool recursive) external;
     function removeFile(string calldata path) external;
-    function replace(string calldata input, string calldata from, string calldata to)
-        external
-        pure
-        returns (string memory output);
+    function replace(string calldata input, string calldata from, string calldata to) external pure returns (string memory output);
+    function resetGasMetering() external;
     function resetNonce(address account) external;
     function resumeGasMetering() external;
     function resumeTracing() external view;
