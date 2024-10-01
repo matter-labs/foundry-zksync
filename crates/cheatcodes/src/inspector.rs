@@ -1046,7 +1046,7 @@ impl Cheatcodes {
                 // for each log in cloned logs call handle_expect_emit
                 if !self.expected_emits.is_empty() {
                     for log in result.logs {
-                        expect::handle_expect_emit(self, &log);
+                        expect::handle_expect_emit(self, &log, &mut Default::default());
                     }
                 }
 
@@ -1628,7 +1628,7 @@ impl Cheatcodes {
                     // for each log in cloned logs call handle_expect_emit
                     if !self.expected_emits.is_empty() {
                         for log in result.logs {
-                            expect::handle_expect_emit(self, &log);
+                            expect::handle_expect_emit(self, &log, &mut Default::default());
                         }
                     }
                 }
@@ -1787,9 +1787,9 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         }
     }
 
-    fn log(&mut self, _interpreter: &mut Interpreter, _ecx: &mut EvmContext<DB>, log: &Log) {
+    fn log(&mut self, interpreter: &mut Interpreter, _ecx: &mut EvmContext<DB>, log: &Log) {
         if !self.expected_emits.is_empty() {
-            expect::handle_expect_emit(self, log);
+            expect::handle_expect_emit(self, log, interpreter);
         }
 
         // `recordLogs`
