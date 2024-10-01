@@ -264,8 +264,10 @@ where
     }
     let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
 
+    let is_paymaster_used = !paymaster_params.paymaster.is_zero();
+
     // We check if the paymaster is set, if it is not set, we use the proposed gas limit
-    let gas_limit = if paymaster_params.paymaster.is_zero() {
+    let gas_limit = if is_paymaster_used {
         ecx.env.tx.gas_limit.into()
     } else {
         fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance)
