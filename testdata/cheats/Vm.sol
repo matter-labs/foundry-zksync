@@ -307,6 +307,7 @@ interface Vm {
     function computeCreateAddress(address deployer, uint256 nonce) external pure returns (address);
     function cool(address target) external;
     function copyFile(string calldata from, string calldata to) external returns (uint64 copied);
+    function copyStorage(address from, address to) external;
     function createDir(string calldata path, bool recursive) external;
     function createFork(string calldata urlOrAlias) external returns (uint256 forkId);
     function createFork(string calldata urlOrAlias, uint256 blockNumber) external returns (uint256 forkId);
@@ -467,6 +468,7 @@ interface Vm {
         external;
     function mockCall(address callee, bytes calldata data, bytes calldata returnData) external;
     function mockCall(address callee, uint256 msgValue, bytes calldata data, bytes calldata returnData) external;
+    function mockFunction(address callee, address target, bytes calldata data) external;
     function parseAddress(string calldata stringifiedValue) external pure returns (address parsedValue);
     function parseBool(string calldata stringifiedValue) external pure returns (bool parsedValue);
     function parseBytes(string calldata stringifiedValue) external pure returns (bytes memory parsedValue);
@@ -616,31 +618,14 @@ interface Vm {
         external
         returns (string memory json);
     function serializeJson(string calldata objectKey, string calldata value) external returns (string memory json);
-    function serializeJsonType(string calldata typeDescription, bytes memory value)
-        external
-        pure
-        returns (string memory json);
-    function serializeJsonType(
-        string calldata objectKey,
-        string calldata valueKey,
-        string calldata typeDescription,
-        bytes memory value
-    ) external returns (string memory json);
-    function serializeString(string calldata objectKey, string calldata valueKey, string calldata value)
-        external
-        returns (string memory json);
-    function serializeString(string calldata objectKey, string calldata valueKey, string[] calldata values)
-        external
-        returns (string memory json);
-    function serializeUintToHex(string calldata objectKey, string calldata valueKey, uint256 value)
-        external
-        returns (string memory json);
-    function serializeUint(string calldata objectKey, string calldata valueKey, uint256 value)
-        external
-        returns (string memory json);
-    function serializeUint(string calldata objectKey, string calldata valueKey, uint256[] calldata values)
-        external
-        returns (string memory json);
+    function serializeJsonType(string calldata typeDescription, bytes memory value) external pure returns (string memory json);
+    function serializeJsonType(string calldata objectKey, string calldata valueKey, string calldata typeDescription, bytes memory value) external returns (string memory json);
+    function serializeString(string calldata objectKey, string calldata valueKey, string calldata value) external returns (string memory json);
+    function serializeString(string calldata objectKey, string calldata valueKey, string[] calldata values) external returns (string memory json);
+    function serializeUintToHex(string calldata objectKey, string calldata valueKey, uint256 value) external returns (string memory json);
+    function serializeUint(string calldata objectKey, string calldata valueKey, uint256 value) external returns (string memory json);
+    function serializeUint(string calldata objectKey, string calldata valueKey, uint256[] calldata values) external returns (string memory json);
+    function setArbitraryStorage(address target) external;
     function setBlockhash(uint256 blockNumber, bytes32 blockHash) external;
     function setEnv(string calldata name, string calldata value) external;
     function setNonce(address account, uint64 newNonce) external;
