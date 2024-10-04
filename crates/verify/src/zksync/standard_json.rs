@@ -24,7 +24,7 @@ impl ZksyncSourceProvider for ZksyncStandardJsonSource {
             .display()
             .to_string();
 
-        let normalized_path = relative_path.replace("\\", "/");
+        let normalized_path = relative_path.replace('\\', "/");
 
         // Format the name as <path>/<file>:<contract_name>
         let name = format!("{}:{}", normalized_path, context.target_name);

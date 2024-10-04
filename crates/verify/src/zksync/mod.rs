@@ -198,7 +198,7 @@ impl ZkVerificationProvider {
             if args.starts_with("0x") {
                 return Ok(Some(args.clone()));
             } else {
-                return Ok(Some(format!("0x{}", args)));
+                return Ok(Some(format!("0x{args}")));
             }
         }
 
@@ -240,7 +240,7 @@ impl ZkVerificationProvider {
             }
             if resp.is_pending() || resp.is_queued() {
                 if retries >= max_retries {
-                    println!("Verification is still pending after {} retries.", max_retries);
+                    println!("Verification is still pending after {max_retries} retries.");
                     return Ok(resp);
                 }
 
