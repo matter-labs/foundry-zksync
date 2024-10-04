@@ -35,7 +35,7 @@ use alloy_consensus::{transaction::eip4844::TxEip4844Variant, Account, TxEnvelop
 use alloy_dyn_abi::TypedData;
 use alloy_eips::eip2718::Encodable2718;
 use alloy_network::{eip2718::Decodable2718, BlockResponse};
-use alloy_primitives::{Address, Bytes, Parity, TxHash, TxKind, B256, B64, U256, U64};
+use alloy_primitives::{map::{HashMap, HashSet}, Address, Bytes, Parity, TxHash, TxKind, B256, B64, U256, U64};
 use alloy_rpc_types::{
     anvil::{
         ForkedNetwork, Forking, Metadata, MineOptions, NodeEnvironment, NodeForkConfig, NodeInfo,
@@ -80,7 +80,6 @@ use foundry_evm::{
 use futures::channel::{mpsc::Receiver, oneshot};
 use parking_lot::RwLock;
 use std::{
-    collections::{HashMap, HashSet},
     future::Future,
     sync::Arc,
     time::Duration,
@@ -1969,7 +1968,7 @@ impl EthApi {
         // Convert the transaction requests to pool transactions if they exist, otherwise use empty
         // hashmap
         let block_pool_txs = if tx_block_pairs.is_empty() {
-            HashMap::new()
+            HashMap::default()
         } else {
             let mut pairs = tx_block_pairs;
 
@@ -1986,9 +1985,9 @@ impl EthApi {
 
             // Manage nonces for each signer
             // address -> cumulative nonce
-            let mut nonces: HashMap<Address, u64> = HashMap::new();
+            let mut nonces: HashMap<Address, u64> = HashMap::default();
 
-            let mut txs: HashMap<u64, Vec<Arc<PoolTransaction>>> = HashMap::new();
+            let mut txs: HashMap<u64, Vec<Arc<PoolTransaction>>> = HashMap::default();
             for pair in pairs {
                 let (tx_data, block_index) = pair;
 

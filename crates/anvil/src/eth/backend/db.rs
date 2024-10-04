@@ -2,7 +2,7 @@
 
 use crate::{mem::storage::MinedTransaction, revm::primitives::AccountInfo};
 use alloy_consensus::Header;
-use alloy_primitives::{keccak256, Address, Bytes, B256, U256, U64};
+use alloy_primitives::{keccak256, map::HashMap, Address, Bytes, B256, U256, U64};
 use alloy_rpc_types::BlockId;
 use anvil_core::eth::{
     block::Block,
@@ -15,7 +15,7 @@ use foundry_evm::{
     },
     revm::{
         db::{CacheDB, DatabaseRef, DbAccount},
-        primitives::{BlockEnv, Bytecode, HashMap, KECCAK_EMPTY},
+        primitives::{BlockEnv, Bytecode, KECCAK_EMPTY},
         Database, DatabaseCommit,
     },
 };
@@ -236,8 +236,8 @@ impl<T: DatabaseRef<Error = DatabaseError>> MaybeFullDatabase for CacheDB<T> {
 
     fn clear_into_snapshot(&mut self) -> StateSnapshot {
         let db_accounts = std::mem::take(&mut self.accounts);
-        let mut accounts = HashMap::new();
-        let mut account_storage = HashMap::new();
+        let mut accounts = HashMap::default();
+        let mut account_storage = HashMap::default();
 
         for (addr, mut acc) in db_accounts {
             account_storage.insert(addr, std::mem::take(&mut acc.storage));
@@ -251,8 +251,8 @@ impl<T: DatabaseRef<Error = DatabaseError>> MaybeFullDatabase for CacheDB<T> {
 
     fn read_as_snapshot(&self) -> StateSnapshot {
         let db_accounts = self.accounts.clone();
-        let mut accounts = HashMap::new();
-        let mut account_storage = HashMap::new();
+        let mut accounts = HashMap::default();
+        let mut account_storage = HashMap::default();
 
         for (addr, acc) in db_accounts {
             account_storage.insert(addr, acc.storage.clone());

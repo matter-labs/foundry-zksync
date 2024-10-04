@@ -4832,7 +4832,7 @@ dependencies = [
  "itertools 0.13.0",
  "regex",
  "reqwest 0.12.7",
- "revm-primitives 9.0.2",
+ "revm-primitives",
  "semver 1.0.23",
  "serde",
  "serde_json",
@@ -5091,7 +5091,7 @@ dependencies = [
  "chrono",
  "comfy-table",
  "foundry-macros",
- "revm-primitives 9.0.2",
+ "revm-primitives",
  "serde",
  "serde_json",
  "similar-asserts",
@@ -5249,7 +5249,7 @@ dependencies = [
  "path-slash",
  "regex",
  "reqwest 0.12.7",
- "revm-primitives 9.0.2",
+ "revm-primitives",
  "semver 1.0.23",
  "serde",
  "serde_json",
@@ -10134,7 +10134,7 @@ version = "10.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e5e14002afae20b5bf1566f22316122f42f57517000e559c55b25bf7a49cba2"
 dependencies = [
- "revm-primitives 10.0.0",
+ "revm-primitives",
  "serde",
 ]
 
@@ -10150,29 +10150,11 @@ dependencies = [
  "k256 0.13.3",
  "once_cell",
  "p256",
- "revm-primitives 10.0.0",
+ "revm-primitives",
  "ripemd",
  "secp256k1 0.29.1",
  "sha2 0.10.8",
  "substrate-bn",
-]
-
-[[package]]
-name = "revm-primitives"
-version = "9.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7a6bff9dbde3370a5ac9555104117f7e6039b3cc76e8d5d9d01899088beca2a"
-dependencies = [
- "alloy-eips",
- "alloy-primitives",
- "auto_impl",
- "bitflags 2.6.0",
- "bitvec 1.0.1",
- "cfg-if 1.0.0",
- "dyn-clone",
- "enumn",
- "hashbrown 0.14.5",
- "hex",
 ]
 
 [[package]]
