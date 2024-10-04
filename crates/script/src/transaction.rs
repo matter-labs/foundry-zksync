@@ -10,6 +10,7 @@ use itertools::Itertools;
 use revm_inspectors::tracing::types::CallKind;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use zksync_web3_rs::eip712::PaymasterParams;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +25,7 @@ pub struct AdditionalContract {
 #[serde(rename_all = "camelCase")]
 pub struct ZkTransaction {
     pub factory_deps: Vec<Vec<u8>>,
+    pub paymaster_data: Option<PaymasterParams>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
