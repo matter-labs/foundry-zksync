@@ -17,9 +17,6 @@ contract TestPaymasterFlow is Test {
         bob = makeAddr("Bob");
         do_stuff = new DoStuff();
         paymaster = new MyPaymaster();
-
-        // A small amount is needed for initial tx processing
-        vm.deal(alice, 1 ether);
         vm.deal(address(paymaster), 10 ether);
 
         // Encode paymaster input
@@ -29,6 +26,7 @@ contract TestPaymasterFlow is Test {
     function testCallWithPaymaster() public {
         vm.deal(address(do_stuff), 1 ether);
         require(address(do_stuff).balance == 1 ether, "Balance is not 1 ether");
+        require(address(alice).balance == 0, "Balance is not 0 ether");
 
         uint256 alice_balance = address(alice).balance;
         (bool success,) = address(vm).call(
@@ -70,6 +68,14 @@ contract TestPaymasterFlow is Test {
 
         require(address(alice).balance == alice_balance, "Balance is not the same");
         require(address(paymaster).balance < paymaster_balance, "Paymaster balance is not less");
+    }
+
+    function testFailTransactionFailsWhenNotUsingPaymaster() public {
+        vm.deal(address(do_stuff), 1 ether);
+        require(address(alice).balance == 0, "Balance is not 0 ether");
+        vm.prank(alice, alice);
+        
+        do_stuff.do_stuff(bob);
     }
 }
 

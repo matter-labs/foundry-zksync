@@ -41,7 +41,7 @@ pub use zksync_types::{
 };
 pub use zksync_utils::bytecode::hash_bytecode;
 use zksync_web3_rs::{
-    eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest},
+    eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest, PaymasterParams},
     zks_provider::types::Fee,
     zks_utils::EIP712_TX_TYPE,
 };
@@ -88,12 +88,14 @@ pub struct ZkPaymasterData {
 pub struct ZkTransactionMetadata {
     /// Factory Deps for ZK transactions.
     pub factory_deps: Vec<Vec<u8>>,
+    /// Paymaster data for ZK transactions.
+    pub paymaster_data: Option<PaymasterParams>,
 }
 
 impl ZkTransactionMetadata {
     /// Create a new [`ZkTransactionMetadata`] with the given factory deps
-    pub fn new(factory_deps: Vec<Vec<u8>>) -> Self {
-        Self { factory_deps }
+    pub fn new(factory_deps: Vec<Vec<u8>>, paymaster_data: Option<PaymasterParams>) -> Self {
+        Self { factory_deps, paymaster_data }
     }
 }
 

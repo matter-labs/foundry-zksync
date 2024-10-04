@@ -931,9 +931,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.86"
+version = "1.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
+checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
 
 [[package]]
 name = "arbitrary"
@@ -4910,6 +4910,7 @@ dependencies = [
  "toml 0.8.15",
  "tracing",
  "walkdir",
+ "zksync-web3-rs",
  "zksync_types",
 ]
 
@@ -8084,7 +8085,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "681030a937600a36906c185595136d26abfebb4aa9c65701cefcaf8578bb982b"
 dependencies = [
- "proc-macro-crate 3.1.0",
+ "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 2.0.71",
@@ -9219,7 +9220,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes",
- "heck 0.5.0",
+ "heck 0.4.1",
  "itertools 0.12.1",
  "log",
  "multimap",
@@ -13907,9 +13908,10 @@ dependencies = [
 
 [[package]]
 name = "zksync-web3-rs"
-version = "0.1.1"
-source = "git+https://github.com/lambdaclass/zksync-web3-rs.git?rev=2da644f5b8fc48a129e80fe0653e5334701c059b#2da644f5b8fc48a129e80fe0653e5334701c059b"
+version = "0.2.1"
+source = "git+https://github.com/jrigada/zksync-web3-rs.git?rev=bc3e6d3e75b7ff3747ff2dccefa9fb74d770931b#bc3e6d3e75b7ff3747ff2dccefa9fb74d770931b"
 dependencies = [
+ "anyhow",
  "async-trait",
  "clap",
  "env_logger 0.10.2",
