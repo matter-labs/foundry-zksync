@@ -38,6 +38,7 @@ revm = { workspace = true, default-features = false, features = [
     "optimism",
 ] }
 tracing.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 
 # zk

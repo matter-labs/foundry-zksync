@@ -4,6 +4,7 @@ use alloy_primitives::{hex, Address, Bytes, TxKind, B256};
 use eyre::{Result, WrapErr};
 use foundry_common::{fmt::format_token_raw, ContractData, TransactionMaybeSigned, SELECTOR_LEN};
 use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, traces::CallTraceDecoder};
+use foundry_zksync_core::ZkTransactionMetadata;
 use itertools::Itertools;
 use revm_inspectors::tracing::types::CallKind;
 use serde::{Deserialize, Serialize};
@@ -16,12 +17,6 @@ pub struct AdditionalContract {
     pub opcode: CallKind,
     pub address: Address,
     pub init_code: Bytes,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ZkTransaction {
-    pub factory_deps: Vec<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -44,7 +39,7 @@ pub struct TransactionWithMetadata {
     pub additional_contracts: Vec<AdditionalContract>,
     pub is_fixed_gas_limit: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zk: Option<ZkTransaction>,
+    pub zk: Option<ZkTransactionMetadata>,
 }
 
 fn default_string() -> Option<String> {
@@ -82,7 +77,7 @@ impl TransactionWithMetadata {
         rpc: String,
         local_contracts: &BTreeMap<Address, &ContractData>,
         decoder: &CallTraceDecoder,
-        zk: Option<ZkTransaction>,
+        zk: Option<ZkTransactionMetadata>,
     ) -> Result<Self> {
         let mut metadata = Self::from_tx_request(transaction);
         metadata.rpc = rpc;

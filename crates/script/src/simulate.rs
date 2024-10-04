@@ -10,7 +10,6 @@ use crate::{
     build::LinkedBuildData,
     execute::{ExecutionArtifacts, ExecutionData},
     sequence::get_commit_hash,
-    transaction::ZkTransaction,
     ScriptArgs, ScriptConfig, ScriptResult,
 };
 use alloy_network::TransactionBuilder;
@@ -110,7 +109,7 @@ impl PreSimulationState {
         // Executes all transactions from the different forks concurrently.
         let futs = transactions
             .into_iter()
-            .map(|mut transaction| async {
+            .map(|transaction| async {
                 let mut runner = runners.get(&transaction.rpc).expect("invalid rpc url").write();
 
                 let tx = &transaction.transaction;

@@ -5569,6 +5569,7 @@ dependencies = [
  "itertools 0.13.0",
  "multivm",
  "revm",
+ "serde",
  "serde_json",
  "tracing",
  "url",

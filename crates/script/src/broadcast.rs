@@ -1,6 +1,6 @@
 use crate::{
     build::LinkedBuildData, progress::ScriptProgress, sequence::ScriptSequenceKind,
-    transaction::ZkTransaction, verify::BroadcastedState, ScriptArgs, ScriptConfig,
+    verify::BroadcastedState, ScriptArgs, ScriptConfig,
 };
 use alloy_chains::Chain;
 use alloy_consensus::{Transaction, TxEnvelope};
@@ -20,7 +20,7 @@ use foundry_common::{
     shell, TransactionMaybeSigned,
 };
 use foundry_config::Config;
-use foundry_zksync_core::convert::{ConvertAddress, ConvertBytes, ConvertSignature, ToSignable};
+use foundry_zksync_core::{convert::{ConvertAddress, ConvertBytes, ConvertSignature, ToSignable}, ZkTransactionMetadata};
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{
@@ -59,7 +59,7 @@ pub async fn next_nonce(caller: Address, provider_url: &str) -> eyre::Result<u64
 async fn convert_to_zksync(
     provider: &Arc<RetryProvider>,
     tx: WithOtherFields<TransactionRequest>,
-    zk: &ZkTransaction,
+    zk: &ZkTransactionMetadata,
 ) -> Result<(Eip712TransactionRequest, Eip712Transaction)> {
     let custom_data = Eip712Meta::new().factory_deps(zk.factory_deps.clone());
 
@@ -100,7 +100,7 @@ async fn convert_to_zksync(
 pub async fn send_transaction(
     provider: Arc<RetryProvider>,
     mut kind: SendTransactionKind<'_>,
-    zk: Option<&ZkTransaction>,
+    zk: Option<&ZkTransactionMetadata>,
     sequential_broadcast: bool,
     is_fixed_gas_limit: bool,
     estimate_via_rpc: bool,

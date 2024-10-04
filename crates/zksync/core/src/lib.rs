@@ -30,6 +30,8 @@ use convert::{
     ToSignable,
 };
 use eyre::{eyre, OptionExt};
+use serde::{Serialize, Deserialize};
+
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};
 
@@ -75,7 +77,7 @@ pub fn get_nonce_key(address: Address) -> rU256 {
 }
 
 /// Represents additional data for ZK transactions.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ZkTransactionMetadata {
     /// Factory Deps for ZK transactions.
     pub factory_deps: Vec<Vec<u8>>,
