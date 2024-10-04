@@ -123,7 +123,7 @@ pub fn fix_l2_gas_limit(
     value: U256,
     balance: U256,
 ) -> U256 {
-    let gas_limit = if gas_price.is_zero() {
+    let gas_limit = if gas_price.is_zero() || balance <= value {
         proposed_gas_limit
     } else {
         let max_gas_limit = balance.saturating_sub(value).div_mod(gas_price).0;
