@@ -36,6 +36,7 @@ use provider::VerificationProvider;
 pub mod bytecode;
 pub mod retry;
 mod sourcify;
+mod zksync;
 
 pub use retry::RetryArgs;
 

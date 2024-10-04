@@ -1,8 +1,6 @@
 use crate::provider::VerificationContext;
 
-use super::{VerifyArgs, VerifyCheckArgs};
 use alloy_json_abi::JsonAbi;
-use async_trait::async_trait;
 use eyre::{OptionExt, Result};
 use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
@@ -122,29 +120,6 @@ impl ZkVerificationContext {
 
         Ok(graph.imports(&self.target_path).into_iter().cloned().collect())
     }
-}
-
-/// An abstraction for various verification providers such as etherscan, sourcify, blockscout
-#[async_trait]
-pub trait ZkVerificationProvider {
-    /// This should ensure the verify request can be prepared successfully.
-    ///
-    /// Caution: Implementers must ensure that this _never_ sends the actual verify request
-    /// `[VerificationProvider::verify]`, instead this is supposed to evaluate whether the given
-    /// [`VerifyArgs`] are valid to begin with. This should prevent situations where there's a
-    /// contract deployment that's executed before the verify request and the subsequent verify task
-    /// fails due to misconfiguration.
-    async fn preflight_check(
-        &mut self,
-        args: VerifyArgs,
-        context: ZkVerificationContext,
-    ) -> Result<()>;
-
-    /// Sends the actual verify request for the targeted contract.
-    async fn verify(&mut self, args: VerifyArgs, context: ZkVerificationContext) -> Result<()>;
-
-    /// Checks whether the contract is verified.
-    async fn check(&self, args: VerifyCheckArgs) -> Result<()>;
 }
 
 #[derive(Debug)]

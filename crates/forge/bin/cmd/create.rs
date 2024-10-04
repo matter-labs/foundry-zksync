@@ -354,9 +354,9 @@ impl CreateArgs {
             config.get_etherscan_config_with_chain(Some(chain.into()))?.map(|c| c.key);
 
         let context = if verify.zksync {
-            CompilerVerificationContext::Solc(verify.resolve_context().await?)
-        } else {
             CompilerVerificationContext::ZkSolc(verify.zk_resolve_context().await?)
+        } else {
+            CompilerVerificationContext::Solc(verify.resolve_context().await?)
         };
 
         verify.verification_provider()?.preflight_check(verify, context).await?;
