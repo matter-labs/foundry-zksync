@@ -15,6 +15,7 @@ ignore = [
     # Should remove once we can update sqlx which is used by some zksync dependencies
     "RUSTSEC-2024-0363",
     # Used by alloy
+    # proc-macro-error is unmaintained
     "RUSTSEC-2024-0370",
 ]
 

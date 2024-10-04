@@ -39,6 +39,10 @@ era_test_node.workspace = true
 jsonrpc-core = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
 jsonrpc-http-server = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
 
+[dev-dependencies]
+tokio.workspace = true
+foundry-block-explorers.workspace = true
+
 [features]
 # feature for integration tests that test external projects
 external-integration-tests = []

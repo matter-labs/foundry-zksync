@@ -9,7 +9,10 @@ use crate::{
     },
     inspector::utils::CommonCreateInput,
     script::{Broadcast, ScriptWallets},
-    test::expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
+    test::{
+        assume::AssumeNoRevert,
+        expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
+    },
     utils::IgnoredTraces,
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result, Vm,
     Vm::AccountAccess,
@@ -29,7 +32,7 @@ use foundry_evm_core::{
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
         CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
-        DEFAULT_CREATE2_DEPLOYER_CODE,
+        DEFAULT_CREATE2_DEPLOYER_CODE, MAGIC_ASSUME,
     },
     decode::decode_console_log,
     utils::new_evm_with_existing_context,
@@ -327,6 +330,9 @@ pub struct Cheatcodes {
     /// Expected revert information
     pub expected_revert: Option<ExpectedRevert>,
 
+    /// Assume next call can revert and discard fuzz run if it does.
+    pub assume_no_revert: Option<AssumeNoRevert>,
+
     /// Additional diagnostic for reverts
     pub fork_revert_diagnostic: Option<RevertDiagnostic>,
 
@@ -486,6 +492,7 @@ impl Cheatcodes {
             gas_price: Default::default(),
             prank: Default::default(),
             expected_revert: Default::default(),
+            assume_no_revert: Default::default(),
             fork_revert_diagnostic: Default::default(),
             accesses: Default::default(),
             recorded_account_diffs_stack: Default::default(),
@@ -1859,6 +1866,19 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                         let _ = self.broadcast.take();
                     }
                 }
+            }
+        }
+
+        // Handle assume not revert cheatcode.
+        if let Some(assume_no_revert) = &self.assume_no_revert {
+            if ecx.journaled_state.depth() == assume_no_revert.depth && !cheatcode_call {
+                // Discard run if we're at the same depth as cheatcode and call reverted.
+                if outcome.result.is_revert() {
+                    outcome.result.output = Error::from(MAGIC_ASSUME).abi_encode().into();
+                    return outcome;
+                }
+                // Call didn't revert, reset `assume_no_revert` state.
+                self.assume_no_revert = None;
             }
         }
 

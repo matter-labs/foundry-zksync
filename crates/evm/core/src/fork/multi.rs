@@ -5,7 +5,7 @@
 
 use super::CreateFork;
 use alloy_primitives::U256;
-use alloy_provider::RootProvider;
+use alloy_provider::network::{BlockResponse, HeaderResponse};
 use alloy_transport::layers::RetryBackoffService;
 use foundry_common::provider::{
     runtime_transport::RuntimeTransport, ProviderBuilder, RetryProvider,
@@ -510,9 +510,7 @@ impl Drop for ShutDownMultiFork {
 ///
 /// This will establish a new `Provider` to the endpoint and return the Fork Backend.
 async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork, Handler)> {
-    let provider: Arc<
-        RootProvider<RetryBackoffService<RuntimeTransport>, alloy_provider::network::AnyNetwork>,
-    > = Arc::new(
+    let provider = Arc::new(
         ProviderBuilder::new(fork.url.as_str())
             .maybe_max_retry(fork.evm_opts.fork_retries)
             .maybe_initial_backoff(fork.evm_opts.fork_retry_backoff)
@@ -527,7 +525,7 @@ async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork,
 
     // We need to use the block number from the block because the env's number can be different on
     // some L2s (e.g. Arbitrum).
-    let number = block.header.number.unwrap_or(meta.block_env.number.to());
+    let number = block.header().number();
 
     // Determine the cache path if caching is enabled.
     let cache_path = if fork.enable_caching {

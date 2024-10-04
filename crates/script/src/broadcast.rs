@@ -3,7 +3,7 @@ use crate::{
     transaction::ZkTransaction, verify::BroadcastedState, ScriptArgs, ScriptConfig,
 };
 use alloy_chains::Chain;
-use alloy_consensus::TxEnvelope;
+use alloy_consensus::{Transaction, TxEnvelope};
 use alloy_eips::eip2718::Encodable2718;
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
 use alloy_primitives::{utils::format_units, Address, TxHash};
@@ -161,7 +161,7 @@ pub async fn send_transaction(
                     .rlp_signed(signature.to_ethers())
                     .wrap_err("able to rlp encode deploy request")?;
 
-                [&[zksync_web3_rs::zks_utils::EIP712_TX_TYPE], encoded].concat()
+                [&[signable.ty()], encoded].concat()
             } else {
                 tx.build(signer).await?.encoded_2718()
             };
