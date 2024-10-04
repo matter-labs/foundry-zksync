@@ -11,10 +11,6 @@ use std::{fmt::Debug, thread::sleep, time::Duration};
 
 pub mod standard_json;
 
-// TODO: This is hardcoded for Sepolia verification URL, need to be updated.
-pub static ZKSYNC_VERIFICATION_URL: &str =
-    "https://explorer.sepolia.era.zksync.dev/contract_verification";
-
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct ZkVerificationProvider;
@@ -57,10 +53,10 @@ impl VerificationProvider for ZkVerificationProvider {
                     );
 
                     let verifier_url = args
-                        .verifier
-                        .verifier_url
-                        .as_deref()
-                        .unwrap_or(ZKSYNC_VERIFICATION_URL);
+                    .verifier
+                    .verifier_url
+                    .as_deref()
+                    .ok_or_else(|| eyre::eyre!("verifier_url must be specified either in the config or through the CLI"))?;
 
                     let response = client
                         .post(verifier_url)
@@ -109,7 +105,9 @@ impl VerificationProvider for ZkVerificationProvider {
         let delay_in_seconds = args.retry.delay;
 
         let client = reqwest::Client::new();
-        let base_url = args.verifier.verifier_url.as_deref().unwrap_or(ZKSYNC_VERIFICATION_URL);
+        let base_url = args.verifier.verifier_url.as_deref().ok_or_else(|| {
+            eyre::eyre!("verifier_url must be specified either in the config or through the CLI")
+        })?;
         let url = format!("{}/{}", base_url, args.id);
 
         let verification_status =
