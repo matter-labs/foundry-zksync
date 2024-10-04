@@ -1,4 +1,4 @@
-use super::{VerifyArgs, ZksyncSourceProvider};
+use super::ZksyncSourceProvider;
 use crate::zk_provider::ZkVerificationContext;
 use eyre::{Context, Result};
 use foundry_compilers::zksolc::input::StandardJsonCompilerInput;
@@ -9,7 +9,6 @@ pub struct ZksyncStandardJsonSource;
 impl ZksyncSourceProvider for ZksyncStandardJsonSource {
     fn zk_source(
         &self,
-        _args: &VerifyArgs,
         context: &ZkVerificationContext,
     ) -> Result<(StandardJsonCompilerInput, String)> {
         let input = foundry_compilers::zksync::project_standard_json_input(
@@ -18,7 +17,6 @@ impl ZksyncSourceProvider for ZksyncStandardJsonSource {
         )
         .wrap_err("failed to get zksolc standard json")?;
 
-        // Extract the path relative to the project root
         let relative_path = context
             .target_path
             .strip_prefix(context.project.root())
@@ -26,7 +24,6 @@ impl ZksyncSourceProvider for ZksyncStandardJsonSource {
             .display()
             .to_string();
 
-        // Ensure the path uses forward slashes consistently (handles Windows paths)
         let normalized_path = relative_path.replace("\\", "/");
 
         // Format the name as <path>/<file>:<contract_name>

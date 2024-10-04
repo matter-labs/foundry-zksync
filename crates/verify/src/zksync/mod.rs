@@ -11,7 +11,7 @@ use std::{fmt::Debug, thread::sleep, time::Duration};
 
 pub mod standard_json;
 
-// TODO: This is hardcode for Sepolia verification URL, need to be updated.
+// TODO: This is hardcoded for Sepolia verification URL, need to be updated.
 pub static ZKSYNC_VERIFICATION_URL: &str =
     "https://explorer.sepolia.era.zksync.dev/contract_verification";
 
@@ -22,7 +22,6 @@ pub struct ZkVerificationProvider;
 pub trait ZksyncSourceProvider: Send + Sync + Debug {
     fn zk_source(
         &self,
-        args: &VerifyArgs,
         context: &ZkVerificationContext,
     ) -> Result<(StandardJsonCompilerInput, String)>;
 }
@@ -131,7 +130,7 @@ impl ZkVerificationProvider {
     ) -> Result<VerifyContractRequest> {
         let (source, contract_name) = if let CompilerVerificationContext::ZkSolc(context) = context
         {
-            self.source_provider().zk_source(args, context)?
+            self.source_provider().zk_source(context)?
         } else {
             eyre::bail!("Unsupported compiler context: only ZkSolc is supported");
         };
