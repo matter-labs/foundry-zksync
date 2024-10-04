@@ -107,7 +107,7 @@ impl TraceCollector {
 
     /// Consumes the Inspector and returns a [GethTraceBuilder].
     #[inline]
-    pub fn into_geth_builder(self) -> GethTraceBuilder {
+    pub fn into_geth_builder(self) -> GethTraceBuilder<'static> {
         self.inner.into_geth_builder()
     }
 }

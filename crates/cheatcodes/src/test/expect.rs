@@ -44,6 +44,10 @@ pub struct ExpectedRevert {
     pub kind: ExpectedRevertKind,
     /// If true then only the first 4 bytes of expected data returned by the revert are checked.
     pub partial_match: bool,
+    /// Contract expected to revert next call.
+    pub reverter: Option<Address>,
+    /// Actual reverter of the call.
+    pub reverted_by: Option<Address>,
 }
 
 #[derive(Clone, Debug)]
@@ -252,7 +256,7 @@ impl Cheatcode for expectEmitAnonymous_3Call {
 impl Cheatcode for expectRevert_0Call {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self {} = self;
-        expect_revert(ccx.state, None, ccx.ecx.journaled_state.depth(), false, false)
+        expect_revert(ccx.state, None, ccx.ecx.journaled_state.depth(), false, false, None)
     }
 }
 
@@ -265,6 +269,7 @@ impl Cheatcode for expectRevert_1Call {
             ccx.ecx.journaled_state.depth(),
             false,
             false,
+            None,
         )
     }
 }
@@ -272,11 +277,60 @@ impl Cheatcode for expectRevert_1Call {
 impl Cheatcode for expectRevert_2Call {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { revertData } = self;
-        expect_revert(ccx.state, Some(revertData), ccx.ecx.journaled_state.depth(), false, false)
+        expect_revert(
+            ccx.state,
+            Some(revertData),
+            ccx.ecx.journaled_state.depth(),
+            false,
+            false,
+            None,
+        )
     }
 }
 
-impl Cheatcode for expectPartialRevertCall {
+impl Cheatcode for expectRevert_3Call {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { reverter } = self;
+        expect_revert(
+            ccx.state,
+            None,
+            ccx.ecx.journaled_state.depth(),
+            false,
+            false,
+            Some(*reverter),
+        )
+    }
+}
+
+impl Cheatcode for expectRevert_4Call {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { revertData, reverter } = self;
+        expect_revert(
+            ccx.state,
+            Some(revertData.as_ref()),
+            ccx.ecx.journaled_state.depth(),
+            false,
+            false,
+            Some(*reverter),
+        )
+    }
+}
+
+impl Cheatcode for expectRevert_5Call {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { revertData, reverter } = self;
+        expect_revert(
+            ccx.state,
+            Some(revertData),
+            ccx.ecx.journaled_state.depth(),
+            false,
+            false,
+            Some(*reverter),
+        )
+    }
+}
+
+impl Cheatcode for expectPartialRevert_0Call {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { revertData } = self;
         expect_revert(
@@ -285,13 +339,28 @@ impl Cheatcode for expectPartialRevertCall {
             ccx.ecx.journaled_state.depth(),
             false,
             true,
+            None,
+        )
+    }
+}
+
+impl Cheatcode for expectPartialRevert_1Call {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { revertData, reverter } = self;
+        expect_revert(
+            ccx.state,
+            Some(revertData.as_ref()),
+            ccx.ecx.journaled_state.depth(),
+            false,
+            true,
+            Some(*reverter),
         )
     }
 }
 
 impl Cheatcode for _expectCheatcodeRevert_0Call {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
-        expect_revert(ccx.state, None, ccx.ecx.journaled_state.depth(), true, false)
+        expect_revert(ccx.state, None, ccx.ecx.journaled_state.depth(), true, false, None)
     }
 }
 
@@ -304,6 +373,7 @@ impl Cheatcode for _expectCheatcodeRevert_1Call {
             ccx.ecx.journaled_state.depth(),
             true,
             false,
+            None,
         )
     }
 }
@@ -311,7 +381,14 @@ impl Cheatcode for _expectCheatcodeRevert_1Call {
 impl Cheatcode for _expectCheatcodeRevert_2Call {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         let Self { revertData } = self;
-        expect_revert(ccx.state, Some(revertData), ccx.ecx.journaled_state.depth(), true, false)
+        expect_revert(
+            ccx.state,
+            Some(revertData),
+            ccx.ecx.journaled_state.depth(),
+            true,
+            false,
+            None,
+        )
     }
 }
 
@@ -545,6 +622,7 @@ fn expect_revert(
     depth: u64,
     cheatcode: bool,
     partial_match: bool,
+    reverter: Option<Address>,
 ) -> Result {
     ensure!(
         state.expected_revert.is_none(),
@@ -559,6 +637,8 @@ fn expect_revert(
             ExpectedRevertKind::Default
         },
         partial_match,
+        reverter,
+        reverted_by: None,
     });
     Ok(Default::default())
 }
@@ -566,8 +646,7 @@ fn expect_revert(
 pub(crate) fn handle_expect_revert(
     is_cheatcode: bool,
     is_create: bool,
-    expected_revert: Option<&[u8]>,
-    partial_match: bool,
+    expected_revert: &ExpectedRevert,
     status: InstructionResult,
     retdata: Bytes,
     known_contracts: &Option<ContractsByArtifact>,
@@ -582,19 +661,33 @@ pub(crate) fn handle_expect_revert(
 
     ensure!(!matches!(status, return_ok!()), "next call did not revert as expected");
 
+    // If expected reverter address is set then check it matches the actual reverter.
+    if let (Some(expected_reverter), Some(actual_reverter)) =
+        (expected_revert.reverter, expected_revert.reverted_by)
+    {
+        if expected_reverter != actual_reverter {
+            return Err(fmt_err!(
+                "Reverter != expected reverter: {} != {}",
+                actual_reverter,
+                expected_reverter
+            ));
+        }
+    }
+
+    let expected_reason = expected_revert.reason.as_deref();
     // If None, accept any revert.
-    let Some(expected_revert) = expected_revert else {
+    let Some(expected_reason) = expected_reason else {
         return Ok(success_return());
     };
 
-    if !expected_revert.is_empty() && retdata.is_empty() {
+    if !expected_reason.is_empty() && retdata.is_empty() {
         bail!("call reverted as expected, but without data");
     }
 
     let mut actual_revert: Vec<u8> = retdata.into();
 
     // Compare only the first 4 bytes if partial match.
-    if partial_match && actual_revert.get(..4) == expected_revert.get(..4) {
+    if expected_revert.partial_match && actual_revert.get(..4) == expected_reason.get(..4) {
         return Ok(success_return())
     }
 
@@ -608,8 +701,8 @@ pub(crate) fn handle_expect_revert(
         }
     }
 
-    if actual_revert == expected_revert ||
-        (is_cheatcode && memchr::memmem::find(&actual_revert, expected_revert).is_some())
+    if actual_revert == expected_reason ||
+        (is_cheatcode && memchr::memmem::find(&actual_revert, expected_reason).is_some())
     {
         Ok(success_return())
     } else {
@@ -617,7 +710,7 @@ pub(crate) fn handle_expect_revert(
             let decoder = RevertDecoder::new().with_abis(contracts.iter().map(|(_, c)| &c.abi));
             (
                 &decoder.decode(actual_revert.as_slice(), Some(status)),
-                &decoder.decode(expected_revert, Some(status)),
+                &decoder.decode(expected_reason, Some(status)),
             )
         } else {
             let stringify = |data: &[u8]| {
@@ -629,7 +722,7 @@ pub(crate) fn handle_expect_revert(
                 }
                 hex::encode_prefixed(data)
             };
-            (&stringify(&actual_revert), &stringify(expected_revert))
+            (&stringify(&actual_revert), &stringify(expected_reason))
         };
         Err(fmt_err!("Error != expected error: {} != {}", actual, expected,))
     }

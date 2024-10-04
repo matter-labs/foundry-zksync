@@ -299,16 +299,6 @@ pub struct ArbitraryStorage {
 }
 
 impl ArbitraryStorage {
-    /// Whether the given address has arbitrary storage.
-    pub fn is_arbitrary(&self, address: &Address) -> bool {
-        self.values.contains_key(address)
-    }
-
-    /// Whether the given address is a copy of an address with arbitrary storage.
-    pub fn is_copy(&self, address: &Address) -> bool {
-        self.copies.contains_key(address)
-    }
-
     /// Marks an address with arbitrary storage.
     pub fn mark_arbitrary(&mut self, address: &Address) {
         self.values.insert(*address, HashMap::default());
@@ -316,7 +306,7 @@ impl ArbitraryStorage {
 
     /// Maps an address that copies storage with the arbitrary storage address.
     pub fn mark_copy(&mut self, from: &Address, to: &Address) {
-        if self.is_arbitrary(from) {
+        if self.values.contains_key(from) {
             self.copies.insert(*to, *from);
         }
     }
@@ -489,7 +479,7 @@ pub struct Cheatcodes {
     pub ignored_traces: IgnoredTraces,
 
     /// Addresses with arbitrary storage.
-    pub arbitrary_storage: ArbitraryStorage,
+    pub arbitrary_storage: Option<ArbitraryStorage>,
 
     /// Use ZK-VM to execute CALLs and CREATEs.
     pub use_zk_vm: bool,
@@ -1255,8 +1245,7 @@ impl Cheatcodes {
                 return match expect::handle_expect_revert(
                     false,
                     true,
-                    expected_revert.reason.as_deref(),
-                    expected_revert.partial_match,
+                    &expected_revert,
                     outcome.result.result,
                     outcome.result.output.clone(),
                     &self.config.available_artifacts,
@@ -1582,12 +1571,12 @@ impl Cheatcodes {
                     });
                     debug!(target: "cheatcodes", tx=?self.broadcastable_transactions.back().unwrap(), "broadcastable call");
 
-                    let prev = account.info.nonce;
-
-                    // Touch account to ensure that incremented nonce is committed
-                    account.mark_touch();
-                    account.info.nonce += 1;
-                    debug!(target: "cheatcodes", address=%broadcast.new_origin, nonce=prev+1, prev, "incremented nonce");
+                    // Explicitly increment nonce if calls are not isolated.
+                    if !self.config.evm_opts.isolate {
+                        let prev = account.info.nonce;
+                        account.info.nonce += 1;
+                        debug!(target: "cheatcodes", address=%broadcast.new_origin, nonce=prev+1, prev, "incremented nonce");
+                    }
                 } else if broadcast.single_call {
                     let msg =
                     "`staticcall`s are not allowed after `broadcast`; use `startBroadcast` instead";
@@ -1802,6 +1791,28 @@ impl Cheatcodes {
             None => StdRng::from_entropy(),
         })
     }
+
+    /// Returns existing or set a default `ArbitraryStorage` option.
+    /// Used by `setArbitraryStorage` cheatcode to track addresses with arbitrary storage.
+    pub fn arbitrary_storage(&mut self) -> &mut ArbitraryStorage {
+        self.arbitrary_storage.get_or_insert_with(ArbitraryStorage::default)
+    }
+
+    /// Whether the given address has arbitrary storage.
+    pub fn has_arbitrary_storage(&self, address: &Address) -> bool {
+        match &self.arbitrary_storage {
+            Some(storage) => storage.values.contains_key(address),
+            None => false,
+        }
+    }
+
+    /// Whether the given address is a copy of an address with arbitrary storage.
+    pub fn is_arbitrary_storage_copy(&self, address: &Address) -> bool {
+        match &self.arbitrary_storage {
+            Some(storage) => storage.copies.contains_key(address),
+            None => false,
+        }
+    }
 }
 
 impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
@@ -1902,10 +1913,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
         }
 
         // `setArbitraryStorage` and `copyStorage`: add arbitrary values to storage.
-        if (self.arbitrary_storage.is_arbitrary(&interpreter.contract().target_address) ||
-            self.arbitrary_storage.is_copy(&interpreter.contract().target_address)) &&
-            interpreter.current_opcode() == op::SLOAD
-        {
+        if self.arbitrary_storage.is_some() {
             self.arbitrary_storage_end(interpreter, ecx);
         }
     }
@@ -1981,8 +1989,17 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
             }
         }
 
-        // Handle expected reverts
-        if let Some(expected_revert) = &self.expected_revert {
+        // Handle expected reverts.
+        if let Some(expected_revert) = &mut self.expected_revert {
+            // Record current reverter address before processing the expect revert if call reverted,
+            // expect revert is set with expected reverter address and no actual reverter set yet.
+            if outcome.result.is_revert() &&
+                expected_revert.reverter.is_some() &&
+                expected_revert.reverted_by.is_none()
+            {
+                expected_revert.reverted_by = Some(call.target_address);
+            }
+
             if ecx.journaled_state.depth() <= expected_revert.depth {
                 let needs_processing = match expected_revert.kind {
                     ExpectedRevertKind::Default => !cheatcode_call,
@@ -1998,8 +2015,7 @@ impl<DB: DatabaseExt> Inspector<DB> for Cheatcodes {
                     return match expect::handle_expect_revert(
                         cheatcode_call,
                         false,
-                        expected_revert.reason.as_deref(),
-                        expected_revert.partial_match,
+                        &expected_revert,
                         outcome.result.result,
                         outcome.result.output.clone(),
                         &self.config.available_artifacts,
@@ -2333,26 +2349,33 @@ impl Cheatcodes {
         interpreter: &mut Interpreter,
         ecx: &mut EvmContext<DB>,
     ) {
-        let key = try_or_return!(interpreter.stack().peek(0));
-        let target_address = interpreter.contract().target_address;
-        if let Ok(value) = ecx.sload(target_address, key) {
-            if value.is_cold && value.data.is_zero() {
+        let (key, target_address) = if interpreter.current_opcode() == op::SLOAD {
+            (try_or_return!(interpreter.stack().peek(0)), interpreter.contract().target_address)
+        } else {
+            return
+        };
+
+        let Ok(value) = ecx.sload(target_address, key) else {
+            return;
+        };
+
+        if value.is_cold && value.data.is_zero() {
+            if self.has_arbitrary_storage(&target_address) {
                 let arbitrary_value = self.rng().gen();
-                if self.arbitrary_storage.is_copy(&target_address) {
-                    self.arbitrary_storage.copy(
-                        &mut ecx.inner,
-                        target_address,
-                        key,
-                        arbitrary_value,
-                    );
-                } else {
-                    self.arbitrary_storage.save(
-                        &mut ecx.inner,
-                        target_address,
-                        key,
-                        arbitrary_value,
-                    );
-                }
+                self.arbitrary_storage.as_mut().unwrap().save(
+                    &mut ecx.inner,
+                    target_address,
+                    key,
+                    arbitrary_value,
+                );
+            } else if self.is_arbitrary_storage_copy(&target_address) {
+                let arbitrary_value = self.rng().gen();
+                self.arbitrary_storage.as_mut().unwrap().copy(
+                    &mut ecx.inner,
+                    target_address,
+                    key,
+                    arbitrary_value,
+                );
             }
         }
     }

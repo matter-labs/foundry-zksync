@@ -526,7 +526,7 @@ fn inspect_inner<S: ReadStorage>(
 /// Patch CREATE traces with bytecode as the data is empty bytes.
 fn call_traces_patch_create<S: ReadStorage>(
     deployed_bytecode_hashes: &HashMap<H160, H256>,
-    bytecodes: &rHashMap<U256, Vec<U256>>,
+    bytecodes: &HashMap<U256, Vec<U256>>,
     storage: StoragePtr<StorageView<S>>,
     call: &mut Call,
 ) {

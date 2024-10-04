@@ -19,7 +19,10 @@ use foundry_evm::{
         Database, DatabaseCommit,
     },
 };
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
 use std::{collections::BTreeMap, fmt, path::Path};
 
 /// Helper trait get access to the full state data of the database
@@ -31,6 +34,11 @@ pub trait MaybeFullDatabase: DatabaseRef<Error = DatabaseError> {
 
     /// Clear the state and move it into a new `StateSnapshot`
     fn clear_into_snapshot(&mut self) -> StateSnapshot;
+
+    /// Read the state snapshot
+    ///
+    /// This clones all the states and returns a new `StateSnapshot`
+    fn read_as_snapshot(&self) -> StateSnapshot;
 
     /// Clears the entire database
     fn clear(&mut self);
@@ -48,6 +56,10 @@ where
     }
 
     fn clear_into_snapshot(&mut self) -> StateSnapshot {
+        unreachable!("never called for DatabaseRef")
+    }
+
+    fn read_as_snapshot(&self) -> StateSnapshot {
         unreachable!("never called for DatabaseRef")
     }
 
@@ -112,7 +124,7 @@ pub trait Db:
     }
 
     /// Sets the balance of the given address
-    fn set_storage_at(&mut self, address: Address, slot: U256, val: U256) -> DatabaseResult<()>;
+    fn set_storage_at(&mut self, address: Address, slot: B256, val: B256) -> DatabaseResult<()>;
 
     /// inserts a blockhash for the given number
     fn insert_block_hash(&mut self, number: U256, hash: B256);
@@ -124,6 +136,7 @@ pub trait Db:
         best_number: U64,
         blocks: Vec<SerializableBlock>,
         transactions: Vec<SerializableTransaction>,
+        historical_states: Option<SerializableHistoricalStates>,
     ) -> DatabaseResult<Option<SerializableState>>;
 
     /// Deserialize and add all chain data to the backend storage
@@ -184,8 +197,8 @@ impl<T: DatabaseRef<Error = DatabaseError> + Send + Sync + Clone + fmt::Debug> D
         self.insert_account_info(address, account)
     }
 
-    fn set_storage_at(&mut self, address: Address, slot: U256, val: U256) -> DatabaseResult<()> {
-        self.insert_account_storage(address, slot, val)
+    fn set_storage_at(&mut self, address: Address, slot: B256, val: B256) -> DatabaseResult<()> {
+        self.insert_account_storage(address, slot.into(), val.into())
     }
 
     fn insert_block_hash(&mut self, number: U256, hash: B256) {
@@ -198,6 +211,7 @@ impl<T: DatabaseRef<Error = DatabaseError> + Send + Sync + Clone + fmt::Debug> D
         _best_number: U64,
         _blocks: Vec<SerializableBlock>,
         _transaction: Vec<SerializableTransaction>,
+        _historical_states: Option<SerializableHistoricalStates>,
     ) -> DatabaseResult<Option<SerializableState>> {
         Ok(None)
     }
@@ -232,6 +246,22 @@ impl<T: DatabaseRef<Error = DatabaseError>> MaybeFullDatabase for CacheDB<T> {
             accounts.insert(addr, info);
         }
         let block_hashes = std::mem::take(&mut self.block_hashes);
+        StateSnapshot { accounts, storage: account_storage, block_hashes }
+    }
+
+    fn read_as_snapshot(&self) -> StateSnapshot {
+        let db_accounts = self.accounts.clone();
+        let mut accounts = HashMap::new();
+        let mut account_storage = HashMap::new();
+
+        for (addr, acc) in db_accounts {
+            account_storage.insert(addr, acc.storage.clone());
+            let mut info = acc.info;
+            info.code = self.contracts.get(&info.code_hash).cloned();
+            accounts.insert(addr, info);
+        }
+
+        let block_hashes = self.block_hashes.clone();
         StateSnapshot { accounts, storage: account_storage, block_hashes }
     }
 
@@ -280,6 +310,12 @@ impl StateDb {
     pub fn new(db: impl MaybeFullDatabase + Send + Sync + 'static) -> Self {
         Self(Box::new(db))
     }
+
+    pub fn serialize_state(&mut self) -> StateSnapshot {
+        // Using read_as_snapshot makes sures we don't clear the historical state from the current
+        // instance.
+        self.read_as_snapshot()
+    }
 }
 
 impl DatabaseRef for StateDb {
@@ -310,6 +346,10 @@ impl MaybeFullDatabase for StateDb {
         self.0.clear_into_snapshot()
     }
 
+    fn read_as_snapshot(&self) -> StateSnapshot {
+        self.0.read_as_snapshot()
+    }
+
     fn clear(&mut self) {
         self.0.clear()
     }
@@ -332,6 +372,11 @@ pub struct SerializableState {
     pub blocks: Vec<SerializableBlock>,
     #[serde(default)]
     pub transactions: Vec<SerializableTransaction>,
+    /// Historical states of accounts and storage at particular block hashes.
+    ///
+    /// Note: This is an Option for backwards compatibility.
+    #[serde(default)]
+    pub historical_states: Option<SerializableHistoricalStates>,
 }
 
 impl SerializableState {
@@ -356,7 +401,38 @@ pub struct SerializableAccountRecord {
     pub nonce: u64,
     pub balance: U256,
     pub code: Bytes,
-    pub storage: BTreeMap<U256, U256>,
+
+    #[serde(deserialize_with = "deserialize_btree")]
+    pub storage: BTreeMap<B256, B256>,
+}
+
+fn deserialize_btree<'de, D>(deserializer: D) -> Result<BTreeMap<B256, B256>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct BTreeVisitor;
+
+    impl<'de> Visitor<'de> for BTreeVisitor {
+        type Value = BTreeMap<B256, B256>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a mapping of hex encoded storage slots to hex encoded state data")
+        }
+
+        fn visit_map<M>(self, mut mapping: M) -> Result<BTreeMap<B256, B256>, M::Error>
+        where
+            M: MapAccess<'de>,
+        {
+            let mut btree = BTreeMap::new();
+            while let Some((key, value)) = mapping.next_entry::<U256, U256>()? {
+                btree.insert(B256::from(key), B256::from(value));
+            }
+
+            Ok(btree)
+        }
+    }
+
+    deserializer.deserialize_map(BTreeVisitor)
 }
 
 /// Defines a backwards-compatible enum for transactions.
@@ -442,5 +518,23 @@ impl From<SerializableTransaction> for MinedTransaction {
             block_hash: transaction.block_hash,
             block_number: transaction.block_number,
         }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct SerializableHistoricalStates(Vec<(B256, StateSnapshot)>);
+
+impl SerializableHistoricalStates {
+    pub const fn new(states: Vec<(B256, StateSnapshot)>) -> Self {
+        Self(states)
+    }
+}
+
+impl IntoIterator for SerializableHistoricalStates {
+    type Item = (B256, StateSnapshot);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }

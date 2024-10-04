@@ -1485,10 +1485,17 @@ contract ATest is Test {
     )
     .unwrap();
 
-    cmd.args(["test"]).with_no_redact().assert_success().stdout_eq(str![[r#"
-...
-[PASS] testSelfMeteringRevert() (gas: 3299)
-...
+    cmd.args(["test"]).assert_success().stdout_eq(str![[r#"
+[COMPILING_FILES] with [SOLC_VERSION]
+[SOLC_VERSION] [ELAPSED]
+Compiler run successful!
+
+Ran 1 test for test/ATest.t.sol:ATest
+[PASS] testSelfMeteringRevert() ([GAS])
+Suite result: ok. 1 passed; 0 failed; 0 skipped; [ELAPSED]
+
+Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
+
 "#]]);
 });
 
@@ -1764,12 +1771,12 @@ contract ATest is DSTest {
 [PASS] testResetGas() (gas: 40)
 [PASS] testResetGas1() (gas: 40)
 [PASS] testResetGas2() (gas: 40)
-[PASS] testResetGas3() (gas: 134476)
-[PASS] testResetGas4() (gas: 56302)
+[PASS] testResetGas3() (gas: [..])
+[PASS] testResetGas4() (gas: [..])
 [PASS] testResetGas5() (gas: 40)
 [PASS] testResetGas6() (gas: 40)
 [PASS] testResetGas7() (gas: 49)
-[PASS] testResetGas8() (gas: 622)
+[PASS] testResetGas8() (gas: [..])
 [PASS] testResetGas9() (gas: 40)
 [PASS] testResetNegativeGas() (gas: 0)
 ...
@@ -2008,6 +2015,119 @@ Ran 6 tests for src/Counter.t.sol:Skips
 Suite result: ok. 0 passed; 0 failed; 6 skipped; [ELAPSED]
 
 Ran 1 test suite [ELAPSED]: 0 tests passed, 0 failed, 6 skipped (6 total tests)
+
+"#]]);
+});
+
+forgetest_init!(should_generate_junit_xml_report, |prj, cmd| {
+    prj.wipe_contracts();
+    prj.insert_ds_test();
+    prj.insert_vm();
+    prj.clear();
+
+    prj.add_source(
+        "JunitReportTest.t.sol",
+        r#"
+        import {Vm} from "./Vm.sol";
+        import {DSTest} from "./test.sol";
+
+        contract AJunitReportTest is DSTest {
+            function test_junit_assert_fail() public {
+                assert(1 > 2);
+            }
+
+            function test_junit_revert_fail() public {
+                require(1 > 2, "Revert");
+            }
+        }
+
+        contract BJunitReportTest is DSTest {
+            Vm constant vm = Vm(HEVM_ADDRESS);
+            function test_junit_pass() public {
+                require(1 < 2, "Revert");
+            }
+
+            function test_junit_skip() public {
+                vm.skip(true);
+            }
+
+            function test_junit_skip_with_message() public {
+                vm.skip(true, "skipped test");
+            }
+
+            function test_junit_pass_fuzz(uint256 a) public {
+            }
+        }
+   "#,
+    )
+    .unwrap();
+
+    cmd.args(["test", "--junit"]).assert_failure().stdout_eq(str![[r#"
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Test run" tests="6" failures="2" errors="0" timestamp="[..]" time="[..]">
+    <testsuite name="src/JunitReportTest.t.sol:AJunitReportTest" tests="2" disabled="0" errors="0" failures="2" time="[..]">
+        <testcase name="test_junit_assert_fail()" time="[..]">
+            <failure message="panic: assertion failed (0x01)"/>
+            <system-out>[FAIL: panic: assertion failed (0x01)] test_junit_assert_fail() ([GAS])</system-out>
+        </testcase>
+        <testcase name="test_junit_revert_fail()" time="[..]">
+            <failure message="revert: Revert"/>
+            <system-out>[FAIL: revert: Revert] test_junit_revert_fail() ([GAS])</system-out>
+        </testcase>
+        <system-out>Suite result: FAILED. 0 passed; 2 failed; 0 skipped; [ELAPSED]</system-out>
+    </testsuite>
+    <testsuite name="src/JunitReportTest.t.sol:BJunitReportTest" tests="4" disabled="2" errors="0" failures="0" time="[..]">
+        <testcase name="test_junit_pass()" time="[..]">
+            <system-out>[PASS] test_junit_pass() ([GAS])</system-out>
+        </testcase>
+        <testcase name="test_junit_pass_fuzz(uint256)" time="[..]">
+            <system-out>[PASS] test_junit_pass_fuzz(uint256) (runs: 256, [AVG_GAS])</system-out>
+        </testcase>
+        <testcase name="test_junit_skip()" time="[..]">
+            <skipped/>
+            <system-out>[SKIP] test_junit_skip() ([GAS])</system-out>
+        </testcase>
+        <testcase name="test_junit_skip_with_message()" time="[..]">
+            <skipped message="skipped test"/>
+            <system-out>[SKIP: skipped test] test_junit_skip_with_message() ([GAS])</system-out>
+        </testcase>
+        <system-out>Suite result: ok. 2 passed; 0 failed; 2 skipped; [ELAPSED]</system-out>
+    </testsuite>
+</testsuites>
+
+
+"#]]);
+});
+
+forgetest_init!(should_generate_junit_xml_report_with_logs, |prj, cmd| {
+    prj.wipe_contracts();
+    prj.add_source(
+        "JunitReportTest.t.sol",
+        r#"
+import "forge-std/Test.sol";
+contract JunitReportTest is Test {
+    function test_junit_with_logs() public {
+        console.log("Step1");
+        console.log("Step2");
+        console.log("Step3");
+        assert(2 > 1);
+    }
+}
+   "#,
+    )
+    .unwrap();
+
+    cmd.args(["test", "--junit", "-vvvv"]).assert_success().stdout_eq(str![[r#"
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Test run" tests="1" failures="0" errors="0" timestamp="[..]" time="[..]">
+    <testsuite name="src/JunitReportTest.t.sol:JunitReportTest" tests="1" disabled="0" errors="0" failures="0" time="[..]">
+        <testcase name="test_junit_with_logs()" time="[..]">
+            <system-out>[PASS] test_junit_with_logs() ([GAS])/nLogs:/n  Step1/n  Step2/n  Step3/n</system-out>
+        </testcase>
+        <system-out>Suite result: ok. 1 passed; 0 failed; 0 skipped; [ELAPSED]</system-out>
+    </testsuite>
+</testsuites>
+
 
 "#]]);
 });
