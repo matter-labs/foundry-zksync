@@ -101,6 +101,12 @@ impl VerificationProvider for ZkVerificationProvider {
     }
 
     async fn check(&self, args: VerifyCheckArgs) -> Result<()> {
+        println!(
+            "Checking verification status for ID: {} using verifier: {} at URL: {}",
+            args.id,
+            args.verifier.verifier,
+            args.verifier.verifier_url.as_deref().unwrap_or("URL not specified")
+        );
         let max_retries = args.retry.retries;
         let delay_in_seconds = args.retry.delay;
 
