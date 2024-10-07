@@ -3,7 +3,7 @@
 use crate::constants::TEMPLATE_CONTRACT;
 use alloy_primitives::{hex, Address, Bytes};
 use anvil::{spawn, NodeConfig};
-use foundry_test_utils::{rpc, ScriptOutcome, ScriptTester};
+use foundry_test_utils::{rpc, util::OutputExt, ScriptOutcome, ScriptTester};
 use regex::Regex;
 use serde_json::Value;
 use std::{env, path::PathBuf, str::FromStr};
@@ -2004,13 +2004,14 @@ forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
     #[serde(rename_all = "camelCase")]
     #[allow(dead_code)]
     struct Zk {
+        #[serde(default)]
         factory_deps: Vec<Vec<u8>>,
     }
 
     let node = foundry_test_utils::ZkSyncNode::start();
 
     cmd.args(["init", "--force"]).arg(prj.root());
-    cmd.assert_non_empty_stdout();
+    cmd.assert_success();
     cmd.forge_fuse();
 
     prj.add_script(
@@ -2078,7 +2079,10 @@ contract DeployScript is Script {
         "shanghai",
     ]);
 
-    assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+    cmd.assert_success()
+        .get_output()
+        .stdout_lossy()
+        .contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
 
     let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))

@@ -78,7 +78,7 @@ pub fn config_create_project(
     {
         zksolc
     } else if !config.offline {
-        let default_version = semver::Version::new(1, 5, 3);
+        let default_version = semver::Version::new(1, 5, 4);
         let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
         if zksolc.is_none() {
             ZkSolc::blocking_install(&default_version)?;

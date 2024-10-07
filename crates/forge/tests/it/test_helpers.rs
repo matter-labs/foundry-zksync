@@ -24,7 +24,7 @@ use foundry_evm::{
     constants::CALLER,
     opts::{Env, EvmOpts},
 };
-use foundry_test_utils::{fd_lock, init_tracing, TestCommand, ZkSyncNode, rpc::next_rpc_endpoint};
+use foundry_test_utils::{fd_lock, init_tracing, rpc::next_rpc_endpoint, util::OutputExt, TestCommand, ZkSyncNode};
 use foundry_zksync_compiler::{DualCompiledContracts, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME};
 use semver::Version;
 use std::{
@@ -208,7 +208,7 @@ impl ForgeTestProfile {
         zk_config.zksync.startup = true;
         zk_config.zksync.fallback_oz = true;
         zk_config.zksync.optimizer_mode = '3';
-        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 3)));
+        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 4)));
         zk_config.fuzz.no_zksync_reserved_addresses = true;
 
         zk_config
@@ -585,7 +585,7 @@ pub fn run_zk_script_test(
         let mut install_args = vec!["install"];
         install_args.extend(deps.split_whitespace());
         install_args.push("--no-commit");
-        cmd.args(&install_args).ensure_execute_success().expect("Installed successfully");
+        cmd.args(&install_args).assert_success();
     }
 
     cmd.forge_fuse();
@@ -593,6 +593,7 @@ pub fn run_zk_script_test(
     let script_path_contract = format!("{script_path}:{contract_name}");
     let private_key =
         ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
+
     let mut script_args = vec![
         "--zk-startup",
         &script_path_contract,
@@ -616,7 +617,7 @@ pub fn run_zk_script_test(
 
     cmd.arg("script").args(&script_args);
 
-    assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+    cmd.assert_success().get_output().stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
 
     let run_latest = foundry_common::fs::json_files(root.as_ref().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))
@@ -648,7 +649,10 @@ pub fn deploy_zk_contract(
         private_key,
     ]);
 
-    let (stdout, stderr) = cmd.output_lossy();
+    let output = cmd.assert_success();
+    let output = output.get_output();
+    let stdout = output.stdout_lossy();
+    let stderr = foundry_test_utils::util::lossy_string(output.stderr.as_slice());
 
     if stdout.contains("Deployed to:") {
         let regex = regex::Regex::new(r"Deployed to:\s*(\S+)").unwrap();

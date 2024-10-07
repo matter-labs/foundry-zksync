@@ -1328,8 +1328,10 @@ contract CallEmptyCode is Test {
     .unwrap();
     cmd.args(["test", "--zksync", "--evm-version", "shanghai", "--mc", "CallEmptyCode"]);
 
-    let output = cmd.stdout_lossy();
-    assert!(output.contains("call may fail or behave unexpectedly due to empty code"));
+    cmd.assert_success()
+        .get_output()
+        .stdout_lossy()
+        .contains("call may fail or behave unexpectedly due to empty code");
 });
 
 // tests that `forge test` with a seed produces deterministic random values for uint and addresses.

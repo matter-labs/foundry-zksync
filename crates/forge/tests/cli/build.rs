@@ -1,5 +1,5 @@
 use foundry_config::Config;
-use foundry_test_utils::{forgetest, snapbox::IntoData, str};
+use foundry_test_utils::{forgetest, snapbox::IntoData, str, util::OutputExt};
 use globset::Glob;
 use regex::Regex;
 
@@ -69,7 +69,7 @@ forgetest_init!(build_sizes_no_forge_std, |prj, cmd| {
 // tests build output is as expected in zksync mode
 forgetest_init!(test_zk_build_sizes, |prj, cmd| {
     cmd.args(["build", "--sizes", "--zksync", "--evm-version", "shanghai"]);
-    let stdout = cmd.stdout_lossy();
+    let stdout = cmd.assert_success().get_output().stdout_lossy();
     let pattern = Regex::new(r"\|\s*Counter\s*\|\s*800\s*\|\s*450,199\s*\|").unwrap();
 
     assert!(pattern.is_match(&stdout), "Unexpected size output:\n{stdout}");

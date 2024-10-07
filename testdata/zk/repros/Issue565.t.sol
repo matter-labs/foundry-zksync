@@ -85,6 +85,7 @@ contract Issue565 is DSTest, StdInvariant {
 
     function setUp() public {
         cnt = new Counter();
+        vm.makePersistent(address(cnt));
 
         vm.zkVmSkip();
         handler = new CounterHandler(cnt);

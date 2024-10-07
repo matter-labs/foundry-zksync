@@ -7,7 +7,7 @@ use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::{address, hex, Address, Bytes};
 use forge::{
     revm::primitives::SpecId,
-    traces::{CallKind, CallTraceArena, CallTraceNode, TraceKind},
+    traces::{CallKind, CallTraceNode, SparsedTraceArena, TraceKind},
 };
 use foundry_common::fs;
 use foundry_test_utils::Filter;
@@ -162,9 +162,9 @@ async fn test_zk_traces_work_during_create() {
     let filter = Filter::new("testZkTraceOutputDuringCreate", "ZkTraceTest", ".*");
 
     let results = TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).test();
-    let traces = &results["zk/Trace.t.sol:ZkTraceTest"].test_results
+    let traces = results["zk/Trace.t.sol:ZkTraceTest"].test_results
         ["testZkTraceOutputDuringCreate()"]
-        .traces;
+        .traces.as_slice();
 
     assert_execution_trace(
         vec![TraceAssertion {
@@ -253,7 +253,7 @@ struct TraceAssertion {
 }
 
 /// Assert that the execution trace matches the actual trace.
-fn assert_execution_trace(expected: Vec<TraceAssertion>, traces: &[(TraceKind, CallTraceArena)]) {
+fn assert_execution_trace(expected: Vec<TraceAssertion>, traces: &[(TraceKind, SparsedTraceArena)]) {
     #[allow(dead_code)]
     #[derive(Debug)]
     struct AssertionFailure {
@@ -369,7 +369,7 @@ struct DecodedTrace {
 }
 
 /// Decodes and returns the first execution trace.
-fn decode_first_execution_trace(traces: &[(TraceKind, CallTraceArena)]) -> Vec<DecodedTrace> {
+fn decode_first_execution_trace(traces: &[(TraceKind, SparsedTraceArena)]) -> Vec<DecodedTrace> {
     fn decode_recursive(nodes: &[CallTraceNode], node: &CallTraceNode) -> DecodedTrace {
         let children =
             node.children.iter().map(|idx| decode_recursive(nodes, &nodes[*idx])).collect_vec();
