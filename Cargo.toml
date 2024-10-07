@@ -298,8 +298,8 @@ comfy-table = "7"
 # [patch."https://github.com/matter-labs/era-test-node"]
 # era_test_node = { path = "../era-test-node" }
 
-# [patch."https://github.com/Moonsong-Labs/compilers"]
-# foundry-compilers = { path = "../compilers/crates/compilers/" }
+[patch."https://github.com/Moonsong-Labs/compilers"]
+foundry-compilers = { path = "/Users/dustinbrickwood/Documents/dev/zk/temp/compilers/crates/compilers" }
 
 # [patch."https://github.com/matter-labs/era-boojum"]
 # cs_derive = { git = "https://github.com/nbaztec/era-boojum", branch = "foundry-fix" }

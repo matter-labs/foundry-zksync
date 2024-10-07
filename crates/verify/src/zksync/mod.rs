@@ -5,21 +5,29 @@ use alloy_primitives::hex;
 use eyre::{eyre, Result};
 use foundry_common::{abi::encode_function_args, retry::Retry};
 use foundry_compilers::zksolc::input::StandardJsonCompilerInput;
+use foundry_block_explorers::verify::CodeFormat;
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use std::{fmt::Debug, thread::sleep, time::Duration};
 
 pub mod standard_json;
+pub mod flatten;
 
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct ZkVerificationProvider;
 
+pub enum ZkSourceOutput {
+    StandardJson(StandardJsonCompilerInput),
+    FlattenedSource(String),
+}
+
 pub trait ZksyncSourceProvider: Send + Sync + Debug {
     fn zk_source(
         &self,
+        args: &VerifyArgs,
         context: &ZkVerificationContext,
-    ) -> Result<(StandardJsonCompilerInput, String)>;
+    ) -> Result<(ZkSourceOutput, String, CodeFormat)>;
 }
 
 #[async_trait::async_trait]
@@ -124,17 +132,21 @@ impl VerificationProvider for ZkVerificationProvider {
 }
 
 impl ZkVerificationProvider {
-    fn source_provider(&self) -> Box<dyn ZksyncSourceProvider> {
-        Box::new(standard_json::ZksyncStandardJsonSource)
+    fn source_provider(&self, args: &VerifyArgs) -> Box<dyn ZksyncSourceProvider> {
+        if args.flatten {
+            Box::new(flatten::ZksyncFlattenedSource)
+        } else {
+            Box::new(standard_json::ZksyncStandardJsonSource)
+        }
     }
     async fn prepare_request(
         &mut self,
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<VerifyContractRequest> {
-        let (source, contract_name) = if let CompilerVerificationContext::ZkSolc(context) = context
+        let (source_output, contract_name, code_format) = if let CompilerVerificationContext::ZkSolc(context) = context
         {
-            self.source_provider().zk_source(context)?
+            self.source_provider(args).zk_source(args, context)?
         } else {
             eyre::bail!("Unsupported compiler context: only ZkSolc is supported");
         };
@@ -152,21 +164,37 @@ impl ZkVerificationProvider {
                 ));
             }
         };
-        let optimization_used = source.settings.optimizer.enabled.unwrap_or(false);
+        
+        let (source_code, optimization_used) = match source_output {
+            ZkSourceOutput::StandardJson(compiler_input) => {
+                // Assuming the `StandardJsonCompilerInput` has `settings` field or similar
+                let optimization_used = compiler_input.settings.optimizer.enabled.unwrap_or(false);
+                (SourceCode::StandardJson(compiler_input), optimization_used)
+            }
+            ZkSourceOutput::FlattenedSource(flattened_source) => {
+                // Flattened source does not contain optimization details
+                (SourceCode::Flattened(flattened_source), false)
+            }
+        };
         // TODO: investigate runs better. Currently not included in the verification request.
         let _runs = args.num_of_optimizations.map(|n| n as u64);
         let constructor_args = self.constructor_args(args, context).await?.unwrap_or_default();
 
         let request = VerifyContractRequest {
             contract_address: args.address.to_string(),
-            source_code: source,
-            code_format: "solidity-standard-json-input".to_string(),
+            source_code: source_code,
+            code_format: match code_format {
+                CodeFormat::StandardJsonInput => "solidity-standard-json-input".to_string(),
+                CodeFormat::SingleFile => "solidity-single-file".to_string(),
+            },
             contract_name,
             compiler_version: solc_version,
             zk_compiler_version,
             constructor_arguments: constructor_args,
             optimization_used,
         };
+
+        warn!("request: {:?}", request);
 
         Ok(request)
     }
@@ -336,12 +364,30 @@ impl ContractVerificationStatusResponse {
     }
 }
 
+#[derive(Debug)]
+pub enum SourceCode {
+    StandardJson(StandardJsonCompilerInput),
+    Flattened(String),
+}
+
+impl Serialize for SourceCode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            SourceCode::StandardJson(input) => input.serialize(serializer),
+            SourceCode::Flattened(flattened_source) => flattened_source.serialize(serializer),
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct VerifyContractRequest {
     #[serde(rename = "contractAddress")]
     contract_address: String,
     #[serde(rename = "sourceCode")]
-    source_code: StandardJsonCompilerInput,
+    source_code: SourceCode,
     #[serde(rename = "codeFormat")]
     code_format: String,
     #[serde(rename = "contractName")]
