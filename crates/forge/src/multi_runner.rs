@@ -272,6 +272,7 @@ impl MultiContractRunner {
                     .enable_isolation(self.isolation)
                     .alphanet(self.alphanet)
             })
+            .use_zk_vm(self.use_zk)
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
