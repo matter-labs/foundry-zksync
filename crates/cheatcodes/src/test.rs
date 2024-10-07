@@ -8,6 +8,7 @@ use alloy_primitives::Address;
 use alloy_sol_types::SolValue;
 use foundry_evm_core::constants::MAGIC_SKIP;
 use foundry_zksync_compiler::DualCompiledContract;
+use foundry_zksync_core::ZkPaymasterData;
 
 pub(crate) mod assert;
 pub(crate) mod assume;
@@ -31,6 +32,15 @@ impl Cheatcode for zkVmSkipCall {
     fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
         ccx.state.skip_zk_vm = ccx.state.use_zk_vm;
 
+        Ok(Default::default())
+    }
+}
+
+impl Cheatcode for zkUsePaymasterCall {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { paymaster_address, paymaster_input } = self;
+        ccx.state.paymaster_params =
+            Some(ZkPaymasterData { address: *paymaster_address, input: paymaster_input.clone() });
         Ok(Default::default())
     }
 }

@@ -45,15 +45,19 @@ use crate::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
         env::{create_l1_batch_env, create_system_env},
         storage_view::StorageView,
-        tracer::{CallContext, CheatcodeTracer, CheatcodeTracerContext},
+        tracers::{
+            bootloader::{BootloaderDebug, BootloaderDebugTracer},
+            cheatcode::{CallContext, CheatcodeTracer, CheatcodeTracerContext},
+            error::ErrorTracer,
+        },
     },
 };
 use foundry_evm_abi::{
     patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS,
 };
 
-/// Maximum gas price allowed for L1.
-const MAX_L1_GAS_PRICE: u64 = 1000;
+/// Minimum gas price allowed for L1.
+const MIN_L1_GAS_PRICE: u64 = 1000;
 
 /// Represents the result of execution a [`L2Tx`] on EraVM
 #[derive(Debug)]
@@ -173,7 +177,6 @@ where
         .map(|factory_deps| (*factory_deps).clone())
         .unwrap_or_default();
 
-    let env_tx_gas_limit = ecx.env.tx.gas_limit;
     let mut era_db = ZKVMData::new_with_system_contracts(ecx, chain_id)
         .with_extra_factory_deps(persisted_factory_deps)
         .with_storage_accesses(ccx.accesses.take());
@@ -191,8 +194,19 @@ where
     let storage_ptr =
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
-    let InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces, create_outcome } =
-        inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
+    let InnerZkVmResult {
+        tx_result,
+        bytecodes,
+        modified_storage,
+        call_traces,
+        create_outcome,
+        gas_usage,
+    } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
+
+    info!(
+        reserved=?gas_usage.bootloader_debug.reserved_gas, limit=?gas_usage.limit, execution=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
+        "gas usage",
+    );
 
     if let Some(record) = &mut era_db.accesses {
         for k in modified_storage.keys() {
@@ -251,7 +265,7 @@ where
                 call_traces,
                 execution_result: rExecutionResult::Success {
                     reason: SuccessReason::Return,
-                    gas_used: tx_result.statistics.gas_used,
+                    gas_used: gas_usage.gas_used(),
                     gas_refunded: tx_result.refunds.gas_refunded,
                     logs,
                     output,
@@ -269,7 +283,7 @@ where
                 logs,
                 call_traces,
                 execution_result: rExecutionResult::Revert {
-                    gas_used: env_tx_gas_limit - tx_result.refunds.gas_refunded,
+                    gas_used: gas_usage.gas_used(),
                     output: Bytes::from(output),
                 },
             }
@@ -286,7 +300,7 @@ where
                 call_traces,
                 execution_result: rExecutionResult::Halt {
                     reason: mapped_reason,
-                    gas_used: env_tx_gas_limit - tx_result.refunds.gas_refunded,
+                    gas_used: gas_usage.gas_used(),
                 },
             }
         }
@@ -367,12 +381,35 @@ struct InnerCreateOutcome {
     bytecode: Vec<u8>,
 }
 
+#[allow(unused)]
+#[derive(Debug)]
+struct ZkVmGasUsage {
+    /// Gas limit set for the user excluding the reserved gas.
+    pub limit: U256,
+    /// Gas refunded after transaction execution by the operator.
+    pub refunded: U256,
+    /// Gas used for only on transaction execution (validation and execution).
+    pub execution: U256,
+    /// Gas used for publishing pubdata.
+    pub pubdata: U256,
+    /// Additional bootloader debug info for gas usage.
+    pub bootloader_debug: BootloaderDebug,
+}
+
+impl ZkVmGasUsage {
+    pub fn gas_used(&self) -> u64 {
+        // Gas limit is capped by the environment so gas should never reach max u64
+        self.execution.saturating_add(self.pubdata).as_u64()
+    }
+}
+
 struct InnerZkVmResult {
     tx_result: VmExecutionResultAndLogs,
     bytecodes: HashMap<U256, Vec<U256>>,
     modified_storage: HashMap<StorageKey, H256>,
     call_traces: Vec<Call>,
     create_outcome: Option<InnerCreateOutcome>,
+    gas_usage: ZkVmGasUsage,
 }
 
 fn inspect_inner<S: ReadStorage>(
@@ -382,7 +419,7 @@ fn inspect_inner<S: ReadStorage>(
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> InnerZkVmResult {
-    let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MAX_L1_GAS_PRICE);
+    let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MIN_L1_GAS_PRICE);
     let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
     let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price, fair_l2_gas_price);
 
@@ -404,8 +441,12 @@ fn inspect_inner<S: ReadStorage>(
     }
     let is_static = call_ctx.is_static;
     let is_create = call_ctx.is_create;
+    let bootloader_debug_tracer_result = Arc::default();
     let tracers = vec![
+        ErrorTracer.into_tracer_pointer(),
         CallTracer::new(Arc::clone(&call_tracer_result)).into_tracer_pointer(),
+        BootloaderDebugTracer { result: Arc::clone(&bootloader_debug_tracer_result) }
+            .into_tracer_pointer(),
         CheatcodeTracer::new(
             ccx.mocked_calls.clone(),
             expected_calls,
@@ -436,6 +477,34 @@ fn inspect_inner<S: ReadStorage>(
     if let Some(expected_calls) = ccx.expected_calls.as_mut() {
         expected_calls.extend(cheatcode_result.expected_calls);
     }
+
+    // populate gas usage info
+    let bootloader_debug = Arc::try_unwrap(bootloader_debug_tracer_result)
+        .unwrap()
+        .take()
+        .and_then(|result| result.ok())
+        .expect("failed obtaining bootloader debug info");
+    trace!("{bootloader_debug:?}");
+
+    let total_gas_limit =
+        bootloader_debug.total_gas_limit_from_user.saturating_sub(bootloader_debug.reserved_gas);
+    let intrinsic_gas = total_gas_limit - bootloader_debug.gas_limit_after_intrinsic;
+    let gas_for_validation =
+        bootloader_debug.gas_limit_after_intrinsic - bootloader_debug.gas_after_validation;
+    let gas_used_tx_execution =
+        intrinsic_gas + gas_for_validation + bootloader_debug.gas_spent_on_execution;
+
+    let gas_used_pubdata = bootloader_debug
+        .gas_per_pubdata
+        .saturating_mul(tx_result.statistics.pubdata_published.into());
+
+    let gas_usage = ZkVmGasUsage {
+        limit: total_gas_limit,
+        execution: gas_used_tx_execution,
+        pubdata: gas_used_pubdata,
+        refunded: bootloader_debug.refund_by_operator,
+        bootloader_debug,
+    };
 
     formatter::print_vm_details(&tx_result);
 
@@ -520,7 +589,14 @@ fn inspect_inner<S: ReadStorage>(
         None
     };
 
-    InnerZkVmResult { tx_result, bytecodes, modified_storage, call_traces, create_outcome }
+    InnerZkVmResult {
+        tx_result,
+        bytecodes,
+        modified_storage,
+        call_traces,
+        create_outcome,
+        gas_usage,
+    }
 }
 
 /// Patch CREATE traces with bytecode as the data is empty bytes.

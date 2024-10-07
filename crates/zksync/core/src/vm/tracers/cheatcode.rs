@@ -27,11 +27,9 @@ use zksync_utils::bytecode::hash_bytecode;
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
-    vm::farcall::{CallAction, CallDepth},
-    EMPTY_CODE,
+    vm::farcall::{CallAction, CallDepth, FarCallHandler},
+    ZkPaymasterData, EMPTY_CODE,
 };
-
-use super::farcall::FarCallHandler;
 
 /// Selector for retrieving account version.
 /// This is used to override the caller's account version when deploying a contract
@@ -82,6 +80,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub accesses: Option<&'a mut RecordAccess>,
     /// Factory deps that were persisted across calls
     pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
+    /// Paymaster data
+    pub paymaster_data: Option<ZkPaymasterData>,
 }
 
 /// Tracer result to return back to foundry.

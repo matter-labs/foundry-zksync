@@ -25,7 +25,7 @@ use foundry_evm::{
     opts::{Env, EvmOpts},
 };
 use foundry_test_utils::{fd_lock, init_tracing, rpc::next_rpc_endpoint, util::OutputExt, TestCommand, ZkSyncNode};
-use foundry_zksync_compiler::{DualCompiledContracts, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME};
+use foundry_zksync_compiler::{DualCompiledContracts, ZKSYNC_ARTIFACTS_DIR, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME};
 use semver::Version;
 use std::{
     env, fmt,
@@ -92,7 +92,7 @@ impl ForgeTestProfile {
         let mut zk_project =
             foundry_zksync_compiler::config_create_project(&zk_config, zk_config.cache, false)
                 .expect("failed creating zksync project");
-        zk_project.paths.artifacts = zk_config.root.as_ref().join("zk").join("zkout");
+        zk_project.paths.artifacts = zk_config.root.as_ref().join("zk").join(ZKSYNC_ARTIFACTS_DIR);
         zk_project.paths.cache = zk_config
             .root
             .as_ref()

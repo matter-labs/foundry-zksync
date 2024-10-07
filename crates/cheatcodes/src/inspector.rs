@@ -40,9 +40,9 @@ use foundry_evm_core::{
 };
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
-    convert::{ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, Call, ZkTransactionMetadata,
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    get_account_code_key, get_balance_key, get_nonce_key, Call, ZkPaymasterData,
+    ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
 use foundry_zksync_inspectors::TraceCollector;
 use itertools::Itertools;
@@ -76,6 +76,7 @@ use zksync_types::{
     H256, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
 };
+use zksync_web3_rs::eip712::PaymasterParams;
 
 mod utils;
 
@@ -495,6 +496,9 @@ pub struct Cheatcodes {
     /// Records the next create address for `skip_zk_vm_addresses`.
     pub record_next_create_address: bool,
 
+    /// Paymaster params
+    pub paymaster_params: Option<ZkPaymasterData>,
+
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
 
@@ -590,14 +594,15 @@ impl Cheatcodes {
             mapping_slots: Default::default(),
             pc: Default::default(),
             breakpoints: Default::default(),
+            rng: Default::default(),
+            ignored_traces: Default::default(),
+            arbitrary_storage: Default::default(),
             use_zk_vm: Default::default(),
             skip_zk_vm: Default::default(),
             skip_zk_vm_addresses: Default::default(),
             record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
-            rng: Default::default(),
-            ignored_traces: Default::default(),
-            arbitrary_storage: Default::default(),
+            paymaster_params: None,
         }
     }
 
@@ -972,6 +977,11 @@ impl Cheatcodes {
                         None
                     };
                     let rpc = ecx_inner.db.active_fork_url();
+                    let paymaster_params =
+                        self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
+                            paymaster: paymaster_data.address.to_h160(),
+                            paymaster_input: paymaster_data.input.to_vec(),
+                        });
                     if let Some(factory_deps) = zk_tx {
                         let mut batched =
                             foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
@@ -990,7 +1000,10 @@ impl Cheatcodes {
                                     ..Default::default()
                                 }
                                 .into(),
-                                zk_tx: Some(ZkTransactionMetadata { factory_deps }),
+                                zk_tx: Some(ZkTransactionMetadata {
+                                    factory_deps,
+                                    paymaster_data: paymaster_params.clone(),
+                                }),
                             });
 
                             //update nonce for each tx
@@ -1014,7 +1027,9 @@ impl Cheatcodes {
                             ..Default::default()
                         }
                         .into(),
-                        zk_tx: zk_tx.map(ZkTransactionMetadata::new),
+                        zk_tx: zk_tx.map(|factory_deps| {
+                            ZkTransactionMetadata::new(factory_deps, paymaster_params)
+                        }),
                     });
 
                     input.log_debug(self, &input.scheme().unwrap_or(CreateScheme::Create));
@@ -1076,6 +1091,22 @@ impl Cheatcodes {
             return None
         }
 
+        if let Some(CreateScheme::Create) = input.scheme() {
+            let caller = input.caller();
+            let nonce = ecx
+                .inner
+                .journaled_state
+                .load_account(input.caller(), &mut ecx.inner.db)
+                .expect("to load caller account")
+                .info
+                .nonce;
+            let address = caller.create(nonce);
+            if ecx.db.get_test_contract_address().map(|addr| address == addr).unwrap_or_default() {
+                info!("running create in EVM, instead of zkEVM (Test Contract) {:#?}", address);
+                return None
+            }
+        }
+
         if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
             info!("running create in EVM, instead of zkEVM (DEFAULT_CREATE2_DEPLOYER_CODE)");
             return None
@@ -1096,6 +1127,7 @@ impl Cheatcodes {
             expected_calls: Some(&mut self.expected_calls),
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
+            paymaster_data: self.paymaster_params.take(),
         };
         let create_inputs = CreateInputs {
             scheme: input.scheme().unwrap_or(CreateScheme::Create),
@@ -1105,9 +1137,7 @@ impl Cheatcodes {
             gas_limit: input.gas_limit(),
         };
 
-        // We currently exhaust the entire gas for the call as zkEVM returns a very high
-        // amount of gas that OOGs revm.
-        let gas = Gas::new(input.gas_limit());
+        let mut gas = Gas::new(input.gas_limit());
         match foundry_zksync_core::vm::create::<_, DatabaseError>(
             &create_inputs,
             zk_contract,
@@ -1149,32 +1179,38 @@ impl Cheatcodes {
                 }
 
                 match result.execution_result {
-                    ExecutionResult::Success { output, .. } => match output {
-                        Output::Create(bytes, address) => Some(CreateOutcome {
-                            result: InterpreterResult {
-                                result: InstructionResult::Return,
-                                output: bytes,
-                                gas,
-                            },
-                            address,
-                        }),
-                        _ => Some(CreateOutcome {
+                    ExecutionResult::Success { output, gas_used, .. } => {
+                        let _ = gas.record_cost(gas_used);
+                        match output {
+                            Output::Create(bytes, address) => Some(CreateOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Return,
+                                    output: bytes,
+                                    gas,
+                                },
+                                address,
+                            }),
+                            _ => Some(CreateOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Revert,
+                                    output: Bytes::new(),
+                                    gas,
+                                },
+                                address: None,
+                            }),
+                        }
+                    }
+                    ExecutionResult::Revert { output, gas_used, .. } => {
+                        let _ = gas.record_cost(gas_used);
+                        Some(CreateOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
-                                output: Bytes::new(),
+                                output,
                                 gas,
                             },
                             address: None,
-                        }),
-                    },
-                    ExecutionResult::Revert { output, .. } => Some(CreateOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output,
-                            gas,
-                        },
-                        address: None,
-                    }),
+                        })
+                    }
                     ExecutionResult::Halt { .. } => Some(CreateOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,
@@ -1541,11 +1577,22 @@ impl Cheatcodes {
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let zk_tx = if self.use_zk_vm {
+                        let paymaster_params =
+                            self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
+                                paymaster: paymaster_data.address.to_h160(),
+                                paymaster_input: paymaster_data.input.to_vec(),
+                            });
                         // We shouldn't need factory_deps for CALLs
                         if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
-                            Some(ZkTransactionMetadata { factory_deps: factory_deps.clone() })
+                            Some(ZkTransactionMetadata {
+                                factory_deps: factory_deps.clone(),
+                                paymaster_data: paymaster_params,
+                            })
                         } else {
-                            Some(ZkTransactionMetadata { factory_deps: Default::default() })
+                            Some(ZkTransactionMetadata {
+                                factory_deps: Default::default(),
+                                paymaster_data: paymaster_params,
+                            })
                         }
                     } else {
                         None
@@ -1690,11 +1737,10 @@ impl Cheatcodes {
             expected_calls: Some(&mut self.expected_calls),
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
+            paymaster_data: self.paymaster_params.take(),
         };
 
-        // We currently exhaust the entire gas for the call as zkEVM returns a very high amount
-        // of gas that OOGs revm.
-        let gas = Gas::new(call.gas_limit);
+        let mut gas = Gas::new(call.gas_limit);
         match foundry_zksync_core::vm::call::<_, DatabaseError>(call, factory_deps, ecx, ccx) {
             Ok(result) => {
                 // append console logs from zkEVM to the current executor's LogTracer
@@ -1733,32 +1779,38 @@ impl Cheatcodes {
                 }
 
                 match result.execution_result {
-                    ExecutionResult::Success { output, .. } => match output {
-                        Output::Call(bytes) => Some(CallOutcome {
-                            result: InterpreterResult {
-                                result: InstructionResult::Return,
-                                output: bytes,
-                                gas,
-                            },
-                            memory_offset: call.return_memory_offset.clone(),
-                        }),
-                        _ => Some(CallOutcome {
+                    ExecutionResult::Success { output, gas_used, .. } => {
+                        let _ = gas.record_cost(gas_used);
+                        match output {
+                            Output::Call(bytes) => Some(CallOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Return,
+                                    output: bytes,
+                                    gas,
+                                },
+                                memory_offset: call.return_memory_offset.clone(),
+                            }),
+                            _ => Some(CallOutcome {
+                                result: InterpreterResult {
+                                    result: InstructionResult::Revert,
+                                    output: Bytes::new(),
+                                    gas,
+                                },
+                                memory_offset: call.return_memory_offset.clone(),
+                            }),
+                        }
+                    }
+                    ExecutionResult::Revert { output, gas_used, .. } => {
+                        let _ = gas.record_cost(gas_used);
+                        Some(CallOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
-                                output: Bytes::new(),
+                                output,
                                 gas,
                             },
                             memory_offset: call.return_memory_offset.clone(),
-                        }),
-                    },
-                    ExecutionResult::Revert { output, .. } => Some(CallOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output,
-                            gas,
-                        },
-                        memory_offset: call.return_memory_offset.clone(),
-                    }),
+                        })
+                    }
                     ExecutionResult::Halt { .. } => Some(CallOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,

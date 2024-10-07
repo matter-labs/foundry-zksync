@@ -11,6 +11,7 @@ use foundry_test_utils::{
     util::{pretty_err, read_string, OutputExt, TestCommand},
 };
 use semver::Version;
+use similar_asserts::assert_eq;
 use std::{
     fs,
     path::Path,
@@ -1819,6 +1820,78 @@ contract ContractThreeTest is DSTest {
     let third_out =
         cmd.arg("test").arg("--gas-report").assert_success().get_output().stdout_lossy();
     assert!(third_out.contains("foo") && third_out.contains("bar") && third_out.contains("baz"));
+});
+
+forgetest!(zk_gas_report, |prj, cmd| {
+    prj.insert_ds_test();
+    prj.add_source(
+        "Contracts.sol",
+        r#"
+//SPDX-license-identifier: MIT
+
+import "./test.sol";
+
+contract ContractOne {
+    int public i;
+
+    constructor() {
+        i = 0;
+    }
+
+    function foo() public{
+        while(i<5){
+            i++;
+        }
+    }
+}
+
+contract ContractOneTest is DSTest {
+    ContractOne c1;
+
+    function setUp() public {
+        c1 = new ContractOne();
+    }
+
+    function testFoo() public {
+        c1.foo();
+    }
+}
+    "#,
+    )
+    .unwrap();
+
+    prj.write_config(Config {
+        gas_reports: (vec!["*".to_string()]),
+        gas_reports_ignore: (vec![]),
+        ..Default::default()
+    });
+    let out = cmd.arg("test").arg("--gas-report").assert_success().get_output().stdout_lossy();
+    cmd.forge_fuse();
+    let out_zk = cmd
+        .arg("test")
+        .arg("--gas-report")
+        .arg("--zksync")
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    let mut cells = out.split('|');
+    let deployment_cost: u64 = cells.nth(22).unwrap().trim().parse().unwrap();
+    let deployment_size: u64 = cells.next().unwrap().trim().parse().unwrap();
+    let function = cells.nth(12).unwrap().trim();
+    let gas: u64 = cells.next().unwrap().trim().parse().unwrap();
+
+    let mut cells_zk = out_zk.split('|');
+    let deployment_cost_zk: u64 = cells_zk.nth(22).unwrap().trim().parse().unwrap();
+    let deployment_size_zk: u64 = cells_zk.next().unwrap().trim().parse().unwrap();
+    let function_zk = cells_zk.nth(12).unwrap().trim();
+    let gas_zk: u64 = cells_zk.next().unwrap().trim().parse().unwrap();
+
+    assert!(deployment_cost_zk > deployment_cost);
+    assert!(deployment_size_zk > deployment_size);
+    assert!(gas_zk > gas);
+    assert_eq!(function, "foo");
+    assert_eq!(function_zk, "foo");
 });
 
 forgetest_init!(can_use_absolute_imports, |prj, cmd| {

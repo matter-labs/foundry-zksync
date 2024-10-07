@@ -85,9 +85,9 @@ checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
 
 [[package]]
 name = "alloy-chains"
-version = "0.1.31"
+version = "0.1.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b68b94c159bcc2ca5f758b8663d7b00fc7c5e40569984595ddf2221b0f7f7f6e"
+checksum = "8158b4878c67837e5413721cc44298e6a2d88d39203175ea025e51892a16ba4c"
 dependencies = [
  "num_enum 0.7.3",
  "serde",
@@ -4974,6 +4974,7 @@ dependencies = [
  "tracing",
  "vergen",
  "walkdir",
+ "zksync-web3-rs",
  "zksync_types",
 ]
 
@@ -5417,6 +5418,7 @@ dependencies = [
  "foundry-config",
  "foundry-evm-core",
  "foundry-linking",
+ "foundry-zksync-compiler",
  "futures 0.3.30",
  "itertools 0.13.0",
  "rayon",
@@ -9420,7 +9422,7 @@ checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes",
  "heck 0.4.1",
- "itertools 0.11.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -14264,9 +14266,10 @@ dependencies = [
 
 [[package]]
 name = "zksync-web3-rs"
-version = "0.1.1"
-source = "git+https://github.com/lambdaclass/zksync-web3-rs.git?rev=2da644f5b8fc48a129e80fe0653e5334701c059b#2da644f5b8fc48a129e80fe0653e5334701c059b"
+version = "0.2.1"
+source = "git+https://github.com/jrigada/zksync-web3-rs.git?rev=bc3e6d3e75b7ff3747ff2dccefa9fb74d770931b#bc3e6d3e75b7ff3747ff2dccefa9fb74d770931b"
 dependencies = [
+ "anyhow",
  "async-trait",
  "clap",
  "env_logger 0.10.2",

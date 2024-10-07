@@ -13,6 +13,7 @@ mod invariant;
 mod logs;
 mod nft;
 mod ownership;
+mod paymaster;
 mod proxy;
 mod repros;
 mod traces;

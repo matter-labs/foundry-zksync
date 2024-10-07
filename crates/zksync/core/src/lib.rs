@@ -43,7 +43,7 @@ pub use zksync_types::{
 };
 pub use zksync_utils::bytecode::hash_bytecode;
 use zksync_web3_rs::{
-    eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest},
+    eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest, PaymasterParams},
     zks_provider::types::Fee,
     zks_utils::EIP712_TX_TYPE,
 };
@@ -76,17 +76,28 @@ pub fn get_nonce_key(address: Address) -> rU256 {
     zksync_types::get_nonce_key(&address.to_h160()).key().to_ru256()
 }
 
+/// Represents additional data for ZK transactions that require a paymaster.
+#[derive(Clone, Debug, Default)]
+pub struct ZkPaymasterData {
+    /// Paymaster address.
+    pub address: Address,
+    /// Paymaster input.
+    pub input: Bytes,
+}
+
 /// Represents additional data for ZK transactions.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ZkTransactionMetadata {
     /// Factory Deps for ZK transactions.
     pub factory_deps: Vec<Vec<u8>>,
+    /// Paymaster data for ZK transactions.
+    pub paymaster_data: Option<PaymasterParams>,
 }
 
 impl ZkTransactionMetadata {
     /// Create a new [`ZkTransactionMetadata`] with the given factory deps
-    pub fn new(factory_deps: Vec<Vec<u8>>) -> Self {
-        Self { factory_deps }
+    pub fn new(factory_deps: Vec<Vec<u8>>, paymaster_data: Option<PaymasterParams>) -> Self {
+        Self { factory_deps, paymaster_data }
     }
 }
 

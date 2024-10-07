@@ -61,7 +61,11 @@ async fn convert_to_zksync(
     tx: WithOtherFields<TransactionRequest>,
     zk: &ZkTransactionMetadata,
 ) -> Result<(Eip712TransactionRequest, Eip712Transaction)> {
-    let custom_data = Eip712Meta::new().factory_deps(zk.factory_deps.clone());
+    let mut custom_data = Eip712Meta::new().factory_deps(zk.factory_deps.clone());
+
+    if let Some(paymaster_params) = &zk.paymaster_data {
+        custom_data = custom_data.paymaster_params(paymaster_params.clone());
+    }
 
     let gas_price = match tx.gas_price() {
         Some(price) => price,
