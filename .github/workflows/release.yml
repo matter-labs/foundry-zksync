@@ -152,6 +152,8 @@ jobs:
 
           [[ "$TARGET" == *windows* ]] && ext=".exe"
 
+          cargo build "${flags[@]}"
+
           bins=(cast forge)
           for name in "${bins[@]}"; do
             bin=$OUT_DIR/$name$ext
