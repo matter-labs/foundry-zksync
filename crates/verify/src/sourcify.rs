@@ -1,7 +1,7 @@
 use crate::{
     provider::VerificationProvider,
-    zk_provider::CompilerVerificationContext,
     verify::{VerifyArgs, VerifyCheckArgs},
+    zk_provider::CompilerVerificationContext,
 };
 use async_trait::async_trait;
 use eyre::Result;

@@ -472,11 +472,8 @@ impl TestArgs {
             let (_, _, test_result) =
                 outcome.remove_first().ok_or_eyre("no tests were executed")?;
 
-            let sources = ContractSources::from_project_output(
-                &output,
-                project.root(),
-                Some(&libraries),
-            )?;
+            let sources =
+                ContractSources::from_project_output(&output, project.root(), Some(&libraries))?;
 
             // Run the debugger.
             let mut builder = Debugger::builder()

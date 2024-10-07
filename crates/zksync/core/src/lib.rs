@@ -30,7 +30,7 @@ use convert::{
     ToSignable,
 };
 use eyre::{eyre, OptionExt};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};

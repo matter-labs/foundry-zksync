@@ -3,8 +3,8 @@
 use crate::{
     etherscan::EtherscanVerificationProvider,
     provider::{VerificationContext, VerificationProvider, VerificationProviderType},
-    zk_provider::{CompilerVerificationContext, ZkVerificationContext},
     utils::is_host_only,
+    zk_provider::{CompilerVerificationContext, ZkVerificationContext},
     RetryArgs,
 };
 use alloy_primitives::Address;

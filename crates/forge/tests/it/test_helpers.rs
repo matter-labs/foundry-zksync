@@ -24,8 +24,12 @@ use foundry_evm::{
     constants::CALLER,
     opts::{Env, EvmOpts},
 };
-use foundry_test_utils::{fd_lock, init_tracing, rpc::next_rpc_endpoint, util::OutputExt, TestCommand, ZkSyncNode};
-use foundry_zksync_compiler::{DualCompiledContracts, ZKSYNC_ARTIFACTS_DIR, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME};
+use foundry_test_utils::{
+    fd_lock, init_tracing, rpc::next_rpc_endpoint, util::OutputExt, TestCommand, ZkSyncNode,
+};
+use foundry_zksync_compiler::{
+    DualCompiledContracts, ZKSYNC_ARTIFACTS_DIR, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME,
+};
 use semver::Version;
 use std::{
     env, fmt,
@@ -617,7 +621,10 @@ pub fn run_zk_script_test(
 
     cmd.arg("script").args(&script_args);
 
-    cmd.assert_success().get_output().stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
+    cmd.assert_success()
+        .get_output()
+        .stdout_lossy()
+        .contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
 
     let run_latest = foundry_common::fs::json_files(root.as_ref().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))

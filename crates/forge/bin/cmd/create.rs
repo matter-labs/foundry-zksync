@@ -228,8 +228,18 @@ impl CreateArgs {
             let result = if self.unlocked {
                 // Deploy with unlocked account
                 let sender = self.eth.wallet.from.expect("required");
-                self.deploy_zk(abi, bin.object, params, provider, chain_id, sender, config.transaction_timeout, zk_data, None)
-                    .await
+                self.deploy_zk(
+                    abi,
+                    bin.object,
+                    params,
+                    provider,
+                    chain_id,
+                    sender,
+                    config.transaction_timeout,
+                    zk_data,
+                    None,
+                )
+                .await
             } else {
                 // Deploy with signer
                 let signer = self.eth.wallet.signer().await?;

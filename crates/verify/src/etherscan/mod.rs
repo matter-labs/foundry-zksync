@@ -1,8 +1,8 @@
 use crate::{
     provider::{VerificationContext, VerificationProvider},
     retry::RETRY_CHECK_ON_VERIFY,
-    zk_provider::{CompilerVerificationContext, ZkVerificationContext},
     verify::{VerifyArgs, VerifyCheckArgs},
+    zk_provider::{CompilerVerificationContext, ZkVerificationContext},
 };
 use alloy_json_abi::Function;
 use alloy_primitives::hex;
@@ -656,6 +656,9 @@ Compiler run successful!
         let context = args.resolve_context().await.unwrap();
 
         let mut etherscan = EtherscanVerificationProvider::default();
-        etherscan.preflight_verify_check(args, CompilerVerificationContext::Solc(context)).await.unwrap();
+        etherscan
+            .preflight_verify_check(args, CompilerVerificationContext::Solc(context))
+            .await
+            .unwrap();
     });
 }

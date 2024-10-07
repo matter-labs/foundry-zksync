@@ -17,7 +17,7 @@ async fn test_zk_contract_paymaster() {
         "--no-commit",
         "--shallow",
     ])
-        .assert_success();
+    .assert_success();
     cmd.forge_fuse();
 
     let config = cmd.config();

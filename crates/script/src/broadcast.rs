@@ -20,7 +20,10 @@ use foundry_common::{
     shell, TransactionMaybeSigned,
 };
 use foundry_config::Config;
-use foundry_zksync_core::{convert::{ConvertAddress, ConvertBytes, ConvertSignature, ToSignable}, ZkTransactionMetadata};
+use foundry_zksync_core::{
+    convert::{ConvertAddress, ConvertBytes, ConvertSignature, ToSignable},
+    ZkTransactionMetadata,
+};
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{
@@ -132,7 +135,7 @@ pub async fn send_transaction(
                         factory_deps: zk.factory_deps.clone(),
                         ..Default::default()
                     })
-                        .expect("failed serializing json"),
+                    .expect("failed serializing json"),
                 );
             }
             estimate_gas(tx, &provider, estimate_multiplier).await?;
@@ -150,8 +153,9 @@ pub async fn send_transaction(
             debug!("sending transaction: {:?}", tx);
 
             let signed = if let Some(zk) = zk {
-                let signer =
-                    signer.signer_by_address(tx.from.expect("no sender")).ok_or(eyre::eyre!("Signer not found"))?;
+                let signer = signer
+                    .signer_by_address(tx.from.expect("no sender"))
+                    .ok_or(eyre::eyre!("Signer not found"))?;
 
                 let (deploy_request, signable) = convert_to_zksync(&provider, tx, zk).await?;
                 let mut signable = signable.to_signable_tx();

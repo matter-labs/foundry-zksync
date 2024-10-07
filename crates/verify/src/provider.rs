@@ -2,8 +2,8 @@ use crate::{
     etherscan::EtherscanVerificationProvider,
     sourcify::SourcifyVerificationProvider,
     verify::{VerifyArgs, VerifyCheckArgs},
+    zk_provider::CompilerVerificationContext,
 };
-use crate::zk_provider::CompilerVerificationContext;
 use alloy_json_abi::JsonAbi;
 use async_trait::async_trait;
 use eyre::{OptionExt, Result};

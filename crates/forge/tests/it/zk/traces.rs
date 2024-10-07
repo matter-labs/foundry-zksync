@@ -1,7 +1,6 @@
 //! Forge tests for zksync logs.
 
-use std::path::Path;
-use std::sync::LazyLock;
+use std::{path::Path, sync::LazyLock};
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::{address, hex, Address, Bytes};
@@ -164,7 +163,8 @@ async fn test_zk_traces_work_during_create() {
     let results = TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).test();
     let traces = results["zk/Trace.t.sol:ZkTraceTest"].test_results
         ["testZkTraceOutputDuringCreate()"]
-        .traces.as_slice();
+        .traces
+        .as_slice();
 
     assert_execution_trace(
         vec![TraceAssertion {
@@ -253,7 +253,10 @@ struct TraceAssertion {
 }
 
 /// Assert that the execution trace matches the actual trace.
-fn assert_execution_trace(expected: Vec<TraceAssertion>, traces: &[(TraceKind, SparsedTraceArena)]) {
+fn assert_execution_trace(
+    expected: Vec<TraceAssertion>,
+    traces: &[(TraceKind, SparsedTraceArena)],
+) {
     #[allow(dead_code)]
     #[derive(Debug)]
     struct AssertionFailure {

@@ -3,7 +3,10 @@
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use forge::revm::primitives::SpecId;
 use foundry_config::fs_permissions::PathPermission;
-use foundry_test_utils::{util::{self, OutputExt}, Filter};
+use foundry_test_utils::{
+    util::{self, OutputExt},
+    Filter,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_can_call_function() {
@@ -58,8 +61,7 @@ async fn test_zk_contract_create2() {
     );
     util::initialize(prj.root());
 
-    cmd.args(["install", "matter-labs/era-contracts", "--no-commit", "--shallow"])
-        .assert_success();
+    cmd.args(["install", "matter-labs/era-contracts", "--no-commit", "--shallow"]).assert_success();
     cmd.forge_fuse();
 
     let mut config = cmd.config();
