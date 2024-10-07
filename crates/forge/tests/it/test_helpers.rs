@@ -493,7 +493,7 @@ pub fn get_zk_compiled(zk_project: &ZkProject) -> ZkProjectCompileOutput {
     out
 }
 
-pub static EVM_OPTS: Lazy<EvmOpts> = Lazy::new(|| EvmOpts {
+pub static EVM_OPTS: LazyLock<EvmOpts> = LazyLock::new(|| EvmOpts {
     env: Env {
         gas_limit: u64::MAX,
         chain_id: None,
