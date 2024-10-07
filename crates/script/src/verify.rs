@@ -6,6 +6,7 @@ use foundry_cli::opts::{EtherscanOpts, ProjectPathsArgs};
 use foundry_common::ContractsByArtifact;
 use foundry_compilers::{info::ContractInfo, Project};
 use foundry_config::{Chain, Config};
+use foundry_zksync_compiler::ZKSYNC_ARTIFACTS_DIR;
 use semver::Version;
 
 /// State after we have broadcasted the script.
@@ -106,13 +107,33 @@ impl VerifyBundle {
         create2_offset: usize,
         data: &[u8],
         libraries: &[String],
+        zksync: bool,
     ) -> Option<VerifyArgs> {
         for (artifact, contract) in self.known_contracts.iter() {
             let Some(bytecode) = contract.bytecode() else { continue };
             // If it's a CREATE2, the tx.data comes with a 32-byte salt in the beginning
             // of the transaction
-            if data.split_at(create2_offset).1.starts_with(bytecode) {
-                let constructor_args = data.split_at(create2_offset + bytecode.len()).1.to_vec();
+            let (contract_match, effective_create2_offset) = if zksync {
+                let is_zksync_artifact =
+                    artifact.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR);
+                if is_zksync_artifact {
+                    let bytecode_hash =
+                        foundry_zksync_core::hash_bytecode(contract.deployed_bytecode().unwrap());
+                    let data_after_offset = &data[36..]; // Use 36 as the offset for zkSync
+                    (data_after_offset.starts_with(bytecode_hash.as_bytes()), 36)
+                } else {
+                    (false, create2_offset)
+                }
+            } else {
+                (data[create2_offset..].starts_with(bytecode), create2_offset)
+            };
+
+            if contract_match {
+                let constructor_args = if zksync {
+                    data[effective_create2_offset + 32 + 64..].to_vec()
+                } else {
+                    data[effective_create2_offset + bytecode.len()..].to_vec()
+                };
 
                 if artifact.source.extension().map_or(false, |e| e.to_str() == Some("vy")) {
                     warn!("Skipping verification of Vyper contract: {}", artifact.name);

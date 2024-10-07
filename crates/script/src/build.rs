@@ -13,17 +13,21 @@ use foundry_common::{
     compile::ProjectCompiler, provider::try_get_http_provider, ContractData, ContractsByArtifact,
 };
 use foundry_compilers::{
-    artifacts::{BytecodeObject, Libraries},
+    artifacts::{
+        BytecodeObject, CompactBytecode, CompactContractBytecode, CompactDeployedBytecode,
+        Libraries,
+    },
     compilers::{multi::MultiCompilerLanguage, Language},
     info::ContractInfo,
     solc::SolcLanguage,
     utils::source_files_iter,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     ArtifactId, ProjectCompileOutput,
 };
 use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, traces::debug::ContractSources};
 use foundry_linking::Linker;
 use foundry_zksync_compiler::DualCompiledContracts;
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{collections::BTreeMap, path::PathBuf, str::FromStr, sync::Arc};
 
 /// Container for the compiled contracts.
 #[derive(Debug)]
@@ -32,6 +36,8 @@ pub struct BuildData {
     pub project_root: PathBuf,
     /// The compiler output.
     pub output: ProjectCompileOutput,
+    /// The zk compiler output
+    pub zk_output: Option<ZkProjectCompileOutput>,
     /// ID of target contract artifact.
     pub target: ArtifactId,
     pub dual_compiled_contracts: Option<DualCompiledContracts>,
@@ -133,7 +139,7 @@ impl LinkedBuildData {
     pub fn new(
         libraries: Libraries,
         predeploy_libraries: ScriptPredeployLibraries,
-        build_data: BuildData,
+        mut build_data: BuildData,
     ) -> Result<Self> {
         let sources = ContractSources::from_project_output(
             &build_data.output,
@@ -141,9 +147,38 @@ impl LinkedBuildData {
             Some(&libraries),
         )?;
 
-        //TODO: zk contracts?
-        let known_contracts =
-            ContractsByArtifact::new(build_data.get_linker().get_linked_artifacts(&libraries)?);
+        let mut known_artifacts = build_data.get_linker().get_linked_artifacts(&libraries)?;
+        // Extend known_artifacts with zk artifacts if available
+        if let Some(zk_output) = build_data.zk_output.take() {
+            let zk_contracts =
+                zk_output.with_stripped_file_prefixes(&build_data.project_root).into_artifacts();
+
+            for (id, contract) in zk_contracts {
+                if let Some(abi) = contract.abi {
+                    let bytecode = contract.bytecode.as_ref();
+                    if let Some(bytecode_object) = bytecode.map(|b| b.object.clone()) {
+                        let compact_bytecode = CompactBytecode {
+                            object: bytecode_object.clone(),
+                            source_map: None,
+                            link_references: BTreeMap::new(),
+                        };
+                        let compact_contract = CompactContractBytecode {
+                            abi: Some(abi),
+                            bytecode: Some(compact_bytecode.clone()),
+                            deployed_bytecode: Some(CompactDeployedBytecode {
+                                bytecode: Some(compact_bytecode),
+                                immutable_references: BTreeMap::new(),
+                            }),
+                        };
+                        known_artifacts.insert(id.clone(), compact_contract);
+                    }
+                } else {
+                    warn!("Abi not found for contract {}", id.identifier());
+                }
+            }
+        }
+
+        let known_contracts = ContractsByArtifact::new(known_artifacts);
 
         Ok(Self { build_data, known_contracts, libraries, predeploy_libraries, sources })
     }
@@ -199,6 +234,7 @@ impl PreprocessedState {
             .files(sources_to_compile)
             .compile(&project)?;
 
+        let mut zk_output = None;
         // ZK
         let dual_compiled_contracts = if script_config.config.zksync.should_compile() {
             let zk_project = foundry_zksync_compiler::config_create_project(
@@ -213,9 +249,16 @@ impl PreprocessedState {
             let zk_compiler =
                 ProjectCompiler::new().quiet_if(args.opts.silent).files(sources_to_compile);
 
-            let zk_output = zk_compiler
-                .zksync_compile(&zk_project, script_config.config.zksync.avoid_contracts())?;
-            Some(DualCompiledContracts::new(&output, &zk_output, &project.paths, &zk_project.paths))
+            zk_output = Some(
+                zk_compiler
+                    .zksync_compile(&zk_project, script_config.config.zksync.avoid_contracts())?,
+            );
+            Some(DualCompiledContracts::new(
+                &output,
+                &zk_output.clone().unwrap(),
+                &project.paths,
+                &zk_project.paths,
+            ))
         } else {
             None
         };
@@ -260,6 +303,7 @@ impl PreprocessedState {
             script_wallets,
             build_data: BuildData {
                 output,
+                zk_output,
                 target,
                 project_root: project.root().clone(),
                 dual_compiled_contracts,
