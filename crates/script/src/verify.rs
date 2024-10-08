@@ -114,12 +114,19 @@ impl VerifyBundle {
             // If it's a CREATE2, the tx.data comes with a 32-byte salt in the beginning
             // of the transaction
             let (contract_match, effective_create2_offset) = if zksync {
+                // For zkSync, we need to handle both EVM and zkEVM artifacts
+                // as known_contracts may contain both types
                 let is_zksync_artifact =
                     artifact.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR);
                 if is_zksync_artifact {
+                    // zkSync-specific artifact handling
                     let bytecode_hash =
                         foundry_zksync_core::hash_bytecode(contract.deployed_bytecode().unwrap());
-                    let data_after_offset = &data[36..]; // Use 36 as the offset for zkSync
+
+                    // The 36-byte offset consists of:
+                    // - 4 bytes: selector
+                    // - 32 bytes: salt (for CREATE2)
+                    let data_after_offset = &data[4 + 32..];
                     (data_after_offset.starts_with(bytecode_hash.as_bytes()), 36)
                 } else {
                     (false, create2_offset)
@@ -130,6 +137,10 @@ impl VerifyBundle {
 
             if contract_match {
                 let constructor_args = if zksync {
+                    // For zkSync:
+                    // 32 bytes: bytecode hash length
+                    // 64 bytes: offset (32 bytes) + constructor arguments length (32 bytes)
+                    // The rest: actual constructor arguments
                     data[effective_create2_offset + 32 + 64..].to_vec()
                 } else {
                     data[effective_create2_offset + bytecode.len()..].to_vec()
