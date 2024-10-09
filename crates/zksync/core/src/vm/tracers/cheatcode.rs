@@ -11,10 +11,13 @@ use foundry_cheatcodes_common::{
     record::RecordAccess,
 };
 use zksync_multivm::{
-    interface::tracer::TracerExecutionStatus, tracers::dynamic::vm_1_5_0::DynTracer, vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState}, zk_evm_latest::{
+    interface::tracer::TracerExecutionStatus,
+    tracers::dynamic::vm_1_5_0::DynTracer,
+    vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
+    zk_evm_latest::{
         tracing::{AfterDecodingData, AfterExecutionData, BeforeExecutionData, VmLocalStateData},
         zkevm_opcode_defs::{FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER},
-    }
+    },
 };
 use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
