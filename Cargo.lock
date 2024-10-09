@@ -14106,7 +14106,7 @@ dependencies = [
 [[package]]
 name = "zksync-web3-rs"
 version = "0.2.1"
-source = "git+https://github.com/lambdaclass/zksync-web3-rs.git?rev=56653345d14331e0865a6785c77cdda63c94eeba#56653345d14331e0865a6785c77cdda63c94eeba"
+source = "git+https://github.com/jrigada/zksync-web3-rs.git?rev=bc3e6d3e75b7ff3747ff2dccefa9fb74d770931b#bc3e6d3e75b7ff3747ff2dccefa9fb74d770931b"
 dependencies = [
  "anyhow",
  "async-trait",
