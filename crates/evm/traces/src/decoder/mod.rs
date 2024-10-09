@@ -23,10 +23,12 @@ use foundry_evm_core::{
 };
 use foundry_zksync_compiler::ZKSYNC_ARTIFACTS_DIR;
 use itertools::Itertools;
-use once_cell::sync::OnceCell;
 use revm_inspectors::tracing::types::{DecodedCallLog, DecodedCallTrace};
 use rustc_hash::FxHashMap;
-use std::collections::{hash_map::Entry, BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    sync::OnceLock,
+};
 
 mod precompiles;
 
@@ -147,7 +149,7 @@ impl CallTraceDecoder {
     pub fn new() -> &'static Self {
         // If you want to take arguments in this function, assign them to the fields of the cloned
         // lazy instead of removing it
-        static INIT: OnceCell<CallTraceDecoder> = OnceCell::new();
+        static INIT: OnceLock<CallTraceDecoder> = OnceLock::new();
         INIT.get_or_init(Self::init)
     }
 

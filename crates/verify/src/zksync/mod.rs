@@ -1,8 +1,9 @@
-use super::{provider::VerificationProvider, EtherscanOpts, VerifyArgs, VerifyCheckArgs};
+use super::{provider::VerificationProvider, VerifyArgs, VerifyCheckArgs};
 use crate::zk_provider::{CompilerVerificationContext, ZkVerificationContext};
 use alloy_json_abi::Function;
 use alloy_primitives::hex;
 use eyre::{eyre, Result};
+use foundry_cli::opts::EtherscanOpts;
 use foundry_common::{abi::encode_function_args, retry::Retry};
 use foundry_compilers::zksolc::input::StandardJsonCompilerInput;
 use futures::FutureExt;
@@ -24,7 +25,7 @@ pub trait ZksyncSourceProvider: Send + Sync + Debug {
 
 #[async_trait::async_trait]
 impl VerificationProvider for ZkVerificationProvider {
-    async fn preflight_check(
+    async fn preflight_verify_check(
         &mut self,
         args: VerifyArgs,
         context: CompilerVerificationContext,

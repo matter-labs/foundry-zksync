@@ -30,6 +30,8 @@ mod base64;
 
 mod config;
 
+mod crypto;
+
 mod env;
 pub use env::set_execution_context;
 
@@ -77,18 +79,23 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
     fn apply_full<DB: DatabaseExt, E: CheatcodesExecutor>(
         &self,
         ccx: &mut CheatsCtxt<DB>,
-        _executor: &mut E,
+        executor: &mut E,
     ) -> Result {
+        let _ = executor;
         self.apply_stateful(ccx)
     }
 }
 
 pub(crate) trait DynCheatcode {
+    fn name(&self) -> &'static str;
     fn id(&self) -> &'static str;
     fn as_debug(&self) -> &dyn std::fmt::Debug;
 }
 
 impl<T: Cheatcode> DynCheatcode for T {
+    fn name(&self) -> &'static str {
+        T::CHEATCODE.func.signature.split('(').next().unwrap()
+    }
     fn id(&self) -> &'static str {
         T::CHEATCODE.func.id
     }

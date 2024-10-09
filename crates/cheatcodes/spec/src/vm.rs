@@ -274,6 +274,10 @@ interface Vm {
     #[cheatcode(group = Evm, safety = Safe)]
     function getNonce(address account) external view returns (uint64 nonce);
 
+    /// Get the nonce of a `Wallet`.
+    #[cheatcode(group = Evm, safety = Safe)]
+    function getNonce(Wallet calldata wallet) external returns (uint64 nonce);
+
     /// Loads a storage slot from an address.
     #[cheatcode(group = Evm, safety = Safe)]
     function load(address target, bytes32 slot) external view returns (bytes32 data);
@@ -281,30 +285,6 @@ interface Vm {
     /// Load a genesis JSON file's `allocs` into the in-memory revm state.
     #[cheatcode(group = Evm, safety = Unsafe)]
     function loadAllocs(string calldata pathToAllocsJson) external;
-
-    /// Signs `digest` with `privateKey` using the secp256k1 curve.
-    #[cheatcode(group = Evm, safety = Safe)]
-    function sign(uint256 privateKey, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
-
-    /// Signs `digest` with signer provided to script using the secp256k1 curve.
-    ///
-    /// If `--sender` is provided, the signer with provided address is used, otherwise,
-    /// if exactly one signer is provided to the script, that signer is used.
-    ///
-    /// Raises error if signer passed through `--sender` does not match any unlocked signers or
-    /// if `--sender` is not provided and not exactly one signer is passed to the script.
-    #[cheatcode(group = Evm, safety = Safe)]
-    function sign(bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
-
-    /// Signs `digest` with signer provided to script using the secp256k1 curve.
-    ///
-    /// Raises error if none of the signers passed into the script have provided address.
-    #[cheatcode(group = Evm, safety = Safe)]
-    function sign(address signer, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
-
-    /// Signs `digest` with `privateKey` using the secp256r1 curve.
-    #[cheatcode(group = Evm, safety = Safe)]
-    function signP256(uint256 privateKey, bytes32 digest) external pure returns (bytes32 r, bytes32 s);
 
     // -------- Record Storage --------
 
@@ -492,6 +472,15 @@ interface Vm {
     #[cheatcode(group = Evm, safety = Unsafe)]
     function mockCallRevert(address callee, uint256 msgValue, bytes calldata data, bytes calldata revertData)
         external;
+
+    /// Whenever a call is made to `callee` with calldata `data`, this cheatcode instead calls
+    /// `target` with the same calldata. This functionality is similar to a delegate call made to
+    /// `target` contract from `callee`.
+    /// Can be used to substitute a call to a function with another implementation that captures
+    /// the primary logic of the original function but is easier to reason about.
+    /// If calldata is not a strict match then partial match by selector is attempted.
+    #[cheatcode(group = Evm, safety = Unsafe)]
+    function mockFunction(address callee, address target, bytes calldata data) external;
 
     // --- Impersonation (pranks) ---
 
@@ -682,6 +671,10 @@ interface Vm {
     #[cheatcode(group = Evm, safety = Safe)]
     function resumeGasMetering() external;
 
+    /// Reset gas metering (i.e. gas usage is set to gas limit).
+    #[cheatcode(group = Evm, safety = Safe)]
+    function resetGasMetering() external;
+
     // -------- Gas Measurement --------
 
     /// Gets the gas used in the last call.
@@ -712,6 +705,10 @@ interface Vm {
     #[cheatcode(group = Testing, safety = Safe)]
     function assume(bool condition) external pure;
 
+    /// Discard this run's fuzz inputs and generate new ones if next call reverted.
+    #[cheatcode(group = Testing, safety = Safe)]
+    function assumeNoRevert() external pure;
+
     /// Writes a breakpoint to jump to in the debugger.
     #[cheatcode(group = Testing, safety = Safe)]
     function breakpoint(string calldata char) external;
@@ -719,6 +716,15 @@ interface Vm {
     /// Writes a conditional breakpoint to jump to in the debugger.
     #[cheatcode(group = Testing, safety = Safe)]
     function breakpoint(string calldata char, bool value) external;
+
+    /// Returns the Foundry version.
+    /// Format: <cargo_version>+<git_sha>+<build_timestamp>
+    /// Sample output: 0.2.0+faa94c384+202407110019
+    /// Note: Build timestamps may vary slightly across platforms due to separate CI jobs.
+    /// For reliable version comparisons, use YYYYMMDD0000 format (e.g., >= 202407110000)
+    /// to compare timestamps while ignoring minor time differences.
+    #[cheatcode(group = Testing, safety = Safe)]
+    function getFoundryVersion() external view returns (string memory version);
 
     /// Returns the RPC url for the given alias.
     #[cheatcode(group = Testing, safety = Safe)]
@@ -816,13 +822,33 @@ interface Vm {
     #[cheatcode(group = Testing, safety = Unsafe)]
     function expectRevert() external;
 
-    /// Expects an error on next call that starts with the revert data.
+    /// Expects an error on next call that exactly matches the revert data.
     #[cheatcode(group = Testing, safety = Unsafe)]
     function expectRevert(bytes4 revertData) external;
 
     /// Expects an error on next call that exactly matches the revert data.
     #[cheatcode(group = Testing, safety = Unsafe)]
     function expectRevert(bytes calldata revertData) external;
+
+    /// Expects an error with any revert data on next call to reverter address.
+    #[cheatcode(group = Testing, safety = Unsafe)]
+    function expectRevert(address reverter) external;
+
+    /// Expects an error from reverter address on next call, with any revert data.
+    #[cheatcode(group = Testing, safety = Unsafe)]
+    function expectRevert(bytes4 revertData, address reverter) external;
+
+    /// Expects an error from reverter address on next call, that exactly matches the revert data.
+    #[cheatcode(group = Testing, safety = Unsafe)]
+    function expectRevert(bytes calldata revertData, address reverter) external;
+
+    /// Expects an error on next call that starts with the revert data.
+    #[cheatcode(group = Testing, safety = Unsafe)]
+    function expectPartialRevert(bytes4 revertData) external;
+
+    /// Expects an error on next call to reverter address, that starts with the revert data.
+    #[cheatcode(group = Testing, safety = Unsafe)]
+    function expectPartialRevert(bytes4 revertData, address reverter) external;
 
     /// Expects an error on next cheatcode call with any revert data.
     #[cheatcode(group = Testing, safety = Unsafe, status = Internal)]
@@ -851,9 +877,13 @@ interface Vm {
     #[cheatcode(group = Testing, safety = Unsafe)]
     function expectSafeMemoryCall(uint64 min, uint64 max) external;
 
-    /// Marks a test as skipped. Must be called at the top of the test.
+    /// Marks a test as skipped. Must be called at the top level of a test.
     #[cheatcode(group = Testing, safety = Unsafe)]
     function skip(bool skipTest) external;
+
+    /// Marks a test as skipped with a reason. Must be called at the top level of a test.
+    #[cheatcode(group = Testing, safety = Unsafe)]
+    function skip(bool skipTest, string calldata reason) external;
 
     /// Asserts that the given condition is true.
     #[cheatcode(group = Testing, safety = Safe)]
@@ -1777,6 +1807,10 @@ interface Vm {
     #[cheatcode(group = Scripting)]
     function stopBroadcast() external;
 
+    /// Takes a signed transaction and broadcasts it to the network.
+    #[cheatcode(group = Scripting)]
+    function broadcastRawTransaction(bytes calldata data) external;
+
     // ======== Utilities ========
 
     // -------- Strings --------
@@ -2136,56 +2170,122 @@ interface Vm {
     #[cheatcode(group = Toml)]
     function writeToml(string calldata json, string calldata path, string calldata valueKey) external;
 
+    // ======== Cryptography ========
+
     // -------- Key Management --------
 
     /// Derives a private key from the name, labels the account with that name, and returns the wallet.
-    #[cheatcode(group = Utilities)]
+    #[cheatcode(group = Crypto)]
     function createWallet(string calldata walletLabel) external returns (Wallet memory wallet);
 
     /// Generates a wallet from the private key and returns the wallet.
-    #[cheatcode(group = Utilities)]
+    #[cheatcode(group = Crypto)]
     function createWallet(uint256 privateKey) external returns (Wallet memory wallet);
 
     /// Generates a wallet from the private key, labels the account with that name, and returns the wallet.
-    #[cheatcode(group = Utilities)]
+    #[cheatcode(group = Crypto)]
     function createWallet(uint256 privateKey, string calldata walletLabel) external returns (Wallet memory wallet);
 
-    /// Get a `Wallet`'s nonce.
-    #[cheatcode(group = Utilities)]
-    function getNonce(Wallet calldata wallet) external returns (uint64 nonce);
+    /// Signs data with a `Wallet`.
+    #[cheatcode(group = Crypto)]
+    function sign(Wallet calldata wallet, bytes32 digest) external returns (uint8 v, bytes32 r, bytes32 s);
 
     /// Signs data with a `Wallet`.
-    #[cheatcode(group = Utilities)]
-    function sign(Wallet calldata wallet, bytes32 digest) external returns (uint8 v, bytes32 r, bytes32 s);
+    ///
+    /// Returns a compact signature (`r`, `vs`) as per EIP-2098, where `vs` encodes both the
+    /// signature's `s` value, and the recovery id `v` in a single bytes32.
+    /// This format reduces the signature size from 65 to 64 bytes.
+    #[cheatcode(group = Crypto)]
+    function signCompact(Wallet calldata wallet, bytes32 digest) external returns (bytes32 r, bytes32 vs);
+
+    /// Signs `digest` with `privateKey` using the secp256k1 curve.
+    #[cheatcode(group = Crypto)]
+    function sign(uint256 privateKey, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
+
+    /// Signs `digest` with `privateKey` using the secp256k1 curve.
+    ///
+    /// Returns a compact signature (`r`, `vs`) as per EIP-2098, where `vs` encodes both the
+    /// signature's `s` value, and the recovery id `v` in a single bytes32.
+    /// This format reduces the signature size from 65 to 64 bytes.
+    #[cheatcode(group = Crypto)]
+    function signCompact(uint256 privateKey, bytes32 digest) external pure returns (bytes32 r, bytes32 vs);
+
+    /// Signs `digest` with signer provided to script using the secp256k1 curve.
+    ///
+    /// If `--sender` is provided, the signer with provided address is used, otherwise,
+    /// if exactly one signer is provided to the script, that signer is used.
+    ///
+    /// Raises error if signer passed through `--sender` does not match any unlocked signers or
+    /// if `--sender` is not provided and not exactly one signer is passed to the script.
+    #[cheatcode(group = Crypto)]
+    function sign(bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
+
+    /// Signs `digest` with signer provided to script using the secp256k1 curve.
+    ///
+    /// Returns a compact signature (`r`, `vs`) as per EIP-2098, where `vs` encodes both the
+    /// signature's `s` value, and the recovery id `v` in a single bytes32.
+    /// This format reduces the signature size from 65 to 64 bytes.
+    ///
+    /// If `--sender` is provided, the signer with provided address is used, otherwise,
+    /// if exactly one signer is provided to the script, that signer is used.
+    ///
+    /// Raises error if signer passed through `--sender` does not match any unlocked signers or
+    /// if `--sender` is not provided and not exactly one signer is passed to the script.
+    #[cheatcode(group = Crypto)]
+    function signCompact(bytes32 digest) external pure returns (bytes32 r, bytes32 vs);
+
+    /// Signs `digest` with signer provided to script using the secp256k1 curve.
+    ///
+    /// Raises error if none of the signers passed into the script have provided address.
+    #[cheatcode(group = Crypto)]
+    function sign(address signer, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
+
+    /// Signs `digest` with signer provided to script using the secp256k1 curve.
+    ///
+    /// Returns a compact signature (`r`, `vs`) as per EIP-2098, where `vs` encodes both the
+    /// signature's `s` value, and the recovery id `v` in a single bytes32.
+    /// This format reduces the signature size from 65 to 64 bytes.
+    ///
+    /// Raises error if none of the signers passed into the script have provided address.
+    #[cheatcode(group = Crypto)]
+    function signCompact(address signer, bytes32 digest) external pure returns (bytes32 r, bytes32 vs);
+
+    /// Signs `digest` with `privateKey` using the secp256r1 curve.
+    #[cheatcode(group = Crypto)]
+    function signP256(uint256 privateKey, bytes32 digest) external pure returns (bytes32 r, bytes32 s);
+
+    /// Derives secp256r1 public key from the provided `privateKey`.
+    #[cheatcode(group = Crypto)]
+    function publicKeyP256(uint256 privateKey) external pure returns (uint256 publicKeyX, uint256 publicKeyY);
 
     /// Derive a private key from a provided mnenomic string (or mnenomic file path)
     /// at the derivation path `m/44'/60'/0'/0/{index}`.
-    #[cheatcode(group = Utilities)]
+    #[cheatcode(group = Crypto)]
     function deriveKey(string calldata mnemonic, uint32 index) external pure returns (uint256 privateKey);
     /// Derive a private key from a provided mnenomic string (or mnenomic file path)
     /// at `{derivationPath}{index}`.
-    #[cheatcode(group = Utilities)]
+    #[cheatcode(group = Crypto)]
     function deriveKey(string calldata mnemonic, string calldata derivationPath, uint32 index)
         external
         pure
         returns (uint256 privateKey);
     /// Derive a private key from a provided mnenomic string (or mnenomic file path) in the specified language
     /// at the derivation path `m/44'/60'/0'/0/{index}`.
-    #[cheatcode(group = Utilities)]
+    #[cheatcode(group = Crypto)]
     function deriveKey(string calldata mnemonic, uint32 index, string calldata language)
         external
         pure
         returns (uint256 privateKey);
     /// Derive a private key from a provided mnenomic string (or mnenomic file path) in the specified language
     /// at `{derivationPath}{index}`.
-    #[cheatcode(group = Utilities)]
+    #[cheatcode(group = Crypto)]
     function deriveKey(string calldata mnemonic, string calldata derivationPath, uint32 index, string calldata language)
         external
         pure
         returns (uint256 privateKey);
 
     /// Adds a private key to the local forge wallet and returns the address.
-    #[cheatcode(group = Utilities)]
+    #[cheatcode(group = Crypto)]
     function rememberKey(uint256 privateKey) external returns (address keyAddr);
 
     // -------- Uncategorized Utilities --------
@@ -2241,6 +2341,23 @@ interface Vm {
     /// Returns a random `address`.
     #[cheatcode(group = Utilities)]
     function randomAddress() external returns (address);
+
+    /// Pauses collection of call traces. Useful in cases when you want to skip tracing of
+    /// complex calls which are not useful for debugging.
+    #[cheatcode(group = Utilities)]
+    function pauseTracing() external view;
+
+    /// Unpauses collection of call traces.
+    #[cheatcode(group = Utilities)]
+    function resumeTracing() external view;
+
+    /// Utility cheatcode to copy storage of `from` contract to another `to` contract.
+    #[cheatcode(group = Utilities)]
+    function copyStorage(address from, address to) external;
+
+    /// Utility cheatcode to set arbitrary storage for given target address.
+    #[cheatcode(group = Utilities)]
+    function setArbitraryStorage(address target) external;
 }
 }
 

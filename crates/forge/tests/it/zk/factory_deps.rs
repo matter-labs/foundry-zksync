@@ -1,7 +1,11 @@
 //! Forge tests for zksync factory contracts.
 
 use forge::revm::primitives::SpecId;
-use foundry_test_utils::{forgetest_async, util, Filter, ZkSyncNode};
+use foundry_test_utils::{
+    forgetest_async,
+    util::{self, OutputExt},
+    Filter, ZkSyncNode,
+};
 
 use crate::{config::TestConfig, test_helpers::TEST_DATA_DEFAULT};
 
@@ -60,7 +64,10 @@ contract ZkLargeFactoryDependenciesScript is Script {
             "--evm-version",
             "shanghai",
         ]);
-        assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+        cmd.assert_success()
+            .get_output()
+            .stdout_lossy()
+            .contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
 
         let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
             .find(|file| file.ends_with("run-latest.json"))

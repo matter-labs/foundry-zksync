@@ -1,6 +1,6 @@
 //! Forge tests for zksync contracts.
 
-use foundry_test_utils::util;
+use foundry_test_utils::util::{self, OutputExt};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_paymaster() {
@@ -17,9 +17,7 @@ async fn test_zk_contract_paymaster() {
         "--no-commit",
         "--shallow",
     ])
-    .ensure_execute_success()
-    .expect("able to install dependencies");
-
+    .assert_success();
     cmd.forge_fuse();
 
     let config = cmd.config();
@@ -29,5 +27,5 @@ async fn test_zk_contract_paymaster() {
     prj.add_source("Paymaster.t.sol", include_str!("../../fixtures/zk/Paymaster.t.sol")).unwrap();
 
     cmd.args(["test", "--zk-startup", "--via-ir", "--match-contract", "TestPaymasterFlow"]);
-    assert!(cmd.stdout_lossy().contains("Suite result: ok"));
+    assert!(cmd.assert_success().get_output().stdout_lossy().contains("Suite result: ok"));
 }
