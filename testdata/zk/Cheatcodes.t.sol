@@ -151,7 +151,6 @@ contract ZkCheatcodesTest is DSTest {
         assertEq(string(fullPath), expected, "code for the contract was incorrect");
     }
 
-
     function testZkCheatcodesEtch() public {
         vm.selectFork(forkEra);
 
