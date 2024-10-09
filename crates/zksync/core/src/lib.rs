@@ -19,7 +19,7 @@ pub mod vm;
 pub mod state;
 
 use alloy_network::{AnyNetwork, TxSigner};
-use alloy_primitives::{address, Address, Bytes, U256 as rU256};
+use alloy_primitives::{address, hex, Address, Bytes, U256 as rU256};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
@@ -35,6 +35,7 @@ use serde::{Deserialize, Serialize};
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};
 
+pub use vm::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use zksync_multivm::interface::{Call, CallType};
 use zksync_types::utils::storage_key_for_eth_balance;
 pub use zksync_types::{
@@ -239,4 +240,59 @@ pub fn to_safe_address(address: Address) -> Address {
     } else {
         address
     }
+}
+
+const SIGNATURE_CREATE: &str = "create(bytes32,bytes)";
+const SIGNATURE_CREATE2: &str = "create2(bytes32,bytes32,bytes)";
+
+/// Try decoding the provided transaction data into create2 parameters.
+pub fn try_decode_create2(data: &[u8]) -> Result<(H256, H256, Vec<u8>)> {
+    let decoded_calldata =
+        foundry_common::abi::abi_decode_calldata(SIGNATURE_CREATE2, &hex::encode(data), true, true)
+            .map_err(|err| eyre!("failed decoding data: {err:?}"))?;
+
+    if decoded_calldata.len() < 3 {
+        eyre::bail!(
+            "failed decoding data, invalid length of {} instead of 3",
+            decoded_calldata.len()
+        );
+    }
+    let (salt, bytecode_hash, constructor_args) =
+        (&decoded_calldata[0], &decoded_calldata[1], &decoded_calldata[2]);
+
+    let Some(salt) = salt.as_word() else {
+        eyre::bail!("failed decoding salt {salt:?}");
+    };
+    let Some(bytecode_hash) = bytecode_hash.as_word() else {
+        eyre::bail!("failed decoding bytecode hash {bytecode_hash:?}");
+    };
+    let Some(constructor_args) = constructor_args.as_bytes() else {
+        eyre::bail!("failed decoding constructor args {constructor_args:?}");
+    };
+
+    Ok((H256(salt.0), H256(bytecode_hash.0), constructor_args.to_vec()))
+}
+
+/// Try decoding the provided transaction data into create parameters.
+pub fn try_decode_create(data: &[u8]) -> Result<(H256, Vec<u8>)> {
+    let decoded_calldata =
+        foundry_common::abi::abi_decode_calldata(SIGNATURE_CREATE, &hex::encode(data), true, true)
+            .map_err(|err| eyre!("failed decoding data: {err:?}"))?;
+
+    if decoded_calldata.len() < 2 {
+        eyre::bail!(
+            "failed decoding data, invalid length of {} instead of 2",
+            decoded_calldata.len()
+        );
+    }
+    let (bytecode_hash, constructor_args) = (&decoded_calldata[0], &decoded_calldata[1]);
+
+    let Some(bytecode_hash) = bytecode_hash.as_word() else {
+        eyre::bail!("failed decoding bytecode hash {bytecode_hash:?}");
+    };
+    let Some(constructor_args) = constructor_args.as_bytes() else {
+        eyre::bail!("failed decoding constructor args {constructor_args:?}");
+    };
+
+    Ok((H256(bytecode_hash.0), constructor_args.to_vec()))
 }

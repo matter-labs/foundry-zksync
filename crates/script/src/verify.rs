@@ -193,4 +193,94 @@ impl VerifyBundle {
         }
         None
     }
+
+    /// Given a `VerifyBundle` and contract details, it tries to generate a valid `VerifyArgs` to
+    /// use against the `contract_address` in the ZKsync context.
+    pub fn get_verify_args_zk(
+        &self,
+        contract_address: Address,
+        data: &[u8],
+        libraries: &[String],
+    ) -> Option<VerifyArgs> {
+        if data.len() < 4 {
+            warn!("failed decoding verify input data, invalid data length, require minimum of 4 bytes");
+            return None;
+        }
+        let selector = hex::encode(&data[..4]);
+        let is_create2 = match selector.as_str() {
+            foundry_zksync_core::SELECTOR_CONTRACT_DEPLOYER_CREATE => false,
+            foundry_zksync_core::SELECTOR_CONTRACT_DEPLOYER_CREATE2 => true,
+            _ => {
+                warn!("failed decoding verify input data, invalid selector {selector:?}");
+                return None;
+            }
+        };
+        let (bytecode_hash, constructor_args) = if is_create2 {
+            let (_salt, bytecode_hash, constructor_args) =
+                foundry_zksync_core::try_decode_create2(data)
+                    .inspect_err(|err| warn!("failed parsing create2 verify data: {err:?}"))
+                    .ok()?;
+            (bytecode_hash, constructor_args)
+        } else {
+            foundry_zksync_core::try_decode_create(data)
+                .inspect_err(|err| warn!("failed parsing create verify data: {err:?}"))
+                .ok()?
+        };
+
+        for (artifact, contract) in self.known_contracts.iter() {
+            let Some(bytecode) = contract.bytecode() else { continue };
+            let is_zksync_artifact = artifact.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR);
+            if !is_zksync_artifact {
+                continue;
+            }
+
+            let contract_bytecode_hash = foundry_zksync_core::hash_bytecode(bytecode);
+            if bytecode_hash == contract_bytecode_hash {
+                if artifact.source.extension().map_or(false, |e| e.to_str() == Some("vy")) {
+                    warn!("Skipping verification of Vyper contract: {}", artifact.name);
+                }
+
+                let contract = ContractInfo {
+                    path: Some(artifact.source.to_string_lossy().to_string()),
+                    name: artifact.name.clone(),
+                };
+
+                // We strip the build metadadata information, since it can lead to
+                // etherscan not identifying it correctly. eg:
+                // `v0.8.10+commit.fc410830.Linux.gcc` != `v0.8.10+commit.fc410830`
+                let version = Version::new(
+                    artifact.version.major,
+                    artifact.version.minor,
+                    artifact.version.patch,
+                );
+
+                let verify = VerifyArgs {
+                    address: contract_address,
+                    contract: Some(contract),
+                    compiler_version: Some(version.to_string()),
+                    constructor_args: Some(hex::encode(constructor_args)),
+                    constructor_args_path: None,
+                    num_of_optimizations: self.num_of_optimizations,
+                    etherscan: self.etherscan.clone(),
+                    rpc: Default::default(),
+                    flatten: false,
+                    force: false,
+                    skip_is_verified_check: true,
+                    watch: true,
+                    retry: self.retry,
+                    libraries: libraries.to_vec(),
+                    root: None,
+                    verifier: self.verifier.clone(),
+                    via_ir: self.via_ir,
+                    evm_version: None,
+                    show_standard_json_input: false,
+                    guess_constructor_args: false,
+                    zksync: self.zksync,
+                };
+
+                return Some(verify)
+            }
+        }
+        None
+    }
 }
