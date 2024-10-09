@@ -35,9 +35,9 @@ use serde::{Deserialize, Serialize};
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};
 
+pub use zksync_multivm::interface::{Call, CallType};
 use zksync_types::utils::storage_key_for_eth_balance;
 pub use zksync_types::{
-    vm_trace::{Call, CallType},
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, L2_BASE_TOKEN_ADDRESS,
     NONCE_HOLDER_ADDRESS,
 };

@@ -1,12 +1,12 @@
-use multivm::{
-    interface::dyn_tracers::vm_1_5_0::DynTracer,
+use zksync_multivm::{
+    tracers::dynamic::vm_1_5_0::DynTracer,
     vm_latest::{HistoryMode, SimpleMemory, VmTracer},
     zk_evm_latest::{
         tracing::{AfterDecodingData, VmLocalStateData},
         vm_state::ErrorFlags,
     },
 };
-use zksync_state::{ReadStorage, WriteStorage};
+use zksync_state::interface::{ReadStorage, WriteStorage};
 
 /// A tracer to allow logging low-level vm errors.
 #[derive(Debug, Default)]

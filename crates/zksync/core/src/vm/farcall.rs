@@ -4,7 +4,8 @@ use std::{collections::HashMap, default, fmt::Debug};
 
 use alloy_primitives::{hex, Address};
 use itertools::Itertools;
-use multivm::{
+use zksync_basic_types::{H160, U256};
+use zksync_multivm::{
     vm_1_3_2::zk_evm_1_3_3::zkevm_opcode_defs::RetABI,
     vm_latest::{BootloaderState, HistoryMode, SimpleMemory, ZkSyncVmState},
     zk_evm_latest::{
@@ -20,8 +21,7 @@ use multivm::{
         },
     },
 };
-use zksync_basic_types::{H160, U256};
-use zksync_state::{StoragePtr, WriteStorage};
+use zksync_state::interface::{StoragePtr, WriteStorage};
 use zksync_types::MSG_VALUE_SIMULATOR_ADDRESS;
 
 use crate::convert::{ConvertAddress, ConvertH256, ConvertU256};

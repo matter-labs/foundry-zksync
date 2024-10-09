@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-use zksync_state::{ReadStorage, WriteStorage};
+use zksync_state::interface::{ReadStorage, WriteStorage};
 use zksync_types::{StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256};
 
 use crate::convert::ConvertH160;
@@ -151,7 +151,7 @@ impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use zksync_state::InMemoryStorage;
+    use zksync_state::interface::InMemoryStorage;
     use zksync_types::{AccountTreeId, Address, H256};
 
     #[test]

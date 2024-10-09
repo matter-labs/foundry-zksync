@@ -1,13 +1,10 @@
-use multivm::{
-    interface::{L1BatchEnv, L2BlockEnv, SystemEnv},
-    vm_latest::{
-        constants::BATCH_COMPUTATIONAL_GAS_LIMIT, utils::l2_blocks::load_last_l2_block,
-        TxExecutionMode,
-    },
-};
 use zksync_basic_types::{AccountTreeId, L1BatchNumber, L2BlockNumber, L2ChainId, H160};
 use zksync_contracts::BaseSystemContracts;
-use zksync_state::{ReadStorage, StoragePtr};
+use zksync_multivm::{
+    interface::{L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode},
+    vm_latest::{constants::BATCH_COMPUTATIONAL_GAS_LIMIT, utils::l2_blocks::load_last_l2_block},
+};
+use zksync_state::interface::{ReadStorage, StoragePtr};
 use zksync_types::{
     block::{unpack_block_info, L2BlockHasher},
     fee_model::L1PeggedBatchFeeModelInput,
@@ -20,7 +17,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
     l1_gas_price: u64,
     fair_l2_gas_price: u64,
 ) -> L1BatchEnv {
-    let mut first_l2_block = if let Some(last_l2_block) = load_last_l2_block(storage.clone()) {
+    let mut first_l2_block = if let Some(last_l2_block) = load_last_l2_block(&storage) {
         L2BlockEnv {
             number: last_l2_block.number + 1,
             timestamp: last_l2_block.timestamp + 1,
