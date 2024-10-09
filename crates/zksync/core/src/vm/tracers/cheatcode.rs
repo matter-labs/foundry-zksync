@@ -10,15 +10,13 @@ use foundry_cheatcodes_common::{
     mock::{MockCallDataContext, MockCallReturnData},
     record::RecordAccess,
 };
-use multivm::{
-    interface::{dyn_tracers::vm_1_5_0::DynTracer, tracer::TracerExecutionStatus},
-    vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
-    zk_evm_latest::{
+use zksync_multivm::{
+    interface::tracer::TracerExecutionStatus, tracers::dynamic::vm_1_5_0::DynTracer, vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState}, zk_evm_latest::{
         tracing::{AfterDecodingData, AfterExecutionData, BeforeExecutionData, VmLocalStateData},
         zkevm_opcode_defs::{FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER},
-    },
+    }
 };
-use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
+use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,
     SYSTEM_CONTEXT_ADDRESS, U256,
@@ -393,7 +391,7 @@ impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
         &mut self,
         _state: &mut ZkSyncVmState<S, H>,
         _bootloader_state: &BootloaderState,
-        _stop_reason: multivm::interface::tracer::VmExecutionStopReason,
+        _stop_reason: zksync_multivm::interface::tracer::VmExecutionStopReason,
     ) {
         let cell = self.result.as_ref();
         cell.set(CheatcodeTracerResult { expected_calls: self.expected_calls.clone() }).unwrap();

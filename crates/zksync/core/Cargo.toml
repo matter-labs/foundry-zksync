@@ -42,7 +42,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 # zk
-multivm.workspace = true
+zksync_multivm.workspace = true
 zksync_basic_types.workspace = true
 zksync_types.workspace = true
 zksync-web3-rs.workspace = true
