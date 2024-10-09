@@ -5,6 +5,8 @@ pub use foundry_evm_coverage::CoverageCollector;
 pub use foundry_evm_fuzz::Fuzzer;
 pub use foundry_evm_traces::{StackSnapshotType, TracingInspector, TracingInspectorConfig};
 
+pub use foundry_zksync_inspectors::TraceCollector;
+
 pub use revm_inspectors::access_list::AccessListInspector;
 
 mod chisel_state;
@@ -15,6 +17,3 @@ pub use logs::LogCollector;
 
 mod stack;
 pub use stack::{InspectorData, InspectorStack, InspectorStackBuilder};
-
-mod trace;
-pub use trace::TraceCollector;

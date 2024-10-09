@@ -31,7 +31,7 @@ where
     let system_account = SYSTEM_CONTEXT_ADDRESS.to_address();
     ecx.load_account(system_account).expect("account could not be loaded");
     let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
-    let (block_info, _) = ecx.sload(system_account, block_info_key).unwrap_or_default();
+    let block_info = ecx.sload(system_account, block_info_key).unwrap_or_default();
     let (block_number, _block_timestamp) = unpack_block_info(block_info.to_u256());
     let new_block_info = pack_block_info(block_number, timestamp.as_limbs()[0]).to_ru256();
 
@@ -51,7 +51,7 @@ where
     let system_account = SYSTEM_CONTEXT_ADDRESS.to_address();
     ecx.load_account(system_account).expect("account could not be loaded");
     let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
-    let (block_info, _) = ecx.sload(system_account, block_info_key).unwrap_or_default();
+    let block_info = ecx.sload(system_account, block_info_key).unwrap_or_default();
     let (_block_number, block_timestamp) = unpack_block_info(block_info.to_u256());
     let new_block_info = pack_block_info(number.as_limbs()[0], block_timestamp).to_ru256();
 
@@ -72,11 +72,11 @@ where
     ecx.load_account(balance_addr).expect("account could not be loaded");
     let zk_address = address.to_h160();
     let balance_key = storage_key_for_eth_balance(&zk_address).key().to_ru256();
-    let (old_balance, _) = ecx.sload(balance_addr, balance_key).unwrap_or_default();
+    let old_balance = ecx.sload(balance_addr, balance_key).unwrap_or_default();
     ecx.touch(&balance_addr);
     ecx.sstore(balance_addr, balance_key, balance).expect("failed storing value");
 
-    old_balance
+    old_balance.data
 }
 
 /// Sets nonce for a specific address.
@@ -109,7 +109,7 @@ where
     ecx.load_account(nonce_addr).expect("account could not be loaded");
     let zk_address = address.to_h160();
     let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
-    let (full_nonce, _) = ecx.sload(nonce_addr, nonce_key).unwrap_or_default();
+    let full_nonce = ecx.sload(nonce_addr, nonce_key).unwrap_or_default();
 
     let (tx_nonce, _deploy_nonce) = decompose_full_nonce(full_nonce.to_u256());
     tx_nonce.to_ru256()
@@ -180,7 +180,7 @@ where
     // update account code storage for empty code
     let account_key = address.to_h256().to_ru256();
     let has_code =
-        ecx.sload(account_code_addr, account_key).map(|(v, _)| !v.is_zero()).unwrap_or_default();
+        ecx.sload(account_code_addr, account_key).map(|v| !v.is_zero()).unwrap_or_default();
     if has_code {
         return;
     }
@@ -191,8 +191,7 @@ where
         .expect("failed storing value");
 
     let hash_key = empty_code_hash.to_ru256();
-    let has_hash =
-        ecx.sload(known_code_addr, hash_key).map(|(v, _)| !v.is_zero()).unwrap_or_default();
+    let has_hash = ecx.sload(known_code_addr, hash_key).map(|v| !v.is_zero()).unwrap_or_default();
     if !has_hash {
         ecx.touch(&known_code_addr);
         ecx.sstore(known_code_addr, hash_key, rU256::from(1u32)).expect("failed storing value");

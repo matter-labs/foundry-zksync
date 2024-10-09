@@ -273,7 +273,7 @@ impl Cheatcode for deployCode_0Call {
     ) -> Result {
         let Self { artifactPath: path } = self;
         let bytecode = get_artifact_code(ccx.state, path, false)?;
-        let output = executor
+        let address = executor
             .exec_create(
                 CreateInputs {
                     caller: ccx.caller,
@@ -283,10 +283,11 @@ impl Cheatcode for deployCode_0Call {
                     gas_limit: ccx.gas_limit,
                 },
                 ccx,
-            )
-            .unwrap();
+            )?
+            .address
+            .ok_or_else(|| fmt_err!("contract creation failed"))?;
 
-        Ok(output.address.unwrap().abi_encode())
+        Ok(address.abi_encode())
     }
 }
 
@@ -299,7 +300,7 @@ impl Cheatcode for deployCode_1Call {
         let Self { artifactPath: path, constructorArgs } = self;
         let mut bytecode = get_artifact_code(ccx.state, path, false)?.to_vec();
         bytecode.extend_from_slice(constructorArgs);
-        let output = executor
+        let address = executor
             .exec_create(
                 CreateInputs {
                     caller: ccx.caller,
@@ -309,10 +310,11 @@ impl Cheatcode for deployCode_1Call {
                     gas_limit: ccx.gas_limit,
                 },
                 ccx,
-            )
-            .unwrap();
+            )?
+            .address
+            .ok_or_else(|| fmt_err!("contract creation failed"))?;
 
-        Ok(output.address.unwrap().abi_encode())
+        Ok(address.abi_encode())
     }
 }
 
@@ -353,7 +355,7 @@ fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<B
         }
 
         let version = if let Some(version) = version {
-            Some(Version::parse(version).map_err(|_| fmt_err!("Error parsing version"))?)
+            Some(Version::parse(version).map_err(|e| fmt_err!("failed parsing version: {e}"))?)
         } else {
             None
         };
@@ -388,14 +390,13 @@ fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<B
                 })
                 .collect::<Vec<_>>();
 
-            let artifact = match filtered.len() {
-                0 => Err(fmt_err!("No matching artifact found")),
-                1 => Ok(filtered[0]),
-                _ => {
+            let artifact = match &filtered[..] {
+                [] => Err(fmt_err!("no matching artifact found")),
+                [artifact] => Ok(artifact),
+                filtered => {
                     // If we find more than one artifact, we need to filter by contract type
                     // depending on whether we are using the zkvm or evm
                     filtered
-                        .clone()
                         .into_iter()
                         .find(|(id, _)| {
                             let contract_type = state
@@ -415,7 +416,7 @@ fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<B
                                 filtered.into_iter().find(|(id, _)| id.version == *version)
                             })
                         })
-                        .ok_or_else(|| fmt_err!("Multiple matching artifacts found"))
+                        .ok_or_else(|| fmt_err!("multiple matching artifacts found"))
                 }
             }?;
 
@@ -426,7 +427,7 @@ fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<B
             };
 
             return maybe_bytecode
-                .ok_or_else(|| fmt_err!("No bytecode for contract. Is it abstract or unlinked?"));
+                .ok_or_else(|| fmt_err!("no bytecode for contract; is it abstract or unlinked?"));
         } else {
             let path_in_artifacts =
                 match (file.map(|f| f.to_string_lossy().to_string()), contract_name) {
@@ -451,7 +452,7 @@ fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<B
     let data = fs::read_to_string(path)?;
     let artifact = serde_json::from_str::<ContractObject>(&data)?;
     let maybe_bytecode = if deployed { artifact.deployed_bytecode } else { artifact.bytecode };
-    maybe_bytecode.ok_or_else(|| fmt_err!("No bytecode for contract. Is it abstract or unlinked?"))
+    maybe_bytecode.ok_or_else(|| fmt_err!("no bytecode for contract; is it abstract or unlinked?"))
 }
 
 impl Cheatcode for ffiCall {
@@ -630,7 +631,7 @@ mod tests {
             root: PathBuf::from(&env!("CARGO_MANIFEST_DIR")),
             ..Default::default()
         };
-        Cheatcodes { config: Arc::new(config), ..Default::default() }
+        Cheatcodes::new(Arc::new(config))
     }
 
     #[test]

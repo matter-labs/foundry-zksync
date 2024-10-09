@@ -490,6 +490,10 @@ pub enum CastSubcommand {
 
         /// The ABI-encoded calldata.
         calldata: String,
+
+        /// Print the decoded calldata as JSON.
+        #[arg(long, short, help_heading = "Display options")]
+        json: bool,
     },
 
     /// Decode ABI-encoded input or output data.
@@ -508,6 +512,10 @@ pub enum CastSubcommand {
         /// Whether to decode the input or output data.
         #[arg(long, short, help_heading = "Decode input data instead of output data")]
         input: bool,
+
+        /// Print the decoded calldata as JSON.
+        #[arg(long, short, help_heading = "Display options")]
+        json: bool,
     },
 
     /// ABI encode the given function argument, excluding the selector.
@@ -594,6 +602,10 @@ pub enum CastSubcommand {
     FourByteDecode {
         /// The ABI-encoded calldata.
         calldata: Option<String>,
+
+        /// Print the decoded calldata as JSON.
+        #[arg(long, short, help_heading = "Display options")]
+        json: bool,
     },
 
     /// Get the event signature for a given topic 0 from https://openchain.xyz.
@@ -742,6 +754,13 @@ pub enum CastSubcommand {
         data: Option<String>,
     },
 
+    /// Hash a message according to EIP-191.
+    #[command(visible_aliases = &["--hash-message", "hm"])]
+    HashMessage {
+        /// The message to hash.
+        message: Option<String>,
+    },
+
     /// Perform an ENS lookup.
     #[command(visible_alias = "rn")]
     ResolveName {
@@ -807,6 +826,48 @@ pub enum CastSubcommand {
         /// The address to get the nonce for.
         #[arg(value_parser = NameOrAddress::from_str)]
         who: NameOrAddress,
+
+        #[command(flatten)]
+        rpc: RpcOpts,
+    },
+
+    /// Get the codehash for an account.
+    #[command()]
+    Codehash {
+        /// The block height to query at.
+        ///
+        /// Can also be the tags earliest, finalized, safe, latest, or pending.
+        #[arg(long, short = 'B')]
+        block: Option<BlockId>,
+
+        /// The address to get the codehash for.
+        #[arg(value_parser = NameOrAddress::from_str)]
+        who: NameOrAddress,
+
+        /// The storage slot numbers (hex or decimal).
+        #[arg(value_parser = parse_slot)]
+        slots: Vec<B256>,
+
+        #[command(flatten)]
+        rpc: RpcOpts,
+    },
+
+    /// Get the storage root for an account.
+    #[command(visible_alias = "sr")]
+    StorageRoot {
+        /// The block height to query at.
+        ///
+        /// Can also be the tags earliest, finalized, safe, latest, or pending.
+        #[arg(long, short = 'B')]
+        block: Option<BlockId>,
+
+        /// The address to get the storage root for.
+        #[arg(value_parser = NameOrAddress::from_str)]
+        who: NameOrAddress,
+
+        /// The storage slot numbers (hex or decimal).
+        #[arg(value_parser = parse_slot)]
+        slots: Vec<B256>,
 
         #[command(flatten)]
         rpc: RpcOpts,

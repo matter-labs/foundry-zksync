@@ -1,8 +1,12 @@
 pub use crate::ic::*;
-use crate::{constants::DEFAULT_CREATE2_DEPLOYER, InspectorExt};
+use crate::{constants::DEFAULT_CREATE2_DEPLOYER, precompiles::ALPHANET_P256, InspectorExt};
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Selector, TxKind, U256};
-use alloy_rpc_types::{Block, Transaction};
+use alloy_provider::{
+    network::{BlockResponse, HeaderResponse},
+    Network,
+};
+use alloy_rpc_types::Transaction;
 use foundry_config::NamedChain;
 use foundry_zksync_core::DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
 use revm::{
@@ -25,9 +29,12 @@ pub use revm::primitives::EvmState as StateChangeset;
 /// - applies chain specifics: on Arbitrum `block.number` is the L1 block
 ///
 /// Should be called with proper chain id (retrieved from provider if not provided).
-pub fn apply_chain_and_block_specific_env_changes(env: &mut revm::primitives::Env, block: &Block) {
+pub fn apply_chain_and_block_specific_env_changes<N: Network>(
+    env: &mut revm::primitives::Env,
+    block: &N::BlockResponse,
+) {
     if let Ok(chain) = NamedChain::try_from(env.cfg.chain_id) {
-        let block_number = block.header.number.unwrap_or_default();
+        let block_number = block.header().number();
 
         match chain {
             NamedChain::Mainnet => {
@@ -44,10 +51,14 @@ pub fn apply_chain_and_block_specific_env_changes(env: &mut revm::primitives::En
             NamedChain::ArbitrumTestnet => {
                 // on arbitrum `block.number` is the L1 block which is included in the
                 // `l1BlockNumber` field
-                if let Some(l1_block_number) = block.other.get("l1BlockNumber").cloned() {
-                    if let Ok(l1_block_number) = serde_json::from_value::<U256>(l1_block_number) {
-                        env.block.number = l1_block_number;
-                    }
+                if let Some(l1_block_number) = block
+                    .other_fields()
+                    .and_then(|other| other.get("l1BlockNumber").cloned())
+                    .and_then(|l1_block_number| {
+                        serde_json::from_value::<U256>(l1_block_number).ok()
+                    })
+                {
+                    env.block.number = l1_block_number;
                 }
             }
             _ => {}
@@ -55,7 +66,7 @@ pub fn apply_chain_and_block_specific_env_changes(env: &mut revm::primitives::En
     }
 
     // if difficulty is `0` we assume it's past merge
-    if block.header.difficulty.is_zero() {
+    if block.header().difficulty().is_zero() {
         env.block.difficulty = env.block.prevrandao.unwrap_or_default().into();
     }
 }
@@ -145,10 +156,10 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
             // Sanity check that CREATE2 deployer exists.
             // We check which deployer we are using to separate the logic for zkSync and original
             // foundry.
-            let mut code_hash = ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.0.info.code_hash;
+            let mut code_hash = ctx.evm.load_account(DEFAULT_CREATE2_DEPLOYER)?.info.code_hash;
 
             if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
-                code_hash = ctx.evm.load_account(call_inputs.target_address)?.0.info.code_hash;
+                code_hash = ctx.evm.load_account(call_inputs.target_address)?.info.code_hash;
             };
 
             if code_hash == KECCAK_EMPTY {
@@ -220,6 +231,20 @@ pub fn create2_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
         });
 }
 
+/// Adds Alphanet P256 precompile to the list of loaded precompiles.
+pub fn alphanet_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
+    handler: &mut EvmHandler<'_, I, DB>,
+) {
+    let prev = handler.pre_execution.load_precompiles.clone();
+    handler.pre_execution.load_precompiles = Arc::new(move || {
+        let mut loaded_precompiles = prev();
+
+        loaded_precompiles.extend([ALPHANET_P256]);
+
+        loaded_precompiles
+    });
+}
+
 /// Creates a new EVM with the given inspector.
 pub fn new_evm_with_inspector<'a, DB, I>(
     db: DB,
@@ -245,10 +270,15 @@ where
         .build()
     */
 
-    let context = revm::Context::new(revm::EvmContext::new_with_env(db, env), inspector);
     let mut handler = revm::Handler::new(handler_cfg);
     handler.append_handler_register_plain(revm::inspector_handle_register);
+    if inspector.is_alphanet() {
+        handler.append_handler_register_plain(alphanet_handler_register);
+    }
     handler.append_handler_register_plain(create2_handler_register);
+
+    let context = revm::Context::new(revm::EvmContext::new_with_env(db, env), inspector);
+
     revm::Evm::new(context, handler)
 }
 
@@ -274,11 +304,16 @@ where
     I: InspectorExt<DB>,
 {
     let handler_cfg = HandlerCfg::new(inner.spec_id());
-    let context =
-        revm::Context::new(revm::EvmContext { inner, precompiles: Default::default() }, inspector);
+
     let mut handler = revm::Handler::new(handler_cfg);
     handler.append_handler_register_plain(revm::inspector_handle_register);
+    if inspector.is_alphanet() {
+        handler.append_handler_register_plain(alphanet_handler_register);
+    }
     handler.append_handler_register_plain(create2_handler_register);
+
+    let context =
+        revm::Context::new(revm::EvmContext { inner, precompiles: Default::default() }, inspector);
     revm::Evm::new(context, handler)
 }
 
