@@ -242,7 +242,7 @@ pub fn to_safe_address(address: Address) -> Address {
     }
 }
 
-const SIGNATURE_CREATE: &str = "create(bytes32,bytes)";
+const SIGNATURE_CREATE: &str = "create(bytes32,bytes32,bytes)";
 const SIGNATURE_CREATE2: &str = "create2(bytes32,bytes32,bytes)";
 
 /// Try decoding the provided transaction data into create2 parameters.
@@ -285,7 +285,8 @@ pub fn try_decode_create(data: &[u8]) -> Result<(H256, Vec<u8>)> {
             decoded_calldata.len()
         );
     }
-    let (bytecode_hash, constructor_args) = (&decoded_calldata[0], &decoded_calldata[1]);
+    let (_salt, bytecode_hash, constructor_args) =
+        (&decoded_calldata[0], &decoded_calldata[1], &decoded_calldata[2]);
 
     let Some(bytecode_hash) = bytecode_hash.as_word() else {
         eyre::bail!("failed decoding bytecode hash {bytecode_hash:?}");
