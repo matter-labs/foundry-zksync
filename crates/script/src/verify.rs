@@ -107,44 +107,13 @@ impl VerifyBundle {
         create2_offset: usize,
         data: &[u8],
         libraries: &[String],
-        zksync: bool,
     ) -> Option<VerifyArgs> {
         for (artifact, contract) in self.known_contracts.iter() {
             let Some(bytecode) = contract.bytecode() else { continue };
             // If it's a CREATE2, the tx.data comes with a 32-byte salt in the beginning
             // of the transaction
-            let (contract_match, effective_create2_offset) = if zksync {
-                // For zkSync, we need to handle both EVM and zkEVM artifacts
-                // as known_contracts may contain both types
-                let is_zksync_artifact =
-                    artifact.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR);
-                if is_zksync_artifact {
-                    // zkSync-specific artifact handling
-                    let bytecode_hash =
-                        foundry_zksync_core::hash_bytecode(contract.deployed_bytecode().unwrap());
-
-                    // The 36-byte offset consists of:
-                    // - 4 bytes: selector
-                    // - 32 bytes: salt (for CREATE2)
-                    let data_after_offset = &data[4 + 32..];
-                    (data_after_offset.starts_with(bytecode_hash.as_bytes()), 36)
-                } else {
-                    (false, create2_offset)
-                }
-            } else {
-                (data[create2_offset..].starts_with(bytecode), create2_offset)
-            };
-
-            if contract_match {
-                let constructor_args = if zksync {
-                    // For zkSync:
-                    // 32 bytes: bytecode hash length
-                    // 64 bytes: offset (32 bytes) + constructor arguments length (32 bytes)
-                    // The rest: actual constructor arguments
-                    data[effective_create2_offset + 32 + 64..].to_vec()
-                } else {
-                    data[effective_create2_offset + bytecode.len()..].to_vec()
-                };
+            if data.split_at(create2_offset).1.starts_with(bytecode) {
+                let constructor_args = data.split_at(create2_offset + bytecode.len()).1.to_vec();
 
                 if artifact.source.extension().map_or(false, |e| e.to_str() == Some("vy")) {
                     warn!("Skipping verification of Vyper contract: {}", artifact.name);
