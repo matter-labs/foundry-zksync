@@ -6,14 +6,6 @@ use era_test_node::{
     utils::bytecode_to_factory_dep,
 };
 use itertools::Itertools;
-use multivm::{
-    interface::{Halt, VmInterface, VmRevertReason},
-    tracers::CallTracer,
-    vm_latest::{
-        ExecutionResult, HistoryDisabled, ToTracerPointer, Vm, VmExecutionMode,
-        VmExecutionResultAndLogs,
-    },
-};
 use revm::{
     db::states::StorageSlot,
     primitives::{
@@ -25,10 +17,18 @@ use revm::{
 };
 use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
-use zksync_state::{ReadStorage, StoragePtr, WriteStorage};
+use zksync_multivm::{
+    interface::{
+        Call, CallType, ExecutionResult, Halt, VmEvent, VmExecutionResultAndLogs, VmFactory,
+        VmInterface, VmRevertReason,
+    },
+    tracers::CallTracer,
+    vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
+};
+use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    l2::L2Tx, vm_trace::Call, PackedEthSignature, StorageKey, Transaction, VmEvent,
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
+    l2::L2Tx, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS,
 };
 use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
@@ -430,7 +430,6 @@ fn inspect_inner<S: ReadStorage>(
 
     let tx: Transaction = l2_tx.clone().into();
 
-    vm.push_transaction(tx.clone());
     let call_tracer_result = Arc::default();
     let cheatcode_tracer_result = Arc::default();
     let mut expected_calls = HashMap::<_, _>::new();
@@ -455,7 +454,10 @@ fn inspect_inner<S: ReadStorage>(
         )
         .into_tracer_pointer(),
     ];
-    let mut tx_result = vm.inspect(tracers.into(), VmExecutionMode::OneTx);
+    let (compressed_bytecodes, mut tx_result) =
+        vm.inspect_transaction_with_bytecode_compression(&mut tracers.into(), tx, true);
+    let compressed_bytecodes = compressed_bytecodes.expect("failed compressing bytecodes");
+
     let mut call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
     trace!(?tx_result.result, "zk vm result");
 
@@ -540,8 +542,7 @@ fn inspect_inner<S: ReadStorage>(
         formatter::print_event(event, resolve_hashes);
     }
 
-    let bytecodes = vm
-        .get_last_tx_compressed_bytecodes()
+    let bytecodes = compressed_bytecodes
         .iter()
         .map(|b| {
             bytecode_to_factory_dep(b.original.clone())
@@ -606,7 +607,7 @@ fn call_traces_patch_create<S: ReadStorage>(
     storage: StoragePtr<StorageView<S>>,
     call: &mut Call,
 ) {
-    if matches!(call.r#type, zksync_types::vm_trace::CallType::Create) {
+    if matches!(call.r#type, CallType::Create) {
         if let Some(hash) = deployed_bytecode_hashes.get(&call.to).cloned() {
             let maybe_bytecode = bytecodes
                 .get(&h256_to_u256(hash))
@@ -767,7 +768,7 @@ fn split_tx_by_factory_deps(mut tx: L2Tx) -> Vec<L2Tx> {
     let mut txs = Vec::with_capacity(batched.len() + 1);
     for deps in batched.into_iter() {
         txs.push(L2Tx::new(
-            H160::zero(),
+            Some(H160::zero()),
             Vec::default(),
             tx.common_data.nonce,
             tx.common_data.fee.clone(),
