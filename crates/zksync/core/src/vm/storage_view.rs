@@ -151,7 +151,7 @@ impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use zksync_state::InMemoryStorage;
+    use zksync_state::interface::InMemoryStorage;
     use zksync_types::{AccountTreeId, Address, H256};
 
     #[test]

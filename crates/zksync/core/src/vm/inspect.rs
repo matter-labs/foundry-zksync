@@ -565,7 +565,7 @@ fn inspect_inner<S: ReadStorage>(
     let create_outcome = if is_create {
         match &tx_result.result {
             ExecutionResult::Success { output } => {
-                let result = ethabi::decode(&[ethabi::ParamType::Bytes], &output)
+                let result = ethabi::decode(&[ethabi::ParamType::Bytes], output)
                     .ok()
                     .and_then(|result| result.first().cloned())
                     .and_then(|result| result.into_bytes())
