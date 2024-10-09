@@ -1,17 +1,28 @@
 //! ZKSolc module.
 use std::{
     collections::{HashMap, HashSet, VecDeque},
+    path::PathBuf,
     str::FromStr,
 };
 
 use foundry_compilers::{
     solc::SolcLanguage, zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
-    Artifact, ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput, ProjectPathsConfig,
+    Artifact, ArtifactId, ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput,
+    ProjectPathsConfig,
 };
 
 use alloy_primitives::{keccak256, B256};
 use tracing::debug;
 use zksync_types::H256;
+
+/// Represents the type of contract (ZK or EVM)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContractType {
+    /// ZkSolc compiled contract
+    ZK,
+    /// Solc compiled contract
+    EVM,
+}
 
 /// Defines a contract that has been dual compiled with both zksolc and solc
 #[derive(Debug, Default, Clone)]
@@ -36,6 +47,10 @@ pub struct DualCompiledContract {
 #[derive(Debug, Default, Clone)]
 pub struct DualCompiledContracts {
     contracts: Vec<DualCompiledContract>,
+    /// ZKvm artifacts path
+    pub zk_artifact_path: PathBuf,
+    /// EVM artifacts path
+    pub evm_artifact_path: PathBuf,
 }
 
 impl DualCompiledContracts {
@@ -158,7 +173,11 @@ impl DualCompiledContracts {
             }
         }
 
-        Self { contracts: dual_compiled_contracts }
+        Self {
+            contracts: dual_compiled_contracts,
+            zk_artifact_path: zk_layout.artifacts.clone(),
+            evm_artifact_path: layout.artifacts.clone(),
+        }
     }
 
     /// Finds a contract matching the ZK deployed bytecode
@@ -207,6 +226,23 @@ impl DualCompiledContracts {
         }
 
         visited.into_iter().cloned().collect()
+    }
+
+    /// Returns the contract type (ZK or EVM) based on the artifact path
+    pub fn get_contract_type_by_artifact(&self, artifact_id: &ArtifactId) -> Option<ContractType> {
+        if artifact_id.path.starts_with(&self.zk_artifact_path) {
+            Some(ContractType::ZK)
+        } else if artifact_id.path.starts_with(&self.evm_artifact_path) {
+            Some(ContractType::EVM)
+        } else {
+            tracing::error!(
+                "Contract path {:?} not found in {:?} or {:?}",
+                artifact_id.path,
+                self.zk_artifact_path,
+                self.evm_artifact_path
+            );
+            None
+        }
     }
 
     /// Returns an iterator over all `[DualCompiledContract]`s in the collection

@@ -10,6 +10,7 @@ use dialoguer::{Input, Password};
 use foundry_common::fs;
 use foundry_config::fs_permissions::FsAccessKind;
 use foundry_evm_core::backend::DatabaseExt;
+use foundry_zksync_compiler::ContractType;
 use revm::interpreter::CreateInputs;
 use semver::Version;
 use std::{
@@ -391,18 +392,28 @@ fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<B
                 0 => Err(fmt_err!("No matching artifact found")),
                 1 => Ok(filtered[0]),
                 _ => {
-                    // If we know the current script/test contract solc version, try to filter by it
-                    state
-                        .config
-                        .running_version
-                        .as_ref()
-                        .and_then(|version| {
-                            let filtered = filtered
-                                .into_iter()
-                                .filter(|(id, _)| id.version == *version)
-                                .collect::<Vec<_>>();
-
-                            (filtered.len() == 1).then_some(filtered[0])
+                    // If we find more than one artifact, we need to filter by contract type
+                    // depending on whether we are using the zkvm or evm
+                    filtered
+                        .clone()
+                        .into_iter()
+                        .find(|(id, _)| {
+                            let contract_type = state
+                                .config
+                                .dual_compiled_contracts
+                                .get_contract_type_by_artifact(id);
+                            match contract_type {
+                                Some(ContractType::ZK) => state.use_zk_vm,
+                                Some(ContractType::EVM) => !state.use_zk_vm,
+                                None => false,
+                            }
+                        })
+                        .or_else(|| {
+                            // If we know the current script/test contract solc version, try to
+                            // filter by it
+                            state.config.running_version.as_ref().and_then(|version| {
+                                filtered.into_iter().find(|(id, _)| id.version == *version)
+                            })
                         })
                         .ok_or_else(|| fmt_err!("Multiple matching artifacts found"))
                 }
