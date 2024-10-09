@@ -45,6 +45,7 @@ alloy-transport-http = { workspace = true, features = [
 alloy-transport-ipc.workspace = true
 alloy-transport-ws.workspace = true
 alloy-transport.workspace = true
+alloy-consensus = { workspace = true, features = ["k256"] }
 
 tower.workspace = true
 
@@ -54,7 +55,6 @@ comfy-table.workspace = true
 dunce.workspace = true
 eyre.workspace = true
 num-format.workspace = true
-once_cell.workspace = true
 reqwest.workspace = true
 rustc-hash.workspace = true
 semver.workspace = true

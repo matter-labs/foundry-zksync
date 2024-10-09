@@ -3,7 +3,10 @@
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use forge::revm::primitives::SpecId;
 use foundry_config::fs_permissions::PathPermission;
-use foundry_test_utils::{util, Filter};
+use foundry_test_utils::{
+    util::{self, OutputExt},
+    Filter,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_can_call_function() {
@@ -58,9 +61,7 @@ async fn test_zk_contract_create2() {
     );
     util::initialize(prj.root());
 
-    cmd.args(["install", "matter-labs/era-contracts", "--no-commit", "--shallow"])
-        .ensure_execute_success()
-        .expect("able to install dependencies");
+    cmd.args(["install", "matter-labs/era-contracts", "--no-commit", "--shallow"]).assert_success();
     cmd.forge_fuse();
 
     let mut config = cmd.config();
@@ -78,7 +79,7 @@ async fn test_zk_contract_create2() {
     prj.add_test("Create2.t.sol", include_str!("../../fixtures/zk/Create2.t.sol")).unwrap();
 
     cmd.args(["test", "--zk-startup", "--evm-version", "shanghai", "--mc", "Create2Test"]);
-    assert!(cmd.stdout_lossy().contains("Suite result: ok"));
+    cmd.assert_success().get_output().stdout_lossy().contains("Suite result: ok");
 }
 
 #[tokio::test(flavor = "multi_thread")]

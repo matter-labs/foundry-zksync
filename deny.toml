@@ -15,6 +15,7 @@ ignore = [
     # Should remove once we can update sqlx which is used by some zksync dependencies
     "RUSTSEC-2024-0363",
     # Used by alloy
+    # proc-macro-error is unmaintained
     "RUSTSEC-2024-0370",
 ]
 
@@ -61,6 +62,7 @@ allow = [
     "WTFPL",
     "Unicode-3.0",
     "MPL-2.0",
+    "CDDL-1.0",
 ]
 
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
@@ -108,12 +110,9 @@ allow-git = [
     "https://github.com/paradigmxyz/revm-inspectors",
     "https://github.com/bluealloy/revm",
     "https://github.com/lambdaclass/zksync-web3-rs",
-    "https://github.com/Moonsong-Labs/compilers",
-    "https://github.com/Moonsong-Labs/foundry-zksync-fork-db",
-    "https://github.com/Moonsong-Labs/block-explorers",
     "https://github.com/RustCrypto/hashes",
     "https://github.com/jrigada/zksync-web3-rs.git",
 ]
 
 [sources.allow-org]
-github = ["matter-labs"]
+github = ["matter-labs", "Moonsong-Labs"]

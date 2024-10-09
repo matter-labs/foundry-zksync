@@ -11,6 +11,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   IS_NIGHTLY: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+  PROFILE: maxperf
 
 jobs:
   prepare:
@@ -135,59 +136,69 @@ jobs:
       - name: Build binaries
         env:
           SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
+          PLATFORM_NAME: ${{ matrix.platform }}
+          TARGET: ${{ matrix.target }}
+          OUT_DIR: target/${{ matrix.target }}/${{ env.PROFILE }}
         shell: bash
         run: |
           set -eo pipefail
-          target="${{ matrix.target }}"
-          flags=()
+          flags=(--target $TARGET --profile $PROFILE --bins 
+            --no-default-features --features rustls,aws-kms,cli,asm-keccak)
 
-          # Disable asm-keccak, see https://github.com/alloy-rs/core/issues/711
-          # # Remove jemalloc, only keep `asm-keccak` if applicable
-          # if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
-          #     flags+=(--features asm-keccak)
-          # fi
+          # `jemalloc` is not fully supported on MSVC or aarch64 Linux.
+          if [[ "$TARGET" != *msvc* && "$TARGET" != "aarch64-unknown-linux-gnu" ]]; then
+            flags+=(--features jemalloc)
+          fi
 
-          cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
+          [[ "$TARGET" == *windows* ]] && ext=".exe"
+
+          cargo build "${flags[@]}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
-              bin=./target/$target/release/$name
-              file "$bin" || true
-              ldd "$bin" || true
-              $bin --version || true
+            bin=$OUT_DIR/$name$ext
+            echo ""
+            file "$bin" || true
+            du -h "$bin" || true
+            ldd "$bin" || true
+            $bin --version || true
           done
 
       - name: Archive binaries
         id: artifacts
         env:
           PLATFORM_NAME: ${{ matrix.platform }}
-          TARGET: ${{ matrix.target }}
-          ARCH: ${{ matrix.arch }}
+          OUT_DIR: target/${{ matrix.target }}/${{ env.PROFILE }}
           VERSION_NAME: ${{ (env.IS_NIGHTLY && 'nightly') || needs.prepare.outputs.tag_name }}
+          ARCH: ${{ matrix.arch }}
         shell: bash
         run: |
           if [ "$PLATFORM_NAME" == "linux" ]; then
-              tar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
+              tar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C $OUT_DIR forge cast
               echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
               # We need to use gtar here otherwise the archive is corrupt.
               # See: https://github.com/actions/virtual-environments/issues/2619
-              gtar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
+              gtar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C $OUT_DIR forge cast
               echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+          else
+            cd $OUT_DIR
+            7z a -tzip "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" forge.exe cast.exe
+            mv "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" ../../../
+            echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.zip" >> $GITHUB_OUTPUT
           fi
 
       - name: Build man page
         id: man
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         env:
-          PLATFORM_NAME: ${{ matrix.platform }}
-          TARGET: ${{ matrix.target }}
+          OUT_DIR: target/${{ matrix.target }}/${{ env.PROFILE }}
           VERSION_NAME: ${{ (env.IS_NIGHTLY && 'nightly') || needs.prepare.outputs.tag_name }}
         shell: bash
         run: |
           sudo apt-get -y install help2man
-          help2man -N ./target/${TARGET}/release/forge > forge.1
-          help2man -N ./target/${TARGET}/release/cast > cast.1
+          help2man -N $OUT_DIR/forge > forge.1
+          help2man -N $OUT_DIR/cast > cast.1
           gzip forge.1
           gzip cast.1
           tar -czvf "foundry_man_${VERSION_NAME}.tar.gz" forge.1.gz cast.1.gz

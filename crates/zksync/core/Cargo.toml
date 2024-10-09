@@ -38,6 +38,7 @@ revm = { workspace = true, default-features = false, features = [
     "optimism",
 ] }
 tracing.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 
 # zk
@@ -51,7 +52,5 @@ zksync_contracts.workspace = true
 zksync_state.workspace = true
 
 ansiterm = "0.12.2"
-once_cell = "1"
 eyre = "0.6"
 url = "2"
-lazy_static = "1.5.0"

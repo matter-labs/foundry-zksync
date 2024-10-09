@@ -27,6 +27,12 @@ impl TraceCollector {
         Self { inner: TracingInspector::new(config) }
     }
 
+    /// Returns the inner [`TracingInspector`]
+    #[inline]
+    pub fn inner(&mut self) -> &mut TracingInspector {
+        &mut self.inner
+    }
+
     /// Resets the inspector to its initial state of [Self::new].
     /// This makes the inspector ready to be used again.
     ///
@@ -101,7 +107,7 @@ impl TraceCollector {
 
     /// Consumes the Inspector and returns a [GethTraceBuilder].
     #[inline]
-    pub fn into_geth_builder(self) -> GethTraceBuilder {
+    pub fn into_geth_builder(self) -> GethTraceBuilder<'static> {
         self.inner.into_geth_builder()
     }
 }

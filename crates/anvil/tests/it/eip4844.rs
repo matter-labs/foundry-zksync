@@ -1,16 +1,16 @@
 use crate::utils::http_provider;
 use alloy_consensus::{SidecarBuilder, SimpleCoder};
 use alloy_eips::eip4844::{DATA_GAS_PER_BLOB, MAX_DATA_GAS_PER_BLOCK};
-use alloy_network::TransactionBuilder;
+use alloy_network::{TransactionBuilder, TransactionBuilder4844};
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, TransactionRequest};
 use alloy_serde::WithOtherFields;
-use anvil::{spawn, Hardfork, NodeConfig};
+use anvil::{spawn, EthereumHardfork, NodeConfig};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_send_eip4844_transaction() {
-    let node_config = NodeConfig::test().with_hardfork(Some(Hardfork::Cancun));
+    let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Cancun.into()));
     let (_api, handle) = spawn(node_config).await;
 
     let wallets = handle.dev_wallets().collect::<Vec<_>>();
@@ -46,7 +46,7 @@ async fn can_send_eip4844_transaction() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_send_multiple_blobs_in_one_tx() {
-    let node_config = NodeConfig::test().with_hardfork(Some(Hardfork::Cancun));
+    let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Cancun.into()));
     let (_api, handle) = spawn(node_config).await;
 
     let wallets = handle.dev_wallets().collect::<Vec<_>>();
@@ -84,7 +84,7 @@ async fn can_send_multiple_blobs_in_one_tx() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cannot_exceed_six_blobs() {
-    let node_config = NodeConfig::test().with_hardfork(Some(Hardfork::Cancun));
+    let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Cancun.into()));
     let (_api, handle) = spawn(node_config).await;
 
     let wallets = handle.dev_wallets().collect::<Vec<_>>();
@@ -121,7 +121,7 @@ async fn cannot_exceed_six_blobs() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_mine_blobs_when_exceeds_max_blobs() {
-    let node_config = NodeConfig::test().with_hardfork(Some(Hardfork::Cancun));
+    let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Cancun.into()));
     let (api, handle) = spawn(node_config).await;
     api.anvil_set_auto_mine(false).await.unwrap();
 
@@ -194,7 +194,7 @@ async fn can_mine_blobs_when_exceeds_max_blobs() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_check_blob_fields_on_genesis() {
-    let node_config = NodeConfig::test().with_hardfork(Some(Hardfork::Cancun));
+    let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Cancun.into()));
     let (_api, handle) = spawn(node_config).await;
 
     let provider = http_provider(&handle.http_endpoint());
