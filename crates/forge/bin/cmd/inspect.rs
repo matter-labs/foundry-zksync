@@ -1,4 +1,4 @@
-use alloy_primitives::Address;
+use alloy_primitives::{hex, keccak256, Address};
 use clap::Parser;
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 use eyre::{Context, Result};
@@ -16,9 +16,8 @@ use foundry_compilers::{
     info::ContractInfo,
     utils::canonicalize,
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
-use std::fmt;
+use std::{fmt, sync::LazyLock};
 
 /// CLI arguments for `forge inspect`.
 #[derive(Clone, Debug, Parser)]
@@ -133,7 +132,7 @@ impl InspectArgs {
                 let mut out = serde_json::Map::new();
                 if let Some(abi) = &artifact.abi {
                     let abi = &abi;
-                    // Print the signature of all errors
+                    // Print the signature of all errors.
                     for er in abi.errors.iter().flat_map(|(_, errors)| errors) {
                         let types = er.inputs.iter().map(|p| p.ty.clone()).collect::<Vec<_>>();
                         let sig = format!("{:x}", er.selector());
@@ -150,13 +149,13 @@ impl InspectArgs {
                 let mut out = serde_json::Map::new();
                 if let Some(abi) = &artifact.abi {
                     let abi = &abi;
-
-                    // print the signature of all events including anonymous
+                    // Print the topic of all events including anonymous.
                     for ev in abi.events.iter().flat_map(|(_, events)| events) {
                         let types = ev.inputs.iter().map(|p| p.ty.clone()).collect::<Vec<_>>();
+                        let topic = hex::encode(keccak256(ev.signature()));
                         out.insert(
                             format!("{}({})", ev.name, types.join(",")),
-                            format!("{:?}", ev.signature()).into(),
+                            format!("0x{topic}").into(),
                         );
                     }
                 }
@@ -398,8 +397,8 @@ fn print_yul(yul: Option<&str>, pretty: bool) -> Result<()> {
         eyre::bail!("Could not get IR output");
     };
 
-    static YUL_COMMENTS: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"(///.*\n\s*)|(\s*/\*\*.*\*/)").unwrap());
+    static YUL_COMMENTS: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(///.*\n\s*)|(\s*/\*\*.*\*/)").unwrap());
 
     if pretty {
         println!("{}", YUL_COMMENTS.replace_all(yul, ""));

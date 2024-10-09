@@ -81,7 +81,7 @@ pub fn config_create_project(
     {
         zksolc
     } else if !config.offline {
-        let default_version = semver::Version::new(1, 5, 3);
+        let default_version = semver::Version::new(1, 5, 4);
         let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
         if zksolc.is_none() {
             ZkSolc::blocking_install(&default_version)?;
@@ -109,8 +109,8 @@ pub fn config_create_project(
 /// 1. If `solc_path` in zksync config options is set, use it.
 /// 2. If `solc_path` is not set, check the `solc` requirements: a. If a version is specified, use
 ///    zkVm solc matching that version. b. If a path is specified, use it.
-/// 3. If none of the above, use autodetect which will match source files to a compiler version
-/// and use zkVm solc matching that version.
+/// 3. If none of the above, use autodetect which will match source files to a compiler version and
+///    use zkVm solc matching that version.
 fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
     if let Some(path) = &config.zksync.solc_path {
         if !path.is_file() {

@@ -166,22 +166,19 @@ where
 
     /// Load an account into the journaled state.
     pub fn load_account(&mut self, address: Address) -> &mut Account {
-        let (account, _) = self.ecx.load_account(address).expect("account could not be loaded");
-        account
+        self.ecx.load_account(address).expect("account could not be loaded").data
     }
 
     /// Load an storage slot into the journaled state.
     /// The account must be already loaded else this function panics.
     pub fn sload(&mut self, address: Address, key: rU256) -> rU256 {
-        let (value, _) = self.ecx.sload(address, key).unwrap_or_default();
-        value
+        self.ecx.sload(address, key).unwrap_or_default().data
     }
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
         let addr = address.to_address();
         self.ecx.load_account(addr).expect("failed loading account");
-        let (value, _) = self.ecx.sload(addr, idx.to_ru256()).expect("failed sload");
-        value.to_h256()
+        self.ecx.sload(addr, idx.to_ru256()).expect("failed sload").to_h256()
     }
 }
 

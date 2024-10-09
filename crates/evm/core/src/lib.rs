@@ -51,6 +51,10 @@ pub trait InspectorExt<DB: Database>: Inspector<DB> {
 
     // Appends provided zksync traces.
     fn trace_zksync(&mut self, _context: &mut EvmContext<DB>, _call_traces: Vec<Call>) {}
+
+    fn is_alphanet(&self) -> bool {
+        false
+    }
 }
 
 impl<DB: Database> InspectorExt<DB> for NoOpInspector {}

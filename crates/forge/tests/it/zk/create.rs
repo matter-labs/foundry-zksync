@@ -1,4 +1,8 @@
-use foundry_test_utils::{forgetest_async, util, ZkSyncNode};
+use foundry_test_utils::{
+    forgetest_async,
+    util::{self, OutputExt},
+    ZkSyncNode,
+};
 
 use crate::test_helpers::deploy_zk_contract;
 
@@ -57,7 +61,7 @@ forgetest_async!(forge_zk_can_deploy_contracts_and_cast_a_transaction, |prj, cmd
         "1",
     ]);
 
-    let (stdout, _) = cmd.output_lossy();
+    let stdout = cmd.assert_success().get_output().stdout_lossy();
 
     assert!(stdout.contains("transactionHash"), "Transaction hash not found in output");
     assert!(stdout.contains("success"), "Transaction was not successful");

@@ -1,7 +1,10 @@
 //! In-memory blockchain storage
 use crate::eth::{
     backend::{
-        db::{MaybeFullDatabase, SerializableBlock, SerializableTransaction, StateDb},
+        db::{
+            MaybeFullDatabase, SerializableBlock, SerializableHistoricalStates,
+            SerializableTransaction, StateDb,
+        },
         mem::cache::DiskStateCache,
     },
     error::BlockchainError,
@@ -25,6 +28,7 @@ use anvil_core::eth::{
 };
 use anvil_rpc::error::RpcError;
 use foundry_evm::{
+    backend::MemDb,
     revm::primitives::Env,
     traces::{
         CallKind, FourByteInspector, GethTraceBuilder, ParityTraceBuilder, TracingInspectorConfig,
@@ -40,7 +44,7 @@ use std::{
 
 // === various limits in number of blocks ===
 
-const DEFAULT_HISTORY_LIMIT: usize = 500;
+pub const DEFAULT_HISTORY_LIMIT: usize = 500;
 const MIN_HISTORY_LIMIT: usize = 10;
 // 1hr of up-time at lowest 1s interval
 const MAX_ON_DISK_HISTORY_LIMIT: usize = 3_600;
@@ -69,13 +73,13 @@ pub struct InMemoryBlockStates {
 
 impl InMemoryBlockStates {
     /// Creates a new instance with limited slots
-    pub fn new(limit: usize) -> Self {
+    pub fn new(in_memory_limit: usize, on_disk_limit: usize) -> Self {
         Self {
             states: Default::default(),
             on_disk_states: Default::default(),
-            in_memory_limit: limit,
-            min_in_memory_limit: limit.min(MIN_HISTORY_LIMIT),
-            max_on_disk_limit: MAX_ON_DISK_HISTORY_LIMIT,
+            in_memory_limit,
+            min_in_memory_limit: in_memory_limit.min(MIN_HISTORY_LIMIT),
+            max_on_disk_limit: on_disk_limit,
             oldest_on_disk: Default::default(),
             present: Default::default(),
             disk_cache: Default::default(),
@@ -188,6 +192,34 @@ impl InMemoryBlockStates {
             self.disk_cache.remove(on_disk)
         }
     }
+
+    /// Serialize all states to a list of serializable historical states
+    pub fn serialized_states(&mut self) -> SerializableHistoricalStates {
+        // Get in-memory states
+        let mut states = self
+            .states
+            .iter_mut()
+            .map(|(hash, state)| (*hash, state.serialize_state()))
+            .collect::<Vec<_>>();
+
+        // Get on-disk state snapshots
+        self.on_disk_states.iter().for_each(|(hash, _)| {
+            if let Some(snapshot) = self.disk_cache.read(*hash) {
+                states.push((*hash, snapshot));
+            }
+        });
+
+        SerializableHistoricalStates::new(states)
+    }
+
+    /// Load states from serialized data
+    pub fn load_states(&mut self, states: SerializableHistoricalStates) {
+        for (hash, snapshot) in states {
+            let mut state_db = StateDb::new(MemDb::default());
+            state_db.init_from_snapshot(snapshot);
+            self.insert(hash, state_db);
+        }
+    }
 }
 
 impl fmt::Debug for InMemoryBlockStates {
@@ -205,7 +237,7 @@ impl fmt::Debug for InMemoryBlockStates {
 impl Default for InMemoryBlockStates {
     fn default() -> Self {
         // enough in memory to store `DEFAULT_HISTORY_LIMIT` blocks in memory
-        Self::new(DEFAULT_HISTORY_LIMIT)
+        Self::new(DEFAULT_HISTORY_LIMIT, MAX_ON_DISK_HISTORY_LIMIT)
     }
 }
 
@@ -269,6 +301,23 @@ impl BlockchainStorage {
             transactions: Default::default(),
             total_difficulty,
         }
+    }
+
+    /// Unwind the chain state back to the given block in storage.
+    ///
+    /// The block identified by `block_number` and `block_hash` is __non-inclusive__, i.e. it will
+    /// remain in the state.
+    pub fn unwind_to(&mut self, block_number: u64, block_hash: B256) {
+        let best_num: u64 = self.best_number.try_into().unwrap_or(0);
+        for i in (block_number + 1)..=best_num {
+            if let Some(hash) = self.hashes.remove(&U64::from(i)) {
+                if let Some(block) = self.blocks.remove(&hash) {
+                    self.remove_block_transactions_by_number(block.header.number);
+                }
+            }
+        }
+        self.best_hash = block_hash;
+        self.best_number = U64::from(block_number);
     }
 
     #[allow(unused)]
@@ -492,7 +541,8 @@ impl MinedTransaction {
                     }
                     GethDebugBuiltInTracerType::PreStateTracer |
                     GethDebugBuiltInTracerType::NoopTracer |
-                    GethDebugBuiltInTracerType::MuxTracer => {}
+                    GethDebugBuiltInTracerType::MuxTracer |
+                    GethDebugBuiltInTracerType::FlatCallTracer => {}
                 },
                 GethDebugTracerType::JsTracer(_code) => {}
             }
@@ -545,9 +595,32 @@ mod tests {
         assert_eq!(storage.in_memory_limit, DEFAULT_HISTORY_LIMIT * 3);
     }
 
+    #[test]
+    fn test_init_state_limits() {
+        let mut storage = InMemoryBlockStates::default();
+        assert_eq!(storage.in_memory_limit, DEFAULT_HISTORY_LIMIT);
+        assert_eq!(storage.min_in_memory_limit, MIN_HISTORY_LIMIT);
+        assert_eq!(storage.max_on_disk_limit, MAX_ON_DISK_HISTORY_LIMIT);
+
+        storage = storage.memory_only();
+        assert!(storage.is_memory_only());
+
+        storage = InMemoryBlockStates::new(1, 0);
+        assert!(storage.is_memory_only());
+        assert_eq!(storage.in_memory_limit, 1);
+        assert_eq!(storage.min_in_memory_limit, 1);
+        assert_eq!(storage.max_on_disk_limit, 0);
+
+        storage = InMemoryBlockStates::new(1, 2);
+        assert!(!storage.is_memory_only());
+        assert_eq!(storage.in_memory_limit, 1);
+        assert_eq!(storage.min_in_memory_limit, 1);
+        assert_eq!(storage.max_on_disk_limit, 2);
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn can_read_write_cached_state() {
-        let mut storage = InMemoryBlockStates::new(1);
+        let mut storage = InMemoryBlockStates::new(1, MAX_ON_DISK_HISTORY_LIMIT);
         let one = B256::from(U256::from(1));
         let two = B256::from(U256::from(2));
 
@@ -573,7 +646,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn can_decrease_state_cache_size() {
         let limit = 15;
-        let mut storage = InMemoryBlockStates::new(limit);
+        let mut storage = InMemoryBlockStates::new(limit, MAX_ON_DISK_HISTORY_LIMIT);
 
         let num_states = 30;
         for idx in 0..num_states {

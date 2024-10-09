@@ -9,6 +9,7 @@ use zksync_web3_rs::{
         encode_type, EIP712Domain as EthersEip712Domain, Eip712 as EthersEip712, Eip712DomainType,
         Types,
     },
+    zks_utils::EIP712_TX_TYPE,
 };
 
 use super::{ConvertAddress, ConvertH160, ConvertRU256, ConvertU256};
@@ -84,6 +85,38 @@ impl Transaction for Eip712SignableTransaction {
 
     fn input(&self) -> &[u8] {
         self.0.data.as_ref()
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.0.max_fee_per_gas.low_u128()
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        Some(self.priority_fee_or_price())
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.0.max_priority_fee_per_gas.low_u128()
+    }
+
+    fn ty(&self) -> u8 {
+        EIP712_TX_TYPE
+    }
+
+    fn access_list(&self) -> Option<&alloy_rpc_types::AccessList> {
+        None
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    fn authorization_list(&self) -> Option<&[revm::primitives::SignedAuthorization]> {
+        None
     }
 }
 

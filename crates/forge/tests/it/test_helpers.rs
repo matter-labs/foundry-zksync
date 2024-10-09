@@ -1,5 +1,6 @@
 //! Test helpers for Forge integration tests.
 
+use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
     revm::primitives::SpecId, MultiContractRunner, MultiContractRunnerBuilder, TestOptions,
@@ -23,24 +24,25 @@ use foundry_evm::{
     constants::CALLER,
     opts::{Env, EvmOpts},
 };
-use foundry_test_utils::{fd_lock, init_tracing, TestCommand, ZkSyncNode};
+use foundry_test_utils::{
+    fd_lock, init_tracing, rpc::next_rpc_endpoint, util::OutputExt, TestCommand, ZkSyncNode,
+};
 use foundry_zksync_compiler::{
     DualCompiledContracts, ZKSYNC_ARTIFACTS_DIR, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME,
 };
-use once_cell::sync::Lazy;
 use semver::Version;
 use std::{
     env, fmt,
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 type ZkProject = Project<ZkSolcCompiler, ZkArtifactOutput>;
 
 pub const RE_PATH_SEPARATOR: &str = "/";
 const TESTDATA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata");
-static VYPER: Lazy<PathBuf> = Lazy::new(|| std::env::temp_dir().join("vyper"));
+static VYPER: LazyLock<PathBuf> = LazyLock::new(|| std::env::temp_dir().join("vyper"));
 
 /// Profile for the tests group. Used to configure separate configurations for test runs.
 pub enum ForgeTestProfile {
@@ -81,7 +83,8 @@ impl ForgeTestProfile {
             settings.evm_version = Some(EvmVersion::Cancun);
         }
 
-        SolcConfig::builder().settings(settings).build()
+        let settings = SolcConfig::builder().settings(settings).build();
+        SolcConfig { settings }
     }
 
     pub fn project(&self) -> Project {
@@ -209,7 +212,7 @@ impl ForgeTestProfile {
         zk_config.zksync.startup = true;
         zk_config.zksync.fallback_oz = true;
         zk_config.zksync.optimizer_mode = '3';
-        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 3)));
+        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 4)));
         zk_config.fuzz.no_zksync_reserved_addresses = true;
 
         zk_config
@@ -494,7 +497,7 @@ pub fn get_zk_compiled(zk_project: &ZkProject) -> ZkProjectCompileOutput {
     out
 }
 
-pub static EVM_OPTS: Lazy<EvmOpts> = Lazy::new(|| EvmOpts {
+pub static EVM_OPTS: LazyLock<EvmOpts> = LazyLock::new(|| EvmOpts {
     env: Env {
         gas_limit: u64::MAX,
         chain_id: None,
@@ -512,16 +515,16 @@ pub static EVM_OPTS: Lazy<EvmOpts> = Lazy::new(|| EvmOpts {
 });
 
 /// Default data for the tests group.
-pub static TEST_DATA_DEFAULT: Lazy<ForgeTestData> =
-    Lazy::new(|| ForgeTestData::new(ForgeTestProfile::Default));
+pub static TEST_DATA_DEFAULT: LazyLock<ForgeTestData> =
+    LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::Default));
 
 /// Data for tests requiring Cancun support on Solc and EVM level.
-pub static TEST_DATA_CANCUN: Lazy<ForgeTestData> =
-    Lazy::new(|| ForgeTestData::new(ForgeTestProfile::Cancun));
+pub static TEST_DATA_CANCUN: LazyLock<ForgeTestData> =
+    LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::Cancun));
 
 /// Data for tests requiring Cancun support on Solc and EVM level.
-pub static TEST_DATA_MULTI_VERSION: Lazy<ForgeTestData> =
-    Lazy::new(|| ForgeTestData::new(ForgeTestProfile::MultiVersion));
+pub static TEST_DATA_MULTI_VERSION: LazyLock<ForgeTestData> =
+    LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::MultiVersion));
 
 pub fn manifest_root() -> &'static Path {
     let mut root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -536,19 +539,14 @@ pub fn manifest_root() -> &'static Path {
 /// the RPC endpoints used during tests
 pub fn rpc_endpoints() -> RpcEndpoints {
     RpcEndpoints::new([
-        (
-            "rpcAlias",
-            RpcEndpoint::Url(
-                "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf".to_string(),
-            ),
-        ),
-        (
-            "rpcAliasSepolia",
-            RpcEndpoint::Url(
-                "https://eth-sepolia.g.alchemy.com/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf".to_string(),
-            ),
-        ),
-        ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".to_string())),
+        ("mainnet", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Mainnet))),
+        ("mainnet2", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Mainnet))),
+        ("sepolia", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Sepolia))),
+        ("optimism", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Optimism))),
+        ("arbitrum", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Arbitrum))),
+        ("polygon", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Polygon))),
+        ("avaxTestnet", RpcEndpoint::Url("https://api.avax-test.network/ext/bc/C/rpc".into())),
+        ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".into())),
     ])
 }
 
@@ -591,7 +589,7 @@ pub fn run_zk_script_test(
         let mut install_args = vec!["install"];
         install_args.extend(deps.split_whitespace());
         install_args.push("--no-commit");
-        cmd.args(&install_args).ensure_execute_success().expect("Installed successfully");
+        cmd.args(&install_args).assert_success();
     }
 
     cmd.forge_fuse();
@@ -599,6 +597,7 @@ pub fn run_zk_script_test(
     let script_path_contract = format!("{script_path}:{contract_name}");
     let private_key =
         ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
+
     let mut script_args = vec![
         "--zk-startup",
         &script_path_contract,
@@ -622,7 +621,10 @@ pub fn run_zk_script_test(
 
     cmd.arg("script").args(&script_args);
 
-    assert!(cmd.stdout_lossy().contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+    cmd.assert_success()
+        .get_output()
+        .stdout_lossy()
+        .contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
 
     let run_latest = foundry_common::fs::json_files(root.as_ref().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))
@@ -654,7 +656,10 @@ pub fn deploy_zk_contract(
         private_key,
     ]);
 
-    let (stdout, stderr) = cmd.output_lossy();
+    let output = cmd.assert_success();
+    let output = output.get_output();
+    let stdout = output.stdout_lossy();
+    let stderr = foundry_test_utils::util::lossy_string(output.stderr.as_slice());
 
     if stdout.contains("Deployed to:") {
         let regex = regex::Regex::new(r"Deployed to:\s*(\S+)").unwrap();
