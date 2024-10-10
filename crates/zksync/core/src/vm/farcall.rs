@@ -4,7 +4,8 @@ use std::{collections::HashMap, default, fmt::Debug};
 
 use alloy_primitives::{hex, Address};
 use itertools::Itertools;
-use multivm::{
+use zksync_basic_types::{H160, U256};
+use zksync_multivm::{
     vm_1_3_2::zk_evm_1_3_3::zkevm_opcode_defs::RetABI,
     vm_latest::{BootloaderState, HistoryMode, SimpleMemory, ZkSyncVmState},
     zk_evm_latest::{
@@ -20,8 +21,7 @@ use multivm::{
         },
     },
 };
-use zksync_basic_types::{H160, U256};
-use zksync_state::{StoragePtr, WriteStorage};
+use zksync_state::interface::{StoragePtr, WriteStorage};
 use zksync_types::MSG_VALUE_SIMULATOR_ADDRESS;
 
 use crate::convert::{ConvertAddress, ConvertH256, ConvertU256};
@@ -325,9 +325,9 @@ pub const SELECTOR_L2_ETH_BALANCE_OF: &str = "9cc7f708";
 pub const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: &str = "42cbb15c";
 /// Selector for `SystemContext::getBlockTimestamp()`
 pub const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: &str = "796b89b9";
-// Selector for `ContractDeployer::create(bytes32, bytes32, bytes)`
+/// Selector for `ContractDeployer::create(bytes32, bytes32, bytes)`
 pub const SELECTOR_CONTRACT_DEPLOYER_CREATE: &str = "9c4d535b";
-// Selector for `ContractDeployer::create2(bytes32, bytes32, bytes)`
+/// Selector for `ContractDeployer::create2(bytes32, bytes32, bytes)`
 pub const SELECTOR_CONTRACT_DEPLOYER_CREATE2: &str = "3cda3351";
 
 /// Represents a parsed FarCall from the ZK-EVM

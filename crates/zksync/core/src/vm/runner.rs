@@ -49,7 +49,7 @@ where
     let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller, &PaymasterParams::default());
     debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
-        transact_to,
+        Some(transact_to),
         env.tx.data.to_vec(),
         nonce,
         Fee {
@@ -147,7 +147,7 @@ where
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
     let tx = L2Tx::new(
-        CONTRACT_DEPLOYER_ADDRESS,
+        Some(CONTRACT_DEPLOYER_ADDRESS),
         calldata,
         nonce,
         Fee {
@@ -206,7 +206,7 @@ where
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
     let tx = L2Tx::new(
-        call.bytecode_address.to_h160(),
+        Some(call.bytecode_address.to_h160()),
         call.input.to_vec(),
         nonce,
         Fee {
