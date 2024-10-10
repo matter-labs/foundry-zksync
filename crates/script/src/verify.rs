@@ -196,12 +196,12 @@ impl VerifyBundle {
                 .ok()?
         };
 
-        for (artifact, contract) in self.known_contracts.iter() {
-            let Some(bytecode) = contract.bytecode() else { continue };
+        let known_zksync_contracts = self.known_contracts.iter().filter(|(artifact, _)| {
             let is_zksync_artifact = artifact.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR);
-            if !is_zksync_artifact {
-                continue;
-            }
+            is_zksync_artifact
+        });
+        for (artifact, contract) in known_zksync_contracts {
+            let Some(bytecode) = contract.bytecode() else { continue };
 
             let contract_bytecode_hash = foundry_zksync_core::hash_bytecode(bytecode);
             if bytecode_hash == contract_bytecode_hash {

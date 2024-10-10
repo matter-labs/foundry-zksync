@@ -242,7 +242,9 @@ pub fn to_safe_address(address: Address) -> Address {
     }
 }
 
+/// https://github.com/matter-labs/era-contracts/blob/main/system-contracts/contracts/ContractDeployer.sol#L148
 const SIGNATURE_CREATE: &str = "create(bytes32,bytes32,bytes)";
+/// https://github.com/matter-labs/era-contracts/blob/main/system-contracts/contracts/ContractDeployer.sol#L133
 const SIGNATURE_CREATE2: &str = "create2(bytes32,bytes32,bytes)";
 
 /// Try decoding the provided transaction data into create2 parameters.

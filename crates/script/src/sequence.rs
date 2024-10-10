@@ -298,7 +298,7 @@ impl ScriptSequence {
                 }
 
                 // Verify potential contracts created during the transaction execution
-                // This will fail for ZKsync context
+                // This will fail in ZKsync context due to `init_code` usage.
                 for AdditionalContract { address, init_code, .. } in &tx.additional_contracts {
                     match verify.get_verify_args(*address, 0, init_code.as_ref(), &self.libraries) {
                         Some(verify) => future_verifications.push(verify.run()),
