@@ -397,7 +397,7 @@ fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<B
                     // If we find more than one artifact, we need to filter by contract type
                     // depending on whether we are using the zkvm or evm
                     filtered
-                        .into_iter()
+                        .iter()
                         .find(|(id, _)| {
                             let contract_type = state
                                 .config
@@ -413,7 +413,7 @@ fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<B
                             // If we know the current script/test contract solc version, try to
                             // filter by it
                             state.config.running_version.as_ref().and_then(|version| {
-                                filtered.into_iter().find(|(id, _)| id.version == *version)
+                                filtered.iter().find(|(id, _)| id.version == *version)
                             })
                         })
                         .ok_or_else(|| fmt_err!("multiple matching artifacts found"))
