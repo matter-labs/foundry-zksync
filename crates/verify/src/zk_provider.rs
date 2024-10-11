@@ -46,7 +46,7 @@ impl ZkVerificationContext {
         let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
 
         let (solc_version, is_zksync_solc) = if let Some(solc) = &config.zksync.solc_path {
-            let solc_type_and_version = zksolc::get_solc_type_and_version(solc)?;
+            let solc_type_and_version = zksolc::get_solc_version_info(solc)?;
             (solc_type_and_version.version, solc_type_and_version.zksync_version.is_some())
         } else {
             //if there's no `solc_path` specified then we use the same

@@ -23,7 +23,7 @@ use foundry_compilers::{
     artifacts::Severity,
     error::SolcError,
     solc::{Solc, SolcCompiler, SolcLanguage},
-    zksolc::{ZkSolc, ZkSolcCompiler, ZkSolcSettings},
+    zksolc::{get_solc_version_info, ZkSolc, ZkSolcCompiler, ZkSolcSettings},
     zksync::artifact_output::zk::ZkArtifactOutput,
     Project, ProjectBuilder, ProjectPathsConfig,
 };
@@ -114,7 +114,7 @@ fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
         if !path.is_file() {
             return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())))
         }
-        let version = solc_version(path)?;
+        let version = get_solc_version_info(path)?.version;
         let solc =
             Solc::new_with_version(path, Version::new(version.major, version.minor, version.patch));
         return Ok(SolcCompiler::Specific(solc))
@@ -141,7 +141,7 @@ fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
                 if !path.is_file() {
                     return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())))
                 }
-                let version = solc_version(path)?;
+                let version = get_solc_version_info(path)?.version;
                 Solc::new_with_version(
                     path,
                     Version::new(version.major, version.minor, version.patch),
@@ -213,25 +213,21 @@ pub fn config_ensure_zksolc(
     Ok(None)
 }
 
-/// Given a solc path, get the semver. Works for both solc an zkVm solc.
-// TODO: Maybe move this to compilers and use it to identify if used binary is zkVm or not
-fn solc_version(path: &Path) -> Result<Version, SolcError> {
-    let mut cmd = Command::new(path);
-    cmd.arg("--version").stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
-    debug!(?cmd, "getting Solc version");
-    let output = cmd.output().map_err(|e| SolcError::io(e, path))?;
-    trace!(?output);
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let version = stdout
-            .lines()
-            .filter(|l| !l.trim().is_empty())
-            .nth(1)
-            .ok_or_else(|| SolcError::msg("Version not found in Solc output"))?;
-        debug!(%version);
-        // NOTE: semver doesn't like `+` in g++ in build metadata which is invalid semver
-        Ok(Version::from_str(&version.trim_start_matches("Version: ").replace(".g++", ".gcc"))?)
-    } else {
-        Err(SolcError::solc_output(&output))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zksync_project_has_zksync_solc_when_solc_req_is_a_version() {
+        let config =
+            Config { solc: Some(SolcReq::Version(Version::new(0, 8, 26))), ..Default::default() };
+        let project = config_create_project(&config, false, true).unwrap();
+        let solc_compiler = project.compiler.solc;
+        if let SolcCompiler::Specific(path) = solc_compiler {
+            let version = get_solc_version_info(&path.solc).unwrap();
+            assert!(version.zksync_version.is_some());
+        } else {
+            panic!("Expected SolcCompiler::Specific");
+        }
     }
 }
