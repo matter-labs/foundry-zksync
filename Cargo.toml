@@ -226,7 +226,7 @@ alloy-chains = "0.1"
 alloy-rlp = "0.3"
 alloy-trie = "0.5.0"
 # alloy-zksync = "0.1.0"
-alloy-zksync = { path = "../nbaztec-alloy-zksync" }
+alloy-zksync = { git = "https://github.com/nbaztec/alloy-zksync", branch = "v0.3.6"}
 
 ## op-alloy for tests in anvil
 op-alloy-rpc-types = "0.2.9"
