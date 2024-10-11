@@ -8,7 +8,7 @@ use foundry_compilers::{
     compilers::CompilerSettings,
     resolver::parse::SolData,
     solc::{Solc, SolcCompiler},
-    zksolc::{ZkSolc, ZkSolcCompiler},
+    zksolc::{self, ZkSolc, ZkSolcCompiler},
     zksync::artifact_output::zk::ZkArtifactOutput,
     Graph, Project,
 };
@@ -43,13 +43,11 @@ impl ZkVerificationContext {
         let mut project =
             foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
         project.no_artifacts = true;
-        let zksolc_version = ZkSolc::new(project.compiler.zksolc.clone()).version()?;
-        let mut is_zksync_solc = false;
+        let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
 
-        let solc_version = if let Some(solc) = &config.zksync.solc_path {
-            let solc = Solc::new(solc)?;
-            //TODO: determine if this solc is zksync or not
-            solc.version
+        let (solc_version, is_zksync_solc) = if let Some(solc) = &config.zksync.solc_path {
+            let solc_type_and_version = zksolc::get_solc_type_and_version(solc)?;
+            (solc_type_and_version.version, solc_type_and_version.zksync_version.is_some())
         } else {
             //if there's no `solc_path` specified then we use the same
             // as the project version
@@ -64,8 +62,7 @@ impl ZkVerificationContext {
             let solc = Solc::new_with_version(solc_path, context_solc_version.clone());
             project.compiler.solc = SolcCompiler::Specific(solc);
 
-            is_zksync_solc = true;
-            context_solc_version
+            (context_solc_version, true)
         };
 
         let compiler_version =

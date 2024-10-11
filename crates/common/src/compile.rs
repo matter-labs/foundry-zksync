@@ -299,7 +299,7 @@ impl ProjectCompiler {
         let files = self.files.clone();
 
         {
-            let zksolc_version = ZkSolc::new(project.compiler.zksolc.clone()).version()?;
+            let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
             Report::new(SpinnerReporter::spawn_with(format!("Using zksolc-{zksolc_version}")));
         }
         self.zksync_compile_with(&project.paths.root, || {

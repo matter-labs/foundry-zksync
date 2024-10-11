@@ -87,9 +87,7 @@ pub fn config_create_project(
             ZkSolc::blocking_install(&default_version)?;
             zksolc = ZkSolc::find_installed_version(&default_version)?;
         }
-        zksolc
-            .map(|c| c.zksolc)
-            .unwrap_or_else(|| panic!("Could not install zksolc v{}", default_version))
+        zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{}", default_version))
     } else {
         "zksolc".into()
     };
@@ -197,7 +195,7 @@ pub fn config_ensure_zksolc(
                     ZkSolc::blocking_install(version)?;
                     zksolc = ZkSolc::find_installed_version(version)?;
                 }
-                zksolc.map(|commmand| commmand.zksolc)
+                zksolc
             }
             SolcReq::Local(zksolc) => {
                 if !zksolc.is_file() {
