@@ -198,7 +198,11 @@ pub async fn estimate_gas<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
         provider.get_gas_price().await?
     };
     let data = tx.input.clone().into_input().unwrap_or_default();
+    for d in &factory_deps {
+        println!("{}", hex::encode(&d));
+    }
     let custom_data = Eip712Meta::new().factory_deps(factory_deps);
+    let custom_data_min = Eip712Meta::new();
 
     let mut deploy_request = Eip712TransactionRequest::new()
         .r#type(EIP712_TX_TYPE)
@@ -207,10 +211,13 @@ pub async fn estimate_gas<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
         .nonce(nonce)
         .gas_price(gas_price)
         .data(data.to_ethers())
-        .custom_data(custom_data);
+        .custom_data(custom_data_min);
     if let Some(from) = tx.from {
         deploy_request = deploy_request.from(from.to_h160())
     }
+
+    println!("{}", serde_json::to_string_pretty(&deploy_request).unwrap());
+    deploy_request = deploy_request.custom_data(custom_data);
 
     let gas_price = provider.get_gas_price().await.unwrap();
     let fee: Fee = provider

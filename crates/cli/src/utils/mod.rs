@@ -2,6 +2,7 @@ use alloy_json_abi::JsonAbi;
 use alloy_primitives::U256;
 use alloy_provider::{network::AnyNetwork, Provider};
 use alloy_transport::Transport;
+use alloy_zksync::network::Zksync;
 use eyre::{ContextCompat, Result};
 use foundry_common::provider::{ProviderBuilder, RetryProvider};
 use foundry_config::{Chain, Config};
@@ -84,6 +85,12 @@ pub fn abi_to_solidity(abi: &JsonAbi, name: &str) -> Result<String> {
 /// RPC
 pub fn get_provider(config: &Config) -> Result<RetryProvider> {
     get_provider_builder(config)?.build()
+}
+
+/// Returns a [RetryProvider] instantiated using [Config]'s
+/// RPC for ZKsync
+pub fn get_provider_zksync(config: &Config) -> Result<RetryProvider<Zksync>> {
+    get_provider_builder(config)?.build_zksync()
 }
 
 /// Returns a [ProviderBuilder] instantiated using [Config] values.

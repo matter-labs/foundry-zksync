@@ -15,6 +15,7 @@ use alloy_transport::{
     layers::{RetryBackoffLayer, RetryBackoffService},
     utils::guess_local_url,
 };
+use alloy_zksync::network::Zksync;
 use eyre::{Result, WrapErr};
 use foundry_config::NamedChain;
 use reqwest::Url;
@@ -280,6 +281,47 @@ impl ProviderBuilder {
 
         Ok(provider)
     }
+
+    /// Constructs the `RetryProvider` taking all configs into account for ZKsync network.
+    pub fn build_zksync(self) -> Result<RetryProvider<Zksync>> {
+        let Self {
+            url,
+            chain,
+            max_retry,
+            initial_backoff,
+            timeout,
+            compute_units_per_second,
+            jwt,
+            headers,
+            is_local,
+        } = self;
+        let url = url?;
+
+        let retry_layer =
+            RetryBackoffLayer::new(max_retry, initial_backoff, compute_units_per_second);
+
+        let transport = RuntimeTransportBuilder::new(url)
+            .with_timeout(timeout)
+            .with_headers(headers)
+            .with_jwt(jwt)
+            .build();
+        let client = ClientBuilder::default().layer(retry_layer).transport(transport, is_local);
+
+        if !is_local {
+            client.set_poll_interval(
+                chain
+                    .average_blocktime_hint()
+                    .unwrap_or(DEFAULT_UNKNOWN_CHAIN_BLOCK_TIME)
+                    .mul_f32(POLL_INTERVAL_BLOCK_TIME_SCALE_FACTOR),
+            );
+        }
+
+        let provider = AlloyProviderBuilder::<_, _, Zksync>::default()
+            .on_provider(RootProvider::new(client));
+
+        Ok(provider)
+    }
+
 
     /// Constructs the `RetryProvider` with a wallet.
     pub fn build_with_wallet(self, wallet: EthereumWallet) -> Result<RetryProviderWithSigner> {

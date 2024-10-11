@@ -2,12 +2,13 @@ use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-use alloy_primitives::{hex, Address, Bytes};
+use alloy_primitives::{hex, Address, Bytes, U256};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
 use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
+use alloy_zksync::{network::Zksync, provider::ZksyncProvider, wallet::ZksyncWallet};
 use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
 use forge_verify::{zk_provider::CompilerVerificationContext, RetryArgs};
@@ -152,7 +153,7 @@ impl CreateArgs {
 
             // Add arguments to constructor
             let config = self.eth.try_load_config_emit_warnings()?;
-            let provider = utils::get_provider(&config)?;
+            let provider = utils::get_provider_zksync(&config)?;
             let params = match abi.constructor {
                 Some(ref v) => {
                     let constructor_args =
@@ -225,10 +226,52 @@ impl CreateArgs {
             };
             let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
 
-            let result = if self.unlocked {
+            if std::env::var("CREATE_ZK").unwrap_or_default() == "1" {
+                let provider = utils::get_provider(&config)?;
+                let result = if self.unlocked {
+                    // Deploy with unlocked account
+                    let sender = self.eth.wallet.from.expect("required");
+                    self.deploy_zk(
+                        abi,
+                        bin.object,
+                        params,
+                        provider,
+                        chain_id,
+                        sender,
+                        config.transaction_timeout,
+                        zk_data,
+                        None,
+                    )
+                    .await
+                } else {
+                    // Deploy with signer
+                    let signer = self.eth.wallet.signer().await?;
+                    let zk_signer = self.eth.wallet.signer().await?;
+                    let deployer = signer.address();
+                    let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
+                        .wallet(EthereumWallet::new(signer))
+                        .on_provider(provider);
+                    self.deploy_zk(
+                        abi,
+                        bin.object,
+                        params,
+                        provider,
+                        chain_id,
+                        deployer,
+                        config.transaction_timeout,
+                        zk_data,
+                        Some(zk_signer),
+                    )
+                    .await
+                };
+
+                return result;
+            }
+
+            return if self.unlocked {
                 // Deploy with unlocked account
                 let sender = self.eth.wallet.from.expect("required");
-                self.deploy_zk(
+                self.deploy2(
                     abi,
                     bin.object,
                     params,
@@ -237,18 +280,16 @@ impl CreateArgs {
                     sender,
                     config.transaction_timeout,
                     zk_data,
-                    None,
                 )
                 .await
             } else {
                 // Deploy with signer
                 let signer = self.eth.wallet.signer().await?;
-                let zk_signer = self.eth.wallet.signer().await?;
                 let deployer = signer.address();
-                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                    .wallet(EthereumWallet::new(signer))
+                let provider = ProviderBuilder::<_, _, Zksync>::default()
+                    .wallet(ZksyncWallet::new(signer))
                     .on_provider(provider);
-                self.deploy_zk(
+                self.deploy2(
                     abi,
                     bin.object,
                     params,
@@ -257,12 +298,9 @@ impl CreateArgs {
                     deployer,
                     config.transaction_timeout,
                     zk_data,
-                    Some(zk_signer),
                 )
                 .await
-            };
-
-            return result;
+            }
         }
 
         let target_path = if let Some(ref mut path) = self.contract.path {
@@ -532,6 +570,166 @@ impl CreateArgs {
         verify.run().await
     }
 
+    /// Deploys the contract
+    #[allow(clippy::too_many_arguments)]
+    async fn deploy2<P: Provider<T, Zksync>, T: Transport + Clone>(
+        self,
+        abi: JsonAbi,
+        bin: BytecodeObject,
+        args: Vec<DynSolValue>,
+        provider: P,
+        chain: u64,
+        deployer_address: Address,
+        timeout: u64,
+        zk_data: ZkSyncData,
+    ) -> Result<()> {
+        let bin = bin.into_bytes().unwrap_or_else(|| {
+            panic!("no bytecode found in bin object for {}", self.contract.name)
+        });
+        let provider = Arc::new(provider);
+        let factory = ContractFactory::new_zk(abi.clone(), bin.clone(), provider.clone(), timeout);
+
+        let is_args_empty = args.is_empty();
+        let mut deployer =
+            factory.deploy_tokens_zk(args.clone(), &zk_data).context("failed to deploy contract").map_err(|e| {
+                if is_args_empty {
+                    e.wrap_err("no arguments provided for contract constructor; consider --constructor-args or --constructor-args-path")
+                } else {
+                    e
+                }
+            })?;
+        let is_legacy = self.tx.legacy || Chain::from(chain).is_legacy();
+
+        // The large L2 gas per pubdata to sign. This gas is enough to ensure that
+        // any reasonable limit will be accepted. Note, that the operator is NOT required to
+        // use the honest value of gas per pubdata and it can use any value up to the one signed by
+        // the user. In the future releases, we will provide a way to estimate the current
+        // gasPerPubdata.
+        pub const DEFAULT_GAS_PER_PUBDATA_LIMIT: u64 = 50000;
+
+        deployer.tx_zk =
+            deployer.tx_zk.with_gas_per_pubdata(U256::from(DEFAULT_GAS_PER_PUBDATA_LIMIT)).with_factory_deps(
+                zk_data.factory_deps.clone().into_iter().map(|dep| dep.into()).collect(),
+            );
+        deployer.tx_zk.set_from(deployer_address);
+        deployer.tx_zk.set_chain_id(chain);
+        // `to` field must be set explicitly, cannot be None.
+        if deployer.tx_zk.to().is_none() {
+            deployer.tx_zk.set_create();
+        }
+        deployer.tx_zk.set_nonce(if let Some(nonce) = self.tx.nonce {
+            Ok(nonce.to())
+        } else {
+            provider.get_transaction_count(deployer_address).await
+        }?);
+
+        // set tx value if specified
+        if let Some(value) = self.tx.value {
+            deployer.tx_zk.set_value(value);
+        }
+
+        let gas_price = if let Some(gas_price) = self.tx.gas_price {
+            gas_price.to()
+        } else {
+            provider.get_gas_price().await?
+        };
+        deployer.tx_zk.set_gas_price(gas_price);
+        
+        if !is_legacy {
+            let estimate = provider.estimate_eip1559_fees(None).await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
+            let priority_fee = if let Some(priority_fee) = self.tx.priority_gas_price {
+                priority_fee.to()
+            } else {
+                estimate.max_priority_fee_per_gas
+            };
+            let max_fee = if let Some(max_fee) = self.tx.gas_price {
+                max_fee.to()
+            } else {
+                estimate.max_fee_per_gas
+            };
+
+            deployer.tx_zk.set_max_fee_per_gas(max_fee);
+            deployer.tx_zk.set_max_priority_fee_per_gas(priority_fee);
+        }
+
+        let fee = provider
+            .estimate_fee(&deployer.tx_zk)
+            .await
+            .map_err(|err| eyre::eyre!("failed rpc call for estimating fee: {:?}", err))?
+            .unwrap_or_default();
+
+        deployer.tx_zk.set_gas_limit(if let Some(gas_limit) = self.tx.gas_limit {
+            gas_limit.to::<u128>()
+        } else {
+            fee.gas_limit.saturating_to::<u128>()
+        });
+
+        // Before we actually deploy the contract we try check if the verify settings are valid
+        let mut constructor_args = None;
+        if self.verify {
+            if !args.is_empty() {
+                let encoded_args = abi
+                    .constructor()
+                    .ok_or_else(|| eyre::eyre!("could not find constructor"))?
+                    .abi_encode_input(&args)?;
+                constructor_args = Some(hex::encode_prefixed(encoded_args));
+            }
+
+            self.verify_preflight_check(constructor_args.clone(), chain).await?;
+        }
+
+        // Deploy the actual contract
+        let (deployed_contract, receipt) = deployer.send_with_receipt_zk().await?;
+
+        let address = deployed_contract;
+        if self.json {
+            let output = json!({
+                "deployer": deployer_address.to_string(),
+                "deployedTo": address.to_string(),
+                "transactionHash": receipt.transaction_hash
+            });
+            println!("{output}");
+        } else {
+            println!("Deployer: {deployer_address}");
+            println!("Deployed to: {address}");
+            println!("Transaction hash: {:?}", receipt.transaction_hash);
+        };
+
+        if !self.verify {
+            return Ok(());
+        }
+
+        println!("Starting contract verification...");
+
+        let num_of_optimizations =
+            if self.opts.compiler.optimize { self.opts.compiler.optimizer_runs } else { None };
+        let verify = forge_verify::VerifyArgs {
+            address,
+            contract: Some(self.contract),
+            compiler_version: None,
+            constructor_args,
+            constructor_args_path: None,
+            num_of_optimizations,
+            etherscan: EtherscanOpts { key: self.eth.etherscan.key(), chain: Some(chain.into()) },
+            rpc: Default::default(),
+            flatten: false,
+            force: false,
+            skip_is_verified_check: false,
+            watch: true,
+            retry: self.retry,
+            libraries: self.opts.libraries.clone(),
+            root: None,
+            verifier: self.verifier,
+            via_ir: self.opts.via_ir,
+            evm_version: self.opts.compiler.evm_version,
+            show_standard_json_input: self.show_standard_json_input,
+            guess_constructor_args: false,
+            zksync: self.opts.compiler.zk.enabled(),
+        };
+        println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
+        verify.run().await
+    }
+
     // Deploys the zk contract
     #[allow(clippy::too_many_arguments)]
     async fn deploy_zk<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
@@ -553,11 +751,16 @@ impl CreateArgs {
         let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone(), timeout);
 
         let is_args_empty = args.is_empty();
-        let mut deployer =
-            factory.deploy_tokens_zk(args.clone(), &zk_data).context("failed to deploy contract")
-                .map(|deployer| deployer.set_zk_factory_deps(zk_data.factory_deps.clone())).map_err(|e| {
+        let mut deployer = factory
+            .deploy_tokens_zk_old(args.clone(), &zk_data)
+            .context("failed to deploy contract")
+            .map(|deployer| deployer.set_zk_factory_deps(zk_data.factory_deps.clone()))
+            .map_err(|e| {
                 if is_args_empty {
-                    e.wrap_err("no arguments provided for contract constructor; consider --constructor-args or --constructor-args-path")
+                    e.wrap_err(
+                        "no arguments provided for contract
+    constructor; consider --constructor-args or --constructor-args-path",
+                    )
                 } else {
                     e
                 }
@@ -628,7 +831,7 @@ impl CreateArgs {
         }
 
         // Deploy the actual contract
-        let (deployed_contract, receipt) = deployer.send_with_receipt_zk(zk_signer).await?;
+        let (deployed_contract, receipt) = deployer.send_with_receipt_zk_old(zk_signer).await?;
 
         let address = deployed_contract;
         if self.json {
@@ -772,6 +975,7 @@ impl<B, P, T, C> From<Deployer<B, P, T>> for ContractDeploymentTx<B, P, T, C> {
 pub struct Deployer<B, P, T> {
     /// The deployer's transaction, exposed for overriding the defaults
     pub tx: WithOtherFields<TransactionRequest>,
+    pub tx_zk: alloy_zksync::network::transaction_request::TransactionRequest,
     abi: JsonAbi,
     client: B,
     confs: usize,
@@ -788,6 +992,7 @@ where
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),
+            tx_zk: self.tx_zk.clone(),
             abi: self.abi.clone(),
             client: self.client.clone(),
             confs: self.confs,
@@ -815,7 +1020,7 @@ where
     /// be sufficiently confirmed (default: 1), it returns a tuple with
     /// the [`Contract`](crate::Contract) struct at the deployed contract's address
     /// and the corresponding [`AnyReceipt`].
-    pub async fn send_with_receipt_zk(
+    pub async fn send_with_receipt_zk_old(
         self,
         signer: Option<WalletSigner>,
     ) -> Result<(Address, AnyTransactionReceipt), ContractDeploymentError> {
@@ -855,6 +1060,35 @@ where
             .client
             .borrow()
             .send_transaction(self.tx)
+            .await?
+            .with_required_confirmations(self.confs as u64)
+            .get_receipt()
+            .await?;
+
+        let address =
+            receipt.contract_address.ok_or(ContractDeploymentError::ContractNotDeployed)?;
+
+        Ok((address, receipt))
+    }
+}
+
+impl<B, P, T> Deployer<B, P, T>
+where
+    B: Borrow<P> + Clone,
+    P: Provider<T, Zksync>,
+    T: Transport + Clone,
+{
+    /// Broadcasts the contract deployment transaction and after waiting for it to
+    /// be sufficiently confirmed (default: 1), it returns a tuple with
+    /// the [`Contract`](crate::Contract) struct at the deployed contract's address
+    /// and the corresponding [`AnyReceipt`].
+    pub async fn send_with_receipt_zk(
+        self,
+    ) -> Result<(Address, AnyTransactionReceipt), ContractDeploymentError> {
+        let receipt = self
+            .client
+            .borrow()
+            .send_transaction(self.tx_zk)
             .await?
             .with_required_confirmations(self.confs as u64)
             .get_receipt()
@@ -966,12 +1200,18 @@ where
         };
 
         // create the tx object. Since we're deploying a contract, `to` is `None`
-        let tx = WithOtherFields::new(TransactionRequest::default().input(data.into()));
+        let tx = WithOtherFields::new(TransactionRequest::default().input(data.clone().into()));
+        let tx_zk = alloy_zksync::network::transaction_request::TransactionRequest::default().base(
+            TransactionRequest::default()
+                .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
+                .input(data.into()),
+        );
 
         Ok(Deployer {
             client: self.client.clone(),
             abi: self.abi,
             tx,
+            tx_zk,
             confs: 1,
             timeout: self.timeout,
             zk_factory_deps: None,
@@ -982,7 +1222,7 @@ where
 
     /// Create a deployment tx using the provided tokens as constructor
     /// arguments
-    pub fn deploy_tokens_zk(
+    pub fn deploy_tokens_zk_old(
         self,
         params: Vec<DynSolValue>,
         zk_data: &ZkSyncData,
@@ -1010,6 +1250,11 @@ where
         let tx = WithOtherFields::new(
             TransactionRequest::default()
                 .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
+                .input(data.clone().into()),
+        );
+        let tx_zk = alloy_zksync::network::transaction_request::TransactionRequest::default().base(
+            TransactionRequest::default()
+                .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
                 .input(data.into()),
         );
 
@@ -1017,9 +1262,72 @@ where
             client: self.client.clone(),
             abi: self.abi,
             tx,
+            tx_zk,
             confs: 1,
             timeout: self.timeout,
             zk_factory_deps: Some(vec![zk_data.bytecode.clone()]),
+            _p: PhantomData,
+            _t: PhantomData,
+        })
+    }
+}
+
+impl<P, T, B> DeploymentTxFactory<B, P, T>
+where
+    B: Borrow<P> + Clone,
+    P: Provider<T, Zksync>,
+    T: Transport + Clone,
+{
+    /// Creates a factory for deployment of the Contract with bytecode, and the
+    /// constructor defined in the abi. The client will be used to send any deployment
+    /// transaction.
+    pub fn new_zk(abi: JsonAbi, bytecode: Bytes, client: B, timeout: u64) -> Self {
+        Self { client, abi, bytecode, timeout, _p: PhantomData, _t: PhantomData }
+    }
+
+    /// Create a deployment tx using the provided tokens as constructor
+    /// arguments
+    pub fn deploy_tokens_zk(
+        self,
+        params: Vec<DynSolValue>,
+        zk_data: &ZkSyncData,
+    ) -> Result<Deployer<B, P, T>, ContractDeploymentError>
+    where
+        B: Clone,
+    {
+        // Encode the constructor args & concatenate with the bytecode if necessary
+        if self.abi.constructor().is_none() && !params.is_empty() {
+            return Err(ContractDeploymentError::ConstructorError)
+        }
+
+        // Encode the constructor args & concatenate with the bytecode if necessary
+        let constructor_args = match self.abi.constructor() {
+            None => Default::default(),
+            Some(constructor) => constructor.abi_encode_input(&params).unwrap_or_default(),
+        };
+        let data: Bytes = foundry_zksync_core::encode_create_params(
+            &forge::revm::primitives::CreateScheme::Create,
+            zk_data.bytecode_hash,
+            constructor_args,
+        )
+        .into();
+
+        // create the tx object. Since we're deploying a contract, `to` is `None`
+        let tx = WithOtherFields::new(TransactionRequest::default().input(data.clone().into()));
+        let tx_zk = alloy_zksync::network::transaction_request::TransactionRequest::default().base(
+            TransactionRequest::default()
+                .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
+                .input(data.into()),
+        );
+
+        Ok(Deployer {
+            client: self.client.clone(),
+            abi: self.abi,
+            tx,
+            tx_zk,
+            confs: 1,
+            timeout: self.timeout,
+            zk_factory_deps: None,
             _p: PhantomData,
             _t: PhantomData,
         })
