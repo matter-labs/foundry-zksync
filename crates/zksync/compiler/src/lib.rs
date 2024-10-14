@@ -6,15 +6,10 @@
 /// ZKSolc specific logic.
 mod zksolc;
 
-use std::{
-    path::{Path, PathBuf},
-    process::{Command, Stdio},
-    str::FromStr,
-};
+use std::path::PathBuf;
 
 use foundry_config::{Config, SkipBuildFilters, SolcReq};
 use semver::Version;
-use tracing::{debug, trace};
 pub use zksolc::*;
 
 pub mod libraries;
