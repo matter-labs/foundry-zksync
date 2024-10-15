@@ -127,24 +127,22 @@ contract ZkCheatcodesTest is DSTest {
         require(vm.getNonce(TEST_ADDRESS) == 0, "era nonce mismatch");
     }
 
-    function testZkCheatcodesGetCode() public {
-        bytes memory fullPath = vm.getCode("ConstantNumber.sol");
+    function getCodeCheck(string memory contractName, string memory outDir) internal {
+        bytes memory bytecode = vm.getCode(contractName);
 
-        string memory artifact = vm.readFile("zk/zkout/ConstantNumber.sol/ConstantNumber.json");
+        string memory artifactPath = string.concat("zk/", outDir, "/", contractName, ".sol/", contractName, ".json");
+        string memory artifact = vm.readFile(artifactPath);
         bytes memory expectedBytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
 
-        assertEq(fullPath, expectedBytecode, "code for the contract was incorrect");
+        assertEq(bytecode, expectedBytecode, "code for the contract was incorrect");
     }
 
-    function testZkCheatcodesGetEVMCode() public {
+    function testZkCheatcodesGetCode() public {
+        string memory contractName = "ConstantNumber";
+        getCodeCheck(contractName, "zkout");
+
         vm.zkVm(false);
-        bytes memory fullPath = vm.getCode("ConstantNumber.sol");
-        vm.zkVm(true);
-
-        string memory artifact = vm.readFile("zk/out/ConstantNumber.sol/ConstantNumber.json");
-        bytes memory expectedBytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
-
-        assertEq(fullPath, expectedBytecode, "code for the contract was incorrect");
+        getCodeCheck(contractName, "out");
     }
 
     function testZkCheatcodesEtch() public {
