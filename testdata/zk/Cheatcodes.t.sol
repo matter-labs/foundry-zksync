@@ -130,12 +130,10 @@ contract ZkCheatcodesTest is DSTest {
     function testZkCheatcodesGetCode() public {
         bytes memory fullPath = vm.getCode("ConstantNumber.sol");
 
-        string memory expected = string(
-            bytes(
-                hex"0000008003000039000000400030043f0000000100200190000000120000c13d000000000201001900000009002001980000001a0000613d000000000101043b0000000a011001970000000b0010009c0000001a0000c13d0000000001000416000000000001004b0000001a0000c13d0000000a01000039000000800010043f0000000c010000410000001d0001042e0000000001000416000000000001004b0000001a0000c13d00000020010000390000010000100443000001200000044300000008010000410000001d0001042e00000000010000190000001e000104300000001c000004320000001d0001042e0000001e000104300000000000000000000000020000000000000000000000000000004000000100000000000000000000000000000000000000000000000000fffffffc000000000000000000000000ffffffff00000000000000000000000000000000000000000000000000000000643ceff9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000800000000000000000000000000000000000000000000000000000000000000000000000000000000003a132f0d7f2acbc17068fa391c92b7f5a0af0a008d2273d995838958ac6eeb4"
-            )
-        );
-        assertEq(string(fullPath), expected, "code for the contract was incorrect");
+        string memory artifact = vm.readFile("zk/zkout/ConstantNumber.sol/ConstantNumber.json");
+        bytes memory expectedBytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
+        
+        assertEq(fullPath, expectedBytecode, "code for the contract was incorrect");
     }
 
     function testZkCheatcodesGetCodeEVM() public {
@@ -143,12 +141,10 @@ contract ZkCheatcodesTest is DSTest {
         bytes memory fullPath = vm.getCode("ConstantNumber.sol");
         vm.zkVm(true);
 
-        string memory expected = string(
-            bytes(
-                hex"6080604052348015600f57600080fd5b50607780601d6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063643ceff914602d575b600080fd5b60408051600a815290519081900360200190f3fea2646970667358221220e940a7e80d99723067bd50f2ae220c5faa1bc6a1d90f422384a14c93135a110064736f6c634300081b0033"
-            )
-        );
-        assertEq(string(fullPath), expected, "code for the contract was incorrect");
+        string memory artifact = vm.readFile("zk/out/ConstantNumber.sol/ConstantNumber.json");
+        bytes memory expectedBytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
+        
+        assertEq(fullPath, expectedBytecode, "code for the contract was incorrect");
     }
 
     function testZkCheatcodesEtch() public {
@@ -395,3 +391,4 @@ contract ZkCheatcodeZkVmSkipTest is DSTest {
         helper2.exec();
     }
 }
+
