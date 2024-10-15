@@ -136,7 +136,7 @@ contract ZkCheatcodesTest is DSTest {
         assertEq(fullPath, expectedBytecode, "code for the contract was incorrect");
     }
 
-    function testZkCheatcodesGetCodeEVM() public {
+    function testZkCheatcodesGetEVMCode() public {
         vm.zkVm(false);
         bytes memory fullPath = vm.getCode("ConstantNumber.sol");
         vm.zkVm(true);

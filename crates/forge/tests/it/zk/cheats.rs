@@ -32,7 +32,7 @@ async fn test_zk_cheat_get_code_evm() {
         .fs_permissions
         .add(PathPermission::read_write("./zk/out/ConstantNumber.sol/ConstantNumber.json"));
     let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
-    let filter = Filter::new("testZkCheatcodesGetCodeEVM", "ZkCheatcodesTest", ".*");
+    let filter = Filter::new("testZkCheatcodesGetEVMCode", "ZkCheatcodesTest", ".*");
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }
