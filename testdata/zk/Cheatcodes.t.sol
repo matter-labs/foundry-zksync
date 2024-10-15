@@ -132,7 +132,7 @@ contract ZkCheatcodesTest is DSTest {
 
         string memory artifact = vm.readFile("zk/zkout/ConstantNumber.sol/ConstantNumber.json");
         bytes memory expectedBytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
-        
+
         assertEq(fullPath, expectedBytecode, "code for the contract was incorrect");
     }
 
@@ -143,7 +143,7 @@ contract ZkCheatcodesTest is DSTest {
 
         string memory artifact = vm.readFile("zk/out/ConstantNumber.sol/ConstantNumber.json");
         bytes memory expectedBytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
-        
+
         assertEq(fullPath, expectedBytecode, "code for the contract was incorrect");
     }
 
@@ -391,4 +391,3 @@ contract ZkCheatcodeZkVmSkipTest is DSTest {
         helper2.exec();
     }
 }
-
