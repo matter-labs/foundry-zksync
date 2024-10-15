@@ -43,6 +43,7 @@ use std::{
     sync::Arc,
 };
 use zksync_types::H256;
+use zksync_web3_rs::eip712::PaymasterParams;
 
 merge_impl_figment_convert!(CreateArgs, opts, eth);
 
@@ -114,6 +115,7 @@ pub struct ZkSyncData {
     bytecode: Vec<u8>,
     bytecode_hash: H256,
     factory_deps: Vec<Vec<u8>>,
+    paymaster_params: Option<PaymasterParams>,
 }
 
 impl CreateArgs {
@@ -125,6 +127,22 @@ impl CreateArgs {
 
         let zksync = self.opts.compiler.zk.enabled();
         if zksync {
+            let paymaster_params =
+                if let Some(paymaster_address) = self.opts.compiler.zk.paymaster_address {
+                    Some(PaymasterParams {
+                        paymaster: paymaster_address,
+                        paymaster_input: self
+                            .opts
+                            .compiler
+                            .zk
+                            .paymaster_input
+                            .clone()
+                            .unwrap_or_default()
+                            .to_vec(),
+                    })
+                } else {
+                    None
+                };
             let target_path = if let Some(ref mut path) = self.contract.path {
                 canonicalize(project.root().join(path))?
             } else {
@@ -223,7 +241,7 @@ impl CreateArgs {
                 visited_bytecodes.insert(bytecode.clone());
                 visited_bytecodes.into_iter().collect()
             };
-            let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
+            let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps, paymaster_params };
 
             let result = if self.unlocked {
                 // Deploy with unlocked account
@@ -555,7 +573,7 @@ impl CreateArgs {
         let is_args_empty = args.is_empty();
         let mut deployer =
             factory.deploy_tokens_zk(args.clone(), &zk_data).context("failed to deploy contract")
-                .map(|deployer| deployer.set_zk_factory_deps(zk_data.factory_deps.clone())).map_err(|e| {
+                .map(|deployer| deployer.set_zk_factory_deps(zk_data.factory_deps.clone()).set_zk_paymaster_params(zk_data.paymaster_params.clone())).map_err(|e| {
                 if is_args_empty {
                     e.wrap_err("no arguments provided for contract constructor; consider --constructor-args or --constructor-args-path")
                 } else {
@@ -777,6 +795,7 @@ pub struct Deployer<B, P, T> {
     confs: usize,
     timeout: u64,
     zk_factory_deps: Option<Vec<Vec<u8>>>,
+    zk_paymaster_params: Option<PaymasterParams>,
     _p: PhantomData<P>,
     _t: PhantomData<T>,
 }
@@ -793,6 +812,7 @@ where
             confs: self.confs,
             timeout: self.timeout,
             zk_factory_deps: self.zk_factory_deps.clone(),
+            zk_paymaster_params: self.zk_paymaster_params.clone(),
             _p: PhantomData,
             _t: PhantomData,
         }
@@ -811,6 +831,12 @@ where
         self
     }
 
+    /// Set zksync's paymaster params.
+    pub fn set_zk_paymaster_params(mut self, params: Option<PaymasterParams>) -> Self {
+        self.zk_paymaster_params = params;
+        self
+    }
+
     /// Broadcasts the zk contract deployment transaction and after waiting for it to
     /// be sufficiently confirmed (default: 1), it returns a tuple with
     /// the [`Contract`](crate::Contract) struct at the deployed contract's address
@@ -823,12 +849,12 @@ where
         let tx = foundry_zksync_core::new_eip712_transaction(
             self.tx,
             factory_deps,
+            self.zk_paymaster_params.clone(),
             self.client.borrow(),
             signer.expect("No signer was found"),
         )
         .await
         .map_err(|_| ContractDeploymentError::ContractNotDeployed)?;
-
         let receipt = self
             .client
             .borrow()
@@ -975,6 +1001,7 @@ where
             confs: 1,
             timeout: self.timeout,
             zk_factory_deps: None,
+            zk_paymaster_params: None,
             _p: PhantomData,
             _t: PhantomData,
         })
@@ -1012,7 +1039,6 @@ where
                 .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
                 .input(data.into()),
         );
-
         Ok(Deployer {
             client: self.client.clone(),
             abi: self.abi,
@@ -1020,6 +1046,7 @@ where
             confs: 1,
             timeout: self.timeout,
             zk_factory_deps: Some(vec![zk_data.bytecode.clone()]),
+            zk_paymaster_params: zk_data.paymaster_params.clone(),
             _p: PhantomData,
             _t: PhantomData,
         })
