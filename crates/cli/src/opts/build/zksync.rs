@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use foundry_config::ZkSyncConfig;
 use serde::Serialize;
+use zksync_web3_rs::types::{Address, Bytes};
 
 #[derive(Clone, Debug, Default, Serialize, Parser)]
 #[clap(next_help_heading = "ZKSync configuration")]
@@ -104,6 +105,22 @@ pub struct ZkSyncArgs {
     /// Contracts to avoid compiling on zkSync
     #[clap(long = "zk-avoid-contracts", visible_alias = "avoid-contracts", value_delimiter = ',')]
     pub avoid_contracts: Option<Vec<String>>,
+
+    /// Paymaster address
+    #[clap(
+        long = "zk-paymaster-address",
+        value_name = "PAYMASTER_ADDRESS",
+        visible_alias = "paymaster-address"
+    )]
+    pub paymaster_address: Option<Address>,
+
+    /// Paymaster input
+    #[clap(
+        long = "zk-paymaster-input",
+        value_name = "PAYMASTER_INPUT",
+        visible_alias = "paymaster-input"
+    )]
+    pub paymaster_input: Option<Bytes>,
 }
 
 impl ZkSyncArgs {
