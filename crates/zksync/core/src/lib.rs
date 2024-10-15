@@ -110,6 +110,7 @@ pub async fn new_eip712_transaction<
 >(
     tx: WithOtherFields<TransactionRequest>,
     factory_deps: Vec<Vec<u8>>,
+    paymaster_data: Option<PaymasterParams>,
     provider: P,
     signer: S,
 ) -> Result<Bytes> {
@@ -126,7 +127,10 @@ pub async fn new_eip712_transaction<
     let gas_price = tx.gas_price.ok_or_eyre("`gas_price` cannot be empty")?;
 
     let data = tx.input.clone().into_input().unwrap_or_default();
-    let custom_data = Eip712Meta::new().factory_deps(factory_deps);
+    let mut custom_data = Eip712Meta::new().factory_deps(factory_deps);
+    if let Some(params) = paymaster_data {
+        custom_data = custom_data.paymaster_params(params);
+    }
 
     let mut deploy_request = Eip712TransactionRequest::new()
         .r#type(EIP712_TX_TYPE)

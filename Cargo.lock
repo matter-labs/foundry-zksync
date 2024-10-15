@@ -5011,6 +5011,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tracy",
  "yansi 1.0.1",
+ "zksync-web3-rs",
 ]
 
 [[package]]
