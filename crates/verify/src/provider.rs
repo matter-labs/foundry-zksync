@@ -3,6 +3,7 @@ use crate::{
     sourcify::SourcifyVerificationProvider,
     verify::{VerifyArgs, VerifyCheckArgs},
     zk_provider::CompilerVerificationContext,
+    zksync::ZkVerificationProvider,
 };
 use alloy_json_abi::JsonAbi;
 use async_trait::async_trait;
@@ -129,6 +130,7 @@ impl FromStr for VerificationProviderType {
             "s" | "sourcify" => Ok(Self::Sourcify),
             "b" | "blockscout" => Ok(Self::Blockscout),
             "o" | "oklink" => Ok(Self::Oklink),
+            "z" | "zksync" => Ok(Self::ZKsync),
             _ => Err(format!("Unknown provider: {s}")),
         }
     }
@@ -149,6 +151,9 @@ impl fmt::Display for VerificationProviderType {
             Self::Oklink => {
                 write!(f, "oklink")?;
             }
+            Self::ZKsync => {
+                write!(f, "zksync")?;
+            }
         };
         Ok(())
     }
@@ -161,6 +166,8 @@ pub enum VerificationProviderType {
     Sourcify,
     Blockscout,
     Oklink,
+    #[value(alias = "zksync")]
+    ZKsync,
 }
 
 impl VerificationProviderType {
@@ -176,6 +183,7 @@ impl VerificationProviderType {
             Self::Sourcify => Ok(Box::<SourcifyVerificationProvider>::default()),
             Self::Blockscout => Ok(Box::<EtherscanVerificationProvider>::default()),
             Self::Oklink => Ok(Box::<EtherscanVerificationProvider>::default()),
+            Self::ZKsync => Ok(Box::<ZkVerificationProvider>::default()),
         }
     }
 }

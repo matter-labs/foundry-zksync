@@ -325,9 +325,9 @@ pub const SELECTOR_L2_ETH_BALANCE_OF: &str = "9cc7f708";
 pub const SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER: &str = "42cbb15c";
 /// Selector for `SystemContext::getBlockTimestamp()`
 pub const SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP: &str = "796b89b9";
-// Selector for `ContractDeployer::create(bytes32, bytes32, bytes)`
+/// Selector for `ContractDeployer::create(bytes32, bytes32, bytes)`
 pub const SELECTOR_CONTRACT_DEPLOYER_CREATE: &str = "9c4d535b";
-// Selector for `ContractDeployer::create2(bytes32, bytes32, bytes)`
+/// Selector for `ContractDeployer::create2(bytes32, bytes32, bytes)`
 pub const SELECTOR_CONTRACT_DEPLOYER_CREATE2: &str = "3cda3351";
 
 /// Represents a parsed FarCall from the ZK-EVM

@@ -1,8 +1,6 @@
 use crate::provider::VerificationContext;
 
-use super::{VerifyArgs, VerifyCheckArgs};
 use alloy_json_abi::JsonAbi;
-use async_trait::async_trait;
 use eyre::{OptionExt, Result};
 use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
@@ -10,7 +8,7 @@ use foundry_compilers::{
     compilers::CompilerSettings,
     resolver::parse::SolData,
     solc::{Solc, SolcCompiler},
-    zksolc::{ZkSolc, ZkSolcCompiler},
+    zksolc::{self, ZkSolc, ZkSolcCompiler},
     zksync::artifact_output::zk::ZkArtifactOutput,
     Graph, Project,
 };
@@ -45,13 +43,11 @@ impl ZkVerificationContext {
         let mut project =
             foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
         project.no_artifacts = true;
-        let zksolc_version = ZkSolc::new(project.compiler.zksolc.clone()).version()?;
-        let mut is_zksync_solc = false;
+        let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
 
-        let solc_version = if let Some(solc) = &config.zksync.solc_path {
-            let solc = Solc::new(solc)?;
-            //TODO: determine if this solc is zksync or not
-            solc.version
+        let (solc_version, is_zksync_solc) = if let Some(solc) = &config.zksync.solc_path {
+            let solc_type_and_version = zksolc::get_solc_version_info(solc)?;
+            (solc_type_and_version.version, solc_type_and_version.zksync_version.is_some())
         } else {
             //if there's no `solc_path` specified then we use the same
             // as the project version
@@ -66,8 +62,7 @@ impl ZkVerificationContext {
             let solc = Solc::new_with_version(solc_path, context_solc_version.clone());
             project.compiler.solc = SolcCompiler::Specific(solc);
 
-            is_zksync_solc = true;
-            context_solc_version
+            (context_solc_version, true)
         };
 
         let compiler_version =
@@ -122,29 +117,6 @@ impl ZkVerificationContext {
 
         Ok(graph.imports(&self.target_path).into_iter().cloned().collect())
     }
-}
-
-/// An abstraction for various verification providers such as etherscan, sourcify, blockscout
-#[async_trait]
-pub trait ZkVerificationProvider {
-    /// This should ensure the verify request can be prepared successfully.
-    ///
-    /// Caution: Implementers must ensure that this _never_ sends the actual verify request
-    /// `[VerificationProvider::verify]`, instead this is supposed to evaluate whether the given
-    /// [`VerifyArgs`] are valid to begin with. This should prevent situations where there's a
-    /// contract deployment that's executed before the verify request and the subsequent verify task
-    /// fails due to misconfiguration.
-    async fn preflight_check(
-        &mut self,
-        args: VerifyArgs,
-        context: ZkVerificationContext,
-    ) -> Result<()>;
-
-    /// Sends the actual verify request for the targeted contract.
-    async fn verify(&mut self, args: VerifyArgs, context: ZkVerificationContext) -> Result<()>;
-
-    /// Checks whether the contract is verified.
-    async fn check(&self, args: VerifyCheckArgs) -> Result<()>;
 }
 
 #[derive(Debug)]

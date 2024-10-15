@@ -180,7 +180,7 @@ Diagnostics: {diags}",
     ) -> Result<()> {
         let solc_version = strip_build_meta(compiler_version.solc.clone());
         let zksolc_version = strip_build_meta(compiler_version.zksolc.clone());
-        let zksolc = ZkSolc::find_installed_version(&zksolc_version)?
+        let zksolc_path = ZkSolc::find_installed_version(&zksolc_version)?
             .unwrap_or(ZkSolc::blocking_install(&solc_version)?);
 
         let input = ZkSolcVersionedInput {
@@ -202,9 +202,10 @@ Diagnostics: {diags}",
             SolcCompiler::Specific(solc)
         };
 
-        let zksolc_compiler = ZkSolcCompiler { zksolc: zksolc.zksolc, solc: solc_compiler };
+        let zksolc_compiler = ZkSolcCompiler { zksolc: zksolc_path, solc: solc_compiler };
+        let zksolc = zksolc_compiler.zksolc(&input)?;
 
-        let out = zksolc_compiler.zksync_compile(&input)?;
+        let out = zksolc.compile(&input.input)?;
         if out.has_error() {
             let mut o = ZkAggregatedCompilerOutput::default();
             o.extend(solc_version, raw_build_info_new(&input, &out, false)?, out);
