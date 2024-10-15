@@ -83,7 +83,10 @@ fn main() -> Result<()> {
         ForgeSubcommand::Clean { root } => {
             let config = utils::load_config_with_root(root.as_deref());
             let project = config.project()?;
+            let zk_project =
+                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
             config.cleanup(&project)?;
+            config.cleanup(&zk_project)?;
             Ok(())
         }
         ForgeSubcommand::Snapshot(cmd) => {
