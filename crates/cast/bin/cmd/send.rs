@@ -254,7 +254,7 @@ async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
 
     let tx_hash = pending_tx.inner().tx_hash();
 
-    handle_transaction_result(&cast, &tx_hash, cast_async, confs, timeout, to_json).await
+    handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout, to_json).await
 }
 
 async fn handle_transaction_result<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
