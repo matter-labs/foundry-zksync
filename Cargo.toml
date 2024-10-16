@@ -297,3 +297,29 @@ tower-http = "0.5"
 soldeer = "=0.3.4"
 proptest = "1"
 comfy-table = "7"
+
+[patch.crates-io]
+alloy-consensus = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-contract = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-eips = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-genesis = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-json-rpc = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-network = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-network-primitives = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-provider = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-pubsub = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-rpc-client = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-rpc-types = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-rpc-types-trace = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-rpc-types-eth = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-serde = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-signer = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-signer-aws = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-signer-gcp = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-signer-ledger = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-signer-local = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-signer-trezor = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-transport = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-transport-http = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-transport-ipc = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
+alloy-transport-ws = { git = "https://github.com/Karrq/alloy", rev = "d016019" }
