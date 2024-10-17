@@ -235,13 +235,10 @@ impl DualCompiledContracts {
         } else if artifact_id.path.starts_with(&self.evm_artifact_path) {
             Some(ContractType::EVM)
         } else {
-            tracing::error!(
-                "Contract path {:?} not found in {:?} or {:?}",
-                artifact_id.path,
-                self.zk_artifact_path,
-                self.evm_artifact_path
+            panic!(
+                "Unexpected artifact path: {:?}. Not found in ZK path {:?} or EVM path {:?}",
+                artifact_id.path, self.zk_artifact_path, self.evm_artifact_path
             );
-            None
         }
     }
 
