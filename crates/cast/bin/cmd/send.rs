@@ -7,7 +7,7 @@ use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_transport::Transport;
 use cast::Cast;
-use clap::Parser;
+use clap::{builder::ArgPredicate, Parser};
 use eyre::Result;
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
@@ -23,15 +23,15 @@ use zksync_web3_rs::eip712::PaymasterParams;
 #[derive(Debug, Parser)]
 pub struct ZksyncParams {
     /// Use ZKSync
-    #[arg(long)]
+    #[arg(long, default_value_ifs([("paymaster_address", ArgPredicate::IsPresent, "true"),("paymaster_input", ArgPredicate::IsPresent, "true")]))]
     zksync: bool,
 
     /// The paymaster address for the ZKSync transaction
-    #[arg(long = "zk-paymaster-address", requires_all = ["paymaster_input", "zksync"])]
+    #[arg(long = "zk-paymaster-address", requires_all = ["paymaster_input"])]
     paymaster_address: Option<String>,
 
     /// The paymaster input for the ZKSync transaction
-    #[arg(long = "zk-paymaster-input", requires_all = ["paymaster_address", "zksync"])]
+    #[arg(long = "zk-paymaster-input", requires_all = ["paymaster_address"])]
     paymaster_input: Option<String>,
 }
 
@@ -196,26 +196,23 @@ impl SendTxArgs {
 
             if zksync_params.zksync {
                 // ZkSync transaction
-                let paymaster_address = zksync_params
+                let paymaster_params = zksync_params
                     .paymaster_address
-                    .as_ref()
-                    .map(|s| Address::from_str(s))
-                    .transpose()?
-                    .map(|addr| addr.to_h160())
-                    .unwrap_or_default();
-                let paymaster_input = zksync_params
-                    .paymaster_input
-                    .as_ref()
-                    .map(|s| Bytes::from_str(s))
-                    .transpose()?
-                    .map(|bytes| bytes.to_vec())
-                    .unwrap_or_default();
+                    .and_then(|addr| zksync_params.paymaster_input.map(|input| (addr, input)))
+                    .map(|(addr, input)| PaymasterParams {
+                        paymaster: Address::from_str(&addr)
+                            .expect("Invalid paymaster address")
+                            .to_h160(),
+                        paymaster_input: Bytes::from_str(&input)
+                            .expect("Invalid paymaster input")
+                            .to_vec(),
+                    });
 
                 // Build EIP712 transaction for ZKSync
                 let tx = foundry_zksync_core::new_eip712_transaction(
                     builder.build(&signer).await?.0,
                     Vec::new(), // Empty factory_deps
-                    Some(PaymasterParams { paymaster: paymaster_address, paymaster_input }),
+                    paymaster_params,
                     &provider,
                     signer,
                 )
