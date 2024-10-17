@@ -22,12 +22,16 @@ use zksync_web3_rs::eip712::PaymasterParams;
 /// ZkSync-specific paymaster parameters for transactions
 #[derive(Debug, Parser)]
 pub struct ZksyncParams {
+    /// Use ZKSync
+    #[arg(long)]
+    zksync: bool,
+
     /// The paymaster address for the ZKSync transaction
-    #[arg(long = "zk-paymaster-address")]
+    #[arg(long = "zk-paymaster-address", requires_all = ["paymaster_input", "zksync"])]
     paymaster_address: Option<String>,
 
     /// The paymaster input for the ZKSync transaction
-    #[arg(long = "zk-paymaster-input")]
+    #[arg(long = "zk-paymaster-input", requires_all = ["paymaster_address", "zksync"])]
     paymaster_input: Option<String>,
 }
 
@@ -190,18 +194,22 @@ impl SendTxArgs {
 
             tx::validate_from_address(eth.wallet.from, from)?;
 
-            let paymaster_address = zksync_params
-                .paymaster_address
-                .as_ref()
-                .map(|s| Address::from_str(s))
-                .transpose()?;
-            let paymaster_input =
-                zksync_params.paymaster_input.as_ref().map(|s| Bytes::from_str(s)).transpose()?;
-
-            if paymaster_address.is_some() || paymaster_input.is_some() {
+            if zksync_params.zksync {
                 // ZkSync transaction
-                let paymaster_address = paymaster_address.unwrap().to_h160();
-                let paymaster_input = paymaster_input.unwrap().to_vec();
+                let paymaster_address = zksync_params
+                    .paymaster_address
+                    .as_ref()
+                    .map(|s| Address::from_str(s))
+                    .transpose()?
+                    .map(|addr| addr.to_h160())
+                    .unwrap_or_default();
+                let paymaster_input = zksync_params
+                    .paymaster_input
+                    .as_ref()
+                    .map(|s| Bytes::from_str(s))
+                    .transpose()?
+                    .map(|bytes| bytes.to_vec())
+                    .unwrap_or_default();
 
                 // Build EIP712 transaction for ZKSync
                 let tx = foundry_zksync_core::new_eip712_transaction(
