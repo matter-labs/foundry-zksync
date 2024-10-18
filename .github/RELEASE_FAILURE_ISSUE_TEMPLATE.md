@@ -1,6 +1,6 @@
 ---
 title: "bug: release workflow failed"
-labels: P-high, T-bug
+labels: p0 :white_circle:, bug 🐛
 ---
 
 The release workflow has failed. Some or all binaries might have not been published correctly.
