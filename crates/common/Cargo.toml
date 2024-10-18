@@ -20,7 +20,6 @@ foundry-zksync-compiler.workspace = true
 foundry-common-fmt.workspace = true
 foundry-compilers.workspace = true
 foundry-config.workspace = true
-foundry-linking.workspace = true
 
 alloy-contract.workspace = true
 alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }
@@ -56,7 +55,6 @@ dunce.workspace = true
 eyre.workspace = true
 num-format.workspace = true
 reqwest.workspace = true
-rustc-hash.workspace = true
 semver.workspace = true
 serde_json.workspace = true
 serde.workspace = true

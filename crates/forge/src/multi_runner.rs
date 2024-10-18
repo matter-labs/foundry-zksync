@@ -252,7 +252,7 @@ impl MultiContractRunner {
             &self.config,
             self.evm_opts.clone(),
             Some(self.known_contracts.clone()),
-            None,
+            Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
             self.dual_compiled_contracts.clone(),
             self.use_zk,

@@ -3,13 +3,14 @@ use crate::{
     verify::{VerifyArgs, VerifyCheckArgs},
     zk_provider::CompilerVerificationContext,
 };
+use alloy_primitives::map::HashMap;
 use async_trait::async_trait;
 use eyre::Result;
 use foundry_common::{fs, retry::Retry};
 use futures::FutureExt;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 pub static SOURCIFY_URL: &str = "https://sourcify.dev/server/";
 
@@ -117,7 +118,7 @@ impl SourcifyVerificationProvider {
         let metadata = context.get_target_metadata()?;
         let imports = context.get_target_imports()?;
 
-        let mut files = HashMap::with_capacity(2 + imports.len());
+        let mut files = HashMap::with_capacity_and_hasher(2 + imports.len(), Default::default());
 
         let metadata = serde_json::to_string_pretty(&metadata)?;
         files.insert("metadata.json".to_string(), metadata);
