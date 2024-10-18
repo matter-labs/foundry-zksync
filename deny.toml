@@ -113,6 +113,7 @@ allow-git = [
     "https://github.com/lambdaclass/zksync-web3-rs",
     "https://github.com/RustCrypto/hashes",
     "https://github.com/jrigada/zksync-web3-rs.git",
+    "https://github.com/Karrq/alloy",
 ]
 
 [sources.allow-org]
