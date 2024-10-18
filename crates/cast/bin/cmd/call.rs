@@ -74,7 +74,7 @@ pub struct CallArgs {
     json: bool,
 
     /// Enable Alphanet features.
-    #[arg(long)]
+    #[arg(long, alias = "odyssey")]
     pub alphanet: bool,
 
     #[command(subcommand)]
@@ -200,7 +200,7 @@ impl CallArgs {
                 ),
             };
 
-            handle_traces(trace, &config, chain, labels, debug, decode_internal).await?;
+            handle_traces(trace, &config, chain, labels, debug, decode_internal, false).await?;
 
             return Ok(());
         }

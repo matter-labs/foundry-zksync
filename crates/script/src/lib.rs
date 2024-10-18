@@ -8,16 +8,20 @@
 #[macro_use]
 extern crate tracing;
 
-use self::transaction::AdditionalContract;
 use crate::runner::ScriptRunner;
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_primitives::{hex, Address, Bytes, Log, TxKind, U256};
+use alloy_primitives::{
+    hex,
+    map::{AddressHashMap, HashMap},
+    Address, Bytes, Log, TxKind, U256,
+};
 use alloy_signer::Signer;
 use broadcast::next_nonce;
 use build::PreprocessedState;
 use clap::{Parser, ValueHint};
 use dialoguer::Confirm;
 use eyre::{ContextCompat, Result};
+use forge_script_sequence::{AdditionalContract, NestedValue};
 use forge_verify::RetryArgs;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
 use foundry_common::{
@@ -39,7 +43,7 @@ use foundry_evm::{
     constants::DEFAULT_CREATE2_DEPLOYER,
     executors::ExecutorBuilder,
     inspectors::{
-        cheatcodes::{BroadcastableTransactions, ScriptWallets},
+        cheatcodes::{BroadcastableTransactions, Wallets},
         CheatsConfig,
     },
     opts::EvmOpts,
@@ -47,7 +51,7 @@ use foundry_evm::{
 };
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 use std::collections::HashMap;
 use yansi::Paint;
 
@@ -205,7 +209,7 @@ pub struct ScriptArgs {
 impl ScriptArgs {
     pub async fn preprocess(self) -> Result<PreprocessedState> {
         let script_wallets =
-            ScriptWallets::new(self.wallets.get_multi_wallet().await?, self.evm_opts.sender);
+            Wallets::new(self.wallets.get_multi_wallet().await?, self.evm_opts.sender);
 
         let (config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
 
@@ -479,7 +483,7 @@ pub struct ScriptResult {
     pub logs: Vec<Log>,
     pub traces: Traces,
     pub gas_used: u64,
-    pub labeled_addresses: HashMap<Address, String>,
+    pub labeled_addresses: AddressHashMap<String>,
     #[serde(skip)]
     pub transactions: Option<BroadcastableTransactions>,
     pub returned: Bytes,
@@ -516,12 +520,6 @@ struct JsonResult<'a> {
     result: &'a ScriptResult,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct NestedValue {
-    pub internal_type: String,
-    pub value: String,
-}
-
 #[derive(Clone, Debug)]
 pub struct ScriptConfig {
     pub config: Config,
@@ -539,7 +537,7 @@ impl ScriptConfig {
             // dapptools compatibility
             1
         };
-        Ok(Self { config, evm_opts, sender_nonce, backends: HashMap::new() })
+        Ok(Self { config, evm_opts, sender_nonce, backends: HashMap::default() })
     }
 
     pub async fn update_sender(&mut self, sender: Address) -> Result<()> {
@@ -560,7 +558,7 @@ impl ScriptConfig {
     async fn get_runner_with_cheatcodes(
         &mut self,
         known_contracts: ContractsByArtifact,
-        script_wallets: ScriptWallets,
+        script_wallets: Wallets,
         debug: bool,
         target: ArtifactId,
         dual_compiled_contracts: DualCompiledContracts,
@@ -574,12 +572,16 @@ impl ScriptConfig {
 
     async fn _get_runner(
         &mut self,
+<<<<<<< HEAD
         cheats_data: Option<(
             ContractsByArtifact,
             ScriptWallets,
             ArtifactId,
             DualCompiledContracts,
         )>,
+=======
+        cheats_data: Option<(ContractsByArtifact, Wallets, ArtifactId)>,
+>>>>>>> foundry/master
         debug: bool,
     ) -> Result<ScriptRunner> {
         trace!("preparing script runner");
@@ -613,6 +615,7 @@ impl ScriptConfig {
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions);
 
+<<<<<<< HEAD
         let use_zk = self.config.zksync.run_in_zk_mode();
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
@@ -635,6 +638,24 @@ impl ScriptConfig {
                         .enable_isolation(self.evm_opts.isolate)
                 })
                 .use_zk_vm(use_zk);
+=======
+        if let Some((known_contracts, script_wallets, target)) = cheats_data {
+            builder = builder.inspectors(|stack| {
+                stack
+                    .cheatcodes(
+                        CheatsConfig::new(
+                            &self.config,
+                            self.evm_opts.clone(),
+                            Some(known_contracts),
+                            Some(target.name),
+                            Some(target.version),
+                        )
+                        .into(),
+                    )
+                    .wallets(script_wallets)
+                    .enable_isolation(self.evm_opts.isolate)
+            });
+>>>>>>> foundry/master
         }
 
         let executor = builder.build(env, db);

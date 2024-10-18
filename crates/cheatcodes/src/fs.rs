@@ -4,16 +4,14 @@ use super::string::parse;
 use crate::{Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, Result, Vm::*};
 use alloy_dyn_abi::DynSolType;
 use alloy_json_abi::ContractObject;
-use alloy_primitives::{hex, Bytes, U256};
+use alloy_primitives::{hex, map::Entry, Bytes, U256};
 use alloy_sol_types::SolValue;
 use dialoguer::{Input, Password};
 use foundry_common::fs;
 use foundry_config::fs_permissions::FsAccessKind;
-use foundry_evm_core::backend::DatabaseExt;
 use revm::interpreter::CreateInputs;
 use semver::Version;
 use std::{
-    collections::hash_map::Entry,
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::Command,
@@ -250,6 +248,34 @@ impl Cheatcode for writeLineCall {
     }
 }
 
+impl Cheatcode for getArtifactPathByCodeCall {
+    fn apply(&self, state: &mut Cheatcodes) -> Result {
+        let Self { code } = self;
+        let (artifact_id, _) = state
+            .config
+            .available_artifacts
+            .as_ref()
+            .and_then(|artifacts| artifacts.find_by_creation_code(code))
+            .ok_or_else(|| fmt_err!("no matching artifact found"))?;
+
+        Ok(artifact_id.path.to_string_lossy().abi_encode())
+    }
+}
+
+impl Cheatcode for getArtifactPathByDeployedCodeCall {
+    fn apply(&self, state: &mut Cheatcodes) -> Result {
+        let Self { deployedCode } = self;
+        let (artifact_id, _) = state
+            .config
+            .available_artifacts
+            .as_ref()
+            .and_then(|artifacts| artifacts.find_by_deployed_code(deployedCode))
+            .ok_or_else(|| fmt_err!("no matching artifact found"))?;
+
+        Ok(artifact_id.path.to_string_lossy().abi_encode())
+    }
+}
+
 impl Cheatcode for getCodeCall {
     fn apply(&self, state: &mut Cheatcodes) -> Result {
         let Self { artifactPath: path } = self;
@@ -265,11 +291,7 @@ impl Cheatcode for getDeployedCodeCall {
 }
 
 impl Cheatcode for deployCode_0Call {
-    fn apply_full<DB: DatabaseExt, E: CheatcodesExecutor>(
-        &self,
-        ccx: &mut CheatsCtxt<DB>,
-        executor: &mut E,
-    ) -> Result {
+    fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         let Self { artifactPath: path } = self;
         let bytecode = get_artifact_code(ccx.state, path, false)?;
         let address = executor
@@ -291,11 +313,7 @@ impl Cheatcode for deployCode_0Call {
 }
 
 impl Cheatcode for deployCode_1Call {
-    fn apply_full<DB: DatabaseExt, E: CheatcodesExecutor>(
-        &self,
-        ccx: &mut CheatsCtxt<DB>,
-        executor: &mut E,
-    ) -> Result {
+    fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         let Self { artifactPath: path, constructorArgs } = self;
         let mut bytecode = get_artifact_code(ccx.state, path, false)?.to_vec();
         bytecode.extend_from_slice(constructorArgs);

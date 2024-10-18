@@ -97,21 +97,23 @@ dependencies = [
 
 [[package]]
 name = "alloy-consensus"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-serde",
+ "auto_impl",
  "c-kzg",
+ "derive_more 1.0.0",
  "serde",
 ]
 
 [[package]]
 name = "alloy-contract"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -130,9 +132,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-dyn-abi"
-version = "0.8.8"
+version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6228abfc751a29cde117b0879b805a3e0b3b641358f063272c83ca459a56886"
+checksum = "f95d76a38cae906fd394a5afb0736aaceee5432efe76addfd71048e623e208af"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -178,8 +180,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-eips"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-eip2930",
  "alloy-eip7702",
@@ -195,8 +197,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-genesis"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-primitives",
  "alloy-serde",
@@ -217,8 +219,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-json-rpc"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -230,8 +232,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-network"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -250,9 +252,10 @@ dependencies = [
 
 [[package]]
 name = "alloy-network-primitives"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
+ "alloy-consensus",
  "alloy-eips",
  "alloy-primitives",
  "alloy-serde",
@@ -293,8 +296,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-provider"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -331,8 +334,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-pubsub"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-json-rpc",
  "alloy-primitives",
@@ -371,8 +374,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-client"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-json-rpc",
  "alloy-primitives",
@@ -395,9 +398,10 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
+ "alloy-primitives",
  "alloy-rpc-types-anvil",
  "alloy-rpc-types-engine",
  "alloy-rpc-types-eth",
@@ -409,8 +413,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-anvil"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-primitives",
  "alloy-serde",
@@ -419,8 +423,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-engine"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -431,12 +435,13 @@ dependencies = [
  "jsonwebtoken 9.3.0",
  "rand 0.8.5",
  "serde",
+ "strum",
 ]
 
 [[package]]
 name = "alloy-rpc-types-eth"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -445,9 +450,7 @@ dependencies = [
  "alloy-rlp",
  "alloy-serde",
  "alloy-sol-types",
- "cfg-if 1.0.0",
  "derive_more 1.0.0",
- "hashbrown 0.14.5",
  "itertools 0.13.0",
  "serde",
  "serde_json",
@@ -455,8 +458,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-trace"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
@@ -468,8 +471,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-txpool"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
@@ -479,8 +482,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-serde"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-primitives",
  "serde",
@@ -489,8 +492,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -504,8 +507,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-aws"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -521,8 +524,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-gcp"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -538,8 +541,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-ledger"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -557,8 +560,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-local"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -567,7 +570,6 @@ dependencies = [
  "async-trait",
  "coins-bip32 0.12.0",
  "coins-bip39 0.12.0",
- "elliptic-curve 0.13.8",
  "eth-keystore",
  "k256 0.13.4",
  "rand 0.8.5",
@@ -576,8 +578,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-trezor"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -665,8 +667,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-json-rpc",
  "base64 0.22.1",
@@ -683,8 +685,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport-http"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-json-rpc",
  "alloy-transport",
@@ -697,8 +699,8 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport-ipc"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-json-rpc",
  "alloy-pubsub",
@@ -717,31 +719,30 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport-ws"
-version = "0.3.6"
-source = "git+https://github.com/Karrq/alloy?rev=d016019#d016019ce94b2530b426f596831a099af933d10b"
+version = "0.4.2"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.4.2#36f6a2ef91341075338bddcfa14cfb5bd5203ef8"
 dependencies = [
  "alloy-pubsub",
  "alloy-transport",
  "futures 0.3.31",
  "http 1.1.0",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "serde_json",
  "tokio",
- "tokio-tungstenite 0.23.1",
+ "tokio-tungstenite 0.24.0",
  "tracing",
  "ws_stream_wasm",
 ]
 
 [[package]]
 name = "alloy-trie"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a46c9c4fdccda7982e7928904bd85fe235a0404ee3d7e197fff13d61eac8b4f"
+checksum = "e9703ce68b97f8faae6f7739d1e003fc97621b856953cbcdbb2b515743f23288"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "derive_more 1.0.0",
- "hashbrown 0.14.5",
  "nybbles",
  "serde",
  "smallvec",
@@ -775,12 +776,6 @@ checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "anes"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
 
 [[package]]
 name = "ansiterm"
@@ -871,7 +866,6 @@ dependencies = [
  "anvil-rpc",
  "anvil-server",
  "async-trait",
- "auto_impl",
  "axum",
  "bytes",
  "chrono",
@@ -891,6 +885,7 @@ dependencies = [
  "hyper 1.5.0",
  "itertools 0.13.0",
  "k256 0.13.4",
+ "op-alloy-consensus",
  "op-alloy-rpc-types",
  "parking_lot 0.12.3",
  "rand 0.8.5",
@@ -925,6 +920,7 @@ dependencies = [
  "bytes",
  "foundry-common",
  "foundry-evm",
+ "op-alloy-consensus",
  "rand 0.8.5",
  "revm",
  "serde",
@@ -1138,9 +1134,9 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.4.16"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "103db485efc3e41214fe4fda9f3dbeae2eb9082f48fd236e6095627a9422066e"
+checksum = "998282f8f49ccd6116b0ed8a4de0fbd3151697920e7c7533416d6e25e76434a7"
 dependencies = [
  "flate2",
  "futures-core",
@@ -1972,6 +1968,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "bon"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97493a391b4b18ee918675fb8663e53646fd09321c58b46afa04e8ce2499c869"
+dependencies = [
+ "bon-macros",
+ "rustversion",
+]
+
+[[package]]
+name = "bon-macros"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a2af3eac944c12cdf4423eab70d310da0a8e5851a18ffb192c0a5e3f7ae1663"
+dependencies = [
+ "darling 0.20.10",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
+
+[[package]]
 name = "boojum"
 version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2213,9 +2232,61 @@ checksum = "df8670b8c7b9dae1793364eafadf7239c40d669904660c5960d74cfd80b46a53"
 
 [[package]]
 name = "cast"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
+version = "0.0.2"
+dependencies = [
+ "alloy-chains",
+ "alloy-consensus",
+ "alloy-contract",
+ "alloy-dyn-abi",
+ "alloy-json-abi",
+ "alloy-json-rpc",
+ "alloy-network",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rlp",
+ "alloy-rpc-types",
+ "alloy-serde",
+ "alloy-signer",
+ "alloy-signer-local",
+ "alloy-sol-types",
+ "alloy-transport",
+ "anvil",
+ "async-trait",
+ "aws-sdk-kms",
+ "chrono",
+ "clap",
+ "clap_complete",
+ "clap_complete_fig",
+ "comfy-table",
+ "divan",
+ "dunce",
+ "evmole",
+ "eyre",
+ "foundry-block-explorers",
+ "foundry-cli",
+ "foundry-common",
+ "foundry-compilers",
+ "foundry-config",
+ "foundry-evm",
+ "foundry-test-utils",
+ "foundry-wallets",
+ "futures 0.3.31",
+ "indicatif",
+ "itertools 0.13.0",
+ "rand 0.8.5",
+ "rayon",
+ "regex",
+ "rpassword",
+ "semver 1.0.23",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tikv-jemallocator",
+ "tokio",
+ "tracing",
+ "vergen",
+ "yansi 1.0.1",
+]
 
 [[package]]
 name = "castaway"
@@ -2285,7 +2356,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-rpc-types",
  "clap",
- "criterion",
  "dirs 5.0.1",
  "eyre",
  "forge-fmt",
@@ -2569,6 +2639,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cliclack"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a80570d35684e725e9d2d4aaaf32bc0cbfcfb8539898f9afea3da0d2e5189e4"
+dependencies = [
+ "console",
+ "indicatif",
+ "once_cell",
+ "strsim 0.11.1",
+ "textwrap",
+ "zeroize",
+]
+
+[[package]]
 name = "clipboard-win"
 version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2807,6 +2891,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "condtype"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf0a07a401f374238ab8e2f11a104d2851bf9ce711ec69804834de8af45c7af"
+
+[[package]]
 name = "console"
 version = "0.15.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2936,44 +3026,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a97769d94ddab943e4510d138150169a2758b5ef3eb191a9ee688de3e23ef7b3"
 dependencies = [
  "cfg-if 1.0.0",
-]
-
-[[package]]
-name = "criterion"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
-dependencies = [
- "anes",
- "cast",
- "ciborium",
- "clap",
- "criterion-plot",
- "futures 0.3.31",
- "is-terminal",
- "itertools 0.10.5",
- "num-traits",
- "once_cell",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "tokio",
- "walkdir",
-]
-
-[[package]]
-name = "criterion-plot"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
-dependencies = [
- "cast",
- "itertools 0.10.5",
 ]
 
 [[package]]
@@ -3515,6 +3567,31 @@ name = "displaydoc"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
+
+[[package]]
+name = "divan"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0d567df2c9c2870a43f3f2bd65aaeb18dbce1c18f217c3e564b4fbaeb3ee56c"
+dependencies = [
+ "cfg-if 1.0.0",
+ "clap",
+ "condtype",
+ "divan-macros",
+ "libc",
+ "regex-lite",
+]
+
+[[package]]
+name = "divan-macros"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27540baf49be0d484d8f0130d7d8da3011c32a44d4fc873368154f1510e574a2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4526,7 +4603,6 @@ dependencies = [
  "clap_complete_fig",
  "clearscreen",
  "comfy-table",
- "criterion",
  "dialoguer",
  "dunce",
  "ethers-contract-abigen",
@@ -4568,14 +4644,13 @@ dependencies = [
  "regex",
  "reqwest 0.12.8",
  "revm-inspectors",
- "rustc-hash 2.0.0",
  "semver 1.0.23",
  "serde",
  "serde_json",
  "similar",
  "similar-asserts",
  "solang-parser",
- "soldeer",
+ "soldeer-commands",
  "strum",
  "svm-rs 0.5.8",
  "tempfile",
@@ -4601,7 +4676,6 @@ name = "forge-doc"
 version = "0.0.2"
 dependencies = [
  "alloy-primitives",
- "auto_impl",
  "derive_more 1.0.0",
  "eyre",
  "forge-fmt",
@@ -4656,6 +4730,7 @@ dependencies = [
  "dialoguer",
  "dunce",
  "eyre",
+ "forge-script-sequence",
  "forge-verify",
  "foundry-cheatcodes",
  "foundry-cli",
@@ -4677,9 +4752,27 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "tracing",
  "yansi 1.0.1",
  "zksync-web3-rs",
+]
+
+[[package]]
+name = "forge-script-sequence"
+version = "0.0.2"
+dependencies = [
+ "alloy-primitives",
+ "alloy-rpc-types",
+ "eyre",
+ "foundry-common",
+ "foundry-compilers",
+ "foundry-config",
+ "foundry-zksync-core",
+ "revm-inspectors",
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -4745,7 +4838,7 @@ dependencies = [
 [[package]]
 name = "foundry-block-explorers"
 version = "0.7.3"
-source = "git+https://github.com/Moonsong-Labs/block-explorers?branch=zksync-v0.7.3#9ebec2f71f0ee739f4ec4fb21df4d301aeb61936"
+source = "git+https://github.com/Moonsong-Labs/block-explorers?branch=zksync-v0.7.3#ef81bf5a733517de496ae1d14024ea9b4fcd4d3c"
 dependencies = [
  "alloy-chains",
  "alloy-json-abi",
@@ -4757,65 +4850,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing",
-]
-
-[[package]]
-name = "foundry-cast"
-version = "0.0.2"
-dependencies = [
- "alloy-chains",
- "alloy-consensus",
- "alloy-contract",
- "alloy-dyn-abi",
- "alloy-json-abi",
- "alloy-json-rpc",
- "alloy-network",
- "alloy-primitives",
- "alloy-provider",
- "alloy-rlp",
- "alloy-rpc-types",
- "alloy-serde",
- "alloy-signer",
- "alloy-signer-local",
- "alloy-sol-types",
- "alloy-transport",
- "anvil",
- "async-trait",
- "aws-sdk-kms",
- "chrono",
- "clap",
- "clap_complete",
- "clap_complete_fig",
- "comfy-table",
- "criterion",
- "dunce",
- "evm-disassembler",
- "evmole",
- "eyre",
- "foundry-block-explorers",
- "foundry-cli",
- "foundry-common",
- "foundry-compilers",
- "foundry-config",
- "foundry-evm",
- "foundry-test-utils",
- "foundry-wallets",
- "futures 0.3.31",
- "indicatif",
- "itertools 0.13.0",
- "rand 0.8.5",
- "rayon",
- "regex",
- "rpassword",
- "semver 1.0.23",
- "serde",
- "serde_json",
- "tempfile",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "vergen",
- "yansi 1.0.1",
 ]
 
 [[package]]
@@ -4857,7 +4891,7 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "revm",
- "rustc-hash 2.0.0",
+ "revm-inspectors",
  "semver 1.0.23",
  "serde_json",
  "thiserror",
@@ -4953,12 +4987,10 @@ dependencies = [
  "foundry-common-fmt",
  "foundry-compilers",
  "foundry-config",
- "foundry-linking",
  "foundry-zksync-compiler",
  "globset",
  "num-format",
  "reqwest 0.12.8",
- "rustc-hash 2.0.0",
  "semver 1.0.23",
  "serde",
  "serde_json",
@@ -4993,8 +5025,8 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
+version = "0.11.4"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#9f0cb1b88cb5d52eb292bb3adc187c5c3c622baf"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5033,8 +5065,8 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers-artifacts"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
+version = "0.11.4"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#9f0cb1b88cb5d52eb292bb3adc187c5c3c622baf"
 dependencies = [
  "foundry-compilers-artifacts-solc",
  "foundry-compilers-artifacts-vyper",
@@ -5043,8 +5075,8 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers-artifacts-solc"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
+version = "0.11.4"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#9f0cb1b88cb5d52eb292bb3adc187c5c3c622baf"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5066,8 +5098,8 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers-artifacts-vyper"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
+version = "0.11.4"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#9f0cb1b88cb5d52eb292bb3adc187c5c3c622baf"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5080,8 +5112,8 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers-artifacts-zksolc"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
+version = "0.11.4"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#9f0cb1b88cb5d52eb292bb3adc187c5c3c622baf"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5101,14 +5133,13 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers-core"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
+version = "0.11.4"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#9f0cb1b88cb5d52eb292bb3adc187c5c3c622baf"
 dependencies = [
  "alloy-primitives",
  "cfg-if 1.0.0",
  "dunce",
  "fs_extra",
- "memmap2",
  "once_cell",
  "path-slash",
  "regex",
@@ -5155,6 +5186,7 @@ dependencies = [
  "toml_edit 0.22.22",
  "tracing",
  "walkdir",
+ "yansi 1.0.1",
 ]
 
 [[package]]
@@ -5166,6 +5198,7 @@ dependencies = [
  "eyre",
  "foundry-common",
  "foundry-compilers",
+ "foundry-evm-core",
  "foundry-evm-traces",
  "ratatui",
  "revm",
@@ -5213,7 +5246,6 @@ dependencies = [
  "foundry-macros",
  "foundry-test-utils",
  "itertools 0.13.0",
- "rustc-hash 2.0.0",
 ]
 
 [[package]]
@@ -5243,7 +5275,6 @@ dependencies = [
  "parking_lot 0.12.3",
  "revm",
  "revm-inspectors",
- "rustc-hash 2.0.0",
  "serde",
  "serde_json",
  "thiserror",
@@ -5262,7 +5293,6 @@ dependencies = [
  "foundry-evm-core",
  "rayon",
  "revm",
- "rustc-hash 2.0.0",
  "semver 1.0.23",
  "tracing",
 ]
@@ -5316,7 +5346,6 @@ dependencies = [
  "rayon",
  "revm",
  "revm-inspectors",
- "rustc-hash 2.0.0",
  "serde",
  "solang-parser",
  "tempfile",
@@ -5326,8 +5355,8 @@ dependencies = [
 
 [[package]]
 name = "foundry-fork-db"
-version = "0.3.1"
-source = "git+https://github.com/Moonsong-Labs/foundry-zksync-fork-db?branch=zksync-v0.3.1#3bd8ea2c69cd51991ecf5513444d0d1425b07de3"
+version = "0.4.0"
+source = "git+https://github.com/Moonsong-Labs/foundry-zksync-fork-db?branch=zksync-v0.4.0#183df1a1865ff9af3cb8e3a1675e1bafe0bca69d"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
@@ -5338,7 +5367,6 @@ dependencies = [
  "futures 0.3.31",
  "parking_lot 0.12.3",
  "revm",
- "rustc-hash 2.0.0",
  "serde",
  "serde_json",
  "thiserror",
@@ -6179,7 +6207,6 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash 0.8.11",
  "allocator-api2",
- "serde",
 ]
 
 [[package]]
@@ -6471,7 +6498,7 @@ dependencies = [
  "hyper 1.5.0",
  "hyper-util",
  "log",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "rustls-native-certs 0.8.0",
  "rustls-pki-types",
  "tokio",
@@ -7071,7 +7098,7 @@ dependencies = [
  "http 1.1.0",
  "jsonrpsee-core",
  "pin-project 1.1.6",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "rustls-pki-types",
  "rustls-platform-verifier",
  "soketto",
@@ -7126,7 +7153,7 @@ dependencies = [
  "hyper-util",
  "jsonrpsee-core",
  "jsonrpsee-types",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "rustls-platform-verifier",
  "serde",
  "serde_json",
@@ -8188,16 +8215,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
-name = "oorandom"
-version = "11.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b410bbe7e14ab526a0e86877eb47c6996a2bd7746f027ba551028c925390e4e9"
-
-[[package]]
 name = "op-alloy-consensus"
-version = "0.2.12"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21aad1fbf80d2bcd7406880efc7ba109365f44bbb72896758ddcbfa46bf1592c"
+checksum = "c4f7f318f885db6e1455370ca91f74b7faed152c8142f6418f0936d606e582ff"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -8211,17 +8232,16 @@ dependencies = [
 
 [[package]]
 name = "op-alloy-rpc-types"
-version = "0.2.12"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e281fbfc2198b7c0c16457d6524f83d192662bc9f3df70f24c3038d4521616df"
+checksum = "547d29c5ab957ff32e14edddb93652dad748d2ef6cbe4b0fe8615ce06b0a3ddb"
 dependencies = [
+ "alloy-consensus",
  "alloy-eips",
  "alloy-network-primitives",
  "alloy-primitives",
  "alloy-rpc-types-eth",
  "alloy-serde",
- "cfg-if 1.0.0",
- "hashbrown 0.14.5",
  "op-alloy-consensus",
  "serde",
  "serde_json",
@@ -8694,9 +8714,9 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "pest"
-version = "2.7.14"
+version = "2.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "879952a81a83930934cbf1786752d6dedc3b1f29e8f8fb2ad1d0a36f377cf442"
+checksum = "fdbef9d1d47087a895abd220ed25eb4ad973a5e26f6a4367b038c25e28dfc2d9"
 dependencies = [
  "memchr",
  "thiserror",
@@ -8705,9 +8725,9 @@ dependencies = [
 
 [[package]]
 name = "pest_derive"
-version = "2.7.14"
+version = "2.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d214365f632b123a47fd913301e14c946c61d1c183ee245fa76eb752e59a02dd"
+checksum = "4d3a6e3394ec80feb3b6393c725571754c6188490265c61aaf260810d6b95aa0"
 dependencies = [
  "pest",
  "pest_generator",
@@ -8715,9 +8735,9 @@ dependencies = [
 
 [[package]]
 name = "pest_generator"
-version = "2.7.14"
+version = "2.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb55586734301717aea2ac313f50b2eb8f60d2fc3dc01d190eefa2e625f60c4e"
+checksum = "94429506bde1ca69d1b5601962c73f4172ab4726571a59ea95931218cb0e930e"
 dependencies = [
  "pest",
  "pest_meta",
@@ -8728,9 +8748,9 @@ dependencies = [
 
 [[package]]
 name = "pest_meta"
-version = "2.7.14"
+version = "2.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b75da2a70cf4d9cb76833c990ac9cd3923c9a8905a8929789ce347c84564d03d"
+checksum = "ac8a071862e93690b6e34e9a5fb8e33ff3734473ac0245b27232222c4906a33f"
 dependencies = [
  "once_cell",
  "pest",
@@ -8918,34 +8938,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
-name = "plotters"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeb6f403d7a4911efb1e33402027fc44f29b5bf6def3effcc22d7bb75f2b747"
-dependencies = [
- "num-traits",
- "plotters-backend",
- "plotters-svg",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "plotters-backend"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df42e13c12958a16b3f7f4386b9ab1f3e7933914ecea48da7139435263a4172a"
-
-[[package]]
-name = "plotters-svg"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51bae2ac328883f7acdfea3d66a7c35751187f870bc81f94563733a154d7a670"
-dependencies = [
- "plotters-backend",
-]
-
-[[package]]
 name = "portable-atomic"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9130,9 +9122,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.88"
+version = "1.0.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c3a7fc5db1e57d5a779a352c8cdb57b29aa4c40cc69c3a68a7fedc815fbf2f9"
+checksum = "b3e4daa0dcf6feba26f985457cdf104d4b4256fc5a09547140f3631bb076b19a"
 dependencies = [
  "unicode-ident",
 ]
@@ -9500,7 +9492,7 @@ dependencies = [
  "quinn-proto",
  "quinn-udp",
  "rustc-hash 2.0.0",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "socket2",
  "thiserror",
  "tokio",
@@ -9517,7 +9509,7 @@ dependencies = [
  "rand 0.8.5",
  "ring 0.17.8",
  "rustc-hash 2.0.0",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "slab",
  "thiserror",
  "tinyvec",
@@ -9896,7 +9888,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "quinn",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "rustls-native-certs 0.8.0",
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
@@ -9937,9 +9929,9 @@ dependencies = [
 
 [[package]]
 name = "revm-inspectors"
-version = "0.7.7"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd8e3bae0d5c824da0ac883e2521c5e83870d6521eeeccd4ee54266aa3cc1a51"
+checksum = "43c44af0bf801f48d25f7baf25cf72aff4c02d610f83b428175228162fef0246"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
@@ -9970,6 +9962,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3198c06247e8d4ad0d1312591edf049b0de4ddffa9fecb625c318fd67db8639b"
 dependencies = [
  "aurora-engine-modexp",
+ "blst",
  "c-kzg",
  "cfg-if 1.0.0",
  "k256 0.13.4",
@@ -10308,9 +10301,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.15"
+version = "0.23.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fbb44d7acc4e873d613422379f69f237a1b141928c02f6bc6ccfddddc2d7993"
+checksum = "415d9944693cb90382053259f89fbb077ea730ad7273047ec63b19bc9b160ba8"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -10380,9 +10373,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-pki-types"
-version = "1.10.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f1201b3c9a7ee8039bcadc17b7e605e2945b27eee7631788c1bd2b0643674b"
+checksum = "0e696e35370c65c9c541198af4543ccd580cf17fc25d8e05c5a242b202488c55"
 
 [[package]]
 name = "rustls-platform-verifier"
@@ -10395,7 +10388,7 @@ dependencies = [
  "jni",
  "log",
  "once_cell",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "rustls-native-certs 0.7.3",
  "rustls-platform-verifier-android",
  "rustls-webpki 0.102.8",
@@ -10533,9 +10526,9 @@ dependencies = [
 
 [[package]]
 name = "scc"
-version = "2.2.2"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2c1f7fc6deb21665a9060dfc7d271be784669295a31babdcd4dd2c79ae8cbfb"
+checksum = "553f8299af7450cda9a52d3a370199904e7a46b5ffd1bef187c4a6af3bb6db69"
 dependencies = [
  "sdd",
 ]
@@ -11299,6 +11292,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "smawk"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7c388c1b5e93756d0c740965c41e8822f866621d41acbdf6336a6a168f8840c"
+
+[[package]]
 name = "snapbox"
 version = "0.6.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11364,24 +11363,39 @@ dependencies = [
 ]
 
 [[package]]
-name = "soldeer"
-version = "0.3.4"
+name = "soldeer-commands"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ed763c2bb43241ca0fb6c00feea54187895b7f4eb1090654fbf82807127369"
+checksum = "8daf7e07f2b6002f8410811915a2f6142f2d1084764dd88cba3f4ebf22232975"
 dependencies = [
- "chrono",
  "clap",
- "const-hex",
- "dunce",
+ "cliclack",
+ "derive_more 1.0.0",
  "email-address-parser",
- "futures 0.3.31",
+ "rayon",
+ "soldeer-core",
+]
+
+[[package]]
+name = "soldeer-core"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea249d0281f3755c3c2b095ad94a554a782cc29138f46c407b8080cfd3918996"
+dependencies = [
+ "bon",
+ "chrono",
+ "cliclack",
+ "const-hex",
+ "derive_more 1.0.0",
+ "dunce",
  "home",
  "ignore",
  "path-slash",
+ "rayon",
  "regex",
  "reqwest 0.12.8",
- "rpassword",
  "sanitize-filename",
+ "semver 1.0.23",
  "serde",
  "serde_json",
  "sha2 0.10.8",
@@ -11389,7 +11403,6 @@ dependencies = [
  "tokio",
  "toml_edit 0.22.22",
  "uuid 1.11.0",
- "yansi 1.0.1",
  "zip 2.2.0",
  "zip-extract",
 ]
@@ -12006,6 +12019,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
 
 [[package]]
+name = "textwrap"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23d434d3f8967a09480fb04132ebe0a3e088c173e6d0ee7897abbdf4eab0f8b9"
+dependencies = [
+ "smawk",
+ "unicode-linebreak",
+ "unicode-width 0.1.14",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12116,16 +12140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinytemplate"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be4d6b5f19ff7664e8c98d03e2139cb510db9b0a60b55f8e8709b689d939b6bc"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "tinyvec"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12195,7 +12209,7 @@ version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
 dependencies = [
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "rustls-pki-types",
  "tokio",
 ]
@@ -12241,30 +12255,18 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6989540ced10490aaf14e6bad2e3d33728a2813310a0c71d1574304c49631cd"
-dependencies = [
- "futures-util",
- "log",
- "rustls 0.23.15",
- "rustls-pki-types",
- "tokio",
- "tokio-rustls 0.26.0",
- "tungstenite 0.23.0",
- "webpki-roots 0.26.6",
-]
-
-[[package]]
-name = "tokio-tungstenite"
 version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edc5f74e248dc973e0dbb7b74c7e0d6fcc301c694ff50049504004ef4d0cdcd9"
 dependencies = [
  "futures-util",
  "log",
+ "rustls 0.23.14",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls 0.26.0",
  "tungstenite 0.24.0",
+ "webpki-roots 0.26.6",
 ]
 
 [[package]]
@@ -12667,26 +12669,6 @@ dependencies = [
 
 [[package]]
 name = "tungstenite"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e2e2ce1e47ed2994fd43b04c8f618008d4cabdd5ee34027cf14f9d918edd9c8"
-dependencies = [
- "byteorder",
- "bytes",
- "data-encoding",
- "http 1.1.0",
- "httparse",
- "log",
- "rand 0.8.5",
- "rustls 0.23.15",
- "rustls-pki-types",
- "sha1",
- "thiserror",
- "utf-8",
-]
-
-[[package]]
-name = "tungstenite"
 version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18e5b8366ee7a95b16d32197d0b2604b43a0be89dc5fac9f8e96ccafbaedda8a"
@@ -12698,6 +12680,8 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.8.5",
+ "rustls 0.23.14",
+ "rustls-pki-types",
  "sha1",
  "thiserror",
  "utf-8",
@@ -12777,6 +12761,12 @@ name = "unicode-ident"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
+
+[[package]]
+name = "unicode-linebreak"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b09c83c3c29d37506a3e260c08c03743a6bb66a9cd432c6934ab501a190571f"
 
 [[package]]
 name = "unicode-normalization"
@@ -14661,7 +14651,7 @@ dependencies = [
  "jsonrpsee",
  "pin-project-lite",
  "rlp",
- "rustls 0.23.15",
+ "rustls 0.23.14",
  "serde",
  "serde_json",
  "thiserror",

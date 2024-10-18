@@ -84,7 +84,7 @@ pub struct RunArgs {
     pub no_rate_limit: bool,
 
     /// Enables Alphanet features.
-    #[arg(long)]
+    #[arg(long, alias = "odyssey")]
     pub alphanet: bool,
 }
 
@@ -242,7 +242,16 @@ impl RunArgs {
             }
         };
 
-        handle_traces(result, &config, chain, self.label, self.debug, self.decode_internal).await?;
+        handle_traces(
+            result,
+            &config,
+            chain,
+            self.label,
+            self.debug,
+            self.decode_internal,
+            self.verbose,
+        )
+        .await?;
 
         Ok(())
     }

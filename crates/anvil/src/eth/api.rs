@@ -592,7 +592,11 @@ impl EthApi {
     /// Returns the current gas price
     pub fn gas_price(&self) -> u128 {
         if self.backend.is_eip1559() {
-            self.backend.base_fee().saturating_add(self.lowest_suggestion_tip())
+            if self.backend.is_min_priority_fee_enforced() {
+                (self.backend.base_fee() as u128).saturating_add(self.lowest_suggestion_tip())
+            } else {
+                self.backend.base_fee() as u128
+            }
         } else {
             self.backend.fees().raw_gas_price()
         }
@@ -1405,7 +1409,7 @@ impl EthApi {
         // The spec states that `base_fee_per_gas` "[..] includes the next block after the
         // newest of the returned range, because this value can be derived from the
         // newest block"
-        response.base_fee_per_gas.push(self.backend.fees().base_fee());
+        response.base_fee_per_gas.push(self.backend.fees().base_fee() as u128);
 
         // Same goes for the `base_fee_per_blob_gas`:
         // > [..] includes the next block after the newest of the returned range, because this
@@ -1911,7 +1915,6 @@ impl EthApi {
     pub async fn anvil_metadata(&self) -> Result<Metadata> {
         node_info!("anvil_metadata");
         let fork_config = self.backend.get_fork();
-        let snapshots = self.backend.list_snapshots();
 
         Ok(Metadata {
             client_version: CLIENT_VERSION.to_string(),
@@ -1924,7 +1927,7 @@ impl EthApi {
                 fork_block_number: cfg.block_number(),
                 fork_block_hash: cfg.block_hash(),
             }),
-            snapshots,
+            snapshots: self.backend.list_state_snapshots(),
         })
     }
 
@@ -1934,7 +1937,7 @@ impl EthApi {
         Ok(())
     }
 
-    /// Reorg the chain to a specific depth and mine new blocks back to the cannonical height.
+    /// Reorg the chain to a specific depth and mine new blocks back to the canonical height.
     ///
     /// e.g depth = 3
     ///     A  -> B  -> C  -> D  -> E
@@ -2057,7 +2060,7 @@ impl EthApi {
     /// Handler for RPC call: `evm_snapshot`
     pub async fn evm_snapshot(&self) -> Result<U256> {
         node_info!("evm_snapshot");
-        Ok(self.backend.create_snapshot().await)
+        Ok(self.backend.create_state_snapshot().await)
     }
 
     /// Revert the state of the blockchain to a previous snapshot.
@@ -2066,7 +2069,7 @@ impl EthApi {
     /// Handler for RPC call: `evm_revert`
     pub async fn evm_revert(&self, id: U256) -> Result<bool> {
         node_info!("evm_revert");
-        self.backend.revert_snapshot(id).await
+        self.backend.revert_state_snapshot(id).await
     }
 
     /// Jump forward in time by the given amount of time, in seconds.
@@ -2303,7 +2306,7 @@ impl EthApi {
             let to = tx.to();
             let gas_price = tx.gas_price();
             let value = tx.value();
-            let gas = tx.gas_limit();
+            let gas = tx.gas_limit() as u128;
             TxpoolInspectSummary { to, value, gas, gas_price }
         }
 
@@ -2443,7 +2446,7 @@ impl EthApi {
                         state,
                     )?);
                 }
-                self.do_estimate_gas_with_state(request, state, block)
+                self.do_estimate_gas_with_state(request, &state, block)
             })
             .await?
     }
@@ -2451,15 +2454,12 @@ impl EthApi {
     /// Estimates the gas usage of the `request` with the state.
     ///
     /// This will execute the transaction request and find the best gas limit via binary search.
-    fn do_estimate_gas_with_state<D>(
+    fn do_estimate_gas_with_state(
         &self,
         mut request: WithOtherFields<TransactionRequest>,
-        state: D,
+        state: &dyn DatabaseRef<Error = DatabaseError>,
         block_env: BlockEnv,
-    ) -> Result<u128>
-    where
-        D: DatabaseRef<Error = DatabaseError>,
-    {
+    ) -> Result<u128> {
         // If the request is a simple native token transfer we can optimize
         // We assume it's a transfer if we have no input data.
         let to = request.to.as_ref().and_then(TxKind::to);
@@ -2489,13 +2489,14 @@ impl EthApi {
 
         // get the highest possible gas limit, either the request's set value or the currently
         // configured gas limit
-        let mut highest_gas_limit = request.gas.unwrap_or(block_env.gas_limit.to());
+        let mut highest_gas_limit =
+            request.gas.map_or(block_env.gas_limit.to::<u128>(), |g| g as u128);
 
         let gas_price = fees.gas_price.unwrap_or_default();
         // If we have non-zero gas price, cap gas limit by sender balance
         if gas_price > 0 {
             if let Some(from) = request.from {
-                let mut available_funds = self.backend.get_balance_with_state(&state, from)?;
+                let mut available_funds = self.backend.get_balance_with_state(state, from)?;
                 if let Some(value) = request.value {
                     if value > available_funds {
                         return Err(InvalidTransactionError::InsufficientFunds.into());
@@ -2511,7 +2512,7 @@ impl EthApi {
         }
 
         let mut call_to_estimate = request.clone();
-        call_to_estimate.gas = Some(highest_gas_limit);
+        call_to_estimate.gas = Some(highest_gas_limit as u64);
 
         // execute the call without writing to db
         let ethres =
@@ -2545,7 +2546,7 @@ impl EthApi {
 
         // Binary search for the ideal gas limit
         while (highest_gas_limit - lowest_gas_limit) > 1 {
-            request.gas = Some(mid_gas_limit);
+            request.gas = Some(mid_gas_limit as u64);
             let ethres = self.backend.call_with_state(
                 &state,
                 request.clone(),
@@ -2567,7 +2568,7 @@ impl EthApi {
                     // current midpoint, as spending any less gas would make no
                     // sense (as the TX would still revert due to lack of gas).
                     //
-                    // We don't care about the reason here, as we known that trasaction is correct
+                    // We don't care about the reason here, as we known that transaction is correct
                     // as it succeeded earlier
                     lowest_gas_limit = mid_gas_limit;
                 }
@@ -2692,7 +2693,7 @@ impl EthApi {
         let max_fee_per_blob_gas = request.max_fee_per_blob_gas;
         let gas_price = request.gas_price;
 
-        let gas_limit = request.gas.unwrap_or(self.backend.gas_limit());
+        let gas_limit = request.gas.unwrap_or(self.backend.gas_limit() as u64);
 
         let request = match transaction_request_to_typed(request) {
             Some(TypedTransactionRequest::Legacy(mut m)) => {
@@ -2902,7 +2903,7 @@ fn determine_base_gas_by_kind(request: &WithOtherFields<TransactionRequest>) -> 
                 TxKind::Create => MIN_CREATE_GAS,
             },
             TypedTransactionRequest::EIP4844(_) => MIN_TRANSACTION_GAS,
-            TypedTransactionRequest::Deposit(req) => match req.kind {
+            TypedTransactionRequest::Deposit(req) => match req.to {
                 TxKind::Call(_) => MIN_TRANSACTION_GAS,
                 TxKind::Create => MIN_CREATE_GAS,
             },

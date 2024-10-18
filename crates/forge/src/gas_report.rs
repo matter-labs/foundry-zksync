@@ -4,22 +4,34 @@ use crate::{
     constants::CHEATCODE_ADDRESS,
     traces::{CallTraceArena, CallTraceDecoder, CallTraceNode, DecodedCallData},
 };
+use alloy_primitives::map::HashSet;
 use comfy_table::{presets::ASCII_MARKDOWN, *};
 use foundry_common::{calc, TestFunctionExt};
 use foundry_evm::traces::CallKind;
 use foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashSet},
-    fmt::Display,
-};
+use std::{collections::BTreeMap, fmt::Display};
 use yansi::Paint;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum GasReportKind {
+    Markdown,
+    JSON,
+}
+
+impl Default for GasReportKind {
+    fn default() -> Self {
+        Self::Markdown
+    }
+}
 
 /// Represents the gas report for a set of contracts.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct GasReport {
     /// Whether to report any contracts.
     report_any: bool,
+    /// What kind of report to generate.
+    report_type: GasReportKind,
     /// Contracts to generate the report for.
     report_for: HashSet<String>,
     /// Contracts to ignore when generating the report.
@@ -33,11 +45,13 @@ impl GasReport {
     pub fn new(
         report_for: impl IntoIterator<Item = String>,
         ignore: impl IntoIterator<Item = String>,
+        report_kind: GasReportKind,
     ) -> Self {
         let report_for = report_for.into_iter().collect::<HashSet<_>>();
         let ignore = ignore.into_iter().collect::<HashSet<_>>();
         let report_any = report_for.is_empty() || report_for.contains("*");
-        Self { report_any, report_for, ignore, ..Default::default() }
+        let report_type = report_kind;
+        Self { report_any, report_type, report_for, ignore, ..Default::default() }
     }
 
     /// Whether the given contract should be reported.
@@ -80,7 +94,7 @@ impl GasReport {
             return;
         }
 
-        // Only include top-level calls which accout for calldata and base (21.000) cost.
+        // Only include top-level calls which account for calldata and base (21.000) cost.
         // Only include Calls and Creates as only these calls are isolated in inspector.
         if trace.depth > 1 &&
             (trace.kind == CallKind::Call ||
@@ -122,7 +136,7 @@ impl GasReport {
                     .or_default()
                     .entry(signature.clone())
                     .or_default();
-                gas_info.calls.push(trace.gas_used);
+                gas_info.frames.push(trace.gas_used);
             }
         }
     }
@@ -134,11 +148,12 @@ impl GasReport {
         for contract in self.contracts.values_mut() {
             for sigs in contract.functions.values_mut() {
                 for func in sigs.values_mut() {
-                    func.calls.sort_unstable();
-                    func.min = func.calls.first().copied().unwrap_or_default();
-                    func.max = func.calls.last().copied().unwrap_or_default();
-                    func.mean = calc::mean(&func.calls);
-                    func.median = calc::median_sorted(&func.calls);
+                    func.frames.sort_unstable();
+                    func.min = func.frames.first().copied().unwrap_or_default();
+                    func.max = func.frames.last().copied().unwrap_or_default();
+                    func.mean = calc::mean(&func.frames);
+                    func.median = calc::median_sorted(&func.frames);
+                    func.calls = func.frames.len() as u64;
                 }
             }
         }
@@ -151,6 +166,11 @@ impl Display for GasReport {
         for (name, contract) in &self.contracts {
             if contract.functions.is_empty() {
                 trace!(name, "gas report contract without functions");
+                continue;
+            }
+
+            if self.report_type == GasReportKind::JSON {
+                writeln!(f, "{}", serde_json::to_string(&contract).unwrap())?;
                 continue;
             }
 
@@ -185,7 +205,7 @@ impl Display for GasReport {
                         Cell::new(gas_info.mean.to_string()).fg(Color::Yellow),
                         Cell::new(gas_info.median.to_string()).fg(Color::Yellow),
                         Cell::new(gas_info.max.to_string()).fg(Color::Red),
-                        Cell::new(gas_info.calls.len().to_string()),
+                        Cell::new(gas_info.calls.to_string()),
                     ]);
                 })
             });
@@ -206,9 +226,12 @@ pub struct ContractInfo {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct GasInfo {
-    pub calls: Vec<u64>,
+    pub calls: u64,
     pub min: u64,
     pub mean: u64,
     pub median: u64,
     pub max: u64,
+
+    #[serde(skip)]
+    pub frames: Vec<u64>,
 }
