@@ -1,129 +1,129 @@
 name: test
 
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-        branches:
-            - main
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 concurrency:
-    cancel-in-progress: true
-    group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+  group: ${{github.workflow}}-${{github.ref}}
 
 env:
-    CARGO_TERM_COLOR: always
-    TARGET_RUST_VERSION: "nightly-2024-07-19"
+  CARGO_TERM_COLOR: always
+  TARGET_RUST_VERSION: "nightly-2024-07-19"
 
 jobs:
-    doctest:
-        runs-on: ubuntu-22.04-github-hosted-16core
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                toolchain: ${{ env.TARGET_RUST_VERSION }}
-            - uses: Swatinem/rust-cache@v2
-              with:
-                cache-on-failure: true
-            - name: cargo test
-              run: cargo test --doc -p forge
+  doctest:
+    runs-on: ubuntu-22.04-github-hosted-16core
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo test
+        run: cargo test --doc -p forge
 
-    clippy:
-        name: clippy
-        runs-on: ubuntu-latest
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@clippy
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  cache-on-failure: true
-            - run: cargo clippy --workspace --all-targets --all-features
-              env:
-                  RUSTFLAGS: -Dwarnings
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo clippy --workspace --all-targets --all-features
+        env:
+          RUSTFLAGS: -Dwarnings
 
-    rustfmt:
-        runs-on: ubuntu-22.04-github-hosted-16core
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                  toolchain: ${{ env.TARGET_RUST_VERSION }}
-                  components: rustfmt
-            - run: cargo fmt --all --check
+  rustfmt:
+    runs-on: ubuntu-22.04-github-hosted-16core
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+          components: rustfmt
+      - run: cargo fmt --all --check
 
-    forge-fmt:
-        runs-on: ubuntu-22.04-github-hosted-16core
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                  toolchain: ${{ env.TARGET_RUST_VERSION }}
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  cache-on-failure: true
-            - name: forge fmt
-              shell: bash
-              run: ./.github/scripts/format.sh --check
+  forge-fmt:
+    runs-on: ubuntu-22.04-github-hosted-16core
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: forge fmt
+        shell: bash
+        run: ./.github/scripts/format.sh --check
 
-    crate-checks:
-        runs-on: ubuntu-22.04-github-hosted-16core
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                toolchain: ${{ env.TARGET_RUST_VERSION }}
-            - uses: taiki-e/install-action@cargo-hack
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  cache-on-failure: true
-            - name: cargo hack
-              run: cargo hack check
-    
-    zk-cargo-test:
-        runs-on: ubuntu-22.04-github-hosted-16core
-  
-        steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-          with:
-            submodules: recursive
-            ref: ${{ github.event.pull_request.head.sha }}
-  
-        - name: Install Rust
-          uses: actions-rust-lang/setup-rust-toolchain@v1
-          with:
-            toolchain: ${{ env.TARGET_RUST_VERSION }}
+  crate-checks:
+    runs-on: ubuntu-22.04-github-hosted-16core
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo hack
+        run: cargo hack check
 
-        - name: Run era-test-node
-          uses: dutterbutter/era-test-node-action@v1
-          with:
-            mode: fork
-            network: mainnet
-            log: info
-            logFilePath: era_test_node.log
-            target: x86_64-unknown-linux-gnu
-            releaseTag: v0.1.0-alpha.25
+  zk-cargo-test:
+    runs-on: ubuntu-22.04-github-hosted-16core
 
-        - name: Run zk tests
-          env:
-            RUST_BACKTRACE: full
-            TEST_MAINNET_URL: http://localhost:8011
-          run: cargo test zk
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha }}
 
-    check-ci-install:
-      name: CI install
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - name: Install foundry-zksync
-          run: |
-            cd /tmp && curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
-        - name: Verify installation
-          run: forge --version
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+
+      - name: Run era-test-node
+        uses: dutterbutter/era-test-node-action@v1
+        with:
+          mode: fork
+          network: mainnet
+          log: info
+          logFilePath: era_test_node.log
+          target: x86_64-unknown-linux-gnu
+          releaseTag: v0.1.0-alpha.29
+
+      - name: Run zk tests
+        env:
+          RUST_BACKTRACE: full
+          TEST_MAINNET_URL: http://localhost:8011
+        run: cargo test zk
+
+  check-ci-install:
+    name: CI install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install foundry-zksync
+        run: |
+          cd /tmp && curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
+      - name: Verify installation
+        run: forge --version
