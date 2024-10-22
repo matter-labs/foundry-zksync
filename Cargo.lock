@@ -4800,6 +4800,7 @@ dependencies = [
  "foundry-evm",
  "foundry-test-utils",
  "foundry-wallets",
+ "foundry-zksync-core",
  "futures 0.3.31",
  "indicatif",
  "itertools 0.13.0",
@@ -4816,6 +4817,7 @@ dependencies = [
  "tracing",
  "vergen",
  "yansi 1.0.1",
+ "zksync-web3-rs",
 ]
 
 [[package]]
