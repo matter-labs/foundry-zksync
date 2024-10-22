@@ -1,6 +1,6 @@
 name: Feature request
 description: Suggest a feature
-labels: ["T-feature", "T-needs-triage"]
+labels: ["feature ➕", "needs triage ♟️"]
 body:
     - type: markdown
       attributes:
@@ -16,9 +16,7 @@ body:
           options:
               - Forge
               - Cast
-              - Anvil
               - Foundryup
-              - Chisel
               - Other (please describe)
       validations:
           required: true
