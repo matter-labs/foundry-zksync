@@ -28,11 +28,11 @@ pub struct ZksyncParams {
     zksync: bool,
 
     /// The paymaster address for the ZKSync transaction
-    #[arg(long = "zk-paymaster-address", requires_all = ["paymaster_input"])]
+    #[arg(long = "zk-paymaster-address", requires = "paymaster_input")]
     paymaster_address: Option<String>,
 
     /// The paymaster input for the ZKSync transaction
-    #[arg(long = "zk-paymaster-input", requires_all = ["paymaster_address"])]
+    #[arg(long = "zk-paymaster-input", requires = "paymaster_address")]
     paymaster_input: Option<String>,
 }
 
