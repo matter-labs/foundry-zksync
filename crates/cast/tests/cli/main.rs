@@ -1419,17 +1419,6 @@ casttest!(cast_without_paymaster, async |prj, cmd| {
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
 
-    // Deploy paymaster
-    cmd.args([
-        "rpc",
-        "hardhat_setCode",
-        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        PAYMASTER_BYTECODE,
-        "--rpc-url",
-        &url,
-    ])
-    .assert_success();
-
     // Deploy counter
     cmd.cast_fuse()
         .args([
@@ -1437,21 +1426,6 @@ casttest!(cast_without_paymaster, async |prj, cmd| {
             "hardhat_setCode",
             "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
             COUNTER_BYTECODE,
-            "--rpc-url",
-            &url,
-        ])
-        .assert_success();
-
-    // Fund the paymaster
-    cmd.cast_fuse()
-        .args([
-            "send",
-            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-            "0x",
-            "--value",
-            "0.1ether",
-            "--private-key",
-            private_key,
             "--rpc-url",
             &url,
         ])
