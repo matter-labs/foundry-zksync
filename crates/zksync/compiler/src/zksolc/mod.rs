@@ -220,10 +220,10 @@ impl DualCompiledContracts {
     /// Find a contract matching the given bytecode, whether it's EVM or ZK.
     ///
     /// Will prioritize longest match
-    pub fn find_bytecode<'a, 'b: 'a>(
-        &'b self,
-        init_code: &'a [u8],
-    ) -> Option<FindBytecodeResult<'a>> {
+    pub fn find_bytecode<'a: 'b, 'b>(
+        &'a self,
+        init_code: &'b [u8],
+    ) -> Option<FindBytecodeResult<'b>> {
         let evm = self.find_by_evm_bytecode(init_code).map(|evm| (ContractType::EVM, evm));
         let zk = self.find_by_zk_deployed_bytecode(init_code).map(|evm| (ContractType::ZK, evm));
 
