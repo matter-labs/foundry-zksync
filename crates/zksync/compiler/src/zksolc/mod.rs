@@ -43,6 +43,28 @@ pub struct DualCompiledContract {
     pub evm_bytecode: Vec<u8>,
 }
 
+/// Couple contract type with contract and init code
+pub struct FindBytecodeResult<'a> {
+    r#type: ContractType,
+    contract: &'a DualCompiledContract,
+    init_code: &'a [u8],
+}
+
+impl<'a> FindBytecodeResult<'a> {
+    /// Retrieve the found contract
+    pub fn contract(self) -> &'a DualCompiledContract {
+        self.contract
+    }
+
+    /// Retrieve the correct constructor args
+    pub fn constructor_args(&self) -> &'a [u8] {
+        match self.r#type {
+            ContractType::ZK => &self.init_code[self.contract.zk_deployed_bytecode.len()..],
+            ContractType::EVM => &self.init_code[self.contract.evm_bytecode.len()..],
+        }
+    }
+}
+
 /// A collection of `[DualCompiledContract]`s
 #[derive(Debug, Default, Clone)]
 pub struct DualCompiledContracts {
@@ -193,6 +215,32 @@ impl DualCompiledContracts {
     /// Finds a contract matching the ZK bytecode hash
     pub fn find_by_zk_bytecode_hash(&self, code_hash: H256) -> Option<&DualCompiledContract> {
         self.contracts.iter().find(|contract| code_hash == contract.zk_bytecode_hash)
+    }
+
+    /// Find a contract matching the given bytecode, whether it's EVM or ZK.
+    ///
+    /// Will prioritize longest match
+    pub fn find_bytecode<'a: 'b, 'b>(
+        &'a self,
+        init_code: &'b [u8],
+    ) -> Option<FindBytecodeResult<'b>> {
+        let evm = self.find_by_evm_bytecode(init_code).map(|evm| (ContractType::EVM, evm));
+        let zk = self.find_by_zk_deployed_bytecode(init_code).map(|evm| (ContractType::ZK, evm));
+
+        match (&evm, &zk) {
+            (Some((_, evm)), Some((_, zk))) => {
+                if zk.zk_deployed_bytecode.len() >= evm.evm_bytecode.len() {
+                    Some(FindBytecodeResult { r#type: ContractType::ZK, contract: zk, init_code })
+                } else {
+                    Some(FindBytecodeResult { r#type: ContractType::EVM, contract: zk, init_code })
+                }
+            }
+            _ => evm.or(zk).map(|(r#type, contract)| FindBytecodeResult {
+                r#type,
+                contract,
+                init_code,
+            }),
+        }
     }
 
     /// Finds a contract own and nested factory deps
