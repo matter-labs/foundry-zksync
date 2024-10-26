@@ -953,22 +953,22 @@ impl Cheatcodes {
                     let mut zk_tx = if self.use_zk_vm {
                         to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
                         nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as u64;
-                        let contract = self
+                        let init_code = input.init_code();
+                        let find_contract = self
                             .dual_compiled_contracts
-                            .find_by_evm_bytecode(&input.init_code().0)
-                            .unwrap_or_else(|| {
-                                panic!("failed finding contract for {:?}", input.init_code())
-                            });
+                            .find_bytecode(&init_code.0)
+                            .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
+
+                        let constructor_args = find_contract.constructor_args();
+                        let contract = find_contract.contract();
+
                         let factory_deps =
                             self.dual_compiled_contracts.fetch_all_factory_deps(contract);
-
-                        let constructor_input =
-                            call_init_code[contract.evm_bytecode.len()..].to_vec();
 
                         let create_input = foundry_zksync_core::encode_create_params(
                             &input.scheme().unwrap_or(CreateScheme::Create),
                             contract.zk_bytecode_hash,
-                            constructor_input,
+                            constructor_args.to_vec(),
                         );
                         call_init_code = Bytes::from(create_input);
 
@@ -1107,20 +1107,30 @@ impl Cheatcodes {
             }
         }
 
-        if input.init_code().0 == DEFAULT_CREATE2_DEPLOYER_CODE {
+        let init_code = input.init_code();
+        if init_code.0 == DEFAULT_CREATE2_DEPLOYER_CODE {
             info!("running create in EVM, instead of zkEVM (DEFAULT_CREATE2_DEPLOYER_CODE)");
             return None
         }
 
         info!("running create in zkEVM");
 
-        let zk_contract = self
+        let find_contract = self
             .dual_compiled_contracts
-            .find_by_evm_bytecode(&input.init_code().0)
-            .unwrap_or_else(|| panic!("failed finding contract for {:?}", input.init_code()));
+            .find_bytecode(&init_code.0)
+            .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
 
-        let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(zk_contract);
-        tracing::debug!(contract = zk_contract.name, "using dual compiled contract");
+        let constructor_args = find_contract.constructor_args();
+        let contract = find_contract.contract();
+
+        let zk_create_input = foundry_zksync_core::encode_create_params(
+            &input.scheme().unwrap_or(CreateScheme::Create),
+            contract.zk_bytecode_hash,
+            constructor_args.to_vec(),
+        );
+
+        let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
+        tracing::debug!(contract = contract.name, "using dual compiled contract");
 
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: self.mocked_calls.clone(),
@@ -1129,22 +1139,15 @@ impl Cheatcodes {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
         };
-        let create_inputs = CreateInputs {
-            scheme: input.scheme().unwrap_or(CreateScheme::Create),
-            init_code: input.init_code(),
-            value: input.value(),
-            caller: input.caller(),
-            gas_limit: input.gas_limit(),
+        let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
+            value: input.value().to_u256(),
+            msg_sender: input.caller(),
+            create_input: zk_create_input,
+            factory_deps,
         };
 
         let mut gas = Gas::new(input.gas_limit());
-        match foundry_zksync_core::vm::create::<_, DatabaseError>(
-            &create_inputs,
-            zk_contract,
-            factory_deps,
-            ecx,
-            ccx,
-        ) {
+        match foundry_zksync_core::vm::create::<_, DatabaseError>(zk_create, ecx, ccx) {
             Ok(result) => {
                 if let Some(recorded_logs) = &mut self.recorded_logs {
                     recorded_logs.extend(result.logs.clone().into_iter().map(|log| Vm::Log {
@@ -1161,8 +1164,8 @@ impl Cheatcodes {
                             state: self,
                             ecx: &mut ecx.inner,
                             precompiles: &mut ecx.precompiles,
-                            gas_limit: create_inputs.gas_limit,
-                            caller: create_inputs.caller,
+                            gas_limit: input.gas_limit(),
+                            caller: input.caller(),
                         },
                         decoded_log,
                     );
@@ -1436,19 +1439,20 @@ impl Cheatcodes {
             call.bytecode_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
 
             let (salt, init_code) = call.input.split_at(32);
-            let contract = self
+            let find_contract = self
                 .dual_compiled_contracts
-                .find_by_evm_bytecode(init_code)
+                .find_bytecode(init_code)
                 .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
 
-            factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
+            let constructor_args = find_contract.constructor_args();
+            let contract = find_contract.contract();
 
-            let constructor_input = init_code[contract.evm_bytecode.len()..].to_vec();
+            factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
 
             let create_input = foundry_zksync_core::encode_create_params(
                 &CreateScheme::Create2 { salt: U256::from_be_slice(salt) },
                 contract.zk_bytecode_hash,
-                constructor_input,
+                constructor_args.to_vec(),
             );
 
             call.input = create_input.into();
