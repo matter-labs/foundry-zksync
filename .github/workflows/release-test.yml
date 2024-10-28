@@ -63,7 +63,7 @@ jobs:
         run: |
           set -eo pipefail
           target="${{ matrix.target }}"
-          echo building for $target
+          echo building for $target, run#${{ github.run_attempt }}
           exit 1
   retry-on-failure:
     if: failure() && fromJSON(github.run_attempt) < 3
