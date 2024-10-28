@@ -2328,7 +2328,7 @@ dependencies = [
  "foundry-block-explorers",
  "foundry-cli",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-evm",
  "foundry-test-utils",
@@ -2427,7 +2427,7 @@ dependencies = [
  "foundry-block-explorers",
  "foundry-cli",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-evm",
  "regex",
@@ -4690,7 +4690,7 @@ dependencies = [
  "foundry-block-explorers",
  "foundry-cli",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-debugger",
  "foundry-evm",
@@ -4753,7 +4753,7 @@ dependencies = [
  "derive_more 1.0.0",
  "eyre",
  "forge-fmt",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "itertools 0.13.0",
  "mdbook",
@@ -4809,7 +4809,7 @@ dependencies = [
  "foundry-cheatcodes",
  "foundry-cli",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-debugger",
  "foundry-evm",
@@ -4840,7 +4840,7 @@ dependencies = [
  "alloy-rpc-types",
  "eyre",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-zksync-core",
  "revm-inspectors",
@@ -4881,7 +4881,7 @@ dependencies = [
  "foundry-block-explorers",
  "foundry-cli",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-evm",
  "foundry-test-utils",
@@ -4912,12 +4912,12 @@ dependencies = [
 [[package]]
 name = "foundry-block-explorers"
 version = "0.7.3"
-source = "git+https://github.com/Moonsong-Labs/block-explorers?branch=zksync-v0.7.3#9ebec2f71f0ee739f4ec4fb21df4d301aeb61936"
+source = "git+https://github.com/Moonsong-Labs/block-explorers?branch=zksync-v0.7.3#ef81bf5a733517de496ae1d14024ea9b4fcd4d3c"
 dependencies = [
  "alloy-chains",
  "alloy-json-abi",
  "alloy-primitives",
- "foundry-compilers 0.11.1",
+ "foundry-compilers",
  "reqwest 0.12.8",
  "semver 1.0.23",
  "serde",
@@ -4949,7 +4949,7 @@ dependencies = [
  "foundry-cheatcodes-common",
  "foundry-cheatcodes-spec",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-evm-core",
  "foundry-wallets",
@@ -5012,7 +5012,7 @@ dependencies = [
  "eyre",
  "forge-fmt",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-debugger",
  "foundry-evm",
@@ -5059,7 +5059,7 @@ dependencies = [
  "eyre",
  "foundry-block-explorers",
  "foundry-common-fmt",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-zksync-compiler",
  "globset",
@@ -5099,46 +5099,6 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
-dependencies = [
- "alloy-json-abi",
- "alloy-primitives",
- "auto_impl",
- "derivative",
- "dirs 5.0.1",
- "dyn-clone",
- "foundry-compilers-artifacts 0.11.1",
- "foundry-compilers-core 0.11.1",
- "fs4 0.8.4",
- "fs_extra",
- "futures-util",
- "home",
- "itertools 0.13.0",
- "md-5",
- "once_cell",
- "path-slash",
- "rand 0.8.5",
- "rayon",
- "reqwest 0.12.8",
- "semver 1.0.23",
- "serde",
- "serde_json",
- "sha2 0.10.8",
- "solang-parser",
- "svm-rs 0.5.8",
- "svm-rs-builds",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "walkdir",
- "winnow 0.6.20",
- "yansi 1.0.1",
-]
-
-[[package]]
-name = "foundry-compilers"
 version = "0.11.4"
 source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#04cb9bd38c9dbd6388488a0d6cd9377db1e44a44"
 dependencies = [
@@ -5148,8 +5108,8 @@ dependencies = [
  "derivative",
  "dirs 5.0.1",
  "dyn-clone",
- "foundry-compilers-artifacts 0.11.4",
- "foundry-compilers-core 0.11.4",
+ "foundry-compilers-artifacts",
+ "foundry-compilers-core",
  "fs4 0.8.4",
  "fs_extra",
  "futures-util",
@@ -5179,45 +5139,12 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers-artifacts"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
-dependencies = [
- "foundry-compilers-artifacts-solc 0.11.1",
- "foundry-compilers-artifacts-vyper 0.11.1",
- "foundry-compilers-artifacts-zksolc 0.11.1",
-]
-
-[[package]]
-name = "foundry-compilers-artifacts"
 version = "0.11.4"
 source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#04cb9bd38c9dbd6388488a0d6cd9377db1e44a44"
 dependencies = [
- "foundry-compilers-artifacts-solc 0.11.4",
- "foundry-compilers-artifacts-vyper 0.11.4",
- "foundry-compilers-artifacts-zksolc 0.11.4",
-]
-
-[[package]]
-name = "foundry-compilers-artifacts-solc"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
-dependencies = [
- "alloy-json-abi",
- "alloy-primitives",
- "foundry-compilers-core 0.11.1",
- "futures-util",
- "md-5",
- "path-slash",
- "rayon",
- "semver 1.0.23",
- "serde",
- "serde_json",
- "serde_repr",
- "thiserror",
- "tokio",
- "tracing",
- "walkdir",
- "yansi 1.0.1",
+ "foundry-compilers-artifacts-solc",
+ "foundry-compilers-artifacts-vyper",
+ "foundry-compilers-artifacts-zksolc",
 ]
 
 [[package]]
@@ -5227,7 +5154,7 @@ source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#0
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
- "foundry-compilers-core 0.11.4",
+ "foundry-compilers-core",
  "futures-util",
  "md-5",
  "path-slash",
@@ -5245,27 +5172,13 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers-artifacts-vyper"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
-dependencies = [
- "alloy-json-abi",
- "alloy-primitives",
- "foundry-compilers-artifacts-solc 0.11.1",
- "foundry-compilers-core 0.11.1",
- "path-slash",
- "semver 1.0.23",
- "serde",
-]
-
-[[package]]
-name = "foundry-compilers-artifacts-vyper"
 version = "0.11.4"
 source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#04cb9bd38c9dbd6388488a0d6cd9377db1e44a44"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
- "foundry-compilers-artifacts-solc 0.11.4",
- "foundry-compilers-core 0.11.4",
+ "foundry-compilers-artifacts-solc",
+ "foundry-compilers-core",
  "path-slash",
  "semver 1.0.23",
  "serde",
@@ -5273,13 +5186,13 @@ dependencies = [
 
 [[package]]
 name = "foundry-compilers-artifacts-zksolc"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
+version = "0.11.4"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#04cb9bd38c9dbd6388488a0d6cd9377db1e44a44"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
- "foundry-compilers-artifacts-solc 0.11.1",
- "foundry-compilers-core 0.11.1",
+ "foundry-compilers-artifacts-solc",
+ "foundry-compilers-core",
  "md-5",
  "path-slash",
  "rayon",
@@ -5290,50 +5203,6 @@ dependencies = [
  "tracing",
  "walkdir",
  "yansi 1.0.1",
-]
-
-[[package]]
-name = "foundry-compilers-artifacts-zksolc"
-version = "0.11.4"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.4#04cb9bd38c9dbd6388488a0d6cd9377db1e44a44"
-dependencies = [
- "alloy-json-abi",
- "alloy-primitives",
- "foundry-compilers-artifacts-solc 0.11.4",
- "foundry-compilers-core 0.11.4",
- "md-5",
- "path-slash",
- "rayon",
- "semver 1.0.23",
- "serde",
- "serde_json",
- "thiserror",
- "tracing",
- "walkdir",
- "yansi 1.0.1",
-]
-
-[[package]]
-name = "foundry-compilers-core"
-version = "0.11.1"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.1#e3f44379f6bfb3c50e3a69acbeaa8f6da0cb4aae"
-dependencies = [
- "alloy-primitives",
- "cfg-if 1.0.0",
- "dunce",
- "fs_extra",
- "memmap2",
- "once_cell",
- "path-slash",
- "regex",
- "semver 1.0.23",
- "serde",
- "serde_json",
- "svm-rs 0.5.8",
- "tempfile",
- "thiserror",
- "tokio",
- "walkdir",
 ]
 
 [[package]]
@@ -5370,7 +5239,7 @@ dependencies = [
  "eyre",
  "figment",
  "foundry-block-explorers",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "glob",
  "globset",
  "mesc",
@@ -5402,7 +5271,7 @@ dependencies = [
  "crossterm 0.28.1",
  "eyre",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-evm-core",
  "foundry-evm-traces",
  "ratatui",
@@ -5423,7 +5292,7 @@ dependencies = [
  "eyre",
  "foundry-cheatcodes",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-evm-core",
  "foundry-evm-coverage",
@@ -5494,7 +5363,7 @@ dependencies = [
  "alloy-primitives",
  "eyre",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-evm-core",
  "rayon",
  "revm",
@@ -5512,7 +5381,7 @@ dependencies = [
  "alloy-primitives",
  "eyre",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-evm-core",
  "foundry-evm-coverage",
@@ -5541,7 +5410,7 @@ dependencies = [
  "foundry-block-explorers",
  "foundry-cheatcodes-spec",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "foundry-evm-core",
  "foundry-linking",
@@ -5585,7 +5454,7 @@ name = "foundry-linking"
 version = "0.0.2"
 dependencies = [
  "alloy-primitives",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "semver 1.0.23",
  "thiserror",
 ]
@@ -5611,7 +5480,7 @@ dependencies = [
  "fd-lock",
  "foundry-block-explorers",
  "foundry-common",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "jsonrpc-core",
  "jsonrpc-http-server",
@@ -5663,7 +5532,7 @@ version = "0.0.2"
 dependencies = [
  "alloy-primitives",
  "eyre",
- "foundry-compilers 0.11.4",
+ "foundry-compilers",
  "foundry-config",
  "semver 1.0.23",
  "serde",
@@ -8519,7 +8388,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
- "proc-macro-crate 3.2.0",
+ "proc-macro-crate 1.3.1",
  "proc-macro2 1.0.88",
  "quote 1.0.37",
  "syn 2.0.79",
