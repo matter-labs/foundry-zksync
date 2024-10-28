@@ -920,7 +920,7 @@ impl Cheatcodes {
     }
 
     // common create functionality for both legacy and EOF.
-    fn create_common<DB, Input>(
+    fn create_common<Input>(
         &mut self,
         ecx: Ecx,
         mut input: Input,
@@ -1098,14 +1098,13 @@ impl Cheatcodes {
     /// Try handling the `CREATE` within zkEVM.
     /// If `Some` is returned then the result must be returned immediately, else the call must be
     /// handled in EVM.
-    fn try_create_in_zk<DB, Input>(
+    fn try_create_in_zk<Input>(
         &mut self,
-        ecx: &mut EvmContext<DB>,
+        ecx: Ecx,
         input: Input,
         executor: &mut impl CheatcodesExecutor,
     ) -> Option<CreateOutcome>
     where
-        DB: DatabaseExt,
         Input: CommonCreateInput,
     {
         if self.skip_zk_vm {
@@ -1726,16 +1725,13 @@ where {
     /// Try handling the `CALL` within zkEVM.
     /// If `Some` is returned then the result must be returned immediately, else the call must be
     /// handled in EVM.
-    fn try_call_in_zk<DB>(
+    fn try_call_in_zk(
         &mut self,
         factory_deps: Vec<Vec<u8>>,
-        ecx: &mut EvmContext<DB>,
+        ecx: Ecx,
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
-    ) -> Option<CallOutcome>
-    where
-        DB: DatabaseExt,
-    {
+    ) -> Option<CallOutcome> {
         // also skip if the target was created during a zkEVM skip
         self.skip_zk_vm =
             self.skip_zk_vm || self.skip_zk_vm_addresses.contains(&call.target_address);

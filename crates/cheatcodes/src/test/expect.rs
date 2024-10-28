@@ -1,8 +1,6 @@
 use crate::{Cheatcode, Cheatcodes, CheatsCtxt, Error, Result, Vm::*};
 use alloy_primitives::{
-    address, hex,
-    map::{hash_map::Entry, HashMap},
-    Address, Bytes, LogData as RawLog, U256,
+    address, hex, map::hash_map::Entry, Address, Bytes, LogData as RawLog, U256,
 };
 use alloy_sol_types::{SolError, SolValue};
 use foundry_cheatcodes_common::expect::{ExpectedCallData, ExpectedCallType};
