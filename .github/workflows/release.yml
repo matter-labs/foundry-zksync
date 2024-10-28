@@ -218,6 +218,16 @@ jobs:
           files: |
             ${{ steps.artifacts.outputs.file_name }}
             ${{ steps.man.outputs.foundry_man }}
+  
+  retry-on-failure:
+    if: failure() && fromJSON(github.run_attempt) < 3
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run retry.yml -F run_id=${{ github.run_id }}
 
   cleanup:
     name: Release cleanup
