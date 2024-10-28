@@ -153,7 +153,12 @@ pub trait CheatcodesExecutor {
         None
     }
 
-    fn trace_zksync(&mut self, ccx_state: &mut Cheatcodes, ecx: &mut Ecx, call_traces: Vec<Call>) {
+    fn trace_zksync<'a>(
+        &mut self,
+        ccx_state: &'a mut Cheatcodes,
+        ecx: Ecx<'a, 'a, 'a>,
+        call_traces: Vec<Call>,
+    ) {
         self.get_inspector(ccx_state).trace_zksync(ecx, call_traces);
     }
 }
@@ -729,11 +734,7 @@ impl Cheatcodes {
     /// Additionally:
     /// * Translates block information
     /// * Translates all persisted addresses
-    pub fn select_fork_vm<DB: DatabaseExt>(
-        &mut self,
-        data: &mut InnerEvmContext<DB>,
-        fork_id: LocalForkId,
-    ) {
+    pub fn select_fork_vm(&mut self, data: InnerEcx, fork_id: LocalForkId) {
         let fork_info = data.db.get_fork_info(fork_id).expect("failed getting fork info");
         if fork_info.fork_type.is_evm() {
             self.select_evm(data)
@@ -744,7 +745,7 @@ impl Cheatcodes {
 
     /// Switch to EVM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    pub fn select_evm<DB: DatabaseExt>(&mut self, data: &mut InnerEvmContext<DB>) {
+    pub fn select_evm(&mut self, data: InnerEcx) {
         if !self.use_zk_vm {
             tracing::info!("already in EVM");
             return
@@ -816,11 +817,7 @@ impl Cheatcodes {
 
     /// Switch to ZK-VM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    pub fn select_zk_vm<DB: DatabaseExt>(
-        &mut self,
-        data: &mut InnerEvmContext<DB>,
-        new_env: Option<&Env>,
-    ) {
+    pub fn select_zk_vm(&mut self, data: InnerEcx, new_env: Option<&Env>) {
         if self.use_zk_vm {
             tracing::info!("already in ZK-VM");
             return

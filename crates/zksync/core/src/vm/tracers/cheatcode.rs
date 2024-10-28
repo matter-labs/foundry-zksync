@@ -1,10 +1,6 @@
-use std::{
-    cell::OnceCell,
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{cell::OnceCell, collections::BTreeMap, sync::Arc};
 
-use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
+use alloy_primitives::{hex, map::HashMap, Address, Bytes, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
