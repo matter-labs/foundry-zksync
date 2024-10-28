@@ -454,7 +454,7 @@ fn inspect_inner<S: ReadStorage>(
         )
         .into_tracer_pointer(),
     ];
-    let compressed_bytecodes = vm.push_transaction(tx.clone()).compressed_bytecodes.into_owned();
+    let compressed_bytecodes = vm.push_transaction(tx).compressed_bytecodes.into_owned();
     let mut tx_result = vm.inspect(&mut tracers.into(), VmExecutionMode::OneTx);
 
     let mut call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
