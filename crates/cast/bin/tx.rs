@@ -165,7 +165,9 @@ where
         }
 
         if let Some(gas_price) = tx_opts.gas_price {
-            if legacy {
+            // We need to set the gas price to be able to create the EIP-712 transaction in
+            // zkcontext
+            if legacy || config.zksync.startup {
                 tx.set_gas_price(gas_price.to());
             } else {
                 tx.set_max_fee_per_gas(gas_price.to());

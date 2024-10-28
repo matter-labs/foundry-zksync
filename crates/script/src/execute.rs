@@ -6,12 +6,15 @@ use crate::{
 };
 use alloy_dyn_abi::FunctionExt;
 use alloy_json_abi::{Function, InternalType, JsonAbi};
-use alloy_primitives::{Address, Bytes};
+use alloy_primitives::{
+    map::{HashMap, HashSet},
+    Address, Bytes,
+};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionInput;
 use async_recursion::async_recursion;
 use eyre::{OptionExt, Result};
-use foundry_cheatcodes::ScriptWallets;
+use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
 use foundry_common::{
     fmt::{format_token, format_token_raw},
@@ -31,7 +34,6 @@ use foundry_evm::{
 };
 use futures::future::join_all;
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
 use yansi::Paint;
 
 /// State after linking, contains the linked build data along with library addresses and optional
@@ -39,7 +41,7 @@ use yansi::Paint;
 pub struct LinkedState {
     pub args: ScriptArgs,
     pub script_config: ScriptConfig,
-    pub script_wallets: ScriptWallets,
+    pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
 }
 
@@ -91,7 +93,7 @@ impl LinkedState {
 pub struct PreExecutionState {
     pub args: ScriptArgs,
     pub script_config: ScriptConfig,
-    pub script_wallets: ScriptWallets,
+    pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub execution_data: ExecutionData,
 }
@@ -274,7 +276,7 @@ pub struct ExecutionArtifacts {
 pub struct ExecutedState {
     pub args: ScriptArgs,
     pub script_config: ScriptConfig,
-    pub script_wallets: ScriptWallets,
+    pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub execution_data: ExecutionData,
     pub execution_result: ScriptResult,
@@ -352,7 +354,7 @@ impl ExecutedState {
 
     /// Collects the return values from the execution result.
     fn get_returns(&self) -> Result<HashMap<String, NestedValue>> {
-        let mut returns = HashMap::new();
+        let mut returns = HashMap::default();
         let returned = &self.execution_result.returned;
         let func = &self.execution_data.func;
 

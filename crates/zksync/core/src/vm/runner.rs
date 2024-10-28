@@ -1,8 +1,7 @@
 use alloy_primitives::hex;
-use foundry_zksync_compiler::DualCompiledContract;
 use itertools::Itertools;
 use revm::{
-    interpreter::{CallInputs, CallScheme, CallValue, CreateInputs},
+    interpreter::{CallInputs, CallScheme, CallValue},
     primitives::{Address, CreateScheme, Env, ResultAndState, TransactTo, B256, U256 as rU256},
     Database, EvmContext, InnerEvmContext,
 };
@@ -116,11 +115,23 @@ where
     ZKVMData::new(ecx).get_tx_nonce(address).0
 }
 
-/// Executes a CREATE opcode on the ZK-VM.
+/// EraVM equivalent of [`CreateInputs`]
+pub struct ZkCreateInputs {
+    /// The current `msg.sender`
+    pub msg_sender: Address,
+    /// The encoded calldata input for `CONTRACT_DEPLOYER`
+    pub create_input: Vec<u8>,
+    /// Factory deps for the contract we are deploying
+    pub factory_deps: Vec<Vec<u8>>,
+    /// Value specified for the deployment
+    pub value: U256,
+}
+
+/// Executes a CREATE opcode on the EraVM.
+///
+/// * `call.init_code` should be valid EraVM's ContractDeployer input
 pub fn create<DB, E>(
-    call: &CreateInputs,
-    contract: &DualCompiledContract,
-    factory_deps: Vec<Vec<u8>>,
+    inputs: ZkCreateInputs,
     ecx: &mut EvmContext<DB>,
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
@@ -128,10 +139,10 @@ where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    info!(?call, "create tx {}", hex::encode(&call.init_code));
-    let constructor_input = call.init_code[contract.evm_bytecode.len()..].to_vec();
+    let ZkCreateInputs { create_input, factory_deps, value, msg_sender } = inputs;
+
+    info!("create tx {}", hex::encode(&create_input));
     let caller = ecx.env.tx.caller;
-    let calldata = encode_create_params(&call.scheme, contract.zk_bytecode_hash, constructor_input);
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
@@ -148,7 +159,7 @@ where
 
     let tx = L2Tx::new(
         Some(CONTRACT_DEPLOYER_ADDRESS),
-        calldata,
+        create_input,
         nonce,
         Fee {
             gas_limit,
@@ -157,14 +168,14 @@ where
             gas_per_pubdata_limit: U256::from(20000),
         },
         caller.to_h160(),
-        call.value.to_u256(),
+        value,
         factory_deps,
         paymaster_params,
     );
 
     let call_ctx = CallContext {
         tx_caller: ecx.env.tx.caller,
-        msg_sender: call.caller,
+        msg_sender,
         contract: CONTRACT_DEPLOYER_ADDRESS.to_address(),
         delegate_as: None,
         block_number: ecx.env.block.number,

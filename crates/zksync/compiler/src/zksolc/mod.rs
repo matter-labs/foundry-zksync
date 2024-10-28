@@ -1,17 +1,28 @@
 //! ZKSolc module.
 use std::{
     collections::{HashMap, HashSet, VecDeque},
+    path::PathBuf,
     str::FromStr,
 };
 
 use foundry_compilers::{
     solc::SolcLanguage, zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
-    Artifact, ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput, ProjectPathsConfig,
+    Artifact, ArtifactId, ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput,
+    ProjectPathsConfig,
 };
 
 use alloy_primitives::{keccak256, B256};
 use tracing::debug;
 use zksync_types::H256;
+
+/// Represents the type of contract (ZK or EVM)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContractType {
+    /// ZkSolc compiled contract
+    ZK,
+    /// Solc compiled contract
+    EVM,
+}
 
 /// Defines a contract that has been dual compiled with both zksolc and solc
 #[derive(Debug, Default, Clone)]
@@ -32,10 +43,36 @@ pub struct DualCompiledContract {
     pub evm_bytecode: Vec<u8>,
 }
 
+/// Couple contract type with contract and init code
+pub struct FindBytecodeResult<'a> {
+    r#type: ContractType,
+    contract: &'a DualCompiledContract,
+    init_code: &'a [u8],
+}
+
+impl<'a> FindBytecodeResult<'a> {
+    /// Retrieve the found contract
+    pub fn contract(self) -> &'a DualCompiledContract {
+        self.contract
+    }
+
+    /// Retrieve the correct constructor args
+    pub fn constructor_args(&self) -> &'a [u8] {
+        match self.r#type {
+            ContractType::ZK => &self.init_code[self.contract.zk_deployed_bytecode.len()..],
+            ContractType::EVM => &self.init_code[self.contract.evm_bytecode.len()..],
+        }
+    }
+}
+
 /// A collection of `[DualCompiledContract]`s
 #[derive(Debug, Default, Clone)]
 pub struct DualCompiledContracts {
     contracts: Vec<DualCompiledContract>,
+    /// ZKvm artifacts path
+    pub zk_artifact_path: PathBuf,
+    /// EVM artifacts path
+    pub evm_artifact_path: PathBuf,
 }
 
 impl DualCompiledContracts {
@@ -158,7 +195,11 @@ impl DualCompiledContracts {
             }
         }
 
-        Self { contracts: dual_compiled_contracts }
+        Self {
+            contracts: dual_compiled_contracts,
+            zk_artifact_path: zk_layout.artifacts.clone(),
+            evm_artifact_path: layout.artifacts.clone(),
+        }
     }
 
     /// Finds a contract matching the ZK deployed bytecode
@@ -174,6 +215,32 @@ impl DualCompiledContracts {
     /// Finds a contract matching the ZK bytecode hash
     pub fn find_by_zk_bytecode_hash(&self, code_hash: H256) -> Option<&DualCompiledContract> {
         self.contracts.iter().find(|contract| code_hash == contract.zk_bytecode_hash)
+    }
+
+    /// Find a contract matching the given bytecode, whether it's EVM or ZK.
+    ///
+    /// Will prioritize longest match
+    pub fn find_bytecode<'a: 'b, 'b>(
+        &'a self,
+        init_code: &'b [u8],
+    ) -> Option<FindBytecodeResult<'b>> {
+        let evm = self.find_by_evm_bytecode(init_code).map(|evm| (ContractType::EVM, evm));
+        let zk = self.find_by_zk_deployed_bytecode(init_code).map(|evm| (ContractType::ZK, evm));
+
+        match (&evm, &zk) {
+            (Some((_, evm)), Some((_, zk))) => {
+                if zk.zk_deployed_bytecode.len() >= evm.evm_bytecode.len() {
+                    Some(FindBytecodeResult { r#type: ContractType::ZK, contract: zk, init_code })
+                } else {
+                    Some(FindBytecodeResult { r#type: ContractType::EVM, contract: zk, init_code })
+                }
+            }
+            _ => evm.or(zk).map(|(r#type, contract)| FindBytecodeResult {
+                r#type,
+                contract,
+                init_code,
+            }),
+        }
     }
 
     /// Finds a contract own and nested factory deps
@@ -207,6 +274,20 @@ impl DualCompiledContracts {
         }
 
         visited.into_iter().cloned().collect()
+    }
+
+    /// Returns the contract type (ZK or EVM) based on the artifact path
+    pub fn get_contract_type_by_artifact(&self, artifact_id: &ArtifactId) -> Option<ContractType> {
+        if artifact_id.path.starts_with(&self.zk_artifact_path) {
+            Some(ContractType::ZK)
+        } else if artifact_id.path.starts_with(&self.evm_artifact_path) {
+            Some(ContractType::EVM)
+        } else {
+            panic!(
+                "Unexpected artifact path: {:?}. Not found in ZK path {:?} or EVM path {:?}",
+                artifact_id.path, self.zk_artifact_path, self.evm_artifact_path
+            );
+        }
     }
 
     /// Returns an iterator over all `[DualCompiledContract]`s in the collection
