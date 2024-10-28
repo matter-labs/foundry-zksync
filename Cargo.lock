@@ -4952,6 +4952,7 @@ dependencies = [
  "foundry-compilers",
  "foundry-config",
  "foundry-evm-core",
+ "foundry-evm-traces",
  "foundry-wallets",
  "foundry-zksync-compiler",
  "foundry-zksync-core",

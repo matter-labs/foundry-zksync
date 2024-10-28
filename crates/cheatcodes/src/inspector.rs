@@ -5,7 +5,7 @@ use crate::{
         journaled_account,
         mapping::{self, MappingSlots},
         prank::Prank,
-        DealRecord, GasRecord, RecordAccess,
+        DealRecord, GasRecord,
     },
     inspector::utils::CommonCreateInput,
     script::{Broadcast, Wallets},
@@ -32,17 +32,17 @@ use foundry_cheatcodes_common::{
 use foundry_common::{evm::Breakpoints, TransactionMaybeSigned, SELECTOR_LEN};
 use foundry_config::Config;
 use foundry_evm_core::{
-    abi::Vm::stopExpectSafeMemoryCall,
+    abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
         CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
-        DEFAULT_CREATE2_DEPLOYER_CODE, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME,
+        DEFAULT_CREATE2_DEPLOYER_CODE, MAGIC_ASSUME,
     },
     decode::decode_console_log,
     utils::new_evm_with_existing_context,
     InspectorExt,
 };
-use foundry_evm_traces::{TracingInspector, TracingInspectorConfig};
+use foundry_evm_traces::TracingInspectorConfig;
 use foundry_wallets::multi_wallet::MultiWallet;
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
@@ -68,7 +68,7 @@ use revm::{
 };
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
@@ -1109,7 +1109,7 @@ impl Cheatcodes {
     ) -> Option<CreateOutcome>
     where
         DB: DatabaseExt,
-        Input: CommonCreateInput<DB>,
+        Input: CommonCreateInput,
     {
         if self.skip_zk_vm {
             self.skip_zk_vm = false; // handled the skip, reset flag
