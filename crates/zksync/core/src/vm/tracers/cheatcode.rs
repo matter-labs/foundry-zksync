@@ -1,4 +1,8 @@
-use std::{cell::OnceCell, collections::BTreeMap, sync::Arc};
+use std::{
+    cell::OnceCell,
+    collections::{BTreeMap, HashMap as sHashMap},
+    sync::Arc,
+};
 
 use alloy_primitives::{hex, map::HashMap, Address, Bytes, U256 as rU256};
 use foundry_cheatcodes_common::{
@@ -76,7 +80,7 @@ pub struct CheatcodeTracerContext<'a> {
     /// Recorded storage accesses
     pub accesses: Option<&'a mut RecordAccess>,
     /// Factory deps that were persisted across calls
-    pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
+    pub persisted_factory_deps: Option<&'a mut sHashMap<H256, Vec<u8>>>,
     /// Paymaster data
     pub paymaster_data: Option<ZkPaymasterData>,
 }
@@ -111,7 +115,7 @@ pub struct CallContext {
     pub is_static: bool,
     /// L1 block hashes to return when `BLOCKHASH` opcode is encountered. This ensures consistency
     /// when returning environment data in L2.
-    pub block_hashes: HashMap<alloy_primitives::U256, alloy_primitives::FixedBytes<32>>,
+    pub block_hashes: sHashMap<alloy_primitives::U256, alloy_primitives::FixedBytes<32>>,
 }
 
 /// A tracer to allow for foundry-specific functionality.

@@ -12,7 +12,6 @@ use revm::interpreter::{
     return_ok, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
 };
 use spec::Vm;
-use std::collections::hash_map::Entry;
 
 /// For some cheatcodes we may internally change the status of the call, i.e. in `expectRevert`.
 /// Solidity will see a successful call and attempt to decode the return data. Therefore, we need
