@@ -1,0 +1,76 @@
+name: release-test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  IS_NIGHTLY: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+
+jobs:
+  release:
+    name: ${{ matrix.target }} (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 2
+    permissions:
+      # Required to post the release
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `runner`: GHA runner label
+          # `target`: Rust build target triple
+          # `platform` and `arch`: Used in tarball names
+          # `svm`: target platform to use for the Solc binary: https://github.com/roynalnaruto/svm-rs/blob/84cbe0ac705becabdc13168bae28a45ad2299749/svm-builds/build.rs#L4-L24
+          - runner: ubuntu-22.04-github-hosted-16core
+            target: x86_64-unknown-linux-gnu
+            svm_target_platform: linux-amd64
+            platform: linux
+            arch: amd64
+          - runner: ubuntu-22.04-github-hosted-16core
+            target: aarch64-unknown-linux-gnu
+            svm_target_platform: linux-aarch64
+            platform: linux
+            arch: arm64
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+            svm_target_platform: macosx-amd64
+            platform: darwin
+            arch: amd64
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            svm_target_platform: macosx-aarch64
+            platform: darwin
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install required Rust targets
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build binaries
+        env:
+          SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          target="${{ matrix.target }}"
+          echo building for $target
+          exit 1
+  retry-on-failure:
+    if: failure() && fromJSON(github.run_attempt) < 3
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run retry.yml -F run_id=${{ github.run_id }}
