@@ -1,6 +1,6 @@
 name: Bug report
 description: File a bug report
-labels: ["T-bug", "T-needs-triage"]
+labels: ["bug 🐛", "needs triage ♟️"]
 body:
     - type: markdown
       attributes:
@@ -16,9 +16,7 @@ body:
           options:
               - Forge
               - Cast
-              - Anvil
               - Foundryup
-              - Chisel
               - Other (please describe)
       validations:
           required: true

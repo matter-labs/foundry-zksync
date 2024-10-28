@@ -35,6 +35,8 @@ foundry-compilers.workspace = true
 foundry-config.workspace = true
 foundry-evm.workspace = true
 foundry-wallets.workspace = true
+foundry-zksync-core.workspace = true
+zksync-web3-rs.workspace = true
 
 alloy-chains.workspace = true
 alloy-consensus = { workspace = true, features = ["serde", "kzg"] }
