@@ -18,11 +18,10 @@ use crate::{
     Vm::{self, AccountAccess},
 };
 use alloy_primitives::{
-    hex,
+    hex, keccak256,
     map::{AddressHashMap, HashMap},
     Address, Bytes, Log, TxKind, B256, U256,
 };
-use alloy_primitives::{hex, keccak256, Address, Bytes, Log, TxKind, B256, U256};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
 use foundry_cheatcodes_common::{
@@ -37,12 +36,14 @@ use foundry_evm_core::{
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
         CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
-        DEFAULT_CREATE2_DEPLOYER_CODE, MAGIC_ASSUME, HARDHAT_CONSOLE_ADDRESS
+        DEFAULT_CREATE2_DEPLOYER_CODE, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME,
     },
     decode::decode_console_log,
     utils::new_evm_with_existing_context,
     InspectorExt,
 };
+use foundry_evm_traces::{TracingInspector, TracingInspectorConfig};
+use foundry_wallets::multi_wallet::MultiWallet;
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
@@ -50,8 +51,6 @@ use foundry_zksync_core::{
     ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
 use foundry_zksync_inspectors::TraceCollector;
-use foundry_evm_traces::{TracingInspector, TracingInspectorConfig};
-use foundry_wallets::multi_wallet::MultiWallet;
 use itertools::Itertools;
 use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::Rng;
@@ -154,12 +153,7 @@ pub trait CheatcodesExecutor {
         None
     }
 
-    fn trace_zksync(
-        &mut self,
-        ccx_state: &mut Cheatcodes,
-        ecx: &mut Ecx,
-        call_traces: Vec<Call>,
-    ) {
+    fn trace_zksync(&mut self, ccx_state: &mut Cheatcodes, ecx: &mut Ecx, call_traces: Vec<Call>) {
         self.get_inspector(ccx_state).trace_zksync(ecx, call_traces);
     }
 }
@@ -935,7 +929,6 @@ impl Cheatcodes {
         mut input: Input,
         executor: &mut impl CheatcodesExecutor,
     ) -> Option<CreateOutcome>
-    fn create_common<Input>(&mut self, ecx: Ecx, mut input: Input) -> Option<CreateOutcome>
     where
         Input: CommonCreateInput,
     {
@@ -2335,11 +2328,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
         outcome
     }
 
-    fn create(
-        &mut self,
-        ecx: Ecx,
-        call: &mut CreateInputs,
-    ) -> Option<CreateOutcome> {
+    fn create(&mut self, ecx: Ecx, call: &mut CreateInputs) -> Option<CreateOutcome> {
         self.create_common(ecx, call, &mut TransparentCheatcodesExecutor)
     }
 
@@ -2352,11 +2341,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
         self.create_end_common(ecx, outcome)
     }
 
-    fn eofcreate(
-        &mut self,
-        ecx: Ecx,
-        call: &mut EOFCreateInputs,
-    ) -> Option<CreateOutcome> {
+    fn eofcreate(&mut self, ecx: Ecx, call: &mut EOFCreateInputs) -> Option<CreateOutcome> {
         self.create_common(ecx, call, &mut TransparentCheatcodesExecutor)
     }
 
