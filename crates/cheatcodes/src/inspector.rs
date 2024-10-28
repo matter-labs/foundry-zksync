@@ -154,13 +154,13 @@ pub trait CheatcodesExecutor {
         None
     }
 
-    fn trace_zksync<DB: DatabaseExt>(
+    fn trace_zksync(
         &mut self,
         ccx_state: &mut Cheatcodes,
-        ecx: &mut EvmContext<DB>,
+        ecx: &mut Ecx,
         call_traces: Vec<Call>,
     ) {
-        self.get_inspector::<DB>(ccx_state).trace_zksync(ecx, call_traces);
+        self.get_inspector(ccx_state).trace_zksync(ecx, call_traces);
     }
 }
 
