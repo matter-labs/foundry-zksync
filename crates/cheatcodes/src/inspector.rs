@@ -994,7 +994,6 @@ impl Cheatcodes {
                             info!("Pushing {:?} factory deps bytecode", factory_deps_contract);
                             factory_deps.push(bytecode.to_vec());
                         }
-                        self.contracts_as_factory_deps.clear();
                         let mut batched = foundry_zksync_core::vm::batch_factory_dependencies(
                             factory_deps.clone(),
                         );
@@ -1594,15 +1593,13 @@ impl Cheatcodes {
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let mut zk_tx = if self.use_zk_vm {
-                        info!("factory deps contract {:?}", self.contracts_as_factory_deps);
                         for factory_deps_contract in &self.contracts_as_factory_deps {
                             let bytecode =
                                 crate::fs::get_artifact_code(self, factory_deps_contract, false)
-                                    .unwrap_or_else(|_| panic!("Failed to get bytecode for factory deps contract {factory_deps_contract}"));
+                                    .unwrap();
                             info!("Pushing {:?} factory deps bytecode", factory_deps_contract);
                             factory_deps.push(bytecode.to_vec());
                         }
-                        self.contracts_as_factory_deps.clear();
 
                         let paymaster_params =
                             self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
@@ -1624,7 +1621,6 @@ impl Cheatcodes {
                     } else {
                         None
                     };
-                    warn!("zk tx {:?}", zk_tx);
                     if let Some(ref mut zk_tx) = zk_tx {
                         zk_tx.factory_deps = factory_deps.clone();
                         Some(zk_tx)

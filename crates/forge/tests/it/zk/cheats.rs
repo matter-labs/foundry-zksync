@@ -149,15 +149,14 @@ async fn test_zk_zk_vm_skip_works() {
 forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
     setup_deploy_prj(&mut prj);
 
-    cmd.args(["install", "cyfrin/zksync-contracts", "--no-commit", "--shallow"]).assert_success();
     cmd.forge_fuse();
     run_zk_script_test(
         prj.root(),
         &mut cmd,
         "./script/DeployMultisig.s.sol",
         "DeployMultisig",
-        Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts"),
-        4,
+        Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts cyfrin/zksync-contracts"),
+        2,
         Some(&["-vvvvv", "--via-ir", "--system-mode", "true"]),
     );
 });
