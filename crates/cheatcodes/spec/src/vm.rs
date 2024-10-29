@@ -697,7 +697,7 @@ interface Vm {
     #[cheatcode(group = Testing, safety = Safe)]
     function zkUsePaymaster(address paymaster_address, bytes calldata paymaster_input) external pure;
 
-    /// Marks the contract to be injected as a factory dependency
+    /// Marks the contract to be injected as a factory dependency in the next transaction
     #[cheatcode(group = Testing, safety = Safe)]
     function zkUseFactoryDep(string calldata name) external pure;
 
