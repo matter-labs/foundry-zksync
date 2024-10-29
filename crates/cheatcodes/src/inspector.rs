@@ -507,7 +507,7 @@ pub struct Cheatcodes {
     pub startup_zk: bool,
 
     /// Factory deps stored through `zkUseFactoryDep`
-    pub contracts_as_factory_deps: Vec<String>, // Changed from Option<String> to Vec<String>
+    pub contracts_as_factory_deps: Vec<String>,
 
     /// The list of factory_deps seen so far during a test or script execution.
     /// Ideally these would be persisted in the storage, but since modifying [revm::JournaledState]
@@ -606,7 +606,7 @@ impl Cheatcodes {
             record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
-            contracts_as_factory_deps: Vec::new(), // Changed from Option<String> to Vec<String>
+            contracts_as_factory_deps: Vec::new(),
         }
     }
 
@@ -1276,7 +1276,7 @@ impl Cheatcodes {
             }
         }
 
-        // Clean up broadcast
+        // Clean up broadcasts
         if let Some(broadcast) = &self.broadcast {
             if ecx.journaled_state.depth() == broadcast.depth {
                 ecx.env.tx.caller = broadcast.original_origin;
