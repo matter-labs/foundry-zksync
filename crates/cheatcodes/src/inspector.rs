@@ -506,6 +506,9 @@ pub struct Cheatcodes {
     /// This is set to `false`, once the startup migration is completed.
     pub startup_zk: bool,
 
+    /// Factory deps stored through `zkUseFactoryDep`
+    pub contracts_as_factory_deps: Vec<String>, // Changed from Option<String> to Vec<String>
+
     /// The list of factory_deps seen so far during a test or script execution.
     /// Ideally these would be persisted in the storage, but since modifying [revm::JournaledState]
     /// would be a significant refactor, we maintain the factory_dep part in the [Cheatcodes].
@@ -603,6 +606,7 @@ impl Cheatcodes {
             record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
+            contracts_as_factory_deps: Vec::new(), // Changed from Option<String> to Vec<String>
         }
     }
 
@@ -982,9 +986,18 @@ impl Cheatcodes {
                             paymaster: paymaster_data.address.to_h160(),
                             paymaster_input: paymaster_data.input.to_vec(),
                         });
-                    if let Some(factory_deps) = zk_tx {
-                        let mut batched =
-                            foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
+                    if let Some(mut factory_deps) = zk_tx {
+                        for factory_deps_contract in &self.contracts_as_factory_deps {
+                            let bytecode =
+                                crate::fs::get_artifact_code(self, factory_deps_contract, false)
+                                    .unwrap_or_else(|_| panic!("Failed to get bytecode for factory deps contract {factory_deps_contract}"));
+                            info!("Pushing {:?} factory deps bytecode", factory_deps_contract);
+                            factory_deps.push(bytecode.to_vec());
+                        }
+                        self.contracts_as_factory_deps.clear();
+                        let mut batched = foundry_zksync_core::vm::batch_factory_dependencies(
+                            factory_deps.clone(),
+                        );
                         debug!(batches = batched.len(), "splitting factory deps for broadcast");
                         // the last batch is the final one that does the deployment
                         zk_tx = batched.pop();
@@ -1263,7 +1276,7 @@ impl Cheatcodes {
             }
         }
 
-        // Clean up broadcasts
+        // Clean up broadcast
         if let Some(broadcast) = &self.broadcast {
             if ecx.journaled_state.depth() == broadcast.depth {
                 ecx.env.tx.caller = broadcast.original_origin;
@@ -1580,7 +1593,17 @@ impl Cheatcodes {
                     let account =
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
-                    let zk_tx = if self.use_zk_vm {
+                    let mut zk_tx = if self.use_zk_vm {
+                        info!("factory deps contract {:?}", self.contracts_as_factory_deps);
+                        for factory_deps_contract in &self.contracts_as_factory_deps {
+                            let bytecode =
+                                crate::fs::get_artifact_code(self, factory_deps_contract, false)
+                                    .unwrap_or_else(|_| panic!("Failed to get bytecode for factory deps contract {factory_deps_contract}"));
+                            info!("Pushing {:?} factory deps bytecode", factory_deps_contract);
+                            factory_deps.push(bytecode.to_vec());
+                        }
+                        self.contracts_as_factory_deps.clear();
+
                         let paymaster_params =
                             self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
                                 paymaster: paymaster_data.address.to_h160(),
@@ -1598,6 +1621,13 @@ impl Cheatcodes {
                                 paymaster_data: paymaster_params,
                             })
                         }
+                    } else {
+                        None
+                    };
+                    warn!("zk tx {:?}", zk_tx);
+                    if let Some(ref mut zk_tx) = zk_tx {
+                        zk_tx.factory_deps = factory_deps.clone();
+                        Some(zk_tx)
                     } else {
                         None
                     };
