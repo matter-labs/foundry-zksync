@@ -17,7 +17,7 @@ use indicatif::ProgressBar;
 use parking_lot::RwLock;
 use proptest::test_runner::TestError;
 use revm::primitives::U256;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 /// Replays a call sequence for collecting logs and traces.
 /// Returns counterexample to be used when the call sequence is a failed scenario.
@@ -60,11 +60,8 @@ pub fn replay_run(
         }
 
         // Identify newly generated contracts, if they exist.
-        ided_contracts.extend(load_contracts(
-            call_result.traces.iter().map(|a| &a.arena),
-            known_contracts,
-            &HashMap::new(),
-        ));
+        ided_contracts
+            .extend(load_contracts(call_result.traces.iter().map(|a| &a.arena), known_contracts));
 
         // Create counter example to be used in failed case.
         counterexample_sequence.push(BaseCounterExample::from_invariant_call(
