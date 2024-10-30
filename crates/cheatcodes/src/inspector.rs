@@ -158,8 +158,6 @@ pub trait CheatcodesExecutor {
 
         // We recreate the EvmContext here to satisfy the lifetime parameters as 'static, with
         // regards to the inspector's lifetime.
-        let error = std::mem::replace(&mut ecx.error, Ok(()));
-        let l1_block_info = std::mem::take(&mut ecx.l1_block_info);
         let mut ecx_inner = EvmContext {
             inner: InnerEvmContext {
                 env: std::mem::replace(&mut ecx.env, Default::default()),
@@ -167,9 +165,9 @@ pub trait CheatcodesExecutor {
                     &mut ecx.journaled_state,
                     revm::JournaledState::new(Default::default(), Default::default()),
                 ),
+                error: std::mem::replace(&mut ecx.error, Ok(())),
+                l1_block_info: std::mem::take(&mut ecx.l1_block_info),
                 db: &mut ecx.db as &mut dyn DatabaseExt,
-                error,
-                l1_block_info,
             },
             precompiles: Default::default(),
         };
