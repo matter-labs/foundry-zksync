@@ -1594,7 +1594,7 @@ impl Cheatcodes {
                     let account =
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
-                    let mut zk_tx = if self.use_zk_vm {
+                    let zk_tx = if self.use_zk_vm {
                         let injected_factory_deps = self.zk_use_factory_deps.iter().map(|contract| {
                             crate::fs::get_artifact_code(self, contract, false)
                                 .inspect(|_| info!(contract, "pushing factory dep"))
@@ -1603,7 +1603,7 @@ impl Cheatcodes {
                                 })
                                 .to_vec()
                         }).collect_vec();
-                        factory_deps.extend(injected_factory_deps);
+                        factory_deps.extend(injected_factory_deps.clone());
 
                         let paymaster_params =
                             self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
@@ -1618,17 +1618,11 @@ impl Cheatcodes {
                             })
                         } else {
                             Some(ZkTransactionMetadata {
-                                factory_deps: Default::default(),
+                                // For this case we use only the injected factory deps
+                                factory_deps: injected_factory_deps,
                                 paymaster_data: paymaster_params,
                             })
                         }
-                    } else {
-                        None
-                    };
-
-                    if let Some(ref mut zk_tx) = zk_tx {
-                        zk_tx.factory_deps = factory_deps.clone();
-                        Some(zk_tx)
                     } else {
                         None
                     };
