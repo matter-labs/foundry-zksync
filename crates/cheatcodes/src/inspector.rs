@@ -506,6 +506,10 @@ pub struct Cheatcodes {
     /// This is set to `false`, once the startup migration is completed.
     pub startup_zk: bool,
 
+    /// Factory deps stored through `zkUseFactoryDep`. These factory deps are used in the next
+    /// CREATE or CALL, and cleared after.
+    pub zk_use_factory_deps: Vec<String>,
+
     /// The list of factory_deps seen so far during a test or script execution.
     /// Ideally these would be persisted in the storage, but since modifying [revm::JournaledState]
     /// would be a significant refactor, we maintain the factory_dep part in the [Cheatcodes].
@@ -603,6 +607,7 @@ impl Cheatcodes {
             record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
+            zk_use_factory_deps: Default::default(),
         }
     }
 
@@ -982,7 +987,16 @@ impl Cheatcodes {
                             paymaster: paymaster_data.address.to_h160(),
                             paymaster_input: paymaster_data.input.to_vec(),
                         });
-                    if let Some(factory_deps) = zk_tx {
+                    if let Some(mut factory_deps) = zk_tx {
+                        let injected_factory_deps = self.zk_use_factory_deps.iter().map(|contract| {
+                            crate::fs::get_artifact_code(self, contract, false)
+                                .inspect(|_| info!(contract, "pushing factory dep"))
+                                .unwrap_or_else(|_| {
+                                    panic!("failed to get bytecode for factory deps contract {contract}")
+                                })
+                                .to_vec()
+                        }).collect_vec();
+                        factory_deps.extend(injected_factory_deps);
                         let mut batched =
                             foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
                         debug!(batches = batched.len(), "splitting factory deps for broadcast");
@@ -1581,6 +1595,16 @@ impl Cheatcodes {
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let zk_tx = if self.use_zk_vm {
+                        let injected_factory_deps = self.zk_use_factory_deps.iter().map(|contract| {
+                            crate::fs::get_artifact_code(self, contract, false)
+                                .inspect(|_| info!(contract, "pushing factory dep"))
+                                .unwrap_or_else(|_| {
+                                    panic!("failed to get bytecode for factory deps contract {contract}")
+                                })
+                                .to_vec()
+                        }).collect_vec();
+                        factory_deps.extend(injected_factory_deps.clone());
+
                         let paymaster_params =
                             self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
                                 paymaster: paymaster_data.address.to_h160(),
@@ -1594,7 +1618,8 @@ impl Cheatcodes {
                             })
                         } else {
                             Some(ZkTransactionMetadata {
-                                factory_deps: Default::default(),
+                                // For this case we use only the injected factory deps
+                                factory_deps: injected_factory_deps,
                                 paymaster_data: paymaster_params,
                             })
                         }

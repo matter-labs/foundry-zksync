@@ -9,7 +9,7 @@ contract Create2Script is Script {
     function run() external {
         (bool success,) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
         require(success, "zkVm() call failed");
-        
+
         vm.startBroadcast();
 
         // Deploy Greeter using create2 with a salt
