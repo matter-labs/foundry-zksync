@@ -153,13 +153,42 @@ pub trait CheatcodesExecutor {
         None
     }
 
-    fn trace_zksync<'a>(
-        &mut self,
-        ccx_state: &'a mut Cheatcodes,
-        ecx: Ecx<'a, 'a, 'a>,
-        call_traces: Vec<Call>,
-    ) {
-        self.get_inspector(ccx_state).trace_zksync(ecx, call_traces);
+    fn trace_zksync(&mut self, ccx_state: &mut Cheatcodes, ecx: Ecx, call_traces: Vec<Call>) {
+        let mut inspector = self.get_inspector(ccx_state);
+
+        // We recreate the EvmContext here to satisfy the lifetime parameters as 'static, with
+        // regards to the inspector's lifetime.
+        let error = std::mem::replace(&mut ecx.error, Ok(()));
+        let l1_block_info = std::mem::take(&mut ecx.l1_block_info);
+        let mut ecx_inner = EvmContext {
+            inner: InnerEvmContext {
+                env: std::mem::replace(&mut ecx.env, Default::default()),
+                journaled_state: std::mem::replace(
+                    &mut ecx.journaled_state,
+                    revm::JournaledState::new(Default::default(), Default::default()),
+                ),
+                db: &mut ecx.db as &mut dyn DatabaseExt,
+                error,
+                l1_block_info,
+            },
+            precompiles: Default::default(),
+        };
+        inspector.trace_zksync(&mut ecx_inner, call_traces);
+
+        // re-apply the modified fields to the original ecx.
+        let env = std::mem::replace(&mut ecx_inner.env, Default::default());
+        let journaled_state = std::mem::replace(
+            &mut ecx_inner.journaled_state,
+            revm::JournaledState::new(Default::default(), Default::default()),
+        );
+        let error = std::mem::replace(&mut ecx_inner.error, Ok(()));
+        let l1_block_info = std::mem::take(&mut ecx_inner.l1_block_info);
+        drop(ecx_inner);
+
+        ecx.env = env;
+        ecx.journaled_state = journaled_state;
+        ecx.error = error;
+        ecx.l1_block_info = l1_block_info;
     }
 }
 
