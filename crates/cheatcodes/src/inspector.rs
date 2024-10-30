@@ -506,7 +506,8 @@ pub struct Cheatcodes {
     /// This is set to `false`, once the startup migration is completed.
     pub startup_zk: bool,
 
-    /// Factory deps stored through `zkUseFactoryDep`
+    /// Factory deps stored through `zkUseFactoryDep`. These factory deps are used in the next
+    /// CREATE or CALL, and cleared after.
     pub zk_use_factory_deps: Vec<String>,
 
     /// The list of factory_deps seen so far during a test or script execution.
@@ -606,7 +607,7 @@ impl Cheatcodes {
             record_next_create_address: Default::default(),
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
-            zk_use_factory_deps: Vec::new(),
+            zk_use_factory_deps: Default::default(),
         }
     }
 
@@ -987,16 +988,17 @@ impl Cheatcodes {
                             paymaster_input: paymaster_data.input.to_vec(),
                         });
                     if let Some(mut factory_deps) = zk_tx {
-                        for factory_deps_contract in &self.zk_use_factory_deps {
-                            let bytecode =
-                                crate::fs::get_artifact_code(self, factory_deps_contract, false)
-                                    .unwrap_or_else(|_| panic!("Failed to get bytecode for factory deps contract {factory_deps_contract}"));
-                            info!("Pushing {:?} factory deps bytecode", factory_deps_contract);
-                            factory_deps.push(bytecode.to_vec());
-                        }
-                        let mut batched = foundry_zksync_core::vm::batch_factory_dependencies(
-                            factory_deps.clone(),
-                        );
+                        let injected_factory_deps = self.zk_use_factory_deps.iter().map(|contract| {
+                            crate::fs::get_artifact_code(self, contract, false)
+                                .inspect(|_| info!(contract, "pushing factory dep"))
+                                .unwrap_or_else(|_| {
+                                    panic!("failed to get bytecode for factory deps contract {contract}")
+                                })
+                                .to_vec()
+                        }).collect_vec();
+                        factory_deps.extend(injected_factory_deps);
+                        let mut batched =
+                            foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
                         debug!(batches = batched.len(), "splitting factory deps for broadcast");
                         // the last batch is the final one that does the deployment
                         zk_tx = batched.pop();
@@ -1593,13 +1595,15 @@ impl Cheatcodes {
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let mut zk_tx = if self.use_zk_vm {
-                        for factory_deps_contract in &self.zk_use_factory_deps {
-                            let bytecode =
-                                crate::fs::get_artifact_code(self, factory_deps_contract, false)
-                                .unwrap_or_else(|_| panic!("Failed to get bytecode for factory deps contract {factory_deps_contract}"));
-                            info!("Pushing {:?} factory deps bytecode", factory_deps_contract);
-                            factory_deps.push(bytecode.to_vec());
-                        }
+                        let injected_factory_deps = self.zk_use_factory_deps.iter().map(|contract| {
+                            crate::fs::get_artifact_code(self, contract, false)
+                                .inspect(|_| info!(contract, "pushing factory dep"))
+                                .unwrap_or_else(|_| {
+                                    panic!("failed to get bytecode for factory deps contract {contract}")
+                                })
+                                .to_vec()
+                        }).collect_vec();
+                        factory_deps.extend(injected_factory_deps);
 
                         let paymaster_params =
                             self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {

@@ -569,7 +569,10 @@ interface Vm {
     function rememberKey(uint256 privateKey) external returns (address keyAddr);
     function removeDir(string calldata path, bool recursive) external;
     function removeFile(string calldata path) external;
-    function replace(string calldata input, string calldata from, string calldata to) external pure returns (string memory output);
+    function replace(string calldata input, string calldata from, string calldata to)
+        external
+        pure
+        returns (string memory output);
     function resetGasMetering() external;
     function resetNonce(address account) external;
     function resumeGasMetering() external;
@@ -622,13 +625,31 @@ interface Vm {
         external
         returns (string memory json);
     function serializeJson(string calldata objectKey, string calldata value) external returns (string memory json);
-    function serializeJsonType(string calldata typeDescription, bytes memory value) external pure returns (string memory json);
-    function serializeJsonType(string calldata objectKey, string calldata valueKey, string calldata typeDescription, bytes memory value) external returns (string memory json);
-    function serializeString(string calldata objectKey, string calldata valueKey, string calldata value) external returns (string memory json);
-    function serializeString(string calldata objectKey, string calldata valueKey, string[] calldata values) external returns (string memory json);
-    function serializeUintToHex(string calldata objectKey, string calldata valueKey, uint256 value) external returns (string memory json);
-    function serializeUint(string calldata objectKey, string calldata valueKey, uint256 value) external returns (string memory json);
-    function serializeUint(string calldata objectKey, string calldata valueKey, uint256[] calldata values) external returns (string memory json);
+    function serializeJsonType(string calldata typeDescription, bytes memory value)
+        external
+        pure
+        returns (string memory json);
+    function serializeJsonType(
+        string calldata objectKey,
+        string calldata valueKey,
+        string calldata typeDescription,
+        bytes memory value
+    ) external returns (string memory json);
+    function serializeString(string calldata objectKey, string calldata valueKey, string calldata value)
+        external
+        returns (string memory json);
+    function serializeString(string calldata objectKey, string calldata valueKey, string[] calldata values)
+        external
+        returns (string memory json);
+    function serializeUintToHex(string calldata objectKey, string calldata valueKey, uint256 value)
+        external
+        returns (string memory json);
+    function serializeUint(string calldata objectKey, string calldata valueKey, uint256 value)
+        external
+        returns (string memory json);
+    function serializeUint(string calldata objectKey, string calldata valueKey, uint256[] calldata values)
+        external
+        returns (string memory json);
     function setArbitraryStorage(address target) external;
     function setBlockhash(uint256 blockNumber, bytes32 blockHash) external;
     function setEnv(string calldata name, string calldata value) external;
@@ -695,6 +716,8 @@ interface Vm {
         bytes32 zkBytecodeHash,
         bytes calldata zkDeployedBytecode
     ) external pure;
+    function zkUseFactoryDep(string calldata name) external pure;
+    function zkUsePaymaster(address paymaster_address, bytes calldata paymaster_input) external pure;
     function zkVm(bool enable) external pure;
     function zkVmSkip() external pure;
 }

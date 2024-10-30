@@ -6613,26 +6613,6 @@
     },
     {
       "func": {
-        "id": "pauseTracing",
-        "description": "Pauses collection of call traces. Useful in cases when you want to skip tracing of\ncomplex calls which are not useful for debugging.",
-        "declaration": "function pauseTracing() external view;",
-        "visibility": "external",
-        "mutability": "view",
-        "signature": "pauseTracing()",
-        "selector": "0xc94d1f90",
-        "selectorBytes": [
-          201,
-          77,
-          31,
-          144
-        ]
-      },
-      "group": "utilities",
-      "status": "stable",
-      "safety": "safe"
-    },
-    {
-      "func": {
         "id": "prank_0",
         "description": "Sets the *next* call's `msg.sender` to be the input address.",
         "declaration": "function prank(address msgSender) external;",
@@ -7248,26 +7228,6 @@
         ]
       },
       "group": "evm",
-      "status": "stable",
-      "safety": "safe"
-    },
-    {
-      "func": {
-        "id": "resumeTracing",
-        "description": "Unpauses collection of call traces.",
-        "declaration": "function resumeTracing() external view;",
-        "visibility": "external",
-        "mutability": "view",
-        "signature": "resumeTracing()",
-        "selector": "0x72a09ccb",
-        "selectorBytes": [
-          114,
-          160,
-          156,
-          203
-        ]
-      },
-      "group": "utilities",
       "status": "stable",
       "safety": "safe"
     },
@@ -9125,6 +9085,46 @@
           140,
           176,
           57
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkUseFactoryDep",
+        "description": "Marks the contract to be injected as a factory dependency in the next transaction",
+        "declaration": "function zkUseFactoryDep(string calldata name) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkUseFactoryDep(string)",
+        "selector": "0xd0a87595",
+        "selectorBytes": [
+          208,
+          168,
+          117,
+          149
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkUsePaymaster",
+        "description": "Enables/Disables use of a paymaster for ZK transactions.",
+        "declaration": "function zkUsePaymaster(address paymaster_address, bytes calldata paymaster_input) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkUsePaymaster(address,bytes)",
+        "selector": "0x2800ccd8",
+        "selectorBytes": [
+          40,
+          0,
+          204,
+          216
         ]
       },
       "group": "testing",
