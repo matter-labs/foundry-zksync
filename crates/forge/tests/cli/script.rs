@@ -5,7 +5,7 @@ use alloy_primitives::{hex, Address, Bytes};
 use anvil::{spawn, NodeConfig};
 use foundry_test_utils::{
     rpc,
-    util::{OTHER_SOLC_VERSION, SOLC_VERSION},
+    util::{OutputExt, OTHER_SOLC_VERSION, SOLC_VERSION},
     ScriptOutcome, ScriptTester,
 };
 use regex::Regex;
@@ -2106,7 +2106,7 @@ contract DeployScript is Script {
     let transactions: ZkTransactions = serde_json::from_str(&content).unwrap();
     let transactions = transactions.transactions;
     assert_eq!(transactions.len(), 3);
-}
+});
 
 // <https://github.com/foundry-rs/foundry/issues/8993>
 forgetest_async!(test_broadcast_raw_create2_deployer, |prj, cmd| {
