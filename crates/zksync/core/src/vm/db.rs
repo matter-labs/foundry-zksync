@@ -3,7 +3,7 @@
 /// This way, we can run transaction on top of the chain that is persisted
 /// in the Database object.
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
-/// is usually collecing all the diffs - and applies them to database itself.
+/// is usually collecting all the diffs - and applies them to database itself.
 use std::{collections::HashMap as sHashMap, fmt::Debug};
 
 use alloy_primitives::{map::HashMap, Address, U256 as rU256};

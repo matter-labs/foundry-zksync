@@ -261,7 +261,7 @@ impl CreateArgs {
             } else {
                 // Deploy with signer
                 // Avoid initializing `signer` twice as it will error out with Ledger
-                // and potentailly other devices that rely on HID too
+                // and potentially other devices that rely on HID too
                 let zk_signer = self.eth.wallet.signer().await?;
                 let deployer = zk_signer.address();
                 let provider = ProviderBuilder::<_, _, AnyNetwork>::default().on_provider(provider);

@@ -259,7 +259,7 @@ impl DualCompiledContracts {
                     debug!(
                         name = contract.name,
                         deps = contract.zk_factory_deps.len(),
-                        "new factory depdendency"
+                        "new factory dependency"
                     );
 
                     for nested_dep in &contract.zk_factory_deps {
