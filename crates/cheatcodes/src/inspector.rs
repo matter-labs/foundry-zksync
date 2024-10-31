@@ -68,7 +68,7 @@ use revm::{
 };
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap as sHashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
@@ -571,7 +571,7 @@ pub struct Cheatcodes {
     /// would be a significant refactor, we maintain the factory_dep part in the [Cheatcodes].
     /// This can be done as each test runs with its own [Cheatcodes] instance, thereby
     /// providing the necessary level of isolation.
-    pub persisted_factory_deps: sHashMap<H256, Vec<u8>>,
+    pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second

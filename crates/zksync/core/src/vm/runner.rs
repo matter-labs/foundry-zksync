@@ -1,4 +1,4 @@
-use alloy_primitives::hex;
+use alloy_primitives::{hex, map::HashMap};
 use itertools::Itertools;
 use revm::{
     interpreter::{CallInputs, CallScheme, CallValue},
@@ -12,7 +12,7 @@ use zksync_types::{
     U256,
 };
 
-use std::{cmp::min, collections::HashMap, fmt::Debug};
+use std::{cmp::min, fmt::Debug};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertRU256, ConvertU256},

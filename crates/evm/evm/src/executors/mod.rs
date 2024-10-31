@@ -37,7 +37,7 @@ use revm::{
     },
     Database,
 };
-use std::{borrow::Cow, collections::HashMap as sHashMap};
+use std::borrow::Cow;
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -94,7 +94,7 @@ pub struct Executor {
     /// Sets up the next transaction to be executed as a ZK transaction.
     zk_tx: Option<ZkTransactionMetadata>,
     // simulate persisted factory deps
-    zk_persisted_factory_deps: sHashMap<foundry_zksync_core::H256, Vec<u8>>,
+    zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
 
     pub use_zk: bool,
 }

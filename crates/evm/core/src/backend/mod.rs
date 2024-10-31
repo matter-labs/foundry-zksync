@@ -8,7 +8,7 @@ use crate::{
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
-use alloy_primitives::{keccak256, uint, Address, B256, U256};
+use alloy_primitives::{keccak256, map::HashMap, uint, Address, B256, U256};
 use alloy_rpc_types::{Block, BlockNumberOrTag, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use eyre::Context;
@@ -29,7 +29,7 @@ use revm::{
     Database, DatabaseCommit, JournaledState,
 };
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     time::Instant,
 };
 
