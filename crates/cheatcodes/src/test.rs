@@ -44,6 +44,15 @@ impl Cheatcode for zkUsePaymasterCall {
     }
 }
 
+impl Cheatcode for zkUseFactoryDepCall {
+    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+        let Self { name } = self;
+        info!("Adding factory dependency: {:?}", name);
+        ccx.state.zk_use_factory_deps.push(name.clone());
+        Ok(Default::default())
+    }
+}
+
 impl Cheatcode for zkRegisterContractCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {
