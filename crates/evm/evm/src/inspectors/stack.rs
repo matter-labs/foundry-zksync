@@ -1031,7 +1031,7 @@ impl InspectorExt for InspectorStackRefMut<'_> {
     }
 
     fn trace_zksync(&mut self, ecx: &mut EvmContext<&mut dyn DatabaseExt>, call_traces: Vec<Call>) {
-        call_inspectors!([&mut self.tracer], |inspector| InspectorExt::<DB>::trace_zksync(
+        call_inspectors!([&mut self.tracer], |inspector| InspectorExt::trace_zksync(
             inspector,
             ecx,
             call_traces

@@ -178,7 +178,7 @@ pub struct EstimatedGas {
     /// Estimated gas price.
     pub price: u128,
     /// Estimated gas limit.
-    pub limit: u128,
+    pub limit: u64,
 }
 
 /// Estimates the gas parameters for the provided transaction.
@@ -222,7 +222,7 @@ pub async fn estimate_gas<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
         .await
         .map_err(|err| eyre!("failed rpc call for estimating fee: {:?}", err))?;
 
-    Ok(EstimatedGas { price: gas_price, limit: fee.gas_limit.low_u128() })
+    Ok(EstimatedGas { price: gas_price, limit: fee.gas_limit.low_u64() })
 }
 
 /// Returns true if the provided address is a reserved zkSync system address

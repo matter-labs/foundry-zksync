@@ -14,7 +14,7 @@ pub(crate) mod assume;
 pub(crate) mod expect;
 
 impl Cheatcode for zkVmCall {
-    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { enable } = *self;
 
         if enable {
@@ -28,7 +28,7 @@ impl Cheatcode for zkVmCall {
 }
 
 impl Cheatcode for zkVmSkipCall {
-    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         ccx.state.skip_zk_vm = ccx.state.use_zk_vm;
 
         Ok(Default::default())
@@ -36,7 +36,7 @@ impl Cheatcode for zkVmSkipCall {
 }
 
 impl Cheatcode for zkUsePaymasterCall {
-    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { paymaster_address, paymaster_input } = self;
         ccx.state.paymaster_params =
             Some(ZkPaymasterData { address: *paymaster_address, input: paymaster_input.clone() });
@@ -45,7 +45,7 @@ impl Cheatcode for zkUsePaymasterCall {
 }
 
 impl Cheatcode for zkRegisterContractCall {
-    fn apply_stateful<DB: DatabaseExt>(&self, ccx: &mut CheatsCtxt<DB>) -> Result {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {
             name,
             evmBytecodeHash,

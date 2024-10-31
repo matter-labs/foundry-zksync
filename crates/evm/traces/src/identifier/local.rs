@@ -1,9 +1,9 @@
 use super::{AddressIdentity, TraceIdentifier};
 use alloy_json_abi::JsonAbi;
-use alloy_primitives::{Address, Bytes};
+use alloy_primitives::Address;
 use foundry_common::contracts::{bytecode_diff_score, ContractsByArtifact};
 use foundry_compilers::ArtifactId;
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
 
 /// A trace identifier that tries to identify addresses using local contracts.
 pub struct LocalTraceIdentifier<'a> {
@@ -11,8 +11,6 @@ pub struct LocalTraceIdentifier<'a> {
     known_contracts: &'a ContractsByArtifact,
     /// Vector of pairs of artifact ID and the runtime code length of the given artifact.
     ordered_ids: Vec<(&'a ArtifactId, usize)>,
-    /// Deployments generated during the setup
-    pub deployments: HashMap<Address, Bytes>,
 }
 
 impl<'a> LocalTraceIdentifier<'a> {
@@ -25,7 +23,7 @@ impl<'a> LocalTraceIdentifier<'a> {
             .map(|(id, bytecode)| (id, bytecode.len()))
             .collect::<Vec<_>>();
         ordered_ids.sort_by_key(|(_, len)| *len);
-        Self { known_contracts, ordered_ids, deployments: HashMap::new() }
+        Self { known_contracts, ordered_ids }
     }
 
     /// Returns the known contracts.
@@ -139,12 +137,7 @@ impl TraceIdentifier for LocalTraceIdentifier<'_> {
             .filter_map(|(address, runtime_code, creation_code)| {
                 let _span = trace_span!(target: "evm::traces", "identify", %address).entered();
                 trace!(target: "evm::traces", "identifying");
-                let (id, abi) =
-                    self.identify_code(runtime_code?, creation_code?).or_else(|| {
-                        self.deployments
-                            .get(address)
-                            .and_then(|bytes| self.identify_code(bytes, bytes))
-                    })?;
+                let (id, abi) = self.identify_code(runtime_code?, creation_code?)?;
 
                 trace!(target: "evm::traces", id=%id.identifier(), "identified");
 

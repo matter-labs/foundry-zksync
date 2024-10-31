@@ -473,17 +473,6 @@ impl Executor {
             result_and_state.clone(),
             backend.has_state_snapshot_failure(),
         )?;
-        let state = result_and_state.state;
-        if let Some(traces) = &mut result.traces {
-            for trace_node in traces.nodes() {
-                if let Some(account_info) = state.get(&trace_node.trace.address) {
-                    result.deployments.insert(
-                        trace_node.trace.address,
-                        account_info.info.code.clone().unwrap_or_default().bytes(),
-                    );
-                }
-            }
-        }
 
         self.commit(&mut result);
         Ok(result)
@@ -823,14 +812,11 @@ pub struct RawCallResult {
     pub out: Option<Output>,
     /// The chisel state
     pub chisel_state: Option<(Vec<U256>, Vec<u8>, InstructionResult)>,
-    /// The deployments generated during the call
-    pub deployments: HashMap<Address, Bytes>,
 }
 
 impl Default for RawCallResult {
     fn default() -> Self {
         Self {
-            deployments: HashMap::new(),
             exit_reason: InstructionResult::Continue,
             reverted: false,
             has_state_snapshot_failure: false,
@@ -964,7 +950,6 @@ fn convert_executed_result(
         .filter(|txs| !txs.is_empty());
 
     Ok(RawCallResult {
-        deployments: HashMap::new(),
         exit_reason,
         reverted: !matches!(exit_reason, return_ok!()),
         has_state_snapshot_failure,

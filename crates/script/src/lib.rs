@@ -52,7 +52,6 @@ use foundry_evm::{
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
 use serde::Serialize;
-use std::collections::HashMap;
 use yansi::Paint;
 
 mod broadcast;

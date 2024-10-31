@@ -1,10 +1,10 @@
 use std::{
     cell::OnceCell,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, VecDeque},
     sync::Arc,
 };
 
-use alloy_primitives::{hex, Address, Bytes, U256 as rU256};
+use alloy_primitives::{hex, map::HashMap, Address, Bytes, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
@@ -74,7 +74,7 @@ const SELECTOR_BLOCK_HASH: [u8; 4] = hex!("80b41246");
 #[derive(Debug, Default)]
 pub struct CheatcodeTracerContext<'a> {
     /// Mocked calls.
-    pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
+    pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, VecDeque<MockCallReturnData>>>,
     /// Expected calls recorder.
     pub expected_calls: Option<&'a mut ExpectedCallTracker>,
     /// Recorded storage accesses
@@ -122,7 +122,7 @@ pub struct CallContext {
 #[derive(Debug, Default)]
 pub struct CheatcodeTracer {
     /// List of mocked calls.
-    pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
+    pub mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, VecDeque<MockCallReturnData>>>,
     /// Tracked for foundry's expected calls.
     pub expected_calls: ExpectedCallTracker,
     /// Defines the current call context.
@@ -136,7 +136,7 @@ pub struct CheatcodeTracer {
 impl CheatcodeTracer {
     /// Create an instance of [CheatcodeTracer].
     pub fn new(
-        mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, MockCallReturnData>>,
+        mocked_calls: HashMap<Address, BTreeMap<MockCallDataContext, VecDeque<MockCallReturnData>>>,
         expected_calls: ExpectedCallTracker,
         result: Arc<OnceCell<CheatcodeTracerResult>>,
         call_context: CallContext,
@@ -220,29 +220,39 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             let call_contract = current.code_address.to_address();
             let call_value = U256::from(current.context_u128_value).to_ru256();
 
-            let mocks = self.mocked_calls.get(&call_contract);
-            if let Some(mocks) = &mocks {
+            let mut had_mocks = false;
+            if let Some(mocks) = self.mocked_calls.get_mut(&call_contract) {
+                had_mocks = true;
                 let ctx = MockCallDataContext {
                     calldata: Bytes::from(call_input.clone()),
                     value: Some(call_value),
                 };
-                if let Some(return_data) = mocks.get(&ctx).or_else(|| {
-                    mocks
-                        .iter()
+                if let Some(return_data_queue) = match mocks.get_mut(&ctx) {
+                    Some(queue) => Some(queue),
+                    None => mocks
+                        .iter_mut()
                         .find(|(mock, _)| {
                             call_input.get(..mock.calldata.len()) == Some(&mock.calldata[..]) &&
                                 mock.value.map_or(true, |value| value == call_value)
                         })
-                        .map(|(_, v)| v)
-                }) {
-                    let return_data = return_data.data.clone().to_vec();
-                    tracing::info!(
-                        "returning mocked value {:?} for {:?}",
-                        hex::encode(&call_input),
-                        hex::encode(&return_data)
-                    );
-                    self.farcall_handler.set_immediate_return(return_data);
-                    return;
+                        .map(|(_, v)| v),
+                } {
+                    if let Some(return_data) = if return_data_queue.len() == 1 {
+                        // If the mocked calls stack has a single element in it, don't empty it
+                        return_data_queue.front().map(|x| x.to_owned())
+                    } else {
+                        // Else, we pop the front element
+                        return_data_queue.pop_front()
+                    } {
+                        let return_data = return_data.data.clone().to_vec();
+                        tracing::info!(
+                            "returning mocked value {:?} for {:?}",
+                            hex::encode(&call_input),
+                            hex::encode(&return_data)
+                        );
+                        self.farcall_handler.set_immediate_return(return_data);
+                        return;
+                    }
                 }
             }
 
@@ -251,11 +261,8 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             if self.has_empty_code(storage, call_contract) {
                 // issue a more targeted
                 // error if we already had some mocks there
-                let had_mocks_message = if mocks.is_some() {
-                    " - please ensure the current calldata is mocked"
-                } else {
-                    ""
-                };
+                let had_mocks_message =
+                    if had_mocks { " - please ensure the current calldata is mocked" } else { "" };
 
                 tracing::error!(
                     target = ?call_contract,

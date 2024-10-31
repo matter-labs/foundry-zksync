@@ -6,7 +6,7 @@ use crate::{
 };
 use alloy_primitives::{
     map::{AddressHashMap, HashMap},
-    Address, Bytes, Log,
+    Address, Log,
 };
 use eyre::Report;
 use foundry_common::{evm::Breakpoints, get_contract_name, get_file_name, shell};
@@ -741,8 +741,6 @@ impl TestKind {
 
 #[derive(Clone, Debug, Default)]
 pub struct TestSetup {
-    /// Deployments generated during the setup
-    pub deployments: HashMap<Address, Bytes>,
     /// The address at which the test contract was deployed
     pub address: Address,
     /// The logs emitted during setup
@@ -784,7 +782,6 @@ impl TestSetup {
     }
 
     pub fn success(
-        deployments: HashMap<Address, Bytes>,
         address: Address,
         logs: Vec<Log>,
         traces: Traces,
@@ -792,16 +789,7 @@ impl TestSetup {
         coverage: Option<HitMaps>,
         fuzz_fixtures: FuzzFixtures,
     ) -> Self {
-        Self {
-            deployments,
-            address,
-            logs,
-            traces,
-            labeled_addresses,
-            reason: None,
-            coverage,
-            fuzz_fixtures,
-        }
+        Self { address, logs, traces, labeled_addresses, reason: None, coverage, fuzz_fixtures }
     }
 
     pub fn failed_with(
@@ -811,7 +799,6 @@ impl TestSetup {
         reason: String,
     ) -> Self {
         Self {
-            deployments: HashMap::new(),
             address: Address::ZERO,
             logs,
             traces,

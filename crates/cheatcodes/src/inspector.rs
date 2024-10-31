@@ -5,7 +5,7 @@ use crate::{
         journaled_account,
         mapping::{self, MappingSlots},
         prank::Prank,
-        DealRecord, GasRecord, RecordAccess,
+        DealRecord, GasRecord,
     },
     inspector::utils::CommonCreateInput,
     script::{Broadcast, Wallets},
@@ -18,11 +18,10 @@ use crate::{
     Vm::{self, AccountAccess},
 };
 use alloy_primitives::{
-    hex,
+    hex, keccak256,
     map::{AddressHashMap, HashMap},
     Address, Bytes, Log, TxKind, B256, U256,
 };
-use alloy_primitives::{hex, keccak256, Address, Bytes, Log, TxKind, B256, U256};
 use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
 use foundry_cheatcodes_common::{
@@ -33,16 +32,18 @@ use foundry_cheatcodes_common::{
 use foundry_common::{evm::Breakpoints, TransactionMaybeSigned, SELECTOR_LEN};
 use foundry_config::Config;
 use foundry_evm_core::{
-    abi::Vm::stopExpectSafeMemoryCall,
+    abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
         CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
-        DEFAULT_CREATE2_DEPLOYER_CODE, MAGIC_ASSUME, HARDHAT_CONSOLE_ADDRESS
+        DEFAULT_CREATE2_DEPLOYER_CODE, MAGIC_ASSUME,
     },
     decode::decode_console_log,
     utils::new_evm_with_existing_context,
     InspectorExt,
 };
+use foundry_evm_traces::TracingInspectorConfig;
+use foundry_wallets::multi_wallet::MultiWallet;
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
@@ -50,8 +51,6 @@ use foundry_zksync_core::{
     ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
 use foundry_zksync_inspectors::TraceCollector;
-use foundry_evm_traces::{TracingInspector, TracingInspectorConfig};
-use foundry_wallets::multi_wallet::MultiWallet;
 use itertools::Itertools;
 use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::Rng;
@@ -69,7 +68,7 @@ use revm::{
 };
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fs::File,
     io::BufReader,
     ops::Range,
@@ -154,13 +153,40 @@ pub trait CheatcodesExecutor {
         None
     }
 
-    fn trace_zksync(
-        &mut self,
-        ccx_state: &mut Cheatcodes,
-        ecx: &mut Ecx,
-        call_traces: Vec<Call>,
-    ) {
-        self.get_inspector(ccx_state).trace_zksync(ecx, call_traces);
+    fn trace_zksync(&mut self, ccx_state: &mut Cheatcodes, ecx: Ecx, call_traces: Vec<Call>) {
+        let mut inspector = self.get_inspector(ccx_state);
+
+        // We recreate the EvmContext here to satisfy the lifetime parameters as 'static, with
+        // regards to the inspector's lifetime.
+        let mut ecx_inner = EvmContext {
+            inner: InnerEvmContext {
+                env: std::mem::replace(&mut ecx.env, Default::default()),
+                journaled_state: std::mem::replace(
+                    &mut ecx.journaled_state,
+                    revm::JournaledState::new(Default::default(), Default::default()),
+                ),
+                error: std::mem::replace(&mut ecx.error, Ok(())),
+                l1_block_info: std::mem::take(&mut ecx.l1_block_info),
+                db: &mut ecx.db as &mut dyn DatabaseExt,
+            },
+            precompiles: Default::default(),
+        };
+        inspector.trace_zksync(&mut ecx_inner, call_traces);
+
+        // re-apply the modified fields to the original ecx.
+        let env = std::mem::replace(&mut ecx_inner.env, Default::default());
+        let journaled_state = std::mem::replace(
+            &mut ecx_inner.journaled_state,
+            revm::JournaledState::new(Default::default(), Default::default()),
+        );
+        let error = std::mem::replace(&mut ecx_inner.error, Ok(()));
+        let l1_block_info = std::mem::take(&mut ecx_inner.l1_block_info);
+        drop(ecx_inner);
+
+        ecx.env = env;
+        ecx.journaled_state = journaled_state;
+        ecx.error = error;
+        ecx.l1_block_info = l1_block_info;
     }
 }
 
@@ -735,11 +761,7 @@ impl Cheatcodes {
     /// Additionally:
     /// * Translates block information
     /// * Translates all persisted addresses
-    pub fn select_fork_vm<DB: DatabaseExt>(
-        &mut self,
-        data: &mut InnerEvmContext<DB>,
-        fork_id: LocalForkId,
-    ) {
+    pub fn select_fork_vm(&mut self, data: InnerEcx, fork_id: LocalForkId) {
         let fork_info = data.db.get_fork_info(fork_id).expect("failed getting fork info");
         if fork_info.fork_type.is_evm() {
             self.select_evm(data)
@@ -750,7 +772,7 @@ impl Cheatcodes {
 
     /// Switch to EVM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    pub fn select_evm<DB: DatabaseExt>(&mut self, data: &mut InnerEvmContext<DB>) {
+    pub fn select_evm(&mut self, data: InnerEcx) {
         if !self.use_zk_vm {
             tracing::info!("already in EVM");
             return
@@ -822,11 +844,7 @@ impl Cheatcodes {
 
     /// Switch to ZK-VM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    pub fn select_zk_vm<DB: DatabaseExt>(
-        &mut self,
-        data: &mut InnerEvmContext<DB>,
-        new_env: Option<&Env>,
-    ) {
+    pub fn select_zk_vm(&mut self, data: InnerEcx, new_env: Option<&Env>) {
         if self.use_zk_vm {
             tracing::info!("already in ZK-VM");
             return
@@ -929,13 +947,12 @@ impl Cheatcodes {
     }
 
     // common create functionality for both legacy and EOF.
-    fn create_common<DB, Input>(
+    fn create_common<Input>(
         &mut self,
         ecx: Ecx,
         mut input: Input,
         executor: &mut impl CheatcodesExecutor,
     ) -> Option<CreateOutcome>
-    fn create_common<Input>(&mut self, ecx: Ecx, mut input: Input) -> Option<CreateOutcome>
     where
         Input: CommonCreateInput,
     {
@@ -1108,15 +1125,14 @@ impl Cheatcodes {
     /// Try handling the `CREATE` within zkEVM.
     /// If `Some` is returned then the result must be returned immediately, else the call must be
     /// handled in EVM.
-    fn try_create_in_zk<DB, Input>(
+    fn try_create_in_zk<Input>(
         &mut self,
-        ecx: &mut EvmContext<DB>,
+        ecx: Ecx,
         input: Input,
         executor: &mut impl CheatcodesExecutor,
     ) -> Option<CreateOutcome>
     where
-        DB: DatabaseExt,
-        Input: CommonCreateInput<DB>,
+        Input: CommonCreateInput,
     {
         if self.skip_zk_vm {
             self.skip_zk_vm = false; // handled the skip, reset flag
@@ -1736,16 +1752,13 @@ where {
     /// Try handling the `CALL` within zkEVM.
     /// If `Some` is returned then the result must be returned immediately, else the call must be
     /// handled in EVM.
-    fn try_call_in_zk<DB>(
+    fn try_call_in_zk(
         &mut self,
         factory_deps: Vec<Vec<u8>>,
-        ecx: &mut EvmContext<DB>,
+        ecx: Ecx,
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
-    ) -> Option<CallOutcome>
-    where
-        DB: DatabaseExt,
-    {
+    ) -> Option<CallOutcome> {
         // also skip if the target was created during a zkEVM skip
         self.skip_zk_vm =
             self.skip_zk_vm || self.skip_zk_vm_addresses.contains(&call.target_address);
@@ -2335,11 +2348,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
         outcome
     }
 
-    fn create(
-        &mut self,
-        ecx: Ecx,
-        call: &mut CreateInputs,
-    ) -> Option<CreateOutcome> {
+    fn create(&mut self, ecx: Ecx, call: &mut CreateInputs) -> Option<CreateOutcome> {
         self.create_common(ecx, call, &mut TransparentCheatcodesExecutor)
     }
 
@@ -2352,11 +2361,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
         self.create_end_common(ecx, outcome)
     }
 
-    fn eofcreate(
-        &mut self,
-        ecx: Ecx,
-        call: &mut EOFCreateInputs,
-    ) -> Option<CreateOutcome> {
+    fn eofcreate(&mut self, ecx: Ecx, call: &mut EOFCreateInputs) -> Option<CreateOutcome> {
         self.create_common(ecx, call, &mut TransparentCheatcodesExecutor)
     }
 
