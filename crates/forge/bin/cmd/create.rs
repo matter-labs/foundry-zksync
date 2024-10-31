@@ -615,7 +615,7 @@ impl CreateArgs {
         .await?;
 
         deployer.tx.set_gas_limit(if let Some(gas_limit) = self.tx.gas_limit {
-            gas_limit.to::<u128>()
+            gas_limit.to::<u64>()
         } else {
             estimated_gas.limit
         });
