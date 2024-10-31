@@ -165,8 +165,6 @@ where
         }
 
         if let Some(gas_price) = tx_opts.gas_price {
-            // We need to set the gas price to be able to create the EIP-712 transaction in
-            // zkcontext
             if legacy {
                 tx.set_gas_price(gas_price.to());
             } else {
