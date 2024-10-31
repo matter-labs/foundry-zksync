@@ -470,7 +470,7 @@ impl Executor {
         let mut result = convert_executed_result(
             env,
             inspector,
-            result_and_state.clone(),
+            result_and_state,
             backend.has_state_snapshot_failure(),
         )?;
 

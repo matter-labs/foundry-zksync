@@ -160,7 +160,7 @@ pub trait CheatcodesExecutor {
         // regards to the inspector's lifetime.
         let mut ecx_inner = EvmContext {
             inner: InnerEvmContext {
-                env: std::mem::replace(&mut ecx.env, Default::default()),
+                env: std::mem::take(&mut ecx.env),
                 journaled_state: std::mem::replace(
                     &mut ecx.journaled_state,
                     revm::JournaledState::new(Default::default(), Default::default()),
@@ -174,7 +174,7 @@ pub trait CheatcodesExecutor {
         inspector.trace_zksync(&mut ecx_inner, call_traces);
 
         // re-apply the modified fields to the original ecx.
-        let env = std::mem::replace(&mut ecx_inner.env, Default::default());
+        let env = std::mem::take(&mut ecx_inner.env);
         let journaled_state = std::mem::replace(
             &mut ecx_inner.journaled_state,
             revm::JournaledState::new(Default::default(), Default::default()),
