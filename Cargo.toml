@@ -174,10 +174,10 @@ foundry-zksync-inspectors = { path = "crates/zksync/inspectors" }
 
 # solc & compilation utilities
 # foundry-block-explorers = { version = "0.7.3", default-features = false }
-# foundry-compilers = { version = "0.11.1", default-features = false }
+# foundry-compilers = { version = "0.11.4", default-features = false }
 # foundry-fork-db = "0.3"
 foundry-block-explorers = { git = "https://github.com/Moonsong-Labs/block-explorers", branch = "zksync-v0.7.3", default-features = false }
-foundry-compilers = { git = "https://github.com/Moonsong-Labs/compilers", branch = "zksync-v0.11.1" }
+foundry-compilers = { git = "https://github.com/Moonsong-Labs/compilers", branch = "zksync-v0.11.4" }
 foundry-fork-db = { git = "https://github.com/Moonsong-Labs/foundry-zksync-fork-db", branch = "zksync-v0.3.1" }
 solang-parser = "=0.3.3"
 
