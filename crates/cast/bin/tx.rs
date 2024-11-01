@@ -154,7 +154,7 @@ where
 
         let chain = utils::get_chain(config.chain, &provider).await?;
         let etherscan_api_key = config.get_etherscan_api_key(Some(chain));
-        let legacy = tx_opts.legacy || chain.is_legacy();
+        let legacy = tx_opts.legacy || chain.is_legacy() || config.zksync.run_in_zk_mode();
 
         if let Some(gas_limit) = tx_opts.gas_limit {
             tx.set_gas_limit(gas_limit.to());
@@ -165,9 +165,7 @@ where
         }
 
         if let Some(gas_price) = tx_opts.gas_price {
-            // We need to set the gas price to be able to create the EIP-712 transaction in
-            // zkcontext
-            if legacy || config.zksync.startup {
+            if legacy {
                 tx.set_gas_price(gas_price.to());
             } else {
                 tx.set_max_fee_per_gas(gas_price.to());

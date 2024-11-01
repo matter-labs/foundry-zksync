@@ -144,7 +144,10 @@ impl SendTxArgs {
             None
         };
 
-        let config = Config::from(&eth);
+        let mut config = Config::from(&eth);
+        config.zksync.startup = zksync_params.zksync;
+        config.zksync.compile = zksync_params.zksync;
+
         let provider = utils::get_provider(&config)?;
 
         let builder = CastTxBuilder::new(&provider, tx, &config)
