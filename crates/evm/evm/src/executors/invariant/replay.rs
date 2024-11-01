@@ -4,7 +4,7 @@ use super::{
 };
 use crate::executors::Executor;
 use alloy_dyn_abi::JsonAbiExt;
-use alloy_primitives::Log;
+use alloy_primitives::{map::HashMap, Log};
 use eyre::Result;
 use foundry_common::{ContractsByAddress, ContractsByArtifact};
 use foundry_evm_coverage::HitMaps;
@@ -17,7 +17,7 @@ use indicatif::ProgressBar;
 use parking_lot::RwLock;
 use proptest::test_runner::TestError;
 use revm::primitives::U256;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 /// Replays a call sequence for collecting logs and traces.
 /// Returns counterexample to be used when the call sequence is a failed scenario.
@@ -30,6 +30,7 @@ pub fn replay_run(
     logs: &mut Vec<Log>,
     traces: &mut Traces,
     coverage: &mut Option<HitMaps>,
+    deprecated_cheatcodes: &mut HashMap<&'static str, Option<&'static str>>,
     inputs: &[BasicTxDetails],
 ) -> Result<Vec<BaseCounterExample>> {
     // We want traces for a failed case.
@@ -59,11 +60,8 @@ pub fn replay_run(
         }
 
         // Identify newly generated contracts, if they exist.
-        ided_contracts.extend(load_contracts(
-            call_result.traces.iter().map(|a| &a.arena),
-            known_contracts,
-            &HashMap::new(),
-        ));
+        ided_contracts
+            .extend(load_contracts(call_result.traces.iter().map(|a| &a.arena), known_contracts));
 
         // Create counter example to be used in failed case.
         counterexample_sequence.push(BaseCounterExample::from_invariant_call(
@@ -87,6 +85,12 @@ pub fn replay_run(
     )?;
     traces.push((TraceKind::Execution, invariant_result.traces.clone().unwrap()));
     logs.extend(invariant_result.logs);
+    deprecated_cheatcodes.extend(
+        invariant_result
+            .cheatcodes
+            .as_ref()
+            .map_or_else(Default::default, |cheats| cheats.deprecated.clone()),
+    );
 
     // Collect after invariant logs and traces.
     if invariant_contract.call_after_invariant && invariant_success {
@@ -110,6 +114,7 @@ pub fn replay_error(
     logs: &mut Vec<Log>,
     traces: &mut Traces,
     coverage: &mut Option<HitMaps>,
+    deprecated_cheatcodes: &mut HashMap<&'static str, Option<&'static str>>,
     progress: Option<&ProgressBar>,
 ) -> Result<Vec<BaseCounterExample>> {
     match failed_case.test_error {
@@ -136,6 +141,7 @@ pub fn replay_error(
                 logs,
                 traces,
                 coverage,
+                deprecated_cheatcodes,
                 &calls,
             )
         }

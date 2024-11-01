@@ -35,9 +35,3 @@ See our [contributing guidelines](./CONTRIBUTING.md).
 
 ### Foundry ZKsync
 - [Moonsong Labs](https://moonsonglabs.com/): Implemented [ZKsync crates](./crates/zksync/), and resolved a number of different challenges to enable ZKsync support. 
-
-[foundry-book]: https://book.getfoundry.sh
-[foundry-gha]: https://github.com/foundry-rs/foundry-toolchain
-[ethers-solc]: https://github.com/gakonst/ethers-rs/tree/master/ethers-solc/
-[vscode-setup]: https://book.getfoundry.sh/config/vscode.html
-[shell-setup]: https://book.getfoundry.sh/config/shell-autocompletion.html

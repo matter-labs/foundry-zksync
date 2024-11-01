@@ -152,7 +152,7 @@ impl CompilerVerificationContext {
             Self::Solc(c) => &c.compiler_version,
             // TODO: will refer to the solc version here. Analyze if we can remove
             // this ambiguity somehow (e.g: by having sepparate paths for solc/zksolc
-            // and remove this method alltogether)
+            // and remove this method altogether)
             Self::ZkSolc(c) => &c.compiler_version.solc,
         }
     }

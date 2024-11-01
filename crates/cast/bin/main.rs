@@ -42,6 +42,7 @@ fn main() -> Result<()> {
     main_args(args)
 }
 
+#[allow(clippy::needless_return)]
 #[tokio::main]
 async fn main_args(args: CastArgs) -> Result<()> {
     match args.cmd {
@@ -306,7 +307,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
             println!("Computed Address: {}", computed.to_checksum(None));
         }
         CastSubcommand::Disassemble { bytecode } => {
-            println!("{}", SimpleCast::disassemble(&bytecode)?);
+            println!("{}", SimpleCast::disassemble(&hex::decode(bytecode)?)?);
         }
         CastSubcommand::Selectors { bytecode, resolve } => {
             let functions = SimpleCast::extract_functions(&bytecode)?;

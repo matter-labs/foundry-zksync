@@ -8,7 +8,6 @@
 #[macro_use]
 extern crate tracing;
 
-use alloy_primitives::{Address, Bytes};
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use revm::interpreter::OpCode;
 use revm_inspectors::tracing::{
@@ -18,9 +17,11 @@ use revm_inspectors::tracing::{
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    collections::{BTreeSet, HashMap},
+    collections::BTreeSet,
     ops::{Deref, DerefMut},
 };
+
+use alloy_primitives::map::HashMap;
 
 pub use revm_inspectors::tracing::{
     types::{
@@ -179,7 +180,15 @@ pub async fn decode_trace_arena(
 
 /// Render a collection of call traces to a string.
 pub fn render_trace_arena(arena: &SparsedTraceArena) -> String {
-    let mut w = TraceWriter::new(Vec::<u8>::new());
+    render_trace_arena_with_bytecodes(arena, false)
+}
+
+/// Render a collection of call traces to a string optionally including contract creation bytecodes.
+pub fn render_trace_arena_with_bytecodes(
+    arena: &SparsedTraceArena,
+    with_bytecodes: bool,
+) -> String {
+    let mut w = TraceWriter::new(Vec::<u8>::new()).write_bytecodes(with_bytecodes);
     w.write_arena(&arena.resolve_arena()).expect("Failed to write traces");
     String::from_utf8(w.into_writer()).expect("trace writer wrote invalid UTF-8")
 }
@@ -222,10 +231,8 @@ impl TraceKind {
 pub fn load_contracts<'a>(
     traces: impl IntoIterator<Item = &'a CallTraceArena>,
     known_contracts: &ContractsByArtifact,
-    deployments: &HashMap<Address, Bytes>,
 ) -> ContractsByAddress {
     let mut local_identifier = LocalTraceIdentifier::new(known_contracts);
-    local_identifier.deployments.clone_from(deployments);
     let decoder = CallTraceDecoder::new();
     let mut contracts = ContractsByAddress::new();
     for trace in traces {

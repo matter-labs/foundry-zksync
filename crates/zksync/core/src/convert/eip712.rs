@@ -67,8 +67,8 @@ impl Transaction for Eip712SignableTransaction {
         self.0.nonce.as_u64()
     }
 
-    fn gas_limit(&self) -> u128 {
-        self.0.gas_limit.as_u128()
+    fn gas_limit(&self) -> u64 {
+        self.0.gas_limit.as_u64()
     }
 
     fn gas_price(&self) -> Option<u128> {
