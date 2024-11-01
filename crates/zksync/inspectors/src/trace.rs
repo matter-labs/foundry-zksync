@@ -1,5 +1,5 @@
 use alloy_primitives::{Address, Bytes, Log, U256};
-use foundry_evm_core::InspectorExt;
+use foundry_evm_core::{backend::DatabaseExt, InspectorExt};
 use foundry_evm_traces::{
     CallTraceArena, GethTraceBuilder, ParityTraceBuilder, TracingInspector, TracingInspectorConfig,
 };
@@ -186,11 +186,15 @@ where
     }
 }
 
-impl<DB: Database> InspectorExt<DB> for TraceCollector {
-    fn trace_zksync(&mut self, context: &mut EvmContext<DB>, call_traces: Vec<Call>) {
-        fn trace_call_recursive<DB: Database>(
+impl InspectorExt for TraceCollector {
+    fn trace_zksync(
+        &mut self,
+        context: &mut EvmContext<&mut dyn DatabaseExt>,
+        call_traces: Vec<Call>,
+    ) {
+        fn trace_call_recursive(
             tracer: &mut TracingInspector,
-            context: &mut EvmContext<DB>,
+            context: &mut EvmContext<&mut dyn DatabaseExt>,
             call: Call,
             suppressed_top_call: bool,
         ) -> u64 {

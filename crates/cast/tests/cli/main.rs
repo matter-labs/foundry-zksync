@@ -59,6 +59,7 @@ mixHash              [..]
 nonce                [..]
 number               [..]
 parentHash           [..]
+parentBeaconRoot     [..]
 transactionsRoot     [..]
 receiptsRoot         [..]
 sha3Uncles           [..]
@@ -707,6 +708,8 @@ to                      0x91da5bf3F8Eb72724E6f50Ec6C3D199C6355c59c
 
 "#]]);
 
+    let rpc = next_http_rpc_endpoint();
+
     // <https://etherscan.io/tx/0x0e07d8b53ed3d91314c80e53cf25bcde02084939395845cbb625b029d568135c>
     cmd.cast_fuse()
         .args([
@@ -884,6 +887,8 @@ casttest!(mktx_requires_to, |_prj, cmd| {
         "mktx",
         "--private-key",
         "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "--chain",
+        "1",
     ]);
     cmd.assert_failure().stderr_eq(str![[r#"
 Error: 
@@ -972,6 +977,8 @@ casttest!(send_requires_to, |_prj, cmd| {
         "send",
         "--private-key",
         "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "--chain",
+        "1",
     ]);
     cmd.assert_failure().stderr_eq(str![[r#"
 Error: 
@@ -1021,6 +1028,7 @@ casttest!(storage, |_prj, cmd| {
 
 "#]]);
 
+    let rpc = next_http_rpc_endpoint();
     cmd.cast_fuse()
         .args(["storage", usdt, total_supply_slot, "--rpc-url", &rpc, "--block", block_after])
         .assert_success()
@@ -1392,9 +1400,7 @@ casttest!(cast_using_paymaster, async |prj, cmd| {
         "--zk-paymaster-input",
         "0x8c5a344500000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
         "--rpc-url",
-        &url,
-        "--gas-price",
-        "1000000000000002",
+        &url
     ])
     .assert_success();
 

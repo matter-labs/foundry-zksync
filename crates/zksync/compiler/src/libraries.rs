@@ -1,4 +1,4 @@
-//! Handles resolution nd storage of missing libraries emitted by zksolc
+//! Handles resolution and storage of missing libraries emitted by zksolc
 
 use std::{
     fs,
@@ -110,7 +110,7 @@ pub fn resolve_libraries(
         }
 
         // remove this batch from each library's missing_library if listed as dependency
-        // this potentailly allows more libraries to be included in the next batch
+        // this potentially allows more libraries to be included in the next batch
         for lib in &mut missing_libraries {
             lib.missing_libraries.retain(|maybe_missing_lib| {
                 let mut split = maybe_missing_lib.split(':');

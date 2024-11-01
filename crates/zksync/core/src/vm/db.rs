@@ -3,10 +3,10 @@
 /// This way, we can run transaction on top of the chain that is persisted
 /// in the Database object.
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
-/// is usually collecing all the diffs - and applies them to database itself.
-use std::{collections::HashMap, fmt::Debug};
+/// is usually collecting all the diffs - and applies them to database itself.
+use std::{collections::HashMap as sHashMap, fmt::Debug};
 
-use alloy_primitives::{Address, U256 as rU256};
+use alloy_primitives::{map::HashMap, Address, U256 as rU256};
 use foundry_cheatcodes_common::record::RecordAccess;
 use revm::{primitives::Account, Database, EvmContext, InnerEvmContext};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
@@ -29,7 +29,7 @@ pub struct ZKVMData<'a, DB: Database> {
     // pub journaled_state: &'a mut JournaledState,
     ecx: &'a mut InnerEvmContext<DB>,
     pub factory_deps: HashMap<H256, Vec<u8>>,
-    pub override_keys: HashMap<StorageKey, StorageValue>,
+    pub override_keys: sHashMap<StorageKey, StorageValue>,
     pub accesses: Option<&'a mut RecordAccess>,
 }
 

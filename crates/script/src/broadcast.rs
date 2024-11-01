@@ -6,14 +6,18 @@ use alloy_chains::Chain;
 use alloy_consensus::{Transaction, TxEnvelope};
 use alloy_eips::eip2718::Encodable2718;
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-use alloy_primitives::{utils::format_units, Address, TxHash};
+use alloy_primitives::{
+    map::{AddressHashMap, AddressHashSet},
+    utils::format_units,
+    Address, TxHash,
+};
 use alloy_provider::{utils::Eip1559Estimation, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_transport::Transport;
 use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
-use foundry_cheatcodes::ScriptWallets;
+use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_batch_support, has_different_gas_calc};
 use foundry_common::{
     provider::{get_http_provider, try_get_http_provider, RetryProvider},
@@ -26,10 +30,7 @@ use foundry_zksync_core::{
 };
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{cmp::Ordering, sync::Arc};
 use zksync_web3_rs::eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest};
 
 pub async fn estimate_gas<P, T>(
@@ -47,7 +48,7 @@ where
 
     tx.set_gas_limit(
         provider.estimate_gas(tx).await.wrap_err("Failed to estimate gas for tx")? *
-            estimate_multiplier as u128 /
+            estimate_multiplier /
             100,
     );
     Ok(())
@@ -116,11 +117,26 @@ pub async fn send_transaction(
     if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
         if sequential_broadcast {
             let from = tx.from.expect("no sender");
-            let nonce = provider.get_transaction_count(from).await?;
 
             let tx_nonce = tx.nonce.expect("no nonce");
-            if nonce != tx_nonce {
-                bail!("EOA nonce changed unexpectedly while sending transactions. Expected {tx_nonce} got {nonce} from provider.")
+            for attempt in 0..5 {
+                let nonce = provider.get_transaction_count(from).await?;
+                match nonce.cmp(&tx_nonce) {
+                    Ordering::Greater => {
+                        bail!("EOA nonce changed unexpectedly while sending transactions. Expected {tx_nonce} got {nonce} from provider.")
+                    }
+                    Ordering::Less => {
+                        if attempt == 4 {
+                            bail!("After 5 attempts, provider nonce ({nonce}) is still behind expected nonce ({tx_nonce}).")
+                        }
+                        warn!("Expected nonce ({tx_nonce}) is ahead of provider nonce ({nonce}). Retrying in 1 second...");
+                        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    }
+                    Ordering::Equal => {
+                        // Nonces are equal, we can proceed
+                        break;
+                    }
+                }
             }
         }
 
@@ -197,9 +213,9 @@ pub enum SendTransactionKind<'a> {
 /// Represents how to send _all_ transactions
 pub enum SendTransactionsKind {
     /// Send via `eth_sendTransaction` and rely on the  `from` address being unlocked.
-    Unlocked(HashSet<Address>),
+    Unlocked(AddressHashSet),
     /// Send a signed transaction via `eth_sendRawTransaction`
-    Raw(HashMap<Address, EthereumWallet>),
+    Raw(AddressHashMap<EthereumWallet>),
 }
 
 impl SendTransactionsKind {
@@ -230,12 +246,12 @@ impl SendTransactionsKind {
 }
 
 /// State after we have bundled all
-/// [`TransactionWithMetadata`](crate::transaction::TransactionWithMetadata) objects into a single
-/// [`ScriptSequenceKind`] object containing one or more script sequences.
+/// [`TransactionWithMetadata`](forge_script_sequence::TransactionWithMetadata) objects into a
+/// single [`ScriptSequenceKind`] object containing one or more script sequences.
 pub struct BundledState {
     pub args: ScriptArgs,
     pub script_config: ScriptConfig,
-    pub script_wallets: ScriptWallets,
+    pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub sequence: ScriptSequenceKind,
 }
@@ -281,7 +297,7 @@ impl BundledState {
             .sequences()
             .iter()
             .flat_map(|sequence| sequence.transactions().map(|tx| tx.from().expect("missing from")))
-            .collect::<HashSet<_>>();
+            .collect::<AddressHashSet>();
 
         if required_addresses.contains(&Config::DEFAULT_SENDER) {
             eyre::bail!(
@@ -378,7 +394,7 @@ impl BundledState {
 
                                 tx.set_chain_id(sequence.chain);
 
-                                // Set TxKind::Create explicitly to satify `check_reqd_fields` in
+                                // Set TxKind::Create explicitly to satisfy `check_reqd_fields` in
                                 // alloy
                                 if tx.to.is_none() {
                                     tx.set_create();
