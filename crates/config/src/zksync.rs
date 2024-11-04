@@ -6,14 +6,15 @@ use foundry_compilers::{
     solc::CliSettings,
     zksolc::{
         settings::{
-            BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings,
+            BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcError,
+            ZkSolcSettings, ZkSolcWarning,
         },
         ZkSettings,
     },
 };
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use crate::SolcReq;
 
@@ -59,8 +60,14 @@ pub struct ZkSyncConfig {
     /// The optimization mode string for zkSync
     pub optimizer_mode: char,
 
-    /// zkSolc optimizer details
+    /// zksolc optimizer details
     pub optimizer_details: Option<OptimizerDetails>,
+
+    /// zksolc suppressed errors
+    pub suppressed_warnings: HashSet<ZkSolcWarning>,
+
+    /// zksolc suppressed warnings
+    pub suppressed_errors: HashSet<ZkSolcError>,
 }
 
 impl Default for ZkSyncConfig {
@@ -80,6 +87,8 @@ impl Default for ZkSyncConfig {
             optimizer: true,
             optimizer_mode: '3',
             optimizer_details: Default::default(),
+            suppressed_warnings: Default::default(),
+            suppressed_errors: Default::default(),
         }
     }
 }
@@ -130,6 +139,8 @@ impl ZkSyncConfig {
                 },
             },
             codegen: if self.force_evmla { Codegen::EVMLA } else { Codegen::Yul },
+            suppressed_warnings: self.suppressed_warnings.clone(),
+            suppressed_errors: self.suppressed_errors.clone(),
         };
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
