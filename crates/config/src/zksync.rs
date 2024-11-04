@@ -5,7 +5,9 @@ use foundry_compilers::{
     },
     solc::CliSettings,
     zksolc::{
-        settings::{BytecodeHash, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings},
+        settings::{
+            BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcSettings,
+        },
         ZkSettings,
     },
 };
@@ -122,11 +124,12 @@ impl ZkSyncConfig {
             force_evmla: self.force_evmla,
             llvm_options: self.llvm_options.clone(),
             output_selection: OutputSelection {
-                all: Some(FileOutputSelection {
-                    per_file: None,
-                    per_contract: Some([OutputSelectionFlag::ABI].into()),
-                }),
+                all: FileOutputSelection {
+                    per_file: [].into(),
+                    per_contract: [OutputSelectionFlag::ABI].into(),
+                },
             },
+            codegen: if self.force_evmla { Codegen::EVMLA } else { Codegen::Yul },
         };
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
