@@ -102,10 +102,6 @@ pub struct ZkSyncArgs {
     #[clap(long = "zk-optimizer")]
     pub optimizer: bool,
 
-    /// Contracts to avoid compiling on zkSync
-    #[clap(long = "zk-avoid-contracts", visible_alias = "avoid-contracts", value_delimiter = ',')]
-    pub avoid_contracts: Option<Vec<String>>,
-
     /// Paymaster address
     #[clap(
         long = "zk-paymaster-address",
@@ -150,7 +146,6 @@ impl ZkSyncArgs {
             self.detect_missing_libraries.then_some(true),
             zksync.detect_missing_libraries
         );
-        set_if_some!(self.avoid_contracts.clone(), zksync.avoid_contracts);
 
         set_if_some!(self.optimizer.then_some(true), zksync.optimizer);
         set_if_some!(

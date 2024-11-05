@@ -50,9 +50,6 @@ pub struct ZkSyncConfig {
     /// Currently unused
     pub detect_missing_libraries: bool,
 
-    /// Source files to avoid compiling on zksolc
-    pub avoid_contracts: Option<Vec<String>>,
-
     /// Enable optimizer for zkSync
     pub optimizer: bool,
 
@@ -76,7 +73,6 @@ impl Default for ZkSyncConfig {
             force_evmla: Default::default(),
             detect_missing_libraries: Default::default(),
             llvm_options: Default::default(),
-            avoid_contracts: Default::default(),
             optimizer: true,
             optimizer_mode: '3',
             optimizer_details: Default::default(),
@@ -134,14 +130,5 @@ impl ZkSyncConfig {
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
         ZkSolcSettings { settings: zk_settings, cli_settings: CliSettings::default() }
-    }
-
-    pub fn avoid_contracts(&self) -> Option<Vec<globset::GlobMatcher>> {
-        self.avoid_contracts.clone().map(|patterns| {
-            patterns
-                .into_iter()
-                .map(|pat| globset::Glob::new(&pat).expect("invalid pattern").compile_matcher())
-                .collect::<Vec<_>>()
-        })
     }
 }

@@ -155,8 +155,7 @@ impl CreateArgs {
             let zk_compiler = ProjectCompiler::new()
                 .quiet(self.json || self.opts.silent)
                 .files([target_path.clone()]);
-            let mut zk_output =
-                zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
+            let mut zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
             let artifact = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 

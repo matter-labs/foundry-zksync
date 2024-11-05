@@ -315,8 +315,7 @@ impl TestArgs {
                 .quiet_if(self.json || self.opts.silent)
                 .files(sources_to_compile);
 
-            let zk_output =
-                zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
+            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
             let dual_compiled_contracts =
                 DualCompiledContracts::new(&output, &zk_output, &project.paths, &zk_project.paths);
 
