@@ -344,7 +344,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "wasmtimer 0.2.1",
+ "wasmtimer",
 ]
 
 [[package]]
@@ -409,7 +409,7 @@ dependencies = [
  "tower 0.5.1",
  "tracing",
  "url",
- "wasmtimer 0.2.1",
+ "wasmtimer",
 ]
 
 [[package]]
@@ -684,7 +684,7 @@ dependencies = [
 [[package]]
 name = "alloy-transport"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-json-rpc",
  "base64 0.22.1",
@@ -697,7 +697,7 @@ dependencies = [
  "tower 0.5.1",
  "tracing",
  "url",
- "wasmtimer 0.4.0",
+ "wasmtimer",
 ]
 
 [[package]]
@@ -13497,20 +13497,6 @@ name = "wasmtimer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7ed9d8b15c7fb594d72bfb4b5a276f3d2029333cd93a932f376f5937f6f80ee"
-dependencies = [
- "futures 0.3.31",
- "js-sys",
- "parking_lot 0.12.3",
- "pin-utils",
- "slab",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "wasmtimer"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb4f099acbc1043cc752b91615b24b02d7f6fcd975bd781fed9f50b3c3e15bf7"
 dependencies = [
  "futures 0.3.31",
  "js-sys",
