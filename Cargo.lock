@@ -96,9 +96,9 @@ checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
 
 [[package]]
 name = "alloy"
-version = "0.3.6"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8367891bf380210abb0d6aa30c5f85a9080cb4a066c4d5c5acadad630823751b"
+checksum = "056f2c01b2aed86e15b43c47d109bfc8b82553dc34e66452875e51247ec31ab2"
 dependencies = [
  "alloy-consensus",
  "alloy-contract",
@@ -164,6 +164,19 @@ dependencies = [
  "futures 0.3.31",
  "futures-util",
  "thiserror",
+]
+
+[[package]]
+name = "alloy-core"
+version = "0.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eeb750349efda145ca6aada68d0336067f7f364d7d44ef09e2cf000b040c5e99"
+dependencies = [
+ "alloy-dyn-abi",
+ "alloy-json-abi",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-sol-types",
 ]
 
 [[package]]
@@ -788,13 +801,14 @@ dependencies = [
 [[package]]
 name = "alloy-zksync"
 version = "0.1.0"
-source = "git+https://github.com/nbaztec/alloy-zksync?branch=v0.3.6#0adab979cf081350a9c0d7a42d4e8905a39d8c92"
+source = "git+https://github.com/popzxc/alloy-zksync?branch=main#d454818e7afd3a79d3ab3b5bc2875ba6c855e825"
 dependencies = [
  "alloy",
  "async-trait",
  "futures-utils-wasm",
- "k256 0.13.3",
+ "k256 0.13.4",
  "rand 0.8.5",
+ "reqwest 0.12.8",
  "serde",
  "thiserror",
  "tracing",
@@ -8433,7 +8447,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
- "proc-macro-crate 1.3.1",
+ "proc-macro-crate 3.2.0",
  "proc-macro2 1.0.88",
  "quote 1.0.37",
  "syn 2.0.79",

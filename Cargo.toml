@@ -231,7 +231,7 @@ alloy-chains = "0.1"
 alloy-rlp = "0.3"
 alloy-trie = "0.6.0"
 # alloy-zksync = "0.1.0"
-alloy-zksync = { git = "https://github.com/nbaztec/alloy-zksync", branch = "v0.3.6"}
+alloy-zksync = { git = "https://github.com/popzxc/alloy-zksync", branch = "main"}
 
 ## op-alloy 
 op-alloy-rpc-types = "0.3.3"

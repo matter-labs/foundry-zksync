@@ -592,6 +592,9 @@ impl CreateArgs {
             .with_factory_deps(
                 zk_data.factory_deps.clone().into_iter().map(|dep| dep.into()).collect(),
             );
+        if let Some(paymaster_params) = zk_data.paymaster_params {
+            deployer.tx.set_paymaster(paymaster_params);
+        }
         deployer.tx.set_from(deployer_address);
         deployer.tx.set_chain_id(chain);
         // `to` field must be set explicitly, cannot be None.
