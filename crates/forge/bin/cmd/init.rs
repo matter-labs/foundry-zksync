@@ -155,7 +155,7 @@ impl InitArgs {
             // install forge-zksync-std
             if zksync && !offline {
                 if root.join("lib/forge-zksync-std").exists() {
-                    p_println!(!quiet => "\"lib/forge-zksync-std\" already exists, skipping install....");
+                    sh_println!("\"lib/forge-zksync-std\" already exists, skipping install....")?;
                     self.opts.install(&mut config, vec![])?;
                 } else {
                     let dep = "https://github.com/Moonsong-Labs/forge-zksync-std".parse()?;

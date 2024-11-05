@@ -314,9 +314,7 @@ impl TestArgs {
                 foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
 
             let sources_to_compile = self.get_sources_to_compile(&config, &filter)?;
-            let zk_compiler = ProjectCompiler::new()
-                .quiet_if(self.json || self.opts.silent)
-                .files(sources_to_compile);
+            let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
 
             let zk_output =
                 zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
