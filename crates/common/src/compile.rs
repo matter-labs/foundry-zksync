@@ -273,7 +273,12 @@ impl ProjectCompiler {
 
             // TODO: avoid process::exit
             // exit with error if any contract exceeds the size limit, excluding test contracts.
-            if size_report.exceeds_size_limit() {
+            if size_report.exceeds_runtime_size_limit() {
+                std::process::exit(1);
+            }
+
+            // Check size limits only if not ignoring EIP-3860
+            if !self.ignore_eip_3860 && size_report.exceeds_initcode_size_limit() {
                 std::process::exit(1);
             }
         }
@@ -477,14 +482,8 @@ impl ProjectCompiler {
                 .collect();
 
             for (name, artifact) in artifacts {
-                let bytecode = artifact.get_bytecode_object().unwrap_or_default();
-                let size = match bytecode.as_ref() {
-                    BytecodeObject::Bytecode(bytes) => bytes.len(),
-                    BytecodeObject::Unlinked(_) => {
-                        // TODO: This should never happen on zksolc, maybe error somehow
-                        0
-                    }
-                };
+                let runtime_size = contract_size(artifact, false).unwrap_or_default();
+                let init_size = contract_size(artifact, true).unwrap_or_default();
 
                 let is_dev_contract = artifact
                     .abi
