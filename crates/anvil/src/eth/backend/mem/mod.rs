@@ -857,15 +857,14 @@ impl Backend {
     }
 
     /// Creates an EVM instance with optionally injected precompiles.
-    fn new_evm_with_inspector_ref<DB, I>(
+    fn new_evm_with_inspector_ref<'a, DB>(
         &self,
         db: DB,
         env: EnvWithHandlerCfg,
-        inspector: I,
-    ) -> revm::Evm<'_, I, WrapDatabaseRef<DB>>
+        inspector: &'a mut dyn InspectorExt<WrapDatabaseRef<DB>>,
+    ) -> revm::Evm<'a, &'a mut dyn InspectorExt<WrapDatabaseRef<DB>>, WrapDatabaseRef<DB>>
     where
         DB: revm::DatabaseRef,
-        I: InspectorExt<WrapDatabaseRef<DB>>,
     {
         let mut evm = new_evm_with_inspector_ref(db, env, inspector);
         if let Some(factory) = &self.precompile_factory {

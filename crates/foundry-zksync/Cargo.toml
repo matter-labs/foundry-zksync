@@ -1,0 +1,30 @@
+[package]
+name = "foundry-zksync"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+foundry-common.workspace = true
+foundry-compilers.workspace = true
+foundry-evm-traces.workspace = true
+foundry-evm-core.workspace = true
+foundry-strategy.workspace = true
+foundry-zksync-core.workspace = true
+revm-inspectors.workspace = true
+
+alloy-primitives.workspace = true
+
+eyre.workspace = true
+revm.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true

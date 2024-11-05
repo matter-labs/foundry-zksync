@@ -26,6 +26,8 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use foundry_linking::{LinkOutput, Linker};
+use foundry_strategy::{EvmRunnerStrategy, RunnerStrategy};
+use foundry_zksync::ZkRunnerStrategy;
 use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
@@ -88,7 +90,7 @@ pub struct MultiContractRunner {
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
     /// Use zk runner.
-    pub use_zk: bool,
+    pub strategy: Box<dyn RunnerStrategy>,
 }
 
 impl MultiContractRunner {
@@ -181,8 +183,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let mut db = Backend::spawn(self.fork.take());
-        db.is_zk = self.use_zk;
+        let db = Backend::spawn_with_strategy(self.fork.take(), self.strategy.backend_strategy());
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -255,7 +256,7 @@ impl MultiContractRunner {
             None,
             Some(artifact_id.version.clone()),
             self.dual_compiled_contracts.clone(),
-            self.use_zk,
+            self.strategy.name() == "zk", // use_zk
         );
 
         let trace_mode = TraceMode::default()
@@ -272,7 +273,7 @@ impl MultiContractRunner {
                     .enable_isolation(self.isolation)
                     .alphanet(self.alphanet)
             })
-            .use_zk_vm(self.use_zk)
+            .use_zk_vm(self.strategy.name() == "zk") // use_zk
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
@@ -416,6 +417,11 @@ impl MultiContractRunnerBuilder {
         dual_compiled_contracts: DualCompiledContracts,
     ) -> Result<MultiContractRunner> {
         let use_zk = zk_output.is_some();
+        let strategy: Box<dyn RunnerStrategy> = if use_zk {
+            Box::new(ZkRunnerStrategy::default())
+        } else {
+            Box::new(EvmRunnerStrategy::default())
+        };
         let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);
         let linker = Linker::new(root, output.artifact_ids().collect());
@@ -515,7 +521,7 @@ impl MultiContractRunnerBuilder {
             libs_to_deploy,
             libraries,
             dual_compiled_contracts,
-            use_zk,
+            strategy,
         })
     }
 }

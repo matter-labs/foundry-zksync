@@ -36,6 +36,7 @@ foundry-evm.workspace = true
 foundry-evm-abi.workspace = true
 foundry-wallets.workspace = true
 foundry-linking.workspace = true
+foundry-strategy.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compiler.workspace = true
 
@@ -61,6 +62,7 @@ forge-script.workspace = true
 forge-sol-macro-gen.workspace = true
 foundry-cli.workspace = true
 foundry-debugger.workspace = true
+foundry-zksync.workspace = true
 
 alloy-chains.workspace = true
 alloy-consensus.workspace = true

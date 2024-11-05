@@ -14,9 +14,6 @@ use alloy_serde::WithOtherFields;
 use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
-use foundry_zksync_core::{
-    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-};
 use itertools::Itertools;
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -30,8 +27,10 @@ use revm::{
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    sync::{Arc, Mutex},
     time::Instant,
 };
+use strategy::{BackendStrategy, BackendStrategyForkInfo, EvmBackendStrategy};
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -51,8 +50,10 @@ pub use snapshot::{BackendSnapshot, RevertSnapshotAction, StateSnapshot};
 mod fork_type;
 pub use fork_type::{CachedForkType, ForkType};
 
+pub mod strategy;
+
 // A `revm::Database` that is used in forking mode
-type ForkDB = CacheDB<SharedBackend>;
+pub type ForkDB = CacheDB<SharedBackend>;
 
 /// Represents a numeric `ForkId` valid only for the existence of the `Backend`.
 ///
@@ -444,6 +445,9 @@ struct _ObjectSafe(dyn DatabaseExt);
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct Backend {
+    /// Custom backend strategy
+    pub strategy: Arc<Mutex<dyn BackendStrategy>>,
+
     /// The access point for managing forks
     forks: MultiFork,
     // The default in memory db
@@ -473,13 +477,6 @@ pub struct Backend {
     inner: BackendInner,
     /// Keeps track of the fork type
     fork_url_type: CachedForkType,
-    /// TODO: Ensure this parameter is updated on `select_fork`.
-    ///
-    /// Keeps track if the backend is in ZK mode.
-    /// This is required to correctly merge storage when selecting another ZK fork.
-    /// The balance, nonce and code are stored under zkSync's respective system contract
-    /// storages. These need to be merged into the forked storage.
-    pub is_zk: bool,
 }
 
 impl Backend {
@@ -491,6 +488,17 @@ impl Backend {
         Self::new(MultiFork::spawn(), fork)
     }
 
+    /// Creates a new Backend with a spawned multi fork thread.
+    ///
+    /// If `fork` is `Some` this will use a `fork` database, otherwise with an in-memory
+    /// database.
+    pub fn spawn_with_strategy(
+        fork: Option<CreateFork>,
+        strategy: Arc<Mutex<dyn BackendStrategy>>,
+    ) -> Self {
+        Self::new_with_strategy(MultiFork::spawn(), fork, strategy)
+    }
+
     /// Creates a new instance of `Backend`
     ///
     /// If `fork` is `Some` this will use a `fork` database, otherwise with an in-memory
@@ -498,6 +506,20 @@ impl Backend {
     ///
     /// Prefer using [`spawn`](Self::spawn) instead.
     pub fn new(forks: MultiFork, fork: Option<CreateFork>) -> Self {
+        Self::new_with_strategy(forks, fork, Arc::new(Mutex::new(EvmBackendStrategy)))
+    }
+
+    /// Creates a new instance of `Backend`
+    ///
+    /// If `fork` is `Some` this will use a `fork` database, otherwise with an in-memory
+    /// database.
+    ///
+    /// Prefer using [`spawn`](Self::spawn) instead.
+    pub fn new_with_strategy(
+        forks: MultiFork,
+        fork: Option<CreateFork>,
+        strategy: Arc<Mutex<dyn BackendStrategy>>,
+    ) -> Self {
         trace!(target: "backend", forking_mode=?fork.is_some(), "creating executor backend");
         // Note: this will take of registering the `fork`
         let inner = BackendInner {
@@ -506,13 +528,13 @@ impl Backend {
         };
 
         let mut backend = Self {
+            strategy,
             forks,
             mem_db: CacheDB::new(Default::default()),
             fork_init_journaled_state: inner.new_journaled_state(),
             active_fork_ids: None,
             inner,
             fork_url_type: Default::default(),
-            is_zk: false,
         };
 
         if let Some(fork) = fork {
@@ -546,13 +568,13 @@ impl Backend {
     /// Creates a new instance with a `BackendDatabase::InMemory` cache layer for the `CacheDB`
     pub fn clone_empty(&self) -> Self {
         Self {
+            strategy: self.strategy.clone(),
             forks: self.forks.clone(),
             mem_db: CacheDB::new(Default::default()),
             fork_init_journaled_state: self.inner.new_journaled_state(),
             active_fork_ids: None,
             inner: Default::default(),
             fork_url_type: Default::default(),
-            is_zk: false,
         }
     }
 
@@ -652,41 +674,41 @@ impl Backend {
         self.inner.has_snapshot_failure = has_snapshot_failure
     }
 
-    /// When creating or switching forks, we update the AccountInfo of the contract
-    pub(crate) fn update_fork_db(
-        &self,
-        active_journaled_state: &mut JournaledState,
-        target_fork: &mut Fork,
-        merge_zk_db: bool,
-    ) {
-        self.update_fork_db_contracts(
-            self.inner.persistent_accounts.iter().copied(),
-            active_journaled_state,
-            target_fork,
-            merge_zk_db,
-        )
-    }
+    // /// When creating or switching forks, we update the AccountInfo of the contract
+    // pub(crate) fn update_fork_db(
+    //     &self,
+    //     active_journaled_state: &mut JournaledState,
+    //     target_fork: &mut Fork,
+    //     merge_zk_db: bool,
+    // ) {
+    //     self.update_fork_db_contracts(
+    //         self.inner.persistent_accounts.iter().copied(),
+    //         active_journaled_state,
+    //         target_fork,
+    //         merge_zk_db,
+    //     )
+    // }
 
-    /// Merges the state of all `accounts` from the currently active db into the given `fork`
-    pub(crate) fn update_fork_db_contracts(
-        &self,
-        accounts: impl IntoIterator<Item = Address>,
-        active_journaled_state: &mut JournaledState,
-        target_fork: &mut Fork,
-        merge_zk_db: bool,
-    ) {
-        if let Some(db) = self.active_fork_db() {
-            merge_account_data(accounts, db, active_journaled_state, target_fork, merge_zk_db)
-        } else {
-            merge_account_data(
-                accounts,
-                &self.mem_db,
-                active_journaled_state,
-                target_fork,
-                merge_zk_db,
-            )
-        }
-    }
+    // /// Merges the state of all `accounts` from the currently active db into the given `fork`
+    // pub(crate) fn update_fork_db_contracts(
+    //     &self,
+    //     accounts: impl IntoIterator<Item = Address>,
+    //     active_journaled_state: &mut JournaledState,
+    //     target_fork: &mut Fork,
+    //     merge_zk_db: bool,
+    // ) {
+    //     if let Some(db) = self.active_fork_db() {
+    //         merge_account_data(accounts, db, active_journaled_state, target_fork, merge_zk_db)
+    //     } else {
+    //         merge_account_data(
+    //             accounts,
+    //             &self.mem_db,
+    //             active_journaled_state,
+    //             target_fork,
+    //             merge_zk_db,
+    //         )
+    //     }
+    // }
 
     /// Returns the memory db used if not in forking mode
     pub fn mem_db(&self) -> &FoundryEvmInMemoryDB {
@@ -778,7 +800,7 @@ impl Backend {
     /// Initializes settings we need to keep track of.
     ///
     /// We need to track these mainly to prevent issues when switching between different evms
-    pub(crate) fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+    pub fn initialize(&mut self, env: &EnvWithHandlerCfg) {
         self.set_caller(env.tx.caller);
         self.set_spec_id(env.handler_cfg.spec_id);
     }
@@ -796,16 +818,21 @@ impl Backend {
     pub fn inspect<'a, I: InspectorExt<&'a mut Self>>(
         &'a mut self,
         env: &mut EnvWithHandlerCfg,
-        inspector: I,
+        mut inspector: I,
+        extra: Option<Vec<u8>>,
     ) -> eyre::Result<ResultAndState> {
         self.initialize(env);
-        let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), inspector);
 
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+        let strategy = self.strategy.clone();
+        let mut guard = strategy.lock().unwrap();
+        guard.inspect(self, env, &mut inspector, extra)
+        // let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), inspector);
 
-        env.env = evm.context.evm.inner.env;
+        // let res = evm.transact().wrap_err("backend: failed while inspecting")?;
 
-        Ok(res)
+        // env.env = evm.context.evm.inner.env;
+
+        // Ok(res)
     }
 
     /// Executes the configured test call of the `env` without committing state changes
@@ -1117,20 +1144,19 @@ impl DatabaseExt for Backend {
         let fork_id = self.ensure_fork_id(id).cloned()?;
         let idx = self.inner.ensure_fork_index(&fork_id)?;
 
-        let is_current_zk_fork = if let Some(active_fork_id) = self.active_fork_id() {
+        let current_fork_type = if let Some(active_fork_id) = self.active_fork_id() {
             self.forks
                 .get_fork_url(self.ensure_fork_id(active_fork_id).cloned()?)?
-                .map(|url| self.fork_url_type.get(&url).is_zk())
-                .unwrap_or_default()
+                .map(|url| self.fork_url_type.get(&url))
+                .unwrap_or(ForkType::Evm)
         } else {
-            self.is_zk
+            ForkType::Zk
         };
-        let is_target_zk_fork = self
+        let target_fork_type = self
             .forks
             .get_fork_url(fork_id.clone())?
-            .map(|url| self.fork_url_type.get(&url).is_zk())
-            .unwrap_or_default();
-        let merge_zk_db = is_current_zk_fork && is_target_zk_fork;
+            .map(|url| self.fork_url_type.get(&url))
+            .unwrap_or(ForkType::Evm);
 
         let fork_env = self
             .forks
@@ -1199,7 +1225,17 @@ impl DatabaseExt for Backend {
                 caller_account.into()
             });
 
-            self.update_fork_db(active_journaled_state, &mut fork, merge_zk_db);
+            self.strategy.lock().unwrap().update_fork_db(
+                BackendStrategyForkInfo {
+                    active_fork: self.active_fork(),
+                    active_type: current_fork_type,
+                    target_type: target_fork_type,
+                },
+                &self.mem_db,
+                &self.inner,
+                active_journaled_state,
+                &mut fork,
+            );
 
             // insert the fork back
             self.inner.set_fork(idx, fork);
@@ -1248,7 +1284,11 @@ impl DatabaseExt for Backend {
 
                 active.journaled_state.depth = journaled_state.depth;
                 for addr in persistent_addrs {
-                    merge_journaled_state_data(addr, journaled_state, &mut active.journaled_state);
+                    strategy::merge_journaled_state_data(
+                        addr,
+                        journaled_state,
+                        &mut active.journaled_state,
+                    );
                 }
 
                 // Ensure all previously loaded accounts are present in the journaled state to
@@ -1261,7 +1301,7 @@ impl DatabaseExt for Backend {
                 for (addr, acc) in journaled_state.state.iter() {
                     if acc.is_created() {
                         if acc.is_touched() {
-                            merge_journaled_state_data(
+                            strategy::merge_journaled_state_data(
                                 *addr,
                                 journaled_state,
                                 &mut active.journaled_state,
@@ -1644,8 +1684,8 @@ pub enum BackendDatabaseSnapshot {
 /// Represents a fork
 #[derive(Clone, Debug)]
 pub struct Fork {
-    db: ForkDB,
-    journaled_state: JournaledState,
+    pub db: ForkDB,
+    pub journaled_state: JournaledState,
 }
 
 impl Fork {
@@ -1828,7 +1868,7 @@ impl BackendInner {
             // we initialize a _new_ `ForkDB` but keep the state of persistent accounts
             let mut new_db = ForkDB::new(backend);
             for addr in self.persistent_accounts.iter().copied() {
-                merge_db_account_data(addr, &active.db, &mut new_db);
+                strategy::merge_db_account_data(addr, &active.db, &mut new_db);
             }
             active.db = new_db;
         }
@@ -1914,121 +1954,121 @@ pub(crate) fn update_current_env_with_fork_env(current: &mut Env, fork: Env) {
     current.tx.chain_id = fork.tx.chain_id;
 }
 
-/// Clones the data of the given `accounts` from the `active` database into the `fork_db`
-/// This includes the data held in storage (`CacheDB`) and kept in the `JournaledState`.
-pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
-    accounts: impl IntoIterator<Item = Address>,
-    active: &CacheDB<ExtDB>,
-    active_journaled_state: &mut JournaledState,
-    target_fork: &mut Fork,
-    merge_zk_db: bool,
-) {
-    for addr in accounts.into_iter() {
-        merge_db_account_data(addr, active, &mut target_fork.db);
-        if merge_zk_db {
-            merge_zk_account_data(addr, active, &mut target_fork.db);
-        }
-        merge_journaled_state_data(addr, active_journaled_state, &mut target_fork.journaled_state);
-    }
+// /// Clones the data of the given `accounts` from the `active` database into the `fork_db`
+// /// This includes the data held in storage (`CacheDB`) and kept in the `JournaledState`.
+// pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
+//     accounts: impl IntoIterator<Item = Address>,
+//     active: &CacheDB<ExtDB>,
+//     active_journaled_state: &mut JournaledState,
+//     target_fork: &mut Fork,
+//     merge_zk_db: bool,
+// ) {
+//     for addr in accounts.into_iter() {
+//         merge_db_account_data(addr, active, &mut target_fork.db);
+//         if merge_zk_db {
+//             merge_zk_account_data(addr, active, &mut target_fork.db);
+//         }
+//         merge_journaled_state_data(addr, active_journaled_state, &mut
+// target_fork.journaled_state);     }
 
-    // need to mock empty journal entries in case the current checkpoint is higher than the existing
-    // journal entries
-    while active_journaled_state.journal.len() > target_fork.journaled_state.journal.len() {
-        target_fork.journaled_state.journal.push(Default::default());
-    }
+//     // need to mock empty journal entries in case the current checkpoint is higher than the
+// existing     // journal entries
+//     while active_journaled_state.journal.len() > target_fork.journaled_state.journal.len() {
+//         target_fork.journaled_state.journal.push(Default::default());
+//     }
 
-    *active_journaled_state = target_fork.journaled_state.clone();
-}
+//     *active_journaled_state = target_fork.journaled_state.clone();
+// }
 
-/// Clones the account data from the `active_journaled_state`  into the `fork_journaled_state`
-fn merge_journaled_state_data(
-    addr: Address,
-    active_journaled_state: &JournaledState,
-    fork_journaled_state: &mut JournaledState,
-) {
-    if let Some(mut acc) = active_journaled_state.state.get(&addr).cloned() {
-        trace!(?addr, "updating journaled_state account data");
-        if let Some(fork_account) = fork_journaled_state.state.get_mut(&addr) {
-            // This will merge the fork's tracked storage with active storage and update values
-            fork_account.storage.extend(std::mem::take(&mut acc.storage));
-            // swap them so we can insert the account as whole in the next step
-            std::mem::swap(&mut fork_account.storage, &mut acc.storage);
-        }
-        fork_journaled_state.state.insert(addr, acc);
-    }
-}
+// /// Clones the account data from the `active_journaled_state`  into the `fork_journaled_state`
+// fn merge_journaled_state_data(
+//     addr: Address,
+//     active_journaled_state: &JournaledState,
+//     fork_journaled_state: &mut JournaledState,
+// ) {
+//     if let Some(mut acc) = active_journaled_state.state.get(&addr).cloned() {
+//         trace!(?addr, "updating journaled_state account data");
+//         if let Some(fork_account) = fork_journaled_state.state.get_mut(&addr) {
+//             // This will merge the fork's tracked storage with active storage and update values
+//             fork_account.storage.extend(std::mem::take(&mut acc.storage));
+//             // swap them so we can insert the account as whole in the next step
+//             std::mem::swap(&mut fork_account.storage, &mut acc.storage);
+//         }
+//         fork_journaled_state.state.insert(addr, acc);
+//     }
+// }
 
-/// Clones the account data from the `active` db into the `ForkDB`
-fn merge_db_account_data<ExtDB: DatabaseRef>(
-    addr: Address,
-    active: &CacheDB<ExtDB>,
-    fork_db: &mut ForkDB,
-) {
-    let mut acc = if let Some(acc) = active.accounts.get(&addr).cloned() {
-        acc
-    } else {
-        // Account does not exist
-        return;
-    };
+// /// Clones the account data from the `active` db into the `ForkDB`
+// fn merge_db_account_data<ExtDB: DatabaseRef>(
+//     addr: Address,
+//     active: &CacheDB<ExtDB>,
+//     fork_db: &mut ForkDB,
+// ) {
+//     let mut acc = if let Some(acc) = active.accounts.get(&addr).cloned() {
+//         acc
+//     } else {
+//         // Account does not exist
+//         return;
+//     };
 
-    if let Some(code) = active.contracts.get(&acc.info.code_hash).cloned() {
-        fork_db.contracts.insert(acc.info.code_hash, code);
-    }
+//     if let Some(code) = active.contracts.get(&acc.info.code_hash).cloned() {
+//         fork_db.contracts.insert(acc.info.code_hash, code);
+//     }
 
-    if let Some(fork_account) = fork_db.accounts.get_mut(&addr) {
-        // This will merge the fork's tracked storage with active storage and update values
-        fork_account.storage.extend(std::mem::take(&mut acc.storage));
-        // swap them so we can insert the account as whole in the next step
-        std::mem::swap(&mut fork_account.storage, &mut acc.storage);
-    }
+//     if let Some(fork_account) = fork_db.accounts.get_mut(&addr) {
+//         // This will merge the fork's tracked storage with active storage and update values
+//         fork_account.storage.extend(std::mem::take(&mut acc.storage));
+//         // swap them so we can insert the account as whole in the next step
+//         std::mem::swap(&mut fork_account.storage, &mut acc.storage);
+//     }
 
-    fork_db.accounts.insert(addr, acc);
-}
+//     fork_db.accounts.insert(addr, acc);
+// }
 
-/// Clones the zk account data from the `active` db into the `ForkDB`
-fn merge_zk_account_data<ExtDB: DatabaseRef>(
-    addr: Address,
-    active: &CacheDB<ExtDB>,
-    fork_db: &mut ForkDB,
-) {
-    let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
-        let mut acc = if let Some(acc) = active.accounts.get(&system_contract).cloned() {
-            acc
-        } else {
-            // Account does not exist
-            return;
-        };
+// /// Clones the zk account data from the `active` db into the `ForkDB`
+// fn merge_zk_account_data<ExtDB: DatabaseRef>(
+//     addr: Address,
+//     active: &CacheDB<ExtDB>,
+//     fork_db: &mut ForkDB,
+// ) {
+//     let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
+//         let mut acc = if let Some(acc) = active.accounts.get(&system_contract).cloned() {
+//             acc
+//         } else {
+//             // Account does not exist
+//             return;
+//         };
 
-        let mut storage = Map::<U256, U256>::default();
-        if let Some(value) = acc.storage.get(&slot) {
-            storage.insert(slot, *value);
-        }
+//         let mut storage = Map::<U256, U256>::default();
+//         if let Some(value) = acc.storage.get(&slot) {
+//             storage.insert(slot, *value);
+//         }
 
-        if let Some(fork_account) = fork_db.accounts.get_mut(&system_contract) {
-            // This will merge the fork's tracked storage with active storage and update values
-            fork_account.storage.extend(storage);
-            // swap them so we can insert the account as whole in the next step
-            std::mem::swap(&mut fork_account.storage, &mut acc.storage);
-        } else {
-            std::mem::swap(&mut storage, &mut acc.storage)
-        }
+//         if let Some(fork_account) = fork_db.accounts.get_mut(&system_contract) {
+//             // This will merge the fork's tracked storage with active storage and update values
+//             fork_account.storage.extend(storage);
+//             // swap them so we can insert the account as whole in the next step
+//             std::mem::swap(&mut fork_account.storage, &mut acc.storage);
+//         } else {
+//             std::mem::swap(&mut storage, &mut acc.storage)
+//         }
 
-        fork_db.accounts.insert(system_contract, acc);
-    };
+//         fork_db.accounts.insert(system_contract, acc);
+//     };
 
-    merge_system_contract_entry(
-        L2_BASE_TOKEN_ADDRESS.to_address(),
-        foundry_zksync_core::get_balance_key(addr),
-    );
-    merge_system_contract_entry(
-        ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
-        foundry_zksync_core::get_account_code_key(addr),
-    );
-    merge_system_contract_entry(
-        NONCE_HOLDER_ADDRESS.to_address(),
-        foundry_zksync_core::get_nonce_key(addr),
-    );
-}
+//     merge_system_contract_entry(
+//         L2_BASE_TOKEN_ADDRESS.to_address(),
+//         foundry_zksync_core::get_balance_key(addr),
+//     );
+//     merge_system_contract_entry(
+//         ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
+//         foundry_zksync_core::get_account_code_key(addr),
+//     );
+//     merge_system_contract_entry(
+//         NONCE_HOLDER_ADDRESS.to_address(),
+//         foundry_zksync_core::get_nonce_key(addr),
+//     );
+// }
 
 /// Returns true of the address is a contract
 fn is_contract_in_state(journaled_state: &JournaledState, acc: Address) -> bool {
@@ -2059,7 +2099,7 @@ fn commit_transaction<I: InspectorExt<Backend>>(
     fork: &mut Fork,
     fork_id: &ForkId,
     persistent_accounts: &HashSet<Address>,
-    inspector: I,
+    mut inspector: I,
 ) -> eyre::Result<()> {
     configure_tx_env(&mut env.env, &tx.inner);
 
@@ -2070,7 +2110,7 @@ fn commit_transaction<I: InspectorExt<Backend>>(
         let depth = journaled_state.depth;
         let db = Backend::new_with_fork(fork_id, fork, journaled_state);
 
-        let mut evm = crate::utils::new_evm_with_inspector(db, env, inspector);
+        let mut evm = crate::utils::new_evm_with_inspector(db, env, &mut inspector);
         // Adjust inner EVM depth to ensure that inspectors receive accurate data.
         evm.context.evm.inner.journaled_state.depth = depth + 1;
         evm.transact().wrap_err("backend: failed committing transaction")?

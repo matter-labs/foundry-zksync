@@ -81,13 +81,13 @@ impl<'a> CowBackend<'a> {
     pub fn inspect<'b, I: InspectorExt<&'b mut Self>>(
         &'b mut self,
         env: &mut EnvWithHandlerCfg,
-        inspector: I,
+        mut inspector: I,
     ) -> eyre::Result<ResultAndState> {
         // this is a new call to inspect with a new env, so even if we've cloned the backend
         // already, we reset the initialized state
         self.is_initialized = false;
         self.spec_id = env.handler_cfg.spec_id;
-        let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), inspector);
+        let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), &mut inspector);
 
         let res = evm.transact().wrap_err("backend: failed while inspecting")?;
 

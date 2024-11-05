@@ -40,6 +40,7 @@ mod evm;
 mod fs;
 
 mod inspector;
+mod zk;
 
 mod json;
 

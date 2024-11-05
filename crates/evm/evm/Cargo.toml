@@ -47,6 +47,7 @@ revm = { workspace = true, default-features = false, features = [
 revm-inspectors.workspace = true
 
 eyre.workspace = true
+serde_json.workspace = true
 parking_lot.workspace = true
 proptest.workspace = true
 thiserror.workspace = true

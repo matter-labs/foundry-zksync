@@ -246,14 +246,14 @@ pub fn alphanet_handler_register<DB: revm::Database, I: InspectorExt<DB>>(
 }
 
 /// Creates a new EVM with the given inspector.
-pub fn new_evm_with_inspector<'a, DB, I>(
+pub fn new_evm_with_inspector<'a, DB>(
     db: DB,
     env: revm::primitives::EnvWithHandlerCfg,
-    inspector: I,
-) -> revm::Evm<'a, I, DB>
+    inspector: &mut dyn InspectorExt<DB>,
+) -> revm::Evm<'a, &mut dyn InspectorExt<DB>, DB>
 where
     DB: revm::Database,
-    I: InspectorExt<DB>,
+    // I: InspectorExt<DB>,
 {
     let revm::primitives::EnvWithHandlerCfg { env, handler_cfg } = env;
 
@@ -283,14 +283,13 @@ where
 }
 
 /// Creates a new EVM with the given inspector and wraps the database in a `WrapDatabaseRef`.
-pub fn new_evm_with_inspector_ref<'a, DB, I>(
+pub fn new_evm_with_inspector_ref<'a, DB>(
     db: DB,
     env: revm::primitives::EnvWithHandlerCfg,
-    inspector: I,
-) -> revm::Evm<'a, I, WrapDatabaseRef<DB>>
+    inspector: &mut dyn InspectorExt<WrapDatabaseRef<DB>>,
+) -> revm::Evm<'a, &mut dyn InspectorExt<WrapDatabaseRef<DB>>, WrapDatabaseRef<DB>>
 where
     DB: revm::DatabaseRef,
-    I: InspectorExt<WrapDatabaseRef<DB>>,
 {
     new_evm_with_inspector(WrapDatabaseRef(db), env, inspector)
 }

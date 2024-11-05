@@ -448,22 +448,27 @@ impl Executor {
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
-        let result_and_state = match self.zk_tx.take() {
-            None => backend.inspect(&mut env, &mut inspector)?,
-            Some(zk_tx) => {
-                // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
-                env.block = self.env.block.clone();
-                env.tx.gas_price = self.env.tx.gas_price;
-                backend.inspect_ref_zk(
-                    &mut env,
-                    // this will persist the added factory deps,
-                    // no need to commit them later
-                    &mut self.zk_persisted_factory_deps,
-                    Some(zk_tx.factory_deps),
-                )?
-            }
-        };
+        let strategy = backend.strategy.clone();
+        let extra = self.zk_tx.take().map(|zk_tx| serde_json::to_vec(&zk_tx).unwrap());
+        let result_and_state =
+            strategy.lock().unwrap().inspect(backend, &mut env, &mut inspector, extra)?;
+
+        // let result_and_state = match self.zk_tx.take() {
+        //     None => backend.inspect(&mut env, &mut inspector, &[])?,
+        //     Some(zk_tx) => {
+        //         // apply fork-related env instead of cheatcode handler
+        //         // since it won't be run inside zkvm
+        //         env.block = self.env.block.clone();
+        //         env.tx.gas_price = self.env.tx.gas_price;
+        //         backend.inspect_ref_zk(
+        //             &mut env,
+        //             // this will persist the added factory deps,
+        //             // no need to commit them later
+        //             &mut self.zk_persisted_factory_deps,
+        //             Some(zk_tx.factory_deps),
+        //         )?
+        //     }
+        // };
         let mut result = convert_executed_result(
             env,
             inspector,

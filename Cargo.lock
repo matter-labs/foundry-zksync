@@ -4618,8 +4618,10 @@ dependencies = [
  "foundry-evm",
  "foundry-evm-abi",
  "foundry-linking",
+ "foundry-strategy",
  "foundry-test-utils",
  "foundry-wallets",
+ "foundry-zksync",
  "foundry-zksync-compiler",
  "foundry-zksync-core",
  "futures 0.3.31",
@@ -5272,6 +5274,7 @@ dependencies = [
  "proptest",
  "revm",
  "revm-inspectors",
+ "serde_json",
  "thiserror",
  "tracing",
 ]
@@ -5442,6 +5445,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "foundry-strategy"
+version = "0.0.2"
+dependencies = [
+ "foundry-evm-core",
+]
+
+[[package]]
 name = "foundry-test-utils"
 version = "0.0.2"
 dependencies = [
@@ -5495,6 +5505,25 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "foundry-zksync"
+version = "0.0.2"
+dependencies = [
+ "alloy-primitives",
+ "eyre",
+ "foundry-common",
+ "foundry-compilers",
+ "foundry-evm-core",
+ "foundry-evm-traces",
+ "foundry-strategy",
+ "foundry-zksync-core",
+ "revm",
+ "revm-inspectors",
+ "serde",
+ "serde_json",
  "tracing",
 ]
 
