@@ -30,7 +30,6 @@ use foundry_cheatcodes_common::{
     record::RecordAccess,
 };
 use foundry_common::{evm::Breakpoints, TransactionMaybeSigned, SELECTOR_LEN};
-use foundry_config::Config;
 use foundry_evm_core::{
     abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
     backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
@@ -109,7 +108,7 @@ pub trait CheatcodesExecutor {
             evm.context.evm.inner.journaled_state.depth += 1;
 
             // Handle EOF bytecode
-            let first_frame_or_result = if evm.handler.cfg.spec_id.is_enabled_in(SpecId::PRAGUE_EOF) &&
+            let first_frame_or_result = if evm.handler.cfg.spec_id.is_enabled_in(SpecId::OSAKA) &&
                 inputs.scheme == CreateScheme::Create &&
                 inputs.init_code.starts_with(&EOF_MAGIC_BYTES)
             {
@@ -1442,27 +1441,25 @@ where {
         // At the root call to test function or script `run()`/`setUp()` functions, we are
         // decreasing sender nonce to ensure that it matches on-chain nonce once we start
         // broadcasting.
-        if ecx_inner.journaled_state.depth == 0 {
-            let sender = ecx_inner.env.tx.caller;
-            if sender != Config::DEFAULT_SENDER {
-                let account = match super::evm::journaled_account(ecx_inner, sender) {
-                    Ok(account) => account,
-                    Err(err) => {
-                        return Some(CallOutcome {
-                            result: InterpreterResult {
-                                result: InstructionResult::Revert,
-                                output: err.abi_encode().into(),
-                                gas,
-                            },
-                            memory_offset: call.return_memory_offset.clone(),
-                        })
-                    }
-                };
-                let prev = account.info.nonce;
-                account.info.nonce = prev.saturating_sub(1);
+        if ecx.journaled_state.depth == 0 {
+            let sender = ecx.env.tx.caller;
+            let account = match super::evm::journaled_account(ecx, sender) {
+                Ok(account) => account,
+                Err(err) => {
+                    return Some(CallOutcome {
+                        result: InterpreterResult {
+                            result: InstructionResult::Revert,
+                            output: err.abi_encode().into(),
+                            gas,
+                        },
+                        memory_offset: call.return_memory_offset.clone(),
+                    })
+                }
+            };
+            let prev = account.info.nonce;
+            account.info.nonce = prev.saturating_sub(1);
 
-                trace!(target: "cheatcodes", %sender, nonce=account.info.nonce, prev, "corrected nonce");
-            }
+            trace!(target: "cheatcodes", %sender, nonce=account.info.nonce, prev, "corrected nonce");
         }
 
         if call.target_address == CHEATCODE_ADDRESS {

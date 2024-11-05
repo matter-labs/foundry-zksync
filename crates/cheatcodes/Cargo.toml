@@ -30,6 +30,7 @@ foundry-config.workspace = true
 foundry-evm-core.workspace = true
 foundry-evm-traces.workspace = true
 foundry-wallets.workspace = true
+forge-script-sequence.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compiler.workspace = true
 foundry-zksync-inspectors.workspace = true
