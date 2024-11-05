@@ -120,7 +120,9 @@ impl VerificationProvider for ZkVerificationProvider {
         let verification_status =
             self.retry_verification_status(&client, &url, max_retries, delay_in_seconds).await?;
 
-        self.process_status_response(Some(verification_status))
+        self.process_status_response(Some(verification_status), &url)?;
+
+        Ok(())
     }
 }
 
@@ -235,13 +237,10 @@ impl ZkVerificationProvider {
             let resp: ContractVerificationStatusResponse = serde_json::from_str(&text)?;
 
             if resp.error_exists() {
-                eyre::bail!("Verification error: {}", resp.get_error());
-            }
-            if resp.is_verification_success() {
                 return Ok(resp);
             }
-            if resp.is_verification_failure() {
-                eyre::bail!("Verification failed: {}", resp.get_error());
+            if resp.is_verification_success() || resp.is_verification_failure() {
+                return Ok(resp);
             }
             if resp.is_pending() || resp.is_queued() {
                 if retries >= max_retries {
@@ -260,15 +259,18 @@ impl ZkVerificationProvider {
     fn process_status_response(
         &self,
         response: Option<ContractVerificationStatusResponse>,
+        verification_url: &str,
     ) -> Result<()> {
+        trace!("Processing verification status response. {:?}", response);
+
         if let Some(resp) = response {
             match resp.status {
                 VerificationStatusEnum::Successful => {
                     println!("Verification was successful.");
                 }
                 VerificationStatusEnum::Failed => {
-                    let error_message = resp.get_error();
-                    eyre::bail!("Verification failed: {}", error_message);
+                    let error_message = resp.get_error(verification_url);
+                    eyre::bail!("Verification failed:\n\n{}", error_message);
                 }
                 VerificationStatusEnum::Queued => {
                     println!("Verification is queued.");
@@ -303,6 +305,7 @@ pub enum VerificationStatusEnum {
 pub struct ContractVerificationStatusResponse {
     pub status: VerificationStatusEnum,
     pub error: Option<String>,
+    #[serde(rename = "compilationErrors")]
     pub compilation_errors: Option<Vec<String>>,
 }
 
@@ -310,18 +313,31 @@ impl ContractVerificationStatusResponse {
     pub fn error_exists(&self) -> bool {
         self.error.is_some() || self.compilation_errors.is_some()
     }
-    pub fn get_error(&self) -> String {
-        let mut errors = String::new();
+    pub fn get_error(&self, verification_url: &str) -> String {
+        let mut error_message = String::new();
 
         if let Some(ref error) = self.error {
-            errors.push_str(error);
+            error_message.push_str("Error:\n");
+            error_message.push_str(error);
         }
 
+        // Detailed compilation errors, if any
         if let Some(ref compilation_errors) = self.compilation_errors {
-            errors.push_str(&compilation_errors.join("\n"));
+            if !compilation_errors.is_empty() {
+                let detailed_errors = compilation_errors
+                    .iter()
+                    .map(|e| format!("- {e}"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                error_message.push_str("\n\nError Details:\n");
+                error_message.push_str(&detailed_errors);
+            }
         }
 
-        errors
+        error_message.push_str("\n\nView verification response:\n");
+        error_message.push_str(verification_url);
+
+        error_message.trim_end().to_string()
     }
     pub fn is_pending(&self) -> bool {
         matches!(self.status, VerificationStatusEnum::InProgress)
