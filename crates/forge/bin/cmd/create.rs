@@ -150,9 +150,7 @@ impl CreateArgs {
             let config = self.opts.try_load_config_emit_warnings()?;
             let zk_project =
                 foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
-            let zk_compiler = ProjectCompiler::new()
-                .quiet(self.json || self.opts.silent)
-                .files([target_path.clone()]);
+            let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
             let mut zk_output =
                 zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
 
@@ -647,7 +645,7 @@ impl CreateArgs {
         let (deployed_contract, receipt) = deployer.send_with_receipt_zk(zk_signer).await?;
 
         let address = deployed_contract;
-        if self.json {
+        if shell::is_json() {
             let output = json!({
                 "deployer": deployer_address.to_string(),
                 "deployedTo": address.to_string(),

@@ -109,7 +109,7 @@ dependencies = [
 [[package]]
 name = "alloy-consensus"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -118,14 +118,13 @@ dependencies = [
  "auto_impl",
  "c-kzg",
  "derive_more 1.0.0",
- "k256 0.13.4",
  "serde",
 ]
 
 [[package]]
 name = "alloy-contract"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -194,7 +193,7 @@ dependencies = [
 [[package]]
 name = "alloy-eips"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-eip2930",
  "alloy-eip7702",
@@ -211,7 +210,7 @@ dependencies = [
 [[package]]
 name = "alloy-genesis"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-primitives",
  "alloy-serde",
@@ -233,7 +232,7 @@ dependencies = [
 [[package]]
 name = "alloy-json-rpc"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -246,7 +245,7 @@ dependencies = [
 [[package]]
 name = "alloy-network"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -260,15 +259,13 @@ dependencies = [
  "async-trait",
  "auto_impl",
  "futures-utils-wasm",
- "serde",
- "serde_json",
  "thiserror",
 ]
 
 [[package]]
 name = "alloy-network-primitives"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -312,7 +309,7 @@ dependencies = [
 [[package]]
 name = "alloy-provider"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -347,13 +344,13 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "wasmtimer",
+ "wasmtimer 0.2.1",
 ]
 
 [[package]]
 name = "alloy-pubsub"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-json-rpc",
  "alloy-primitives",
@@ -393,7 +390,7 @@ dependencies = [
 [[package]]
 name = "alloy-rpc-client"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-json-rpc",
  "alloy-primitives",
@@ -412,13 +409,13 @@ dependencies = [
  "tower 0.5.1",
  "tracing",
  "url",
- "wasmtimer",
+ "wasmtimer 0.2.1",
 ]
 
 [[package]]
 name = "alloy-rpc-types"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-anvil",
@@ -433,10 +430,9 @@ dependencies = [
 [[package]]
 name = "alloy-rpc-types-anvil"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-primitives",
- "alloy-rpc-types-eth",
  "alloy-serde",
  "serde",
 ]
@@ -444,7 +440,7 @@ dependencies = [
 [[package]]
 name = "alloy-rpc-types-engine"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -461,7 +457,7 @@ dependencies = [
 [[package]]
 name = "alloy-rpc-types-eth"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -479,7 +475,7 @@ dependencies = [
 [[package]]
 name = "alloy-rpc-types-trace"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
@@ -492,7 +488,7 @@ dependencies = [
 [[package]]
 name = "alloy-rpc-types-txpool"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
@@ -503,7 +499,7 @@ dependencies = [
 [[package]]
 name = "alloy-serde"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-primitives",
  "serde",
@@ -513,7 +509,7 @@ dependencies = [
 [[package]]
 name = "alloy-signer"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -528,7 +524,7 @@ dependencies = [
 [[package]]
 name = "alloy-signer-aws"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -545,7 +541,7 @@ dependencies = [
 [[package]]
 name = "alloy-signer-gcp"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -562,7 +558,7 @@ dependencies = [
 [[package]]
 name = "alloy-signer-ledger"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -581,7 +577,7 @@ dependencies = [
 [[package]]
 name = "alloy-signer-local"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -599,7 +595,7 @@ dependencies = [
 [[package]]
 name = "alloy-signer-trezor"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-network",
@@ -701,7 +697,7 @@ dependencies = [
  "tower 0.5.1",
  "tracing",
  "url",
- "wasmtimer",
+ "wasmtimer 0.4.0",
 ]
 
 [[package]]
@@ -13494,6 +13490,20 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "wasmtimer"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7ed9d8b15c7fb594d72bfb4b5a276f3d2029333cd93a932f376f5937f6f80ee"
+dependencies = [
+ "futures 0.3.31",
+ "js-sys",
+ "parking_lot 0.12.3",
+ "pin-utils",
+ "slab",
+ "wasm-bindgen",
 ]
 
 [[package]]

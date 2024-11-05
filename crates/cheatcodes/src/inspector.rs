@@ -1441,9 +1441,9 @@ where {
         // At the root call to test function or script `run()`/`setUp()` functions, we are
         // decreasing sender nonce to ensure that it matches on-chain nonce once we start
         // broadcasting.
-        if ecx.journaled_state.depth == 0 {
-            let sender = ecx.env.tx.caller;
-            let account = match super::evm::journaled_account(ecx, sender) {
+        if ecx_inner.journaled_state.depth == 0 {
+            let sender = ecx_inner.env.tx.caller;
+            let account = match super::evm::journaled_account(ecx_inner, sender) {
                 Ok(account) => account,
                 Err(err) => {
                     return Some(CallOutcome {
