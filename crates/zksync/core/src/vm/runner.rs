@@ -269,21 +269,23 @@ where
     <DB as Database>::Error: Debug,
 {
     let value = ecx.env.tx.value.to_u256();
-    let balance = ZKVMData::new(ecx).get_balance(caller);
-    if balance.is_zero() {
-        error!("balance is 0 for {caller:?}, transaction will fail");
-    }
-    let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
-
     let use_paymaster = !paymaster_params.paymaster.is_zero();
 
-    // We check if the paymaster is set, if it is not set, we use the proposed gas limit
-    let gas_limit = if use_paymaster {
-        ecx.env.tx.gas_limit.into()
+    // Get balance of either paymaster or caller depending on who's paying
+    let address = if use_paymaster {
+        Address::from_slice(paymaster_params.paymaster.as_bytes())
     } else {
-        fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance)
+        caller
     };
+    let balance = ZKVMData::new(ecx).get_balance(address);
 
+    if balance.is_zero() {
+        error!("balance is 0 for {}, transaction will fail", address.to_h160());
+    }
+
+    let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
+
+    let gas_limit = fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
     (gas_limit, max_fee_per_gas)
 }
 
