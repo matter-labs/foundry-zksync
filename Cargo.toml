@@ -241,16 +241,16 @@ anstyle = "1.0.8"
 terminal_size = "0.4"
 
 ## zksync
-era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "56c4e92693b5dd5ab166e368b066d9169b438855" }
+era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "94503847b402f0161c3372d5f357a4cb16a2d66d" }
 zksync-web3-rs = {git = "https://github.com/jrigada/zksync-web3-rs.git", rev = "bc3e6d3e75b7ff3747ff2dccefa9fb74d770931b"}
 # zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "56653345d14331e0865a6785c77cdda63c94eeba"}
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "cfbcc11be0826e8c55fafa84ae01b2aead25d127" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "cfbcc11be0826e8c55fafa84ae01b2aead25d127" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "cfbcc11be0826e8c55fafa84ae01b2aead25d127" }
-zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "cfbcc11be0826e8c55fafa84ae01b2aead25d127" }
-zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "cfbcc11be0826e8c55fafa84ae01b2aead25d127" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "cfbcc11be0826e8c55fafa84ae01b2aead25d127" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "cfbcc11be0826e8c55fafa84ae01b2aead25d127" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
+zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
 
 # macros
 proc-macro2 = "1.0.82"
