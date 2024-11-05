@@ -65,6 +65,10 @@ url.workspace = true
 walkdir.workspace = true
 yansi.workspace = true
 
+anstream.workspace = true
+anstyle.workspace = true
+terminal_size.workspace = true
+
 # zksync
 globset = "0.4"
 
