@@ -74,7 +74,7 @@ contract TestPaymasterFlow is Test {
         vm.deal(address(do_stuff), 1 ether);
         require(address(alice).balance == 0, "Balance is not 0 ether");
         vm.prank(alice, alice);
-        
+
         do_stuff.do_stuff(bob);
     }
 }

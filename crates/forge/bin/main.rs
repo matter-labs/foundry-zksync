@@ -83,12 +83,15 @@ fn main() -> Result<()> {
         ForgeSubcommand::Clean { root } => {
             let config = utils::load_config_with_root(root.as_deref());
             let project = config.project()?;
+            let zk_project =
+                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
             config.cleanup(&project)?;
+            config.cleanup(&zk_project)?;
             Ok(())
         }
         ForgeSubcommand::Snapshot(cmd) => {
             if cmd.is_watch() {
-                utils::block_on(watch::watch_snapshot(cmd))
+                utils::block_on(watch::watch_gas_snapshot(cmd))
             } else {
                 utils::block_on(cmd.run())
             }
@@ -118,7 +121,7 @@ fn main() -> Result<()> {
         ForgeSubcommand::Generate(cmd) => match cmd.sub {
             GenerateSubcommands::Test(cmd) => cmd.run(),
         },
-        ForgeSubcommand::Soldeer(cmd) => cmd.run(),
+        ForgeSubcommand::Soldeer(cmd) => utils::block_on(cmd.run()),
         ForgeSubcommand::Eip712(cmd) => cmd.run(),
         ForgeSubcommand::BindJson(cmd) => cmd.run(),
     }

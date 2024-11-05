@@ -43,6 +43,7 @@ use std::{
     sync::Arc,
 };
 use zksync_types::H256;
+use zksync_web3_rs::eip712::PaymasterParams;
 
 merge_impl_figment_convert!(CreateArgs, opts, eth);
 
@@ -115,6 +116,7 @@ pub struct ZkSyncData {
     bytecode: Vec<u8>,
     bytecode_hash: H256,
     factory_deps: Vec<Vec<u8>>,
+    paymaster_params: Option<PaymasterParams>,
 }
 
 impl CreateArgs {
@@ -126,6 +128,22 @@ impl CreateArgs {
 
         let zksync = self.opts.compiler.zk.enabled();
         if zksync {
+            let paymaster_params =
+                if let Some(paymaster_address) = self.opts.compiler.zk.paymaster_address {
+                    Some(PaymasterParams {
+                        paymaster: paymaster_address,
+                        paymaster_input: self
+                            .opts
+                            .compiler
+                            .zk
+                            .paymaster_input
+                            .clone()
+                            .unwrap_or_default()
+                            .to_vec(),
+                    })
+                } else {
+                    None
+                };
             let target_path = if let Some(ref mut path) = self.contract.path {
                 canonicalize(project.root().join(path))?
             } else {
@@ -224,7 +242,7 @@ impl CreateArgs {
                 visited_bytecodes.insert(bytecode.clone());
                 visited_bytecodes.into_iter().collect()
             };
-            let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps };
+            let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps, paymaster_params };
 
             return if self.unlocked {
                 // Deploy with unlocked account
@@ -242,11 +260,11 @@ impl CreateArgs {
                 .await
             } else {
                 // Deploy with signer
-                let signer = self.eth.wallet.signer().await?;
-                let deployer = signer.address();
-                let provider = ProviderBuilder::<_, _, Zksync>::default()
-                    .wallet(ZksyncWallet::new(signer))
-                    .on_provider(provider);
+                // Avoid initializing `signer` twice as it will error out with Ledger
+                // and potentially other devices that rely on HID too
+                let zk_signer = self.eth.wallet.signer().await?;
+                let deployer = zk_signer.address();
+                let provider = ProviderBuilder::<_, _, Zksync>::default().wallet(ZksyncWallet::new(signer)).on_provider(provider);
                 self.deploy_zk(
                     abi,
                     bin.object,
@@ -499,8 +517,11 @@ impl CreateArgs {
 
         println!("Starting contract verification...");
 
-        let num_of_optimizations =
-            if self.opts.compiler.optimize { self.opts.compiler.optimizer_runs } else { None };
+        let num_of_optimizations = if self.opts.compiler.optimize.unwrap_or_default() {
+            self.opts.compiler.optimizer_runs
+        } else {
+            None
+        };
         let verify = forge_verify::VerifyArgs {
             address,
             contract: Some(self.contract),
@@ -619,7 +640,7 @@ impl CreateArgs {
             .unwrap_or_default();
 
         deployer.tx.set_gas_limit(if let Some(gas_limit) = self.tx.gas_limit {
-            gas_limit.to::<u128>()
+            gas_limit.to::<u64>()
         } else {
             fee.gas_limit.saturating_to::<u128>()
         });
@@ -661,8 +682,11 @@ impl CreateArgs {
 
         println!("Starting contract verification...");
 
-        let num_of_optimizations =
-            if self.opts.compiler.optimize { self.opts.compiler.optimizer_runs } else { None };
+        let num_of_optimizations = if self.opts.compiler.optimize.unwrap_or_default() {
+            self.opts.compiler.optimizer_runs
+        } else {
+            None
+        };
         let verify = forge_verify::VerifyArgs {
             address,
             contract: Some(self.contract),
@@ -788,6 +812,7 @@ pub struct Deployer<B, P, T> {
     confs: usize,
     timeout: u64,
     zk_factory_deps: Option<Vec<Vec<u8>>>,
+    zk_paymaster_params: Option<PaymasterParams>,
     _p: PhantomData<P>,
     _t: PhantomData<T>,
 }
@@ -804,6 +829,7 @@ where
             confs: self.confs,
             timeout: self.timeout,
             zk_factory_deps: self.zk_factory_deps.clone(),
+            zk_paymaster_params: self.zk_paymaster_params.clone(),
             _p: PhantomData,
             _t: PhantomData,
         }
@@ -1009,6 +1035,7 @@ where
             confs: 1,
             timeout: self.timeout,
             zk_factory_deps: None,
+            zk_paymaster_params: None,
             _p: PhantomData,
             _t: PhantomData,
         })

@@ -3,7 +3,11 @@
 use crate::constants::TEMPLATE_CONTRACT;
 use alloy_primitives::{hex, Address, Bytes};
 use anvil::{spawn, NodeConfig};
-use foundry_test_utils::{rpc, util::OutputExt, ScriptOutcome, ScriptTester};
+use foundry_test_utils::{
+    rpc,
+    util::{OutputExt, OTHER_SOLC_VERSION, SOLC_VERSION},
+    ScriptOutcome, ScriptTester,
+};
 use regex::Regex;
 use serde_json::Value;
 use std::{env, path::PathBuf, str::FromStr};
@@ -930,7 +934,7 @@ forgetest_async!(check_broadcast_log, |prj, cmd| {
 
     // Check broadcast logs
     // Ignore timestamp, blockHash, blockNumber, cumulativeGasUsed, effectiveGasPrice,
-    // transactionIndex and logIndex values since they can change inbetween runs
+    // transactionIndex and logIndex values since they can change in between runs
     let re = Regex::new(r#"((timestamp":).[0-9]*)|((blockHash":).*)|((blockNumber":).*)|((cumulativeGasUsed":).*)|((effectiveGasPrice":).*)|((transactionIndex":).*)|((logIndex":).*)"#).unwrap();
 
     let fixtures_log = std::fs::read_to_string(
@@ -954,7 +958,7 @@ forgetest_async!(check_broadcast_log, |prj, cmd| {
     // );
 
     // Check sensitive logs
-    // Ignore port number since it can change inbetween runs
+    // Ignore port number since it can change in between runs
     let re = Regex::new(r":[0-9]+").unwrap();
 
     let fixtures_log = std::fs::read_to_string(
@@ -1012,7 +1016,7 @@ forgetest_async!(can_execute_script_with_arguments, |prj, cmd| {
 Target directory is not empty, but `--force` was specified
 Initializing [..]...
 Installing forge-std in [..] (url: Some("https://github.com/foundry-rs/forge-std"), tag: None)
-    Installed forge-std [..]
+    Installed forge-std[..]
     Initialized forge project
 
 "#]]);
@@ -1134,7 +1138,7 @@ forgetest_async!(can_execute_script_with_arguments_nested_deploy, |prj, cmd| {
 Target directory is not empty, but `--force` was specified
 Initializing [..]...
 Installing forge-std in [..] (url: Some("https://github.com/foundry-rs/forge-std"), tag: None)
-    Installed forge-std [..]
+    Installed forge-std[..]
     Initialized forge project
 
 "#]]);
@@ -1301,7 +1305,7 @@ forgetest_async!(assert_tx_origin_is_not_overritten, |prj, cmd| {
 Target directory is not empty, but `--force` was specified
 Initializing [..]...
 Installing forge-std in [..] (url: Some("https://github.com/foundry-rs/forge-std"), tag: None)
-    Installed forge-std [..]
+    Installed forge-std[..]
     Initialized forge project
 
 "#]]);
@@ -1382,7 +1386,7 @@ forgetest_async!(assert_can_create_multiple_contracts_with_correct_nonce, |prj, 
 Target directory is not empty, but `--force` was specified
 Initializing [..]...
 Installing forge-std in [..] (url: Some("https://github.com/foundry-rs/forge-std"), tag: None)
-    Installed forge-std [..]
+    Installed forge-std[..]
     Initialized forge project
 
 "#]]);
@@ -1520,36 +1524,45 @@ forgetest_async!(can_detect_contract_when_multiple_versions, |prj, cmd| {
 
     prj.add_script(
         "A.sol",
-        r#"pragma solidity 0.8.20;
+        &format!(
+            r#"
+pragma solidity {SOLC_VERSION};
 import "./B.sol";
 
-contract ScriptA {}
-"#,
+contract ScriptA {{}}
+"#
+        ),
     )
     .unwrap();
 
     prj.add_script(
         "B.sol",
-        r#"pragma solidity >=0.8.5 <=0.8.20;
+        &format!(
+            r#"
+pragma solidity >={OTHER_SOLC_VERSION} <={SOLC_VERSION};
 import 'forge-std/Script.sol';
 
-contract ScriptB is Script {
-    function run() external {
+contract ScriptB is Script {{
+    function run() external {{
         vm.broadcast();
         address(0).call("");
-    }
-}
-"#,
+    }}
+}}
+"#
+        ),
     )
     .unwrap();
 
     prj.add_script(
         "C.sol",
-        r#"pragma solidity 0.8.5;
+        &format!(
+            r#"
+pragma solidity {OTHER_SOLC_VERSION};
 import "./B.sol";
 
-contract ScriptC {}
-"#,
+contract ScriptC {{}}
+"#
+        ),
     )
     .unwrap();
 
@@ -1607,7 +1620,7 @@ forgetest_async!(can_decode_custom_errors, |prj, cmd| {
 Target directory is not empty, but `--force` was specified
 Initializing [..]...
 Installing forge-std in [..] (url: Some("https://github.com/foundry-rs/forge-std"), tag: None)
-    Installed forge-std [..]
+    Installed forge-std[..]
     Initialized forge project
 
 "#]]);
@@ -2093,4 +2106,151 @@ contract DeployScript is Script {
     let transactions: ZkTransactions = serde_json::from_str(&content).unwrap();
     let transactions = transactions.transactions;
     assert_eq!(transactions.len(), 3);
+});
+
+// <https://github.com/foundry-rs/foundry/issues/8993>
+forgetest_async!(test_broadcast_raw_create2_deployer, |prj, cmd| {
+    let (_api, handle) =
+        spawn(NodeConfig::test().with_disable_default_create2_deployer(true)).await;
+
+    foundry_test_utils::util::initialize(prj.root());
+    prj.add_script(
+        "Foo",
+        r#"
+import "forge-std/Script.sol";
+
+contract SimpleScript is Script {
+    function run() external {
+        // send funds to create2 factory deployer
+        vm.broadcast();
+        payable(0x3fAB184622Dc19b6109349B94811493BF2a45362).transfer(10000000 gwei);
+        // deploy create2 factory
+        vm.broadcastRawTransaction(
+            hex"f8a58085174876e800830186a08080b853604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf31ba02222222222222222222222222222222222222222222222222222222222222222a02222222222222222222222222222222222222222222222222222222222222222"
+        );
+    }
+}
+   "#,
+    )
+    .unwrap();
+
+    cmd.args([
+        "script",
+        "--private-key",
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        "--rpc-url",
+        &handle.http_endpoint(),
+        "--broadcast",
+        "SimpleScript",
+    ]);
+
+    cmd.assert_success().stdout_eq(str![[r#"
+[COMPILING_FILES] with [SOLC_VERSION]
+[SOLC_VERSION] [ELAPSED]
+Compiler run successful!
+Script ran successfully.
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 31337
+
+[ESTIMATED_GAS_PRICE]
+
+[ESTIMATED_TOTAL_GAS_USED]
+
+[ESTIMATED_AMOUNT_REQUIRED]
+
+==========================
+
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+
+[SAVED_TRANSACTIONS]
+
+[SAVED_SENSITIVE_VALUES]
+
+
+"#]]);
+});
+
+forgetest_init!(can_get_script_wallets, |prj, cmd| {
+    let script = prj
+        .add_source(
+            "Foo",
+            r#"
+import "forge-std/Script.sol";
+
+interface Vm {
+    function getWallets() external returns (address[] memory wallets);
+}
+
+contract WalletScript is Script {
+    function run() public {
+        address[] memory wallets = Vm(address(vm)).getWallets();
+        console.log(wallets[0]);
+    }
+}"#,
+        )
+        .unwrap();
+    cmd.arg("script")
+        .arg(script)
+        .args([
+            "--private-key",
+            "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6",
+            "-v",
+        ])
+        .assert_success()
+        .stdout_eq(str![[r#"
+[COMPILING_FILES] with [SOLC_VERSION]
+[SOLC_VERSION] [ELAPSED]
+Compiler run successful!
+Script ran successfully.
+[GAS]
+
+== Logs ==
+  0xa0Ee7A142d267C1f36714E4a8F75612F20a79720
+
+"#]]);
+});
+
+forgetest_init!(can_remeber_keys, |prj, cmd| {
+    let script = prj
+        .add_source(
+            "Foo",
+            r#"
+import "forge-std/Script.sol";
+
+interface Vm {
+    function rememberKeys(string calldata mnemonic, string calldata derivationPath, uint32 count) external returns (address[] memory keyAddrs);
+}
+
+contract WalletScript is Script {
+    function run() public {
+        string memory mnemonic = "test test test test test test test test test test test junk";
+        string memory derivationPath = "m/44'/60'/0'/0/";
+        address[] memory wallets = Vm(address(vm)).rememberKeys(mnemonic, derivationPath, 3);
+        for (uint256 i = 0; i < wallets.length; i++) {
+            console.log(wallets[i]);
+        }
+    }
+}"#,
+        )
+        .unwrap();
+    cmd.arg("script").arg(script).assert_success().stdout_eq(str![[r#"
+[COMPILING_FILES] with [SOLC_VERSION]
+[SOLC_VERSION] [ELAPSED]
+Compiler run successful!
+Script ran successfully.
+[GAS]
+
+== Logs ==
+  0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+  0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+
+"#]]);
 });

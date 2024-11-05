@@ -71,6 +71,15 @@ jobs:
               shell: bash
               run: ./.github/scripts/format.sh --check
 
+    codespell:
+      runs-on: ubuntu-latest
+      timeout-minutes: 30
+      steps:
+        - uses: actions/checkout@v4
+        - uses: codespell-project/actions-codespell@v2
+          with:
+            skip: "*.json"
+
     crate-checks:
         runs-on: ubuntu-22.04-github-hosted-16core
         timeout-minutes: 60
@@ -109,7 +118,7 @@ jobs:
             log: info
             logFilePath: era_test_node.log
             target: x86_64-unknown-linux-gnu
-            releaseTag: v0.1.0-alpha.25
+            releaseTag: v0.1.0-alpha.29
 
         - name: Run zk tests
           env:

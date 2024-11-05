@@ -1,9 +1,6 @@
 use super::{
-    multi_sequence::MultiChainSequence,
-    providers::ProvidersManager,
-    runner::ScriptRunner,
-    sequence::{ScriptSequence, ScriptSequenceKind},
-    transaction::TransactionWithMetadata,
+    multi_sequence::MultiChainSequence, providers::ProvidersManager, runner::ScriptRunner,
+    sequence::ScriptSequenceKind, transaction::ScriptTransactionBuilder,
 };
 use crate::{
     broadcast::{estimate_gas, BundledState},
@@ -13,17 +10,18 @@ use crate::{
     ScriptArgs, ScriptConfig, ScriptResult,
 };
 use alloy_network::TransactionBuilder;
-use alloy_primitives::{utils::format_units, Address, Bytes, TxKind, U256};
+use alloy_primitives::{map::HashMap, utils::format_units, Address, Bytes, TxKind, U256};
 use dialoguer::Confirm;
 use eyre::{Context, Result};
-use foundry_cheatcodes::ScriptWallets;
+use forge_script_sequence::{ScriptSequence, TransactionWithMetadata};
+use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_different_gas_calc, now};
 use foundry_common::{get_contract_name, shell, ContractData};
 use foundry_evm::traces::{decode_trace_arena, render_trace_arena};
 use futures::future::{join_all, try_join_all};
 use parking_lot::RwLock;
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, VecDeque},
     sync::Arc,
 };
 use yansi::Paint;
@@ -36,7 +34,7 @@ use yansi::Paint;
 pub struct PreSimulationState {
     pub args: ScriptArgs,
     pub script_config: ScriptConfig,
-    pub script_wallets: ScriptWallets,
+    pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub execution_data: ExecutionData,
     pub execution_result: ScriptResult,
@@ -60,13 +58,19 @@ impl PreSimulationState {
             .into_iter()
             .map(|tx| {
                 let rpc = tx.rpc.expect("missing broadcastable tx rpc url");
-                TransactionWithMetadata::new(
-                    tx.transaction,
-                    rpc,
-                    &address_to_abi,
-                    &self.execution_artifacts.decoder,
-                    tx.zk_tx,
-                )
+                let sender = tx.transaction.from().expect("all transactions should have a sender");
+                let nonce = tx.transaction.nonce().expect("all transactions should have a sender");
+                let to = tx.transaction.to();
+
+                let mut builder = ScriptTransactionBuilder::new(tx.transaction, rpc, tx.zk_tx);
+
+                if let Some(TxKind::Call(_)) = to {
+                    builder.set_call(&address_to_abi, &self.execution_artifacts.decoder)?;
+                } else {
+                    builder.set_create(false, sender.create(nonce), &address_to_abi)?;
+                }
+
+                Ok(builder.build())
             })
             .collect::<Result<VecDeque<_>>>()?;
 
@@ -109,10 +113,11 @@ impl PreSimulationState {
         // Executes all transactions from the different forks concurrently.
         let futs = transactions
             .into_iter()
-            .map(|transaction| async {
+            .map(|mut transaction| async {
                 let mut runner = runners.get(&transaction.rpc).expect("invalid rpc url").write();
 
-                let tx = &transaction.transaction;
+                let zk_metadata = transaction.zk.clone();
+                let tx = transaction.tx_mut();
                 let to = if let Some(TxKind::Call(to)) = tx.to() { Some(to) } else { None };
                 let result = runner
                     .simulate(
@@ -121,7 +126,7 @@ impl PreSimulationState {
                         to,
                         tx.input().map(Bytes::copy_from_slice),
                         tx.value(),
-                        (self.script_config.config.zksync.run_in_zk_mode(), transaction.zk.clone()),
+                        (self.script_config.config.zksync.run_in_zk_mode(), zk_metadata),
                     )
                     .wrap_err("Internal EVM error during simulation")?;
 
@@ -140,8 +145,9 @@ impl PreSimulationState {
                     false
                 };
 
-                let transaction =
-                    transaction.with_execution_result(&result, self.args.gas_estimate_multiplier);
+                let transaction = ScriptTransactionBuilder::from(transaction)
+                    .with_execution_result(&result, self.args.gas_estimate_multiplier)
+                    .build();
 
                 eyre::Ok((Some(transaction), is_noop_tx, result.traces))
             })
@@ -236,7 +242,7 @@ impl PreSimulationState {
 pub struct FilledTransactionsState {
     pub args: ScriptArgs,
     pub script_config: ScriptConfig,
-    pub script_wallets: ScriptWallets,
+    pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub execution_artifacts: ExecutionArtifacts,
     pub transactions: VecDeque<TransactionWithMetadata>,
@@ -255,7 +261,7 @@ impl FilledTransactionsState {
             eyre::bail!("Multi-chain deployment is not supported with libraries.");
         }
 
-        let mut total_gas_per_rpc: HashMap<String, u128> = HashMap::new();
+        let mut total_gas_per_rpc: HashMap<String, u128> = HashMap::default();
 
         // Batches sequence of transactions from different rpcs.
         let mut new_sequence = VecDeque::new();
@@ -267,10 +273,10 @@ impl FilledTransactionsState {
         let mut txes_iter = self.transactions.clone().into_iter().peekable();
 
         while let Some(mut tx) = txes_iter.next() {
-            let tx_rpc = tx.rpc.clone();
+            let tx_rpc = tx.rpc.to_owned();
             let provider_info = manager.get_or_init_provider(&tx.rpc, self.args.legacy).await?;
 
-            if let Some(tx) = tx.transaction.as_unsigned_mut() {
+            if let Some(tx) = tx.tx_mut().as_unsigned_mut() {
                 // Handles chain specific requirements for unsigned transactions.
                 tx.set_chain_id(provider_info.chain);
             }
@@ -420,7 +426,7 @@ impl FilledTransactionsState {
             })
             .collect();
 
-        Ok(ScriptSequence {
+        let sequence = ScriptSequence {
             transactions,
             returns: self.execution_artifacts.returns.clone(),
             receipts: vec![],
@@ -430,6 +436,7 @@ impl FilledTransactionsState {
             libraries,
             chain,
             commit,
-        })
+        };
+        Ok(sequence)
     }
 }

@@ -154,7 +154,7 @@ where
 
         let chain = utils::get_chain(config.chain, &provider).await?;
         let etherscan_api_key = config.get_etherscan_api_key(Some(chain));
-        let legacy = tx_opts.legacy || chain.is_legacy();
+        let legacy = tx_opts.legacy || chain.is_legacy() || config.zksync.run_in_zk_mode();
 
         if let Some(gas_limit) = tx_opts.gas_limit {
             tx.set_gas_limit(gas_limit.to());

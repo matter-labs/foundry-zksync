@@ -1,21 +1,17 @@
-<!--
-Thank you for your Pull Request. Please provide a description above and review
-the requirements below.
+# What :computer: 
+* First thing updated with this PR
+* Second thing updated with this PR
+* Third thing updated with this PR
 
-Bug fixes and new features should include tests.
--->
+# Why :hand:
+* Reason why first thing was added to PR
+* Reason why second thing was added to PR
+* Reason why third thing was added to PR
 
-## Motivation
+# Evidence :camera:
+Include screenshots, screen recordings, or `console` output here demonstrating that your changes work as intended
 
-<!--
-Explain the context and why you're making that change. What is the problem
-you're trying to solve? In some cases there is not a problem and this can be
-thought of as being the motivation for your change.
--->
+<!-- All sections below are optional. You can uncomment any section applicable to your Pull Request. -->
 
-## Solution
-
-<!--
-Summarize the solution and provide any necessary context needed to understand
-the code change.
--->
+<!-- # Notes :memo:
+* Any notes/thoughts that the reviewers should know prior to reviewing the code? -->

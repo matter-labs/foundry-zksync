@@ -253,9 +253,9 @@ impl VerifyBytecodeArgs {
 
             if let Some(ref block) = genesis_block {
                 configure_env_block(&mut env, block);
-                gen_tx.max_fee_per_gas = Some(block.header.base_fee_per_gas.unwrap_or_default());
+                gen_tx.max_fee_per_gas = block.header.base_fee_per_gas.map(|g| g as u128);
                 gen_tx.gas = block.header.gas_limit;
-                gen_tx.gas_price = Some(block.header.base_fee_per_gas.unwrap_or_default());
+                gen_tx.gas_price = block.header.base_fee_per_gas.map(|g| g as u128);
             }
 
             configure_tx_env(&mut env, &gen_tx);
@@ -468,7 +468,7 @@ impl VerifyBytecodeArgs {
                 &transaction,
             )?;
 
-            // State commited using deploy_with_env, now get the runtime bytecode from the db.
+            // State committed using deploy_with_env, now get the runtime bytecode from the db.
             let (fork_runtime_code, onchain_runtime_code) = crate::utils::get_runtime_codes(
                 &mut executor,
                 &provider,
