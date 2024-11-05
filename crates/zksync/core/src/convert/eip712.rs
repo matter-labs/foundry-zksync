@@ -56,39 +56,50 @@ impl ConvertEIP712Domain for EthersEip712Domain {
 }
 
 /// Wrapper around [`Eip712Transaction`] implementing [`SignableTransaction`]
-pub struct Eip712SignableTransaction(Eip712Transaction);
+#[derive(Debug)]
+pub struct Eip712SignableTransaction {
+    inner: Eip712Transaction,
+    input: alloy_primitives::Bytes,
+}
+
+impl Eip712SignableTransaction {
+    /// Creates a new `Eip712SignableTransaction` from an existing `Eip712Transaction`.
+    pub fn new(inner: Eip712Transaction) -> Self {
+        Self { input: alloy_primitives::Bytes::from_iter(inner.data.iter()), inner }
+    }
+}
 
 impl Transaction for Eip712SignableTransaction {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
-        Some(self.0.chain_id.as_u64())
+        Some(self.inner.chain_id.as_u64())
     }
 
     fn nonce(&self) -> u64 {
-        self.0.nonce.as_u64()
+        self.inner.nonce.as_u64()
     }
 
     fn gas_limit(&self) -> u64 {
-        self.0.gas_limit.as_u64()
+        self.inner.gas_limit.as_u64()
     }
 
     fn gas_price(&self) -> Option<u128> {
         None
     }
 
-    fn to(&self) -> alloy_primitives::TxKind {
-        alloy_primitives::TxKind::Call(self.0.to.to_address())
+    fn to(&self) -> Option<alloy_primitives::Address> {
+        Some(self.inner.to.to_address())
     }
 
     fn value(&self) -> alloy_primitives::U256 {
-        self.0.value.to_ru256()
+        self.inner.value.to_ru256()
     }
 
-    fn input(&self) -> &[u8] {
-        self.0.data.as_ref()
+    fn input(&self) -> &alloy_primitives::Bytes {
+        &self.input
     }
 
     fn max_fee_per_gas(&self) -> u128 {
-        self.0.max_fee_per_gas.low_u128()
+        self.inner.max_fee_per_gas.low_u128()
     }
 
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
@@ -100,7 +111,7 @@ impl Transaction for Eip712SignableTransaction {
     }
 
     fn priority_fee_or_price(&self) -> u128 {
-        self.0.max_priority_fee_per_gas.low_u128()
+        self.inner.max_priority_fee_per_gas.low_u128()
     }
 
     fn ty(&self) -> u8 {
@@ -118,21 +129,25 @@ impl Transaction for Eip712SignableTransaction {
     fn authorization_list(&self) -> Option<&[revm::primitives::SignedAuthorization]> {
         None
     }
+
+    fn kind(&self) -> alloy_primitives::TxKind {
+        alloy_primitives::TxKind::Call(self.inner.to.to_address())
+    }
 }
 
 impl SignableTransaction<Signature> for Eip712SignableTransaction {
     fn set_chain_id(&mut self, chain_id: alloy_primitives::ChainId) {
-        self.0.chain_id = chain_id.into();
+        self.inner.chain_id = chain_id.into();
     }
 
     fn encode_for_signing(&self, out: &mut dyn BufMut) {
         out.put_u8(0x19);
         out.put_u8(0x01);
 
-        let domain_separator = self.0.domain_separator().expect("able to get domain separator");
+        let domain_separator = self.inner.domain_separator().expect("able to get domain separator");
         out.put_slice(&domain_separator);
 
-        let struct_hash = self.0.struct_hash().expect("able to get struct hash");
+        let struct_hash = self.inner.struct_hash().expect("able to get struct hash");
         out.put_slice(&struct_hash);
     }
 
@@ -144,7 +159,7 @@ impl SignableTransaction<Signature> for Eip712SignableTransaction {
     where
         Self: Sized,
     {
-        let hash = self.0.encode_eip712().map(B256::from).expect("able to encode EIP712 hash");
+        let hash = self.inner.encode_eip712().map(B256::from).expect("able to encode EIP712 hash");
         alloy_consensus::Signed::new_unchecked(self, signature, hash)
     }
 }
@@ -162,7 +177,7 @@ impl ToSignable<Signature> for Eip712Transaction {
     type Signable = Eip712SignableTransaction;
 
     fn to_signable_tx(self) -> Self::Signable {
-        Eip712SignableTransaction(self)
+        Eip712SignableTransaction::new(self)
     }
 }
 
