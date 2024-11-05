@@ -76,6 +76,8 @@ pub struct BuildArgs {
 }
 
 impl BuildArgs {
+    // TODO(zk): We cannot return `ProjectCompileOutput` as there's currently no way to return
+    // a common type from solc and zksolc branches.
     pub fn run(self) -> Result<()> {
         let mut config = self.try_load_config_emit_warnings()?;
 
@@ -113,7 +115,10 @@ impl BuildArgs {
                 sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
             }
 
-            Ok(output)
+            // NOTE(zk): We skip returning output because currently there's no way to return from
+            // this function due to differing solc and zksolc project output types, and
+            // no way to return a default from either branch. Ok(output)
+            Ok(())
         } else {
             let format_json = shell::is_json();
             let zk_project =
@@ -122,8 +127,8 @@ impl BuildArgs {
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .zksync_sizes()
-                .quiet(self.format_json)
-                .bail(!self.format_json);
+                .quiet(format_json)
+                .bail(!format_json);
 
             let zk_output =
                 zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
@@ -131,7 +136,9 @@ impl BuildArgs {
                 println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
             }
 
-            Ok(zk_output)
+            // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
+            // solc output. This is safe currently as the output is simply dropped.
+            Ok(())
         }
     }
 
