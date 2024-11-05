@@ -5063,7 +5063,6 @@ dependencies = [
  "foundry-compilers",
  "foundry-config",
  "foundry-zksync-compiler",
- "globset",
  "num-format",
  "reqwest 0.12.8",
  "semver 1.0.23",

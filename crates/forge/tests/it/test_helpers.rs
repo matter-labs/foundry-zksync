@@ -483,7 +483,7 @@ pub fn get_zk_compiled(zk_project: &ZkProject) -> ZkProjectCompileOutput {
         write = Some(lock.write().unwrap());
     }
 
-    out = zk_compiler.zksync_compile(zk_project, None);
+    out = zk_compiler.zksync_compile(zk_project);
 
     if let Some(ref mut write) = write {
         write.write_all(b"1").unwrap();
