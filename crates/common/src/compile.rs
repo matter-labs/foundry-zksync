@@ -606,20 +606,21 @@ impl Display for SizeReport {
                 ((runtime_margin, runtime_color), (init_margin, init_color))
             } else {
                 let runtime_margin =
-                CONTRACT_RUNTIME_SIZE_LIMIT as isize - contract.runtime_size as isize;
-            let init_margin = CONTRACT_INITCODE_SIZE_LIMIT as isize - contract.init_size as isize;
+                    CONTRACT_RUNTIME_SIZE_LIMIT as isize - contract.runtime_size as isize;
+                let init_margin =
+                    CONTRACT_INITCODE_SIZE_LIMIT as isize - contract.init_size as isize;
 
-            let runtime_color = match contract.runtime_size {
-                ..18_000 => Color::Reset,
-                18_000..=CONTRACT_RUNTIME_SIZE_LIMIT => Color::Yellow,
-                _ => Color::Red,
-            };
+                let runtime_color = match contract.runtime_size {
+                    ..18_000 => Color::Reset,
+                    18_000..=CONTRACT_RUNTIME_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
 
-            let init_color = match contract.init_size {
-                ..36_000 => Color::Reset,
-                36_000..=CONTRACT_INITCODE_SIZE_LIMIT => Color::Yellow,
-                _ => Color::Red,
-            };
+                let init_color = match contract.init_size {
+                    ..36_000 => Color::Reset,
+                    36_000..=CONTRACT_INITCODE_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
 
                 ((runtime_margin, runtime_color), (init_margin, init_color))
             };
