@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf, str::FromStr};
+use std::{collections::HashSet, path::PathBuf};
 
 use clap::Parser;
 use foundry_compilers::zksolc::settings::{ZkSolcError, ZkSolcWarning};
@@ -127,19 +127,21 @@ pub struct ZkSyncArgs {
     #[clap(
         long = "zk-suppressed-warnings",
         visible_alias = "suppressed-warnings",
-        value_delimiter = ','
+        value_delimiter = ',',
+        help = "Set the warnings to suppress for zksolc, possible values: [txorigin]"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub suppressed_warnings: Option<Vec<String>>,
+    pub suppressed_warnings: Option<Vec<ZkSolcWarning>>,
 
     /// Set the errors to suppress for zksolc.
     #[clap(
         long = "zk-suppressed-errors",
         visible_alias = "suppressed-errors",
-        value_delimiter = ','
+        value_delimiter = ',',
+        help = "Set the errors to suppress for zksolc, possible values: [sendtransfer]"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub suppressed_errors: Option<Vec<String>>,
+    pub suppressed_errors: Option<Vec<ZkSolcError>>,
 }
 
 impl ZkSyncArgs {
@@ -176,27 +178,13 @@ impl ZkSyncArgs {
             self.optimizer_mode.as_ref().and_then(|mode| mode.parse::<char>().ok()),
             zksync.optimizer_mode
         );
-        let suppressed_warnings = self.suppressed_warnings.clone().map(|values| {
-            values
-                .into_iter()
-                .map(|value| {
-                    ZkSolcWarning::from_str(&value).unwrap_or_else(|s| {
-                        panic!("failed parsing suppressed warning '{value}': {s}")
-                    })
-                })
-                .collect::<HashSet<ZkSolcWarning>>()
-        });
+        let suppressed_warnings = self
+            .suppressed_warnings
+            .clone()
+            .map(|values| values.into_iter().collect::<HashSet<_>>());
         set_if_some!(suppressed_warnings, zksync.suppressed_warnings);
-        let suppressed_errors = self.suppressed_errors.clone().map(|values| {
-            values
-                .into_iter()
-                .map(|value| {
-                    ZkSolcError::from_str(&value).unwrap_or_else(|s| {
-                        panic!("failed parsing suppressed error '{value}': {s}")
-                    })
-                })
-                .collect::<HashSet<ZkSolcError>>()
-        });
+        let suppressed_errors =
+            self.suppressed_errors.clone().map(|values| values.into_iter().collect::<HashSet<_>>());
         set_if_some!(suppressed_errors, zksync.suppressed_errors);
 
         zksync
