@@ -43,3 +43,6 @@ test_repro!(565; |cfg| {
     cfg.runner.test_options.invariant.fail_on_revert = true;
     cfg.runner.test_options.invariant.runs = 2;
 });
+
+// https://github.com/matter-labs/foundry-zksync/issues/687
+test_repro!(687);
