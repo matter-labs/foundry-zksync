@@ -243,10 +243,7 @@ impl PreprocessedState {
 
             let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
 
-            zk_output = Some(
-                zk_compiler
-                    .zksync_compile(&zk_project, script_config.config.zksync.avoid_contracts())?,
-            );
+            zk_output = Some(zk_compiler.zksync_compile(&zk_project)?);
             Some(DualCompiledContracts::new(
                 &output,
                 &zk_output.clone().unwrap(),

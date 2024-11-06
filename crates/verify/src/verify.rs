@@ -368,7 +368,7 @@ impl VerifyArgs {
             let provider = utils::get_provider(&config)?;
             let code = provider.get_code_at(self.address).await?;
 
-            let output = ProjectCompiler::new().zksync_compile(&project, None)?;
+            let output = ProjectCompiler::new().zksync_compile(&project)?;
             let contracts = ContractsByArtifact::new(
                 output.artifact_ids().map(|(id, artifact)| (id, artifact.clone().into())),
             );

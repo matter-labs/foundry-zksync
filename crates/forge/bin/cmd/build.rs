@@ -130,8 +130,7 @@ impl BuildArgs {
                 .quiet(format_json)
                 .bail(!format_json);
 
-            let zk_output =
-                zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
+            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
             if format_json {
                 println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
             }
