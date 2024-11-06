@@ -1,6 +1,7 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use clap::Parser;
+use foundry_compilers::zksolc::settings::{ZkSolcError, ZkSolcWarning};
 use foundry_config::ZkSyncConfig;
 use serde::Serialize;
 use zksync_web3_rs::types::{Address, Bytes};
@@ -121,6 +122,26 @@ pub struct ZkSyncArgs {
         visible_alias = "paymaster-input"
     )]
     pub paymaster_input: Option<Bytes>,
+
+    /// Set the warnings to suppress for zksolc.
+    #[clap(
+        long = "zk-suppressed-warnings",
+        visible_alias = "suppressed-warnings",
+        value_delimiter = ',',
+        help = "Set the warnings to suppress for zksolc, possible values: [txorigin]"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suppressed_warnings: Option<Vec<ZkSolcWarning>>,
+
+    /// Set the errors to suppress for zksolc.
+    #[clap(
+        long = "zk-suppressed-errors",
+        visible_alias = "suppressed-errors",
+        value_delimiter = ',',
+        help = "Set the errors to suppress for zksolc, possible values: [sendtransfer]"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suppressed_errors: Option<Vec<ZkSolcError>>,
 }
 
 impl ZkSyncArgs {
@@ -157,6 +178,14 @@ impl ZkSyncArgs {
             self.optimizer_mode.as_ref().and_then(|mode| mode.parse::<char>().ok()),
             zksync.optimizer_mode
         );
+        let suppressed_warnings = self
+            .suppressed_warnings
+            .clone()
+            .map(|values| values.into_iter().collect::<HashSet<_>>());
+        set_if_some!(suppressed_warnings, zksync.suppressed_warnings);
+        let suppressed_errors =
+            self.suppressed_errors.clone().map(|values| values.into_iter().collect::<HashSet<_>>());
+        set_if_some!(suppressed_errors, zksync.suppressed_errors);
 
         zksync
     }

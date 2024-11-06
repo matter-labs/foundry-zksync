@@ -13,9 +13,8 @@ use foundry_compilers::{
     },
 };
 
-use revm_primitives::HashSet;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use crate::SolcReq;
 
@@ -140,10 +139,8 @@ impl ZkSyncConfig {
                 },
             },
             codegen: if self.force_evmla { Codegen::EVMLA } else { Codegen::Yul },
-            suppressed_warnings: Default::default(), /* TODO(zk): take from self when `FromStr`
-                                                      * impl is provided */
-            suppressed_errors: Default::default(), /* TODO(zk): take from self when `FromStr`
-                                                    * impl is provided */
+            suppressed_warnings: self.suppressed_warnings.clone(),
+            suppressed_errors: self.suppressed_errors.clone(),
         };
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
