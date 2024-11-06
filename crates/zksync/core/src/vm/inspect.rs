@@ -19,8 +19,8 @@ use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
 use zksync_multivm::{
     interface::{
-        Call, CallType, ExecutionResult, Halt, VmEvent, VmExecutionMode, VmExecutionResultAndLogs,
-        VmFactory, VmInterface, VmRevertReason,
+        Call, CallType, ExecutionResult, Halt, InspectExecutionMode, VmEvent,
+        VmExecutionResultAndLogs, VmFactory, VmInterface, VmRevertReason,
     },
     tracers::CallTracer,
     vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
@@ -455,7 +455,7 @@ fn inspect_inner<S: ReadStorage>(
         .into_tracer_pointer(),
     ];
     let compressed_bytecodes = vm.push_transaction(tx).compressed_bytecodes.into_owned();
-    let mut tx_result = vm.inspect(&mut tracers.into(), VmExecutionMode::OneTx);
+    let mut tx_result = vm.inspect(&mut tracers.into(), InspectExecutionMode::OneTx);
 
     let mut call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
     trace!(?tx_result.result, "zk vm result");

@@ -142,6 +142,7 @@ impl ForgeTestProfile {
                 max_assume_rejects: 65536,
                 gas_report_samples: 256,
                 failure_persist_dir: Some(tempfile::tempdir().unwrap().into_path()),
+                show_metrics: false,
                 no_zksync_reserved_addresses: false,
             })
             .build(output, Path::new(self.project().root()))

@@ -6,6 +6,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[macro_use]
+extern crate foundry_common;
+
+#[macro_use]
 extern crate tracing;
 
 use crate::runner::ScriptRunner;
@@ -52,7 +55,7 @@ use foundry_evm::{
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
 use serde::Serialize;
-use yansi::Paint;
+use std::path::PathBuf;
 
 mod broadcast;
 mod build;
@@ -150,6 +153,15 @@ pub struct ScriptArgs {
     #[arg(long)]
     pub debug: bool,
 
+    /// Dumps all debugger steps to file.
+    #[arg(
+        long,
+        requires = "debug",
+        value_hint = ValueHint::FilePath,
+        value_name = "PATH"
+    )]
+    pub dump: Option<PathBuf>,
+
     /// Makes sure a transaction is sent,
     /// only after its previous one has been confirmed and succeeded.
     #[arg(long)]
@@ -168,10 +180,6 @@ pub struct ScriptArgs {
     /// Verifies all the contracts found in the receipts of a script, if any.
     #[arg(long)]
     pub verify: bool,
-
-    /// Output results in JSON format.
-    #[arg(long)]
-    pub json: bool,
 
     /// Gas price for legacy transactions, or max fee per gas for EIP1559 transactions, either
     /// specified in wei, or as a string with a unit type.
@@ -245,10 +253,13 @@ impl ScriptArgs {
                 .await?;
 
             if pre_simulation.args.debug {
-                return pre_simulation.run_debugger()
+                return match pre_simulation.args.dump.clone() {
+                    Some(ref path) => pre_simulation.run_debug_file_dumper(path),
+                    None => pre_simulation.run_debugger(),
+                };
             }
 
-            if pre_simulation.args.json {
+            if shell::is_json() {
                 pre_simulation.show_json()?;
             } else {
                 pre_simulation.show_traces().await?;
@@ -267,7 +278,7 @@ impl ScriptArgs {
 
             // Check if there are any missing RPCs and exit early to avoid hard error.
             if pre_simulation.execution_artifacts.rpc_data.missing_rpc {
-                shell::println("\nIf you wish to simulate on-chain transactions pass a RPC URL.")?;
+                sh_println!("\nIf you wish to simulate on-chain transactions pass a RPC URL.")?;
                 return Ok(());
             }
 
@@ -281,7 +292,7 @@ impl ScriptArgs {
 
         // Exit early in case user didn't provide any broadcast/verify related flags.
         if !bundled.args.should_broadcast() {
-            shell::println("\nSIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.")?;
+            sh_println!("\nSIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.")?;
             return Ok(());
         }
 
@@ -426,12 +437,9 @@ impl ScriptArgs {
 
                 if deployment_size > max_size {
                     prompt_user = self.should_broadcast();
-                    shell::println(format!(
-                        "{}",
-                        format!(
-                            "`{name}` is above the contract size limit ({deployment_size} > {max_size})."
-                        ).red()
-                    ))?;
+                    sh_err!(
+                        "`{name}` is above the contract size limit ({deployment_size} > {max_size})."
+                    )?;
                 }
             }
         }

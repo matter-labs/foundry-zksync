@@ -227,10 +227,7 @@ impl PreprocessedState {
         )
         .chain([target_path.to_path_buf()]);
 
-        let output = ProjectCompiler::new()
-            .quiet_if(args.opts.silent)
-            .files(sources_to_compile)
-            .compile(&project)?;
+        let output = ProjectCompiler::new().files(sources_to_compile).compile(&project)?;
 
         let mut zk_output = None;
         // ZK
@@ -244,8 +241,7 @@ impl PreprocessedState {
                 source_files_iter(project.paths.sources.as_path(), SolcLanguage::FILE_EXTENSIONS)
                     .chain([target_path.clone()]);
 
-            let zk_compiler =
-                ProjectCompiler::new().quiet_if(args.opts.silent).files(sources_to_compile);
+            let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
 
             zk_output = Some(
                 zk_compiler
