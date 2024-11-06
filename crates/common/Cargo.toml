@@ -13,9 +13,7 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-foundry-block-explorers = { workspace = true, features = [
-    "foundry-compilers",
-] }
+foundry-block-explorers = { workspace = true, features = ["foundry-compilers"] }
 foundry-zksync-compiler.workspace = true
 foundry-common-fmt.workspace = true
 foundry-compilers.workspace = true
@@ -68,9 +66,6 @@ yansi.workspace = true
 anstream.workspace = true
 anstyle.workspace = true
 terminal_size.workspace = true
-
-# zksync
-globset = "0.4"
 
 [dev-dependencies]
 similar-asserts.workspace = true
