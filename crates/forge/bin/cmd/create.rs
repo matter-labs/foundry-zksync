@@ -151,8 +151,7 @@ impl CreateArgs {
             let zk_project =
                 foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
             let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
-            let mut zk_output =
-                zk_compiler.zksync_compile(&zk_project, config.zksync.avoid_contracts())?;
+            let mut zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
             let artifact = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 

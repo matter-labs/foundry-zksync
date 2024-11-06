@@ -288,7 +288,6 @@ impl ProjectCompiler {
     pub fn zksync_compile(
         self,
         project: &Project<ZkSolcCompiler, ZkArtifactOutput>,
-        maybe_avoid_contracts: Option<Vec<globset::GlobMatcher>>,
     ) -> Result<ZkProjectCompileOutput> {
         // TODO: Avoid process::exit
         if !project.paths.has_input_files() && self.files.is_empty() {
@@ -311,12 +310,7 @@ impl ProjectCompiler {
         self.zksync_compile_with(&project.paths.root, || {
             let files_to_compile =
                 if !files.is_empty() { files } else { project.paths.input_files() };
-            let avoid_contracts = maybe_avoid_contracts.unwrap_or_default();
-            let sources = Source::read_all(
-                files_to_compile
-                    .into_iter()
-                    .filter(|p| !avoid_contracts.iter().any(|c| c.is_match(p))),
-            )?;
+            let sources = Source::read_all(files_to_compile)?;
             foundry_compilers::zksync::compile::project::ProjectCompiler::with_sources(
                 project, sources,
             )?

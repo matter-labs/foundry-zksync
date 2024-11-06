@@ -81,7 +81,7 @@ impl ZkVerificationContext {
         let output = ProjectCompiler::new()
             .quiet(true)
             .files([self.target_path.clone()])
-            .zksync_compile(&project, None)?;
+            .zksync_compile(&project)?;
 
         let artifact = output
             .find(&self.target_path, &self.target_name)
@@ -100,7 +100,7 @@ impl ZkVerificationContext {
         let output = ProjectCompiler::new()
             .quiet(true)
             .files([self.target_path.clone()])
-            .zksync_compile(&project, None)?;
+            .zksync_compile(&project)?;
 
         let artifact = output
             .find(&self.target_path, &self.target_name)
