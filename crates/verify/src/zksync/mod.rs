@@ -120,9 +120,7 @@ impl VerificationProvider for ZkVerificationProvider {
         let verification_status =
             self.retry_verification_status(&client, &url, max_retries, delay_in_seconds).await?;
 
-        self.process_status_response(Some(verification_status), &url)?;
-
-        Ok(())
+        self.process_status_response(Some(verification_status), &url)
     }
 }
 
