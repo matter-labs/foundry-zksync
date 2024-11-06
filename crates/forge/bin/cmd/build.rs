@@ -2,7 +2,7 @@ use super::{install, watch::WatchArgs};
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
-use foundry_common::compile::ProjectCompiler;
+use foundry_common::{compile::ProjectCompiler, shell};
 use foundry_compilers::{
     compilers::{multi::MultiCompilerLanguage, Language},
     utils::source_files_iter,
@@ -56,9 +56,15 @@ pub struct BuildArgs {
     pub names: bool,
 
     /// Print compiled contract sizes.
+    /// Constructor argument length is not included in the calculation of initcode size.
     #[arg(long)]
     #[serde(skip)]
     pub sizes: bool,
+
+    /// Ignore initcode contract bytecode size limit introduced by EIP-3860.
+    #[arg(long, alias = "ignore-initcode-size")]
+    #[serde(skip)]
+    pub ignore_eip_3860: bool,
 
     #[command(flatten)]
     #[serde(flatten)]
@@ -67,21 +73,15 @@ pub struct BuildArgs {
     #[command(flatten)]
     #[serde(skip)]
     pub watch: WatchArgs,
-
-    /// Output the compilation errors in the json format.
-    /// This is useful when you want to use the output in other tools.
-    #[arg(long, conflicts_with = "silent")]
-    #[serde(skip)]
-    pub format_json: bool,
 }
 
 impl BuildArgs {
+    // TODO(zk): We cannot return `ProjectCompileOutput` as there's currently no way to return
+    // a common type from solc and zksolc branches.
     pub fn run(self) -> Result<()> {
         let mut config = self.try_load_config_emit_warnings()?;
 
-        if install::install_missing_dependencies(&mut config, self.args.silent) &&
-            config.auto_detect_remappings
-        {
+        if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
             // need to re-configure here to also catch additional remappings
             config = self.load_config();
         }
@@ -100,33 +100,45 @@ impl BuildArgs {
                 }
             }
 
+            let format_json = shell::is_json();
             let compiler = ProjectCompiler::new()
+                .files(files)
                 .print_names(self.names)
                 .print_sizes(self.sizes)
-                .quiet(self.format_json)
-                .bail(!self.format_json);
+                .ignore_eip_3860(self.ignore_eip_3860)
+                .quiet(format_json)
+                .bail(!format_json);
 
             let output = compiler.compile(&project)?;
-            if self.format_json {
-                println!("{}", serde_json::to_string_pretty(&output.output())?);
+
+            if format_json {
+                sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
             }
+
+            // NOTE(zk): We skip returning output because currently there's no way to return from
+            // this function due to differing solc and zksolc project output types, and
+            // no way to return a default from either branch. Ok(output)
+            Ok(())
         } else {
+            let format_json = shell::is_json();
             let zk_project =
                 foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
             let zk_compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .zksync_sizes()
-                .quiet(self.format_json)
-                .bail(!self.format_json);
+                .quiet(format_json)
+                .bail(!format_json);
 
             let zk_output = zk_compiler.zksync_compile(&zk_project)?;
             if self.format_json {
                 println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
             }
-        }
 
-        Ok(())
+            // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
+            // solc output. This is safe currently as the output is simply dropped.
+            Ok(())
+        }
     }
 
     /// Returns the `Project` for the current workspace
@@ -146,10 +158,12 @@ impl BuildArgs {
     /// Returns the [`watchexec::InitConfig`] and [`watchexec::RuntimeConfig`] necessary to
     /// bootstrap a new [`watchexe::Watchexec`] loop.
     pub(crate) fn watchexec_config(&self) -> Result<watchexec::Config> {
-        // use the path arguments or if none where provided the `src` dir
+        // Use the path arguments or if none where provided the `src`, `test` and `script`
+        // directories as well as the `foundry.toml` configuration file.
         self.watch.watchexec_config(|| {
             let config = Config::from(self);
-            [config.src, config.test, config.script]
+            let foundry_toml: PathBuf = config.root.0.join(Config::FILE_NAME);
+            [config.src, config.test, config.script, foundry_toml]
         })
     }
 }
@@ -173,36 +187,10 @@ impl Provider for BuildArgs {
             dict.insert("sizes".to_string(), true.into());
         }
 
+        if self.ignore_eip_3860 {
+            dict.insert("ignore_eip_3860".to_string(), true.into());
+        }
+
         Ok(Map::from([(Config::selected_profile(), dict)]))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use foundry_config::filter::SkipBuildFilter;
-
-    #[test]
-    fn can_parse_build_filters() {
-        let args: BuildArgs = BuildArgs::parse_from(["foundry-cli", "--skip", "tests"]);
-        assert_eq!(args.args.skip, Some(vec![SkipBuildFilter::Tests]));
-
-        let args: BuildArgs = BuildArgs::parse_from(["foundry-cli", "--skip", "scripts"]);
-        assert_eq!(args.args.skip, Some(vec![SkipBuildFilter::Scripts]));
-
-        let args: BuildArgs =
-            BuildArgs::parse_from(["foundry-cli", "--skip", "tests", "--skip", "scripts"]);
-        assert_eq!(args.args.skip, Some(vec![SkipBuildFilter::Tests, SkipBuildFilter::Scripts]));
-
-        let args: BuildArgs = BuildArgs::parse_from(["foundry-cli", "--skip", "tests", "scripts"]);
-        assert_eq!(args.args.skip, Some(vec![SkipBuildFilter::Tests, SkipBuildFilter::Scripts]));
-    }
-
-    #[test]
-    fn check_conflicts() {
-        let args: std::result::Result<BuildArgs, clap::Error> =
-            BuildArgs::try_parse_from(["foundry-cli", "--format-json", "--silent"]);
-        assert!(args.is_err());
-        assert!(args.unwrap_err().kind() == clap::error::ErrorKind::ArgumentConflict);
     }
 }

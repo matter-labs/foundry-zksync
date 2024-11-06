@@ -37,6 +37,7 @@ foundry-wallets.workspace = true
 foundry-linking.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compiler.workspace = true
+forge-script-sequence.workspace = true
 
 ethers-contract-abigen = { workspace = true, features = ["providers"] }
 

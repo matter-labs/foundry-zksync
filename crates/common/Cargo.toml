@@ -63,6 +63,10 @@ url.workspace = true
 walkdir.workspace = true
 yansi.workspace = true
 
+anstream.workspace = true
+anstyle.workspace = true
+terminal_size.workspace = true
+
 [dev-dependencies]
 similar-asserts.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
