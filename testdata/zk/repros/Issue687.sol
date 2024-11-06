@@ -44,4 +44,3 @@ contract Issue687 is DSTest {
         assertEq(2, counter.get());
     }
 }
-
