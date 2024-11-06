@@ -236,12 +236,6 @@ impl ZkVerificationProvider {
 
             let resp: ContractVerificationStatusResponse = serde_json::from_str(&text)?;
 
-            if resp.error_exists() {
-                return Ok(resp);
-            }
-            if resp.is_verification_success() || resp.is_verification_failure() {
-                return Ok(resp);
-            }
             if resp.is_pending() || resp.is_queued() {
                 if retries >= max_retries {
                     println!("Verification is still pending after {max_retries} retries.");
@@ -250,12 +244,17 @@ impl ZkVerificationProvider {
 
                 retries += 1;
 
-                // Calculate the next delay and wait
                 let delay_in_ms = calculate_retry_delay(retries, delay_in_seconds);
                 sleep(Duration::from_millis(delay_in_ms));
+                continue;
+            }
+
+            if resp.is_verification_success() || resp.is_verification_failure() {
+                return Ok(resp);
             }
         }
     }
+
     fn process_status_response(
         &self,
         response: Option<ContractVerificationStatusResponse>,
@@ -310,9 +309,6 @@ pub struct ContractVerificationStatusResponse {
 }
 
 impl ContractVerificationStatusResponse {
-    pub fn error_exists(&self) -> bool {
-        self.error.is_some() || self.compilation_errors.is_some()
-    }
     pub fn get_error(&self, verification_url: &str) -> String {
         let mut error_message = String::new();
 
