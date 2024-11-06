@@ -2097,7 +2097,6 @@ fn merge_zk_journaled_state_data(
         }
     };
 
-    // trace!(?addr, "updating journaled_state account data");
     merge_system_contract_entry(
         L2_BASE_TOKEN_ADDRESS.to_address(),
         foundry_zksync_core::get_balance_key(addr),
