@@ -27,8 +27,8 @@ use zksync_multivm::{
 };
 use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    l2::L2Tx, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
-    CONTRACT_DEPLOYER_ADDRESS,
+    get_nonce_key, l2::L2Tx, PackedEthSignature, StorageKey, Transaction,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
@@ -182,6 +182,11 @@ where
         .with_storage_accesses(ccx.accesses.take());
 
     let is_create = call_ctx.is_create;
+    // We track the msg_sender and the initiator_address to check if the nonce update should be
+    // ignored
+    let msg_sender = call_ctx.msg_sender.to_h160();
+    let initiator_address = tx.common_data.initiator_address;
+    let should_ignore_nonce_update = initiator_address != msg_sender;
     info!(?call_ctx, "executing transaction in zk vm");
 
     if tx.common_data.signature.is_empty() {
@@ -319,7 +324,11 @@ where
 
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
-    for (k, v) in &modified_storage {
+    for (k, v) in modified_storage.iter().filter(|(k, _)| {
+        !(k.address() == &NONCE_HOLDER_ADDRESS &&
+            should_ignore_nonce_update &&
+            get_nonce_key(&initiator_address) == **k)
+    }) {
         let address = k.address().to_address();
         let index = k.key().to_ru256();
         era_db.load_account(address);
