@@ -124,7 +124,7 @@ jobs:
           env:
             RUST_BACKTRACE: full
             TEST_MAINNET_URL: http://localhost:8011
-          run: git config user.name "runner" && cargo test zk
+          run: git config --global user.name "test-runner" && cargo test zk
 
     check-ci-install:
       name: CI install
