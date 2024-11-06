@@ -131,7 +131,7 @@ impl BuildArgs {
                 .bail(!format_json);
 
             let zk_output = zk_compiler.zksync_compile(&zk_project)?;
-            if self.format_json {
+            if format_json {
                 println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
             }
 
