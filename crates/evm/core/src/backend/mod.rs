@@ -29,7 +29,7 @@ use revm::{
     Database, DatabaseCommit, JournaledState,
 };
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{hash_map::Entry, BTreeMap, HashSet},
     time::Instant,
 };
 
@@ -1945,6 +1945,13 @@ pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
             merge_zk_account_data(addr, active, &mut target_fork.db);
         }
         merge_journaled_state_data(addr, active_journaled_state, &mut target_fork.journaled_state);
+        if merge_zk_db {
+            merge_zk_journaled_state_data(
+                addr,
+                active_journaled_state,
+                &mut target_fork.journaled_state,
+            );
+        }
     }
 
     // need to mock empty journal entries in case the current checkpoint is higher than the existing
@@ -1991,7 +1998,6 @@ fn merge_db_account_data<ExtDB: DatabaseRef>(
     }
 
     // port account storage over
-    use std::collections::hash_map::Entry;
     match fork_db.accounts.entry(addr) {
         Entry::Vacant(vacant) => {
             trace!("target account not present - inserting from active");
@@ -2016,28 +2022,79 @@ fn merge_zk_account_data<ExtDB: DatabaseRef>(
     fork_db: &mut ForkDB,
 ) {
     let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
-        let mut acc = if let Some(acc) = active.accounts.get(&system_contract).cloned() {
-            acc
-        } else {
-            // Account does not exist
-            return;
-        };
+        let Some(acc) = active.accounts.get(&system_contract) else { return };
 
-        let mut storage = Map::<U256, U256>::default();
+        // port contract cache over
+        if let Some(code) = active.contracts.get(&acc.info.code_hash) {
+            trace!("merging contract cache");
+            fork_db.contracts.insert(acc.info.code_hash, code.clone());
+        }
+
+        // prepare only the specified slot in account storage
+        let mut new_acc = acc.clone();
+        new_acc.storage = Default::default();
         if let Some(value) = acc.storage.get(&slot) {
-            storage.insert(slot, *value);
+            new_acc.storage.insert(slot, *value);
         }
 
-        if let Some(fork_account) = fork_db.accounts.get_mut(&system_contract) {
-            // This will merge the fork's tracked storage with active storage and update values
-            fork_account.storage.extend(storage);
-            // swap them so we can insert the account as whole in the next step
-            std::mem::swap(&mut fork_account.storage, &mut acc.storage);
-        } else {
-            std::mem::swap(&mut storage, &mut acc.storage)
+        // port account storage over
+        match fork_db.accounts.entry(system_contract) {
+            Entry::Vacant(vacant) => {
+                trace!("target account not present - inserting from active");
+                // if the fork_db doesn't have the target account
+                // insert the entire thing
+                vacant.insert(new_acc);
+            }
+            Entry::Occupied(mut occupied) => {
+                trace!("target account present - merging storage slots");
+                // if the fork_db does have the system,
+                // extend the existing storage (overriding)
+                let fork_account = occupied.get_mut();
+                fork_account.storage.extend(&new_acc.storage);
+            }
         }
+    };
 
-        fork_db.accounts.insert(system_contract, acc);
+    merge_system_contract_entry(
+        L2_BASE_TOKEN_ADDRESS.to_address(),
+        foundry_zksync_core::get_balance_key(addr),
+    );
+    merge_system_contract_entry(
+        ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
+        foundry_zksync_core::get_account_code_key(addr),
+    );
+    merge_system_contract_entry(
+        NONCE_HOLDER_ADDRESS.to_address(),
+        foundry_zksync_core::get_nonce_key(addr),
+    );
+}
+
+/// Clones the account data from the `active_journaled_state` into the `fork_journaled_state` for
+/// zksync storage.
+fn merge_zk_journaled_state_data(
+    addr: Address,
+    active_journaled_state: &JournaledState,
+    fork_journaled_state: &mut JournaledState,
+) {
+    let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
+        if let Some(acc) = active_journaled_state.state.get(&system_contract) {
+            // prepare only the specified slot in account storage
+            let mut new_acc = acc.clone();
+            new_acc.storage = Default::default();
+            if let Some(value) = acc.storage.get(&slot).cloned() {
+                new_acc.storage.insert(slot, value);
+            }
+
+            match fork_journaled_state.state.entry(system_contract) {
+                Entry::Vacant(vacant) => {
+                    vacant.insert(new_acc);
+                }
+                Entry::Occupied(mut occupied) => {
+                    let fork_account = occupied.get_mut();
+                    fork_account.storage.extend(new_acc.storage);
+                }
+            }
+        }
     };
 
     merge_system_contract_entry(
