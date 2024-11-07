@@ -650,18 +650,18 @@ impl CreateArgs {
                 "deployedTo": address.to_string(),
                 "transactionHash": receipt.transaction_hash
             });
-            println!("{output}");
+            sh_println!("{output}")?;
         } else {
-            println!("Deployer: {deployer_address}");
-            println!("Deployed to: {address}");
-            println!("Transaction hash: {:?}", receipt.transaction_hash);
+            sh_println!("Deployer: {deployer_address}")?;
+            sh_println!("Deployed to: {address}")?;
+            sh_println!("Transaction hash: {:?}", receipt.transaction_hash)?;
         };
 
         if !self.verify {
             return Ok(());
         }
 
-        println!("Starting contract verification...");
+        sh_println!("Starting contract verification...")?;
 
         let num_of_optimizations = if self.opts.compiler.optimize.unwrap_or_default() {
             self.opts.compiler.optimizer_runs
@@ -679,7 +679,7 @@ impl CreateArgs {
             rpc: Default::default(),
             flatten: false,
             force: false,
-            skip_is_verified_check: false,
+            skip_is_verified_check: true,
             watch: true,
             retry: self.retry,
             libraries: self.opts.libraries.clone(),
