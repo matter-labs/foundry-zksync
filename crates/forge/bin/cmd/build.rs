@@ -108,9 +108,9 @@ impl BuildArgs {
                 .ignore_eip_3860(self.ignore_eip_3860)
                 .quiet(format_json)
                 .bail(!format_json);
-
+    
             let output = compiler.compile(&project)?;
-
+    
             if format_json {
                 sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
             }
