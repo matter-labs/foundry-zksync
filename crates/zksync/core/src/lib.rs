@@ -305,8 +305,9 @@ pub fn try_decode_create(data: &[u8]) -> Result<(H256, Vec<u8>)> {
     Ok((H256(bytecode_hash.0), constructor_args.to_vec()))
 }
 
-/// Gets the mapping key for the `ImmutableSimulator::immutableDataStorage` for a given contract
-/// address and variable slot.
+/// Gets the mapping key for the `ImmutableSimulator::immutableDataStorage`.
+///
+/// This retrieves the key for a given contract address and variable slot.
 /// See https://github.com/matter-labs/era-contracts/blob/main/system-contracts/contracts/ImmutableSimulator.sol#L21
 pub fn get_immutable_slot_key(address: Address, slot_index: rU256) -> H256 {
     let immutable_data_storage_key = keccak256(ethabi::encode(&[

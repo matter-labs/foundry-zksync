@@ -5,7 +5,6 @@ import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 import {Globals} from "./Globals.sol";
 
-
 contract Counter {
     uint256 public immutable SOME_IMMUTABLE_VARIABLE;
 
@@ -14,11 +13,12 @@ contract Counter {
     }
 
     uint256 public a;
+
     function set(uint256 _a) public {
         a = _a;
     }
 
-    function get() public view returns (uint) {
+    function get() public view returns (uint256) {
         return a;
     }
 }
