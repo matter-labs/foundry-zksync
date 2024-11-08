@@ -14,7 +14,7 @@ concurrency:
 
 env:
     CARGO_TERM_COLOR: always
-    TARGET_RUST_VERSION: "nightly-2024-07-19"
+    TARGET_RUST_VERSION: "nightly-2024-09-01"
 
 jobs:
     doctest:
