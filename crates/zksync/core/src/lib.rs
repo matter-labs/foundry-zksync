@@ -19,7 +19,7 @@ pub mod vm;
 pub mod state;
 
 use alloy_network::{AnyNetwork, TxSigner};
-use alloy_primitives::{address, hex, Address, Bytes, U256 as rU256};
+use alloy_primitives::{address, hex, keccak256, Address, Bytes, U256 as rU256};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
@@ -38,8 +38,10 @@ pub use vm::{balance, encode_create_params, nonce};
 pub use vm::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use zksync_multivm::interface::{Call, CallType};
 use zksync_types::utils::storage_key_for_eth_balance;
+use zksync_types::U256;
 pub use zksync_types::{
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256, L2_BASE_TOKEN_ADDRESS,
+    ethabi, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,
+    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
     NONCE_HOLDER_ADDRESS,
 };
 pub use zksync_utils::bytecode::hash_bytecode;
@@ -302,4 +304,36 @@ pub fn try_decode_create(data: &[u8]) -> Result<(H256, Vec<u8>)> {
     };
 
     Ok((H256(bytecode_hash.0), constructor_args.to_vec()))
+}
+
+/// Gets the mapping key for the `ImmutableSimulator::immutableDataStorage` for a given address and slot.
+pub fn get_immutable_slot_key(address: Address, slot_index: rU256) -> H256 {
+    let immutable_data_storage_key = keccak256(ethabi::encode(&[
+        ethabi::Token::Address(address.to_h160()),
+        ethabi::Token::Uint(U256::zero()),
+    ]));
+    let immutable_data_storage_key = H256(*immutable_data_storage_key);
+
+    let immutable_value_key = keccak256(ethabi::encode(&[
+        ethabi::Token::Uint(slot_index.to_u256()),
+        ethabi::Token::FixedBytes(immutable_data_storage_key.to_fixed_bytes().to_vec()),
+    ]));
+
+    H256(*immutable_value_key)
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn test_get_immutable_slot_key() {
+        let actual_key = get_immutable_slot_key(address!("f9e9ba9ed9b96ab918c74b21dd0f1d5f2ac38a30"), rU256::from(10u32));
+        let expected_key = H256::from_str("db259b642223206a098c9ffaaf8e4bfd2d60060e8365bb349b2ea2b720d9837c").expect("invalid h256");
+        assert_eq!(expected_key, actual_key)
+    }
 }

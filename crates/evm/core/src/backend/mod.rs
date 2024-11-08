@@ -15,7 +15,9 @@ use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
 use foundry_zksync_core::{
-    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    convert::{ConvertH160, ConvertH256},
+    ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use itertools::Itertools;
 use revm::{
@@ -2021,52 +2023,72 @@ fn merge_zk_account_data<ExtDB: DatabaseRef>(
     active: &CacheDB<ExtDB>,
     fork_db: &mut ForkDB,
 ) {
-    let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
-        let Some(acc) = active.accounts.get(&system_contract) else { return };
+    let merge_system_contract_entry =
+        |fork_db: &mut ForkDB, system_contract: Address, slot: U256| {
+            let Some(acc) = active.accounts.get(&system_contract) else { return };
 
-        // port contract cache over
-        if let Some(code) = active.contracts.get(&acc.info.code_hash) {
-            trace!("merging contract cache");
-            fork_db.contracts.insert(acc.info.code_hash, code.clone());
-        }
-
-        // prepare only the specified slot in account storage
-        let mut new_acc = acc.clone();
-        new_acc.storage = Default::default();
-        if let Some(value) = acc.storage.get(&slot) {
-            new_acc.storage.insert(slot, *value);
-        }
-
-        // port account storage over
-        match fork_db.accounts.entry(system_contract) {
-            Entry::Vacant(vacant) => {
-                trace!("target account not present - inserting from active");
-                // if the fork_db doesn't have the target account
-                // insert the entire thing
-                vacant.insert(new_acc);
+            // port contract cache over
+            if let Some(code) = active.contracts.get(&acc.info.code_hash) {
+                trace!("merging contract cache");
+                fork_db.contracts.insert(acc.info.code_hash, code.clone());
             }
-            Entry::Occupied(mut occupied) => {
-                trace!("target account present - merging storage slots");
-                // if the fork_db does have the system,
-                // extend the existing storage (overriding)
-                let fork_account = occupied.get_mut();
-                fork_account.storage.extend(&new_acc.storage);
+
+            // prepare only the specified slot in account storage
+            let mut new_acc = acc.clone();
+            new_acc.storage = Default::default();
+            if let Some(value) = acc.storage.get(&slot) {
+                new_acc.storage.insert(slot, *value);
             }
-        }
-    };
+
+            // port account storage over
+            match fork_db.accounts.entry(system_contract) {
+                Entry::Vacant(vacant) => {
+                    trace!("target account not present - inserting from active");
+                    // if the fork_db doesn't have the target account
+                    // insert the entire thing
+                    vacant.insert(new_acc);
+                }
+                Entry::Occupied(mut occupied) => {
+                    trace!("target account present - merging storage slots");
+                    // if the fork_db does have the system,
+                    // extend the existing storage (overriding)
+                    let fork_account = occupied.get_mut();
+                    fork_account.storage.extend(&new_acc.storage);
+                }
+            }
+        };
 
     merge_system_contract_entry(
+        fork_db,
         L2_BASE_TOKEN_ADDRESS.to_address(),
         foundry_zksync_core::get_balance_key(addr),
     );
     merge_system_contract_entry(
+        fork_db,
         ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
         foundry_zksync_core::get_account_code_key(addr),
     );
     merge_system_contract_entry(
+        fork_db,
         NONCE_HOLDER_ADDRESS.to_address(),
         foundry_zksync_core::get_nonce_key(addr),
     );
+
+    if let Some(acc) = active.accounts.get(&addr) {
+        merge_system_contract_entry(
+            fork_db,
+            KNOWN_CODES_STORAGE_ADDRESS.to_address(),
+            U256::from_be_slice(&acc.info.code_hash.0[..]),
+        );
+    }
+
+    // merge immutable storage
+    let immutable_simulator_addr = IMMUTABLE_SIMULATOR_STORAGE_ADDRESS.to_address();
+    for slot_index in 0..10u128 {
+        let slot_key =
+            foundry_zksync_core::get_immutable_slot_key(addr, U256::from(slot_index)).to_ru256();
+        merge_system_contract_entry(fork_db, immutable_simulator_addr, slot_key);
+    }
 }
 
 /// Clones the account data from the `active_journaled_state` into the `fork_journaled_state` for
@@ -2076,39 +2098,59 @@ fn merge_zk_journaled_state_data(
     active_journaled_state: &JournaledState,
     fork_journaled_state: &mut JournaledState,
 ) {
-    let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
-        if let Some(acc) = active_journaled_state.state.get(&system_contract) {
-            // prepare only the specified slot in account storage
-            let mut new_acc = acc.clone();
-            new_acc.storage = Default::default();
-            if let Some(value) = acc.storage.get(&slot).cloned() {
-                new_acc.storage.insert(slot, value);
-            }
+    let merge_system_contract_entry =
+        |fork_journaled_state: &mut JournaledState, system_contract: Address, slot: U256| {
+            if let Some(acc) = active_journaled_state.state.get(&system_contract) {
+                // prepare only the specified slot in account storage
+                let mut new_acc = acc.clone();
+                new_acc.storage = Default::default();
+                if let Some(value) = acc.storage.get(&slot).cloned() {
+                    new_acc.storage.insert(slot, value);
+                }
 
-            match fork_journaled_state.state.entry(system_contract) {
-                Entry::Vacant(vacant) => {
-                    vacant.insert(new_acc);
-                }
-                Entry::Occupied(mut occupied) => {
-                    let fork_account = occupied.get_mut();
-                    fork_account.storage.extend(new_acc.storage);
+                match fork_journaled_state.state.entry(system_contract) {
+                    Entry::Vacant(vacant) => {
+                        vacant.insert(new_acc);
+                    }
+                    Entry::Occupied(mut occupied) => {
+                        let fork_account = occupied.get_mut();
+                        fork_account.storage.extend(new_acc.storage);
+                    }
                 }
             }
-        }
-    };
+        };
 
     merge_system_contract_entry(
+        fork_journaled_state,
         L2_BASE_TOKEN_ADDRESS.to_address(),
         foundry_zksync_core::get_balance_key(addr),
     );
     merge_system_contract_entry(
+        fork_journaled_state,
         ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
         foundry_zksync_core::get_account_code_key(addr),
     );
     merge_system_contract_entry(
+        fork_journaled_state,
         NONCE_HOLDER_ADDRESS.to_address(),
         foundry_zksync_core::get_nonce_key(addr),
     );
+
+    if let Some(acc) = active_journaled_state.state.get(&addr) {
+        merge_system_contract_entry(
+            fork_journaled_state,
+            KNOWN_CODES_STORAGE_ADDRESS.to_address(),
+            U256::from_be_slice(&acc.info.code_hash.0[..]),
+        );
+    }
+
+    // merge immutable storage
+    let immutable_simulator_addr = IMMUTABLE_SIMULATOR_STORAGE_ADDRESS.to_address();
+    for slot_index in 0..u8::MAX {
+        let slot_key =
+            foundry_zksync_core::get_immutable_slot_key(addr, U256::from(slot_index)).to_ru256();
+        merge_system_contract_entry(fork_journaled_state, immutable_simulator_addr, slot_key);
+    }
 }
 
 /// Returns true of the address is a contract
