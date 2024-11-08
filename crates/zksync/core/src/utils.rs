@@ -112,6 +112,7 @@ pub fn fix_l2_gas_price(gas_price: U256) -> U256 {
 }
 
 /// Limits the gas_limit proportional to a user's available balance given the gas_price.
+///
 /// Additionally, fixes the gas limit to be maximum of 2^31, which is below the VM gas limit of
 /// 2^32. This is required so the bootloader does not throw an error for not having enough balance
 /// to pay for gas.
