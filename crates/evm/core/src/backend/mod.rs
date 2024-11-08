@@ -1998,7 +1998,6 @@ fn merge_db_account_data<ExtDB: DatabaseRef>(
     }
 
     // port account storage over
-    use std::collections::hash_map::Entry;
     match fork_db.accounts.entry(addr) {
         Entry::Vacant(vacant) => {
             trace!("target account not present - inserting from active");
