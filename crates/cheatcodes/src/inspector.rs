@@ -1244,6 +1244,21 @@ impl Cheatcodes {
                     }
                 }
 
+                // record immutable variables
+                if result.execution_result.is_success() {
+                    for (addr, imm_values) in result.recorded_immutables {
+                        let addr = addr.to_address();
+                        let keys = imm_values
+                            .into_keys()
+                            .map(|slot_index| {
+                                foundry_zksync_core::get_immutable_slot_key(addr, slot_index)
+                                    .to_ru256()
+                            })
+                            .collect::<HashSet<_>>();
+                        ecx.db.save_zk_immutable_storage(addr, keys);
+                    }
+                }
+
                 match result.execution_result {
                     ExecutionResult::Success { output, gas_used, .. } => {
                         let _ = gas.record_cost(gas_used);
