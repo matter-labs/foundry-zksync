@@ -15,9 +15,8 @@ use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
 use foundry_zksync_core::{
-    convert::{ConvertH160, ConvertRU256},
-    ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
-    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use itertools::Itertools;
 use revm::{
