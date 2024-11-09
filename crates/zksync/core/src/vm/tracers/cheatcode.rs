@@ -378,49 +378,43 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                 let calldata = get_calldata(&state, memory);
                 let current = state.vm_local_state.callstack.current;
 
-                if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS {
-                    if calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET) {
-                        let mut params = ethabi::decode(
-                            &[
-                                ethabi::ParamType::Address,
-                                ethabi::ParamType::Array(Box::new(ethabi::ParamType::Tuple(vec![
-                                    ethabi::ParamType::Uint(256),
-                                    ethabi::ParamType::FixedBytes(32),
-                                ]))),
-                            ],
-                            &calldata[4..],
-                        )
-                        .expect("failed decoding setImmutables parameters");
+                if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS &&
+                    calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET)
+                {
+                    let mut params = ethabi::decode(
+                        &[
+                            ethabi::ParamType::Address,
+                            ethabi::ParamType::Array(Box::new(ethabi::ParamType::Tuple(vec![
+                                ethabi::ParamType::Uint(256),
+                                ethabi::ParamType::FixedBytes(32),
+                            ]))),
+                        ],
+                        &calldata[4..],
+                    )
+                    .expect("failed decoding setImmutables parameters");
 
-                        let address =
-                            params.remove(0).into_address().expect("must be valid address");
-                        let immutables =
-                            params.remove(0).into_array().expect("must be valid array");
-                        for immutable in immutables {
-                            let mut imm_tuple =
-                                immutable.into_tuple().expect("must be valid tuple");
-                            let imm_index = imm_tuple
-                                .remove(0)
-                                .into_uint()
-                                .expect("must be valid uint")
-                                .to_ru256();
-                            let imm_value = imm_tuple
-                                .remove(0)
-                                .into_fixed_bytes()
-                                .expect("must be valid fixed bytes");
-                            let imm_value = FixedBytes::<32>::from_slice(&imm_value);
+                    let address = params.remove(0).into_address().expect("must be valid address");
+                    let immutables = params.remove(0).into_array().expect("must be valid array");
+                    for immutable in immutables {
+                        let mut imm_tuple = immutable.into_tuple().expect("must be valid tuple");
+                        let imm_index =
+                            imm_tuple.remove(0).into_uint().expect("must be valid uint").to_ru256();
+                        let imm_value = imm_tuple
+                            .remove(0)
+                            .into_fixed_bytes()
+                            .expect("must be valid fixed bytes");
+                        let imm_value = FixedBytes::<32>::from_slice(&imm_value);
 
-                            self.recorded_immutables
-                                .entry(address)
-                                .and_modify(|entry| {
-                                    entry.insert(imm_index, imm_value);
-                                })
-                                .or_insert_with(|| {
-                                    let mut value = HashMap::default();
-                                    value.insert(imm_index, imm_value);
-                                    value
-                                });
-                        }
+                        self.recorded_immutables
+                            .entry(address)
+                            .and_modify(|entry| {
+                                entry.insert(imm_index, imm_value);
+                            })
+                            .or_insert_with(|| {
+                                let mut value = HashMap::default();
+                                value.insert(imm_index, imm_value);
+                                value
+                            });
                     }
                 }
             }
