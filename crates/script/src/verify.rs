@@ -292,13 +292,21 @@ async fn verify_contracts(
 
             // Verify contract created directly from the transaction
             if let (Some(address), Some(data)) = (receipt.contract_address, tx.tx().input()) {
-                match verify.get_verify_args(address, offset, data, &sequence.libraries) {
-                    Some(verify) => future_verifications.push(verify.run()),
-                    None => unverifiable_contracts.push(address),
-                };
+                if config.zksync.run_in_zk_mode() {
+                    match verify.get_verify_args_zk(address, data, &sequence.libraries) {
+                        Some(verify) => future_verifications.push(verify.run()),
+                        None => unverifiable_contracts.push(address),
+                    };
+                } else {
+                    match verify.get_verify_args(address, offset, data, &sequence.libraries) {
+                        Some(verify) => future_verifications.push(verify.run()),
+                        None => unverifiable_contracts.push(address),
+                    };
+                }
             }
 
             // Verify potential contracts created during the transaction execution
+            // This will fail in ZKsync context due to `init_code` usage.
             for AdditionalContract { address, init_code, .. } in &tx.additional_contracts {
                 match verify.get_verify_args(*address, 0, init_code.as_ref(), &sequence.libraries) {
                     Some(verify) => future_verifications.push(verify.run()),

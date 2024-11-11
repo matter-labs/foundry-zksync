@@ -14,7 +14,7 @@ concurrency:
 
 env:
     CARGO_TERM_COLOR: always
-    TARGET_RUST_VERSION: "nightly-2024-07-19"
+    TARGET_RUST_VERSION: "nightly-2024-09-01"
 
 jobs:
     doctest:
@@ -124,7 +124,7 @@ jobs:
           env:
             RUST_BACKTRACE: full
             TEST_MAINNET_URL: http://localhost:8011
-          run: cargo test zk
+          run: git config --global user.name "test-runner" && ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo test zk
 
     check-ci-install:
       name: CI install

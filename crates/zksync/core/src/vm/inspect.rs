@@ -1,4 +1,4 @@
-use alloy_primitives::{hex, Log};
+use alloy_primitives::{hex, FixedBytes, Log};
 use era_test_node::{
     config::node::ShowCalls,
     formatter,
@@ -19,8 +19,8 @@ use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
 use zksync_multivm::{
     interface::{
-        Call, CallType, ExecutionResult, Halt, VmEvent, VmExecutionMode, VmExecutionResultAndLogs,
-        VmFactory, VmInterface, VmRevertReason,
+        Call, CallType, ExecutionResult, Halt, InspectExecutionMode, VmEvent,
+        VmExecutionResultAndLogs, VmFactory, VmInterface, VmRevertReason,
     },
     tracers::CallTracer,
     vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
@@ -68,6 +68,8 @@ pub struct ZKVMExecutionResult {
     pub execution_result: rExecutionResult,
     /// Call traces
     pub call_traces: Vec<Call>,
+    /// Immutables recorded via calls to ImmutableSimulator::setImmutables.
+    pub recorded_immutables: rHashMap<H160, rHashMap<rU256, FixedBytes<32>>>,
 }
 
 /// Revm-style result with ZKVM Execution
@@ -112,6 +114,7 @@ where
                     logs: result.logs,
                     call_traces: result.call_traces,
                     execution_result: exec,
+                    recorded_immutables: result.recorded_immutables,
                 });
             }
             (None, exec) => {
@@ -119,6 +122,7 @@ where
                     logs: result.logs,
                     call_traces: result.call_traces,
                     execution_result: exec,
+                    recorded_immutables: result.recorded_immutables,
                 });
             }
             (
@@ -133,11 +137,13 @@ where
                             logs: agg_logs,
                             output: agg_output,
                         },
+                    recorded_immutables: aggregated_recorded_immutables,
                 }),
                 rExecutionResult::Success { reason, gas_used, gas_refunded, logs, output },
             ) => {
                 aggregated_logs.append(&mut result.logs);
                 aggregated_call_traces.append(&mut result.call_traces);
+                aggregated_recorded_immutables.extend(result.recorded_immutables);
                 *agg_reason = reason;
                 *agg_gas_used += gas_used;
                 *agg_gas_refunded += gas_refunded;
@@ -199,6 +205,7 @@ where
         bytecodes,
         modified_storage,
         call_traces,
+        recorded_immutables,
         create_outcome,
         gas_usage,
     } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
@@ -270,6 +277,7 @@ where
                     logs,
                     output,
                 },
+                recorded_immutables,
             }
         }
         ExecutionResult::Revert { output } => {
@@ -286,6 +294,7 @@ where
                     gas_used: gas_usage.gas_used(),
                     output: Bytes::from(output),
                 },
+                recorded_immutables,
             }
         }
         ExecutionResult::Halt { reason } => {
@@ -302,6 +311,7 @@ where
                     reason: mapped_reason,
                     gas_used: gas_usage.gas_used(),
                 },
+                recorded_immutables,
             }
         }
     };
@@ -410,6 +420,7 @@ struct InnerZkVmResult {
     call_traces: Vec<Call>,
     create_outcome: Option<InnerCreateOutcome>,
     gas_usage: ZkVmGasUsage,
+    recorded_immutables: rHashMap<H160, rHashMap<rU256, FixedBytes<32>>>,
 }
 
 fn inspect_inner<S: ReadStorage>(
@@ -455,7 +466,7 @@ fn inspect_inner<S: ReadStorage>(
         .into_tracer_pointer(),
     ];
     let compressed_bytecodes = vm.push_transaction(tx).compressed_bytecodes.into_owned();
-    let mut tx_result = vm.inspect(&mut tracers.into(), VmExecutionMode::OneTx);
+    let mut tx_result = vm.inspect(&mut tracers.into(), InspectExecutionMode::OneTx);
 
     let mut call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
     trace!(?tx_result.result, "zk vm result");
@@ -478,6 +489,7 @@ fn inspect_inner<S: ReadStorage>(
     if let Some(expected_calls) = ccx.expected_calls.as_mut() {
         expected_calls.extend(cheatcode_result.expected_calls);
     }
+    let recorded_immutables = cheatcode_result.recorded_immutables;
 
     // populate gas usage info
     let bootloader_debug = Arc::try_unwrap(bootloader_debug_tracer_result)
@@ -548,11 +560,7 @@ fn inspect_inner<S: ReadStorage>(
                 .expect("failed converting bytecode to factory dep")
         })
         .collect::<HashMap<U256, Vec<U256>>>();
-    let modified_storage = if is_static {
-        Default::default()
-    } else {
-        storage.borrow().modified_storage_keys().clone()
-    };
+    let modified_storage = storage.borrow().modified_storage_keys().clone();
 
     // patch CREATE traces.
     for call in call_traces.iter_mut() {
@@ -589,13 +597,26 @@ fn inspect_inner<S: ReadStorage>(
         None
     };
 
-    InnerZkVmResult {
-        tx_result,
-        bytecodes,
-        modified_storage,
-        call_traces,
-        create_outcome,
-        gas_usage,
+    if is_static {
+        InnerZkVmResult {
+            tx_result,
+            bytecodes: Default::default(),
+            modified_storage: Default::default(),
+            call_traces,
+            create_outcome,
+            gas_usage,
+            recorded_immutables: Default::default(),
+        }
+    } else {
+        InnerZkVmResult {
+            tx_result,
+            bytecodes,
+            modified_storage,
+            call_traces,
+            create_outcome,
+            gas_usage,
+            recorded_immutables,
+        }
     }
 }
 
