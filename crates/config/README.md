@@ -240,8 +240,6 @@ fallback_oz = false
 enable_eravm_extensions = false
 # Force compilation via EVMLA instead of Yul codegen pipeline
 force_evmla = false 
-# List of globs that match contracts to avoid compiling with zksolc
-avoid_contracts = []
 # Enable optimizer on zksolc (defaults to true)
 optimizer = true 
 # zksolc optimizer mode (0 | 1 | 2 | 3 | s | z)

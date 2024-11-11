@@ -131,7 +131,6 @@ impl ScriptRunner {
         };
 
         let address = CALLER.create(self.executor.get_nonce(CALLER)?);
-        self.executor.backend_mut().set_test_contract(address);
 
         self.executor.backend_mut().set_test_contract(address);
         // Set the contracts initial balance before deployment, so it is available during the

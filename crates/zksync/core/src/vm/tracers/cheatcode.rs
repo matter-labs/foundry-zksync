@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use alloy_primitives::{hex, map::HashMap, Address, Bytes, U256 as rU256};
+use alloy_primitives::{hex, map::HashMap, Address, Bytes, FixedBytes, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
@@ -21,8 +21,8 @@ use zksync_multivm::{
 };
 use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,
-    SYSTEM_CONTEXT_ADDRESS, U256,
+    ethabi, get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256,
+    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, SYSTEM_CONTEXT_ADDRESS, U256,
 };
 use zksync_utils::bytecode::hash_bytecode;
 
@@ -70,6 +70,13 @@ const SELECTOR_BASE_FEE: [u8; 4] = hex!("6ef25c3a");
 /// Selector for `getBlockHashEVM(uint256)`
 const SELECTOR_BLOCK_HASH: [u8; 4] = hex!("80b41246");
 
+/// Selector for setting immutables for an address.
+/// This is used to retrieve the immutables and use them in merging storage
+/// during forks.
+///
+/// Selector for `setImmutables(address, (uint256,bytes32)[])",
+const SELECTOR_IMMUTABLE_SIMULATOR_SET: [u8; 4] = hex!("ad7e232e");
+
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
 pub struct CheatcodeTracerContext<'a> {
@@ -88,7 +95,10 @@ pub struct CheatcodeTracerContext<'a> {
 /// Tracer result to return back to foundry.
 #[derive(Debug, Default)]
 pub struct CheatcodeTracerResult {
+    /// Recorded expected calls.
     pub expected_calls: ExpectedCallTracker,
+    /// Immutables recorded via calls to ImmutableSimulator::setImmutables.
+    pub recorded_immutables: HashMap<H160, HashMap<rU256, FixedBytes<32>>>,
 }
 
 /// Defines the context for a Vm call.
@@ -115,7 +125,7 @@ pub struct CallContext {
     pub is_static: bool,
     /// L1 block hashes to return when `BLOCKHASH` opcode is encountered. This ensures consistency
     /// when returning environment data in L2.
-    pub block_hashes: HashMap<alloy_primitives::U256, alloy_primitives::FixedBytes<32>>,
+    pub block_hashes: HashMap<rU256, FixedBytes<32>>,
 }
 
 /// A tracer to allow for foundry-specific functionality.
@@ -131,6 +141,8 @@ pub struct CheatcodeTracer {
     pub result: Arc<OnceCell<CheatcodeTracerResult>>,
     /// Handle farcall state.
     farcall_handler: FarCallHandler,
+    /// Immutables recorded via calls to ImmutableSimulator::setImmutables.
+    recorded_immutables: HashMap<H160, HashMap<rU256, FixedBytes<32>>>,
 }
 
 impl CheatcodeTracer {
@@ -360,6 +372,54 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             }
         }
 
+        // record immutables for an address during creates
+        if self.call_context.is_create {
+            if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+                let calldata = get_calldata(&state, memory);
+                let current = state.vm_local_state.callstack.current;
+
+                if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS &&
+                    calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET)
+                {
+                    let mut params = ethabi::decode(
+                        &[
+                            ethabi::ParamType::Address,
+                            ethabi::ParamType::Array(Box::new(ethabi::ParamType::Tuple(vec![
+                                ethabi::ParamType::Uint(256),
+                                ethabi::ParamType::FixedBytes(32),
+                            ]))),
+                        ],
+                        &calldata[4..],
+                    )
+                    .expect("failed decoding setImmutables parameters");
+
+                    let address = params.remove(0).into_address().expect("must be valid address");
+                    let immutables = params.remove(0).into_array().expect("must be valid array");
+                    for immutable in immutables {
+                        let mut imm_tuple = immutable.into_tuple().expect("must be valid tuple");
+                        let imm_index =
+                            imm_tuple.remove(0).into_uint().expect("must be valid uint").to_ru256();
+                        let imm_value = imm_tuple
+                            .remove(0)
+                            .into_fixed_bytes()
+                            .expect("must be valid fixed bytes");
+                        let imm_value = FixedBytes::<32>::from_slice(&imm_value);
+
+                        self.recorded_immutables
+                            .entry(address)
+                            .and_modify(|entry| {
+                                entry.insert(imm_index, imm_value);
+                            })
+                            .or_insert_with(|| {
+                                let mut value = HashMap::default();
+                                value.insert(imm_index, imm_value);
+                                value
+                            });
+                    }
+                }
+            }
+        }
+
         if let Some(delegate_as) = self.call_context.delegate_as {
             if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
                 let current = state.vm_local_state.callstack.current;
@@ -404,7 +464,11 @@ impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
         _stop_reason: zksync_multivm::interface::tracer::VmExecutionStopReason,
     ) {
         let cell = self.result.as_ref();
-        cell.set(CheatcodeTracerResult { expected_calls: self.expected_calls.clone() }).unwrap();
+        cell.set(CheatcodeTracerResult {
+            expected_calls: self.expected_calls.clone(),
+            recorded_immutables: self.recorded_immutables.clone(),
+        })
+        .unwrap();
     }
 }
 

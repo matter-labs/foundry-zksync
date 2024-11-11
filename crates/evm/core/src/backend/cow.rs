@@ -21,7 +21,10 @@ use revm::{
     },
     Database, DatabaseCommit, JournaledState,
 };
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashSet},
+};
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
@@ -131,6 +134,10 @@ impl<'a> CowBackend<'a> {
 impl DatabaseExt for CowBackend<'_> {
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
         self.backend.to_mut().get_fork_info(id)
+    }
+
+    fn save_zk_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
+        self.backend.to_mut().save_zk_immutable_storage(addr, keys)
     }
 
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
