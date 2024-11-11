@@ -154,7 +154,8 @@ impl LinkedBuildData {
             for (id, contract) in zk_contracts {
                 if let Some(abi) = contract.abi {
                     let bytecode = contract.bytecode.as_ref();
-                    if let Some(bytecode_object) = bytecode.map(|b| b.object.clone()) {
+                    //TODO(zk): retrieve link_references
+                    if let Some(bytecode_object) = bytecode.map(|b| b.object()) {
                         let compact_bytecode = CompactBytecode {
                             object: bytecode_object.clone(),
                             source_map: None,
