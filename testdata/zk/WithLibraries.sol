@@ -2,16 +2,16 @@
 
 pragma solidity >=0.8.7 <0.9.0;
 
-import "forge-std/console.sol";
-
 library Foo {
-    function foo() external pure {
-        console.log("I'm a library");
+    function add(uint a, uint b) external pure returns (uint c){
+        c = a + b;
     }
 }
 
 contract UsesFoo {
+    uint number;
+
     constructor() {
-        Foo.foo();
+        number = Foo.add(42, 0);
     }
 }
