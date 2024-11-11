@@ -15,7 +15,8 @@ use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
 use foundry_zksync_core::{
-    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use itertools::Itertools;
 use revm::{
@@ -99,6 +100,14 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
     /// If exists, we return the information about the fork, namely it's type (ZK or EVM)
     /// and the the fork environment.
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo>;
+
+    /// Saves the storage keys for immutable variables per address.
+    ///
+    /// These are required during fork to help merge the persisted addresses, as they are stored
+    /// hashed so there is currently no way to retrieve all the address associated storage keys.
+    /// We store all the storage keys here, even if the addresses are not marked persistent as
+    /// they can be marked at a later stage as well.
+    fn save_zk_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>);
 
     /// Reverts the snapshot if it exists
     ///
@@ -491,6 +500,8 @@ pub struct Backend {
     /// The balance, nonce and code are stored under zkSync's respective system contract
     /// storages. These need to be merged into the forked storage.
     pub is_zk: bool,
+    /// Store storage keys per contract address for immutable variables.
+    zk_recorded_immutable_keys: HashMap<Address, HashSet<U256>>,
 }
 
 impl Backend {
@@ -524,6 +535,7 @@ impl Backend {
             inner,
             fork_url_type: Default::default(),
             is_zk: false,
+            zk_recorded_immutable_keys: Default::default(),
         };
 
         if let Some(fork) = fork {
@@ -564,6 +576,7 @@ impl Backend {
             inner: Default::default(),
             fork_url_type: Default::default(),
             is_zk: false,
+            zk_recorded_immutable_keys: Default::default(),
         }
     }
 
@@ -670,13 +683,13 @@ impl Backend {
         &self,
         active_journaled_state: &mut JournaledState,
         target_fork: &mut Fork,
-        merge_zk_db: bool,
+        zk_state: Option<ZkMergeState>,
     ) {
         self.update_fork_db_contracts(
             self.inner.persistent_accounts.iter().copied(),
             active_journaled_state,
             target_fork,
-            merge_zk_db,
+            zk_state,
         )
     }
 
@@ -686,17 +699,17 @@ impl Backend {
         accounts: impl IntoIterator<Item = Address>,
         active_journaled_state: &mut JournaledState,
         target_fork: &mut Fork,
-        merge_zk_db: bool,
+        zk_state: Option<ZkMergeState>,
     ) {
         if let Some(db) = self.active_fork_db() {
-            merge_account_data(accounts, db, active_journaled_state, target_fork, merge_zk_db)
+            merge_account_data(accounts, db, active_journaled_state, target_fork, zk_state)
         } else {
             merge_account_data(
                 accounts,
                 &self.mem_db,
                 active_journaled_state,
                 target_fork,
-                merge_zk_db,
+                zk_state,
             )
         }
     }
@@ -984,6 +997,13 @@ impl DatabaseExt for Backend {
         Ok(ForkInfo { fork_type, fork_env })
     }
 
+    fn save_zk_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
+        self.zk_recorded_immutable_keys
+            .entry(addr)
+            .and_modify(|entry| entry.extend(&keys))
+            .or_insert(keys);
+    }
+
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
         trace!("create snapshot");
         let id = self.inner.state_snapshots.insert(BackendStateSnapshot::new(
@@ -1144,6 +1164,9 @@ impl DatabaseExt for Backend {
             .map(|url| self.fork_url_type.get(&url).is_zk())
             .unwrap_or_default();
         let merge_zk_db = is_current_zk_fork && is_target_zk_fork;
+        let zk_state = merge_zk_db.then(|| ZkMergeState {
+            persistent_immutable_keys: self.zk_recorded_immutable_keys.clone(),
+        });
 
         let fork_env = self
             .forks
@@ -1212,7 +1235,7 @@ impl DatabaseExt for Backend {
                 caller_account.into()
             });
 
-            self.update_fork_db(active_journaled_state, &mut fork, merge_zk_db);
+            self.update_fork_db(active_journaled_state, &mut fork, zk_state);
 
             // insert the fork back
             self.inner.set_fork(idx, fork);
@@ -1930,6 +1953,12 @@ pub(crate) fn update_current_env_with_fork_env(current: &mut Env, fork: Env) {
     current.tx.chain_id = fork.tx.chain_id;
 }
 
+/// Defines the zksync specific state to help during merge.
+#[derive(Debug, Default)]
+pub(crate) struct ZkMergeState {
+    persistent_immutable_keys: HashMap<Address, HashSet<U256>>,
+}
+
 /// Clones the data of the given `accounts` from the `active` database into the `fork_db`
 /// This includes the data held in storage (`CacheDB`) and kept in the `JournaledState`.
 pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
@@ -1937,19 +1966,20 @@ pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
     active: &CacheDB<ExtDB>,
     active_journaled_state: &mut JournaledState,
     target_fork: &mut Fork,
-    merge_zk_db: bool,
+    zk_state: Option<ZkMergeState>,
 ) {
     for addr in accounts.into_iter() {
         merge_db_account_data(addr, active, &mut target_fork.db);
-        if merge_zk_db {
-            merge_zk_account_data(addr, active, &mut target_fork.db);
+        if let Some(zk_state) = &zk_state {
+            merge_zk_account_data(addr, active, &mut target_fork.db, zk_state);
         }
         merge_journaled_state_data(addr, active_journaled_state, &mut target_fork.journaled_state);
-        if merge_zk_db {
+        if let Some(zk_state) = &zk_state {
             merge_zk_journaled_state_data(
                 addr,
                 active_journaled_state,
                 &mut target_fork.journaled_state,
+                zk_state,
             );
         }
     }
@@ -2020,53 +2050,66 @@ fn merge_zk_account_data<ExtDB: DatabaseRef>(
     addr: Address,
     active: &CacheDB<ExtDB>,
     fork_db: &mut ForkDB,
+    _zk_state: &ZkMergeState,
 ) {
-    let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
-        let Some(acc) = active.accounts.get(&system_contract) else { return };
+    let merge_system_contract_entry =
+        |fork_db: &mut ForkDB, system_contract: Address, slot: U256| {
+            let Some(acc) = active.accounts.get(&system_contract) else { return };
 
-        // port contract cache over
-        if let Some(code) = active.contracts.get(&acc.info.code_hash) {
-            trace!("merging contract cache");
-            fork_db.contracts.insert(acc.info.code_hash, code.clone());
-        }
-
-        // prepare only the specified slot in account storage
-        let mut new_acc = acc.clone();
-        new_acc.storage = Default::default();
-        if let Some(value) = acc.storage.get(&slot) {
-            new_acc.storage.insert(slot, *value);
-        }
-
-        // port account storage over
-        match fork_db.accounts.entry(system_contract) {
-            Entry::Vacant(vacant) => {
-                trace!("target account not present - inserting from active");
-                // if the fork_db doesn't have the target account
-                // insert the entire thing
-                vacant.insert(new_acc);
+            // port contract cache over
+            if let Some(code) = active.contracts.get(&acc.info.code_hash) {
+                trace!("merging contract cache");
+                fork_db.contracts.insert(acc.info.code_hash, code.clone());
             }
-            Entry::Occupied(mut occupied) => {
-                trace!("target account present - merging storage slots");
-                // if the fork_db does have the system,
-                // extend the existing storage (overriding)
-                let fork_account = occupied.get_mut();
-                fork_account.storage.extend(&new_acc.storage);
+
+            // prepare only the specified slot in account storage
+            let mut new_acc = acc.clone();
+            new_acc.storage = Default::default();
+            if let Some(value) = acc.storage.get(&slot) {
+                new_acc.storage.insert(slot, *value);
             }
-        }
-    };
+
+            // port account storage over
+            match fork_db.accounts.entry(system_contract) {
+                Entry::Vacant(vacant) => {
+                    trace!("target account not present - inserting from active");
+                    // if the fork_db doesn't have the target account
+                    // insert the entire thing
+                    vacant.insert(new_acc);
+                }
+                Entry::Occupied(mut occupied) => {
+                    trace!("target account present - merging storage slots");
+                    // if the fork_db does have the system,
+                    // extend the existing storage (overriding)
+                    let fork_account = occupied.get_mut();
+                    fork_account.storage.extend(&new_acc.storage);
+                }
+            }
+        };
 
     merge_system_contract_entry(
+        fork_db,
         L2_BASE_TOKEN_ADDRESS.to_address(),
         foundry_zksync_core::get_balance_key(addr),
     );
     merge_system_contract_entry(
+        fork_db,
         ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
         foundry_zksync_core::get_account_code_key(addr),
     );
     merge_system_contract_entry(
+        fork_db,
         NONCE_HOLDER_ADDRESS.to_address(),
         foundry_zksync_core::get_nonce_key(addr),
     );
+
+    if let Some(acc) = active.accounts.get(&addr) {
+        merge_system_contract_entry(
+            fork_db,
+            KNOWN_CODES_STORAGE_ADDRESS.to_address(),
+            U256::from_be_slice(&acc.info.code_hash.0[..]),
+        );
+    }
 }
 
 /// Clones the account data from the `active_journaled_state` into the `fork_journaled_state` for
@@ -2075,40 +2118,61 @@ fn merge_zk_journaled_state_data(
     addr: Address,
     active_journaled_state: &JournaledState,
     fork_journaled_state: &mut JournaledState,
+    zk_state: &ZkMergeState,
 ) {
-    let mut merge_system_contract_entry = |system_contract: Address, slot: U256| {
-        if let Some(acc) = active_journaled_state.state.get(&system_contract) {
-            // prepare only the specified slot in account storage
-            let mut new_acc = acc.clone();
-            new_acc.storage = Default::default();
-            if let Some(value) = acc.storage.get(&slot).cloned() {
-                new_acc.storage.insert(slot, value);
-            }
+    let merge_system_contract_entry =
+        |fork_journaled_state: &mut JournaledState, system_contract: Address, slot: U256| {
+            if let Some(acc) = active_journaled_state.state.get(&system_contract) {
+                // prepare only the specified slot in account storage
+                let mut new_acc = acc.clone();
+                new_acc.storage = Default::default();
+                if let Some(value) = acc.storage.get(&slot).cloned() {
+                    new_acc.storage.insert(slot, value);
+                }
 
-            match fork_journaled_state.state.entry(system_contract) {
-                Entry::Vacant(vacant) => {
-                    vacant.insert(new_acc);
-                }
-                Entry::Occupied(mut occupied) => {
-                    let fork_account = occupied.get_mut();
-                    fork_account.storage.extend(new_acc.storage);
+                match fork_journaled_state.state.entry(system_contract) {
+                    Entry::Vacant(vacant) => {
+                        vacant.insert(new_acc);
+                    }
+                    Entry::Occupied(mut occupied) => {
+                        let fork_account = occupied.get_mut();
+                        fork_account.storage.extend(new_acc.storage);
+                    }
                 }
             }
-        }
-    };
+        };
 
     merge_system_contract_entry(
+        fork_journaled_state,
         L2_BASE_TOKEN_ADDRESS.to_address(),
         foundry_zksync_core::get_balance_key(addr),
     );
     merge_system_contract_entry(
+        fork_journaled_state,
         ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
         foundry_zksync_core::get_account_code_key(addr),
     );
     merge_system_contract_entry(
+        fork_journaled_state,
         NONCE_HOLDER_ADDRESS.to_address(),
         foundry_zksync_core::get_nonce_key(addr),
     );
+
+    if let Some(acc) = active_journaled_state.state.get(&addr) {
+        merge_system_contract_entry(
+            fork_journaled_state,
+            KNOWN_CODES_STORAGE_ADDRESS.to_address(),
+            U256::from_be_slice(&acc.info.code_hash.0[..]),
+        );
+    }
+
+    // merge immutable storage.
+    let immutable_simulator_addr = IMMUTABLE_SIMULATOR_STORAGE_ADDRESS.to_address();
+    if let Some(immutable_storage_keys) = zk_state.persistent_immutable_keys.get(&addr) {
+        for slot_key in immutable_storage_keys {
+            merge_system_contract_entry(fork_journaled_state, immutable_simulator_addr, *slot_key);
+        }
+    }
 }
 
 /// Returns true of the address is a contract
