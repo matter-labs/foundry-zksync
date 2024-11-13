@@ -27,8 +27,7 @@ use zksync_multivm::{
 };
 use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    l2::L2Tx, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
-    CONTRACT_DEPLOYER_ADDRESS,
+    get_nonce_key, l2::L2Tx, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS
 };
 use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
@@ -190,6 +189,9 @@ where
     let is_create = call_ctx.is_create;
     info!(?call_ctx, "executing transaction in zk vm");
 
+    let initiator_address = tx.common_data.initiator_address;
+    let should_update_nonce = ccx.should_update_nonce;
+
     if tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
         // Fails without a signature here: https://github.com/matter-labs/zksync-era/blob/73a1e8ff564025d06e02c2689da238ae47bb10c3/core/lib/types/src/transaction_request.rs#L381
@@ -336,6 +338,14 @@ where
         let previous = era_db.sload(address, index);
         let entry = storage.entry(address).or_default();
         entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
+
+        if k.address() == &NONCE_HOLDER_ADDRESS && get_nonce_key(&initiator_address) == *k {
+            if !should_update_nonce {
+                println!("Ignoring nonce update for {:?}", initiator_address);
+                continue;
+            }
+            println!("Updating nonce for {:?}", initiator_address);
+        }
 
         if k.address() == &ACCOUNT_CODE_STORAGE_ADDRESS {
             if let Some(bytecode) = bytecodes.get(&h256_to_u256(*v)) {

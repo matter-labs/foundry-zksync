@@ -575,6 +575,8 @@ pub struct Cheatcodes {
     /// This can be done as each test runs with its own [Cheatcodes] instance, thereby
     /// providing the necessary level of isolation.
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
+
+    pub should_update_nonce: Option<bool>,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
@@ -671,6 +673,7 @@ impl Cheatcodes {
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
             zk_use_factory_deps: Default::default(),
+            should_update_nonce: None,
         }
     }
 
@@ -1132,6 +1135,8 @@ impl Cheatcodes {
             }
         }
 
+        self.should_update_nonce.take();
+
         None
     }
 
@@ -1201,7 +1206,11 @@ impl Cheatcodes {
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
+            should_update_nonce: self.broadcast.is_some() || self.should_update_nonce.unwrap_or_default(),
         };
+        
+        println!("should_update_nonce??: {:?}", ccx.should_update_nonce);
+
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
             value: input.value().to_u256(),
             msg_sender: input.caller(),
@@ -1783,6 +1792,8 @@ where {
             }
         }
 
+        self.should_update_nonce.take();
+
         None
     }
 
@@ -1826,6 +1837,7 @@ where {
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
+            should_update_nonce: self.broadcast.is_some() || self.should_update_nonce.unwrap_or_default(),
         };
 
         let mut gas = Gas::new(call.gas_limit);
