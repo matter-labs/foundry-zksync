@@ -673,7 +673,7 @@ impl Cheatcodes {
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
             zk_use_factory_deps: Default::default(),
-            should_update_nonce: None,
+            zk_should_update_nonce: None,
         }
     }
 
@@ -1135,7 +1135,7 @@ impl Cheatcodes {
             }
         }
 
-        self.should_update_nonce.take();
+        self.zk_should_update_nonce.take();
 
         None
     }
@@ -1207,7 +1207,7 @@ impl Cheatcodes {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
             should_update_nonce: self.broadcast.is_some() ||
-                self.should_update_nonce.unwrap_or_default(),
+                self.zk_should_update_nonce.unwrap_or_default(),
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -1480,7 +1480,7 @@ where {
                 }
             };
             let prev = account.info.nonce;
-            let zk_nonce = prev.saturating_sub(1);
+            let nonce = prev.saturating_sub(1);
             account.info.nonce = nonce;
             // NOTE(zk): We sync with the nonce changes to ensure that the nonce matches
             foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx_inner);
@@ -1794,7 +1794,7 @@ where {
             }
         }
 
-        self.should_update_nonce.take();
+        self.zk_should_update_nonce.take();
 
         None
     }
@@ -1840,7 +1840,7 @@ where {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
             should_update_nonce: self.broadcast.is_some() ||
-                self.should_update_nonce.unwrap_or_default(),
+                self.zk_should_update_nonce.unwrap_or_default(),
         };
 
         let mut gas = Gas::new(call.gas_limit);
