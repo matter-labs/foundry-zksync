@@ -18,7 +18,7 @@ contract ScriptSetupNonce is Script {
     function run() public {
         uint256 initial_nonce = checkNonce(address(tx.origin));
         assert(initial_nonce == vm.getNonce(address(tx.origin)));
-        Greeter not_broadcasted_greeter = new Greeter();
+        Greeter notBroadcastGreeter = new Greeter();
         not_broadcasted_greeter.greeting("john");
         assert(checkNonce(address(tx.origin)) == initial_nonce);
         vm.startBroadcast();
