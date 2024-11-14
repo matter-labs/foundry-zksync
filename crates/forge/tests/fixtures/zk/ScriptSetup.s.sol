@@ -9,26 +9,25 @@ contract ScriptSetupNonce is Script {
 
     function setUp() public {
         // Perform transactions and deploy contracts in setup to increment nonce and verify broadcast nonce matches onchain
-        // new Greeter();
-        // new Greeter();
         new Greeter();
-        // new Greeter();
+        new Greeter();
+        new Greeter();
+        new Greeter();
     }
 
     function run() public {
-        // NonceChecker checker1 = new NonceChecker();
-        // checker1.checkNonce();
-        // checker1.checkNonce();
-        // vm.getNonce(address(tx.origin));
-        // checkNonce(tx.origin);
-        // vm.getNonce(address(tx.origin));
+        NonceChecker checker1 = new NonceChecker();
+        checker1.checkNonce();
+        checker1.checkNonce();
+        vm.getNonce(address(tx.origin));
+        checkNonce(tx.origin);
+        vm.getNonce(address(tx.origin));
         vm.startBroadcast();
         Greeter greeter = new Greeter();
-        // greeter.greeting("john");
-        // NonceChecker checker = new NonceChecker();
-        // NonceChecker checker2 = new NonceChecker();
-        // checker.assertNonce(vm.getNonce(address(tx.origin)) + 1);
-        // checker.assertDeployNonce(2);
+        greeter.greeting("john");
+        NonceChecker checker = new NonceChecker();
+        NonceChecker checker2 = new NonceChecker();
+        checker.assertNonce(vm.getNonce(address(tx.origin)) + 1);
         vm.stopBroadcast();
     }
 
@@ -57,11 +56,5 @@ contract NonceChecker {
         uint256 real_nonce = checkNonce();
         console.log("real_nonce", real_nonce);
         require(real_nonce == expected, "Nonce mismatch");
-    }
-
-    function assertDeployNonce(uint256 expected) public {
-        uint256 real_deploy_nonce = checkDeployNonce();
-        console.log("real_deploy_nonce", real_deploy_nonce);
-        require(real_deploy_nonce == expected, "Deploy nonce mismatch");
     }
 }

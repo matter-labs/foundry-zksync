@@ -1206,9 +1206,10 @@ impl Cheatcodes {
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
-            should_update_nonce: self.broadcast.is_some() || self.should_update_nonce.unwrap_or_default(),
+            should_update_nonce: self.broadcast.is_some() ||
+                self.should_update_nonce.unwrap_or_default(),
         };
-        
+
         println!("should_update_nonce??: {:?}", ccx.should_update_nonce);
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -1481,9 +1482,12 @@ where {
                 }
             };
             let prev = account.info.nonce;
-            account.info.nonce = prev.saturating_sub(1);
+            let nonce = prev.saturating_sub(1);
+            account.info.nonce = nonce;
+            // We sync with the nonce changes to ensure that the nonce matches
+            foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx_inner);
 
-            trace!(target: "cheatcodes", %sender, nonce=account.info.nonce, prev, "corrected nonce");
+            trace!(target: "cheatcodes", %sender, nonce, prev, "corrected nonce");
         }
 
         if call.target_address == CHEATCODE_ADDRESS {
@@ -1837,7 +1841,8 @@ where {
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
-            should_update_nonce: self.broadcast.is_some() || self.should_update_nonce.unwrap_or_default(),
+            should_update_nonce: self.broadcast.is_some() ||
+                self.should_update_nonce.unwrap_or_default(),
         };
 
         let mut gas = Gas::new(call.gas_limit);

@@ -9,7 +9,7 @@ use tracing::info;
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     get_nonce_key,
-    utils::{decompose_full_nonce, storage_key_for_eth_balance},
+    utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
     ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
     L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
@@ -94,7 +94,13 @@ where
     let zk_address = address.to_h160();
     let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
     ecx.touch(&nonce_addr);
-    ecx.sstore(nonce_addr, nonce_key, tx_nonce.to_ru256()).expect("failed storing value");
+    // We make sure to keep the old deployment nonce
+    let old_deploy_nonce = ecx
+        .sload(nonce_addr, nonce_key)
+        .map(|v| decompose_full_nonce(v.to_u256()).1)
+        .unwrap_or_default();
+    let updated_nonce = nonces_to_full_nonce(tx_nonce, old_deploy_nonce);
+    ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
 }
 
 /// Gets nonce for a specific address.

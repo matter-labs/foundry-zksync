@@ -16,5 +16,5 @@ mod ownership;
 mod paymaster;
 mod proxy;
 mod repros;
-mod traces;
 mod setup_script;
+mod traces;

@@ -27,7 +27,8 @@ use zksync_multivm::{
 };
 use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    get_nonce_key, l2::L2Tx, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS
+    get_nonce_key, l2::L2Tx, PackedEthSignature, StorageKey, Transaction,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
@@ -331,21 +332,18 @@ where
 
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
-    for (k, v) in &modified_storage {
+    // We skip nonce updates when should_update_nonce is false to avoid nonce mismatch
+    for (k, v) in modified_storage.iter().filter(|(k, _)| {
+        !(k.address() == &NONCE_HOLDER_ADDRESS &&
+            get_nonce_key(&initiator_address) == **k &&
+            !should_update_nonce)
+    }) {
         let address = k.address().to_address();
         let index = k.key().to_ru256();
         era_db.load_account(address);
         let previous = era_db.sload(address, index);
         let entry = storage.entry(address).or_default();
         entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
-
-        if k.address() == &NONCE_HOLDER_ADDRESS && get_nonce_key(&initiator_address) == *k {
-            if !should_update_nonce {
-                println!("Ignoring nonce update for {:?}", initiator_address);
-                continue;
-            }
-            println!("Updating nonce for {:?}", initiator_address);
-        }
 
         if k.address() == &ACCOUNT_CODE_STORAGE_ADDRESS {
             if let Some(bytecode) = bytecodes.get(&h256_to_u256(*v)) {
