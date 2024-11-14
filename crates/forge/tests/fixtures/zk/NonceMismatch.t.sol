@@ -13,7 +13,7 @@ contract NonceMismatchTest is Test {
         new Greeter();
     }
 
-    function testNonceMismatch() public {
+    function testTxOriginNonceDoesNotUpdate() public {
         uint256 nonce = vm.getNonce(address(tx.origin));
         assertEq(nonce, 2);
 
