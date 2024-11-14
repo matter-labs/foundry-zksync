@@ -1480,7 +1480,7 @@ where {
                 }
             };
             let prev = account.info.nonce;
-            let nonce = prev.saturating_sub(1);
+            let zk_nonce = prev.saturating_sub(1);
             account.info.nonce = nonce;
             // We sync with the nonce changes to ensure that the nonce matches
             foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx_inner);
