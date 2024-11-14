@@ -114,6 +114,9 @@ impl ContractRunner<'_> {
         }
 
         let address = self.sender.create(self.executor.get_nonce(self.sender)?);
+        // NOTE(zk): the test contract is set here instead of where upstream does it as
+        // the test contract address needs to be retrieved in order to skip
+        // zkEVM mode for the creation of the test address (and for calls to it later).
         self.executor.backend_mut().set_test_contract(address);
 
         // Set the contracts initial balance before deployment, so it is available during
