@@ -576,7 +576,7 @@ pub struct Cheatcodes {
     /// providing the necessary level of isolation.
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 
-    pub should_update_nonce: Option<bool>,
+    pub zk_should_update_nonce: Option<bool>,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
