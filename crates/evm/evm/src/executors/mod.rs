@@ -429,7 +429,6 @@ impl Executor {
     pub fn call_with_env(&self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector().clone();
         if let Some(cheatcodes) = inspector.cheatcodes.as_mut() {
-            println!("CALL: This should happen once");
             cheatcodes.should_update_nonce = Some(true);
         }
         let mut backend = CowBackend::new_borrowed(self.backend());
@@ -455,7 +454,6 @@ impl Executor {
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         if let Some(cheatcodes) = inspector.cheatcodes.as_mut() {
-            println!("TRANSACT: This should happen once");
             cheatcodes.should_update_nonce = Some(true);
         }
         let backend = &mut self.backend;

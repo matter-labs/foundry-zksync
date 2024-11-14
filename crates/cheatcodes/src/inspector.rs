@@ -1210,8 +1210,6 @@ impl Cheatcodes {
                 self.should_update_nonce.unwrap_or_default(),
         };
 
-        println!("should_update_nonce??: {:?}", ccx.should_update_nonce);
-
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
             value: input.value().to_u256(),
             msg_sender: input.caller(),

@@ -90,7 +90,7 @@ pub struct CheatcodeTracerContext<'a> {
     pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     /// Paymaster data
     pub paymaster_data: Option<ZkPaymasterData>,
-    /// Whether to update the nonce
+    /// Whether to persist the nonce updates or not
     pub should_update_nonce: bool,
 }
 
