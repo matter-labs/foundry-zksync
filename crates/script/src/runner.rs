@@ -172,6 +172,7 @@ impl ScriptRunner {
 
         // Optionally call the `setUp` function
         let (success, gas_used, labeled_addresses, transactions) = if !setup {
+            // NOTE(zk): keeping upstream code for context. Test contract is only set on this branch
             // self.executor.backend_mut().set_test_contract(address);
             (true, 0, Default::default(), Some(library_transactions))
         } else {
