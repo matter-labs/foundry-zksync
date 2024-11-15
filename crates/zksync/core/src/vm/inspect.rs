@@ -333,11 +333,13 @@ where
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
     // We skip nonce updates when should_update_nonce is false to avoid nonce mismatch
-    for (k, v) in modified_storage.iter().filter(|(k, _)| {
+    let filtered = modified_storage.iter().filter(|(k, _)| {
         !(k.address() == &NONCE_HOLDER_ADDRESS &&
             get_nonce_key(&initiator_address) == **k &&
             !should_update_nonce)
-    }) {
+    });
+
+    for (k, v) in filtered {
         let address = k.address().to_address();
         let index = k.key().to_ru256();
         era_db.load_account(address);

@@ -576,6 +576,8 @@ pub struct Cheatcodes {
     /// providing the necessary level of isolation.
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 
+    /// Whether to persist nonce updates in ZK-VM. This is an option to act as a sticky flag
+    /// for the nonce updates.
     pub zk_should_update_nonce: Option<bool>,
 }
 
@@ -1207,7 +1209,7 @@ impl Cheatcodes {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
             should_update_nonce: self.broadcast.is_some() ||
-                self.zk_should_update_nonce.unwrap_or_default(),
+                self.zk_should_update_nonce.take().unwrap_or_default(),
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -1840,7 +1842,7 @@ where {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
             should_update_nonce: self.broadcast.is_some() ||
-                self.zk_should_update_nonce.unwrap_or_default(),
+                self.zk_should_update_nonce.take().unwrap_or_default(),
         };
 
         let mut gas = Gas::new(call.gas_limit);
