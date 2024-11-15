@@ -10,8 +10,6 @@ forgetest_async!(test_zk_can_broadcast_with_keystore_account, |prj, cmd| {
     prj.add_script("Deploy.s.sol", include_str!("../../fixtures/zk/Deploy.s.sol")).unwrap();
     prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
 
-    let config = cmd.config();
-    prj.write_config(config);
     let node = ZkSyncNode::start();
     let url = node.url();
 
