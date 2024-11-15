@@ -44,7 +44,7 @@ pub use zksync_types::{
 };
 use zksync_types::{utils::storage_key_for_eth_balance, U256};
 pub use zksync_utils::bytecode::hash_bytecode;
-use zksync_web3_rs::{
+pub use zksync_web3_rs::{
     eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest, PaymasterParams},
     zks_provider::types::Fee,
     zks_utils::EIP712_TX_TYPE,
