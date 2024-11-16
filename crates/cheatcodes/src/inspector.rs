@@ -431,7 +431,7 @@ impl ZkPersistNonceUpdate {
         *self = Self::PersistNext;
     }
 
-    /// Retrieve if a nonce update must be persisted, or not.
+    /// Retrieve if a nonce update must be persisted, or not. Resets the state to default.
     pub fn get(&mut self) -> bool {
         let persist_nonce_update = match self {
             ZkPersistNonceUpdate::Never => false,
@@ -1232,13 +1232,14 @@ impl Cheatcodes {
         let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
         tracing::debug!(contract = contract.name, "using dual compiled contract");
 
+        let zk_persist_nonce_update = self.zk_persist_nonce_update.get();
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: self.mocked_calls.clone(),
             expected_calls: Some(&mut self.expected_calls),
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
-            persist_nonce_update: self.broadcast.is_some() || self.zk_persist_nonce_update.get(),
+            persist_nonce_update: self.broadcast.is_some() || zk_persist_nonce_update,
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
