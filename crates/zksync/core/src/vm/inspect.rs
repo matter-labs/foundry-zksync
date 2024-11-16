@@ -191,7 +191,7 @@ where
     info!(?call_ctx, "executing transaction in zk vm");
 
     let initiator_address = tx.common_data.initiator_address;
-    let should_update_nonce = ccx.should_update_nonce;
+    let persist_nonce_update = ccx.persist_nonce_update;
 
     if tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -336,7 +336,7 @@ where
     let filtered = modified_storage.iter().filter(|(k, _)| {
         !(k.address() == &NONCE_HOLDER_ADDRESS &&
             get_nonce_key(&initiator_address) == **k &&
-            !should_update_nonce)
+            !persist_nonce_update)
     });
 
     for (k, v) in filtered {

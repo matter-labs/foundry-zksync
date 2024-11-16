@@ -410,6 +410,39 @@ impl ArbitraryStorage {
 /// List of transactions that can be broadcasted.
 pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 
+/// Allows overriding nonce update behavior for the tx caller in the zkEVM.
+///
+/// Since each CREATE or CALL is executed as a separate transaction within zkEVM, we currently skip
+/// persisting nonce updates as it erroneously increments the tx nonce. However, under certain
+/// situations, e.g. deploying contracts, transacts, etc. the nonce updates must be persisted.
+#[derive(Default, Debug, Clone)]
+pub enum ZkPersistNonceUpdate {
+    /// Never update the nonce. This is currently the default behavior.
+    #[default]
+    Never,
+    /// Override the default behavior, and persist nonce update for tx caller for the next
+    /// zkEVM execution _only_.
+    PersistNext,
+}
+
+impl ZkPersistNonceUpdate {
+    /// Persist nonce update for the tx caller for next execution.
+    pub fn persist_next(&mut self) {
+        *self = Self::PersistNext;
+    }
+
+    /// Retrieve if a nonce update must be persisted, or not.
+    pub fn get(&mut self) -> bool {
+        let persist_nonce_update = match self {
+            ZkPersistNonceUpdate::Never => false,
+            ZkPersistNonceUpdate::PersistNext => true,
+        };
+        *self = Default::default();
+
+        persist_nonce_update
+    }
+}
+
 /// An EVM inspector that handles calls to various cheatcodes, each with their own behavior.
 ///
 /// Cheatcodes can be called by contracts during execution to modify the VM environment, such as
@@ -576,9 +609,8 @@ pub struct Cheatcodes {
     /// providing the necessary level of isolation.
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 
-    /// Whether to persist nonce updates in ZK-VM. This is an option to act as a sticky flag
-    /// for the nonce updates.
-    pub zk_should_update_nonce: Option<bool>,
+    /// Nonce update persistence behavior in zkEVM for the tx caller.
+    pub zk_persist_nonce_update: ZkPersistNonceUpdate,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
@@ -675,7 +707,7 @@ impl Cheatcodes {
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
             zk_use_factory_deps: Default::default(),
-            zk_should_update_nonce: None,
+            zk_persist_nonce_update: Default::default(),
         }
     }
 
@@ -1137,8 +1169,6 @@ impl Cheatcodes {
             }
         }
 
-        self.zk_should_update_nonce.take();
-
         None
     }
 
@@ -1208,8 +1238,7 @@ impl Cheatcodes {
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
-            should_update_nonce: self.broadcast.is_some() ||
-                self.zk_should_update_nonce.take().unwrap_or_default(),
+            persist_nonce_update: self.broadcast.is_some() || self.zk_persist_nonce_update.get(),
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -1796,8 +1825,6 @@ where {
             }
         }
 
-        self.zk_should_update_nonce.take();
-
         None
     }
 
@@ -1841,8 +1868,7 @@ where {
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
-            should_update_nonce: self.broadcast.is_some() ||
-                self.zk_should_update_nonce.take().unwrap_or_default(),
+            persist_nonce_update: self.broadcast.is_some() || self.zk_persist_nonce_update.get(),
         };
 
         let mut gas = Gas::new(call.gas_limit);

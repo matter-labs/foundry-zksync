@@ -78,7 +78,7 @@ where
 
     let mut ccx = CheatcodeTracerContext {
         persisted_factory_deps,
-        should_update_nonce: true,
+        persist_nonce_update: true,
         ..Default::default()
     };
 
