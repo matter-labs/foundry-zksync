@@ -2,7 +2,7 @@ use foundry_test_utils::{forgetest_async, util, TestProject};
 
 use crate::test_helpers::{deploy_zk_contract, run_zk_script_test};
 
-//TODO(zk): add test that actually does the deployment
+// TODO(zk): add test that actually does the deployment
 // of the unlinked contract via script, once recursive linking is supported
 // and once we also support doing deploy-time linking
 

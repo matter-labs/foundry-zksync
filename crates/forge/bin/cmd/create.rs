@@ -239,7 +239,7 @@ impl CreateArgs {
                             queue.push_back(dep.clone())
                         }
 
-                        //TODO(zk): ensure factory deps are also linked
+                        // TODO(zk): ensure factory deps are also linked
                         let fdep_bytecode = fdep_art
                             .bytecode
                             .clone()

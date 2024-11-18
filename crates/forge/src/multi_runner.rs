@@ -467,7 +467,7 @@ impl MultiContractRunnerBuilder {
                 if let Some(abi) = contract.abi {
                     let bytecode = contract.bytecode.as_ref();
 
-                    //TODO(zk): retrieve link_references
+                    // TODO(zk): retrieve link_references
                     if let Some(bytecode_object) = bytecode.map(|b| b.object()) {
                         let compact_bytecode = CompactBytecode {
                             object: bytecode_object.clone(),
