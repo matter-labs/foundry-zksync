@@ -660,7 +660,7 @@ impl Cheatcodes {
         let mut persisted_factory_deps = HashMap::new();
         persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
 
-        let zk_startup_migration = config.use_zk.then(|| ZkStartupMigration::Defer);
+        let zk_startup_migration = config.use_zk.then_some(ZkStartupMigration::Defer);
 
         Self {
             fs_commit: true,
