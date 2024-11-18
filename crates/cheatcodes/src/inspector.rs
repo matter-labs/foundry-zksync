@@ -427,7 +427,7 @@ impl ZkStartupMigration {
     /// Check if startup migration is allowed. Migration is not allowed, if marked to be skipped or
     /// has already been performed.
     pub fn is_allowed(&self) -> bool {
-        matches!(self, ZkStartupMigration::Allow)
+        matches!(self, Self::Allow)
     }
 
     /// Allow migrating the the DB to zkEVM storage.
