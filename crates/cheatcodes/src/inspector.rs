@@ -414,9 +414,12 @@ pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 /// the inspector so must only be performed once.
 #[derive(Debug, Default, Clone)]
 pub enum ZkStartupMigration {
-    /// Skip database migration.
+    /// Defer database migration to a later execution point.
+    ///
+    /// This is required as we need to wait for some baseline deployments
+    /// to occur before the test/script execution is performed.
     #[default]
-    Skip,
+    Defer,
     /// Allow database migration.
     Allow,
     /// Database migration has already been performed.
@@ -592,12 +595,8 @@ pub struct Cheatcodes {
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
 
-    /// The migration status of the database to zkEVM storage, if `startup_zk` is set to true.
-    pub zk_startup_migration: ZkStartupMigration,
-
-    /// Starts the cheatcode inspector in ZK mode.
-    /// This is set to `false`, once the startup migration is completed.
-    pub startup_zk: bool,
+    /// The migration status of the database to zkEVM storage, `None` if we start in EVM context.
+    pub zk_startup_migration: Option<ZkStartupMigration>,
 
     /// Factory deps stored through `zkUseFactoryDep`. These factory deps are used in the next
     /// CREATE or CALL, and cleared after.
@@ -661,14 +660,14 @@ impl Cheatcodes {
         let mut persisted_factory_deps = HashMap::new();
         persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
 
-        let startup_zk = config.use_zk;
+        let zk_startup_migration = config.use_zk.then(|| ZkStartupMigration::Defer);
+
         Self {
             fs_commit: true,
             labels: config.labels.clone(),
             config,
             dual_compiled_contracts,
-            zk_startup_migration: Default::default(),
-            startup_zk,
+            zk_startup_migration,
             block: Default::default(),
             gas_price: Default::default(),
             prank: Default::default(),
@@ -2011,9 +2010,16 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
             ecx.env.tx.gas_price = gas_price;
         }
 
-        if self.zk_startup_migration.is_allowed() && self.startup_zk && !self.use_zk_vm {
+        let migration_allowed = self
+            .zk_startup_migration
+            .as_ref()
+            .map(|migration| migration.is_allowed())
+            .unwrap_or(false);
+        if migration_allowed && !self.use_zk_vm {
             self.select_zk_vm(ecx, None);
-            self.zk_startup_migration.done();
+            if let Some(zk_startup_migration) = &mut self.zk_startup_migration {
+                zk_startup_migration.done();
+            }
             debug!("startup zkEVM storage migration completed");
         }
 
