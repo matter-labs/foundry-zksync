@@ -427,7 +427,7 @@ pub enum ZkStartupMigration {
 }
 
 impl ZkStartupMigration {
-    /// Check if startup migration is allowed. Migration is disallowed if it's to be defered or has
+    /// Check if startup migration is allowed. Migration is disallowed if it's to be deferred or has
     /// already been performed.
     pub fn is_allowed(&self) -> bool {
         matches!(self, Self::Allow)
