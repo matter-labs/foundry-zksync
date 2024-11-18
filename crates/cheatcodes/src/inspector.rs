@@ -1462,14 +1462,13 @@ where {
             };
             let prev = account.info.nonce;
             account.info.nonce = prev.saturating_sub(1);
-            let nonce = account.info.nonce;
+
+            trace!(target: "cheatcodes", %sender, nonce=account.info.nonce, prev, "corrected nonce");
 
             if self.startup_zk {
                 self.startup_zk = false; // We only do this once.
                 self.select_zk_vm(ecx_inner, None);
             }
-
-            trace!(target: "cheatcodes", %sender, nonce, prev, "corrected nonce");
         }
 
         if call.target_address == CHEATCODE_ADDRESS {
