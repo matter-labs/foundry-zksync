@@ -34,6 +34,8 @@ pub struct InvariantConfig {
     pub gas_report_samples: u32,
     /// Path where invariant failures are recorded and replayed.
     pub failure_persist_dir: Option<PathBuf>,
+    /// Whether to collect and display fuzzed selectors metrics.
+    pub show_metrics: bool,
     /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
     pub no_zksync_reserved_addresses: bool,
 }
@@ -50,6 +52,7 @@ impl Default for InvariantConfig {
             max_assume_rejects: 65536,
             gas_report_samples: 256,
             failure_persist_dir: None,
+            show_metrics: false,
             no_zksync_reserved_addresses: false,
         }
     }
@@ -68,6 +71,7 @@ impl InvariantConfig {
             max_assume_rejects: 65536,
             gas_report_samples: 256,
             failure_persist_dir: Some(cache_dir),
+            show_metrics: false,
             no_zksync_reserved_addresses: false,
         }
     }
@@ -107,6 +111,7 @@ impl InlineConfigParser for InvariantConfig {
                     conf_clone.failure_persist_dir = Some(PathBuf::from(value))
                 }
                 "shrink-run-limit" => conf_clone.shrink_run_limit = parse_config_u32(key, value)?,
+                "show-metrics" => conf_clone.show_metrics = parse_config_bool(key, value)?,
                 "no-zksync-reserved-addresses" => {
                     conf_clone.no_zksync_reserved_addresses = parse_config_bool(key, value)?
                 }

@@ -198,6 +198,8 @@ pub struct Config {
     pub gas_reports: Vec<String>,
     /// list of contracts to ignore for gas reports
     pub gas_reports_ignore: Vec<String>,
+    /// Whether to include gas reports for tests.
+    pub gas_reports_include_tests: bool,
     /// The Solc instance to use if any.
     ///
     /// This takes precedence over `auto_detect_solc`, if a version is set then this overrides
@@ -240,6 +242,8 @@ pub struct Config {
     pub eth_rpc_url: Option<String>,
     /// JWT secret that should be used for any rpc calls
     pub eth_rpc_jwt: Option<String>,
+    /// Timeout that should be used for any rpc calls
+    pub eth_rpc_timeout: Option<u64>,
     /// etherscan API key, or alias for an `EtherscanConfig` in `etherscan` table
     pub etherscan_api_key: Option<String>,
     /// Multiple etherscan api configs and their aliases
@@ -2211,6 +2215,7 @@ impl Default for Config {
             evm_version: EvmVersion::default(),
             gas_reports: vec!["*".to_string()],
             gas_reports_ignore: vec![],
+            gas_reports_include_tests: false,
             solc: None,
             vyper: Default::default(),
             auto_detect_solc: true,
@@ -2257,6 +2262,7 @@ impl Default for Config {
             memory_limit: 1 << 27, // 2**27 = 128MiB = 134_217_728 bytes
             eth_rpc_url: None,
             eth_rpc_jwt: None,
+            eth_rpc_timeout: None,
             etherscan_api_key: None,
             verbosity: 0,
             remappings: vec![],
