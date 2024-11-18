@@ -978,7 +978,6 @@ impl Cheatcodes {
             journaled_account(data, known_codes_addr).expect("failed to load account");
         known_codes_account.storage.extend(known_codes_storage.clone());
 
-        let test_contract = data.db.get_test_contract_address();
         for (address, info) in deployed_codes {
             let account = journaled_account(data, address).expect("failed to load account");
             let _ = std::mem::replace(&mut account.info.balance, info.balance);
