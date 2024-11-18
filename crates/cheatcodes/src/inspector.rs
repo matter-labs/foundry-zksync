@@ -410,8 +410,8 @@ impl ArbitraryStorage {
 /// List of transactions that can be broadcasted.
 pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 
-/// Setting for migrating the database to zkEVM storage. The migration is performed on the DB via
-/// the inspector so must only be performed once.
+/// Setting for migrating the database to zkEVM storage when starting in ZKsync mode.
+/// The migration is performed on the DB via the inspector so must only be performed once.
 #[derive(Debug, Default, Clone)]
 pub enum ZkStartupMigration {
     /// Defer database migration to a later execution point.
@@ -427,8 +427,8 @@ pub enum ZkStartupMigration {
 }
 
 impl ZkStartupMigration {
-    /// Check if startup migration is allowed. Migration is not allowed, if marked to be skipped or
-    /// has already been performed.
+    /// Check if startup migration is allowed. Migration is disallowed if it's to be defered or has
+    /// already been performed.
     pub fn is_allowed(&self) -> bool {
         matches!(self, Self::Allow)
     }
@@ -438,7 +438,7 @@ impl ZkStartupMigration {
         *self = Self::Allow
     }
 
-    /// Mark the migration as finished.
+    /// Mark the migration as completed. It must not be performed again.
     pub fn done(&mut self) {
         *self = Self::Done
     }
