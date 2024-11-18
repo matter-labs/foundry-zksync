@@ -144,6 +144,15 @@ impl ContractRunner<'_> {
 
         self.executor.deploy_create2_deployer()?;
 
+        // Test contract has already been deployed so we can migrate the database to zkEVM storage
+        // in the next runner execution.
+        if self.executor.use_zk {
+            if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
+                debug!("test contract deployed, allowing startup storage migration");
+                cheatcodes.zk_startup_migration.allow();
+            }
+        }
+
         // Optionally call the `setUp` function
         let result = if call_setup {
             trace!("calling setUp");

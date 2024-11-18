@@ -410,6 +410,37 @@ impl ArbitraryStorage {
 /// List of transactions that can be broadcasted.
 pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 
+/// Setting for migrating the database to zkEVM storage. The migration is performed on the DB via
+/// the inspector so must only be performed once.
+#[derive(Debug, Default, Clone)]
+pub enum ZkStartupMigration {
+    /// Skip database migration.
+    #[default]
+    Skip,
+    /// Allow database migration.
+    Allow,
+    /// Database migration has already been performed.
+    Done,
+}
+
+impl ZkStartupMigration {
+    /// Check if startup migration is allowed. Migration is not allowed, if marked to be skipped or
+    /// has already been performed.
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, ZkStartupMigration::Allow)
+    }
+
+    /// Allow migrating the the DB to zkEVM storage.
+    pub fn allow(&mut self) {
+        *self = Self::Allow
+    }
+
+    /// Mark the migration as finished.
+    pub fn done(&mut self) {
+        *self = Self::Done
+    }
+}
+
 /// An EVM inspector that handles calls to various cheatcodes, each with their own behavior.
 ///
 /// Cheatcodes can be called by contracts during execution to modify the VM environment, such as
@@ -561,6 +592,9 @@ pub struct Cheatcodes {
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
 
+    /// The migration status of the database to zkEVM storage, if `startup_zk` is set to true.
+    pub zk_startup_migration: ZkStartupMigration,
+
     /// Starts the cheatcode inspector in ZK mode.
     /// This is set to `false`, once the startup migration is completed.
     pub startup_zk: bool,
@@ -633,6 +667,7 @@ impl Cheatcodes {
             labels: config.labels.clone(),
             config,
             dual_compiled_contracts,
+            zk_startup_migration: Default::default(),
             startup_zk,
             block: Default::default(),
             gas_price: Default::default(),
@@ -1974,9 +2009,10 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
             ecx.env.tx.gas_price = gas_price;
         }
 
-        if self.startup_zk && !self.use_zk_vm {
-            self.startup_zk = false; // We only do this once.
+        if self.zk_startup_migration.is_allowed() && self.startup_zk && !self.use_zk_vm {
             self.select_zk_vm(ecx, None);
+            self.zk_startup_migration.done();
+            debug!("startup zkEVM storage migration completed");
         }
 
         // Record gas for current frame.
