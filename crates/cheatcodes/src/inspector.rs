@@ -906,6 +906,7 @@ impl Cheatcodes {
         let mut known_codes_storage: rHashMap<U256, EvmStorageSlot> = Default::default();
         let mut deployed_codes: HashMap<Address, AccountInfo> = Default::default();
 
+        let test_contract = data.db.get_test_contract_address();
         for address in data.db.persistent_accounts().into_iter().chain([data.env.tx.caller]) {
             info!(?address, "importing to zk state");
 
@@ -920,6 +921,12 @@ impl Cheatcodes {
 
             let nonce_key = get_nonce_key(address);
             nonce_storage.insert(nonce_key, EvmStorageSlot::new(full_nonce.to_ru256()));
+
+            if test_contract.map(|test_address| address == test_address).unwrap_or_default() {
+                // avoid migrating test contract code
+                tracing::trace!(?address, "ignoring code translation for test contract");
+                continue;
+            }
 
             if let Some(contract) = self.dual_compiled_contracts.iter().find(|contract| {
                 info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
@@ -976,12 +983,8 @@ impl Cheatcodes {
             let account = journaled_account(data, address).expect("failed to load account");
             let _ = std::mem::replace(&mut account.info.balance, info.balance);
             let _ = std::mem::replace(&mut account.info.nonce, info.nonce);
-            if test_contract.map(|addr| addr == address).unwrap_or_default() {
-                tracing::trace!(?address, "ignoring code translation for test contract");
-            } else {
-                account.info.code_hash = info.code_hash;
-                account.info.code.clone_from(&info.code);
-            }
+            account.info.code_hash = info.code_hash;
+            account.info.code.clone_from(&info.code);
         }
     }
 
