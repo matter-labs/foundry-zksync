@@ -16,40 +16,55 @@ contract ScriptSetupNonce is Script {
     }
 
     function run() public {
+        // Get initial nonce
         uint256 initial_nonce = checkNonce(address(tx.origin));
         assert(initial_nonce == vm.getNonce(address(tx.origin)));
+
+        // Create and interact with non-broadcasted contract to verify nonce is not incremented
         Greeter notBroadcastGreeter = new Greeter();
         notBroadcastGreeter.greeting("john");
         assert(checkNonce(address(tx.origin)) == initial_nonce);
+
+        // Start broadcasting transactions
         vm.startBroadcast();
-        Greeter greeter = new Greeter();
-        greeter.greeting("john");
-        NonceChecker checker = new NonceChecker();
-        checker.assertNonce(vm.getNonce(address(tx.origin)) + 1);
+            // Deploy and interact with broadcasted contracts
+            Greeter greeter = new Greeter();
+            greeter.greeting("john");
+
+            // Deploy checker and verify nonce
+            NonceChecker checker = new NonceChecker();
+            checker.assertNonce(vm.getNonce(address(tx.origin)) + 1);
         vm.stopBroadcast();
     }
 
     function checkNonce(address addr) public returns (uint256) {
+        // We prank here to avoid accidentally "polluting" the nonce of `addr` during the call
+        // for example when `addr` is `tx.origin`
         vm.prank(address(this), address(this));
-        (bool success, bytes memory data) = address(0x000000000000000000000000000000000000008003).call(
-            abi.encodeWithSignature("getMinNonce(address)", addr)
-        );
-        require(success, "Failed to get nonce");
-        return abi.decode(data, (uint256));
+        return NonceLib.getNonce(addr);
     }
 }
 
 contract NonceChecker {
     function checkNonce() public returns (uint256) {
-        (bool success, bytes memory data) = address(0x000000000000000000000000000000000000008003).call(
-            abi.encodeWithSignature("getMinNonce(address)", address(tx.origin))
-        );
-        require(success, "Failed to get nonce");
-        return abi.decode(data, (uint256));
+        return NonceLib.getNonce(address(tx.origin));
     }
-
+    
     function assertNonce(uint256 expected) public {
         uint256 real_nonce = checkNonce();
         require(real_nonce == expected, "Nonce mismatch");
+    }
+}
+
+library NonceLib {
+    address constant NONCE_HOLDER = address(0x8003);
+
+    /// Retrieve tx nonce for `addr` from the NONCE_HOLDER system contract
+    function getNonce(address addr) internal returns (uint256) {
+        (bool success, bytes memory data) = NONCE_HOLDER.call(
+            abi.encodeWithSignature("getMinNonce(address)", addr)
+        );
+        require(success, "Failed to get nonce");
+        return abi.decode(data, (uint256));
     }
 }
