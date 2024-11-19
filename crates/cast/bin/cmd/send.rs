@@ -11,6 +11,7 @@ use alloy_zksync::{
         transaction_request::TransactionRequest as ZkTransactionRequest,
         unsigned_tx::eip712::PaymasterParams, Zksync,
     },
+    provider::ZksyncProvider,
     wallet::ZksyncWallet,
 };
 use cast::{Cast, ZkCast};
@@ -22,9 +23,7 @@ use foundry_cli::{
 };
 use foundry_common::ens::NameOrAddress;
 use foundry_config::Config;
-use foundry_zksync_core::convert::ConvertU256;
 use std::{path::PathBuf, str::FromStr};
-use zksync_types::fee::Fee;
 
 /// ZkSync-specific paymaster parameters for transactions
 #[derive(Debug, Parser)]
@@ -255,7 +254,7 @@ async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
     handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout).await
 }
 
-async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: Provider<T, Zksync>, T: Transport + Clone>(
+async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Transport + Clone>(
     provider: P,
     zk_provider: Z,
     tx: WithOtherFields<TransactionRequest>,
@@ -278,11 +277,11 @@ async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: Provider<T, Zksync>, T: Tra
         zk_tx.set_paymaster(paymaster_params);
     }
 
-    let fee = provider.raw_request::<_, Fee>("zks_estimateFee".into(), [&zk_tx]).await.unwrap();
-    zk_tx.set_gas_limit(fee.gas_limit.as_u64());
-    zk_tx.set_max_fee_per_gas(fee.max_fee_per_gas.as_u128());
-    zk_tx.set_max_priority_fee_per_gas(fee.max_priority_fee_per_gas.as_u128());
-    zk_tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit.to_ru256());
+    let fee = zk_provider.estimate_fee(zk_tx.clone()).await?;
+    zk_tx.set_gas_limit(fee.gas_limit);
+    zk_tx.set_max_fee_per_gas(fee.max_fee_per_gas);
+    zk_tx.set_max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
+    zk_tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit);
 
     let cast = ZkCast::new(zk_provider, Cast::new(provider));
     let pending_tx = cast.send_zk(zk_tx).await?;

@@ -60,7 +60,5 @@ alloy-transport.workspace = true
 alloy-consensus.workspace = true
 alloy-zksync.workspace = true
 
-zksync_types.workspace = true
-
 [dev-dependencies]
 tempfile.workspace = true

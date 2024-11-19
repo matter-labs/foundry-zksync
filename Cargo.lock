@@ -807,6 +807,8 @@ dependencies = [
 [[package]]
 name = "alloy-zksync"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65f279833c27d8116f15d9a294c0529a716b3303ae1296063c71729a74c2e8b5"
 dependencies = [
  "alloy",
  "async-trait",
@@ -4613,7 +4615,6 @@ dependencies = [
  "tokio",
  "tracing",
  "yansi",
- "zksync_types",
 ]
 
 [[package]]
