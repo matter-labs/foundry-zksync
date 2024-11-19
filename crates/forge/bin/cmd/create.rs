@@ -1025,7 +1025,7 @@ where
         };
 
         // create the tx object. Since we're deploying a contract, `to` is `None`
-        let tx = WithOtherFields::new(TransactionRequest::default().input(data.clone().into()));
+        let tx = WithOtherFields::new(TransactionRequest::default().input(data.into()));
 
         Ok(Deployer {
             client: self.client.clone(),
