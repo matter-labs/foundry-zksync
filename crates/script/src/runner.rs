@@ -171,12 +171,16 @@ impl ScriptRunner {
         traces.extend(constructor_traces.map(|traces| (TraceKind::Deployment, traces)));
 
         // Script has already been deployed so we can migrate the database to zkEVM storage
-        // in the next runner execution.
+        // in the next runner execution. Additionally we can allow persisting the next nonce update
+        // to simulate EVM behavior where only the test contract deployment increments the
+        // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
             if let Some(zk_startup_migration) = &mut cheatcodes.zk_startup_migration {
                 debug!("script deployed, allowing startup storage migration");
                 zk_startup_migration.allow();
             }
+            debug!("script deployed, allowing persisting next nonce update");
+            cheatcodes.zk_persist_nonce_update.persist_next();
         }
 
         // Optionally call the `setUp` function
