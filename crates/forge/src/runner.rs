@@ -114,6 +114,9 @@ impl ContractRunner<'_> {
         }
 
         let address = self.sender.create(self.executor.get_nonce(self.sender)?);
+        // NOTE(zk): the test contract is set here instead of where upstream does it as
+        // the test contract address needs to be retrieved in order to skip
+        // zkEVM mode for the creation of the test address (and for calls to it later).
         self.executor.backend_mut().set_test_contract(address);
 
         // Set the contracts initial balance before deployment, so it is available during
@@ -143,6 +146,15 @@ impl ContractRunner<'_> {
         self.executor.set_balance(LIBRARY_DEPLOYER, self.initial_balance)?;
 
         self.executor.deploy_create2_deployer()?;
+
+        // Test contract has already been deployed so we can migrate the database to zkEVM storage
+        // in the next runner execution.
+        if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
+            if let Some(zk_startup_migration) = &mut cheatcodes.zk_startup_migration {
+                debug!("test contract deployed, allowing startup storage migration");
+                zk_startup_migration.allow();
+            }
+        }
 
         // Optionally call the `setUp` function
         let result = if call_setup {
