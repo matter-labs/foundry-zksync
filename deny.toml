@@ -17,6 +17,11 @@ ignore = [
     # Used by alloy
     # proc-macro-error is unmaintained
     "RUSTSEC-2024-0370",
+    # instant is unmaintained
+    "RUSTSEC-2024-0384",
+    # Used by boojum
+    # derivative is unmaintained
+    "RUSTSEC-2024-0388",
 ]
 
 # This section is considered when running `cargo deny check bans`.
