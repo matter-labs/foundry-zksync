@@ -1,5 +1,5 @@
 use crate::tx::{self, CastTxBuilder};
-use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
+use alloy_network::{AnyNetwork, EthereumWallet};
 use alloy_primitives::{Address, Bytes, TxHash};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
@@ -277,11 +277,7 @@ async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Trans
         zk_tx.set_paymaster(paymaster_params);
     }
 
-    let fee = zk_provider.estimate_fee(zk_tx.clone()).await?;
-    zk_tx.set_gas_limit(fee.gas_limit);
-    zk_tx.set_max_fee_per_gas(fee.max_fee_per_gas);
-    zk_tx.set_max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
-    zk_tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit);
+    foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;
 
     let cast = ZkCast::new(zk_provider, Cast::new(provider));
     let pending_tx = cast.send_zk(zk_tx).await?;

@@ -5341,11 +5341,9 @@ version = "0.0.2"
 dependencies = [
  "alloy-network",
  "alloy-primitives",
- "alloy-provider",
- "alloy-rpc-types",
- "alloy-serde",
  "alloy-sol-types",
  "alloy-transport",
+ "alloy-zksync",
  "ansiterm",
  "era_test_node",
  "eyre",

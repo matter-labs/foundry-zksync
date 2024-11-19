@@ -18,12 +18,13 @@ pub mod vm;
 /// ZKSync Era State implementation.
 pub mod state;
 
-use alloy_network::AnyNetwork;
+use alloy_network::TransactionBuilder;
 use alloy_primitives::{address, hex, keccak256, Address, Bytes, U256 as rU256};
-use alloy_provider::Provider;
-use alloy_rpc_types::TransactionRequest;
-use alloy_serde::WithOtherFields;
 use alloy_transport::Transport;
+use alloy_zksync::{
+    network::transaction_request::TransactionRequest as ZkTransactionRequest,
+    provider::ZksyncProvider,
+};
 use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256};
 use eyre::eyre;
 use serde::{Deserialize, Serialize};
@@ -39,7 +40,7 @@ pub use zksync_types::{
     NONCE_HOLDER_ADDRESS,
 };
 use zksync_types::{
-    fee::Fee, transaction_request::PaymasterParams, utils::storage_key_for_eth_balance, U256,
+    transaction_request::PaymasterParams, utils::storage_key_for_eth_balance, U256,
 };
 pub use zksync_utils::bytecode::hash_bytecode;
 
@@ -104,17 +105,18 @@ pub struct EstimatedGas {
 }
 
 /// Estimates the gas parameters for the provided transaction.
-pub async fn estimate_gas<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
-    tx: &WithOtherFields<TransactionRequest>,
+/// This will call `estimateFee` method on the rpc and set the gas parameters on the transaction.
+pub async fn estimate_gas<P: ZksyncProvider<T>, T: Transport + Clone>(
+    tx: &mut ZkTransactionRequest,
     provider: P,
-) -> Result<EstimatedGas> {
-    let gas_price = provider.get_gas_price().await.unwrap();
-    let fee: Fee = provider
-        .raw_request("zks_estimateFee".into(), [tx.clone()])
-        .await
-        .map_err(|err| eyre!("failed rpc call for estimating fee: {:?}", err))?;
+) -> Result<()> {
+    let fee = provider.estimate_fee(tx.clone()).await?;
+    tx.set_gas_limit(fee.gas_limit);
+    tx.set_max_fee_per_gas(fee.max_fee_per_gas);
+    tx.set_max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
+    tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit);
 
-    Ok(EstimatedGas { price: gas_price, limit: fee.gas_limit.low_u64() })
+    Ok(())
 }
 
 /// Returns true if the provided address is a reserved zkSync system address

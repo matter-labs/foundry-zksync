@@ -15,9 +15,8 @@ use alloy_provider::{utils::Eip1559Estimation, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_transport::Transport;
-use alloy_zksync::{
-    network::{transaction_request::TransactionRequest as ZkTransactionRequest, Zksync},
-    provider::ZksyncProvider,
+use alloy_zksync::network::{
+    transaction_request::TransactionRequest as ZkTransactionRequest, Zksync,
 };
 use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
@@ -132,11 +131,7 @@ pub async fn send_transaction(
                         },
                     );
                 }
-                let fee = zk_provider.estimate_fee(zk_tx.clone()).await?;
-                zk_tx.set_gas_limit(fee.gas_limit);
-                zk_tx.set_max_fee_per_gas(fee.max_fee_per_gas);
-                zk_tx.set_max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
-                zk_tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit);
+                foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;
 
                 let zk_signer = alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
                 let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
