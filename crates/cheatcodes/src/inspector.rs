@@ -1173,8 +1173,6 @@ impl Cheatcodes {
             }
         }
 
-        self.zk_should_update_nonce.take();
-
         None
     }
 
@@ -1831,8 +1829,6 @@ where {
                 return Some(result);
             }
         }
-
-        self.zk_should_update_nonce.take();
 
         None
     }
