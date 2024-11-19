@@ -97,8 +97,7 @@ checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
 [[package]]
 name = "alloy"
 version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea8ebf106e84a1c37f86244df7da0c7587e697b71a0d565cce079449b85ac6f8"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-consensus",
  "alloy-contract",
@@ -741,7 +740,7 @@ dependencies = [
 [[package]]
 name = "alloy-transport-http"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-json-rpc",
  "alloy-transport",
@@ -755,7 +754,7 @@ dependencies = [
 [[package]]
 name = "alloy-transport-ipc"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-json-rpc",
  "alloy-pubsub",
@@ -775,7 +774,7 @@ dependencies = [
 [[package]]
 name = "alloy-transport-ws"
 version = "0.5.4"
-source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#31bccc864525b5ba64fefb8211363807c7a43d2d"
+source = "git+https://github.com/Karrq/alloy?branch=zksync-v0.5.4#21484592682f146ba8f50de0d90883a10e82d52f"
 dependencies = [
  "alloy-pubsub",
  "alloy-transport",

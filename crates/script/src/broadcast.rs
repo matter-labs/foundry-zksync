@@ -122,9 +122,7 @@ pub async fn send_transaction(
             if let Some(zk) = zk {
                 let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
                 if !zk.factory_deps.is_empty() {
-                    zk_tx.set_factory_deps(
-                        zk.factory_deps.iter().map(|bytes| Bytes::from_iter(bytes)).collect(),
-                    );
+                    zk_tx.set_factory_deps(zk.factory_deps.iter().map(Bytes::from_iter).collect());
                 }
                 if let Some(paymaster_data) = &zk.paymaster_data {
                     zk_tx.set_paymaster(
