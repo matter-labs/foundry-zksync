@@ -163,6 +163,15 @@ impl ScriptRunner {
 
         traces.extend(constructor_traces.map(|traces| (TraceKind::Deployment, traces)));
 
+        // Script has already been deployed so we can migrate the database to zkEVM storage
+        // in the next runner execution.
+        if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
+            if let Some(zk_startup_migration) = &mut cheatcodes.zk_startup_migration {
+                debug!("script deployed, allowing startup storage migration");
+                zk_startup_migration.allow();
+            }
+        }
+
         // Optionally call the `setUp` function
         let (success, gas_used, labeled_addresses, transactions) = if !setup {
             (true, 0, Default::default(), Some(library_transactions))
