@@ -193,26 +193,25 @@ impl SendTxArgs {
         // If we cannot successfully instantiate a local signer, then we will assume we don't have
         // enough information to sign and we must bail.
         } else {
-            // Retrieve the signer, and bail if it can't be constructed.
-            let signer = eth.wallet.signer().await?;
-            let zk_signer = eth.wallet.signer().await?;
-            let from = signer.address();
-
-            tx::validate_from_address(eth.wallet.from, from)?;
-
+            // NOTE(zk): Avoid initializing `signer` twice as it will error out with Ledger, so we
+            // move the signers to their respective blocks.
             if zksync_params.zksync {
-                // Zksync transaction
-                let (tx, _) = builder.build(&signer).await?;
+                // Retrieve the signer, and bail if it can't be constructed.
+                let zk_signer: foundry_wallets::WalletSigner = eth.wallet.signer().await?;
+                let from = zk_signer.address();
 
-                let wallet = EthereumWallet::from(signer);
-                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                    .wallet(wallet)
-                    .on_provider(&provider);
+                tx::validate_from_address(eth.wallet.from, from)?;
+
+                // Zksync transaction
+                let (tx, _) = builder.build(&zk_signer).await?;
 
                 let zk_wallet = ZksyncWallet::from(zk_signer);
                 let zk_provider = ProviderBuilder::<_, _, Zksync>::default()
-                    .wallet(zk_wallet)
+                    .wallet(zk_wallet.clone())
                     .on_provider(&zk_provider);
+                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
+                    .wallet(zk_wallet)
+                    .on_provider(&provider);
 
                 cast_send_zk(
                     provider,
@@ -225,6 +224,12 @@ impl SendTxArgs {
                 )
                 .await
             } else {
+                // Retrieve the signer, and bail if it can't be constructed.
+                let signer = eth.wallet.signer().await?;
+                let from = signer.address();
+
+                tx::validate_from_address(eth.wallet.from, from)?;
+
                 // Standard transaction
                 let (tx, _) = builder.build(&signer).await?;
 
