@@ -8,7 +8,11 @@ use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
-use alloy_zksync::{network::Zksync, provider::ZksyncProvider, wallet::ZksyncWallet};
+use alloy_zksync::{
+    network::{unsigned_tx::eip712::PaymasterParams, Zksync},
+    provider::ZksyncProvider,
+    wallet::ZksyncWallet,
+};
 use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
 use forge_verify::{zk_provider::CompilerVerificationContext, RetryArgs};
@@ -44,7 +48,6 @@ use std::{
     sync::Arc,
 };
 use zksync_types::H256;
-use zksync_web3_rs::eip712::PaymasterParams;
 
 merge_impl_figment_convert!(CreateArgs, opts, eth);
 
@@ -136,8 +139,7 @@ impl CreateArgs {
                             .zk
                             .paymaster_input
                             .clone()
-                            .unwrap_or_default()
-                            .to_vec(),
+                            .unwrap_or_default(),
                     })
                 } else {
                     None
@@ -259,7 +261,9 @@ impl CreateArgs {
                 // and potentially other devices that rely on HID too
                 let zk_signer = self.eth.wallet.signer().await?;
                 let deployer = zk_signer.address();
-                let provider = ProviderBuilder::<_, _, Zksync>::default().wallet(ZksyncWallet::new(signer)).on_provider(provider);
+                let provider = ProviderBuilder::<_, _, Zksync>::default()
+                    .wallet(ZksyncWallet::new(zk_signer))
+                    .on_provider(provider);
                 self.deploy_zk(
                     abi,
                     bin.object,
@@ -630,15 +634,14 @@ impl CreateArgs {
         }
 
         let fee = provider
-            .estimate_fee(&deployer.tx)
+            .estimate_fee(deployer.tx.clone())
             .await
-            .map_err(|err| eyre::eyre!("failed rpc call for estimating fee: {:?}", err))?
-            .unwrap_or_default();
+            .map_err(|err| eyre::eyre!("failed rpc call for estimating fee: {:?}", err))?;
 
         deployer.tx.set_gas_limit(if let Some(gas_limit) = self.tx.gas_limit {
             gas_limit.to::<u64>()
         } else {
-            fee.gas_limit.saturating_to::<u128>()
+            fee.gas_limit
         });
 
         // Before we actually deploy the contract we try check if the verify settings are valid
@@ -1079,11 +1082,11 @@ where
         .into();
 
         // create the tx object. Since we're deploying a contract, `to` is `None`
-        let tx = alloy_zksync::network::transaction_request::TransactionRequest::default().base(
+        let tx: alloy_zksync::network::transaction_request::TransactionRequest =
             TransactionRequest::default()
                 .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
-                .input(data.into()),
-        );
+                .input(data.into())
+                .into();
 
         Ok(ZkDeployer {
             client: self.client.clone(),

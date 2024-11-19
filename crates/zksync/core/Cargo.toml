@@ -16,15 +16,12 @@ foundry-common.workspace = true
 foundry-evm-abi.workspace = true
 foundry-cheatcodes-common.workspace = true
 alloy-primitives.workspace = true
-alloy-signer.workspace = true
 alloy-network.workspace = true
 alloy-sol-types.workspace = true
-alloy-dyn-abi.workspace = true
 alloy-serde.workspace = true
 alloy-provider.workspace = true
 alloy-transport.workspace = true
 alloy-rpc-types.workspace = true
-alloy-consensus.workspace = true
 itertools.workspace = true
 revm = { workspace = true, default-features = false, features = [
     "std",
@@ -38,13 +35,11 @@ revm = { workspace = true, default-features = false, features = [
 ] }
 tracing.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 
 # zk
 zksync_multivm.workspace = true
 zksync_basic_types.workspace = true
 zksync_types.workspace = true
-zksync-web3-rs.workspace = true
 era_test_node.workspace = true
 zksync_utils.workspace = true
 zksync_contracts.workspace = true

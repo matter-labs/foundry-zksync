@@ -116,7 +116,6 @@ soldeer-commands.workspace = true
 quick-junit = "0.5.0"
 
 # zk
-zksync-web3-rs.workspace = true
 zksync_types.workspace = true
 
 [target.'cfg(unix)'.dependencies]

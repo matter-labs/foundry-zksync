@@ -32,7 +32,7 @@ use alloy_primitives::hex;
 use eyre::Result;
 use url::Url;
 use zksync_basic_types::U256;
-use zksync_web3_rs::types::H256;
+use zksync_types::H256;
 
 /// Gets the RPC URL for Ethereum.
 ///

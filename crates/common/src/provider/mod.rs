@@ -87,6 +87,12 @@ pub fn try_get_http_provider(builder: impl AsRef<str>) -> Result<RetryProvider> 
     ProviderBuilder::new(builder.as_ref()).build()
 }
 
+/// Constructs a ZKsync provider with a 100 millisecond interval poll if it's a localhost URL (most
+/// likely an anvil or other dev node) and with the default, or 7 second otherwise.
+#[inline]
+pub fn try_get_zksync_http_provider(builder: impl AsRef<str>) -> Result<RetryProvider<Zksync>> {
+    ProviderBuilder::new(builder.as_ref()).build_zksync()
+}
 /// Helper type to construct a `RetryProvider`
 #[derive(Debug)]
 pub struct ProviderBuilder {

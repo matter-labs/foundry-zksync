@@ -19,7 +19,6 @@ foundry-config.workspace = true
 foundry-debugger.workspace = true
 foundry-evm.workspace = true
 foundry-wallets.workspace = true
-zksync-web3-rs.workspace = true
 
 foundry-compilers = { workspace = true, features = ["full"] }
 

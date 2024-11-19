@@ -1,10 +1,10 @@
 use std::{collections::HashSet, path::PathBuf};
 
+use alloy_primitives::{Address, Bytes};
 use clap::Parser;
 use foundry_compilers::zksolc::settings::{ZkSolcError, ZkSolcWarning};
 use foundry_config::ZkSyncConfig;
 use serde::Serialize;
-use zksync_web3_rs::types::{Address, Bytes};
 
 #[derive(Clone, Debug, Default, Serialize, Parser)]
 #[clap(next_help_heading = "ZKSync configuration")]
