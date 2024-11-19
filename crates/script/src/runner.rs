@@ -132,7 +132,6 @@ impl ScriptRunner {
 
         let address = CALLER.create(self.executor.get_nonce(CALLER)?);
 
-        self.executor.backend_mut().set_test_contract(address);
         // Set the contracts initial balance before deployment, so it is available during the
         // construction
         self.executor.set_balance(address, self.evm_opts.initial_balance)?;
@@ -147,6 +146,14 @@ impl ScriptRunner {
         if self.evm_opts.sender == CALLER {
             self.executor.set_nonce(self.evm_opts.sender, u64::MAX / 2)?;
         }
+
+        // NOTE(zk): Address recomputed again after the nonce modification as it will
+        // differ in case of evm_opts.sender == CALLER
+        let zk_actual_script_address = CALLER.create(self.executor.get_nonce(CALLER)?);
+        // NOTE(zk): the test contract is set here instead of where upstream does it as
+        // the test contract address needs to be retrieved in order to skip
+        // zkEVM mode for the creation of the test address (and for calls to it later).
+        self.executor.backend_mut().set_test_contract(zk_actual_script_address);
 
         // Deploy an instance of the contract
         let DeployResult {
@@ -174,6 +181,8 @@ impl ScriptRunner {
 
         // Optionally call the `setUp` function
         let (success, gas_used, labeled_addresses, transactions) = if !setup {
+            // NOTE(zk): keeping upstream code for context. Test contract is only set on this branch
+            // self.executor.backend_mut().set_test_contract(address);
             (true, 0, Default::default(), Some(library_transactions))
         } else {
             match self.executor.setup(Some(self.evm_opts.sender), address, None) {
