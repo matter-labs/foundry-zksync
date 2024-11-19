@@ -410,6 +410,40 @@ impl ArbitraryStorage {
 /// List of transactions that can be broadcasted.
 pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 
+/// Setting for migrating the database to zkEVM storage when starting in ZKsync mode.
+/// The migration is performed on the DB via the inspector so must only be performed once.
+#[derive(Debug, Default, Clone)]
+pub enum ZkStartupMigration {
+    /// Defer database migration to a later execution point.
+    ///
+    /// This is required as we need to wait for some baseline deployments
+    /// to occur before the test/script execution is performed.
+    #[default]
+    Defer,
+    /// Allow database migration.
+    Allow,
+    /// Database migration has already been performed.
+    Done,
+}
+
+impl ZkStartupMigration {
+    /// Check if startup migration is allowed. Migration is disallowed if it's to be deferred or has
+    /// already been performed.
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, Self::Allow)
+    }
+
+    /// Allow migrating the the DB to zkEVM storage.
+    pub fn allow(&mut self) {
+        *self = Self::Allow
+    }
+
+    /// Mark the migration as completed. It must not be performed again.
+    pub fn done(&mut self) {
+        *self = Self::Done
+    }
+}
+
 /// An EVM inspector that handles calls to various cheatcodes, each with their own behavior.
 ///
 /// Cheatcodes can be called by contracts during execution to modify the VM environment, such as
@@ -561,9 +595,8 @@ pub struct Cheatcodes {
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
 
-    /// Starts the cheatcode inspector in ZK mode.
-    /// This is set to `false`, once the startup migration is completed.
-    pub startup_zk: bool,
+    /// The migration status of the database to zkEVM storage, `None` if we start in EVM context.
+    pub zk_startup_migration: Option<ZkStartupMigration>,
 
     /// Factory deps stored through `zkUseFactoryDep`. These factory deps are used in the next
     /// CREATE or CALL, and cleared after.
@@ -631,13 +664,14 @@ impl Cheatcodes {
         let mut persisted_factory_deps = HashMap::new();
         persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
 
-        let startup_zk = config.use_zk;
+        let zk_startup_migration = config.use_zk.then_some(ZkStartupMigration::Defer);
+
         Self {
             fs_commit: true,
             labels: config.labels.clone(),
             config,
             dual_compiled_contracts,
-            startup_zk,
+            zk_startup_migration,
             block: Default::default(),
             gas_price: Default::default(),
             prank: Default::default(),
@@ -876,6 +910,7 @@ impl Cheatcodes {
         let mut known_codes_storage: rHashMap<U256, EvmStorageSlot> = Default::default();
         let mut deployed_codes: HashMap<Address, AccountInfo> = Default::default();
 
+        let test_contract = data.db.get_test_contract_address();
         for address in data.db.persistent_accounts().into_iter().chain([data.env.tx.caller]) {
             info!(?address, "importing to zk state");
 
@@ -890,6 +925,12 @@ impl Cheatcodes {
 
             let nonce_key = get_nonce_key(address);
             nonce_storage.insert(nonce_key, EvmStorageSlot::new(full_nonce.to_ru256()));
+
+            if test_contract.map(|test_address| address == test_address).unwrap_or_default() {
+                // avoid migrating test contract code
+                tracing::trace!(?address, "ignoring code translation for test contract");
+                continue;
+            }
 
             if let Some(contract) = self.dual_compiled_contracts.iter().find(|contract| {
                 info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
@@ -941,17 +982,12 @@ impl Cheatcodes {
             journaled_account(data, known_codes_addr).expect("failed to load account");
         known_codes_account.storage.extend(known_codes_storage.clone());
 
-        let test_contract = data.db.get_test_contract_address();
         for (address, info) in deployed_codes {
             let account = journaled_account(data, address).expect("failed to load account");
             let _ = std::mem::replace(&mut account.info.balance, info.balance);
             let _ = std::mem::replace(&mut account.info.nonce, info.nonce);
-            if test_contract.map(|addr| addr == address).unwrap_or_default() {
-                tracing::trace!(?address, "ignoring code translation for test contract");
-            } else {
-                account.info.code_hash = info.code_hash;
-                account.info.code.clone_from(&info.code);
-            }
+            account.info.code_hash = info.code_hash;
+            account.info.code.clone_from(&info.code);
         }
     }
 
@@ -1991,9 +2027,17 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
             ecx.env.tx.gas_price = gas_price;
         }
 
-        if self.startup_zk && !self.use_zk_vm {
-            self.startup_zk = false; // We only do this once.
+        let migration_allowed = self
+            .zk_startup_migration
+            .as_ref()
+            .map(|migration| migration.is_allowed())
+            .unwrap_or(false);
+        if migration_allowed && !self.use_zk_vm {
             self.select_zk_vm(ecx, None);
+            if let Some(zk_startup_migration) = &mut self.zk_startup_migration {
+                zk_startup_migration.done();
+            }
+            debug!("startup zkEVM storage migration completed");
         }
 
         // Record gas for current frame.
