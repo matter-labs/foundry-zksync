@@ -6,9 +6,13 @@ set -e
 INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/foundryup-zksync/install"
 FOUNDRYUP_ZKSYNC_URL="https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/foundryup-zksync/foundryup-zksync"
 
-# Download the install script
-echo "Downloading the install script..."
-curl -L "$INSTALL_SCRIPT_URL" -o install
+if [ -n "${CI}" ]; then
+    echo "Using local install script..."
+else
+    # Download the install script
+    echo "Downloading the install script..."
+    curl -L "$INSTALL_SCRIPT_URL" -o install
+fi
 
 echo "Making install script executable..."
 chmod +x ./install
@@ -36,8 +40,12 @@ else
     echo "No shell configuration file detected. Please source your shell manually or start a new terminal session."
 fi
 
-echo "Downloading foundryup-zksync..."
-curl -L "$FOUNDRYUP_ZKSYNC_URL" -o foundryup-zksync
+if [ -n "${CI}" ]; then
+    echo "Using local foundryup-zksync script..."
+else
+    echo "Downloading foundryup-zksync..."
+    curl -L "$FOUNDRYUP_ZKSYNC_URL" -o foundryup-zksync
+fi
 
 echo "Making foundryup-zksync executable..."
 chmod +x ./foundryup-zksync
