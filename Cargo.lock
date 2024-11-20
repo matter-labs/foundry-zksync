@@ -4893,7 +4893,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.11.6"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#7c69695e5c75451f158dd2456bf8c94a7492ea0b"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#4f9527f5104c4ed5d5e67cb53404fd054962d416"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -4933,7 +4933,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts"
 version = "0.11.6"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#7c69695e5c75451f158dd2456bf8c94a7492ea0b"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#4f9527f5104c4ed5d5e67cb53404fd054962d416"
 dependencies = [
  "foundry-compilers-artifacts-solc",
  "foundry-compilers-artifacts-vyper",
@@ -4943,7 +4943,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-solc"
 version = "0.11.6"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#7c69695e5c75451f158dd2456bf8c94a7492ea0b"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#4f9527f5104c4ed5d5e67cb53404fd054962d416"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -4966,7 +4966,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-vyper"
 version = "0.11.6"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#7c69695e5c75451f158dd2456bf8c94a7492ea0b"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#4f9527f5104c4ed5d5e67cb53404fd054962d416"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -4980,7 +4980,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-zksolc"
 version = "0.11.6"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#7c69695e5c75451f158dd2456bf8c94a7492ea0b"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#4f9527f5104c4ed5d5e67cb53404fd054962d416"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5001,7 +5001,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-core"
 version = "0.11.6"
-source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#7c69695e5c75451f158dd2456bf8c94a7492ea0b"
+source = "git+https://github.com/Moonsong-Labs/compilers?branch=zksync-v0.11.6#4f9527f5104c4ed5d5e67cb53404fd054962d416"
 dependencies = [
  "alloy-primitives",
  "cfg-if 1.0.0",

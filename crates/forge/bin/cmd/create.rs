@@ -160,10 +160,28 @@ impl CreateArgs {
             let ZkContractArtifact { bytecode, hash, factory_dependencies, abi, .. } = artifact;
 
             let abi = abi.expect("Abi not found");
-
             let bin = bytecode.expect("Bytecode not found");
+
+            let bytecode = match bin.object() {
+                BytecodeObject::Bytecode(bytes) => bytes.to_vec(),
+                _ => {
+                    let link_refs = bin
+                        .missing_libraries
+                        .iter()
+                        .map(|library| {
+                            let mut parts = library.split(':');
+                            let path = parts.next().unwrap();
+                            let name = parts.next().unwrap();
+                            format!("\t{name}: {path}")
+                        })
+                        .collect::<HashSet<String>>()
+                        .into_iter()
+                        .collect::<Vec<String>>()
+                        .join("\n");
+                    eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                }
+            };
             let bytecode_hash = H256::from_str(&hash.expect("Contract hash not found"))?;
-            let bytecode = bin.object.clone().into_bytes().unwrap().to_vec();
 
             // Add arguments to constructor
             let config = self.eth.try_load_config_emit_warnings()?;
@@ -223,12 +241,12 @@ impl CreateArgs {
                             queue.push_back(dep.clone())
                         }
 
+                        // TODO(zk): ensure factory deps are also linked
                         let fdep_bytecode = fdep_art
                             .bytecode
                             .clone()
                             .expect("Bytecode not found for factory dependency")
-                            .object
-                            .clone()
+                            .object()
                             .into_bytes()
                             .unwrap()
                             .to_vec();
@@ -245,7 +263,7 @@ impl CreateArgs {
                 let sender = self.eth.wallet.from.expect("required");
                 self.deploy_zk(
                     abi,
-                    bin.object,
+                    bin.object(),
                     params,
                     provider,
                     chain_id,
@@ -265,7 +283,7 @@ impl CreateArgs {
                     .on_provider(provider);
                 self.deploy_zk(
                     abi,
-                    bin.object,
+                    bin.object(),
                     params,
                     provider,
                     chain_id,
