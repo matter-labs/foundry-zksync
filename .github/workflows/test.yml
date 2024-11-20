@@ -132,6 +132,6 @@ jobs:
       steps:
         - uses: actions/checkout@v4
         - name: Install foundry-zksync
-          run: cp ./install-foundry-zksync /tmp/ && cd /tmp && ./install-foundry-zksync
+          run: ./install-foundry-zksync
         - name: Verify installation
           run: forge --version
