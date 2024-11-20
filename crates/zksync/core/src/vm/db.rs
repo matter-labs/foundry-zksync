@@ -187,7 +187,6 @@ where
     }
     /// Helper function to perform async code fetching
     fn fetch_code_async(ecx: &InnerEvmContext<DB>, hash: H256) -> Option<Vec<u8>> {
-        // Define the async logic
         // TODO: figure out provider stuff when alloy-zksync is introduced
         let async_code_fetch = async {
             let provider = get_http_provider("https://mainnet.era.zksync.io");
@@ -212,7 +211,6 @@ where
             Some(bytecode.bytecode().to_vec())
         };
 
-        // Use a Tokio runtime to block on the async task
         tokio::runtime::Handle::current().block_on(async_code_fetch)
     }
 }
@@ -248,10 +246,9 @@ where
                     }
                     None
                 })
-                .unwrap_or_else(|| {
-                    // Correctly call the static method
-                    Self::fetch_code_async(&self.ecx, hash)
-                })
+                // TODO: figure out provider stuff when alloy-zksync is introduced
+                // test ??
+                .unwrap_or_else(|| Self::fetch_code_async(&self.ecx, hash))
         })
     }
 
