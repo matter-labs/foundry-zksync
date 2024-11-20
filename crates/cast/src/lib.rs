@@ -94,7 +94,7 @@ where
     T: Transport + Clone,
     Z: Provider<T, Zksync>,
 {
-    /// Creates a new Cast instance from the provided client
+    /// Creates a new ZkCast instance from the provided client and Cast instance
     ///
     /// # Example
     ///
@@ -125,19 +125,6 @@ where
         Ok(res)
     }
 }
-
-// pub struct Cast<P, T, Z> {
-//     provider: P,
-//     zk_provider: Option<Z>,
-//     transport: PhantomData<T>,
-// }
-
-// impl<T, P, Z> Cast<P, T, Z>
-// where
-//     T: Transport + Clone,
-//     P: Provider<T, AnyNetwork>,
-//     Z: Provider<T, Zksync>,
-// {
 pub struct Cast<P, T> {
     provider: P,
     transport: PhantomData<T>,

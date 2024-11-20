@@ -2,7 +2,7 @@ use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-use alloy_primitives::{hex, Address, Bytes, U256};
+use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
 use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest};
 use alloy_serde::WithOtherFields;
@@ -10,7 +10,6 @@ use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
 use alloy_zksync::{
     network::{unsigned_tx::eip712::PaymasterParams, Zksync},
-    provider::ZksyncProvider,
     wallet::ZksyncWallet,
 };
 use clap::{Parser, ValueHint};
@@ -576,19 +575,9 @@ impl CreateArgs {
             })?;
         let is_legacy = self.tx.legacy || Chain::from(chain).is_legacy();
 
-        // The large L2 gas per pubdata to sign. This gas is enough to ensure that
-        // any reasonable limit will be accepted. Note, that the operator is NOT required to
-        // use the honest value of gas per pubdata and it can use any value up to the one signed by
-        // the user. In the future releases, we will provide a way to estimate the current
-        // gasPerPubdata.
-        pub const DEFAULT_GAS_PER_PUBDATA_LIMIT: u64 = 50000;
-
-        deployer.tx = deployer
-            .tx
-            .with_gas_per_pubdata(U256::from(DEFAULT_GAS_PER_PUBDATA_LIMIT))
-            .with_factory_deps(
-                zk_data.factory_deps.clone().into_iter().map(|dep| dep.into()).collect(),
-            );
+        deployer.tx = deployer.tx.with_factory_deps(
+            zk_data.factory_deps.clone().into_iter().map(|dep| dep.into()).collect(),
+        );
         if let Some(paymaster_params) = zk_data.paymaster_params {
             deployer.tx.set_paymaster(paymaster_params);
         }
@@ -616,6 +605,9 @@ impl CreateArgs {
         };
         deployer.tx.set_gas_price(gas_price);
 
+        // estimate fee
+        foundry_zksync_core::estimate_gas(&mut deployer.tx, &provider).await?;
+
         if !is_legacy {
             let estimate = provider.estimate_eip1559_fees(None).await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
             let priority_fee = if let Some(priority_fee) = self.tx.priority_gas_price {
@@ -633,16 +625,9 @@ impl CreateArgs {
             deployer.tx.set_max_priority_fee_per_gas(priority_fee);
         }
 
-        let fee = provider
-            .estimate_fee(deployer.tx.clone())
-            .await
-            .map_err(|err| eyre::eyre!("failed rpc call for estimating fee: {:?}", err))?;
-
-        deployer.tx.set_gas_limit(if let Some(gas_limit) = self.tx.gas_limit {
-            gas_limit.to::<u64>()
-        } else {
-            fee.gas_limit
-        });
+        if let Some(gas_limit) = self.tx.gas_limit {
+            deployer.tx.set_gas_limit(gas_limit.to::<u64>());
+        };
 
         // Before we actually deploy the contract we try check if the verify settings are valid
         let mut constructor_args = None;
