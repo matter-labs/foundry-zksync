@@ -27,13 +27,13 @@ contract ScriptSetupNonce is Script {
 
         // Start broadcasting transactions
         vm.startBroadcast();
-            // Deploy and interact with broadcasted contracts
-            Greeter greeter = new Greeter();
-            greeter.greeting("john");
+        // Deploy and interact with broadcasted contracts
+        Greeter greeter = new Greeter();
+        greeter.greeting("john");
 
-            // Deploy checker and verify nonce
-            NonceChecker checker = new NonceChecker();
-            checker.assertNonce(vm.getNonce(address(tx.origin)) + 1);
+        // Deploy checker and verify nonce
+        NonceChecker checker = new NonceChecker();
+        checker.assertNonce(vm.getNonce(address(tx.origin)) + 1);
         vm.stopBroadcast();
     }
 
@@ -49,7 +49,7 @@ contract NonceChecker {
     function checkNonce() public returns (uint256) {
         return NonceLib.getNonce(address(tx.origin));
     }
-    
+
     function assertNonce(uint256 expected) public {
         uint256 real_nonce = checkNonce();
         require(real_nonce == expected, "Nonce mismatch");
@@ -61,9 +61,7 @@ library NonceLib {
 
     /// Retrieve tx nonce for `addr` from the NONCE_HOLDER system contract
     function getNonce(address addr) internal returns (uint256) {
-        (bool success, bytes memory data) = NONCE_HOLDER.call(
-            abi.encodeWithSignature("getMinNonce(address)", addr)
-        );
+        (bool success, bytes memory data) = NONCE_HOLDER.call(abi.encodeWithSignature("getMinNonce(address)", addr));
         require(success, "Failed to get nonce");
         return abi.decode(data, (uint256));
     }
