@@ -11,7 +11,7 @@ forgetest_async!(multiple_deployments_of_the_same_contract, |prj, cmd| {
         "DeployScript",
         None,
         3,
-        Some(&["-vvvvv"]),
+        Some(&["-vvvvv", "--broadcast"]),
     );
     run_zk_script_test(
         prj.root(),
@@ -20,7 +20,7 @@ forgetest_async!(multiple_deployments_of_the_same_contract, |prj, cmd| {
         "DeployScript",
         None,
         3,
-        Some(&["-vvvvv"]),
+        Some(&["-vvvvv", "--broadcast"]),
     );
 });
 

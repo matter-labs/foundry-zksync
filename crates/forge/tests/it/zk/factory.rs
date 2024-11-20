@@ -48,7 +48,7 @@ forgetest_async!(script_zk_can_deploy_in_method, |prj, cmd| {
         "ZkClassicFactoryScript",
         None,
         2,
-        None,
+        Some(&["--broadcast"]),
     );
     run_zk_script_test(
         prj.root(),
@@ -57,7 +57,7 @@ forgetest_async!(script_zk_can_deploy_in_method, |prj, cmd| {
         "ZkNestedFactoryScript",
         None,
         2,
-        None,
+        Some(&["--broadcast"]),
     );
 });
 
@@ -70,7 +70,7 @@ forgetest_async!(script_zk_can_deploy_in_constructor, |prj, cmd| {
         "ZkConstructorFactoryScript",
         None,
         1,
-        None,
+        Some(&["--broadcast"]),
     );
     run_zk_script_test(
         prj.root(),
@@ -79,7 +79,7 @@ forgetest_async!(script_zk_can_deploy_in_constructor, |prj, cmd| {
         "ZkNestedConstructorFactoryScript",
         None,
         1,
-        None,
+        Some(&["--broadcast"]),
     );
 });
 
@@ -92,7 +92,7 @@ forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
         "ZkUserFactoryScript",
         None,
         3,
-        None,
+        Some(&["--broadcast"]),
     );
     run_zk_script_test(
         prj.root(),
@@ -101,7 +101,7 @@ forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
         "ZkUserConstructorFactoryScript",
         None,
         2,
-        None,
+        Some(&["--broadcast"]),
     );
 });
 

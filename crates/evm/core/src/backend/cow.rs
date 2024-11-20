@@ -13,6 +13,7 @@ use alloy_primitives::{map::HashMap, Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::WrapErr;
 use foundry_fork_db::DatabaseError;
+use foundry_zksync_core::PaymasterParams;
 use revm::{
     db::DatabaseRef,
     primitives::{
@@ -66,12 +67,19 @@ impl<'a> CowBackend<'a> {
         env: &mut Env,
         persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
         factory_deps: Option<Vec<Vec<u8>>>,
+        paymaster_data: Option<PaymasterParams>,
     ) -> eyre::Result<ResultAndState> {
         // this is a new call to inspect with a new env, so even if we've cloned the backend
         // already, we reset the initialized state
         self.is_initialized = false;
 
-        foundry_zksync_core::vm::transact(Some(persisted_factory_deps), factory_deps, env, self)
+        foundry_zksync_core::vm::transact(
+            Some(persisted_factory_deps),
+            factory_deps,
+            paymaster_data,
+            env,
+            self,
+        )
     }
 
     /// Executes the configured transaction of the `env` without committing state changes

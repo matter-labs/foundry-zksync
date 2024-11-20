@@ -35,13 +35,11 @@ pub use vm::{balance, encode_create_params, nonce};
 pub use vm::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use zksync_multivm::interface::{Call, CallType};
 pub use zksync_types::{
-    ethabi, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,
-    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
-    NONCE_HOLDER_ADDRESS,
+    ethabi, transaction_request::PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
-use zksync_types::{
-    transaction_request::PaymasterParams, utils::storage_key_for_eth_balance, U256,
-};
+use zksync_types::{utils::storage_key_for_eth_balance, U256};
 pub use zksync_utils::bytecode::hash_bytecode;
 
 type Result<T> = std::result::Result<T, eyre::Report>;

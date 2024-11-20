@@ -15,8 +15,9 @@ use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
 use foundry_zksync_core::{
-    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    convert::ConvertH160, PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS,
+    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
+    NONCE_HOLDER_ADDRESS,
 };
 use itertools::Itertools;
 use revm::{
@@ -840,10 +841,17 @@ impl Backend {
         env: &mut EnvWithHandlerCfg,
         persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
         factory_deps: Option<Vec<Vec<u8>>>,
+        paymaster_data: Option<PaymasterParams>,
     ) -> eyre::Result<ResultAndState> {
         self.initialize(env);
 
-        foundry_zksync_core::vm::transact(Some(persisted_factory_deps), factory_deps, env, self)
+        foundry_zksync_core::vm::transact(
+            Some(persisted_factory_deps),
+            factory_deps,
+            paymaster_data,
+            env,
+            self,
+        )
     }
 
     /// Returns true if the address is a precompile
