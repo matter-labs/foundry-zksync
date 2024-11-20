@@ -33,6 +33,8 @@ contract ScriptSetupNonce is Script {
 
         // Deploy checker and verify nonce
         NonceChecker checker = new NonceChecker();
+        // We expect the nonce to be incremented by 1 because the check is done in an external
+        // call
         checker.assertNonce(vm.getNonce(address(tx.origin)) + 1);
         vm.stopBroadcast();
     }
