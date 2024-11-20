@@ -19,11 +19,11 @@ echo "Running the installation script..."
 # Extract the exact path from the install.log
 # Use sed to precisely capture the path after 'source' and before the next apostrophe
 SHELL_CONFIG_FILE=$(sed -n "s/.*Run 'source \(.*\)'.*/\1/p" install.log)
+FOUNDRY_BIN_DIR="${XDG_CONFIG_HOME:-$HOME}/.foundry/bin"
 
 if [ -n "$SHELL_CONFIG_FILE" ]; then
     if [ -n "${CI}" ]; then
         # Add manually to $PATH in CI mode as GHA does not work with `.`
-        FOUNDRY_BIN_DIR="${XDG_CONFIG_HOME:-$HOME}/.foundry/bin"
         echo "adding '${FOUNDRY_BIN_DIR}' to PATH and GITHUB_PATH"
         export PATH="$PATH:$FOUNDRY_BIN_DIR"
         echo "${FOUNDRY_BIN_DIR}" >> $GITHUB_PATH
@@ -54,7 +54,7 @@ echo "Cleanup completed."
 echo "Installation completed successfully!"
 
 echo "Verifying installation..."
-if "$HOME/.foundry/bin/forge" --version | grep -q "0.0.2"; then
+if "${FOUNDRY_BIN_DIR}/forge" --version | grep -q "0.0.2"; then
     echo "Forge version 0.0.2 is successfully installed."
 else
     echo "Installation verification failed. Forge is not properly installed."
