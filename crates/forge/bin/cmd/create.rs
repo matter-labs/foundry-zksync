@@ -1084,7 +1084,8 @@ where
         )
         .into();
 
-        // create the tx object. Since we're deploying a contract, `to` is `None`
+        // create the tx object. Since we're deploying a contract, `to` is
+        // `CONTRACT_DEPLOYER_ADDRESS`
         let tx: alloy_zksync::network::transaction_request::TransactionRequest =
             TransactionRequest::default()
                 .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
