@@ -394,7 +394,7 @@ impl ProjectCompiler {
             let is_target_file =
                 self.files.is_empty() || self.files.iter().any(|f| artifact_id.path == *f);
             if is_target_file {
-                if let Some(mls) = &artifact.missing_libraries {
+                if let Some(mls) = artifact.missing_libraries() {
                     missing_libs_unique.extend(mls.clone());
                 }
             }
@@ -422,7 +422,7 @@ impl ProjectCompiler {
                 ZkMissingLibrary {
                     contract_path: contract_path.to_string(),
                     contract_name: contract_name.to_string(),
-                    missing_libraries: art.missing_libraries.clone().unwrap_or_default(),
+                    missing_libraries: art.missing_libraries().cloned().unwrap_or_default(),
                 }
             })
             .collect();
