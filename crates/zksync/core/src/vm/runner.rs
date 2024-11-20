@@ -28,6 +28,7 @@ use crate::{
 pub fn transact<'a, DB>(
     persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
+    paymaster_data: Option<zksync_web3_rs::eip712::PaymasterParams>,
     env: &'a mut Env,
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
@@ -37,6 +38,13 @@ where
 {
     info!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
 
+    let paymaster_params = PaymasterParams {
+        paymaster: paymaster_data.as_ref().map_or_else(Default::default, |data| data.paymaster),
+        paymaster_input: paymaster_data
+            .as_ref()
+            .map_or_else(Vec::new, |data| data.paymaster_input.to_vec()),
+    };
+
     let mut ecx = EvmContext::new_with_env(db, Box::new(env.clone()));
     let caller = env.tx.caller;
     let nonce = ZKVMData::new(&mut ecx).get_tx_nonce(caller);
@@ -45,7 +53,7 @@ where
         TransactTo::Create => (CONTRACT_DEPLOYER_ADDRESS, true),
     };
 
-    let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller, &PaymasterParams::default());
+    let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller, &paymaster_params);
     debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         Some(transact_to),
@@ -60,7 +68,7 @@ where
         caller.to_h160(),
         env.tx.value.to_u256(),
         factory_deps.unwrap_or_default(),
-        PaymasterParams::default(),
+        paymaster_params,
     );
 
     let call_ctx = CallContext {

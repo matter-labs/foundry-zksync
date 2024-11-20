@@ -602,7 +602,6 @@ pub fn run_zk_script_test(
     let mut script_args = vec![
         "--zk-startup",
         &script_path_contract,
-        "--broadcast",
         "--private-key",
         private_key,
         "--chain",

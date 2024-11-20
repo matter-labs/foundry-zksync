@@ -840,10 +840,17 @@ impl Backend {
         env: &mut EnvWithHandlerCfg,
         persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
         factory_deps: Option<Vec<Vec<u8>>>,
+        paymaster_data: Option<foundry_zksync_core::PaymasterParams>,
     ) -> eyre::Result<ResultAndState> {
         self.initialize(env);
 
-        foundry_zksync_core::vm::transact(Some(persisted_factory_deps), factory_deps, env, self)
+        foundry_zksync_core::vm::transact(
+            Some(persisted_factory_deps),
+            factory_deps,
+            paymaster_data,
+            env,
+            self,
+        )
     }
 
     /// Returns true if the address is a precompile

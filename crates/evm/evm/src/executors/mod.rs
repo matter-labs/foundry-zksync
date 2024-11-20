@@ -440,6 +440,7 @@ impl Executor {
                     &mut env,
                     &mut self.zk_persisted_factory_deps.clone(),
                     Some(zk_tx.factory_deps.clone()),
+                    zk_tx.paymaster_data.clone(),
                 )?
             }
         };
@@ -464,6 +465,7 @@ impl Executor {
                     // no need to commit them later
                     &mut self.zk_persisted_factory_deps,
                     Some(zk_tx.factory_deps),
+                    zk_tx.paymaster_data,
                 )?
             }
         };
