@@ -248,7 +248,7 @@ where
                 })
                 // TODO: figure out provider stuff when alloy-zksync is introduced
                 // test ??
-                .unwrap_or_else(|| Self::fetch_code_async(&self.ecx, hash))
+                .unwrap_or_else(|| ZKVMData::fetch_code_async(&self.ecx, hash))
         })
     }
 

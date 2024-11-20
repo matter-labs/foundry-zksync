@@ -5446,7 +5446,7 @@ dependencies = [
 [[package]]
 name = "foundry-fork-db"
 version = "0.6.0"
-source = "git+https://github.com/Moonsong-Labs/foundry-zksync-fork-db?branch=zksync-v0.6.0#f2e915d1c476007ae16be9fb96b25ffe1b8f5113"
+source = "git+https://github.com/dutterbutter/foundry-fork-db?branch=db/add-custom-req#bbf38165b6e1e2fc9a1eeeaf2258276fbcb5dc0c"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
