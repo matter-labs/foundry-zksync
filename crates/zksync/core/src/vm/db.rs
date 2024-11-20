@@ -1,3 +1,12 @@
+use alloy_primitives::{map::HashMap, Address, U256 as rU256};
+use foundry_cheatcodes_common::record::RecordAccess;
+use foundry_common::provider::get_http_provider;
+use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
+use revm::{
+    primitives::{Account, Bytecode},
+    Database, EvmContext, InnerEvmContext,
+};
+use std::{collections::BTreeSet, sync::Arc};
 /// RevmDatabaseForEra allows era VM to use the revm "Database" object
 /// as a read-only fork source.
 /// This way, we can run transaction on top of the chain that is persisted
@@ -5,10 +14,7 @@
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
 /// is usually collecting all the diffs - and applies them to database itself.
 use std::{collections::HashMap as sHashMap, fmt::Debug};
-
-use alloy_primitives::{map::HashMap, Address, U256 as rU256};
-use foundry_cheatcodes_common::record::RecordAccess;
-use revm::{primitives::Account, Database, EvmContext, InnerEvmContext};
+use tokio::runtime::Handle;
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_state::interface::ReadStorage;
 use zksync_types::{
@@ -16,7 +22,6 @@ use zksync_types::{
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
     Nonce, StorageKey, StorageLog, StorageValue,
 };
-
 use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
 
 use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
@@ -180,6 +185,36 @@ where
         self.ecx.load_account(addr).expect("failed loading account");
         self.ecx.sload(addr, idx.to_ru256()).expect("failed sload").to_h256()
     }
+    /// Helper function to perform async code fetching
+    fn fetch_code_async(ecx: &InnerEvmContext<DB>, hash: H256) -> Option<Vec<u8>> {
+        // Define the async logic
+        // TODO: figure out provider stuff when alloy-zksync is introduced
+        let async_code_fetch = async {
+            let provider = get_http_provider("https://mainnet.era.zksync.io");
+            let meta = BlockchainDbMeta {
+                cfg_env: ecx.env.cfg.clone(),
+                block_env: ecx.env.block.clone(),
+                hosts: BTreeSet::from(["https://mainnet.era.zksync.io".to_string()]),
+            };
+            let db = BlockchainDb::new(meta, None);
+
+            let backend = SharedBackend::spawn_backend(Arc::new(provider), db.clone(), None).await;
+            let custom_future = async move {
+                let code =
+                    provider.get_bytecode_by_hash(hash).await.map_err(|e| eyre::Report::from(e))?;
+                let bytecode = Bytecode::new_raw(code);
+                Ok(bytecode)
+            };
+
+            let receiver = backend.do_any_request(custom_future).unwrap();
+            let result = receiver.recv().unwrap();
+            let bytecode = result.unwrap();
+            Some(bytecode.bytecode().to_vec())
+        };
+
+        // Use a Tokio runtime to block on the async task
+        tokio::runtime::Handle::current().block_on(async_code_fetch)
+    }
 }
 
 impl<'a, DB> ReadStorage for &mut ZKVMData<'a, DB>
@@ -199,6 +234,8 @@ where
     }
 
     fn load_factory_dep(&mut self, hash: H256) -> Option<Vec<u8>> {
+        println!("\n\nLOAD_FACTORY_DEP: {:?}\n\n", hash);
+
         self.factory_deps.get(&hash).cloned().or_else(|| {
             let hash_b256 = hash.to_b256();
             self.ecx
@@ -212,11 +249,8 @@ where
                     None
                 })
                 .unwrap_or_else(|| {
-                    self.ecx
-                        .db
-                        .code_by_hash(hash_b256)
-                        .ok()
-                        .map(|bytecode| bytecode.bytecode().to_vec())
+                    // Correctly call the static method
+                    Self::fetch_code_async(&self.ecx, hash)
                 })
         })
     }
