@@ -54,7 +54,7 @@ echo "Cleanup completed."
 echo "Installation completed successfully!"
 
 echo "Verifying installation..."
-if forge --version | grep -q "0.0.2"; then
+if "$HOME/.foundry/bin/forge" --version | grep -q "0.0.2"; then
     echo "Forge version 0.0.2 is successfully installed."
 else
     echo "Installation verification failed. Forge is not properly installed."
