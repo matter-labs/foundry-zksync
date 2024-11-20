@@ -10,6 +10,7 @@ mod factory_deps;
 mod fork;
 mod fuzz;
 mod invariant;
+mod linking;
 mod logs;
 mod nft;
 mod nonce;

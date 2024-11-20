@@ -136,7 +136,7 @@ impl DualCompiledContracts {
                 // at this stage for zksolc, and BytecodeObject as ref will get the bytecode bytes.
                 // We should be careful however and check/handle errors in
                 // case an Unlinked BytecodeObject gets here somehow
-                let bytes = bytecode.object.clone().into_bytes().unwrap();
+                let bytes = bytecode.object().into_bytes().unwrap();
                 zksolc_all_bytecodes.insert(hash.clone(), bytes.to_vec());
             }
         }
@@ -167,7 +167,7 @@ impl DualCompiledContracts {
                     // bytes. However, we should check and
                     // handle errors in case an Unlinked BytecodeObject gets
                     // here somehow
-                    let bytecode_vec = bytecode.object.clone().into_bytes().unwrap().to_vec();
+                    let bytecode_vec = bytecode.object().into_bytes().unwrap().to_vec();
                     let mut factory_deps_vec: Vec<Vec<u8>> = factory_deps_map
                         .keys()
                         .map(|factory_hash| {
