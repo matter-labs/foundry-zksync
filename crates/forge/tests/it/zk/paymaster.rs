@@ -38,21 +38,13 @@ async fn test_zk_contract_paymaster() {
 
 forgetest_async!(paymaster_script_test, |prj, cmd| {
     setup_deploy_prj(&mut prj);
-    cmd.args([
-        "install",
-        "OpenZeppelin/openzeppelin-contracts",
-        "cyfrin/zksync-contracts",
-        "--no-commit",
-        "--shallow",
-    ])
-    .assert_success();
     cmd.forge_fuse();
     run_zk_script_test(
         prj.root(),
         &mut cmd,
         "./script/Paymaster.s.sol",
         "PaymasterScript",
-        None,
+        Some("OpenZeppelin/openzeppelin-contracts cyfrin/zksync-contracts"),
         3,
         Some(&["-vvvvv", "--via-ir"]),
     );
