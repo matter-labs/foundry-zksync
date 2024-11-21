@@ -148,12 +148,16 @@ impl ContractRunner<'_> {
         self.executor.deploy_create2_deployer()?;
 
         // Test contract has already been deployed so we can migrate the database to zkEVM storage
-        // in the next runner execution.
+        // in the next runner execution. Additionally we can allow persisting the next nonce update
+        // to simulate EVM behavior where only the tx that deploys the test contract increments the
+        // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
             if let Some(zk_startup_migration) = &mut cheatcodes.zk_startup_migration {
                 debug!("test contract deployed, allowing startup storage migration");
                 zk_startup_migration.allow();
             }
+            debug!("test contract deployed, allowing persisting next nonce update");
+            cheatcodes.zk_persist_nonce_update.persist_next();
         }
 
         // Optionally call the `setUp` function

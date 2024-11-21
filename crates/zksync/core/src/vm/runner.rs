@@ -84,7 +84,11 @@ where
         is_static: false,
     };
 
-    let mut ccx = CheatcodeTracerContext { persisted_factory_deps, ..Default::default() };
+    let mut ccx = CheatcodeTracerContext {
+        persisted_factory_deps,
+        persist_nonce_update: true,
+        ..Default::default()
+    };
 
     match inspect::<_, DB::Error>(tx, &mut ecx, &mut ccx, call_ctx) {
         Ok(ZKVMExecutionResult { execution_result: result, .. }) => {

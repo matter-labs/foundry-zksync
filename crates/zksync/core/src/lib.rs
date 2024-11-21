@@ -27,10 +27,12 @@ use alloy_signer::Signature;
 use alloy_transport::Transport;
 use convert::{
     ConvertAddress, ConvertBytes, ConvertH160, ConvertH256, ConvertRU256, ConvertSignature,
-    ToSignable,
+    ConvertU256, ToSignable,
 };
 use eyre::{eyre, OptionExt};
+use revm::{Database, InnerEvmContext};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};
@@ -42,7 +44,10 @@ pub use zksync_types::{
     IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
     NONCE_HOLDER_ADDRESS,
 };
-use zksync_types::{utils::storage_key_for_eth_balance, U256};
+use zksync_types::{
+    utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
+    U256,
+};
 pub use zksync_utils::bytecode::hash_bytecode;
 pub use zksync_web3_rs::{
     eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest, PaymasterParams},
@@ -322,6 +327,50 @@ pub fn get_immutable_slot_key(address: Address, slot_index: rU256) -> H256 {
     ]));
 
     H256(*immutable_value_key)
+}
+
+/// Sets transaction nonce for a specific address.
+pub fn set_tx_nonce<DB>(address: Address, nonce: rU256, ecx: &mut InnerEvmContext<DB>)
+where
+    DB: Database,
+    DB::Error: Debug,
+{
+    //ensure nonce is _only_ tx nonce
+    let (tx_nonce, _deploy_nonce) = decompose_full_nonce(nonce.to_u256());
+
+    let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
+    ecx.load_account(nonce_addr).expect("account could not be loaded");
+    let nonce_key = get_nonce_key(address);
+    ecx.touch(&nonce_addr);
+    // We make sure to keep the old deployment nonce
+    let old_deploy_nonce = ecx
+        .sload(nonce_addr, nonce_key)
+        .map(|v| decompose_full_nonce(v.to_u256()).1)
+        .unwrap_or_default();
+    let updated_nonce = nonces_to_full_nonce(tx_nonce, old_deploy_nonce);
+    ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
+}
+
+/// Sets deployment nonce for a specific address.
+pub fn set_deployment_nonce<DB>(address: Address, nonce: rU256, ecx: &mut InnerEvmContext<DB>)
+where
+    DB: Database,
+    DB::Error: Debug,
+{
+    //ensure nonce is _only_ deployment nonce
+    let (_tx_nonce, deploy_nonce) = decompose_full_nonce(nonce.to_u256());
+
+    let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
+    ecx.load_account(nonce_addr).expect("account could not be loaded");
+    let nonce_key = get_nonce_key(address);
+    ecx.touch(&nonce_addr);
+    // We make sure to keep the old transaction nonce
+    let old_tx_nonce = ecx
+        .sload(nonce_addr, nonce_key)
+        .map(|v| decompose_full_nonce(v.to_u256()).0)
+        .unwrap_or_default();
+    let updated_nonce = nonces_to_full_nonce(old_tx_nonce, deploy_nonce);
+    ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
 }
 
 #[cfg(test)]
