@@ -3,35 +3,36 @@ use crate::{
     verify::BroadcastedState, ScriptArgs, ScriptConfig,
 };
 use alloy_chains::Chain;
-use alloy_consensus::{Transaction, TxEnvelope};
+use alloy_consensus::TxEnvelope;
 use alloy_eips::eip2718::Encodable2718;
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
 use alloy_primitives::{
     map::{AddressHashMap, AddressHashSet},
     utils::format_units,
-    Address, TxHash,
+    Address, Bytes, TxHash,
 };
 use alloy_provider::{utils::Eip1559Estimation, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_transport::Transport;
+use alloy_zksync::network::{
+    transaction_request::TransactionRequest as ZkTransactionRequest, Zksync,
+};
 use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_batch_support, has_different_gas_calc};
 use foundry_common::{
-    provider::{get_http_provider, try_get_http_provider, RetryProvider},
+    provider::{
+        get_http_provider, try_get_http_provider, try_get_zksync_http_provider, RetryProvider,
+    },
     TransactionMaybeSigned,
 };
 use foundry_config::Config;
-use foundry_zksync_core::{
-    convert::{ConvertAddress, ConvertBytes, ConvertSignature, ToSignable},
-    ZkTransactionMetadata,
-};
+use foundry_zksync_core::{convert::ConvertH160, ZkTransactionMetadata};
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{cmp::Ordering, sync::Arc};
-use zksync_web3_rs::eip712::{Eip712Meta, Eip712Transaction, Eip712TransactionRequest};
 
 pub async fn estimate_gas<P, T>(
     tx: &mut WithOtherFields<TransactionRequest>,
@@ -60,53 +61,10 @@ pub async fn next_nonce(caller: Address, provider_url: &str) -> eyre::Result<u64
     Ok(provider.get_transaction_count(caller).await?)
 }
 
-async fn convert_to_zksync(
-    provider: &Arc<RetryProvider>,
-    tx: WithOtherFields<TransactionRequest>,
-    zk: &ZkTransactionMetadata,
-) -> Result<(Eip712TransactionRequest, Eip712Transaction)> {
-    let mut custom_data = Eip712Meta::new().factory_deps(zk.factory_deps.clone());
-
-    if let Some(paymaster_params) = &zk.paymaster_data {
-        custom_data = custom_data.paymaster_params(paymaster_params.clone());
-    }
-
-    let gas_price = match tx.gas_price() {
-        Some(price) => price,
-        None => provider.get_gas_price().await?,
-    };
-
-    let mut deploy_request = Eip712TransactionRequest::new()
-        .r#type(zksync_web3_rs::zks_utils::EIP712_TX_TYPE)
-        .from(Address(*tx.from().unwrap()).to_h160())
-        .to(tx.to().map(|to| to.to_h160()).unwrap())
-        .chain_id(tx.chain_id().unwrap())
-        .nonce(tx.nonce().unwrap())
-        .data(tx.input().cloned().unwrap_or_default().to_ethers())
-        .gas_price(gas_price)
-        .custom_data(custom_data);
-
-    let fee: zksync_web3_rs::zks_provider::types::Fee =
-        provider.raw_request("zks_estimateFee".into(), [deploy_request.clone()]).await.unwrap();
-    deploy_request = deploy_request
-        .gas_limit(fee.gas_limit)
-        .max_fee_per_gas(fee.max_fee_per_gas)
-        .max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
-    deploy_request.custom_data.gas_per_pubdata = fee.gas_per_pubdata_limit;
-
-    // TODO: This is a work around as try_into is not propagating
-    // gas_per_pubdata_byte_limit. It always set the default We would need to
-    // fix that library or add EIP712 to alloy with correct implementation.
-    let mut signable: Eip712Transaction =
-        deploy_request.clone().try_into().wrap_err("converting deploy request")?;
-    signable.gas_per_pubdata_byte_limit = deploy_request.custom_data.gas_per_pubdata;
-
-    Ok((deploy_request, signable))
-}
-
 #[allow(clippy::too_many_arguments)]
 pub async fn send_transaction(
     provider: Arc<RetryProvider>,
+    zk_provider: Arc<RetryProvider<Zksync>>,
     mut kind: SendTransactionKind<'_>,
     zk: Option<&ZkTransactionMetadata>,
     sequential_broadcast: bool,
@@ -143,63 +101,55 @@ pub async fn send_transaction(
         // Chains which use `eth_estimateGas` are being sent sequentially and require their
         // gas to be re-estimated right before broadcasting.
         if !is_fixed_gas_limit && estimate_via_rpc {
-            // manually add factory_deps to estimate_gas
-            if let Some(zk) = zk {
-                tx.other.insert(
-                    "eip712Meta".into(),
-                    serde_json::to_value(&Eip712Meta {
-                        factory_deps: zk.factory_deps.clone(),
-                        ..Default::default()
-                    })
-                    .expect("failed serializing json"),
-                );
+            // We skip estimating gas for zk transactions as the fee is estimated manually later.
+            if zk.is_none() {
+                estimate_gas(tx, &provider, estimate_multiplier).await?;
             }
-            estimate_gas(tx, &provider, estimate_multiplier).await?;
         }
     }
 
-    let pending = match kind {
+    let pending_tx_hash = match kind {
         SendTransactionKind::Unlocked(tx) => {
             debug!("sending transaction from unlocked account {:?}", tx);
 
             // Submit the transaction
-            provider.send_transaction(tx).await?
+            *provider.send_transaction(tx).await?.tx_hash()
         }
         SendTransactionKind::Raw(tx, signer) => {
             debug!("sending transaction: {:?}", tx);
 
-            let signed = if let Some(zk) = zk {
-                let signer = signer
-                    .signer_by_address(tx.from.expect("no sender"))
-                    .ok_or(eyre::eyre!("Signer not found"))?;
+            if let Some(zk) = zk {
+                let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
+                if !zk.factory_deps.is_empty() {
+                    zk_tx.set_factory_deps(zk.factory_deps.iter().map(Bytes::from_iter).collect());
+                }
+                if let Some(paymaster_data) = &zk.paymaster_data {
+                    zk_tx.set_paymaster(
+                        alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
+                            paymaster: paymaster_data.paymaster.to_address(),
+                            paymaster_input: paymaster_data.paymaster_input.clone().into(),
+                        },
+                    );
+                }
+                foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;
 
-                let (deploy_request, signable) = convert_to_zksync(&provider, tx, zk).await?;
-                let mut signable = signable.to_signable_tx();
+                let zk_signer = alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
+                let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
 
-                let signature = signer
-                    .sign_transaction(&mut signable)
-                    .await
-                    .wrap_err("Failed to sign typed data")?;
-
-                let encoded = &*deploy_request
-                    .rlp_signed(signature.to_ethers())
-                    .wrap_err("able to rlp encode deploy request")?;
-
-                [&[signable.ty()], encoded].concat()
+                *zk_provider.send_raw_transaction(signed.as_ref()).await?.tx_hash()
             } else {
-                tx.build(signer).await?.encoded_2718()
-            };
-
-            // Submit the raw transaction
-            provider.send_raw_transaction(signed.as_ref()).await?
+                let signed = tx.build(signer).await?.encoded_2718();
+                // Submit the raw transaction
+                *provider.send_raw_transaction(signed.as_ref()).await?.tx_hash()
+            }
         }
         SendTransactionKind::Signed(tx) => {
             debug!("sending transaction: {:?}", tx);
-            provider.send_raw_transaction(tx.encoded_2718().as_ref()).await?
+            *provider.send_raw_transaction(tx.encoded_2718().as_ref()).await?.tx_hash()
         }
     };
 
-    Ok(*pending.tx_hash())
+    Ok(pending_tx_hash)
 }
 
 /// How to send a single transaction
@@ -339,6 +289,7 @@ impl BundledState {
             let mut sequence = self.sequence.sequences_mut().get_mut(i).unwrap();
 
             let provider = Arc::new(try_get_http_provider(sequence.rpc_url())?);
+            let zk_provider = Arc::new(try_get_zksync_http_provider(sequence.rpc_url())?);
             let already_broadcasted = sequence.receipts.len();
 
             let seq_progress = progress.get_sequence_progress(i, sequence);
@@ -446,6 +397,7 @@ impl BundledState {
                     for (kind, zk, is_fixed_gas_limit) in batch {
                         let fut = send_transaction(
                             provider.clone(),
+                            zk_provider.clone(),
                             kind.clone(),
                             zk.as_ref(),
                             sequential_broadcast,

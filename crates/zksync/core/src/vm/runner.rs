@@ -28,7 +28,7 @@ use crate::{
 pub fn transact<'a, DB>(
     persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
-    paymaster_data: Option<zksync_web3_rs::eip712::PaymasterParams>,
+    paymaster_data: Option<PaymasterParams>,
     env: &'a mut Env,
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
