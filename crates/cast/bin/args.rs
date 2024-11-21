@@ -1,5 +1,5 @@
 use crate::cmd::{
-    access_list::AccessListArgs, bind::BindArgs, call::CallArgs,
+    access_list::AccessListArgs, artifact::ArtifactArgs, bind::BindArgs, call::CallArgs,
     constructor_args::ConstructorArgsArgs, create2::Create2Args, creation_code::CreationCodeArgs,
     estimate::EstimateArgs, find_block::FindBlockArgs, interface::InterfaceArgs, logs::LogsArgs,
     mktx::MakeTxArgs, rpc::RpcArgs, run::RunArgs, send::SendTxArgs, storage::StorageArgs,
@@ -9,7 +9,7 @@ use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::BlockId;
 use clap::{Parser, Subcommand, ValueHint};
 use eyre::Result;
-use foundry_cli::opts::{EtherscanOpts, RpcOpts, ShellOpts};
+use foundry_cli::opts::{EtherscanOpts, GlobalOpts, RpcOpts};
 use foundry_common::ens::NameOrAddress;
 use std::{path::PathBuf, str::FromStr};
 
@@ -31,11 +31,12 @@ const VERSION_MESSAGE: &str = concat!(
     next_display_order = None,
 )]
 pub struct Cast {
+    /// Include the global options.
+    #[command(flatten)]
+    pub global: GlobalOpts,
+
     #[command(subcommand)]
     pub cmd: CastSubcommand,
-
-    #[clap(flatten)]
-    pub shell: ShellOpts,
 }
 
 #[derive(Subcommand)]
@@ -793,7 +794,7 @@ pub enum CastSubcommand {
         who: Option<String>,
 
         /// Perform a reverse lookup to verify that the name is correct.
-        #[arg(long, short)]
+        #[arg(long)]
         verify: bool,
 
         #[command(flatten)]
@@ -807,7 +808,7 @@ pub enum CastSubcommand {
         who: Option<Address>,
 
         /// Perform a normal lookup to verify that the address is correct.
-        #[arg(long, short)]
+        #[arg(long)]
         verify: bool,
 
         #[command(flatten)]
@@ -926,6 +927,10 @@ pub enum CastSubcommand {
     /// Download a contract creation code from Etherscan and RPC.
     #[command(visible_alias = "cc")]
     CreationCode(CreationCodeArgs),
+
+    /// Generate an artifact file, that can be used to deploy a contract locally.
+    #[command(visible_alias = "ar")]
+    Artifact(ArtifactArgs),
 
     /// Display constructor arguments used for the contract initialization.
     #[command(visible_alias = "cra")]

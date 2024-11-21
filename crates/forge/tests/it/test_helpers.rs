@@ -47,7 +47,7 @@ static VYPER: LazyLock<PathBuf> = LazyLock::new(|| std::env::temp_dir().join("vy
 /// Profile for the tests group. Used to configure separate configurations for test runs.
 pub enum ForgeTestProfile {
     Default,
-    Cancun,
+    Paris,
     MultiVersion,
 }
 
@@ -55,16 +55,16 @@ impl fmt::Display for ForgeTestProfile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Default => write!(f, "default"),
-            Self::Cancun => write!(f, "cancun"),
+            Self::Paris => write!(f, "paris"),
             Self::MultiVersion => write!(f, "multi-version"),
         }
     }
 }
 
 impl ForgeTestProfile {
-    /// Returns true if the profile is Cancun.
-    pub fn is_cancun(&self) -> bool {
-        matches!(self, Self::Cancun)
+    /// Returns true if the profile is Paris.
+    pub fn is_paris(&self) -> bool {
+        matches!(self, Self::Paris)
     }
 
     pub fn root(&self) -> PathBuf {
@@ -79,8 +79,8 @@ impl ForgeTestProfile {
         let mut settings =
             Settings { libraries: Libraries::parse(&libs).unwrap(), ..Default::default() };
 
-        if matches!(self, Self::Cancun) {
-            settings.evm_version = Some(EvmVersion::Cancun);
+        if matches!(self, Self::Paris) {
+            settings.evm_version = Some(EvmVersion::Paris);
         }
 
         let settings = SolcConfig::builder().settings(settings).build();
@@ -186,8 +186,8 @@ impl ForgeTestProfile {
             "fork/Fork.t.sol:DssExecLib:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4".to_string(),
         ];
 
-        if self.is_cancun() {
-            config.evm_version = EvmVersion::Cancun;
+        if self.is_paris() {
+            config.evm_version = EvmVersion::Paris;
         }
 
         config
@@ -274,8 +274,8 @@ impl ForgeTestData {
         let mut runner = MultiContractRunnerBuilder::new(Arc::new(self.config.clone()))
             .sender(self.evm_opts.sender)
             .with_test_options(self.test_opts.clone());
-        if self.profile.is_cancun() {
-            runner = runner.evm_spec(SpecId::CANCUN);
+        if self.profile.is_paris() {
+            runner = runner.evm_spec(SpecId::MERGE);
         }
 
         runner
@@ -519,9 +519,9 @@ pub static EVM_OPTS: LazyLock<EvmOpts> = LazyLock::new(|| EvmOpts {
 pub static TEST_DATA_DEFAULT: LazyLock<ForgeTestData> =
     LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::Default));
 
-/// Data for tests requiring Cancun support on Solc and EVM level.
-pub static TEST_DATA_CANCUN: LazyLock<ForgeTestData> =
-    LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::Cancun));
+/// Data for tests requiring Paris support on Solc and EVM level.
+pub static TEST_DATA_PARIS: LazyLock<ForgeTestData> =
+    LazyLock::new(|| ForgeTestData::new(ForgeTestProfile::Paris));
 
 /// Data for tests requiring Cancun support on Solc and EVM level.
 pub static TEST_DATA_MULTI_VERSION: LazyLock<ForgeTestData> =

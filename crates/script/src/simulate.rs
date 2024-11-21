@@ -16,7 +16,7 @@ use eyre::{Context, Result};
 use forge_script_sequence::{ScriptSequence, TransactionWithMetadata};
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_different_gas_calc, now};
-use foundry_common::{get_contract_name, ContractData};
+use foundry_common::ContractData;
 use foundry_evm::traces::{decode_trace_arena, render_trace_arena};
 use futures::future::{join_all, try_join_all};
 use parking_lot::RwLock;
@@ -112,11 +112,11 @@ impl PreSimulationState {
         // Executes all transactions from the different forks concurrently.
         let futs = transactions
             .into_iter()
-            .map(|transaction| async {
+            .map(|mut transaction| async {
                 let mut runner = runners.get(&transaction.rpc).expect("invalid rpc url").write();
-
                 let zk_metadata = transaction.zk.clone();
-                let tx = transaction.tx();
+                let tx = transaction.tx(); //NOTE(zk): this one is `mut` upstream but doesn't need to be
+
                 let to = if let Some(TxKind::Call(to)) = tx.to() { Some(to) } else { None };
                 let result = runner
                     .simulate(
@@ -125,6 +125,7 @@ impl PreSimulationState {
                         to,
                         tx.input().map(Bytes::copy_from_slice),
                         tx.value(),
+                        tx.authorization_list(),
                         (self.script_config.config.zksync.run_in_zk_mode(), zk_metadata),
                     )
                     .wrap_err("Internal EVM error during simulation")?;
@@ -153,8 +154,8 @@ impl PreSimulationState {
             .collect::<Vec<_>>();
 
         if self.script_config.evm_opts.verbosity > 3 {
-            println!("==========================");
-            println!("Simulated On-chain Traces:\n");
+            sh_println!("==========================")?;
+            sh_println!("Simulated On-chain Traces:\n")?;
         }
 
         let mut abort = false;
@@ -165,7 +166,7 @@ impl PreSimulationState {
             if tx.is_none() || self.script_config.evm_opts.verbosity > 3 {
                 for (_, trace) in &mut traces {
                     decode_trace_arena(trace, &self.execution_artifacts.decoder).await?;
-                    println!("{}", render_trace_arena(trace));
+                    sh_println!("{}", render_trace_arena(trace))?;
                 }
             }
 
@@ -207,9 +208,8 @@ impl PreSimulationState {
             .contracts
             .iter()
             .filter_map(move |(addr, contract_id)| {
-                let contract_name = get_contract_name(contract_id);
                 if let Ok(Some((_, data))) =
-                    self.build_data.known_contracts.find_by_name_or_identifier(contract_name)
+                    self.build_data.known_contracts.find_by_name_or_identifier(contract_id)
                 {
                     return Some((*addr, data));
                 }

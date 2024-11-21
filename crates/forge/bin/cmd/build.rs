@@ -100,18 +100,21 @@ impl BuildArgs {
                 }
             }
 
+            if files.is_empty() {
+                eyre::bail!("No source files found in specified build paths.")
+            }
+
             let format_json = shell::is_json();
             let compiler = ProjectCompiler::new()
                 .files(files)
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .ignore_eip_3860(self.ignore_eip_3860)
-                .quiet(format_json)
                 .bail(!format_json);
 
             let output = compiler.compile(&project)?;
 
-            if format_json {
+            if format_json && !self.names && !self.sizes {
                 sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
             }
 
@@ -127,10 +130,12 @@ impl BuildArgs {
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .zksync_sizes()
-                .quiet(format_json)
+                .quiet(format_json) //TODO(zk): remove to match upstream
                 .bail(!format_json);
 
             let zk_output = zk_compiler.zksync_compile(&zk_project)?;
+
+            //TODO(zk): match upstream
             if format_json {
                 println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
             }

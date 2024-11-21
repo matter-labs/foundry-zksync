@@ -5,21 +5,10 @@
 version = 2
 yanked = "warn"
 ignore = [
-    # https://github.com/watchexec/watchexec/issues/852
-    "RUSTSEC-2024-0350",
-    "RUSTSEC-2024-0351",
-    "RUSTSEC-2022-0041",
-    "RUSTSEC-2023-0045",
-    "RUSTSEC-2020-0016",
-    # https://github.com/launchbadge/sqlx/issues/3440
-    # Should remove once we can update sqlx which is used by some zksync dependencies
-    "RUSTSEC-2024-0363",
-    # Used by alloy
     # proc-macro-error is unmaintained
     "RUSTSEC-2024-0370",
     # instant is unmaintained
     "RUSTSEC-2024-0384",
-    # Used by boojum
     # derivative is unmaintained
     "RUSTSEC-2024-0388",
 ]
@@ -60,6 +49,9 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "Zlib",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
     "OpenSSL",
     "Apache-2.0 WITH LLVM-exception",
     "BSL-1.0",
@@ -82,9 +74,6 @@ exceptions = [
     { allow = ["CC0-1.0"], name = "notify" },
     { allow = ["CC0-1.0"], name = "dunce" },
     { allow = ["CC0-1.0"], name = "aurora-engine-modexp" },
-    { allow = ["CC0-1.0"], name = "constant_time_eq" },
-    { allow = ["CC0-1.0"], name = "secp256k1" },
-    { allow = ["CC0-1.0"], name = "secp256k1-sys" },
 ]
 #copyleft = "deny"
 
