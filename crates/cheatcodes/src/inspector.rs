@@ -410,6 +410,39 @@ impl ArbitraryStorage {
 /// List of transactions that can be broadcasted.
 pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 
+/// Allows overriding nonce update behavior for the tx caller in the zkEVM.
+///
+/// Since each CREATE or CALL is executed as a separate transaction within zkEVM, we currently skip
+/// persisting nonce updates as it erroneously increments the tx nonce. However, under certain
+/// situations, e.g. deploying contracts, transacts, etc. the nonce updates must be persisted.
+#[derive(Default, Debug, Clone)]
+pub enum ZkPersistNonceUpdate {
+    /// Never update the nonce. This is currently the default behavior.
+    #[default]
+    Never,
+    /// Override the default behavior, and persist nonce update for tx caller for the next
+    /// zkEVM execution _only_.
+    PersistNext,
+}
+
+impl ZkPersistNonceUpdate {
+    /// Persist nonce update for the tx caller for next execution.
+    pub fn persist_next(&mut self) {
+        *self = Self::PersistNext;
+    }
+
+    /// Retrieve if a nonce update must be persisted, or not. Resets the state to default.
+    pub fn check(&mut self) -> bool {
+        let persist_nonce_update = match self {
+            Self::Never => false,
+            Self::PersistNext => true,
+        };
+        *self = Default::default();
+
+        persist_nonce_update
+    }
+}
+
 /// Setting for migrating the database to zkEVM storage when starting in ZKsync mode.
 /// The migration is performed on the DB via the inspector so must only be performed once.
 #[derive(Debug, Default, Clone)]
@@ -608,6 +641,9 @@ pub struct Cheatcodes {
     /// This can be done as each test runs with its own [Cheatcodes] instance, thereby
     /// providing the necessary level of isolation.
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
+
+    /// Nonce update persistence behavior in zkEVM for the tx caller.
+    pub zk_persist_nonce_update: ZkPersistNonceUpdate,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
@@ -705,6 +741,7 @@ impl Cheatcodes {
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
             zk_use_factory_deps: Default::default(),
+            zk_persist_nonce_update: Default::default(),
         }
     }
 
@@ -1231,13 +1268,16 @@ impl Cheatcodes {
         let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
         tracing::debug!(contract = contract.name, "using dual compiled contract");
 
+        let zk_persist_nonce_update = self.zk_persist_nonce_update.check();
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: self.mocked_calls.clone(),
             expected_calls: Some(&mut self.expected_calls),
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
+            persist_nonce_update: self.broadcast.is_some() || zk_persist_nonce_update,
         };
+
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
             value: input.value().to_u256(),
             msg_sender: input.caller(),
@@ -1508,9 +1548,12 @@ where {
                 }
             };
             let prev = account.info.nonce;
-            account.info.nonce = prev.saturating_sub(1);
+            let nonce = prev.saturating_sub(1);
+            account.info.nonce = nonce;
+            // NOTE(zk): We sync with the nonce changes to ensure that the nonce matches
+            foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx_inner);
 
-            trace!(target: "cheatcodes", %sender, nonce=account.info.nonce, prev, "corrected nonce");
+            trace!(target: "cheatcodes", %sender, nonce, prev, "corrected nonce");
         }
 
         if call.target_address == CHEATCODE_ADDRESS {
@@ -1855,13 +1898,14 @@ where {
         }
 
         info!("running call in zkEVM {:#?}", call);
-
+        let zk_persist_nonce_update = self.zk_persist_nonce_update.check();
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: self.mocked_calls.clone(),
             expected_calls: Some(&mut self.expected_calls),
             accesses: self.accesses.as_mut(),
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
+            persist_nonce_update: self.broadcast.is_some() || zk_persist_nonce_update,
         };
 
         let mut gas = Gas::new(call.gas_limit);

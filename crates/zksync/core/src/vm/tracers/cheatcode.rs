@@ -90,6 +90,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     /// Paymaster data
     pub paymaster_data: Option<ZkPaymasterData>,
+    /// Whether to persist nonce update for the tx caller, or not.
+    pub persist_nonce_update: bool,
 }
 
 /// Tracer result to return back to foundry.
