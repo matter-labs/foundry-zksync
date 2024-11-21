@@ -11,7 +11,7 @@ forgetest_async!(script_zk_can_deploy_nft, |prj, cmd| {
         "MyScript",
         Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts"),
         1,
-        Some(&["-vvvvv"]),
+        Some(&["-vvvvv", "--broadcast"]),
     );
 });
 

@@ -114,6 +114,9 @@ impl ContractRunner<'_> {
         }
 
         let address = self.sender.create(self.executor.get_nonce(self.sender)?);
+        // NOTE(zk): the test contract is set here instead of where upstream does it as
+        // the test contract address needs to be retrieved in order to skip
+        // zkEVM mode for the creation of the test address (and for calls to it later).
         self.executor.backend_mut().set_test_contract(address);
 
         // Set the contracts initial balance before deployment, so it is available during
@@ -145,12 +148,16 @@ impl ContractRunner<'_> {
         self.executor.deploy_create2_deployer()?;
 
         // Test contract has already been deployed so we can migrate the database to zkEVM storage
-        // in the next runner execution.
+        // in the next runner execution. Additionally we can allow persisting the next nonce update
+        // to simulate EVM behavior where only the tx that deploys the test contract increments the
+        // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
             if let Some(zk_startup_migration) = &mut cheatcodes.zk_startup_migration {
                 debug!("test contract deployed, allowing startup storage migration");
                 zk_startup_migration.allow();
             }
+            debug!("test contract deployed, allowing persisting next nonce update");
+            cheatcodes.zk_persist_nonce_update.persist_next();
         }
 
         // Optionally call the `setUp` function

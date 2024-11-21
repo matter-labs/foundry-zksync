@@ -86,15 +86,7 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?address, ?nonce, "cheatcode setNonce");
-    //ensure nonce is _only_ tx nonce
-    let (tx_nonce, _deploy_nonce) = decompose_full_nonce(nonce.to_u256());
-
-    let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
-    ecx.load_account(nonce_addr).expect("account could not be loaded");
-    let zk_address = address.to_h160();
-    let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
-    ecx.touch(&nonce_addr);
-    ecx.sstore(nonce_addr, nonce_key, tx_nonce.to_ru256()).expect("failed storing value");
+    crate::set_tx_nonce(address, nonce, ecx);
 }
 
 /// Gets nonce for a specific address.

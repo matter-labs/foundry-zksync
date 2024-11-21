@@ -213,7 +213,7 @@ impl ForgeTestProfile {
         zk_config.zksync.startup = true;
         zk_config.zksync.fallback_oz = true;
         zk_config.zksync.optimizer_mode = '3';
-        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 4)));
+        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 7)));
         zk_config.fuzz.no_zksync_reserved_addresses = true;
 
         zk_config
@@ -602,7 +602,6 @@ pub fn run_zk_script_test(
     let mut script_args = vec![
         "--zk-startup",
         &script_path_contract,
-        "--broadcast",
         "--private-key",
         private_key,
         "--chain",
