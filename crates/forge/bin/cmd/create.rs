@@ -43,10 +43,8 @@ use std::{
     collections::{HashSet, VecDeque},
     marker::PhantomData,
     path::PathBuf,
-    str::FromStr,
     sync::Arc,
 };
-use zksync_types::H256;
 
 merge_impl_figment_convert!(CreateArgs, opts, eth);
 
@@ -156,7 +154,7 @@ impl CreateArgs {
 
             let artifact = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
-            let ZkContractArtifact { bytecode, hash, factory_dependencies, abi, .. } = artifact;
+            let ZkContractArtifact { bytecode, factory_dependencies, abi, .. } = artifact;
 
             let abi = abi.expect("Abi not found");
             let bin = bytecode.expect("Bytecode not found");
