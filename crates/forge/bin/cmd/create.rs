@@ -180,7 +180,6 @@ impl CreateArgs {
                     eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
                 }
             };
-            let bytecode_hash = H256::from_str(&hash.expect("Contract hash not found"))?;
 
             // Add arguments to constructor
             let config = self.eth.try_load_config_emit_warnings()?;
@@ -659,8 +658,6 @@ impl CreateArgs {
 
             self.verify_preflight_check(constructor_args.clone(), chain).await?;
         }
-
-        println!("{:?}", deployer.tx);
 
         // Deploy the actual contract
         let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
