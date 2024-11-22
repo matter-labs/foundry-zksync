@@ -43,10 +43,8 @@ use std::{
     collections::{HashSet, VecDeque},
     marker::PhantomData,
     path::PathBuf,
-    str::FromStr,
     sync::Arc,
 };
-use zksync_types::H256;
 
 merge_impl_figment_convert!(CreateArgs, opts, eth);
 
@@ -114,7 +112,6 @@ pub struct CreateArgs {
 pub struct ZkSyncData {
     #[allow(dead_code)]
     bytecode: Vec<u8>,
-    bytecode_hash: H256,
     factory_deps: Vec<Vec<u8>>,
     paymaster_params: Option<PaymasterParams>,
 }
@@ -157,7 +154,7 @@ impl CreateArgs {
 
             let artifact = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
-            let ZkContractArtifact { bytecode, hash, factory_dependencies, abi, .. } = artifact;
+            let ZkContractArtifact { bytecode, factory_dependencies, abi, .. } = artifact;
 
             let abi = abi.expect("Abi not found");
             let bin = bytecode.expect("Bytecode not found");
@@ -181,7 +178,6 @@ impl CreateArgs {
                     eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
                 }
             };
-            let bytecode_hash = H256::from_str(&hash.expect("Contract hash not found"))?;
 
             // Add arguments to constructor
             let config = self.eth.try_load_config_emit_warnings()?;
@@ -256,7 +252,7 @@ impl CreateArgs {
                 visited_bytecodes.insert(bytecode.clone());
                 visited_bytecodes.into_iter().collect()
             };
-            let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps, paymaster_params };
+            let zk_data = ZkSyncData { bytecode, factory_deps, paymaster_params };
 
             return if self.unlocked {
                 // Deploy with unlocked account
@@ -1077,20 +1073,15 @@ where
             None => Default::default(),
             Some(constructor) => constructor.abi_encode_input(&params).unwrap_or_default(),
         };
-        let data: Bytes = foundry_zksync_core::encode_create_params(
-            &forge::revm::primitives::CreateScheme::Create,
-            zk_data.bytecode_hash,
-            constructor_args,
-        )
-        .into();
 
-        // create the tx object. Since we're deploying a contract, `to` is
-        // `CONTRACT_DEPLOYER_ADDRESS`
-        let tx: alloy_zksync::network::transaction_request::TransactionRequest =
+        let mut tx: alloy_zksync::network::transaction_request::TransactionRequest =
             TransactionRequest::default()
                 .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
-                .input(data.into())
                 .into();
+
+        tx = tx
+            .zksync_deploy(zk_data.bytecode.clone(), constructor_args, zk_data.factory_deps.clone())
+            .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
 
         Ok(ZkDeployer {
             client: self.client.clone(),
@@ -1116,6 +1107,8 @@ pub enum ContractDeploymentError {
     ContractNotDeployed,
     #[error(transparent)]
     RpcError(#[from] TransportError),
+    #[error("failed building transaction")]
+    TransactionBuildError,
 }
 
 impl From<PendingTransactionError> for ContractDeploymentError {

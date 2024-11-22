@@ -16,7 +16,7 @@ use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_transport::Transport;
 use alloy_zksync::network::{
-    transaction_request::TransactionRequest as ZkTransactionRequest, Zksync,
+    transaction_request::TransactionRequest as ZkTransactionRequest, tx_type::TxType, Zksync,
 };
 use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
@@ -119,7 +119,9 @@ pub async fn send_transaction(
             debug!("sending transaction: {:?}", tx);
 
             if let Some(zk) = zk {
-                let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
+                let mut inner = tx.inner.clone();
+                inner.transaction_type = Some(TxType::Eip712 as u8);
+                let mut zk_tx: ZkTransactionRequest = inner.into();
                 if !zk.factory_deps.is_empty() {
                     zk_tx.set_factory_deps(zk.factory_deps.iter().map(Bytes::from_iter).collect());
                 }
