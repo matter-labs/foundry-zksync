@@ -114,7 +114,6 @@ pub struct CreateArgs {
 pub struct ZkSyncData {
     #[allow(dead_code)]
     bytecode: Vec<u8>,
-    bytecode_hash: H256,
     factory_deps: Vec<Vec<u8>>,
     paymaster_params: Option<PaymasterParams>,
 }
@@ -256,7 +255,7 @@ impl CreateArgs {
                 visited_bytecodes.insert(bytecode.clone());
                 visited_bytecodes.into_iter().collect()
             };
-            let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps, paymaster_params };
+            let zk_data = ZkSyncData { bytecode, factory_deps, paymaster_params };
 
             return if self.unlocked {
                 // Deploy with unlocked account
@@ -660,6 +659,8 @@ impl CreateArgs {
 
             self.verify_preflight_check(constructor_args.clone(), chain).await?;
         }
+
+        println!("{:?}", deployer.tx);
 
         // Deploy the actual contract
         let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
@@ -1077,20 +1078,15 @@ where
             None => Default::default(),
             Some(constructor) => constructor.abi_encode_input(&params).unwrap_or_default(),
         };
-        let data: Bytes = foundry_zksync_core::encode_create_params(
-            &forge::revm::primitives::CreateScheme::Create,
-            zk_data.bytecode_hash,
-            constructor_args,
-        )
-        .into();
 
-        // create the tx object. Since we're deploying a contract, `to` is
-        // `CONTRACT_DEPLOYER_ADDRESS`
-        let tx: alloy_zksync::network::transaction_request::TransactionRequest =
+        let mut tx: alloy_zksync::network::transaction_request::TransactionRequest =
             TransactionRequest::default()
                 .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
-                .input(data.into())
                 .into();
+
+        tx = tx
+            .zksync_deploy(zk_data.bytecode.clone(), constructor_args, zk_data.factory_deps.clone())
+            .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
 
         Ok(ZkDeployer {
             client: self.client.clone(),
@@ -1116,6 +1112,8 @@ pub enum ContractDeploymentError {
     ContractNotDeployed,
     #[error(transparent)]
     RpcError(#[from] TransportError),
+    #[error("failed building transaction")]
+    TransactionBuildError,
 }
 
 impl From<PendingTransactionError> for ContractDeploymentError {
