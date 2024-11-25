@@ -6,8 +6,8 @@ use anvil::{EthereumHardfork, NodeConfig};
 use foundry_test_utils::{
     casttest, file,
     rpc::{
-        next_http_rpc_endpoint, next_mainnet_etherscan_api_key, next_rpc_endpoint,
-        next_ws_rpc_endpoint,
+        next_etherscan_api_key, next_http_rpc_endpoint, next_mainnet_etherscan_api_key,
+        next_rpc_endpoint, next_ws_rpc_endpoint,
     },
     str,
     util::{self, OutputExt},
@@ -33,12 +33,17 @@ Options:
   -h, --help
           Print help (see a summary with '-h')
 
+  -j, --threads <THREADS>
+          Number of threads to use. Specifying 0 defaults to the number of logical cores
+          
+          [aliases: jobs]
+
   -V, --version
           Print version
 
 Display options:
       --color <COLOR>
-          Log messages coloring
+          The color of the log messages
 
           Possible values:
           - auto:   Intelligently guess whether to use color output (default)
@@ -51,8 +56,18 @@ Display options:
   -q, --quiet
           Do not print log messages
 
-      --verbose
-          Use verbose output
+  -v, --verbosity...
+          Verbosity level of the log messages.
+          
+          Pass multiple times to increase the verbosity (e.g. -v, -vv, -vvv).
+          
+          Depending on the context the verbosity levels have different meanings.
+          
+          For example, the verbosity levels of the EVM are:
+          - 2 (-vv): Print logs for all tests.
+          - 3 (-vvv): Print execution traces for failing tests.
+          - 4 (-vvvv): Print execution traces for all tests, and setup traces for failing tests.
+          - 5 (-vvvvv): Print execution and setup traces for all tests.
 
 Find more information in the book: http://book.getfoundry.sh/reference/cast/cast.html
 
@@ -645,8 +660,7 @@ casttest!(rpc_with_args, |_prj, cmd| {
 
     // Call `cast rpc eth_getBlockByNumber 0x123 false`
     cmd.args(["rpc", "--rpc-url", eth_rpc_url.as_str(), "eth_getBlockByNumber", "0x123", "false"])
-        .assert_success()
-        .stdout_eq(str![[r#"
+    .assert_json_stdout(str![[r#"
 {"number":"0x123","hash":"0xc5dab4e189004a1312e9db43a40abb2de91ad7dd25e75880bf36016d8e9df524","transactions":[],"totalDifficulty":"0x4dea420908b","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","extraData":"0x476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32","nonce":"0x29d6547c196e00e0","miner":"0xbb7b8287f3f0a933474a79eae42cbca977791171","difficulty":"0x494433b31","gasLimit":"0x1388","gasUsed":"0x0","uncles":[],"sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","size":"0x220","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","stateRoot":"0x3fe6bd17aa85376c7d566df97d9f2e536f37f7a87abb3a6f9e2891cf9442f2e4","mixHash":"0x943056aa305aa6d22a3c06110942980342d1f4d4b11c17711961436a0f963ea0","parentHash":"0x7abfd11e862ccde76d6ea8ee20978aac26f4bcb55de1188cc0335be13e817017","timestamp":"0x55ba4564"}
 
 "#]]);
@@ -665,8 +679,7 @@ casttest!(rpc_raw_params, |_prj, cmd| {
         "--raw",
         r#"["0x123", false]"#,
     ])
-    .assert_success()
-    .stdout_eq(str![[r#"
+    .assert_json_stdout(str![[r#"
 {"number":"0x123","hash":"0xc5dab4e189004a1312e9db43a40abb2de91ad7dd25e75880bf36016d8e9df524","transactions":[],"totalDifficulty":"0x4dea420908b","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","extraData":"0x476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32","nonce":"0x29d6547c196e00e0","miner":"0xbb7b8287f3f0a933474a79eae42cbca977791171","difficulty":"0x494433b31","gasLimit":"0x1388","gasUsed":"0x0","uncles":[],"sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","size":"0x220","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","stateRoot":"0x3fe6bd17aa85376c7d566df97d9f2e536f37f7a87abb3a6f9e2891cf9442f2e4","mixHash":"0x943056aa305aa6d22a3c06110942980342d1f4d4b11c17711961436a0f963ea0","parentHash":"0x7abfd11e862ccde76d6ea8ee20978aac26f4bcb55de1188cc0335be13e817017","timestamp":"0x55ba4564"}
 
 "#]]);
@@ -682,8 +695,7 @@ casttest!(rpc_raw_params_stdin, |_prj, cmd| {
             stdin.write_all(b"\n[\n\"0x123\",\nfalse\n]\n").unwrap();
         },
     )
-    .assert_success()
-    .stdout_eq(str![[r#"
+    .assert_json_stdout(str![[r#"
 {"number":"0x123","hash":"0xc5dab4e189004a1312e9db43a40abb2de91ad7dd25e75880bf36016d8e9df524","transactions":[],"totalDifficulty":"0x4dea420908b","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","extraData":"0x476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32","nonce":"0x29d6547c196e00e0","miner":"0xbb7b8287f3f0a933474a79eae42cbca977791171","difficulty":"0x494433b31","gasLimit":"0x1388","gasUsed":"0x0","uncles":[],"sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","size":"0x220","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","stateRoot":"0x3fe6bd17aa85376c7d566df97d9f2e536f37f7a87abb3a6f9e2891cf9442f2e4","mixHash":"0x943056aa305aa6d22a3c06110942980342d1f4d4b11c17711961436a0f963ea0","parentHash":"0x7abfd11e862ccde76d6ea8ee20978aac26f4bcb55de1188cc0335be13e817017","timestamp":"0x55ba4564"}
 
 "#]]);
@@ -1129,6 +1141,23 @@ casttest!(storage_layout_simple, |_prj, cmd| {
 "#]]);
 });
 
+// <https://github.com/foundry-rs/foundry/pull/9332>
+casttest!(storage_layout_simple_json, |_prj, cmd| {
+    cmd.args([
+        "storage",
+        "--rpc-url",
+        next_rpc_endpoint(NamedChain::Mainnet).as_str(),
+        "--block",
+        "21034138",
+        "--etherscan-api-key",
+        next_mainnet_etherscan_api_key().as_str(),
+        "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+        "--json",
+    ])
+    .assert_success()
+    .stdout_eq(file!["../fixtures/storage_layout_simple.json": Json]);
+});
+
 // <https://github.com/foundry-rs/foundry/issues/6319>
 casttest!(storage_layout_complex, |_prj, cmd| {
     cmd.args([
@@ -1160,6 +1189,22 @@ casttest!(storage_layout_complex, |_prj, cmd| {
 | _internalTokenBalance         | mapping(address => mapping(contract IERC20 => uint256))            | 11   | 0      | 32    | 0                                                | 0x0000000000000000000000000000000000000000000000000000000000000000 | contracts/vault/Vault.sol:Vault |
 
 "#]]);
+});
+
+casttest!(storage_layout_complex_json, |_prj, cmd| {
+    cmd.args([
+        "storage",
+        "--rpc-url",
+        next_rpc_endpoint(NamedChain::Mainnet).as_str(),
+        "--block",
+        "21034138",
+        "--etherscan-api-key",
+        next_mainnet_etherscan_api_key().as_str(),
+        "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+        "--json",
+    ])
+    .assert_success()
+    .stdout_eq(file!["../fixtures/storage_layout_complex.json": Json]);
 });
 
 casttest!(balance, |_prj, cmd| {
@@ -1369,32 +1414,37 @@ casttest!(block_number_hash, |_prj, cmd| {
     assert_eq!(s.trim().parse::<u64>().unwrap(), 1, "{s}")
 });
 
-casttest!(send_eip7702, async |_prj, cmd| {
-    let (_api, handle) =
-        anvil::spawn(NodeConfig::test().with_hardfork(Some(EthereumHardfork::PragueEOF.into())))
-            .await;
-    let endpoint = handle.http_endpoint();
+casttest!(
+    send_eip7702,
+    async | _prj,
+    cmd | {
+        let (_api, handle) = anvil::spawn(
+            NodeConfig::test().with_hardfork(Some(EthereumHardfork::PragueEOF.into())),
+        )
+        .await;
+        let endpoint = handle.http_endpoint();
 
-    cmd.args([
-        "send",
-        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "--auth",
-        "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-        "--private-key",
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-        "--rpc-url",
-        &endpoint,
-    ])
-    .assert_success();
+        cmd.args([
+            "send",
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+            "--auth",
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "--private-key",
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+            "--rpc-url",
+            &endpoint,
+        ])
+        .assert_success();
 
-    cmd.cast_fuse()
-        .args(["code", "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "--rpc-url", &endpoint])
-        .assert_success()
-        .stdout_eq(str![[r#"
+        cmd.cast_fuse()
+            .args(["code", "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "--rpc-url", &endpoint])
+            .assert_success()
+            .stdout_eq(str![[r#"
 0xef010070997970c51812dc3a010c7d01b50e0d17dc79c8
 
 "#]]);
-});
+    }
+);
 
 casttest!(hash_message, |_prj, cmd| {
     cmd.args(["hash-message", "hello"]).assert_success().stdout_eq(str![[r#"
@@ -1509,64 +1559,115 @@ casttest!(fetch_constructor_args_from_etherscan, |_prj, cmd| {
 "#]]);
 });
 
-casttest!(cast_using_paymaster, async |prj, cmd| {
-    util::initialize(prj.root());
-
-    let node = ZkSyncNode::start();
-    let url = node.url();
-
-    let (addr, private_key) = ZkSyncNode::rich_wallets()
-        .next()
-        .map(|(addr, pk, _)| (addr, pk))
-        .expect("No rich wallets available");
-
-    // Deploy paymaster
+// <https://github.com/foundry-rs/foundry/issues/3473>
+casttest!(test_non_mainnet_traces, |prj, cmd| {
+    prj.clear();
     cmd.args([
-        "rpc",
-        "hardhat_setCode",
-        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        PAYMASTER_BYTECODE,
+        "run",
+        "0xa003e419e2d7502269eb5eda56947b580120e00abfd5b5460d08f8af44a0c24f",
         "--rpc-url",
-        &url,
+        next_rpc_endpoint(NamedChain::Optimism).as_str(),
+        "--etherscan-api-key",
+        next_etherscan_api_key(NamedChain::Optimism).as_str(),
     ])
-    .assert_success();
+    .assert_success()
+    .stdout_eq(str![[r#"
+Executing previous transactions from the block.
+Traces:
+  [33841] FiatTokenProxy::fallback(0x111111125421cA6dc452d289314280a0f8842A65, 164054805 [1.64e8])
+    ├─ [26673] FiatTokenV2_2::approve(0x111111125421cA6dc452d289314280a0f8842A65, 164054805 [1.64e8]) [delegatecall]
+    │   ├─ emit Approval(owner: 0x9a95Af47C51562acfb2107F44d7967DF253197df, spender: 0x111111125421cA6dc452d289314280a0f8842A65, value: 164054805 [1.64e8])
+    │   └─ ← [Return] true
+    └─ ← [Return] true
+...
 
-    // Deploy counter
-    cmd.cast_fuse()
-        .args([
+"#]]);
+});
+
+// tests that displays a sample contract artifact
+// <https://etherscan.io/address/0x0923cad07f06b2d0e5e49e63b8b35738d4156b95>
+casttest!(fetch_artifact_from_etherscan, |_prj, cmd| {
+    let eth_rpc_url = next_http_rpc_endpoint();
+    cmd.args([
+        "artifact",
+        "--etherscan-api-key",
+        &next_mainnet_etherscan_api_key(),
+        "0x0923cad07f06b2d0e5e49e63b8b35738d4156b95",
+        "--rpc-url",
+        eth_rpc_url.as_str(),
+    ])
+    .assert_success()
+    .stdout_eq(str![[r#"{
+  "abi": [],
+  "bytecode": {
+    "object": "0x60566050600b82828239805160001a6073146043577f4e487b7100000000000000000000000000000000000000000000000000000000600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea264697066735822122074c61e8e4eefd410ca92eec26e8112ec6e831d0a4bf35718fdd78b45d68220d064736f6c63430008070033"
+  }
+}
+
+"#]]);
+});
+
+casttest!(
+    zk_cast_using_paymaster,
+    async | prj,
+    cmd | {
+        util::initialize(prj.root());
+
+        let node = ZkSyncNode::start();
+        let url = node.url();
+
+        let (addr, private_key) = ZkSyncNode::rich_wallets()
+            .next()
+            .map(|(addr, pk, _)| (addr, pk))
+            .expect("No rich wallets available");
+
+        // Deploy paymaster
+        cmd.args([
             "rpc",
             "hardhat_setCode",
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-            COUNTER_BYTECODE,
-            "--rpc-url",
-            &url,
-        ])
-        .assert_success();
-
-    // Fund the paymaster
-    cmd.cast_fuse()
-        .args([
-            "send",
             "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-            "0x",
-            "--value",
-            "0.1ether",
-            "--private-key",
-            private_key,
+            PAYMASTER_BYTECODE,
             "--rpc-url",
             &url,
         ])
         .assert_success();
 
-    let balance_before = cmd
-        .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
+        // Deploy counter
+        cmd.cast_fuse()
+            .args([
+                "rpc",
+                "hardhat_setCode",
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                COUNTER_BYTECODE,
+                "--rpc-url",
+                &url,
+            ])
+            .assert_success();
 
-    // Interact with the counter using the paymaster
-    cmd.cast_fuse().args([
+        // Fund the paymaster
+        cmd.cast_fuse()
+            .args([
+                "send",
+                "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+                "0x",
+                "--value",
+                "0.1ether",
+                "--private-key",
+                private_key,
+                "--rpc-url",
+                &url,
+            ])
+            .assert_success();
+
+        let balance_before = cmd
+            .cast_fuse()
+            .args(["balance", addr, "--rpc-url", &url])
+            .assert_success()
+            .get_output()
+            .stdout_lossy();
+
+        // Interact with the counter using the paymaster
+        cmd.cast_fuse().args([
         "send",
         "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
         "increment()",
@@ -1581,66 +1682,71 @@ casttest!(cast_using_paymaster, async |prj, cmd| {
     ])
     .assert_success();
 
-    let balance_after = cmd
-        .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
+        let balance_after = cmd
+            .cast_fuse()
+            .args(["balance", addr, "--rpc-url", &url])
+            .assert_success()
+            .get_output()
+            .stdout_lossy();
 
-    assert_eq!(balance_after, balance_before);
-});
+        assert_eq!(balance_after, balance_before);
+    }
+);
 
-casttest!(cast_without_paymaster, async |prj, cmd| {
-    util::initialize(prj.root());
+casttest!(
+    zk_cast_without_paymaster,
+    async | prj,
+    cmd | {
+        util::initialize(prj.root());
 
-    let node = ZkSyncNode::start();
-    let url = node.url();
+        let node = ZkSyncNode::start();
+        let url = node.url();
 
-    let (addr, private_key) = ZkSyncNode::rich_wallets()
-        .next()
-        .map(|(addr, pk, _)| (addr, pk))
-        .expect("No rich wallets available");
+        let (addr, private_key) = ZkSyncNode::rich_wallets()
+            .next()
+            .map(|(addr, pk, _)| (addr, pk))
+            .expect("No rich wallets available");
 
-    // Deploy counter
-    cmd.cast_fuse()
-        .args([
-            "rpc",
-            "hardhat_setCode",
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-            COUNTER_BYTECODE,
-            "--rpc-url",
-            &url,
-        ])
-        .assert_success();
+        // Deploy counter
+        cmd.cast_fuse()
+            .args([
+                "rpc",
+                "hardhat_setCode",
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                COUNTER_BYTECODE,
+                "--rpc-url",
+                &url,
+            ])
+            .assert_success();
 
-    let balance_before = cmd
-        .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
+        let balance_before = cmd
+            .cast_fuse()
+            .args(["balance", addr, "--rpc-url", &url])
+            .assert_success()
+            .get_output()
+            .stdout_lossy();
 
-    cmd.cast_fuse()
-        .args([
-            "send",
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-            "increment()",
-            "--private-key",
-            private_key,
-            "--rpc-url",
-            &url,
-            "--gas-price",
-            "1000000000000002",
-        ])
-        .assert_success();
+        cmd.cast_fuse()
+            .args([
+                "send",
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                "increment()",
+                "--private-key",
+                private_key,
+                "--rpc-url",
+                &url,
+                "--gas-price",
+                "1000000000000002",
+            ])
+            .assert_success();
 
-    let balance_after = cmd
-        .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
+        let balance_after = cmd
+            .cast_fuse()
+            .args(["balance", addr, "--rpc-url", &url])
+            .assert_success()
+            .get_output()
+            .stdout_lossy();
 
-    assert!(balance_after != balance_before);
-});
+        assert!(balance_after != balance_before);
+    }
+);
