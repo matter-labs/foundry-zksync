@@ -37,6 +37,7 @@ foundry-evm.workspace = true
 foundry-wallets.workspace = true
 foundry-zksync-core.workspace = true
 zksync-web3-rs.workspace = true
+rustls = { version = "0.23.17", features = ["ring"] }
 
 alloy-chains.workspace = true
 alloy-consensus = { workspace = true, features = ["serde", "kzg"] }
