@@ -259,8 +259,8 @@ impl ScriptRunner {
         to: Option<Address>,
         calldata: Option<Bytes>,
         value: Option<U256>,
-        (use_zk, zk_tx): (bool, Option<ZkTransactionMetadata>),
         authorization_list: Option<Vec<SignedAuthorization>>,
+        (use_zk, zk_tx): (bool, Option<ZkTransactionMetadata>),
     ) -> Result<ScriptResult> {
         self.executor.use_zk = use_zk;
         if let Some(zk_tx) = zk_tx {
