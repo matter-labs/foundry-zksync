@@ -80,13 +80,20 @@ pub fn remove_zk_contract(
     output: &mut foundry_compilers::zksync::compile::output::ProjectCompileOutput,
     path: &Path,
     name: &str,
-) -> Result<ZkContractArtifact> {
-    let contract = if let Some(contract) = output.remove(path, name) {
-        contract
-    } else {
+) -> Result<(ZkContractArtifact, ArtifactId)> {
+    let mut other = Vec::new();
+
+    let Some(id) = output.artifact_ids().find_map(|(id, _)| {
+        if id.name == name && id.source == path {
+            Some(id)
+        } else {
+            other.push(id.name);
+            None
+        }
+    }) else {
         let mut err = format!("could not find artifact: `{name}`");
         if let Some(suggestion) =
-            super::did_you_mean(name, output.artifacts().map(|(name, _)| name)).pop()
+            super::did_you_mean(name, other).pop()
         {
             if suggestion != name {
                 err = format!(
@@ -99,7 +106,9 @@ pub fn remove_zk_contract(
         eyre::bail!(err)
     };
 
-    Ok(contract)
+    let contract = output.remove(id.path.as_ref(), &id.name).expect("contract found to exist in zk output");
+
+    Ok((contract, id))
 }
 
 /// Helper function for finding a contract by ContractName

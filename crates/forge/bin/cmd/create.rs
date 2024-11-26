@@ -153,7 +153,7 @@ impl CreateArgs {
             let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
             let mut zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
-            let artifact = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
+            let (artifact, id) = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
             let ZkContractArtifact { bytecode, hash, factory_dependencies, abi, .. } = artifact;
 
@@ -267,6 +267,7 @@ impl CreateArgs {
                     chain_id,
                     sender,
                     config.transaction_timeout,
+                    id,
                     zk_data,
                     None,
                 )
@@ -286,6 +287,7 @@ impl CreateArgs {
                     chain_id,
                     deployer,
                     config.transaction_timeout,
+                    id,
                     zk_data,
                     Some(zk_signer),
                 )
@@ -596,6 +598,7 @@ impl CreateArgs {
         chain: u64,
         deployer_address: Address,
         timeout: u64,
+        id: ArtifactId,
         zk_data: ZkSyncData,
         zk_signer: Option<WalletSigner>,
     ) -> Result<()> {
@@ -677,7 +680,7 @@ impl CreateArgs {
                 constructor_args = Some(hex::encode(encoded_args));
             }
 
-            self.verify_preflight_check(constructor_args.clone(), chain).await?;
+            self.verify_preflight_check(constructor_args.clone(), chain, &id).await?;
         }
 
         // Deploy the actual contract
