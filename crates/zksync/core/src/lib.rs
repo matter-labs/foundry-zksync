@@ -19,11 +19,10 @@ pub mod vm;
 pub mod state;
 
 use alloy_network::{AnyNetwork, TxSigner};
-use alloy_primitives::{address, hex, keccak256, Address, Bytes, U256 as rU256};
+use alloy_primitives::{address, hex, keccak256, Address, Bytes, PrimitiveSignature, U256 as rU256};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
-use alloy_signer::Signature;
 use alloy_transport::Transport;
 use convert::{
     ConvertAddress, ConvertBytes, ConvertH160, ConvertH256, ConvertRU256, ConvertSignature,
@@ -111,7 +110,7 @@ impl ZkTransactionMetadata {
 /// Creates a new signed EIP-712 transaction with the provided factory deps.
 pub async fn new_eip712_transaction<
     P: Provider<T, AnyNetwork>,
-    S: TxSigner<Signature> + Sync,
+    S: TxSigner<PrimitiveSignature> + Sync,
     T: Transport + Clone,
 >(
     tx: WithOtherFields<TransactionRequest>,

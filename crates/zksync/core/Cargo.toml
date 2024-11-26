@@ -16,7 +16,6 @@ foundry-common.workspace = true
 foundry-evm-abi.workspace = true
 foundry-cheatcodes-common.workspace = true
 alloy-primitives.workspace = true
-alloy-signer.workspace = true
 alloy-network.workspace = true
 alloy-sol-types.workspace = true
 alloy-dyn-abi.workspace = true

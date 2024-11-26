@@ -5604,7 +5604,6 @@ dependencies = [
  "alloy-provider",
  "alloy-rpc-types",
  "alloy-serde",
- "alloy-signer",
  "alloy-sol-types",
  "alloy-transport",
  "ansiterm",

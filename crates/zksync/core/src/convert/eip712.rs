@@ -1,6 +1,6 @@
 use alloy_consensus::{SignableTransaction, Transaction};
 use alloy_dyn_abi::TypedData;
-use alloy_primitives::{bytes::BufMut, Signature, B256};
+use alloy_primitives::{bytes::BufMut, PrimitiveSignature as Signature, B256};
 /// Conversion between ethers and alloy for EIP712 items
 use alloy_sol_types::Eip712Domain as AlloyEip712Domain;
 use zksync_web3_rs::{
