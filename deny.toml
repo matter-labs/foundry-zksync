@@ -19,6 +19,8 @@ ignore = [
     "RUSTSEC-2024-0370",
     # instant is unmaintained
     "RUSTSEC-2024-0384",
+    # rustls advisory, only servers affected
+    "RUSTSEC-2024-0399",
     # Used by boojum
     # derivative is unmaintained
     "RUSTSEC-2024-0388",
