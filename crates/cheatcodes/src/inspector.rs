@@ -1534,15 +1534,14 @@ where {
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
     ) -> Option<CallOutcome> {
-        let ecx_inner = &mut ecx.inner;
         let gas = Gas::new(call.gas_limit);
 
         // At the root call to test function or script `run()`/`setUp()` functions, we are
         // decreasing sender nonce to ensure that it matches on-chain nonce once we start
         // broadcasting.
-        if ecx_inner.journaled_state.depth == 0 {
-            let sender = ecx_inner.env.tx.caller;
-            let account = match super::evm::journaled_account(ecx_inner, sender) {
+        if ecx.journaled_state.depth == 0 {
+            let sender = ecx.env.tx.caller;
+            let account = match super::evm::journaled_account(ecx, sender) {
                 Ok(account) => account,
                 Err(err) => {
                     return Some(CallOutcome {
@@ -1559,7 +1558,7 @@ where {
             let nonce = prev.saturating_sub(1);
             account.info.nonce = nonce;
             // NOTE(zk): We sync with the nonce changes to ensure that the nonce matches
-            foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx_inner);
+            foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), &mut ecx.inner);
 
             trace!(target: "cheatcodes", %sender, nonce, prev, "corrected nonce");
         }
@@ -1584,6 +1583,8 @@ where {
                 }),
             };
         }
+
+        let ecx_inner = &mut ecx.inner;
 
         if call.target_address == HARDHAT_CONSOLE_ADDRESS {
             return None;
@@ -1683,15 +1684,16 @@ where {
                 if prank.delegate_call {
                     call.target_address = prank.new_caller;
                     call.caller = prank.new_caller;
-                    let acc = ecx.journaled_state.account(prank.new_caller);
+                    let acc = ecx_inner.journaled_state.account(prank.new_caller);
                     call.value = CallValue::Apparent(acc.info.balance);
                     if let Some(new_origin) = prank.new_origin {
-                        ecx.env.tx.caller = new_origin;
+                        ecx_inner.env.tx.caller = new_origin;
                     }
                 }
             }
 
-            if ecx.journaled_state.depth() >= prank.depth && call.caller == prank.prank_caller {
+            if ecx_inner.journaled_state.depth() >= prank.depth && call.caller == prank.prank_caller
+            {
                 let mut prank_applied = false;
 
                 // At the target depth we set `msg.sender`
@@ -1799,7 +1801,7 @@ where {
                         value: call.transfer_value(),
                         input: TransactionInput::new(call.input.clone()),
                         nonce: Some(nonce),
-                        chain_id: Some(ecx.env.cfg.chain_id),
+                        chain_id: Some(ecx_inner.env.cfg.chain_id),
                         gas: if is_fixed_gas_limit { Some(call.gas_limit) } else { None },
                         ..Default::default()
                     };
@@ -1811,7 +1813,7 @@ where {
                     }
 
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc: ecx.db.active_fork_url(),
+                        rpc: ecx_inner.db.active_fork_url(),
                         transaction: tx_req.into(),
                         zk_tx,
                     });
@@ -1844,7 +1846,7 @@ where {
             // nonce, a non-zero KECCAK_EMPTY codehash, or non-empty code
             let initialized;
             let old_balance;
-            if let Ok(acc) = ecx.load_account(call.target_address) {
+            if let Ok(acc) = ecx_inner.load_account(call.target_address) {
                 initialized = acc.info.exists();
                 old_balance = acc.info.balance;
             } else {
@@ -1867,8 +1869,8 @@ where {
             // as "warm" if the call from which they were accessed is reverted
             recorded_account_diffs_stack.push(vec![AccountAccess {
                 chainInfo: crate::Vm::ChainInfo {
-                    forkId: ecx.db.active_fork_id().unwrap_or_default(),
-                    chainId: U256::from(ecx.env.cfg.chain_id),
+                    forkId: ecx_inner.db.active_fork_id().unwrap_or_default(),
+                    chainId: U256::from(ecx_inner.env.cfg.chain_id),
                 },
                 accessor: call.caller,
                 account: call.bytecode_address,
@@ -1881,7 +1883,7 @@ where {
                 reverted: false,
                 deployedCode: Bytes::new(),
                 storageAccesses: vec![], // updated on step
-                depth: ecx.journaled_state.depth(),
+                depth: ecx_inner.journaled_state.depth(),
             }]);
         }
 
