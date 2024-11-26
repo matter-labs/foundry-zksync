@@ -161,7 +161,13 @@ impl ConvertSignature for ZkSignature {
 
 impl ConvertSignature for AlloySignature {
     fn to_ethers(self) -> ZkSignature {
-        ZkSignature { r: self.r().to_u256(), s: self.s().to_u256(), v: self.v() as u64 }
+        let parity = alloy_primitives::Parity::from(self.v());
+
+        ZkSignature {
+            r: self.r().to_u256(),
+            s: self.s().to_u256(),
+            v: parity.y_parity_byte_non_eip155().unwrap_or(parity.y_parity_byte()) as u64,
+        }
     }
 
     fn to_alloy(self) -> AlloySignature {
