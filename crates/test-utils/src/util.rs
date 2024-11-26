@@ -431,6 +431,8 @@ impl TestProject {
     pub fn new(name: &str, style: PathStyle) -> Self {
         let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
         let project = pretty_err(name, TempProject::with_style(&format!("{name}-{id}"), style));
+        // Initialize crypto provider
+        let _ = rustls::crypto::ring::default_provider().install_default();
         Self::with_project(project)
     }
 

@@ -1550,8 +1550,10 @@ where {
             let prev = account.info.nonce;
             let nonce = prev.saturating_sub(1);
             account.info.nonce = nonce;
-            // NOTE(zk): We sync with the nonce changes to ensure that the nonce matches
-            foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx_inner);
+            if self.use_zk_vm {
+                // NOTE(zk): We sync with the nonce changes to ensure that the nonce matches
+                foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx_inner);
+            }
 
             trace!(target: "cheatcodes", %sender, nonce, prev, "corrected nonce");
         }
