@@ -157,6 +157,7 @@ impl fmt::Display for VerificationProviderType {
             }
             Self::ZKsync => {
                 write!(f, "zksync")?;
+            }
             Self::Custom => {
                 write!(f, "custom")?;
             }
