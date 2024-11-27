@@ -106,7 +106,7 @@ pub fn remove_zk_contract(
         eyre::bail!(err)
     };
 
-    let contract = output.remove(id.path.as_ref(), &id.name).expect("contract found to exist in zk output");
+    let contract = output.remove(id.source.as_ref(), &id.name).expect("contract found to exist in zk output");
 
     Ok((contract, id))
 }
