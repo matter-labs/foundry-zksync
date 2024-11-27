@@ -1,0 +1,197 @@
+name: release-nightly
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # Daily at 1 AM UTC
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  IS_NIGHTLY: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+
+jobs:
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tag_name: ${{ steps.release_info.outputs.tag_name }}
+      release_name: ${{ steps.release_info.outputs.release_name }}
+      changelog: ${{ steps.build_changelog.outputs.changelog }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute Release Name and Tag
+        id: release_info
+        run: |
+          if [[ "$IS_NIGHTLY" == "true" ]]; then
+            TAG_NAME="nightly-${GITHUB_SHA::7}"
+            RELEASE_NAME="foundry-zksync Nightly ($(date '+%Y-%m-%d'))"
+          else
+            TAG_NAME="release-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+            RELEASE_NAME="foundry-zksync Release #${GITHUB_RUN_NUMBER}"
+          fi
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "release_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
+
+      # Create commit-specific nightly tag
+      - name: Create Commit-Specific Nightly Tag
+        if: ${{ env.IS_NIGHTLY }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tagName = '${{ steps.release_info.outputs.tag_name }}';
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${tagName}`,
+              sha: context.sha
+            });
+
+      - name: Build Changelog
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          configuration: "./.github/changelog.json"
+          fromTag: ${{ env.IS_NIGHTLY && 'nightly' || '' }}
+          toTag: ${{ steps.release_info.outputs.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    name: Release ${{ needs.prepare.outputs.release_name }} (${ { matrix.platform } })
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    needs: prepare
+    permissions:
+      contents: write # Required to post the release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Define your build matrix as needed
+          - runner: ubuntu-22.04-github-hosted-16core
+            target: x86_64-unknown-linux-gnu
+            svm_target_platform: linux-amd64
+            platform: linux
+            arch: amd64
+          - runner: ubuntu-22.04-github-hosted-16core
+            target: aarch64-unknown-linux-gnu
+            svm_target_platform: linux-aarch64
+            platform: linux
+            arch: arm64
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+            svm_target_platform: macosx-amd64
+            platform: darwin
+            arch: amd64
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            svm_target_platform: macosx-aarch64
+            platform: darwin
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Required Rust Targets
+        run: rustup target add ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+          cache-on-failure: true
+
+      # Platform-specific setup steps
+      - name: Apple M1 Setup
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: |
+          brew install make
+          echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
+          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
+
+      - name: Apple Darwin Setup
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: |
+          brew install make
+          echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
+
+      - name: Linux ARM Setup
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
+          echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
+
+      - name: Build Binaries
+        env:
+          SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          cargo build --release --bin forge --bin cast --target "${{ matrix.target }}"
+          bins=(cast forge)
+          for name in "${bins[@]}"; do
+            bin=./target/${{ matrix.target }}/release/${name}
+            file "$bin" || true
+            ldd "$bin" || true
+            $bin --version || true
+          done
+
+      - name: Archive Binaries
+        id: artifacts
+        env:
+          PLATFORM_NAME: ${{ matrix.platform }}
+          TARGET: ${{ matrix.target }}
+          ARCH: ${{ matrix.arch }}
+          VERSION_NAME: ${{ (env.IS_NIGHTLY && 'nightly' || needs.prepare.outputs.tag_name) }}
+        shell: bash
+        run: |
+          if [ "$PLATFORM_NAME" == "linux" ]; then
+            tar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
+            echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+          elif [ "$PLATFORM_NAME" == "darwin" ]; then
+            # Use gtar to ensure compatibility
+            brew install gnu-tar
+            gtar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
+            echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+          fi
+
+      # Create the GitHub release
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ needs.prepare.outputs.release_name }}
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
+          prerelease: true
+          body: ${{ needs.prepare.outputs.changelog }}
+          files: |
+            ${{ steps.artifacts.outputs.file_name }}
+
+  retry-on-failure:
+    name: Retry on Failure
+    if: failure() && fromJSON(github.run_attempt) < 3
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release-nightly.yml -F run_id=${{ github.run_id }}
+
+  cleanup:
+    name: Release Cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: release
+    if: always()
+    steps:
+      - uses: actions/checkout@v4

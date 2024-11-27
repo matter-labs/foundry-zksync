@@ -1,16 +1,94 @@
 {
-    "categories": [
-        {
-            "title": "## Features",
-            "labels": ["T-feature"]
-        },
-        {
-            "title": "## Fixes",
-            "labels": ["T-bug", "T-fix"]
-        }
-    ],
-    "ignore_labels": ["L-ignore"],
-    "template": "${{CHANGELOG}}\n## Other\n\n${{UNCATEGORIZED}}",
-    "pr_template": "- ${{TITLE}} (#${{NUMBER}})",
-    "empty_template": "- No changes"
+  "categories": [
+    {
+      "title": "### 🐛 Bug Fixes:",
+      "pattern": "^fix:\\s(.+)",
+      "pr_template": "- fix: {{title}} ([#{{number}}]({{url}}))"
+    },
+    {
+      "title": "### ✨ New Features:",
+      "pattern": "^feat:\\s(.+)",
+      "pr_template": "- feat: {{title}} ([#{{number}}]({{url}}))"
+    },
+    {
+      "title": "### ⚠️ Breaking Changes:",
+      "pattern": "^BREAKING CHANGE:\\s(.+)",
+      "pr_template": "- BREAKING CHANGE: {{title}} ([#{{number}}]({{url}}))",
+      "empty_content": "- N/A"
+    },
+    {
+      "title": "### 🔧 Chores:",
+      "pattern": "^chore:\\s(.+)",
+      "pr_template": "- chore: {{title}} ([#{{number}}]({{url}}))"
+    },
+    {
+      "title": "### 📝 Documentation:",
+      "pattern": "^docs:\\s(.+)",
+      "pr_template": "- docs: {{title}} ([#{{number}}]({{url}}))"
+    }
+  ],
+  "ignore_patterns": [
+    "^Merge pull request",
+    "^Revert",
+    "^Merge branch",
+    "^Update README",
+    "^Bump",
+    "^Upgrade",
+    "^ci:",
+    "^test:"
+  ],
+  "sort": {
+    "order": "DESC",
+    "on_property": "mergedAt"
+  },
+  "template": "# 📋 Summary\n\n{{CHANGELOG}}\n\n## 📜 All Changes\n\n{{ALL_CHANGES}}\n\n## ⭐ Contributors\n\n{{CONTRIBUTORS}}",
+  "pr_template": "- {{prefix}}: {{title}} ([#{{number}}]({{url}}))",
+  "all_changes_template": "- {{prefix}}: {{title}} ([#{{number}}]({{url}}))",
+  "contributors_template": "- {{author_name}} ({{author_email}})",
+  "empty_template": "- No changes in this release.",
+  "commit_message_parser": {
+    "enabled": true,
+    "patterns": [
+      {
+        "regex": "^(fix|feat|chore|docs|refactor|perf|test|build|ci|revert|release|hotfix|BREAKING CHANGE):\\s(.+)",
+        "type": "$1",
+        "description": "$2"
+      }
+    ]
+  },
+  "duplicate_filter": {
+    "pattern": "\\[\\w+-\\d+\\]",
+    "on_property": "title",
+    "method": "match"
+  },
+  "reference": {
+    "pattern": "related to \\#(\\d+)",
+    "on_property": "body",
+    "method": "replace",
+    "target": "$1"
+  },
+  "transformers": [
+    {
+      "pattern": "^(Add|Fix|Update|Remove|Refactor|Improve|Implement|Change)\\s(.+)",
+      "target": "$2"
+    }
+  ],
+  "max_tags_to_fetch": 50,
+  "max_pull_requests": 200,
+  "max_back_track_time_days": 365,
+  "exclude_merge_branches": ["main"],
+  "tag_resolver": {
+    "method": "semver",
+    "filter": {
+      "pattern": "^v\\d+\\.\\d+\\.\\d+$",
+      "flags": "i"
+    },
+    "transformer": {
+      "pattern": "^v(\\d+\\.\\d+\\.\\d+)$",
+      "target": "$1"
+    }
+  },
+  "base_branches": ["main"],
+  "trim_values": true,
+  "contributors": true
 }

@@ -1,4 +1,4 @@
-name: Stable Release
+name: release-stable
 
 on:
   push:
@@ -6,9 +6,12 @@ on:
       - "v*.*.*"
   schedule:
     # Stable releases: Every Sunday at midnight UTC
-    # - cron: "0 0 * * SUN"
-    - cron: "20 17 * * WED"
+    - cron: "0 0 * * SUN"
   workflow_dispatch:
+    inputs:
+      tag_version:
+        description: "Tag version (e.g., v0.0.3)"
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -33,7 +36,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             schedule_cron="${{ github.event.schedule }}"
             # Ensure the correct cron for stable releases
-            if [[ "$schedule_cron" == "20 17 * * WED" ]]; then
+            if [[ "$schedule_cron" == "0 0 * * SUN" ]]; then
               echo "release_type=stable" >> $GITHUB_OUTPUT
             else
               echo "release_type=unknown" >> $GITHUB_OUTPUT
@@ -69,7 +72,6 @@ jobs:
           else
             echo "Invalid release type." >&2
             exit 1
-          fi
 
       - name: Create stable tag and update latest
         if: ${{ steps.release_type.outputs.release_type == 'stable' || steps.release_type.outputs.release_type == 'tag' || steps.release_type.outputs.release_type == 'manual' }}
@@ -84,10 +86,10 @@ jobs:
 
       - name: Build changelog
         id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@v4
+        uses: mikepenz/release-changelog-builder-action@v5
         with:
           configuration: "./.github/changelog.json"
-          fromTag: "v*.*.*"
+          fromTag: "v*.*.2"
           toTag: ${{ steps.release_info.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -113,16 +115,17 @@ jobs:
             svm_target_platform: linux-aarch64
             platform: linux
             arch: arm64
-        #   - runner: macos-latest
-        #     target: x86_64-apple-darwin
-        #     svm_target_platform: macosx-amd64
-        #     platform: darwin
-        #     arch: amd64
-        #   - runner: macos-latest
-        #     target: aarch64-apple-darwin
-        #     svm_target_platform: macosx-aarch64
-        #     platform: darwin
-        #     arch: arm64
+          # Uncomment and configure if macOS builds are needed
+          # - runner: macos-latest
+          #   target: x86_64-apple-darwin
+          #   svm_target_platform: macosx-amd64
+          #   platform: darwin
+          #   arch: amd64
+          # - runner: macos-latest
+          #   target: aarch64-apple-darwin
+          #   svm_target_platform: macosx-aarch64
+          #   platform: darwin
+          #   arch: arm64
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -232,7 +235,7 @@ jobs:
         if: startsWith(needs.prepare.outputs.tag_name, 'v')
         uses: softprops/action-gh-release@v1
         with:
-          name: "Latest foundry-zksync"
+          name: "foundry-zksync@latest"
           tag_name: "latest"
           prerelease: false
           body: ${{ needs.prepare.outputs.changelog }}
@@ -259,8 +262,3 @@ jobs:
     if: always()
     steps:
       - uses: actions/checkout@v4
-
-      - name: Delete old stable tags (optional)
-        run: |
-          # Add any cleanup logic here if necessary
-          echo "Cleanup completed."
