@@ -19,7 +19,9 @@ pub mod vm;
 pub mod state;
 
 use alloy_network::{AnyNetwork, TxSigner};
-use alloy_primitives::{address, hex, keccak256, Address, Bytes, PrimitiveSignature, U256 as rU256};
+use alloy_primitives::{
+    address, hex, keccak256, Address, Bytes, PrimitiveSignature, U256 as rU256,
+};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;

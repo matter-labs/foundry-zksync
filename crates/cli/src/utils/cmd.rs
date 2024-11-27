@@ -7,8 +7,7 @@ use foundry_compilers::{
     cache::{CacheEntry, CompilerCache},
     utils::read_json_file,
     zksync::artifact_output::zk::ZkContractArtifact,
-    Artifact, ProjectCompileOutput,
-    ArtifactId
+    Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::{error::ExtractConfigError, figment::Figment, Chain, Config, NamedChain};
 use foundry_debugger::Debugger;
@@ -92,9 +91,7 @@ pub fn remove_zk_contract(
         }
     }) else {
         let mut err = format!("could not find artifact: `{name}`");
-        if let Some(suggestion) =
-            super::did_you_mean(name, other).pop()
-        {
+        if let Some(suggestion) = super::did_you_mean(name, other).pop() {
             if suggestion != name {
                 err = format!(
                     r#"{err}
@@ -106,7 +103,8 @@ pub fn remove_zk_contract(
         eyre::bail!(err)
     };
 
-    let contract = output.remove(id.source.as_ref(), &id.name).expect("contract found to exist in zk output");
+    let contract =
+        output.remove(id.source.as_ref(), &id.name).expect("contract found to exist in zk output");
 
     Ok((contract, id))
 }

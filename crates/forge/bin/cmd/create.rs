@@ -22,7 +22,7 @@ use foundry_common::{
 };
 use foundry_compilers::{
     artifacts::BytecodeObject, info::ContractInfo, utils::canonicalize,
-    zksync::artifact_output::zk::ZkContractArtifact, ArtifactId
+    zksync::artifact_output::zk::ZkContractArtifact, ArtifactId,
 };
 use foundry_config::{
     figment::{
@@ -153,7 +153,8 @@ impl CreateArgs {
             let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
             let mut zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
-            let (artifact, id) = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
+            let (artifact, id) =
+                remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
             let ZkContractArtifact { bytecode, hash, factory_dependencies, abi, .. } = artifact;
 
