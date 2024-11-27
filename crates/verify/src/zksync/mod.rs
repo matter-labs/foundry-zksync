@@ -88,7 +88,10 @@ impl VerificationProvider for ZkVerificationProvider {
             })
             .await?;
 
-        let _ = sh_println!("Verification submitted successfully. Verification ID: {}", verification_id);
+        let _ = sh_println!(
+            "Verification submitted successfully. Verification ID: {}",
+            verification_id
+        );
 
         self.check(VerifyCheckArgs {
             id: verification_id.to_string(),
@@ -236,7 +239,8 @@ impl ZkVerificationProvider {
 
             if resp.is_pending() || resp.is_queued() {
                 if retries >= max_retries {
-                    let _ = sh_println!("Verification is still pending after {max_retries} retries.");
+                    let _ =
+                        sh_println!("Verification is still pending after {max_retries} retries.");
                     return Ok(resp);
                 }
 
