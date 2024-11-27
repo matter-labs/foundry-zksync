@@ -7,7 +7,7 @@ on:
   schedule:
     # Stable releases: Every Sunday at midnight UTC
     # - cron: "0 0 * * SUN"
-    - cron: "15 16 * * WED"
+    - cron: "20 17 * * WED"
   workflow_dispatch:
 
 env:
@@ -33,7 +33,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             schedule_cron="${{ github.event.schedule }}"
             # Ensure the correct cron for stable releases
-            if [[ "$schedule_cron" == "15 16 * * WED" ]]; then
+            if [[ "$schedule_cron" == "20 17 * * WED" ]]; then
               echo "release_type=stable" >> $GITHUB_OUTPUT
             else
               echo "release_type=unknown" >> $GITHUB_OUTPUT
