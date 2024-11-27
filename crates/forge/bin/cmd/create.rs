@@ -584,7 +584,7 @@ impl CreateArgs {
             compilation_profile: Some(id.profile.to_string()),
             zksync: self.opts.compiler.zk.enabled(),
         };
-        println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
+        sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await
     }
 

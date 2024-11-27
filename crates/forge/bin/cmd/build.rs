@@ -123,21 +123,20 @@ impl BuildArgs {
             // no way to return a default from either branch. Ok(output)
             Ok(())
         } else {
-            let format_json = shell::is_json();
             let zk_project =
                 foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+
+            let format_json = shell::is_json();
             let zk_compiler = ProjectCompiler::new()
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .zksync_sizes()
-                .quiet(format_json) //TODO(zk): remove to match upstream
                 .bail(!format_json);
 
             let zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
-            //TODO(zk): match upstream
-            if format_json {
-                println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
+            if format_json && !self.names && !self.sizes {
+                sh_println!("{}", serde_json::to_string_pretty(&zk_output.output())?)?;
             }
 
             // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
