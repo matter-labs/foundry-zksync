@@ -45,9 +45,6 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    // Initialize crypto provider
-    let _ = rustls::crypto::ring::default_provider().install_default();
-
     handler::install();
     utils::load_dotenv();
     utils::subscriber();

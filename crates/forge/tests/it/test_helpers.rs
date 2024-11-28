@@ -247,7 +247,6 @@ impl ForgeTestData {
     pub fn new(profile: ForgeTestProfile) -> Self {
         init_tracing();
 
-        let _ = rustls::crypto::ring::default_provider().install_default();
         let mut project = profile.project();
         let output = get_compiled(&mut project);
         let test_opts = profile.test_opts(&output);
