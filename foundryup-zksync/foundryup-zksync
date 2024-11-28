@@ -89,7 +89,7 @@ main() {
     FOUNDRYUP_VERSION=${FOUNDRYUP_VERSION:-nightly}
     FOUNDRYUP_TAG=$FOUNDRYUP_VERSION
 
-    # Normalize versions (handle channels, versions without v prefix
+    # Normalize versions (handle channels, versions without v prefix)
     if [[ "$FOUNDRYUP_VERSION" =~ ^nightly ]]; then
       FOUNDRYUP_VERSION="nightly"
     elif [[ "$FOUNDRYUP_VERSION" == [[:digit:]]* ]]; then
@@ -101,52 +101,34 @@ main() {
     say "installing foundry (version ${FOUNDRYUP_VERSION}, tag ${FOUNDRYUP_TAG})"
 
     uname_s=$(uname -s)
-    PLATFORM=$(tolower "${FOUNDRYUP_PLATFORM:-$uname_s}")
-    EXT="tar.gz"
-    case $PLATFORM in
-      linux) ;;
-      darwin|mac*)
-        PLATFORM="darwin"
-        ;;
-      mingw*|win*)
-        EXT="zip"
-        PLATFORM="win32"
-        ;;
-      *)
-        err "unsupported platform: $PLATFORM"
-        ;;
+    uname_m=$(uname -m)
+
+    # Map uname -s to platform
+    case "$uname_s" in
+      Linux*)   PLATFORM="unknown-linux-gnu" ;;
+      Darwin*)  PLATFORM="apple-darwin" ;;
+      *)        err "unsupported platform: $uname_s" ;;
     esac
 
-    uname_m=$(uname -m)
-    ARCHITECTURE=$(tolower "${FOUNDRYUP_ARCH:-$uname_m}")
-    if [ "${ARCHITECTURE}" = "x86_64" ]; then
-      # Redirect stderr to /dev/null to avoid printing errors if non Rosetta.
-      if [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = "1" ]; then
-        ARCHITECTURE="arm64" # Rosetta.
-      else
-        ARCHITECTURE="amd64" # Intel.
-      fi
-    elif [ "${ARCHITECTURE}" = "arm64" ] ||[ "${ARCHITECTURE}" = "aarch64" ] ; then
-      ARCHITECTURE="arm64" # Arm.
-    else
-      ARCHITECTURE="amd64" # Amd.
-    fi
+    # Map uname -m to architecture
+    case "$uname_m" in
+      x86_64)   ARCHITECTURE="x86_64" ;;
+      arm64|aarch64) ARCHITECTURE="aarch64" ;;
+      *)        err "unsupported architecture: $uname_m" ;;
+    esac
+
+    # Construct the filenames
+    EXT="tar.gz"
+    FOUNDRY_BIN_NAME="${ARCHITECTURE}-${PLATFORM}.${EXT}"
 
     # Compute the URL of the release tarball in the Foundry repository.
     RELEASE_URL="https://github.com/${FOUNDRYUP_REPO}/releases/download/${FOUNDRYUP_TAG}/"
-    BIN_ARCHIVE_URL="${RELEASE_URL}foundry_${FOUNDRYUP_VERSION}_${PLATFORM}_${ARCHITECTURE}.$EXT"
+    BIN_ARCHIVE_URL="${RELEASE_URL}foundry_${FOUNDRYUP_VERSION}_${FOUNDRY_BIN_NAME}"
     MAN_TARBALL_URL="${RELEASE_URL}foundry_man_${FOUNDRYUP_VERSION}.tar.gz"
 
     # Download and extract the binaries archive
-    say "downloading latest forge, and cast"
-    if [ "$PLATFORM" = "win32" ]; then
-      tmp="$(mktemp -d 2>/dev/null || echo ".")/foundry-zksync.zip"
-      ensure download "$BIN_ARCHIVE_URL" "$tmp"
-      ensure unzip "$tmp" -d "$FOUNDRY_BIN_DIR"
-      rm -f "$tmp"
-    else
-      ensure download "$BIN_ARCHIVE_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR"
-    fi
+    say "downloading latest forge and cast"
+    ensure download "$BIN_ARCHIVE_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR"
 
     # Optionally download the manuals
     if check_cmd tar; then
@@ -177,6 +159,49 @@ in your 'PATH' to allow the newly installed version to take precedence!
 EOF
       fi
     done
+
+    # Begin anvil-zksync installation
+    say "downloading anvil-zksync"
+
+    # Supported targets for anvil-zksync
+    SUPPORTED_TARGETS=(
+      "x86_64-apple-darwin"
+      "aarch64-apple-darwin"
+      "x86_64-unknown-linux-gnu"
+      "aarch64-unknown-linux-gnu"
+    )
+
+    TARGET="${ARCHITECTURE}-${PLATFORM}"
+
+    if [[ " ${SUPPORTED_TARGETS[*]} " == *" $TARGET "* ]]; then
+      ANVIL_REPO="matter-labs/era-test-node"
+
+      say "getting latest tag for anvil-zksync"
+
+      ANVIL_TAG=$(curl -s https://api.github.com/repos/$ANVIL_REPO/releases/latest | grep -Po '"tag_name": "\K.*?(?=")')
+
+      if [ -z "$ANVIL_TAG" ]; then
+        err "failed to get latest tag for anvil-zksync"
+      fi
+
+      ANVIL_BIN_NAME="anvil-${ANVIL_TAG}-${ARCHITECTURE}-${PLATFORM}.${EXT}"
+
+      ANVIL_BIN_URL="https://github.com/$ANVIL_REPO/releases/download/$ANVIL_TAG/$ANVIL_BIN_NAME"
+
+      ANVIL_BIN_PATH="$FOUNDRY_BIN_DIR/anvil-zksync"
+
+      say "downloading anvil-zksync from $ANVIL_BIN_URL"
+
+      ensure download "$ANVIL_BIN_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR" anvil
+
+      mv "$FOUNDRY_BIN_DIR/anvil" "$ANVIL_BIN_PATH"
+
+      chmod +x "$ANVIL_BIN_PATH"
+
+      say "installed - $(ensure "$ANVIL_BIN_PATH" --version)"
+    else
+      warn "anvil-zksync is not supported on your platform ($TARGET). Skipping anvil-zksync installation."
+    fi
 
     say "done!"
 
@@ -235,8 +260,6 @@ Update or revert to a specific Foundry-zksync version with ease.
 
 By default, the latest nightly version is installed from built binaries.
 
-By default, the latest nightly version is installed from built binaries.
-
 USAGE:
     foundryup-zksync <OPTIONS>
 
@@ -249,8 +272,8 @@ OPTIONS:
     -r, --repo      Build and install from a remote GitHub repo (uses default branch if no other options are set)
     -p, --path      Build and install a local repository
     -j, --jobs      Number of CPUs to use for building Foundry (default: all CPUs)
-    --arch          Install a specific architecture (supports amd64 and arm64)
-    --platform      Install a specific platform (supports win32, linux, and darwin)
+    --arch          Install a specific architecture (supports x86_64 and aarch64)
+    --platform      Install a specific platform (supports apple-darwin and unknown-linux-gnu)
 EOF
 }
 
@@ -267,12 +290,8 @@ err() {
   exit 1
 }
 
-tolower() {
-  echo "$1" | awk '{print tolower($0)}'
-}
-
 need_cmd() {
-  if ! check_cmd "$1"; then
+  if ! command -v "$1" &>/dev/null; then
     err "need '$1' (command not found)"
   fi
 }
@@ -292,16 +311,16 @@ download() {
   if [ -n "$2" ]; then
     # output into $2
     if check_cmd curl; then
-      curl -#o "$2" -L "$1"
+      curl -sSfL -o "$2" "$1"
     else
-      wget --show-progress -qO "$2" "$1"
+      wget -qO "$2" "$1"
     fi
   else
     # output to stdout
     if check_cmd curl; then
-      curl -#L "$1"
+      curl -sSfL "$1"
     else
-      wget --show-progress -qO- "$1"
+      wget -qO- "$1"
     fi
   fi
 }
@@ -313,19 +332,18 @@ banner() {
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 
  ╔═╗ ╔═╗ ╦ ╦ ╔╗╔ ╔╦╗ ╦═╗ ╦ ╦         Portable and modular toolkit
- ╠╣  ║ ║ ║ ║ ║║║  ║║ ╠╦╝ ╚╦╝    for Ethereum Application Development
+ ╠╣  ║ ║ ║ ║ ║║║  ║║ ╠╦╝ ╚╦╝    for ZKsync Application Development
  ╚   ╚═╝ ╚═╝ ╝╚╝ ═╩╝ ╩╚═  ╩                 written in Rust.
 
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 
 Fork of    : https://github.com/foundry-rs/
 Repo       : https://github.com/matter-labs/foundry-zksync/
-Book       : https://book.getfoundry.sh/   
+Book       : https://foundry-book.zksync.io/
 
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 
 '
 }
-
 
 main "$@"
