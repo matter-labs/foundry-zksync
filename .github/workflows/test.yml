@@ -120,12 +120,16 @@ jobs:
             logFilePath: era_test_node.log
             target: x86_64-unknown-linux-gnu
             releaseTag: v0.1.0-alpha.29
-
+        - name: Setup Git config
+          run: |
+            git config --global user.name "GitHub Actions Bot"
+            git config --global user.email "<>"
+            git config --global url."https://github.com/".insteadOf "git@github.com:"
         - name: Run zk tests
           env:
             RUST_BACKTRACE: full
             TEST_MAINNET_URL: http://localhost:8011
-          run: git config --global user.name "test-runner" && ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo test zk
+          run: ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo test zk
 
     check-ci-install:
       name: CI install
