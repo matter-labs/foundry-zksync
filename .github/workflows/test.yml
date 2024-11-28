@@ -19,7 +19,7 @@ env:
 
 jobs:
     doctest:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-latest
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
                   RUSTFLAGS: -Dwarnings
 
     rustfmt:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-latest
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -58,7 +58,7 @@ jobs:
             - run: cargo fmt --all --check
 
     forge-fmt:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-latest
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -82,7 +82,7 @@ jobs:
             skip: "*.json"
 
     crate-checks:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-latest
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -97,7 +97,7 @@ jobs:
               run: cargo hack check
     
     zk-cargo-test:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-latest
   
         steps:
         - name: Checkout code
