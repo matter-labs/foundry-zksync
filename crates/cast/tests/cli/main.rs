@@ -10,7 +10,7 @@ use foundry_test_utils::{
         next_rpc_endpoint, next_ws_rpc_endpoint,
     },
     str,
-    util::{self, OutputExt},
+    util::OutputExt,
     ZkSyncNode,
 };
 use std::{fs, io::Write, path::Path, str::FromStr};
@@ -1602,9 +1602,7 @@ casttest!(fetch_artifact_from_etherscan, |_prj, cmd| {
 "#]]);
 });
 
-casttest!(zk_cast_using_paymaster, async |prj, cmd| {
-    util::initialize(prj.root());
-
+casttest!(zk_cast_using_paymaster, async |_prj, cmd| {
     let node = ZkSyncNode::start();
     let url = node.url();
 
@@ -1684,9 +1682,7 @@ casttest!(zk_cast_using_paymaster, async |prj, cmd| {
     assert_eq!(balance_after, balance_before);
 });
 
-casttest!(zk_cast_without_paymaster, async |prj, cmd| {
-    util::initialize(prj.root());
-
+casttest!(zk_cast_without_paymaster, async |_prj, cmd| {
     let node = ZkSyncNode::start();
     let url = node.url();
 
