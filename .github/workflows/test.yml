@@ -129,7 +129,7 @@ jobs:
           env:
             RUST_BACKTRACE: full
             TEST_MAINNET_URL: http://localhost:8011
-          run: ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo test zk
+          run: ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo test zk -j1
 
     check-ci-install:
       name: CI install
