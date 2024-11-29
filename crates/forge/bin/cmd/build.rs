@@ -91,17 +91,16 @@ impl BuildArgs {
 
             // Collect sources to compile if build subdirectories specified.
             let mut files = vec![];
-            if let Some(paths) = self.paths {
+            if let Some(paths) = &self.paths {
                 for path in paths {
-                    files.extend(source_files_iter(
-                        path.as_path(),
-                        MultiCompilerLanguage::FILE_EXTENSIONS,
-                    ));
+                    let joined = project.root().join(path);
+                    let path = if joined.exists() { &joined } else { path };
+                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
                 }
-            }
 
-            if files.is_empty() {
-                eyre::bail!("No source files found in specified build paths.")
+                if files.is_empty() {
+                    eyre::bail!("No source files found in specified build paths.")
+                }
             }
 
             let format_json = shell::is_json();
@@ -126,8 +125,23 @@ impl BuildArgs {
             let zk_project =
                 foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
 
+            // Collect sources to compile if build subdirectories specified.
+            let mut files = vec![];
+            if let Some(paths) = &self.paths {
+                for path in paths {
+                    let joined = zk_project.root().join(path);
+                    let path = if joined.exists() { &joined } else { path };
+                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
+                }
+
+                if files.is_empty() {
+                    eyre::bail!("No source files found in specified build paths.")
+                }
+            }
+
             let format_json = shell::is_json();
             let zk_compiler = ProjectCompiler::new()
+                .files(files)
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .zksync_sizes()
