@@ -1282,7 +1282,7 @@ impl Cheatcodes {
             .collect_vec();
         factory_deps.extend(injected_factory_deps);
 
-        // NOTE(zk): Clear injected factory deps
+        // NOTE(zk): Clear injected factory deps so that they are not sent on further transactions
         self.zk_use_factory_deps.clear();
         tracing::debug!(contract = contract.name, "using dual compiled contract");
 
