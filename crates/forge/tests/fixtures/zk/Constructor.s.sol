@@ -2,6 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {Script} from "forge-std/Script.sol";
+import {Bank} from "../src/Bank.sol";
 
 contract ConstructorScript is Script {
     function run() external {
@@ -20,16 +21,5 @@ contract ConstructorScript is Script {
         assert(bankSmallValue.balance() == 0.1 ether);
         
         vm.stopBroadcast();
-    }
-}
-
-contract Bank {
-    event Received(address sender, uint256 amount);
-    
-    function balance() public view returns (uint256) {
-        return address(this).balance;
-    }
-    
-    constructor() payable {
     }
 }
