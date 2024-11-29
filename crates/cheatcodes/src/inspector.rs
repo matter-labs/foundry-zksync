@@ -1920,7 +1920,7 @@ where {
         info!("running call in zkEVM {:#?}", call);
         let zk_persist_nonce_update = self.zk_persist_nonce_update.check();
 
-        // Note(zk): Clear injected factory deps here even though it's actually used in broadcast.
+        // NOTE(zk): Clear injected factory deps here even though it's actually used in broadcast.
         // To be consistent with where we clear factory deps in try_create_in_zk.
         self.zk_use_factory_deps.clear();
 
