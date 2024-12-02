@@ -1273,7 +1273,9 @@ impl Cheatcodes {
                 let artifact_code = crate::fs::get_artifact_code(self, contract, false)
                     .inspect(|_| info!(contract, "pushing factory dep"))
                     .unwrap_or_else(|_| {
-                        panic!("failed to get bytecode for injected factory deps contract {contract}")
+                        panic!(
+                            "failed to get bytecode for injected factory deps contract {contract}"
+                        )
                     })
                     .to_vec();
                 let res = self.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
