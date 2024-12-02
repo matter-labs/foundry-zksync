@@ -1584,6 +1584,8 @@ where {
             };
         }
 
+        // NOTE(zk): renamed from `ecx` because we need the full one later
+        // and this helps with borrow checker
         let ecx_inner = &mut ecx.inner;
 
         if call.target_address == HARDHAT_CONSOLE_ADDRESS {
