@@ -20,7 +20,7 @@ env:
 
 jobs:
     doctest:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
 
     clippy:
         name: clippy
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
                   RUSTFLAGS: -Dwarnings
 
     rustfmt:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
             - run: cargo fmt --all --check
 
     forge-fmt:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
               run: ./.github/scripts/format.sh --check
 
     codespell:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       timeout-minutes: 30
       steps:
         - uses: actions/checkout@v4
@@ -83,7 +83,7 @@ jobs:
             skip: "*.json"
 
     crate-checks:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -98,7 +98,7 @@ jobs:
               run: cargo hack check
     
     zk-cargo-test:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
   
         steps:
         - name: Checkout code
@@ -134,7 +134,7 @@ jobs:
 
     check-ci-install:
       name: CI install
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       steps:
         - uses: actions/checkout@v4
         - name: Install foundry-zksync
