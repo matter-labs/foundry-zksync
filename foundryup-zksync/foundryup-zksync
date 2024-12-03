@@ -200,7 +200,7 @@ EOF
     fi
     
     if [[ " ${SUPPORTED_TARGETS[*]} " == *" $TARGET "* ]]; then
-      ANVIL_REPO="matter-labs/era-test-node"
+      ANVIL_REPO="matter-labs/anvil-zksync"
 
       say "getting latest tag for anvil-zksync"
 
