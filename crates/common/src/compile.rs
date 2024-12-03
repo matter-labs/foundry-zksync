@@ -309,7 +309,7 @@ impl ProjectCompiler {
     ) -> Result<ZkProjectCompileOutput> {
         // TODO: Avoid process::exit
         if !project.paths.has_input_files() && self.files.is_empty() {
-            println!("Nothing to compile");
+            sh_println!("Nothing to compile")?;
             // nothing to do here
             std::process::exit(0);
         }
@@ -379,10 +379,10 @@ impl ProjectCompiler {
 
         if !quiet {
             if output.is_unchanged() {
-                println!("No files changed, compilation skipped");
+                sh_println!("No files changed, compilation skipped")?;
             } else {
                 // print the compiler output / warnings
-                println!("{output}");
+                sh_println!("{output}")?;
             }
 
             self.zksync_handle_output(root_path, &output)?;
@@ -397,7 +397,6 @@ impl ProjectCompiler {
         root_path: impl AsRef<Path>,
         output: &ZkProjectCompileOutput,
     ) -> Result<()> {
-        //TODO(zk): update to use `sh_println!`
         let print_names = self.print_names.unwrap_or(false);
         let print_sizes = self.print_sizes.unwrap_or(false);
 
@@ -467,20 +466,22 @@ impl ProjectCompiler {
                 artifacts.entry(version).or_default().push(name);
             }
             for (version, names) in artifacts {
-                println!(
+                let _ = sh_println!(
                     "  compiler version: {}.{}.{}",
-                    version.major, version.minor, version.patch
+                    version.major,
+                    version.minor,
+                    version.patch
                 );
                 for name in names {
-                    println!("    - {name}");
+                    let _ = sh_println!("    - {name}");
                 }
             }
         }
 
         if print_sizes {
             // add extra newline if names were already printed
-            if print_names {
-                println!();
+            if print_names && !shell::is_json() {
+                let _ = sh_println!();
             }
 
             let mut size_report = SizeReport {

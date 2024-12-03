@@ -1,6 +1,6 @@
 use alloy_consensus::{SignableTransaction, Transaction};
 use alloy_dyn_abi::TypedData;
-use alloy_primitives::{bytes::BufMut, Signature, B256};
+use alloy_primitives::{bytes::BufMut, PrimitiveSignature as Signature, B256};
 /// Conversion between ethers and alloy for EIP712 items
 use alloy_sol_types::Eip712Domain as AlloyEip712Domain;
 use zksync_web3_rs::{
@@ -132,6 +132,27 @@ impl Transaction for Eip712SignableTransaction {
 
     fn kind(&self) -> alloy_primitives::TxKind {
         alloy_primitives::TxKind::Call(self.inner.to.to_address())
+    }
+
+    // got from EIP4844 impl
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        let max_fee_per_gas = self.inner.max_fee_per_gas.low_u128();
+        let max_priority_fee_per_gas = self.inner.max_priority_fee_per_gas.low_u128();
+        base_fee.map_or(max_fee_per_gas, |base_fee| {
+            // if the tip is greater than the max priority fee per gas, set it to the max
+            // priority fee per gas + base fee
+            let tip = max_fee_per_gas.saturating_sub(base_fee as u128);
+            if tip > max_priority_fee_per_gas {
+                max_priority_fee_per_gas + base_fee as u128
+            } else {
+                // otherwise return the max fee per gas
+                self.inner.max_fee_per_gas.low_u128()
+            }
+        })
+    }
+
+    fn is_dynamic_fee(&self) -> bool {
+        true
     }
 }
 

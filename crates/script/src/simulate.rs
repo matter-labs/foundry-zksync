@@ -115,7 +115,7 @@ impl PreSimulationState {
             .map(|mut transaction| async {
                 let mut runner = runners.get(&transaction.rpc).expect("invalid rpc url").write();
                 let zk_metadata = transaction.zk.clone();
-                let tx = transaction.tx(); //NOTE(zk): this one is `mut` upstream but doesn't need to be
+                let tx = transaction.tx_mut();
 
                 let to = if let Some(TxKind::Call(to)) = tx.to() { Some(to) } else { None };
                 let result = runner

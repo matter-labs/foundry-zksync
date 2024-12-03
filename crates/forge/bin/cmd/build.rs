@@ -91,17 +91,16 @@ impl BuildArgs {
 
             // Collect sources to compile if build subdirectories specified.
             let mut files = vec![];
-            if let Some(paths) = self.paths {
+            if let Some(paths) = &self.paths {
                 for path in paths {
-                    files.extend(source_files_iter(
-                        path.as_path(),
-                        MultiCompilerLanguage::FILE_EXTENSIONS,
-                    ));
+                    let joined = project.root().join(path);
+                    let path = if joined.exists() { &joined } else { path };
+                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
                 }
-            }
 
-            if files.is_empty() {
-                eyre::bail!("No source files found in specified build paths.")
+                if files.is_empty() {
+                    eyre::bail!("No source files found in specified build paths.")
+                }
             }
 
             let format_json = shell::is_json();
@@ -123,21 +122,35 @@ impl BuildArgs {
             // no way to return a default from either branch. Ok(output)
             Ok(())
         } else {
-            let format_json = shell::is_json();
             let zk_project =
                 foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+
+            // Collect sources to compile if build subdirectories specified.
+            let mut files = vec![];
+            if let Some(paths) = &self.paths {
+                for path in paths {
+                    let joined = zk_project.root().join(path);
+                    let path = if joined.exists() { &joined } else { path };
+                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
+                }
+
+                if files.is_empty() {
+                    eyre::bail!("No source files found in specified build paths.")
+                }
+            }
+
+            let format_json = shell::is_json();
             let zk_compiler = ProjectCompiler::new()
+                .files(files)
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .zksync_sizes()
-                .quiet(format_json) //TODO(zk): remove to match upstream
                 .bail(!format_json);
 
             let zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
-            //TODO(zk): match upstream
-            if format_json {
-                println!("{}", serde_json::to_string_pretty(&zk_output.output())?);
+            if format_json && !self.names && !self.sizes {
+                sh_println!("{}", serde_json::to_string_pretty(&zk_output.output())?)?;
             }
 
             // TODO(zk): We cannot return the zk_output as it does not match the concrete type for

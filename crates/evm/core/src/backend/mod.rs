@@ -9,10 +9,9 @@ use crate::{
 };
 use alloy_consensus::Transaction as TransactionTrait;
 use alloy_genesis::GenesisAccount;
-use alloy_primitives::{keccak256, map::HashMap, uint, Address, B256, U256};
-use alloy_rpc_types::{Block, BlockNumberOrTag, Transaction, TransactionRequest};
-use alloy_serde::WithOtherFields;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
+use alloy_primitives::{keccak256, map::HashMap, uint, Address, B256, U256};
+use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
 use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};

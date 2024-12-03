@@ -22,7 +22,7 @@ use foundry_common::{
 };
 use foundry_compilers::{
     artifacts::BytecodeObject, info::ContractInfo, utils::canonicalize,
-    zksync::artifact_output::zk::ZkContractArtifact, ArtifactId
+    zksync::artifact_output::zk::ZkContractArtifact, ArtifactId,
 };
 use foundry_config::{
     figment::{
@@ -153,7 +153,8 @@ impl CreateArgs {
             let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
             let mut zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
-            let artifact = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
+            let (artifact, id) =
+                remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
             let ZkContractArtifact { bytecode, hash, factory_dependencies, abi, .. } = artifact;
 
@@ -267,6 +268,7 @@ impl CreateArgs {
                     chain_id,
                     sender,
                     config.transaction_timeout,
+                    id,
                     zk_data,
                     None,
                 )
@@ -286,6 +288,7 @@ impl CreateArgs {
                     chain_id,
                     deployer,
                     config.transaction_timeout,
+                    id,
                     zk_data,
                     Some(zk_signer),
                 )
@@ -581,7 +584,7 @@ impl CreateArgs {
             compilation_profile: Some(id.profile.to_string()),
             zksync: self.opts.compiler.zk.enabled(),
         };
-        println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
+        sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await
     }
 
@@ -596,6 +599,7 @@ impl CreateArgs {
         chain: u64,
         deployer_address: Address,
         timeout: u64,
+        id: ArtifactId,
         zk_data: ZkSyncData,
         zk_signer: Option<WalletSigner>,
     ) -> Result<()> {
@@ -677,7 +681,7 @@ impl CreateArgs {
                 constructor_args = Some(hex::encode(encoded_args));
             }
 
-            self.verify_preflight_check(constructor_args.clone(), chain).await?;
+            self.verify_preflight_check(constructor_args.clone(), chain, &id).await?;
         }
 
         // Deploy the actual contract

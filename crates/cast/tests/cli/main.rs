@@ -10,7 +10,7 @@ use foundry_test_utils::{
         next_rpc_endpoint, next_ws_rpc_endpoint,
     },
     str,
-    util::{self, OutputExt},
+    util::OutputExt,
     ZkSyncNode,
 };
 use std::{fs, io::Write, path::Path, str::FromStr};
@@ -1414,37 +1414,32 @@ casttest!(block_number_hash, |_prj, cmd| {
     assert_eq!(s.trim().parse::<u64>().unwrap(), 1, "{s}")
 });
 
-casttest!(
-    send_eip7702,
-    async | _prj,
-    cmd | {
-        let (_api, handle) = anvil::spawn(
-            NodeConfig::test().with_hardfork(Some(EthereumHardfork::PragueEOF.into())),
-        )
-        .await;
-        let endpoint = handle.http_endpoint();
+casttest!(send_eip7702, async |_prj, cmd| {
+    let (_api, handle) =
+        anvil::spawn(NodeConfig::test().with_hardfork(Some(EthereumHardfork::PragueEOF.into())))
+            .await;
+    let endpoint = handle.http_endpoint();
 
-        cmd.args([
-            "send",
-            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-            "--auth",
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-            "--private-key",
-            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-            "--rpc-url",
-            &endpoint,
-        ])
-        .assert_success();
+    cmd.args([
+        "send",
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "--auth",
+        "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "--private-key",
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        "--rpc-url",
+        &endpoint,
+    ])
+    .assert_success();
 
-        cmd.cast_fuse()
-            .args(["code", "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "--rpc-url", &endpoint])
-            .assert_success()
-            .stdout_eq(str![[r#"
+    cmd.cast_fuse()
+        .args(["code", "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "--rpc-url", &endpoint])
+        .assert_success()
+        .stdout_eq(str![[r#"
 0xef010070997970c51812dc3a010c7d01b50e0d17dc79c8
 
 "#]]);
-    }
-);
+});
 
 casttest!(hash_message, |_prj, cmd| {
     cmd.args(["hash-message", "hello"]).assert_success().stdout_eq(str![[r#"
@@ -1607,67 +1602,62 @@ casttest!(fetch_artifact_from_etherscan, |_prj, cmd| {
 "#]]);
 });
 
-casttest!(
-    zk_cast_using_paymaster,
-    async | prj,
-    cmd | {
-        util::initialize(prj.root());
+casttest!(zk_cast_using_paymaster, async |_prj, cmd| {
+    let node = ZkSyncNode::start();
+    let url = node.url();
 
-        let node = ZkSyncNode::start();
-        let url = node.url();
+    let (addr, private_key) = ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(addr, pk, _)| (addr, pk))
+        .expect("No rich wallets available");
 
-        let (addr, private_key) = ZkSyncNode::rich_wallets()
-            .next()
-            .map(|(addr, pk, _)| (addr, pk))
-            .expect("No rich wallets available");
+    // Deploy paymaster
+    cmd.args([
+        "rpc",
+        "hardhat_setCode",
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        PAYMASTER_BYTECODE,
+        "--rpc-url",
+        &url,
+    ])
+    .assert_success();
 
-        // Deploy paymaster
-        cmd.args([
+    // Deploy counter
+    cmd.cast_fuse()
+        .args([
             "rpc",
             "hardhat_setCode",
-            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-            PAYMASTER_BYTECODE,
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            COUNTER_BYTECODE,
             "--rpc-url",
             &url,
         ])
         .assert_success();
 
-        // Deploy counter
-        cmd.cast_fuse()
-            .args([
-                "rpc",
-                "hardhat_setCode",
-                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-                COUNTER_BYTECODE,
-                "--rpc-url",
-                &url,
-            ])
-            .assert_success();
+    // Fund the paymaster
+    cmd.cast_fuse()
+        .args([
+            "send",
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+            "0x",
+            "--value",
+            "0.1ether",
+            "--private-key",
+            private_key,
+            "--rpc-url",
+            &url,
+        ])
+        .assert_success();
 
-        // Fund the paymaster
-        cmd.cast_fuse()
-            .args([
-                "send",
-                "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-                "0x",
-                "--value",
-                "0.1ether",
-                "--private-key",
-                private_key,
-                "--rpc-url",
-                &url,
-            ])
-            .assert_success();
+    let balance_before = cmd
+        .cast_fuse()
+        .args(["balance", addr, "--rpc-url", &url])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
 
-        let balance_before = cmd
-            .cast_fuse()
-            .args(["balance", addr, "--rpc-url", &url])
-            .assert_success()
-            .get_output()
-            .stdout_lossy();
-
-        // Interact with the counter using the paymaster
-        cmd.cast_fuse().args([
+    // Interact with the counter using the paymaster
+    cmd.cast_fuse().args([
         "send",
         "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
         "increment()",
@@ -1682,71 +1672,64 @@ casttest!(
     ])
     .assert_success();
 
-        let balance_after = cmd
-            .cast_fuse()
-            .args(["balance", addr, "--rpc-url", &url])
-            .assert_success()
-            .get_output()
-            .stdout_lossy();
+    let balance_after = cmd
+        .cast_fuse()
+        .args(["balance", addr, "--rpc-url", &url])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
 
-        assert_eq!(balance_after, balance_before);
-    }
-);
+    assert_eq!(balance_after, balance_before);
+});
 
-casttest!(
-    zk_cast_without_paymaster,
-    async | prj,
-    cmd | {
-        util::initialize(prj.root());
+casttest!(zk_cast_without_paymaster, async |_prj, cmd| {
+    let node = ZkSyncNode::start();
+    let url = node.url();
 
-        let node = ZkSyncNode::start();
-        let url = node.url();
+    let (addr, private_key) = ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(addr, pk, _)| (addr, pk))
+        .expect("No rich wallets available");
 
-        let (addr, private_key) = ZkSyncNode::rich_wallets()
-            .next()
-            .map(|(addr, pk, _)| (addr, pk))
-            .expect("No rich wallets available");
+    // Deploy counter
+    cmd.cast_fuse()
+        .args([
+            "rpc",
+            "hardhat_setCode",
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            COUNTER_BYTECODE,
+            "--rpc-url",
+            &url,
+        ])
+        .assert_success();
 
-        // Deploy counter
-        cmd.cast_fuse()
-            .args([
-                "rpc",
-                "hardhat_setCode",
-                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-                COUNTER_BYTECODE,
-                "--rpc-url",
-                &url,
-            ])
-            .assert_success();
+    let balance_before = cmd
+        .cast_fuse()
+        .args(["balance", addr, "--rpc-url", &url])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
 
-        let balance_before = cmd
-            .cast_fuse()
-            .args(["balance", addr, "--rpc-url", &url])
-            .assert_success()
-            .get_output()
-            .stdout_lossy();
+    cmd.cast_fuse()
+        .args([
+            "send",
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "increment()",
+            "--private-key",
+            private_key,
+            "--rpc-url",
+            &url,
+            "--gas-price",
+            "1000000000000002",
+        ])
+        .assert_success();
 
-        cmd.cast_fuse()
-            .args([
-                "send",
-                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-                "increment()",
-                "--private-key",
-                private_key,
-                "--rpc-url",
-                &url,
-                "--gas-price",
-                "1000000000000002",
-            ])
-            .assert_success();
+    let balance_after = cmd
+        .cast_fuse()
+        .args(["balance", addr, "--rpc-url", &url])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
 
-        let balance_after = cmd
-            .cast_fuse()
-            .args(["balance", addr, "--rpc-url", &url])
-            .assert_success()
-            .get_output()
-            .stdout_lossy();
-
-        assert!(balance_after != balance_before);
-    }
-);
+    assert!(balance_after != balance_before);
+});
