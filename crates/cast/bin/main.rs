@@ -45,8 +45,9 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    // NOTE(zk): We need to manually install the crypto provider as zksync-era uses `aws-lc-rs` provider, while
-    // foundry uses the `ring` provider. As a result, rustls cannot disambiguate between the two while selecting a default provider.
+    // NOTE(zk): We need to manually install the crypto provider as zksync-era uses `aws-lc-rs`
+    // provider, while foundry uses the `ring` provider. As a result, rustls cannot disambiguate
+    // between the two while selecting a default provider.
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     handler::install();
