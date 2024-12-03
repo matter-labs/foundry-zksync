@@ -32,11 +32,7 @@ use zksync_types::{
 };
 use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    sync::{Arc, LazyLock},
-};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
