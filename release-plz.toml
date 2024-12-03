@@ -1,6 +1,6 @@
 [workspace]
 dependencies_update = true                   # Whether to run `cargo update` in the release PR
-pr_name = "release: zksync-foundry {{version}}" # template for the PR name
+pr_name = "release: foundry-zksync {{version}}" # template for the PR name
 pr_labels = ["release", "automated"]         # Set PR labels
 changelog_update = false                     # Disable individual changelog updates for all packages.
 git_tag_enable = false                       # Disable individual tags for all packages.
