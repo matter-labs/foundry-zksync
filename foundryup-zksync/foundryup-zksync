@@ -210,7 +210,7 @@ EOF
         err "failed to get latest tag for anvil-zksync"
       fi
 
-      ANVIL_BIN_NAME="era_test_node-${ANVIL_TAG}-${TARGET}.${EXT}"
+      ANVIL_BIN_NAME="anvil-zksync-${ANVIL_TAG}-${TARGET}.${EXT}"
 
       ANVIL_BIN_URL="https://github.com/$ANVIL_REPO/releases/download/$ANVIL_TAG/$ANVIL_BIN_NAME"
 
@@ -321,7 +321,7 @@ tolower() {
 }
 
 need_cmd() {
-  if ! command -v "$1" &>/dev/null; then
+  if ! check_cmd "$1"; then
     err "need '$1' (command not found)"
   fi
 }
@@ -341,16 +341,16 @@ download() {
   if [ -n "$2" ]; then
     # output into $2
     if check_cmd curl; then
-      curl -sSfL -o "$2" "$1"
+      curl -#o "$2" -L "$1"
     else
-      wget -qO "$2" "$1"
+      wget --show-progress -qO "$2" "$1"
     fi
   else
     # output to stdout
     if check_cmd curl; then
-      curl -sSfL "$1"
+      curl -#L "$1"
     else
-      wget -qO- "$1"
+      wget --show-progress -qO- "$1"
     fi
   fi
 }
