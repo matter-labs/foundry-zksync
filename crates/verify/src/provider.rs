@@ -166,7 +166,7 @@ pub enum VerificationProviderType {
     Sourcify,
     Blockscout,
     Oklink,
-    #[value(alias = "zksync")]
+    #[clap(name = "zksync")]
     ZKsync,
 }
 
