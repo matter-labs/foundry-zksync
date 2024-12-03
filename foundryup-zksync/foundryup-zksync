@@ -195,6 +195,8 @@ EOF
 
     if [ "$PLATFORM" = "darwin" ]; then
       TARGET="${ARCHITECTURE}-apple-${PLATFORM}"
+    elif [ "$PLATFORM" = "linux" ]; then
+      TARGET="${ARCHITECTURE}-unknown-${PLATFORM}-gnu"
     else
       TARGET="${ARCHITECTURE}-${PLATFORM}"
     fi
@@ -298,8 +300,8 @@ OPTIONS:
     -r, --repo      Build and install from a remote GitHub repo (uses default branch if no other options are set)
     -p, --path      Build and install a local repository
     -j, --jobs      Number of CPUs to use for building Foundry (default: all CPUs)
-    --arch          Install a specific architecture (supports x86_64 and aarch64)
-    --platform      Install a specific platform (supports apple-darwin and unknown-linux-gnu)
+    --arch          Install a specific architecture (supports amd64 and arm64)
+    --platform      Install a specific platform (supports linux, and darwin)
 EOF
 }
 
@@ -374,6 +376,7 @@ Book       : https://foundry-book.zksync.io/
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 
 '
+
 }
 
 main "$@"
