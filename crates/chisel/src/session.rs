@@ -5,21 +5,22 @@
 
 use crate::prelude::{SessionSource, SessionSourceConfig};
 use eyre::Result;
+use foundry_evm::backend::strategy::BackendStrategy;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use time::{format_description, OffsetDateTime};
 
 /// A Chisel REPL Session
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChiselSession {
+pub struct ChiselSession<B: Default> {
     /// The `SessionSource` object that houses the REPL session.
-    pub session_source: SessionSource,
+    pub session_source: SessionSource<B>,
     /// The current session's identifier
     pub id: Option<String>,
 }
 
 // ChiselSession Common Associated Functions
-impl ChiselSession {
+impl<B> ChiselSession<B> where B: BackendStrategy {
     /// Create a new `ChiselSession` with a specified `solc` version and configuration.
     ///
     /// ### Takes
@@ -29,7 +30,7 @@ impl ChiselSession {
     /// ### Returns
     ///
     /// A new instance of [ChiselSession]
-    pub fn new(config: SessionSourceConfig) -> Result<Self> {
+    pub fn new(config: SessionSourceConfig<B>) -> Result<Self> {
         let solc = config.solc()?;
         // Return initialized ChiselSession with set solc version
         Ok(Self { session_source: SessionSource::new(solc, config), id: None })

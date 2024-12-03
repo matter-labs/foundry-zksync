@@ -12,8 +12,11 @@ use core::fmt::Debug;
 use eyre::{Result, WrapErr};
 use foundry_compilers::Artifact;
 use foundry_evm::{
-    backend::Backend, decode::decode_console_logs, executors::ExecutorBuilder,
-    inspectors::CheatsConfig, traces::TraceMode,
+    backend::{strategy::BackendStrategy, Backend},
+    decode::decode_console_logs,
+    executors::ExecutorBuilder,
+    inspectors::CheatsConfig,
+    traces::TraceMode,
 };
 use solang_parser::pt::{self, CodeLocation};
 use std::str::FromStr;
@@ -23,7 +26,10 @@ use yansi::Paint;
 const USIZE_MAX_AS_U256: U256 = U256::from_limbs([usize::MAX as u64, 0, 0, 0]);
 
 /// Executor implementation for [SessionSource]
-impl SessionSource {
+impl<B> SessionSource<B>
+where
+    B: BackendStrategy,
+{
     /// Runs the source with the [ChiselRunner]
     ///
     /// ### Returns
@@ -216,8 +222,10 @@ impl SessionSource {
 
         let Some((stack, memory, _)) = &res.state else {
             // Show traces and logs, if there are any, and return an error
-            if let Ok(decoder) = ChiselDispatcher::decode_traces(&source.config, &mut res).await {
-                ChiselDispatcher::show_traces(&decoder, &mut res).await?;
+            if let Ok(decoder) =
+                ChiselDispatcher::<B>::decode_traces(&source.config, &mut res).await
+            {
+                ChiselDispatcher::<B>::show_traces(&decoder, &mut res).await?;
             }
             let decoded_logs = decode_console_logs(&res.logs);
             if !decoded_logs.is_empty() {
@@ -311,7 +319,7 @@ impl SessionSource {
     /// ### Returns
     ///
     /// A configured [ChiselRunner]
-    async fn prepare_runner(&mut self, final_pc: usize) -> ChiselRunner {
+    async fn prepare_runner(&mut self, final_pc: usize) -> ChiselRunner<B> {
         let env =
             self.config.evm_opts.evm_env().await.expect("Could not instantiate fork environment");
 
@@ -320,7 +328,7 @@ impl SessionSource {
             Some(backend) => backend,
             None => {
                 let fork = self.config.evm_opts.get_fork(&self.config.foundry_config, env.clone());
-                let backend = Backend::spawn(fork);
+                let backend = Backend::spawn(fork, B::new());
                 self.config.backend = Some(backend.clone());
                 backend
             }
@@ -1422,6 +1430,7 @@ impl Iterator for InstructionIter<'_> {
 mod tests {
     use super::*;
     use foundry_compilers::{error::SolcError, solc::Solc};
+    use foundry_evm::backend::strategy::EvmBackendStrategy;
     use semver::Version;
     use std::sync::Mutex;
 
@@ -1517,7 +1526,7 @@ mod tests {
             ]
         };
 
-        let source = &mut source();
+        let source = &mut source::<EvmBackendStrategy>();
 
         let array_expressions: &[(&str, DynSolType)] = &[
             ("[1, 2, 3]", fixed_array(DynSolType::Uint(256), 3)),
@@ -1592,8 +1601,8 @@ mod tests {
             ));
         }
 
-        generic_type_test(&mut source(), TYPES);
-        generic_type_test(&mut source(), &types);
+        generic_type_test(&mut source::<EvmBackendStrategy>(), TYPES);
+        generic_type_test(&mut source::<EvmBackendStrategy>(), &types);
     }
 
     #[test]
@@ -1692,11 +1701,11 @@ mod tests {
             ]
         };
 
-        generic_type_test(&mut source(), global_variables);
+        generic_type_test(&mut source::<EvmBackendStrategy>(), global_variables);
     }
 
     #[track_caller]
-    fn source() -> SessionSource {
+    fn source<B: BackendStrategy>() -> SessionSource<B> {
         // synchronize solc install
         static PRE_INSTALL_SOLC_LOCK: Mutex<bool> = Mutex::new(false);
 
@@ -1739,7 +1748,11 @@ mod tests {
         DynSolType::FixedArray(Box::new(ty), len)
     }
 
-    fn parse(s: &mut SessionSource, input: &str, clear: bool) -> IntermediateOutput {
+    fn parse<B: BackendStrategy>(
+        s: &mut SessionSource<B>,
+        input: &str,
+        clear: bool,
+    ) -> IntermediateOutput {
         if clear {
             s.drain_run();
             s.drain_top_level_code();
@@ -1770,8 +1783,8 @@ mod tests {
         }
     }
 
-    fn get_type(
-        s: &mut SessionSource,
+    fn get_type<B: BackendStrategy>(
+        s: &mut SessionSource<B>,
         input: &str,
         clear: bool,
     ) -> (Option<Type>, IntermediateOutput) {
@@ -1781,15 +1794,20 @@ mod tests {
         (Type::from_expression(&expr).map(Type::map_special), intermediate)
     }
 
-    fn get_type_ethabi(s: &mut SessionSource, input: &str, clear: bool) -> Option<DynSolType> {
+    fn get_type_ethabi<B: BackendStrategy>(
+        s: &mut SessionSource<B>,
+        input: &str,
+        clear: bool,
+    ) -> Option<DynSolType> {
         let (ty, intermediate) = get_type(s, input, clear);
         ty.and_then(|ty| ty.try_as_ethabi(Some(&intermediate)))
     }
 
-    fn generic_type_test<'a, T, I>(s: &mut SessionSource, input: I)
+    fn generic_type_test<'a, T, I, B>(s: &mut SessionSource<B>, input: I)
     where
         T: AsRef<str> + std::fmt::Display + 'a,
         I: IntoIterator<Item = &'a (T, DynSolType)> + 'a,
+        B: BackendStrategy,
     {
         for (input, expected) in input.into_iter() {
             let input = input.as_ref();

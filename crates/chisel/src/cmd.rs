@@ -5,6 +5,7 @@
 
 use crate::prelude::ChiselDispatcher;
 use std::{error::Error, str::FromStr};
+use foundry_evm::backend::strategy::EvmBackendStrategy;
 use strum::EnumIter;
 
 /// Builtin chisel command variants
@@ -79,7 +80,7 @@ impl FromStr for ChiselCommand {
             "exec" | "e" => Ok(Self::Exec),
             "rawstack" | "rs" => Ok(Self::RawStack),
             "edit" => Ok(Self::Edit),
-            _ => Err(ChiselDispatcher::make_error(format!(
+            _ => Err(ChiselDispatcher::<EvmBackendStrategy>::make_error(format!(
                 "Unknown command \"{s}\"! See available commands with `!help`.",
             ))
             .into()),

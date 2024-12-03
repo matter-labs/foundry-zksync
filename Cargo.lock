@@ -4481,6 +4481,8 @@ dependencies = [
  "foundry-evm",
  "foundry-evm-abi",
  "foundry-linking",
+ "foundry-strategy-core",
+ "foundry-strategy-zksync",
  "foundry-test-utils",
  "foundry-wallets",
  "foundry-zksync-compiler",
@@ -5099,6 +5101,7 @@ dependencies = [
  "revm",
  "revm-inspectors",
  "serde",
+ "serde_json",
  "thiserror",
  "tracing",
 ]
@@ -5261,6 +5264,32 @@ dependencies = [
  "proc-macro2 1.0.89",
  "quote 1.0.37",
  "syn 2.0.87",
+]
+
+[[package]]
+name = "foundry-strategy-core"
+version = "0.0.2"
+dependencies = [
+ "foundry-evm-core",
+]
+
+[[package]]
+name = "foundry-strategy-zksync"
+version = "0.0.2"
+dependencies = [
+ "alloy-primitives",
+ "eyre",
+ "foundry-common",
+ "foundry-compilers",
+ "foundry-evm-core",
+ "foundry-evm-traces",
+ "foundry-strategy-core",
+ "foundry-zksync-core",
+ "revm",
+ "revm-inspectors",
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]

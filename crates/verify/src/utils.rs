@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::{bytecode::VerifyBytecodeArgs, types::VerificationType};
 use alloy_dyn_abi::DynSolValue;
 use alloy_primitives::{Address, Bytes, U256};
@@ -12,7 +14,7 @@ use foundry_block_explorers::{
 use foundry_common::{abi::encode_args, compile::ProjectCompiler, provider::RetryProvider, shell};
 use foundry_compilers::artifacts::{BytecodeHash, CompactContractBytecode, EvmVersion};
 use foundry_config::Config;
-use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, executors::TracingExecutor, opts::EvmOpts};
+use foundry_evm::{backend::strategy::BackendStrategy, constants::DEFAULT_CREATE2_DEPLOYER, executors::TracingExecutor, opts::EvmOpts};
 use reqwest::Url;
 use revm_primitives::{
     db::Database,
@@ -321,17 +323,18 @@ pub fn check_args_len(
     Ok(())
 }
 
-pub async fn get_tracing_executor(
+pub async fn get_tracing_executor<B: BackendStrategy>(
     fork_config: &mut Config,
     fork_blk_num: u64,
     evm_version: EvmVersion,
     evm_opts: EvmOpts,
-) -> Result<(Env, TracingExecutor)> {
+    strategy: Arc<Mutex<B>>,
+) -> Result<(Env, TracingExecutor<B>)> {
     fork_config.fork_block_number = Some(fork_blk_num);
     fork_config.evm_version = evm_version;
 
     let (env, fork, _chain, is_alphanet) =
-        TracingExecutor::get_fork_material(fork_config, evm_opts).await?;
+        TracingExecutor::<B>::get_fork_material(fork_config, evm_opts).await?;
 
     let executor = TracingExecutor::new(
         env.clone(),
@@ -340,6 +343,7 @@ pub async fn get_tracing_executor(
         false,
         false,
         is_alphanet,
+        strategy,
     );
 
     Ok((env, executor))
@@ -354,8 +358,8 @@ pub fn configure_env_block(env: &mut Env, block: &AnyNetworkBlock) {
     env.block.gas_limit = U256::from(block.header.gas_limit);
 }
 
-pub fn deploy_contract(
-    executor: &mut TracingExecutor,
+pub fn deploy_contract<B: BackendStrategy>(
+    executor: &mut TracingExecutor<B>,
     env: &Env,
     spec_id: SpecId,
     transaction: &Transaction,
@@ -383,8 +387,8 @@ pub fn deploy_contract(
     }
 }
 
-pub async fn get_runtime_codes(
-    executor: &mut TracingExecutor,
+pub async fn get_runtime_codes<B: BackendStrategy>(
+    executor: &mut TracingExecutor<B>,
     provider: &RetryProvider,
     address: Address,
     fork_address: Address,

@@ -22,6 +22,7 @@ use foundry_config::{
     },
     Config,
 };
+use foundry_evm::backend::strategy::{BackendStrategy, EvmBackendStrategy};
 use rustyline::{config::Configurer, error::ReadlineError, Editor};
 use std::path::PathBuf;
 use tracing::debug;
@@ -132,7 +133,7 @@ async fn main_args(args: Chisel) -> eyre::Result<()> {
     let (config, evm_opts) = args.load_config_and_evm_opts()?;
 
     // Create a new cli dispatcher
-    let mut dispatcher = ChiselDispatcher::new(chisel::session_source::SessionSourceConfig {
+    let mut dispatcher = ChiselDispatcher::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         // Enable traces if any level of verbosity was passed
         traces: config.verbosity > 0,
         foundry_config: config,
@@ -265,7 +266,7 @@ impl Provider for Chisel {
 }
 
 /// Evaluate a single Solidity line.
-async fn dispatch_repl_line(dispatcher: &mut ChiselDispatcher, line: &str) -> eyre::Result<bool> {
+async fn dispatch_repl_line<B: BackendStrategy>(dispatcher: &mut ChiselDispatcher<B>, line: &str) -> eyre::Result<bool> {
     let r = dispatcher.dispatch(line).await;
     match &r {
         DispatchResult::Success(msg) | DispatchResult::CommandSuccess(msg) => {
@@ -288,8 +289,8 @@ async fn dispatch_repl_line(dispatcher: &mut ChiselDispatcher, line: &str) -> ey
 
 /// Evaluate multiple Solidity source files contained within a
 /// Chisel prelude directory.
-async fn evaluate_prelude(
-    dispatcher: &mut ChiselDispatcher,
+async fn evaluate_prelude<B: BackendStrategy>(
+    dispatcher: &mut ChiselDispatcher<B>,
     maybe_prelude: Option<PathBuf>,
 ) -> eyre::Result<()> {
     let Some(prelude_dir) = maybe_prelude else { return Ok(()) };
@@ -314,7 +315,7 @@ async fn evaluate_prelude(
 }
 
 /// Loads a single Solidity file into the prelude.
-async fn load_prelude_file(dispatcher: &mut ChiselDispatcher, file: PathBuf) -> eyre::Result<()> {
+async fn load_prelude_file<B: BackendStrategy>(dispatcher: &mut ChiselDispatcher<B>, file: PathBuf) -> eyre::Result<()> {
     let prelude = fs::read_to_string(file)
         .wrap_err("Could not load source file. Are you sure this path is correct?")?;
     dispatch_repl_line(dispatcher, &prelude).await?;

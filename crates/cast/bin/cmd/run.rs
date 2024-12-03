@@ -1,7 +1,7 @@
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockTransactions;
-use cast::revm::primitives::EnvWithHandlerCfg;
+use cast::{backend::strategy::{BackendStrategy, EvmBackendStrategy}, revm::primitives::EnvWithHandlerCfg};
 use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_cli::{
@@ -133,7 +133,7 @@ impl RunArgs {
         config.fork_block_number = Some(tx_block_number - 1);
 
         let (mut env, fork, chain, alphanet) =
-            TracingExecutor::get_fork_material(&config, evm_opts).await?;
+            TracingExecutor::<EvmBackendStrategy>::get_fork_material(&config, evm_opts).await?;
 
         let mut evm_version = self.evm_version;
 
@@ -164,6 +164,7 @@ impl RunArgs {
             self.debug,
             self.decode_internal,
             alphanet,
+            EvmBackendStrategy::new(),
         );
         let mut env =
             EnvWithHandlerCfg::new_with_spec_id(Box::new(env.clone()), executor.spec_id());

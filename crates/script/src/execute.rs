@@ -24,6 +24,7 @@ use foundry_common::{
 use foundry_config::{Config, NamedChain};
 use foundry_debugger::Debugger;
 use foundry_evm::{
+    backend::strategy::BackendStrategy,
     decode::decode_console_logs,
     inspectors::cheatcodes::BroadcastableTransactions,
     traces::{
@@ -39,9 +40,9 @@ use yansi::Paint;
 
 /// State after linking, contains the linked build data along with library addresses and optional
 /// array of libraries that need to be predeployed.
-pub struct LinkedState {
+pub struct LinkedState<B> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<B>,
     pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
 }
@@ -59,10 +60,10 @@ pub struct ExecutionData {
     pub abi: JsonAbi,
 }
 
-impl LinkedState {
+impl<B> LinkedState<B> {
     /// Given linked and compiled artifacts, prepares data we need for execution.
     /// This includes the function to call and the calldata to pass to it.
-    pub async fn prepare_execution(self) -> Result<PreExecutionState> {
+    pub async fn prepare_execution(self) -> Result<PreExecutionState<B>> {
         let Self { args, script_config, script_wallets, build_data } = self;
 
         let target_contract = build_data.get_target_contract()?;
@@ -91,19 +92,22 @@ impl LinkedState {
 
 /// Same as [LinkedState], but also contains [ExecutionData].
 #[derive(Debug)]
-pub struct PreExecutionState {
+pub struct PreExecutionState<B> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<B>,
     pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub execution_data: ExecutionData,
 }
 
-impl PreExecutionState {
+impl<B> PreExecutionState<B>
+where
+    B: BackendStrategy,
+{
     /// Executes the script and returns the state after execution.
     /// Might require executing script twice in cases when we determine sender from execution.
     #[async_recursion]
-    pub async fn execute(mut self) -> Result<ExecutedState> {
+    pub async fn execute(mut self) -> Result<ExecutedState<B>> {
         let mut runner = self
             .script_config
             .get_runner_with_cheatcodes(
@@ -112,6 +116,7 @@ impl PreExecutionState {
                 self.args.debug,
                 self.build_data.build_data.target.clone(),
                 self.build_data.build_data.dual_compiled_contracts.clone().unwrap_or_default(),
+                B::new(),
             )
             .await?;
         let result = self.execute_with_runner(&mut runner).await?;
@@ -143,7 +148,7 @@ impl PreExecutionState {
     }
 
     /// Executes the script using the provided runner and returns the [ScriptResult].
-    pub async fn execute_with_runner(&self, runner: &mut ScriptRunner) -> Result<ScriptResult> {
+    pub async fn execute_with_runner(&self, runner: &mut ScriptRunner<B>) -> Result<ScriptResult> {
         let (address, mut setup_result) = runner.setup(
             &self.build_data.predeploy_libraries,
             self.execution_data.bytecode.clone(),
@@ -274,18 +279,18 @@ pub struct ExecutionArtifacts {
 }
 
 /// State after the script has been executed.
-pub struct ExecutedState {
+pub struct ExecutedState<B> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<B>,
     pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub execution_data: ExecutionData,
     pub execution_result: ScriptResult,
 }
 
-impl ExecutedState {
+impl<B> ExecutedState<B> {
     /// Collects the data we need for simulation and various post-execution tasks.
-    pub async fn prepare_simulation(self) -> Result<PreSimulationState> {
+    pub async fn prepare_simulation(self) -> Result<PreSimulationState<B>> {
         let returns = self.get_returns()?;
 
         let decoder = self.build_trace_decoder(&self.build_data.known_contracts).await?;
@@ -389,7 +394,7 @@ impl ExecutedState {
     }
 }
 
-impl PreSimulationState {
+impl<B> PreSimulationState<B> {
     pub fn show_json(&self) -> Result<()> {
         let result = &self.execution_result;
 

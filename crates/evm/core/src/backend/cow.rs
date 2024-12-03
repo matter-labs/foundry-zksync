@@ -1,6 +1,6 @@
 //! A wrapper around `Backend` that is clone-on-write used for fuzzing.
 
-use super::{BackendError, ForkInfo};
+use super::{strategy::BackendStrategy, BackendError, ForkInfo};
 use crate::{
     backend::{
         diagnostic::RevertDiagnostic, Backend, DatabaseExt, LocalForkId, RevertStateSnapshotAction,
@@ -44,20 +44,23 @@ use std::{
 /// which would add significant overhead for large fuzz sets even if the Database is not big after
 /// setup.
 #[derive(Clone, Debug)]
-pub struct CowBackend<'a> {
+pub struct CowBackend<'a, S: Clone> {
     /// The underlying `Backend`.
     ///
     /// No calls on the `CowBackend` will ever persistently modify the `backend`'s state.
-    pub backend: Cow<'a, Backend>,
+    pub backend: Cow<'a, Backend<S>>,
     /// Keeps track of whether the backed is already initialized
     is_initialized: bool,
     /// The [SpecId] of the current backend.
     spec_id: SpecId,
 }
 
-impl<'a> CowBackend<'a> {
+impl<'a, S> CowBackend<'a, S>
+where
+    S: BackendStrategy,
+{
     /// Creates a new `CowBackend` with the given `Backend`.
-    pub fn new(backend: &'a Backend) -> Self {
+    pub fn new(backend: &'a Backend<S>) -> Self {
         Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
     }
 
@@ -105,7 +108,7 @@ impl<'a> CowBackend<'a> {
         Ok(res)
     }
 
-    pub fn new_borrowed(backend: &'a Backend) -> Self {
+    pub fn new_borrowed(backend: &'a Backend<S>) -> Self {
         Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
     }
 
@@ -119,7 +122,7 @@ impl<'a> CowBackend<'a> {
     /// Returns a mutable instance of the Backend.
     ///
     /// If this is the first time this is called, the backed is cloned and initialized.
-    fn backend_mut(&mut self, env: &Env) -> &mut Backend {
+    fn backend_mut(&mut self, env: &Env) -> &mut Backend<S> {
         if !self.is_initialized {
             let backend = self.backend.to_mut();
             let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(env.clone()), self.spec_id);
@@ -131,7 +134,7 @@ impl<'a> CowBackend<'a> {
     }
 
     /// Returns a mutable instance of the Backend if it is initialized.
-    fn initialized_backend_mut(&mut self) -> Option<&mut Backend> {
+    fn initialized_backend_mut(&mut self) -> Option<&mut Backend<S>> {
         if self.is_initialized {
             return Some(self.backend.to_mut())
         }
@@ -139,7 +142,10 @@ impl<'a> CowBackend<'a> {
     }
 }
 
-impl DatabaseExt for CowBackend<'_> {
+impl<S> DatabaseExt for CowBackend<'_, S>
+where
+    S: BackendStrategy,
+{
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
         self.backend.to_mut().get_fork_info(id)
     }
@@ -316,7 +322,10 @@ impl DatabaseExt for CowBackend<'_> {
     }
 }
 
-impl DatabaseRef for CowBackend<'_> {
+impl<S> DatabaseRef for CowBackend<'_, S>
+where
+    S: BackendStrategy,
+{
     type Error = DatabaseError;
 
     fn basic_ref(&self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
@@ -336,7 +345,10 @@ impl DatabaseRef for CowBackend<'_> {
     }
 }
 
-impl Database for CowBackend<'_> {
+impl<S> Database for CowBackend<'_, S>
+where
+    S: BackendStrategy,
+{
     type Error = DatabaseError;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
@@ -356,7 +368,10 @@ impl Database for CowBackend<'_> {
     }
 }
 
-impl DatabaseCommit for CowBackend<'_> {
+impl<S> DatabaseCommit for CowBackend<'_, S>
+where
+    S: BackendStrategy,
+{
     fn commit(&mut self, changes: Map<Address, Account>) {
         self.backend.to_mut().commit(changes)
     }

@@ -15,12 +15,11 @@ use alloy_primitives::{hex, Address};
 use forge_fmt::FormatterConfig;
 use foundry_config::{Config, RpcEndpoint};
 use foundry_evm::{
-    decode::decode_console_logs,
-    traces::{
+    backend::strategy::BackendStrategy, decode::decode_console_logs, traces::{
         decode_trace_arena,
         identifier::{SignaturesIdentifier, TraceIdentifiers},
         render_trace_arena, CallTraceDecoder, CallTraceDecoderBuilder, TraceKind,
-    },
+    }
 };
 use regex::Regex;
 use reqwest::Url;
@@ -58,9 +57,9 @@ static ADDRESS_RE: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Chisel input dispatcher
 #[derive(Debug)]
-pub struct ChiselDispatcher {
+pub struct ChiselDispatcher<B: Default> {
     /// A Chisel Session
-    pub session: ChiselSession,
+    pub session: ChiselSession<B>,
 }
 
 /// Chisel dispatch result variants
@@ -134,9 +133,9 @@ pub fn format_source(source: &str, config: FormatterConfig) -> eyre::Result<Stri
     }
 }
 
-impl ChiselDispatcher {
+impl<B> ChiselDispatcher<B> where B: BackendStrategy {
     /// Associated public function to create a new Dispatcher instance
-    pub fn new(config: SessionSourceConfig) -> eyre::Result<Self> {
+    pub fn new(config: SessionSourceConfig<B>) -> eyre::Result<Self> {
         ChiselSession::new(config).map(|session| Self { session })
     }
 
@@ -146,12 +145,12 @@ impl ChiselDispatcher {
     }
 
     /// Returns the [`SessionSource`].
-    pub fn source(&self) -> &SessionSource {
+    pub fn source(&self) -> &SessionSource<B> {
         &self.session.session_source
     }
 
     /// Returns the [`SessionSource`].
-    pub fn source_mut(&mut self) -> &mut SessionSource {
+    pub fn source_mut(&mut self) -> &mut SessionSource<B> {
         &mut self.session.session_source
     }
 
@@ -302,7 +301,7 @@ impl ChiselDispatcher {
                     DispatchResult::CommandFailed(Self::make_error("Failed to load session!"))
                 }
             }
-            ChiselCommand::ListSessions => match ChiselSession::list_sessions() {
+            ChiselCommand::ListSessions => match ChiselSession::<B>::list_sessions() {
                 Ok(sessions) => DispatchResult::CommandSuccess(Some(format!(
                     "{}\n{}",
                     format!("{CHISEL_CHAR} Chisel Sessions").cyan(),
@@ -326,7 +325,7 @@ impl ChiselDispatcher {
                     DispatchResult::CommandFailed(String::from("Failed to format session source"))
                 }
             },
-            ChiselCommand::ClearCache => match ChiselSession::clear_cache() {
+            ChiselCommand::ClearCache => match ChiselSession::<B>::clear_cache() {
                 Ok(_) => {
                     self.session.id = None;
                     DispatchResult::CommandSuccess(Some(String::from("Cleared chisel cache!")))
@@ -908,7 +907,7 @@ impl ChiselDispatcher {
     ///
     /// Optionally, a [CallTraceDecoder]
     pub async fn decode_traces(
-        session_config: &SessionSourceConfig,
+        session_config: &SessionSourceConfig<B>,
         result: &mut ChiselResult,
         // known_contracts: &ContractsByArtifact,
     ) -> eyre::Result<CallTraceDecoder> {

@@ -42,7 +42,7 @@ use foundry_config::{
     Config,
 };
 use foundry_evm::{
-    backend::Backend,
+    backend::{strategy::{BackendStrategy, EvmBackendStrategy}, Backend},
     constants::DEFAULT_CREATE2_DEPLOYER,
     executors::ExecutorBuilder,
     inspectors::{
@@ -55,7 +55,7 @@ use foundry_evm::{
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
 use serde::Serialize;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::{Arc, Mutex}};
 
 mod broadcast;
 mod build;
@@ -214,7 +214,7 @@ pub struct ScriptArgs {
 }
 
 impl ScriptArgs {
-    pub async fn preprocess(self) -> Result<PreprocessedState> {
+    pub async fn preprocess<B: BackendStrategy>(self) -> Result<PreprocessedState<B>> {
         let script_wallets =
             Wallets::new(self.wallets.get_multi_wallet().await?, self.evm_opts.sender);
 
@@ -224,7 +224,7 @@ impl ScriptArgs {
             evm_opts.sender = sender;
         }
 
-        let script_config = ScriptConfig::new(config, evm_opts).await?;
+        let script_config = ScriptConfig::<B>::new(config, evm_opts).await?;
 
         Ok(PreprocessedState { args: self, script_config, script_wallets })
     }
@@ -233,7 +233,7 @@ impl ScriptArgs {
     pub async fn run_script(self) -> Result<()> {
         trace!(target: "script", "executing script command");
 
-        let compiled = self.preprocess().await?.compile()?;
+        let compiled = self.preprocess::<EvmBackendStrategy>().await?.compile()?;
 
         // Move from `CompiledState` to `BundledState` either by resuming or executing and
         // simulating script.
@@ -528,15 +528,15 @@ struct JsonResult<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ScriptConfig {
+pub struct ScriptConfig<B> {
     pub config: Config,
     pub evm_opts: EvmOpts,
     pub sender_nonce: u64,
     /// Maps a rpc url to a backend
-    pub backends: HashMap<String, Backend>,
+    pub backends: HashMap<String, Backend<B>>,
 }
 
-impl ScriptConfig {
+impl<B> ScriptConfig<B> where B: BackendStrategy {
     pub async fn new(config: Config, evm_opts: EvmOpts) -> Result<Self> {
         let sender_nonce = if let Some(fork_url) = evm_opts.fork_url.as_ref() {
             next_nonce(evm_opts.sender, fork_url).await?
@@ -558,8 +558,8 @@ impl ScriptConfig {
         Ok(())
     }
 
-    async fn get_runner(&mut self) -> Result<ScriptRunner> {
-        self._get_runner(None, false).await
+    async fn get_runner(&mut self, strategy: Arc<Mutex<B>>,) -> Result<ScriptRunner<B>> {
+        self._get_runner(None, false, strategy).await
     }
 
     async fn get_runner_with_cheatcodes(
@@ -569,10 +569,12 @@ impl ScriptConfig {
         debug: bool,
         target: ArtifactId,
         dual_compiled_contracts: DualCompiledContracts,
-    ) -> Result<ScriptRunner> {
+        strategy: Arc<Mutex<B>>,
+    ) -> Result<ScriptRunner<B>> {
         self._get_runner(
             Some((known_contracts, script_wallets, target, dual_compiled_contracts)),
             debug,
+            strategy,
         )
         .await
     }
@@ -581,7 +583,8 @@ impl ScriptConfig {
         &mut self,
         cheats_data: Option<(ContractsByArtifact, Wallets, ArtifactId, DualCompiledContracts)>,
         debug: bool,
-    ) -> Result<ScriptRunner> {
+        strategy: Arc<Mutex<B>>,
+    ) -> Result<ScriptRunner<B>> {
         trace!("preparing script runner");
         let env = self.evm_opts.evm_env().await?;
 
@@ -590,7 +593,7 @@ impl ScriptConfig {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(fork);
+                    let backend = Backend::spawn(fork, strategy);
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -599,7 +602,7 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(None)
+            Backend::spawn(None, strategy)
         };
 
         // We need to enable tracing to decode contract names: local or external.

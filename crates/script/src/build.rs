@@ -22,7 +22,10 @@ use foundry_compilers::{
     zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     ArtifactId, ProjectCompileOutput,
 };
-use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, traces::debug::ContractSources};
+use foundry_evm::{
+    backend::strategy::BackendStrategy, constants::DEFAULT_CREATE2_DEPLOYER,
+    traces::debug::ContractSources,
+};
 use foundry_linking::Linker;
 use foundry_zksync_compiler::DualCompiledContracts;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr, sync::Arc};
@@ -48,7 +51,7 @@ impl BuildData {
 
     /// Links contracts. Uses CREATE2 linking when possible, otherwise falls back to
     /// default linking with sender nonce and address.
-    pub async fn link(self, script_config: &ScriptConfig) -> Result<LinkedBuildData> {
+    pub async fn link<B>(self, script_config: &ScriptConfig<B>) -> Result<LinkedBuildData> {
         let can_use_create2 = if let Some(fork_url) = &script_config.evm_opts.fork_url {
             let provider = try_get_http_provider(fork_url)?;
             let deployer_code = provider.get_code_at(DEFAULT_CREATE2_DEPLOYER).await?;
@@ -191,16 +194,16 @@ impl LinkedBuildData {
 }
 
 /// First state basically containing only inputs of the user.
-pub struct PreprocessedState {
+pub struct PreprocessedState<B> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<B>,
     pub script_wallets: Wallets,
 }
 
-impl PreprocessedState {
+impl<B> PreprocessedState<B> {
     /// Parses user input and compiles the contracts depending on script target.
     /// After compilation, finds exact [ArtifactId] of the target contract.
-    pub fn compile(self) -> Result<CompiledState> {
+    pub fn compile(self) -> Result<CompiledState<B>> {
         let Self { args, script_config, script_wallets } = self;
         let project = script_config.config.project()?;
 
@@ -305,16 +308,19 @@ impl PreprocessedState {
 }
 
 /// State after we have determined and compiled target contract to be executed.
-pub struct CompiledState {
+pub struct CompiledState<B> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<B>,
     pub script_wallets: Wallets,
     pub build_data: BuildData,
 }
 
-impl CompiledState {
+impl<B> CompiledState<B>
+where
+    B: BackendStrategy,
+{
     /// Uses provided sender address to compute library addresses and link contracts with them.
-    pub async fn link(self) -> Result<LinkedState> {
+    pub async fn link(self) -> Result<LinkedState<B>> {
         let Self { args, script_config, script_wallets, build_data } = self;
 
         let build_data = build_data.link(&script_config).await?;
@@ -323,7 +329,7 @@ impl CompiledState {
     }
 
     /// Tries loading the resumed state from the cache files, skipping simulation stage.
-    pub async fn resume(self) -> Result<BundledState> {
+    pub async fn resume(self) -> Result<BundledState<B>> {
         let chain = if self.args.multi {
             None
         } else {

@@ -1,17 +1,27 @@
 use crate::executors::{Executor, ExecutorBuilder};
 use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{utils::evm_spec_id, Chain, Config};
-use foundry_evm_core::{backend::Backend, fork::CreateFork, opts::EvmOpts};
+use foundry_evm_core::{
+    backend::{strategy::BackendStrategy, Backend},
+    fork::CreateFork,
+    opts::EvmOpts,
+};
 use foundry_evm_traces::{InternalTraceMode, TraceMode};
 use revm::primitives::{Env, SpecId};
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::{Arc, Mutex},
+};
 
 /// A default executor with tracing enabled
-pub struct TracingExecutor {
-    executor: Executor,
+pub struct TracingExecutor<B> {
+    executor: Executor<B>,
 }
 
-impl TracingExecutor {
+impl<B> TracingExecutor<B>
+where
+    B: BackendStrategy,
+{
     pub fn new(
         env: revm::primitives::Env,
         fork: Option<CreateFork>,
@@ -19,8 +29,9 @@ impl TracingExecutor {
         debug: bool,
         decode_internal: bool,
         alphanet: bool,
+        strategy: Arc<Mutex<B>>,
     ) -> Self {
-        let db = Backend::spawn(fork);
+        let db = Backend::spawn(fork, strategy);
         let trace_mode =
             TraceMode::Call.with_debug(debug).with_decode_internal(if decode_internal {
                 InternalTraceMode::Full
@@ -58,15 +69,15 @@ impl TracingExecutor {
     }
 }
 
-impl Deref for TracingExecutor {
-    type Target = Executor;
+impl<B> Deref for TracingExecutor<B> {
+    type Target = Executor<B>;
 
     fn deref(&self) -> &Self::Target {
         &self.executor
     }
 }
 
-impl DerefMut for TracingExecutor {
+impl<B> DerefMut for TracingExecutor<B> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.executor
     }

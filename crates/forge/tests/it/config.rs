@@ -1,8 +1,7 @@
 //! Test config.
 
 use forge::{
-    result::{SuiteResult, TestStatus},
-    MultiContractRunner,
+    backend::strategy::BackendStrategy, result::{SuiteResult, TestStatus}, MultiContractRunner
 };
 use foundry_evm::{
     decode::decode_console_logs,
@@ -15,18 +14,18 @@ use itertools::Itertools;
 use std::collections::BTreeMap;
 
 /// How to execute a test run.
-pub struct TestConfig {
-    pub runner: MultiContractRunner,
+pub struct TestConfig<B> {
+    pub runner: MultiContractRunner<B>,
     pub should_fail: bool,
     pub filter: Filter,
 }
 
-impl TestConfig {
-    pub fn new(runner: MultiContractRunner) -> Self {
+impl<B> TestConfig<B> where B: BackendStrategy {
+    pub fn new(runner: MultiContractRunner<B>) -> Self {
         Self::with_filter(runner, Filter::matches_all())
     }
 
-    pub fn with_filter(runner: MultiContractRunner, filter: Filter) -> Self {
+    pub fn with_filter(runner: MultiContractRunner<B>, filter: Filter) -> Self {
         init_tracing();
         Self { runner, should_fail: false, filter }
     }

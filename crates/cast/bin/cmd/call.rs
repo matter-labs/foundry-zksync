@@ -1,7 +1,7 @@
 use crate::tx::{CastTxBuilder, SenderKind};
 use alloy_primitives::{TxKind, U256};
 use alloy_rpc_types::{BlockId, BlockNumberOrTag};
-use cast::{traces::TraceKind, Cast};
+use cast::{backend::strategy::{BackendStrategy, EvmBackendStrategy}, traces::TraceKind, Cast};
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -171,14 +171,14 @@ impl CallArgs {
             }
 
             let (mut env, fork, chain, alphanet) =
-                TracingExecutor::get_fork_material(&config, evm_opts).await?;
+                TracingExecutor::<EvmBackendStrategy>::get_fork_material(&config, evm_opts).await?;
 
             // modify settings that usually set in eth_call
             env.cfg.disable_block_gas_limit = true;
             env.block.gas_limit = U256::MAX;
 
             let mut executor =
-                TracingExecutor::new(env, fork, evm_version, debug, decode_internal, alphanet);
+                TracingExecutor::new(env, fork, evm_version, debug, decode_internal, alphanet, EvmBackendStrategy::new());
 
             let value = tx.value.unwrap_or_default();
             let input = tx.inner.input.into_input().unwrap_or_default();

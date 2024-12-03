@@ -25,7 +25,7 @@ foundry-evm-traces.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-inspectors.workspace = true
 
-alloy-dyn-abi = { workspace = true, features = [ "arbitrary", "eip712" ] }
+alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }
 alloy-json-abi.workspace = true
 alloy-primitives = { workspace = true, features = [
     "serde",
@@ -53,3 +53,4 @@ thiserror.workspace = true
 tracing.workspace = true
 indicatif = "0.17"
 serde.workspace = true
+serde_json.workspace = true

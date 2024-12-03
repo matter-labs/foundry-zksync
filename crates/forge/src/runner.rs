@@ -17,21 +17,17 @@ use foundry_common::{
 };
 use foundry_config::{FuzzConfig, InvariantConfig};
 use foundry_evm::{
-    constants::CALLER,
-    decode::RevertDecoder,
-    executors::{
+    backend::strategy::BackendStrategy, constants::CALLER, decode::RevertDecoder, executors::{
         fuzz::FuzzedExecutor,
         invariant::{
             check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
         },
         CallResult, EvmError, ExecutionErr, Executor, ITest, RawCallResult,
-    },
-    fuzz::{
+    }, fuzz::{
         fixture_name,
         invariant::{CallDetails, InvariantContract},
         CounterExample, FuzzFixtures,
-    },
-    traces::{load_contracts, TraceKind, TraceMode},
+    }, traces::{load_contracts, TraceKind, TraceMode}
 };
 use proptest::test_runner::TestRunner;
 use rayon::prelude::*;
@@ -46,7 +42,7 @@ pub const LIBRARY_DEPLOYER: Address = address!("1F95D37F27EA0dEA9C252FC09D5A6eaA
 
 /// A type that executes all tests of a contract
 #[derive(Clone, Debug)]
-pub struct ContractRunner<'a> {
+pub struct ContractRunner<'a, B> {
     /// The name of the contract.
     pub name: &'a str,
     /// The data of the contract.
@@ -54,7 +50,7 @@ pub struct ContractRunner<'a> {
     /// The libraries that need to be deployed before the contract.
     pub libs_to_deploy: &'a Vec<Bytes>,
     /// The executor used by the runner.
-    pub executor: Executor,
+    pub executor: Executor<B>,
     /// Revert decoder. Contains all known errors.
     pub revert_decoder: &'a RevertDecoder,
     /// The initial balance of the test contract.
@@ -71,7 +67,7 @@ pub struct ContractRunner<'a> {
     pub span: tracing::Span,
 }
 
-impl ContractRunner<'_> {
+impl<B> ContractRunner<'_, B> where B: BackendStrategy {
     /// Deploys the test contract inside the runner from the sending account, and optionally runs
     /// the `setUp` function on the test contract.
     pub fn setup(&mut self, call_setup: bool) -> TestSetup {
@@ -703,7 +699,7 @@ impl ContractRunner<'_> {
         &self,
         func: &Function,
         setup: TestSetup,
-    ) -> Result<(Cow<'_, Executor>, TestResult, Address), TestResult> {
+    ) -> Result<(Cow<'_, Executor<B>>, TestResult, Address), TestResult> {
         let address = setup.address;
         let mut executor = Cow::Borrowed(&self.executor);
         let mut test_result = TestResult::new(setup);

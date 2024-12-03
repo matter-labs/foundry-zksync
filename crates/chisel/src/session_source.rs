@@ -12,7 +12,7 @@ use foundry_compilers::{
     compilers::solc::Solc,
 };
 use foundry_config::{Config, SolcReq};
-use foundry_evm::{backend::Backend, opts::EvmOpts};
+use foundry_evm::{backend::{strategy::BackendStrategy, Backend}, opts::EvmOpts};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use solang_parser::{diagnostics::Diagnostic, pt};
@@ -68,7 +68,7 @@ pub struct GeneratedOutput {
 
 /// Configuration for the [SessionSource]
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct SessionSourceConfig {
+pub struct SessionSourceConfig<B> {
     /// Foundry configuration
     pub foundry_config: Config,
     /// EVM Options
@@ -77,14 +77,14 @@ pub struct SessionSourceConfig {
     pub no_vm: bool,
     #[serde(skip)]
     /// In-memory REVM db for the session's runner.
-    pub backend: Option<Backend>,
+    pub backend: Option<Backend<B>>,
     /// Optionally enable traces for the REPL contract execution
     pub traces: bool,
     /// Optionally set calldata for the REPL contract execution
     pub calldata: Option<Vec<u8>>,
 }
 
-impl SessionSourceConfig {
+impl<B> SessionSourceConfig<B> {
     /// Returns the solc version to use
     ///
     /// Solc version precedence
@@ -131,7 +131,7 @@ impl SessionSourceConfig {
 ///
 /// Heavily based on soli's [`ConstructedSource`](https://github.com/jpopesculian/soli/blob/master/src/main.rs#L166)
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SessionSource {
+pub struct SessionSource<B: Default> {
     /// The file name
     pub file_name: PathBuf,
     /// The contract name
@@ -152,10 +152,10 @@ pub struct SessionSource {
     /// The generated output
     pub generated_output: Option<GeneratedOutput>,
     /// Session Source configuration
-    pub config: SessionSourceConfig,
+    pub config: SessionSourceConfig<B>,
 }
 
-impl SessionSource {
+impl<B> SessionSource<B> where B: BackendStrategy {
     /// Creates a new source given a solidity compiler version
     ///
     /// # Panics
@@ -171,7 +171,7 @@ impl SessionSource {
     ///
     /// A new instance of [SessionSource]
     #[track_caller]
-    pub fn new(solc: Solc, mut config: SessionSourceConfig) -> Self {
+    pub fn new(solc: Solc, mut config: SessionSourceConfig<B>) -> Self {
         if solc.version < MIN_VM_VERSION && !config.no_vm {
             tracing::info!(version=%solc.version, minimum=%MIN_VM_VERSION, "Disabling VM injection");
             config.no_vm = true;
@@ -639,9 +639,9 @@ pub enum ParseTreeFragment {
 
 /// Parses a fragment of solidity code with solang_parser and assigns
 /// it a scope within the [SessionSource].
-pub fn parse_fragment(
+pub fn parse_fragment<B: BackendStrategy>(
     solc: Solc,
-    config: SessionSourceConfig,
+    config: SessionSourceConfig<B>,
     buffer: &str,
 ) -> Option<ParseTreeFragment> {
     let mut base = SessionSource::new(solc, config);

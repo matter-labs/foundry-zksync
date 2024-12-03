@@ -3,8 +3,7 @@
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
-    revm::primitives::SpecId, MultiContractRunner, MultiContractRunnerBuilder, TestOptions,
-    TestOptionsBuilder,
+    backend::strategy::{BackendStrategy, EvmBackendStrategy}, revm::primitives::SpecId, MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder
 };
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
@@ -24,6 +23,7 @@ use foundry_evm::{
     constants::CALLER,
     opts::{Env, EvmOpts},
 };
+use foundry_strategy_zksync::ZkBackendStrategy;
 use foundry_test_utils::{
     fd_lock, init_tracing, rpc::next_rpc_endpoint, util::OutputExt, TestCommand, ZkSyncNode,
 };
@@ -282,7 +282,7 @@ impl ForgeTestData {
     }
 
     /// Builds a non-tracing runner
-    pub fn runner(&self) -> MultiContractRunner {
+    pub fn runner(&self) -> MultiContractRunner<EvmBackendStrategy> {
         let mut config = self.config.clone();
         config.fs_permissions =
             FsPermissions::new(vec![PathPermission::read_write(manifest_root())]);
@@ -291,7 +291,7 @@ impl ForgeTestData {
 
     /// Builds a non-tracing zksync runner
     /// TODO: This needs to be implemented as currently it is a copy of the original function
-    pub fn runner_zksync(&self) -> MultiContractRunner {
+    pub fn runner_zksync(&self) -> MultiContractRunner<ZkBackendStrategy> {
         let mut zk_config = self.zk_test_data.zk_config.clone();
         zk_config.fs_permissions =
             FsPermissions::new(vec![PathPermission::read_write(manifest_root())]);
@@ -299,7 +299,7 @@ impl ForgeTestData {
     }
 
     /// Builds a non-tracing runner
-    pub fn runner_with_config(&self, mut config: Config) -> MultiContractRunner {
+    pub fn runner_with_config(&self, mut config: Config) -> MultiContractRunner<EvmBackendStrategy> {
         config.rpc_endpoints = rpc_endpoints();
         config.allow_paths.push(manifest_root().to_path_buf());
 
@@ -324,13 +324,16 @@ impl ForgeTestData {
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(self.test_opts.clone())
-            .build(root, output, None, env, opts, Default::default())
+            .build(root, output, None, env, opts, Default::default(), EvmBackendStrategy::new())
             .unwrap()
     }
 
     /// Builds a non-tracing runner with zksync
     /// TODO: This needs to be added as currently it is a copy of the original function
-    pub fn runner_with_zksync_config(&self, mut zk_config: Config) -> MultiContractRunner {
+    pub fn runner_with_zksync_config(
+        &self,
+        mut zk_config: Config,
+    ) -> MultiContractRunner<ZkBackendStrategy> {
         zk_config.rpc_endpoints = rpc_endpoints_zk();
         zk_config.allow_paths.push(manifest_root().to_path_buf());
 
@@ -358,12 +361,20 @@ impl ForgeTestData {
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(test_opts)
-            .build(root, output, Some(zk_output), env, opts, dual_compiled_contracts)
+            .build(
+                root,
+                output,
+                Some(zk_output),
+                env,
+                opts,
+                dual_compiled_contracts,
+                ZkBackendStrategy::new(),
+            )
             .unwrap()
     }
 
     /// Builds a tracing runner
-    pub fn tracing_runner(&self) -> MultiContractRunner {
+    pub fn tracing_runner(&self) -> MultiContractRunner<EvmBackendStrategy> {
         let mut opts = self.evm_opts.clone();
         opts.verbosity = 5;
         self.base_runner()
@@ -374,12 +385,13 @@ impl ForgeTestData {
                 opts.local_evm_env(),
                 opts,
                 Default::default(),
+                EvmBackendStrategy::new()
             )
             .unwrap()
     }
 
     /// Builds a runner that runs against forked state
-    pub async fn forked_runner(&self, rpc: &str) -> MultiContractRunner {
+    pub async fn forked_runner(&self, rpc: &str) -> MultiContractRunner<EvmBackendStrategy> {
         let mut opts = self.evm_opts.clone();
 
         opts.env.chain_id = None; // clear chain id so the correct one gets fetched from the RPC
@@ -390,7 +402,7 @@ impl ForgeTestData {
 
         self.base_runner()
             .with_fork(fork)
-            .build(self.project.root(), self.output.clone(), None, env, opts, Default::default())
+            .build(self.project.root(), self.output.clone(), None, env, opts, Default::default(), EvmBackendStrategy::new())
             .unwrap()
     }
 }

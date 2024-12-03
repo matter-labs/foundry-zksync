@@ -16,7 +16,7 @@ use foundry_compilers::{
 };
 use foundry_config::Config;
 use foundry_evm::{
-    backend::Backend,
+    backend::{strategy::BackendStrategy, Backend},
     decode::RevertDecoder,
     executors::ExecutorBuilder,
     fork::CreateFork,
@@ -35,7 +35,7 @@ use std::{
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
-    sync::{mpsc, Arc},
+    sync::{mpsc, Arc, Mutex},
     time::Instant,
 };
 
@@ -49,7 +49,7 @@ pub type DeployableContracts = BTreeMap<ArtifactId, TestContract>;
 
 /// A multi contract runner receives a set of contracts deployed in an EVM instance and proceeds
 /// to run all test functions in these contracts.
-pub struct MultiContractRunner {
+pub struct MultiContractRunner<B> {
     /// Mapping of contract name to JsonAbi, creation bytecode and library bytecode which
     /// needs to be deployed & linked against
     pub contracts: DeployableContracts,
@@ -88,10 +88,10 @@ pub struct MultiContractRunner {
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
     /// Use zk runner.
-    pub use_zk: bool,
+    pub strategy: Arc<Mutex<B>>,
 }
 
-impl MultiContractRunner {
+impl<B> MultiContractRunner<B> where B: BackendStrategy {
     /// Returns an iterator over all contracts that match the filter.
     pub fn matching_contracts<'a: 'b, 'b>(
         &'a self,
@@ -181,8 +181,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let mut db = Backend::spawn(self.fork.take());
-        db.is_zk = self.use_zk;
+        let db = Backend::spawn(self.fork.take(), self.strategy.clone());
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -240,7 +239,7 @@ impl MultiContractRunner {
         &self,
         artifact_id: &ArtifactId,
         contract: &TestContract,
-        db: Backend,
+        db: Backend<B>,
         filter: &dyn TestFilter,
         tokio_handle: &tokio::runtime::Handle,
         progress: Option<&TestsProgress>,
@@ -255,7 +254,7 @@ impl MultiContractRunner {
             Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
             self.dual_compiled_contracts.clone(),
-            self.use_zk,
+            self.strategy.lock().unwrap().name() == "zk", // use_zk
         );
 
         let trace_mode = TraceMode::default()
@@ -272,7 +271,7 @@ impl MultiContractRunner {
                     .enable_isolation(self.isolation)
                     .alphanet(self.alphanet)
             })
-            .use_zk_vm(self.use_zk)
+            .use_zk_vm(self.strategy.lock().unwrap().name() == "zk") // use_zk
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
@@ -406,7 +405,7 @@ impl MultiContractRunnerBuilder {
 
     /// Given an EVM, proceeds to return a runner which is able to execute all tests
     /// against that evm
-    pub fn build<C: Compiler>(
+    pub fn build<C: Compiler, B: BackendStrategy>(
         self,
         root: &Path,
         output: ProjectCompileOutput<C>,
@@ -414,7 +413,8 @@ impl MultiContractRunnerBuilder {
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
         dual_compiled_contracts: DualCompiledContracts,
-    ) -> Result<MultiContractRunner> {
+        strategy: Arc<Mutex<B>>,
+    ) -> Result<MultiContractRunner<B>> {
         let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);
@@ -516,7 +516,7 @@ impl MultiContractRunnerBuilder {
             libs_to_deploy,
             libraries,
             dual_compiled_contracts,
-            use_zk,
+            strategy,
         })
     }
 }

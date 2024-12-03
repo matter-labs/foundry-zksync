@@ -10,8 +10,7 @@ use alloy_dyn_abi::{DecodedEvent, DynSolValue, EventExt};
 use alloy_json_abi::Event;
 use alloy_primitives::{address, b256, Address, U256};
 use forge::{
-    decode::decode_console_logs,
-    result::{TestKind, TestStatus},
+    backend::strategy::EvmBackendStrategy, decode::decode_console_logs, result::{TestKind, TestStatus}
 };
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_evm::traces::{CallKind, CallTraceDecoder, DecodedCallData, TraceKind};
@@ -64,7 +63,7 @@ async fn repro_config(
     should_fail: bool,
     sender: Option<Address>,
     test_data: &ForgeTestData,
-) -> TestConfig {
+) -> TestConfig<EvmBackendStrategy> {
     foundry_test_utils::init_tracing();
     let filter = Filter::path(&format!(".*repros/Issue{issue}.t.sol"));
 

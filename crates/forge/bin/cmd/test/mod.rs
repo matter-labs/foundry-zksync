@@ -4,9 +4,11 @@ use chrono::Utc;
 use clap::{Parser, ValueHint};
 use eyre::{Context, OptionExt, Result};
 use forge::{
+    backend::strategy::{BackendStrategy, EvmBackendStrategy},
     decode::decode_console_logs,
     gas_report::{GasReport, GasReportKind},
     multi_runner::matches_contract,
+    opts::EvmOpts,
     result::{SuiteResult, TestOutcome, TestStatus},
     traces::{
         debug::{ContractSources, DebugTraceIdentifier},
@@ -38,6 +40,7 @@ use foundry_config::{
 };
 use foundry_debugger::Debugger;
 use foundry_evm::traces::identifier::TraceIdentifiers;
+use foundry_strategy_zksync::ZkBackendStrategy;
 use foundry_zksync_compiler::DualCompiledContracts;
 use regex::Regex;
 use std::{
@@ -269,10 +272,21 @@ impl TestArgs {
     /// configured filter will be executed
     ///
     /// Returns the test results for all matching tests.
-    pub async fn execute_tests(mut self) -> Result<TestOutcome> {
+    pub async fn execute_tests(self) -> Result<TestOutcome> {
         // Merge all configs.
-        let (mut config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
+        let (config, evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
+        if config.zksync.should_compile() {
+            self.execute_tests_inner::<ZkBackendStrategy>(config, evm_opts).await
+        } else {
+            self.execute_tests_inner::<EvmBackendStrategy>(config, evm_opts).await
+        }
+    }
 
+    async fn execute_tests_inner<B: BackendStrategy>(
+        mut self,
+        mut config: Config,
+        mut evm_opts: EvmOpts,
+    ) -> Result<TestOutcome> {
         // Set number of max threads to execute tests.
         // If not specified then the number of threads determined by rayon will be used.
         if let Some(test_threads) = config.threads {
@@ -392,6 +406,7 @@ impl TestArgs {
                 env,
                 evm_opts,
                 dual_compiled_contracts.unwrap_or_default(),
+                B::new(),
             )?;
 
         let mut maybe_override_mt = |flag, maybe_regex: Option<&Option<Regex>>| {
@@ -491,9 +506,9 @@ impl TestArgs {
     }
 
     /// Run all tests that matches the filter predicate from a test runner
-    pub async fn run_tests(
+    pub async fn run_tests<B: BackendStrategy>(
         &self,
-        mut runner: MultiContractRunner,
+        mut runner: MultiContractRunner<B>,
         config: Arc<Config>,
         verbosity: u8,
         filter: &ProjectPathsAwareFilter,
@@ -928,7 +943,7 @@ impl Provider for TestArgs {
 }
 
 /// Lists all matching tests
-fn list(runner: MultiContractRunner, filter: &ProjectPathsAwareFilter) -> Result<TestOutcome> {
+fn list<B: BackendStrategy>(runner: MultiContractRunner<B>, filter: &ProjectPathsAwareFilter) -> Result<TestOutcome> {
     let results = runner.list(filter);
 
     if shell::is_json() {

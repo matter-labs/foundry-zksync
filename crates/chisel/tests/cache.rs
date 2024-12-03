@@ -1,6 +1,7 @@
 use chisel::session::ChiselSession;
 use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::Config;
+use foundry_evm::backend::strategy::EvmBackendStrategy;
 use serial_test::serial;
 use std::path::Path;
 
@@ -9,7 +10,7 @@ use std::path::Path;
 fn test_cache_directory() {
     // Get the cache dir
     // Should be ~/.foundry/cache/chisel
-    let cache_dir = ChiselSession::cache_dir().unwrap();
+    let cache_dir = ChiselSession::<EvmBackendStrategy>::cache_dir().unwrap();
 
     // Validate the cache directory
     let home_dir = dirs::home_dir().unwrap();
@@ -20,10 +21,10 @@ fn test_cache_directory() {
 #[serial]
 fn test_create_cache_directory() {
     // Get the cache dir
-    let cache_dir = ChiselSession::cache_dir().unwrap();
+    let cache_dir = ChiselSession::<EvmBackendStrategy>::cache_dir().unwrap();
 
     // Create the cache directory
-    ChiselSession::create_cache_dir().unwrap();
+    ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
 
     // Validate the cache directory
     assert!(Path::new(&cache_dir).exists());
@@ -33,14 +34,14 @@ fn test_create_cache_directory() {
 #[serial]
 fn test_write_session() {
     // Create the cache directory if it doesn't exist
-    let cache_dir = ChiselSession::cache_dir().unwrap();
-    ChiselSession::create_cache_dir().unwrap();
+    let cache_dir = ChiselSession::<EvmBackendStrategy>::cache_dir().unwrap();
+    ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
 
     // Force the solc version to be 0.8.19
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::new(chisel::session_source::SessionSourceConfig {
+    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         foundry_config,
         ..Default::default()
     })
@@ -61,14 +62,14 @@ fn test_write_session() {
 #[serial]
 fn test_write_session_with_name() {
     // Create the cache directory if it doesn't exist
-    let cache_dir = ChiselSession::cache_dir().unwrap();
-    ChiselSession::create_cache_dir().unwrap();
+    let cache_dir = ChiselSession::<EvmBackendStrategy>::cache_dir().unwrap();
+    ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
 
     // Force the solc version to be 0.8.19
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::new(chisel::session_source::SessionSourceConfig {
+    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         foundry_config,
         ..Default::default()
     })
@@ -86,13 +87,13 @@ fn test_write_session_with_name() {
 #[serial]
 fn test_clear_cache() {
     // Create a session to validate clearing a non-empty cache directory
-    let cache_dir = ChiselSession::cache_dir().unwrap();
+    let cache_dir = ChiselSession::<EvmBackendStrategy>::cache_dir().unwrap();
 
     // Force the solc version to be 0.8.19
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
-    ChiselSession::create_cache_dir().unwrap();
-    let mut env = ChiselSession::new(chisel::session_source::SessionSourceConfig {
+    ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
+    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         foundry_config,
         ..Default::default()
     })
@@ -100,7 +101,7 @@ fn test_clear_cache() {
     env.write().unwrap();
 
     // Clear the cache
-    ChiselSession::clear_cache().unwrap();
+    ChiselSession::<EvmBackendStrategy>::clear_cache().unwrap();
 
     // Validate there are no items in the cache dir
     let num_items = std::fs::read_dir(cache_dir).unwrap().count();
@@ -111,14 +112,14 @@ fn test_clear_cache() {
 #[serial]
 fn test_list_sessions() {
     // Create and clear the cache directory
-    ChiselSession::create_cache_dir().unwrap();
-    ChiselSession::clear_cache().unwrap();
+    ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
+    ChiselSession::<EvmBackendStrategy>::clear_cache().unwrap();
 
     // Force the solc version to be 0.8.19
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::new(chisel::session_source::SessionSourceConfig {
+    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         foundry_config,
         ..Default::default()
     })
@@ -127,7 +128,7 @@ fn test_list_sessions() {
     env.write().unwrap();
 
     // List the sessions
-    let sessions = ChiselSession::list_sessions().unwrap();
+    let sessions = ChiselSession::<EvmBackendStrategy>::list_sessions().unwrap();
 
     // Validate the sessions
     assert_eq!(sessions.len(), 1);
@@ -138,14 +139,14 @@ fn test_list_sessions() {
 #[serial]
 fn test_load_cache() {
     // Create and clear the cache directory
-    ChiselSession::create_cache_dir().unwrap();
-    ChiselSession::clear_cache().unwrap();
+    ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
+    ChiselSession::<EvmBackendStrategy>::clear_cache().unwrap();
 
     // Force the solc version to be 0.8.19
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::new(chisel::session_source::SessionSourceConfig {
+    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         foundry_config,
         ..Default::default()
     })
@@ -153,7 +154,7 @@ fn test_load_cache() {
     env.write().unwrap();
 
     // Load the session
-    let new_env = ChiselSession::load("0");
+    let new_env = ChiselSession::<EvmBackendStrategy>::load("0");
 
     // Validate the session
     assert!(new_env.is_ok());
@@ -166,14 +167,14 @@ fn test_load_cache() {
 #[serial]
 fn test_write_same_session_multiple_times() {
     // Create and clear the cache directory
-    ChiselSession::create_cache_dir().unwrap();
-    ChiselSession::clear_cache().unwrap();
+    ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
+    ChiselSession::<EvmBackendStrategy>::clear_cache().unwrap();
 
     // Force the solc version to be 0.8.19
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::new(chisel::session_source::SessionSourceConfig {
+    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         foundry_config,
         ..Default::default()
     })
@@ -182,21 +183,21 @@ fn test_write_same_session_multiple_times() {
     env.write().unwrap();
     env.write().unwrap();
     env.write().unwrap();
-    assert_eq!(ChiselSession::list_sessions().unwrap().len(), 1);
+    assert_eq!(ChiselSession::<EvmBackendStrategy>::list_sessions().unwrap().len(), 1);
 }
 
 #[test]
 #[serial]
 fn test_load_latest_cache() {
     // Create and clear the cache directory
-    ChiselSession::create_cache_dir().unwrap();
-    ChiselSession::clear_cache().unwrap();
+    ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
+    ChiselSession::<EvmBackendStrategy>::clear_cache().unwrap();
 
     // Force the solc version to be 0.8.19
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create sessions
-    let mut env = ChiselSession::new(chisel::session_source::SessionSourceConfig {
+    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         foundry_config: foundry_config.clone(),
         ..Default::default()
     })
@@ -206,7 +207,7 @@ fn test_load_latest_cache() {
     let wait_time = std::time::Duration::from_millis(100);
     std::thread::sleep(wait_time);
 
-    let mut env2 = ChiselSession::new(chisel::session_source::SessionSourceConfig {
+    let mut env2 = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
         foundry_config,
         ..Default::default()
     })
@@ -214,7 +215,7 @@ fn test_load_latest_cache() {
     env2.write().unwrap();
 
     // Load the latest session
-    let new_env = ChiselSession::latest().unwrap();
+    let new_env = ChiselSession::<EvmBackendStrategy>::latest().unwrap();
 
     // Validate the session
     assert_eq!(new_env.id.unwrap(), "1");
