@@ -5278,7 +5278,6 @@ dependencies = [
  "parking_lot 0.12.3",
  "rand 0.8.5",
  "regex",
- "rustls 0.23.18",
  "serde_json",
  "snapbox",
  "tokio",

@@ -31,7 +31,6 @@ tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rand.workspace = true
 snapbox = { version = "0.6", features = ["json", "regex"] }
-rustls = { version = "0.23.17", features = ["ring"] }
 tokio.workspace = true
 
 # zk

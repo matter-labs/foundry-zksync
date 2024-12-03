@@ -104,7 +104,7 @@ watchexec-events = "3.0"
 watchexec-signals = "3.0"
 clearscreen = "3.0"
 evm-disassembler.workspace = true
-rustls = { version = "0.23.17", features = ["ring"] }
+rustls = { version = "0.23", features = ["ring"] }
 
 # doc server
 axum = { workspace = true, features = ["ws"] }
