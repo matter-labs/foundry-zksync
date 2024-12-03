@@ -27,8 +27,8 @@ use zksync_multivm::{
 };
 use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    get_nonce_key, l2::L2Tx, PackedEthSignature, StorageKey, Transaction,
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS,
+    get_nonce_key, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
+    Transaction, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
@@ -39,8 +39,8 @@ use std::{
 };
 
 use crate::{
-    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
-    is_system_address,
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    fix_l2_gas_limit, fix_l2_gas_price, is_system_address,
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
         env::{create_l1_batch_env, create_system_env},
@@ -96,14 +96,14 @@ where
     let mut aggregated_result: Option<ZKVMExecutionResult> = None;
 
     for (idx, mut tx) in txns.into_iter().enumerate() {
-        let gas_used = aggregated_result
-            .as_ref()
-            .map(|r| r.execution_result.gas_used())
-            .map(U256::from)
-            .unwrap_or_default();
-
-        //deducted gas used so far
-        tx.common_data.fee.gas_limit -= gas_used;
+        // cap gas limit so that we do not set a number greater than
+        // remaining sender balance
+        let (new_gas_limit, _) = gas_params(
+            ecx,
+            tx.common_data.initiator_address.to_address(),
+            &tx.common_data.paymaster_params,
+        );
+        tx.common_data.fee.gas_limit = new_gas_limit;
 
         info!("executing batched tx ({}/{})", idx + 1, total_txns);
         let mut result = inspect(tx, ecx, ccx, call_ctx.clone())?;
@@ -392,6 +392,37 @@ where
     }
 
     Ok(execution_result)
+}
+
+/// Assign gas parameters that satisfy zkSync's fee model.
+pub fn gas_params<DB>(
+    ecx: &mut EvmContext<DB>,
+    caller: Address,
+    paymaster_params: &PaymasterParams,
+) -> (U256, U256)
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    let value = ecx.env.tx.value.to_u256();
+    let use_paymaster = !paymaster_params.paymaster.is_zero();
+
+    // Get balance of either paymaster or caller depending on who's paying
+    let address = if use_paymaster {
+        Address::from_slice(paymaster_params.paymaster.as_bytes())
+    } else {
+        caller
+    };
+    let balance = ZKVMData::new(ecx).get_balance(address);
+
+    if balance.is_zero() {
+        error!("balance is 0 for {}, transaction will fail", address.to_h160());
+    }
+
+    let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
+
+    let gas_limit = fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
+    (gas_limit, max_fee_per_gas)
 }
 
 #[allow(dead_code)]
@@ -732,15 +763,7 @@ where
 /// Maximum size allowed for factory_deps during create.
 /// We batch factory_deps till this upper limit if there are multiple deps.
 /// These batches are then deployed individually.
-///
-/// TODO: This feature is disabled by default via `usize::MAX` due to inconsistencies
-/// with determining a value that works in all cases.
-static MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: LazyLock<usize> = LazyLock::new(|| {
-    std::env::var("MAX_FACTORY_DEPENDENCIES_SIZE_BYTES")
-        .ok()
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(usize::MAX)
-});
+const MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: usize = 100_000;
 
 /// Batch factory deps on the basis of size.
 ///
@@ -751,7 +774,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     let factory_deps_count = factory_deps.len();
     let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
     let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();
-    tracing::debug!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, max=*MAX_FACTORY_DEPENDENCIES_SIZE_BYTES, "optimizing factory_deps");
+    tracing::debug!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, max=MAX_FACTORY_DEPENDENCIES_SIZE_BYTES, "optimizing factory_deps");
 
     let mut batches = vec![];
     let mut current_batch = vec![];
@@ -762,7 +785,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     for dep in factory_deps {
         let len = dep.len();
         let new_len = current_batch_len + len;
-        if new_len > *MAX_FACTORY_DEPENDENCIES_SIZE_BYTES && !current_batch.is_empty() {
+        if new_len > MAX_FACTORY_DEPENDENCIES_SIZE_BYTES && !current_batch.is_empty() {
             batches.push(current_batch);
             current_batch = vec![];
             current_batch_len = 0;
