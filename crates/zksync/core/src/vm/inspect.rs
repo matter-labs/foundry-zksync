@@ -756,21 +756,25 @@ where
         .unwrap_or_default()
 }
 
-/// Maximum size allowed for factory_deps during create.
+/// Default maximum size allowed for factory_deps during create.
 /// We batch factory_deps till this upper limit if there are multiple deps.
 /// These batches are then deployed individually.
-const MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: usize = 100_000;
+const DEFAULT_MAX_FACTORY_DEPENDENCIES_SIZE_BYTES: usize = 100_000;
 
 /// Batch factory deps on the basis of size.
 ///
 /// For large factory_deps the VM can run out of gas. To avoid this case we batch factory_deps
-/// on the basis of [MAX_FACTORY_DEPENDENCIES_SIZE_BYTES] and deploy all but the last batch
+/// on the basis of the max factory dependencies size and deploy all but the last batch
 /// via empty transactions, with the last one deployed normally via create.
 pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec<u8>>> {
+    let max_factory_deps_size_bytes = std::env::var("MAX_FACTORY_DEPENDENCIES_SIZE_BYTES")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_MAX_FACTORY_DEPENDENCIES_SIZE_BYTES);
     let factory_deps_count = factory_deps.len();
     let factory_deps_sizes = factory_deps.iter().map(|dep| dep.len()).collect_vec();
     let factory_deps_total_size = factory_deps_sizes.iter().sum::<usize>();
-    tracing::debug!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, max=MAX_FACTORY_DEPENDENCIES_SIZE_BYTES, "optimizing factory_deps");
+    tracing::debug!(count=factory_deps_count, total=factory_deps_total_size, sizes=?factory_deps_sizes, max=max_factory_deps_size_bytes, "optimizing factory_deps");
 
     let mut batches = vec![];
     let mut current_batch = vec![];
@@ -781,7 +785,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
     for dep in factory_deps {
         let len = dep.len();
         let new_len = current_batch_len + len;
-        if new_len > MAX_FACTORY_DEPENDENCIES_SIZE_BYTES && !current_batch.is_empty() {
+        if new_len > max_factory_deps_size_bytes && !current_batch.is_empty() {
             batches.push(current_batch);
             current_batch = vec![];
             current_batch_len = 0;
