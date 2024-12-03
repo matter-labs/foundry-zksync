@@ -6,23 +6,152 @@ pragma solidity >=0.6.2 <0.9.0;
 pragma experimental ABIEncoderV2;
 
 interface Vm {
-    enum CallerMode { None, Broadcast, RecurrentBroadcast, Prank, RecurrentPrank }
-    enum AccountAccessKind { Call, DelegateCall, CallCode, StaticCall, Create, SelfDestruct, Resume, Balance, Extcodesize, Extcodehash, Extcodecopy }
-    enum ForgeContext { TestGroup, Test, Coverage, Snapshot, ScriptGroup, ScriptDryRun, ScriptBroadcast, ScriptResume, Unknown }
-    enum BroadcastTxType { Call, Create, Create2 }
-    struct Log { bytes32[] topics; bytes data; address emitter; }
-    struct Rpc { string key; string url; }
-    struct EthGetLogs { address emitter; bytes32[] topics; bytes data; bytes32 blockHash; uint64 blockNumber; bytes32 transactionHash; uint64 transactionIndex; uint256 logIndex; bool removed; }
-    struct DirEntry { string errorMessage; string path; uint64 depth; bool isDir; bool isSymlink; }
-    struct FsMetadata { bool isDir; bool isSymlink; uint256 length; bool readOnly; uint256 modified; uint256 accessed; uint256 created; }
-    struct Wallet { address addr; uint256 publicKeyX; uint256 publicKeyY; uint256 privateKey; }
-    struct FfiResult { int32 exitCode; bytes stdout; bytes stderr; }
-    struct ChainInfo { uint256 forkId; uint256 chainId; }
-    struct AccountAccess { ChainInfo chainInfo; AccountAccessKind kind; address account; address accessor; bool initialized; uint256 oldBalance; uint256 newBalance; bytes deployedCode; uint256 value; bytes data; bool reverted; StorageAccess[] storageAccesses; uint64 depth; }
-    struct StorageAccess { address account; bytes32 slot; bool isWrite; bytes32 previousValue; bytes32 newValue; bool reverted; }
-    struct Gas { uint64 gasLimit; uint64 gasTotalUsed; uint64 gasMemoryUsed; int64 gasRefunded; uint64 gasRemaining; }
-    struct DebugStep { uint256[] stack; bytes memoryInput; uint8 opcode; uint64 depth; bool isOutOfGas; address contractAddr; }
-    struct BroadcastTxSummary { bytes32 txHash; BroadcastTxType txType; address contractAddress; uint64 blockNumber; bool success; }
+    enum CallerMode {
+        None,
+        Broadcast,
+        RecurrentBroadcast,
+        Prank,
+        RecurrentPrank
+    }
+    enum AccountAccessKind {
+        Call,
+        DelegateCall,
+        CallCode,
+        StaticCall,
+        Create,
+        SelfDestruct,
+        Resume,
+        Balance,
+        Extcodesize,
+        Extcodehash,
+        Extcodecopy
+    }
+    enum ForgeContext {
+        TestGroup,
+        Test,
+        Coverage,
+        Snapshot,
+        ScriptGroup,
+        ScriptDryRun,
+        ScriptBroadcast,
+        ScriptResume,
+        Unknown
+    }
+    enum BroadcastTxType {
+        Call,
+        Create,
+        Create2
+    }
+
+    struct Log {
+        bytes32[] topics;
+        bytes data;
+        address emitter;
+    }
+
+    struct Rpc {
+        string key;
+        string url;
+    }
+
+    struct EthGetLogs {
+        address emitter;
+        bytes32[] topics;
+        bytes data;
+        bytes32 blockHash;
+        uint64 blockNumber;
+        bytes32 transactionHash;
+        uint64 transactionIndex;
+        uint256 logIndex;
+        bool removed;
+    }
+
+    struct DirEntry {
+        string errorMessage;
+        string path;
+        uint64 depth;
+        bool isDir;
+        bool isSymlink;
+    }
+
+    struct FsMetadata {
+        bool isDir;
+        bool isSymlink;
+        uint256 length;
+        bool readOnly;
+        uint256 modified;
+        uint256 accessed;
+        uint256 created;
+    }
+
+    struct Wallet {
+        address addr;
+        uint256 publicKeyX;
+        uint256 publicKeyY;
+        uint256 privateKey;
+    }
+
+    struct FfiResult {
+        int32 exitCode;
+        bytes stdout;
+        bytes stderr;
+    }
+
+    struct ChainInfo {
+        uint256 forkId;
+        uint256 chainId;
+    }
+
+    struct AccountAccess {
+        ChainInfo chainInfo;
+        AccountAccessKind kind;
+        address account;
+        address accessor;
+        bool initialized;
+        uint256 oldBalance;
+        uint256 newBalance;
+        bytes deployedCode;
+        uint256 value;
+        bytes data;
+        bool reverted;
+        StorageAccess[] storageAccesses;
+        uint64 depth;
+    }
+
+    struct StorageAccess {
+        address account;
+        bytes32 slot;
+        bool isWrite;
+        bytes32 previousValue;
+        bytes32 newValue;
+        bool reverted;
+    }
+
+    struct Gas {
+        uint64 gasLimit;
+        uint64 gasTotalUsed;
+        uint64 gasMemoryUsed;
+        int64 gasRefunded;
+        uint64 gasRemaining;
+    }
+
+    struct DebugStep {
+        uint256[] stack;
+        bytes memoryInput;
+        uint8 opcode;
+        uint64 depth;
+        bool isOutOfGas;
+        address contractAddr;
+    }
+
+    struct BroadcastTxSummary {
+        bytes32 txHash;
+        BroadcastTxType txType;
+        address contractAddress;
+        uint64 blockNumber;
+        bool success;
+    }
+
     function _expectCheatcodeRevert() external;
     function _expectCheatcodeRevert(bytes4 revertData) external;
     function _expectCheatcodeRevert(bytes calldata revertData) external;
@@ -259,14 +388,20 @@ interface Vm {
     function getBlobhashes() external view returns (bytes32[] memory hashes);
     function getBlockNumber() external view returns (uint256 height);
     function getBlockTimestamp() external view returns (uint256 timestamp);
-    function getBroadcast(string memory contractName, uint64 chainId, BroadcastTxType txType) external returns (BroadcastTxSummary memory);
-    function getBroadcasts(string memory contractName, uint64 chainId, BroadcastTxType txType) external returns (BroadcastTxSummary[] memory);
+    function getBroadcast(string memory contractName, uint64 chainId, BroadcastTxType txType)
+        external
+        returns (BroadcastTxSummary memory);
+    function getBroadcasts(string memory contractName, uint64 chainId, BroadcastTxType txType)
+        external
+        returns (BroadcastTxSummary[] memory);
     function getBroadcasts(string memory contractName, uint64 chainId) external returns (BroadcastTxSummary[] memory);
     function getCode(string calldata artifactPath) external view returns (bytes memory creationBytecode);
     function getDeployedCode(string calldata artifactPath) external view returns (bytes memory runtimeBytecode);
     function getDeployment(string memory contractName) external returns (address deployedAddress);
     function getDeployment(string memory contractName, uint64 chainId) external returns (address deployedAddress);
-    function getDeployments(string memory contractName, uint64 chainId) external returns (address[] memory deployedAddresses);
+    function getDeployments(string memory contractName, uint64 chainId)
+        external
+        returns (address[] memory deployedAddresses);
     function getFoundryVersion() external view returns (string memory version);
     function getLabel(address account) external view returns (string memory currentLabel);
     function getMappingKeyAndParentOf(address target, bytes32 elementSlot) external returns (bool found, bytes32 key, bytes32 parent);
@@ -337,9 +472,18 @@ interface Vm {
     function parseTomlKeys(string calldata toml, string calldata key) external pure returns (string[] memory keys);
     function parseTomlString(string calldata toml, string calldata key) external pure returns (string memory);
     function parseTomlStringArray(string calldata toml, string calldata key) external pure returns (string[] memory);
-    function parseTomlTypeArray(string calldata toml, string calldata key, string calldata typeDescription) external pure returns (bytes memory);
-    function parseTomlType(string calldata toml, string calldata typeDescription) external pure returns (bytes memory);
-    function parseTomlType(string calldata toml, string calldata key, string calldata typeDescription) external pure returns (bytes memory);
+    function parseTomlTypeArray(string calldata toml, string calldata key, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
+    function parseTomlType(string calldata toml, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
+    function parseTomlType(string calldata toml, string calldata key, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
     function parseTomlUint(string calldata toml, string calldata key) external pure returns (uint256);
     function parseTomlUintArray(string calldata toml, string calldata key) external pure returns (uint256[] memory);
     function parseToml(string calldata toml) external pure returns (bytes memory abiEncodedData);
@@ -379,8 +523,15 @@ interface Vm {
     function record() external;
     function recordLogs() external;
     function rememberKey(uint256 privateKey) external returns (address keyAddr);
-    function rememberKeys(string calldata mnemonic, string calldata derivationPath, uint32 count) external returns (address[] memory keyAddrs);
-    function rememberKeys(string calldata mnemonic, string calldata derivationPath, string calldata language, uint32 count) external returns (address[] memory keyAddrs);
+    function rememberKeys(string calldata mnemonic, string calldata derivationPath, uint32 count)
+        external
+        returns (address[] memory keyAddrs);
+    function rememberKeys(
+        string calldata mnemonic,
+        string calldata derivationPath,
+        string calldata language,
+        uint32 count
+    ) external returns (address[] memory keyAddrs);
     function removeDir(string calldata path, bool recursive) external;
     function removeFile(string calldata path) external;
     function replace(string calldata input, string calldata from, string calldata to) external pure returns (string memory output);

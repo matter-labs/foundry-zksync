@@ -1,6 +1,7 @@
 //! Forge tests for zkysnc functionality.
 mod basic;
 mod cheats;
+mod constructor;
 mod contracts;
 mod create;
 mod create2;
