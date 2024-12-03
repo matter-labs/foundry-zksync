@@ -230,6 +230,7 @@ syn-solidity = "0.8.11"
 alloy-chains = "0.1"
 alloy-rlp = "0.3"
 alloy-trie = "0.6.0"
+alloy-zksync = "0.5"
 
 ## op-alloy 
 op-alloy-rpc-types = "0.6.5"
@@ -241,9 +242,7 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-era_test_node = { git="https://github.com/matter-labs/era-test-node.git" , rev = "94503847b402f0161c3372d5f357a4cb16a2d66d" }
-zksync-web3-rs = {git = "https://github.com/jrigada/zksync-web3-rs.git", rev = "bc3e6d3e75b7ff3747ff2dccefa9fb74d770931b"}
-# zksync-web3-rs = {git = "https://github.com/lambdaclass/zksync-web3-rs.git", rev = "56653345d14331e0865a6785c77cdda63c94eeba"}
+era_test_node = { git = "https://github.com/matter-labs/era-test-node.git", rev = "94503847b402f0161c3372d5f357a4cb16a2d66d" }
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
 zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }

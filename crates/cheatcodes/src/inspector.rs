@@ -77,12 +77,12 @@ use std::{
 };
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
+    transaction_request::PaymasterParams,
     utils::{decompose_full_nonce, nonces_to_full_nonce},
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION,
     H256, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS,
 };
-use zksync_web3_rs::eip712::PaymasterParams;
 
 mod utils;
 

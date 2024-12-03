@@ -34,7 +34,6 @@ forge-script-sequence.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compiler.workspace = true
 foundry-zksync-inspectors.workspace = true
-zksync-web3-rs.workspace = true
 
 zksync_types.workspace = true
 
