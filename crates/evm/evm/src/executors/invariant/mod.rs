@@ -9,6 +9,7 @@ use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use foundry_config::InvariantConfig;
 use foundry_evm_core::{
     abi::HARDHAT_CONSOLE_ADDRESS,
+    backend::strategy::BackendStrategy,
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, MAGIC_ASSUME},
     precompiles::PRECOMPILES,
 };
@@ -229,7 +230,7 @@ impl InvariantTest {
 
     /// End invariant test run by collecting results, cleaning collected artifacts and reverting
     /// created fuzz state.
-    pub fn end_run(&self, run: InvariantTestRun, gas_samples: usize) {
+    pub fn end_run<B>(&self, run: InvariantTestRun<B>, gas_samples: usize) {
         // We clear all the targeted contracts created during this run.
         self.targeted_contracts.clear_created_contracts(run.created_contracts);
 
@@ -247,11 +248,11 @@ impl InvariantTest {
 }
 
 /// Contains data for an invariant test run.
-pub struct InvariantTestRun {
+pub struct InvariantTestRun<B> {
     // Invariant run call sequence.
     pub inputs: Vec<BasicTxDetails>,
     // Current invariant run executor.
-    pub executor: Executor,
+    pub executor: Executor<B>,
     // Invariant run stat reports (eg. gas usage).
     pub fuzz_runs: Vec<FuzzCase>,
     // Contracts created during current invariant run.
@@ -264,9 +265,9 @@ pub struct InvariantTestRun {
     pub assume_rejects_counter: u32,
 }
 
-impl InvariantTestRun {
+impl<B> InvariantTestRun<B> {
     /// Instantiates an invariant test run.
-    pub fn new(first_input: BasicTxDetails, executor: Executor, depth: usize) -> Self {
+    pub fn new(first_input: BasicTxDetails, executor: Executor<B>, depth: usize) -> Self {
         Self {
             inputs: vec![first_input],
             executor,
@@ -285,8 +286,8 @@ impl InvariantTestRun {
 /// contracts with inputs, until it finds a counterexample sequence. The provided [`TestRunner`]
 /// contains all the configuration which can be overridden via [environment
 /// variables](proptest::test_runner::Config)
-pub struct InvariantExecutor<'a> {
-    pub executor: Executor,
+pub struct InvariantExecutor<'a, B> {
+    pub executor: Executor<B>,
     /// Proptest runner.
     runner: TestRunner,
     /// The invariant configuration
@@ -300,10 +301,13 @@ pub struct InvariantExecutor<'a> {
     artifact_filters: ArtifactFilters,
 }
 
-impl<'a> InvariantExecutor<'a> {
+impl<'a, B> InvariantExecutor<'a, B>
+where
+    B: BackendStrategy,
+{
     /// Instantiates a fuzzed executor EVM given a testrunner
     pub fn new(
-        executor: Executor,
+        executor: Executor<B>,
         runner: TestRunner,
         config: InvariantConfig,
         setup_contracts: &'a ContractsByAddress,
@@ -882,8 +886,8 @@ fn collect_data(
 /// Calls the `afterInvariant()` function on a contract.
 /// Returns call result and if call succeeded.
 /// The state after the call is not persisted.
-pub(crate) fn call_after_invariant_function(
-    executor: &Executor,
+pub(crate) fn call_after_invariant_function<B: BackendStrategy>(
+    executor: &Executor<B>,
     to: Address,
 ) -> std::result::Result<(RawCallResult, bool), EvmError> {
     let calldata = Bytes::from_static(&IInvariantTest::afterInvariantCall::SELECTOR);
@@ -893,8 +897,8 @@ pub(crate) fn call_after_invariant_function(
 }
 
 /// Calls the invariant function and returns call result and if succeeded.
-pub(crate) fn call_invariant_function(
-    executor: &Executor,
+pub(crate) fn call_invariant_function<B: BackendStrategy>(
+    executor: &Executor<B>,
     address: Address,
     calldata: Bytes,
 ) -> Result<(RawCallResult, bool)> {

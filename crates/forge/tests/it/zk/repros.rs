@@ -9,6 +9,7 @@ use crate::{
 };
 use alloy_primitives::Address;
 use foundry_config::{fs_permissions::PathPermission, FsPermissions};
+use foundry_strategy_zksync::ZkBackendStrategy;
 use foundry_test_utils::Filter;
 
 // zk-specific repros configuration
@@ -17,7 +18,7 @@ async fn repro_config(
     should_fail: bool,
     sender: Option<Address>,
     test_data: &ForgeTestData,
-) -> TestConfig {
+) -> TestConfig<ZkBackendStrategy> {
     foundry_test_utils::init_tracing();
     let filter = Filter::path(&format!(".*repros/Issue{issue}.t.sol"));
 

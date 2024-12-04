@@ -6,7 +6,7 @@ use crate::executors::{Executor, RawCallResult};
 use alloy_dyn_abi::JsonAbiExt;
 use eyre::Result;
 use foundry_config::InvariantConfig;
-use foundry_evm_core::utils::StateChangeset;
+use foundry_evm_core::{backend::strategy::BackendStrategy, utils::StateChangeset};
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_fuzz::{
     invariant::{BasicTxDetails, FuzzRunIdentifiedContracts, InvariantContract},
@@ -51,11 +51,11 @@ impl RichInvariantResults {
 /// Given the executor state, asserts that no invariant has been broken. Otherwise, it fills the
 /// external `invariant_failures.failed_invariant` map and returns a generic error.
 /// Either returns the call result if successful, or nothing if there was an error.
-pub(crate) fn assert_invariants(
+pub(crate) fn assert_invariants<B: BackendStrategy>(
     invariant_contract: &InvariantContract<'_>,
     invariant_config: &InvariantConfig,
     targeted_contracts: &FuzzRunIdentifiedContracts,
-    executor: &Executor,
+    executor: &Executor<B>,
     calldata: &[BasicTxDetails],
     invariant_failures: &mut InvariantFailures,
 ) -> Result<Option<RawCallResult>> {
@@ -93,10 +93,10 @@ pub(crate) fn assert_invariants(
 
 /// Returns if invariant test can continue and last successful call result of the invariant test
 /// function (if it can continue).
-pub(crate) fn can_continue(
+pub(crate) fn can_continue<B: BackendStrategy>(
     invariant_contract: &InvariantContract<'_>,
     invariant_test: &InvariantTest,
-    invariant_run: &mut InvariantTestRun,
+    invariant_run: &mut InvariantTestRun<B>,
     invariant_config: &InvariantConfig,
     call_result: RawCallResult,
     state_changeset: &StateChangeset,
@@ -160,10 +160,10 @@ pub(crate) fn can_continue(
 
 /// Given the executor state, asserts conditions within `afterInvariant` function.
 /// If call fails then the invariant test is considered failed.
-pub(crate) fn assert_after_invariant(
+pub(crate) fn assert_after_invariant<B: BackendStrategy>(
     invariant_contract: &InvariantContract<'_>,
     invariant_test: &InvariantTest,
-    invariant_run: &InvariantTestRun,
+    invariant_run: &InvariantTestRun<B>,
     invariant_config: &InvariantConfig,
 ) -> Result<bool> {
     let (call_result, success) =

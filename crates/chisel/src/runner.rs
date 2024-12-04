@@ -6,6 +6,7 @@
 use alloy_primitives::{map::AddressHashMap, Address, Bytes, Log, U256};
 use eyre::Result;
 use foundry_evm::{
+    backend::strategy::BackendStrategy,
     executors::{DeployResult, Executor, RawCallResult},
     traces::{TraceKind, Traces},
 };
@@ -19,9 +20,9 @@ static RUN_SELECTOR: [u8; 4] = [0xc0, 0x40, 0x62, 0x26];
 /// Based off of foundry's forge cli runner for scripting.
 /// See: [runner](cli::cmd::forge::script::runner.rs)
 #[derive(Debug)]
-pub struct ChiselRunner {
+pub struct ChiselRunner<B> {
     /// The Executor
-    pub executor: Executor,
+    pub executor: Executor<B>,
     /// An initial balance
     pub initial_balance: U256,
     /// The sender
@@ -52,7 +53,10 @@ pub struct ChiselResult {
 }
 
 /// ChiselRunner implementation
-impl ChiselRunner {
+impl<B> ChiselRunner<B>
+where
+    B: BackendStrategy,
+{
     /// Create a new [ChiselRunner]
     ///
     /// ### Takes
@@ -63,7 +67,7 @@ impl ChiselRunner {
     ///
     /// A new [ChiselRunner]
     pub fn new(
-        executor: Executor,
+        executor: Executor<B>,
         initial_balance: U256,
         sender: Address,
         input: Option<Vec<u8>>,

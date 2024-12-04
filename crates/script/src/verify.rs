@@ -18,14 +18,14 @@ use yansi::Paint;
 /// State after we have broadcasted the script.
 /// It is assumed that at this point [BroadcastedState::sequence] contains receipts for all
 /// broadcasted transactions.
-pub struct BroadcastedState {
+pub struct BroadcastedState<B> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<B>,
     pub build_data: LinkedBuildData,
     pub sequence: ScriptSequenceKind,
 }
 
-impl BroadcastedState {
+impl<B> BroadcastedState<B> {
     pub async fn verify(self) -> Result<()> {
         let Self { args, script_config, build_data, mut sequence, .. } = self;
 

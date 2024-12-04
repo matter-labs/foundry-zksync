@@ -6,6 +6,7 @@ use eyre::Result;
 use foundry_common::evm::Breakpoints;
 use foundry_config::FuzzConfig;
 use foundry_evm_core::{
+    backend::strategy::BackendStrategy,
     constants::MAGIC_ASSUME,
     decode::{RevertDecoder, SkipReason},
 };
@@ -50,9 +51,9 @@ pub struct FuzzTestData {
 /// After instantiation, calling `fuzz` will proceed to hammer the deployed smart contract with
 /// inputs, until it finds a counterexample. The provided [`TestRunner`] contains all the
 /// configuration which can be overridden via [environment variables](proptest::test_runner::Config)
-pub struct FuzzedExecutor {
+pub struct FuzzedExecutor<B> {
     /// The EVM executor
-    executor: Executor,
+    executor: Executor<B>,
     /// The fuzzer
     runner: TestRunner,
     /// The account that calls tests
@@ -61,10 +62,13 @@ pub struct FuzzedExecutor {
     config: FuzzConfig,
 }
 
-impl FuzzedExecutor {
+impl<B> FuzzedExecutor<B>
+where
+    B: BackendStrategy,
+{
     /// Instantiates a fuzzed executor given a testrunner
     pub fn new(
-        executor: Executor,
+        executor: Executor<B>,
         runner: TestRunner,
         sender: Address,
         config: FuzzConfig,

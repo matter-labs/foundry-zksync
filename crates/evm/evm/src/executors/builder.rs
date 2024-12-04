@@ -1,5 +1,5 @@
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
-use foundry_evm_core::backend::Backend;
+use foundry_evm_core::backend::{strategy::BackendStrategy, Backend};
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
 
 /// The builder that allows to configure an evm [`Executor`] which a stack of optional
@@ -83,7 +83,7 @@ impl ExecutorBuilder {
 
     /// Builds the executor as configured.
     #[inline]
-    pub fn build(self, env: Env, db: Backend) -> Executor {
+    pub fn build<B: BackendStrategy>(self, env: Env, db: Backend<B>) -> Executor<B> {
         let Self { mut stack, gas_limit, spec_id, legacy_assertions, use_zk } = self;
         if stack.block.is_none() {
             stack.block = Some(env.block.clone());

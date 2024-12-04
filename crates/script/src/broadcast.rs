@@ -200,15 +200,15 @@ impl SendTransactionsKind {
 /// State after we have bundled all
 /// [`TransactionWithMetadata`](forge_script_sequence::TransactionWithMetadata) objects into a
 /// single [`ScriptSequenceKind`] object containing one or more script sequences.
-pub struct BundledState {
+pub struct BundledState<B> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<B>,
     pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub sequence: ScriptSequenceKind,
 }
 
-impl BundledState {
+impl<B> BundledState<B> {
     pub async fn wait_for_pending(mut self) -> Result<Self> {
         let progress = ScriptProgress::default();
         let progress_ref = &progress;
@@ -243,7 +243,7 @@ impl BundledState {
     }
 
     /// Broadcasts transactions from all sequences.
-    pub async fn broadcast(mut self) -> Result<BroadcastedState> {
+    pub async fn broadcast(mut self) -> Result<BroadcastedState<B>> {
         let required_addresses = self
             .sequence
             .sequences()

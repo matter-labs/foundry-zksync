@@ -6,6 +6,7 @@ use eyre::Result;
 use foundry_cheatcodes::BroadcastableTransaction;
 use foundry_config::Config;
 use foundry_evm::{
+    backend::strategy::BackendStrategy,
     constants::{CALLER, DEFAULT_CREATE2_DEPLOYER},
     executors::{DeployResult, EvmError, ExecutionErr, Executor, RawCallResult},
     opts::EvmOpts,
@@ -18,13 +19,16 @@ use yansi::Paint;
 
 /// Drives script execution
 #[derive(Debug)]
-pub struct ScriptRunner {
-    pub executor: Executor,
+pub struct ScriptRunner<B> {
+    pub executor: Executor<B>,
     pub evm_opts: EvmOpts,
 }
 
-impl ScriptRunner {
-    pub fn new(executor: Executor, evm_opts: EvmOpts) -> Self {
+impl<B> ScriptRunner<B>
+where
+    B: BackendStrategy,
+{
+    pub fn new(executor: Executor<B>, evm_opts: EvmOpts) -> Self {
         Self { executor, evm_opts }
     }
 

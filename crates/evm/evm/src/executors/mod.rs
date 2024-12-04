@@ -17,7 +17,10 @@ use alloy_primitives::{
 };
 use alloy_sol_types::{sol, SolCall};
 use foundry_evm_core::{
-    backend::{Backend, BackendError, BackendResult, CowBackend, DatabaseExt, GLOBAL_FAIL_SLOT},
+    backend::{
+        strategy::BackendStrategy, Backend, BackendError, BackendResult, CowBackend, DatabaseExt,
+        GLOBAL_FAIL_SLOT,
+    },
     constants::{
         CALLER, CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
         DEFAULT_CREATE2_DEPLOYER_CODE, DEFAULT_CREATE2_DEPLOYER_DEPLOYER,
@@ -73,13 +76,13 @@ sol! {
 ///   deployment
 /// - `setup`: a special case of `transact`, used to set up the environment for a test
 #[derive(Clone, Debug)]
-pub struct Executor {
+pub struct Executor<B> {
     /// The underlying `revm::Database` that contains the EVM storage.
     // Note: We do not store an EVM here, since we are really
     // only interested in the database. REVM's `EVM` is a thin
     // wrapper around spawning a new EVM on every call anyway,
     // so the performance difference should be negligible.
-    pub backend: Backend,
+    pub backend: Backend<B>,
     /// The EVM environment.
     pub env: EnvWithHandlerCfg,
     /// The Revm inspector stack.
@@ -99,7 +102,10 @@ pub struct Executor {
     pub use_zk: bool,
 }
 
-impl Executor {
+impl<B> Executor<B>
+where
+    B: BackendStrategy,
+{
     /// Creates a new `ExecutorBuilder`.
     #[inline]
     pub fn builder() -> ExecutorBuilder {
@@ -109,7 +115,7 @@ impl Executor {
     /// Creates a new `Executor` with the given arguments.
     #[inline]
     pub fn new(
-        mut backend: Backend,
+        mut backend: Backend<B>,
         env: EnvWithHandlerCfg,
         inspector: InspectorStack,
         gas_limit: u64,
@@ -140,18 +146,18 @@ impl Executor {
         }
     }
 
-    fn clone_with_backend(&self, backend: Backend) -> Self {
+    fn clone_with_backend(&self, backend: Backend<B>) -> Self {
         let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(self.env().clone()), self.spec_id());
         Self::new(backend, env, self.inspector().clone(), self.gas_limit, self.legacy_assertions)
     }
 
     /// Returns a reference to the EVM backend.
-    pub fn backend(&self) -> &Backend {
+    pub fn backend(&self) -> &Backend<B> {
         &self.backend
     }
 
     /// Returns a mutable reference to the EVM backend.
-    pub fn backend_mut(&mut self) -> &mut Backend {
+    pub fn backend_mut(&mut self) -> &mut Backend<B> {
         &mut self.backend
     }
 
@@ -452,23 +458,10 @@ impl Executor {
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
-        let result_and_state = match self.zk_tx.take() {
-            None => backend.inspect(&mut env, &mut inspector)?,
-            Some(zk_tx) => {
-                // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
-                env.block = self.env.block.clone();
-                env.tx.gas_price = self.env.tx.gas_price;
-                backend.inspect_ref_zk(
-                    &mut env,
-                    // this will persist the added factory deps,
-                    // no need to commit them later
-                    &mut self.zk_persisted_factory_deps,
-                    Some(zk_tx.factory_deps),
-                    zk_tx.paymaster_data,
-                )?
-            }
-        };
+        let strategy = backend.strategy.clone(); // to take a mutable borrow
+        let extra = self.zk_tx.take().map(|zk_tx| serde_json::to_vec(&zk_tx).unwrap());
+        let result_and_state =
+            strategy.lock().unwrap().inspect(backend, &mut env, &mut inspector, extra)?;
         let mut result = convert_executed_result(
             env,
             inspector,

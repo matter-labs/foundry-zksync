@@ -19,7 +19,11 @@ use foundry_cli::{
 use foundry_common::shell;
 use foundry_compilers::{artifacts::EvmVersion, info::ContractInfo};
 use foundry_config::{figment, impl_figment_convert, Config};
-use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, utils::configure_tx_env};
+use foundry_evm::{
+    backend::strategy::{BackendStrategy, EvmBackendStrategy},
+    constants::DEFAULT_CREATE2_DEPLOYER,
+    utils::configure_tx_env,
+};
 use revm_primitives::AccountInfo;
 use std::path::PathBuf;
 use yansi::Paint;
@@ -233,6 +237,7 @@ impl VerifyBytecodeArgs {
                 gen_blk_num,
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
+                <EvmBackendStrategy as BackendStrategy>::new(),
             )
             .await?;
 
@@ -420,6 +425,7 @@ impl VerifyBytecodeArgs {
                 simulation_block - 1, // env.fork_block_number
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
+                <EvmBackendStrategy as BackendStrategy>::new(),
             )
             .await?;
             env.block.number = U256::from(simulation_block);

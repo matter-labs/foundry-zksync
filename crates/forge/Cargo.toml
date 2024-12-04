@@ -38,6 +38,8 @@ foundry-linking.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compiler.workspace = true
 forge-script-sequence.workspace = true
+foundry-strategy-core.workspace = true
+foundry-strategy-zksync.workspace = true
 
 ethers-contract-abigen = { workspace = true, features = ["providers"] }
 

@@ -3,6 +3,7 @@ use alloy_primitives::{map::HashMap, Address, Bytes, U256};
 use clap::{Parser, ValueEnum, ValueHint};
 use eyre::{Context, Result};
 use forge::{
+    backend::strategy::{BackendStrategy, EvmBackendStrategy},
     coverage::{
         analysis::{SourceAnalysis, SourceAnalyzer, SourceFile, SourceFiles},
         anchors::find_anchors,
@@ -240,7 +241,15 @@ impl CoverageArgs {
                 ..Default::default()
             })
             .set_coverage(true)
-            .build(&root, output.clone(), None, env, evm_opts, DualCompiledContracts::default())?;
+            .build(
+                &root,
+                output.clone(),
+                None,
+                env,
+                evm_opts,
+                DualCompiledContracts::default(),
+                EvmBackendStrategy::new(),
+            )?;
 
         let known_contracts = runner.known_contracts.clone();
 

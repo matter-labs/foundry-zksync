@@ -5,7 +5,7 @@ use crate::executors::{
     Executor,
 };
 use alloy_primitives::{Address, Bytes, U256};
-use foundry_evm_core::constants::MAGIC_ASSUME;
+use foundry_evm_core::{backend::strategy::BackendStrategy, constants::MAGIC_ASSUME};
 use foundry_evm_fuzz::invariant::BasicTxDetails;
 use indicatif::ProgressBar;
 use proptest::bits::{BitSetLike, VarBitSet};
@@ -85,10 +85,10 @@ impl CallSequenceShrinker {
 ///
 /// The shrunk call sequence always respect the order failure is reproduced as it is tested
 /// top-down.
-pub(crate) fn shrink_sequence(
+pub(crate) fn shrink_sequence<B: BackendStrategy>(
     failed_case: &FailedInvariantCaseData,
     calls: &[BasicTxDetails],
-    executor: &Executor,
+    executor: &Executor<B>,
     call_after_invariant: bool,
     progress: Option<&ProgressBar>,
 ) -> eyre::Result<Vec<BasicTxDetails>> {
@@ -143,8 +143,8 @@ pub(crate) fn shrink_sequence(
 /// persisted failures.
 /// Returns the result of invariant check (and afterInvariant call if needed) and if sequence was
 /// entirely applied.
-pub fn check_sequence(
-    mut executor: Executor,
+pub fn check_sequence<B: BackendStrategy>(
+    mut executor: Executor<B>,
     calls: &[BasicTxDetails],
     sequence: Vec<usize>,
     test_address: Address,
