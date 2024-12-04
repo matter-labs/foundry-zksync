@@ -1108,7 +1108,11 @@ where
                 .into();
 
         tx = tx
-            .with_create_params(zk_data.bytecode.clone(), constructor_args, zk_data.factory_deps.clone())
+            .with_create_params(
+                zk_data.bytecode.clone(),
+                constructor_args,
+                zk_data.factory_deps.clone(),
+            )
             .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
 
         Ok(ZkDeployer {
