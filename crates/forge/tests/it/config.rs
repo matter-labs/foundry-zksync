@@ -1,7 +1,9 @@
 //! Test config.
 
 use forge::{
-    backend::strategy::BackendStrategy, result::{SuiteResult, TestStatus}, MultiContractRunner
+    backend::strategy::BackendStrategy,
+    result::{SuiteResult, TestStatus},
+    MultiContractRunner,
 };
 use foundry_evm::{
     decode::decode_console_logs,
@@ -20,7 +22,10 @@ pub struct TestConfig<B> {
     pub filter: Filter,
 }
 
-impl<B> TestConfig<B> where B: BackendStrategy {
+impl<B> TestConfig<B>
+where
+    B: BackendStrategy,
+{
     pub fn new(runner: MultiContractRunner<B>) -> Self {
         Self::with_filter(runner, Filter::matches_all())
     }

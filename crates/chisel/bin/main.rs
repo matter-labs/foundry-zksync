@@ -133,15 +133,16 @@ async fn main_args(args: Chisel) -> eyre::Result<()> {
     let (config, evm_opts) = args.load_config_and_evm_opts()?;
 
     // Create a new cli dispatcher
-    let mut dispatcher = ChiselDispatcher::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        // Enable traces if any level of verbosity was passed
-        traces: config.verbosity > 0,
-        foundry_config: config,
-        no_vm: args.no_vm,
-        evm_opts,
-        backend: None,
-        calldata: None,
-    })?;
+    let mut dispatcher =
+        ChiselDispatcher::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            // Enable traces if any level of verbosity was passed
+            traces: config.verbosity > 0,
+            foundry_config: config,
+            no_vm: args.no_vm,
+            evm_opts,
+            backend: None,
+            calldata: None,
+        })?;
 
     // Execute prelude Solidity source files
     evaluate_prelude(&mut dispatcher, args.prelude).await?;
@@ -266,7 +267,10 @@ impl Provider for Chisel {
 }
 
 /// Evaluate a single Solidity line.
-async fn dispatch_repl_line<B: BackendStrategy>(dispatcher: &mut ChiselDispatcher<B>, line: &str) -> eyre::Result<bool> {
+async fn dispatch_repl_line<B: BackendStrategy>(
+    dispatcher: &mut ChiselDispatcher<B>,
+    line: &str,
+) -> eyre::Result<bool> {
     let r = dispatcher.dispatch(line).await;
     match &r {
         DispatchResult::Success(msg) | DispatchResult::CommandSuccess(msg) => {
@@ -315,7 +319,10 @@ async fn evaluate_prelude<B: BackendStrategy>(
 }
 
 /// Loads a single Solidity file into the prelude.
-async fn load_prelude_file<B: BackendStrategy>(dispatcher: &mut ChiselDispatcher<B>, file: PathBuf) -> eyre::Result<()> {
+async fn load_prelude_file<B: BackendStrategy>(
+    dispatcher: &mut ChiselDispatcher<B>,
+    file: PathBuf,
+) -> eyre::Result<()> {
     let prelude = fs::read_to_string(file)
         .wrap_err("Could not load source file. Are you sure this path is correct?")?;
     dispatch_repl_line(dispatcher, &prelude).await?;

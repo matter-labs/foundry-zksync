@@ -3,12 +3,16 @@ use alloy_primitives::{map::HashMap, Address, Bytes, U256};
 use clap::{Parser, ValueEnum, ValueHint};
 use eyre::{Context, Result};
 use forge::{
-    backend::strategy::{BackendStrategy, EvmBackendStrategy}, coverage::{
+    backend::strategy::{BackendStrategy, EvmBackendStrategy},
+    coverage::{
         analysis::{SourceAnalysis, SourceAnalyzer, SourceFile, SourceFiles},
         anchors::find_anchors,
         BytecodeReporter, ContractId, CoverageReport, CoverageReporter, DebugReporter, ItemAnchor,
         LcovReporter, SummaryReporter,
-    }, opts::EvmOpts, utils::IcPcMap, MultiContractRunnerBuilder, TestOptions
+    },
+    opts::EvmOpts,
+    utils::IcPcMap,
+    MultiContractRunnerBuilder, TestOptions,
 };
 use foundry_cli::utils::{LoadConfig, STATIC_FUZZ_SEED};
 use foundry_common::{compile::ProjectCompiler, fs};
@@ -237,7 +241,15 @@ impl CoverageArgs {
                 ..Default::default()
             })
             .set_coverage(true)
-            .build(&root, output.clone(), None, env, evm_opts, DualCompiledContracts::default(), EvmBackendStrategy::new())?;
+            .build(
+                &root,
+                output.clone(),
+                None,
+                env,
+                evm_opts,
+                DualCompiledContracts::default(),
+                EvmBackendStrategy::new(),
+            )?;
 
         let known_contracts = runner.known_contracts.clone();
 

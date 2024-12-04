@@ -42,7 +42,10 @@ use foundry_config::{
     Config,
 };
 use foundry_evm::{
-    backend::{strategy::{BackendStrategy, EvmBackendStrategy}, Backend},
+    backend::{
+        strategy::{BackendStrategy, EvmBackendStrategy},
+        Backend,
+    },
     constants::DEFAULT_CREATE2_DEPLOYER,
     executors::ExecutorBuilder,
     inspectors::{
@@ -55,7 +58,10 @@ use foundry_evm::{
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
 use serde::Serialize;
-use std::{path::PathBuf, sync::{Arc, Mutex}};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 mod broadcast;
 mod build;
@@ -536,7 +542,10 @@ pub struct ScriptConfig<B> {
     pub backends: HashMap<String, Backend<B>>,
 }
 
-impl<B> ScriptConfig<B> where B: BackendStrategy {
+impl<B> ScriptConfig<B>
+where
+    B: BackendStrategy,
+{
     pub async fn new(config: Config, evm_opts: EvmOpts) -> Result<Self> {
         let sender_nonce = if let Some(fork_url) = evm_opts.fork_url.as_ref() {
             next_nonce(evm_opts.sender, fork_url).await?
@@ -558,7 +567,7 @@ impl<B> ScriptConfig<B> where B: BackendStrategy {
         Ok(())
     }
 
-    async fn get_runner(&mut self, strategy: Arc<Mutex<B>>,) -> Result<ScriptRunner<B>> {
+    async fn get_runner(&mut self, strategy: Arc<Mutex<B>>) -> Result<ScriptRunner<B>> {
         self._get_runner(None, false, strategy).await
     }
 

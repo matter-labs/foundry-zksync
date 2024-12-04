@@ -17,17 +17,22 @@ use foundry_common::{
 };
 use foundry_config::{FuzzConfig, InvariantConfig};
 use foundry_evm::{
-    backend::strategy::BackendStrategy, constants::CALLER, decode::RevertDecoder, executors::{
+    backend::strategy::BackendStrategy,
+    constants::CALLER,
+    decode::RevertDecoder,
+    executors::{
         fuzz::FuzzedExecutor,
         invariant::{
             check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
         },
         CallResult, EvmError, ExecutionErr, Executor, ITest, RawCallResult,
-    }, fuzz::{
+    },
+    fuzz::{
         fixture_name,
         invariant::{CallDetails, InvariantContract},
         CounterExample, FuzzFixtures,
-    }, traces::{load_contracts, TraceKind, TraceMode}
+    },
+    traces::{load_contracts, TraceKind, TraceMode},
 };
 use proptest::test_runner::TestRunner;
 use rayon::prelude::*;
@@ -67,7 +72,10 @@ pub struct ContractRunner<'a, B> {
     pub span: tracing::Span,
 }
 
-impl<B> ContractRunner<'_, B> where B: BackendStrategy {
+impl<B> ContractRunner<'_, B>
+where
+    B: BackendStrategy,
+{
     /// Deploys the test contract inside the runner from the sending account, and optionally runs
     /// the `setUp` function on the test contract.
     pub fn setup(&mut self, call_setup: bool) -> TestSetup {

@@ -1,7 +1,10 @@
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockTransactions;
-use cast::{backend::strategy::{BackendStrategy, EvmBackendStrategy}, revm::primitives::EnvWithHandlerCfg};
+use cast::{
+    backend::strategy::{BackendStrategy, EvmBackendStrategy},
+    revm::primitives::EnvWithHandlerCfg,
+};
 use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_cli::{

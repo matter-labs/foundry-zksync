@@ -15,11 +15,13 @@ use alloy_primitives::{hex, Address};
 use forge_fmt::FormatterConfig;
 use foundry_config::{Config, RpcEndpoint};
 use foundry_evm::{
-    backend::strategy::BackendStrategy, decode::decode_console_logs, traces::{
+    backend::strategy::BackendStrategy,
+    decode::decode_console_logs,
+    traces::{
         decode_trace_arena,
         identifier::{SignaturesIdentifier, TraceIdentifiers},
         render_trace_arena, CallTraceDecoder, CallTraceDecoderBuilder, TraceKind,
-    }
+    },
 };
 use regex::Regex;
 use reqwest::Url;
@@ -133,7 +135,10 @@ pub fn format_source(source: &str, config: FormatterConfig) -> eyre::Result<Stri
     }
 }
 
-impl<B> ChiselDispatcher<B> where B: BackendStrategy {
+impl<B> ChiselDispatcher<B>
+where
+    B: BackendStrategy,
+{
     /// Associated public function to create a new Dispatcher instance
     pub fn new(config: SessionSourceConfig<B>) -> eyre::Result<Self> {
         ChiselSession::new(config).map(|session| Self { session })

@@ -18,14 +18,15 @@ pub struct BackendStrategyForkInfo<'a> {
     pub target_type: ForkType,
 }
 
-pub trait BackendStrategy: std::fmt::Debug + Send + Sync + Default + Clone + Serialize + for<'a> Deserialize<'a> + 'static
+pub trait BackendStrategy:
+    std::fmt::Debug + Send + Sync + Default + Clone + Serialize + for<'a> Deserialize<'a> + 'static
 where
     Self: Sized,
 {
     fn new() -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(Self::default()))
     }
-    
+
     fn name(&self) -> &'static str;
 
     /// When creating or switching forks, we update the AccountInfo of the contract

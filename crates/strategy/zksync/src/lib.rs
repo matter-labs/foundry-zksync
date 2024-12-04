@@ -16,7 +16,9 @@ use foundry_evm_core::{
 };
 use foundry_strategy_core::RunnerStrategy;
 use foundry_zksync_core::{
-    convert::ConvertH160, PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS
+    convert::ConvertH160, PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS, H256,
+    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
+    NONCE_HOLDER_ADDRESS,
 };
 use revm::{
     db::CacheDB,
@@ -96,7 +98,7 @@ impl ZkBackendStrategy {
     ) {
         let _require_zk_storage_merge =
             fork_info.active_type.is_zk() && fork_info.target_type.is_zk();
-        
+
         // Ignore EVM interoperatability and import everything
         // if !require_zk_storage_merge {
         //     return;
@@ -302,9 +304,7 @@ pub struct ZkRunnerStrategy {
 }
 impl Default for ZkRunnerStrategy {
     fn default() -> Self {
-        Self {
-            backend: Arc::new(Mutex::new(ZkBackendStrategy::default())),
-        }
+        Self { backend: Arc::new(Mutex::new(ZkBackendStrategy::default())) }
     }
 }
 impl RunnerStrategy for ZkRunnerStrategy {

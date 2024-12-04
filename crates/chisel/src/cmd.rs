@@ -4,8 +4,8 @@
 //! can be executed within the REPL.
 
 use crate::prelude::ChiselDispatcher;
-use std::{error::Error, str::FromStr};
 use foundry_evm::backend::strategy::EvmBackendStrategy;
+use std::{error::Error, str::FromStr};
 use strum::EnumIter;
 
 /// Builtin chisel command variants

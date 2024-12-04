@@ -14,7 +14,10 @@ use foundry_block_explorers::{
 use foundry_common::{abi::encode_args, compile::ProjectCompiler, provider::RetryProvider, shell};
 use foundry_compilers::artifacts::{BytecodeHash, CompactContractBytecode, EvmVersion};
 use foundry_config::Config;
-use foundry_evm::{backend::strategy::BackendStrategy, constants::DEFAULT_CREATE2_DEPLOYER, executors::TracingExecutor, opts::EvmOpts};
+use foundry_evm::{
+    backend::strategy::BackendStrategy, constants::DEFAULT_CREATE2_DEPLOYER,
+    executors::TracingExecutor, opts::EvmOpts,
+};
 use reqwest::Url;
 use revm_primitives::{
     db::Database,

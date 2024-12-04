@@ -8,7 +8,10 @@ use eyre::{eyre, ContextCompat, Result};
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use foundry_config::InvariantConfig;
 use foundry_evm_core::{
-    abi::HARDHAT_CONSOLE_ADDRESS, backend::strategy::BackendStrategy, constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, MAGIC_ASSUME}, precompiles::PRECOMPILES
+    abi::HARDHAT_CONSOLE_ADDRESS,
+    backend::strategy::BackendStrategy,
+    constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, MAGIC_ASSUME},
+    precompiles::PRECOMPILES,
 };
 use foundry_evm_fuzz::{
     invariant::{
@@ -298,7 +301,10 @@ pub struct InvariantExecutor<'a, B> {
     artifact_filters: ArtifactFilters,
 }
 
-impl<'a, B> InvariantExecutor<'a, B> where B: BackendStrategy {
+impl<'a, B> InvariantExecutor<'a, B>
+where
+    B: BackendStrategy,
+{
     /// Instantiates a fuzzed executor EVM given a testrunner
     pub fn new(
         executor: Executor<B>,

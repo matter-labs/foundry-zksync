@@ -943,7 +943,10 @@ impl Provider for TestArgs {
 }
 
 /// Lists all matching tests
-fn list<B: BackendStrategy>(runner: MultiContractRunner<B>, filter: &ProjectPathsAwareFilter) -> Result<TestOutcome> {
+fn list<B: BackendStrategy>(
+    runner: MultiContractRunner<B>,
+    filter: &ProjectPathsAwareFilter,
+) -> Result<TestOutcome> {
     let results = runner.list(filter);
 
     if shell::is_json() {

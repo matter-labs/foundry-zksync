@@ -3,7 +3,9 @@
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
-    backend::strategy::{BackendStrategy, EvmBackendStrategy}, revm::primitives::SpecId, MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder
+    backend::strategy::{BackendStrategy, EvmBackendStrategy},
+    revm::primitives::SpecId,
+    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
 };
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
@@ -299,7 +301,10 @@ impl ForgeTestData {
     }
 
     /// Builds a non-tracing runner
-    pub fn runner_with_config(&self, mut config: Config) -> MultiContractRunner<EvmBackendStrategy> {
+    pub fn runner_with_config(
+        &self,
+        mut config: Config,
+    ) -> MultiContractRunner<EvmBackendStrategy> {
         config.rpc_endpoints = rpc_endpoints();
         config.allow_paths.push(manifest_root().to_path_buf());
 
@@ -385,7 +390,7 @@ impl ForgeTestData {
                 opts.local_evm_env(),
                 opts,
                 Default::default(),
-                EvmBackendStrategy::new()
+                EvmBackendStrategy::new(),
             )
             .unwrap()
     }
@@ -402,7 +407,15 @@ impl ForgeTestData {
 
         self.base_runner()
             .with_fork(fork)
-            .build(self.project.root(), self.output.clone(), None, env, opts, Default::default(), EvmBackendStrategy::new())
+            .build(
+                self.project.root(),
+                self.output.clone(),
+                None,
+                env,
+                opts,
+                Default::default(),
+                EvmBackendStrategy::new(),
+            )
             .unwrap()
     }
 }

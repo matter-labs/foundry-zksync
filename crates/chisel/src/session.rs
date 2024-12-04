@@ -20,7 +20,10 @@ pub struct ChiselSession<B: Default> {
 }
 
 // ChiselSession Common Associated Functions
-impl<B> ChiselSession<B> where B: BackendStrategy {
+impl<B> ChiselSession<B>
+where
+    B: BackendStrategy,
+{
     /// Create a new `ChiselSession` with a specified `solc` version and configuration.
     ///
     /// ### Takes

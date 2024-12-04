@@ -6,7 +6,12 @@ use eyre::Result;
 use foundry_cheatcodes::BroadcastableTransaction;
 use foundry_config::Config;
 use foundry_evm::{
-    backend::strategy::BackendStrategy, constants::{CALLER, DEFAULT_CREATE2_DEPLOYER}, executors::{DeployResult, EvmError, ExecutionErr, Executor, RawCallResult}, opts::EvmOpts, revm::interpreter::{return_ok, InstructionResult}, traces::{TraceKind, Traces}
+    backend::strategy::BackendStrategy,
+    constants::{CALLER, DEFAULT_CREATE2_DEPLOYER},
+    executors::{DeployResult, EvmError, ExecutionErr, Executor, RawCallResult},
+    opts::EvmOpts,
+    revm::interpreter::{return_ok, InstructionResult},
+    traces::{TraceKind, Traces},
 };
 use foundry_zksync_core::ZkTransactionMetadata;
 use std::collections::VecDeque;
@@ -19,7 +24,10 @@ pub struct ScriptRunner<B> {
     pub evm_opts: EvmOpts,
 }
 
-impl<B> ScriptRunner<B> where B: BackendStrategy {
+impl<B> ScriptRunner<B>
+where
+    B: BackendStrategy,
+{
     pub fn new(executor: Executor<B>, evm_opts: EvmOpts) -> Self {
         Self { executor, evm_opts }
     }

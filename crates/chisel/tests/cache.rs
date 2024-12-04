@@ -41,11 +41,12 @@ fn test_write_session() {
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        foundry_config,
-        ..Default::default()
-    })
-    .unwrap_or_else(|e| panic!("Failed to create ChiselSession!, {e}"));
+    let mut env =
+        ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            foundry_config,
+            ..Default::default()
+        })
+        .unwrap_or_else(|e| panic!("Failed to create ChiselSession!, {e}"));
 
     // Write the session
     let cached_session_name = env.write().unwrap();
@@ -69,11 +70,12 @@ fn test_write_session_with_name() {
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        foundry_config,
-        ..Default::default()
-    })
-    .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
+    let mut env =
+        ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            foundry_config,
+            ..Default::default()
+        })
+        .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
     env.id = Some(String::from("test"));
 
     // Write the session
@@ -93,11 +95,12 @@ fn test_clear_cache() {
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     ChiselSession::<EvmBackendStrategy>::create_cache_dir().unwrap();
-    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        foundry_config,
-        ..Default::default()
-    })
-    .unwrap_or_else(|_| panic!("Failed to create ChiselSession!"));
+    let mut env =
+        ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            foundry_config,
+            ..Default::default()
+        })
+        .unwrap_or_else(|_| panic!("Failed to create ChiselSession!"));
     env.write().unwrap();
 
     // Clear the cache
@@ -119,11 +122,12 @@ fn test_list_sessions() {
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        foundry_config,
-        ..Default::default()
-    })
-    .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
+    let mut env =
+        ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            foundry_config,
+            ..Default::default()
+        })
+        .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
 
     env.write().unwrap();
 
@@ -146,11 +150,12 @@ fn test_load_cache() {
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        foundry_config,
-        ..Default::default()
-    })
-    .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
+    let mut env =
+        ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            foundry_config,
+            ..Default::default()
+        })
+        .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
     env.write().unwrap();
 
     // Load the session
@@ -174,11 +179,12 @@ fn test_write_same_session_multiple_times() {
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create a new session
-    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        foundry_config,
-        ..Default::default()
-    })
-    .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
+    let mut env =
+        ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            foundry_config,
+            ..Default::default()
+        })
+        .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
     env.write().unwrap();
     env.write().unwrap();
     env.write().unwrap();
@@ -197,21 +203,23 @@ fn test_load_latest_cache() {
     let foundry_config = Config { evm_version: EvmVersion::London, ..Default::default() };
 
     // Create sessions
-    let mut env = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        foundry_config: foundry_config.clone(),
-        ..Default::default()
-    })
-    .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
+    let mut env =
+        ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            foundry_config: foundry_config.clone(),
+            ..Default::default()
+        })
+        .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
     env.write().unwrap();
 
     let wait_time = std::time::Duration::from_millis(100);
     std::thread::sleep(wait_time);
 
-    let mut env2 = ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
-        foundry_config,
-        ..Default::default()
-    })
-    .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
+    let mut env2 =
+        ChiselSession::<EvmBackendStrategy>::new(chisel::session_source::SessionSourceConfig {
+            foundry_config,
+            ..Default::default()
+        })
+        .unwrap_or_else(|e| panic!("Failed to create ChiselSession! {e}"));
     env2.write().unwrap();
 
     // Load the latest session

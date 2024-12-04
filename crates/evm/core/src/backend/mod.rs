@@ -2313,7 +2313,14 @@ fn apply_state_changeset(
 #[cfg(test)]
 #[allow(clippy::needless_return)]
 mod tests {
-    use crate::{backend::Backend, fork::CreateFork, opts::EvmOpts};
+    use crate::{
+        backend::{
+            strategy::{BackendStrategy, EvmBackendStrategy},
+            Backend,
+        },
+        fork::CreateFork,
+        opts::EvmOpts,
+    };
     use alloy_primitives::{Address, U256};
     use alloy_provider::Provider;
     use foundry_common::provider::get_http_provider;

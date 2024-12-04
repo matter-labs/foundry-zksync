@@ -91,7 +91,10 @@ pub struct MultiContractRunner<B> {
     pub strategy: Arc<Mutex<B>>,
 }
 
-impl<B> MultiContractRunner<B> where B: BackendStrategy {
+impl<B> MultiContractRunner<B>
+where
+    B: BackendStrategy,
+{
     /// Returns an iterator over all contracts that match the filter.
     pub fn matching_contracts<'a: 'b, 'b>(
         &'a self,
@@ -405,6 +408,7 @@ impl MultiContractRunnerBuilder {
 
     /// Given an EVM, proceeds to return a runner which is able to execute all tests
     /// against that evm
+    #[allow(clippy::too_many_arguments)]
     pub fn build<C: Compiler, B: BackendStrategy>(
         self,
         root: &Path,

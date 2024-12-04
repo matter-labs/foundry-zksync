@@ -6,7 +6,9 @@ use eyre::Result;
 use foundry_common::evm::Breakpoints;
 use foundry_config::FuzzConfig;
 use foundry_evm_core::{
-    backend::strategy::BackendStrategy, constants::MAGIC_ASSUME, decode::{RevertDecoder, SkipReason}
+    backend::strategy::BackendStrategy,
+    constants::MAGIC_ASSUME,
+    decode::{RevertDecoder, SkipReason},
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_fuzz::{
@@ -60,7 +62,10 @@ pub struct FuzzedExecutor<B> {
     config: FuzzConfig,
 }
 
-impl<B> FuzzedExecutor<B> where B: BackendStrategy {
+impl<B> FuzzedExecutor<B>
+where
+    B: BackendStrategy,
+{
     /// Instantiates a fuzzed executor given a testrunner
     pub fn new(
         executor: Executor<B>,

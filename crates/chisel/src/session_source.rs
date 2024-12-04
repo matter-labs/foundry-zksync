@@ -12,7 +12,10 @@ use foundry_compilers::{
     compilers::solc::Solc,
 };
 use foundry_config::{Config, SolcReq};
-use foundry_evm::{backend::{strategy::BackendStrategy, Backend}, opts::EvmOpts};
+use foundry_evm::{
+    backend::{strategy::BackendStrategy, Backend},
+    opts::EvmOpts,
+};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use solang_parser::{diagnostics::Diagnostic, pt};
@@ -155,7 +158,10 @@ pub struct SessionSource<B: Default> {
     pub config: SessionSourceConfig<B>,
 }
 
-impl<B> SessionSource<B> where B: BackendStrategy {
+impl<B> SessionSource<B>
+where
+    B: BackendStrategy,
+{
     /// Creates a new source given a solidity compiler version
     ///
     /// # Panics
