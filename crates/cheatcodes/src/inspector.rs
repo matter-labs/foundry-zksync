@@ -1265,7 +1265,27 @@ impl Cheatcodes {
             constructor_args.to_vec(),
         );
 
-        let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
+        let mut factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
+        let injected_factory_deps = self
+            .zk_use_factory_deps
+            .iter()
+            .flat_map(|contract| {
+                let artifact_code = crate::fs::get_artifact_code(self, contract, false)
+                    .inspect(|_| info!(contract, "pushing factory dep"))
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "failed to get bytecode for injected factory deps contract {contract}"
+                        )
+                    })
+                    .to_vec();
+                let res = self.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
+                self.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
+            })
+            .collect_vec();
+        factory_deps.extend(injected_factory_deps);
+
+        // NOTE(zk): Clear injected factory deps so that they are not sent on further transactions
+        self.zk_use_factory_deps.clear();
         tracing::debug!(contract = contract.name, "using dual compiled contract");
 
         let zk_persist_nonce_update = self.zk_persist_nonce_update.check();
@@ -1740,13 +1760,15 @@ where {
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
                     let zk_tx = if self.use_zk_vm {
-                        let injected_factory_deps = self.zk_use_factory_deps.iter().map(|contract| {
-                            crate::fs::get_artifact_code(self, contract, false)
+                        let injected_factory_deps = self.zk_use_factory_deps.iter().flat_map(|contract| {
+                            let artifact_code = crate::fs::get_artifact_code(self, contract, false)
                                 .inspect(|_| info!(contract, "pushing factory dep"))
                                 .unwrap_or_else(|_| {
                                     panic!("failed to get bytecode for factory deps contract {contract}")
                                 })
-                                .to_vec()
+                                .to_vec();
+                            let res = self.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
+                            self.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
                         }).collect_vec();
                         factory_deps.extend(injected_factory_deps.clone());
 
@@ -1899,6 +1921,11 @@ where {
 
         info!("running call in zkEVM {:#?}", call);
         let zk_persist_nonce_update = self.zk_persist_nonce_update.check();
+
+        // NOTE(zk): Clear injected factory deps here even though it's actually used in broadcast.
+        // To be consistent with where we clear factory deps in try_create_in_zk.
+        self.zk_use_factory_deps.clear();
+
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: self.mocked_calls.clone(),
             expected_calls: Some(&mut self.expected_calls),
