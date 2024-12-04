@@ -119,7 +119,7 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
-      - name: Run era-test-node
+      - name: Run anvil-zksync
         uses: dutterbutter/anvil-zksync-action@v1.1.0
         with:
           mode: fork
