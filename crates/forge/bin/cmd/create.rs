@@ -1,7 +1,7 @@
 use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
-use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
+use alloy_network::{AnyNetwork, EthereumWallet, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
 use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest};
@@ -685,19 +685,20 @@ impl CreateArgs {
 
         // Deploy the actual contract
         let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
+        let tx_hash = receipt.transaction_hash();
 
         let address = deployed_contract;
         if shell::is_json() {
             let output = json!({
                 "deployer": deployer_address.to_string(),
                 "deployedTo": address.to_string(),
-                "transactionHash": receipt.transaction_hash
+                "transactionHash": tx_hash
             });
             sh_println!("{output}")?;
         } else {
             sh_println!("Deployer: {deployer_address}")?;
             sh_println!("Deployed to: {address}")?;
-            sh_println!("Transaction hash: {:?}", receipt.transaction_hash)?;
+            sh_println!("Transaction hash: {:?}", tx_hash)?;
         };
 
         if !self.verify {
@@ -935,7 +936,7 @@ where
     /// and the corresponding [`AnyReceipt`].
     pub async fn send_with_receipt(
         self,
-    ) -> Result<(Address, AnyTransactionReceipt), ContractDeploymentError> {
+    ) -> Result<(Address, <Zksync as Network>::ReceiptResponse), ContractDeploymentError> {
         let receipt = self
             .client
             .borrow()
@@ -946,7 +947,7 @@ where
             .await?;
 
         let address =
-            receipt.contract_address.ok_or(ContractDeploymentError::ContractNotDeployed)?;
+            receipt.contract_address().ok_or(ContractDeploymentError::ContractNotDeployed)?;
 
         Ok((address, receipt))
     }
