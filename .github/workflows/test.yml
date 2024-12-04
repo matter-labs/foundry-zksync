@@ -19,6 +19,12 @@ env:
     TARGET_RUST_VERSION: "nightly-2024-09-01"
 
 jobs:
+    nextest:
+      uses: ./.github/workflows/nextest.yml
+      with:
+        profile: default
+      secrets: inherit
+
     doctest:
         runs-on: ubuntu-22.04
         timeout-minutes: 60

@@ -265,7 +265,7 @@ async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
 async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Transport + Clone>(
     provider: P,
     zk_provider: Z,
-    tx: WithOtherFields<TransactionRequest>,
+    mut tx: WithOtherFields<TransactionRequest>,
     zksync_params: ZksyncParams,
     cast_async: bool,
     confs: u64,
@@ -280,6 +280,7 @@ async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Trans
             paymaster_input: Bytes::from_str(&input).expect("Invalid paymaster input"),
         });
 
+    tx.inner.transaction_type = Some(zksync_types::l2::TransactionType::EIP712Transaction as u8);
     let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
     if let Some(paymaster_params) = paymaster_params {
         zk_tx.set_paymaster_params(paymaster_params);
