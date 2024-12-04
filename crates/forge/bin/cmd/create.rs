@@ -619,7 +619,7 @@ impl CreateArgs {
             zk_data.factory_deps.clone().into_iter().map(|dep| dep.into()).collect(),
         );
         if let Some(paymaster_params) = zk_data.paymaster_params {
-            deployer.tx.set_paymaster(paymaster_params);
+            deployer.tx.set_paymaster_params(paymaster_params);
         }
         deployer.tx.set_from(deployer_address);
         deployer.tx.set_chain_id(chain);
@@ -1108,7 +1108,7 @@ where
                 .into();
 
         tx = tx
-            .zksync_deploy(zk_data.bytecode.clone(), constructor_args, zk_data.factory_deps.clone())
+            .with_create_params(zk_data.bytecode.clone(), constructor_args, zk_data.factory_deps.clone())
             .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
 
         Ok(ZkDeployer {

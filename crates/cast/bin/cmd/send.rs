@@ -282,7 +282,7 @@ async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Trans
 
     let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
     if let Some(paymaster_params) = paymaster_params {
-        zk_tx.set_paymaster(paymaster_params);
+        zk_tx.set_paymaster_params(paymaster_params);
     }
 
     foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;
