@@ -37,7 +37,7 @@ async fn test_zk_contract_paymaster() {
 }
 
 // Tests the deployment of contracts using a paymaster for fee abstraction
-forgetest_async!(deploy_with_paymaster, |prj, cmd| {
+forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
     setup_deploy_prj(&mut prj);
     let node = ZkSyncNode::start();
     let url = node.url();
