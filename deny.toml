@@ -14,6 +14,9 @@ ignore = [
     # Used by boojum
     # derivative is unmaintained
     "RUSTSEC-2024-0388",
+    # Used by era-test-node
+    # net2 is unmaintained
+    "RUSTSEC-2020-0016"
 ]
 
 # This section is considered when running `cargo deny check bans`.
