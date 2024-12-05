@@ -1,10 +1,10 @@
 use std::{collections::HashSet, path::PathBuf};
 
+use alloy_primitives::{hex, Address, Bytes};
 use clap::Parser;
 use foundry_compilers::zksolc::settings::{ZkSolcError, ZkSolcWarning};
 use foundry_config::ZkSyncConfig;
 use serde::Serialize;
-use zksync_web3_rs::types::{Address, Bytes};
 
 #[derive(Clone, Debug, Default, Serialize, Parser)]
 #[clap(next_help_heading = "ZKSync configuration")]
@@ -115,7 +115,8 @@ pub struct ZkSyncArgs {
     #[clap(
         long = "zk-paymaster-input",
         value_name = "PAYMASTER_INPUT",
-        visible_alias = "paymaster-input"
+        visible_alias = "paymaster-input",
+        value_parser = parse_hex_bytes
     )]
     pub paymaster_input: Option<Bytes>,
 
@@ -184,4 +185,8 @@ impl ZkSyncArgs {
 
         zksync
     }
+}
+
+fn parse_hex_bytes(s: &str) -> Result<Bytes, String> {
+    hex::decode(s).map(Bytes::from).map_err(|e| format!("Invalid hex string: {e}"))
 }

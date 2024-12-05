@@ -173,7 +173,7 @@ pub enum VerificationProviderType {
     Sourcify,
     Blockscout,
     Oklink,
-    #[value(alias = "zksync")]
+    #[clap(name = "zksync")]
     ZKsync,
     /// Custom verification provider, requires compatibility with the Etherscan API.
     Custom,

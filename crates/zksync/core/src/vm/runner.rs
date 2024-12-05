@@ -5,7 +5,7 @@ use revm::{
     primitives::{Address, CreateScheme, Env, ResultAndState, TransactTo, B256, U256 as rU256},
     Database, EvmContext, InnerEvmContext,
 };
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 use zksync_basic_types::H256;
 use zksync_types::{
     ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, CONTRACT_DEPLOYER_ADDRESS,
@@ -16,10 +16,9 @@ use std::{cmp::min, fmt::Debug};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertRU256, ConvertU256},
-    fix_l2_gas_limit, fix_l2_gas_price,
     vm::{
         db::ZKVMData,
-        inspect::{inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult},
+        inspect::{gas_params, inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult},
         tracers::cheatcode::{CallContext, CheatcodeTracerContext},
     },
 };
@@ -28,7 +27,7 @@ use crate::{
 pub fn transact<'a, DB>(
     persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
-    paymaster_data: Option<zksync_web3_rs::eip712::PaymasterParams>,
+    paymaster_data: Option<PaymasterParams>,
     env: &'a mut Env,
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
@@ -268,37 +267,6 @@ where
     };
 
     inspect(tx, ecx, &mut ccx, call_ctx)
-}
-
-/// Assign gas parameters that satisfy zkSync's fee model.
-fn gas_params<DB>(
-    ecx: &mut EvmContext<DB>,
-    caller: Address,
-    paymaster_params: &PaymasterParams,
-) -> (U256, U256)
-where
-    DB: Database,
-    <DB as Database>::Error: Debug,
-{
-    let value = ecx.env.tx.value.to_u256();
-    let use_paymaster = !paymaster_params.paymaster.is_zero();
-
-    // Get balance of either paymaster or caller depending on who's paying
-    let address = if use_paymaster {
-        Address::from_slice(paymaster_params.paymaster.as_bytes())
-    } else {
-        caller
-    };
-    let balance = ZKVMData::new(ecx).get_balance(address);
-
-    if balance.is_zero() {
-        error!("balance is 0 for {}, transaction will fail", address.to_h160());
-    }
-
-    let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
-
-    let gas_limit = fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
-    (gas_limit, max_fee_per_gas)
 }
 
 /// Prepares calldata to invoke deployer contract.

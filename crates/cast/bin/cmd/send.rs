@@ -6,7 +6,15 @@ use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_transport::Transport;
-use cast::Cast;
+use alloy_zksync::{
+    network::{
+        transaction_request::TransactionRequest as ZkTransactionRequest,
+        unsigned_tx::eip712::PaymasterParams, Zksync,
+    },
+    provider::ZksyncProvider,
+    wallet::ZksyncWallet,
+};
+use cast::{Cast, ZkCast};
 use clap::{builder::ArgPredicate, Parser};
 use eyre::Result;
 use foundry_cli::{
@@ -15,10 +23,7 @@ use foundry_cli::{
 };
 use foundry_common::ens::NameOrAddress;
 use foundry_config::Config;
-use foundry_wallets::WalletSigner;
-use foundry_zksync_core::{self, convert::ConvertAddress};
-use std::{path::PathBuf, str::FromStr};
-use zksync_web3_rs::eip712::PaymasterParams;
+use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 /// ZkSync-specific paymaster parameters for transactions
 #[derive(Debug, Parser)]
@@ -144,6 +149,7 @@ impl SendTxArgs {
         config.zksync.compile = zksync_params.zksync;
 
         let provider = utils::get_provider(&config)?;
+        let zk_provider = utils::get_provider_zksync(&config)?;
 
         let builder = CastTxBuilder::new(&provider, tx, &config)
             .await?
@@ -187,25 +193,46 @@ impl SendTxArgs {
         // If we cannot successfully instantiate a local signer, then we will assume we don't have
         // enough information to sign and we must bail.
         } else {
-            // Retrieve the signer, and bail if it can't be constructed.
-            let signer = eth.wallet.signer().await?;
-            let from = signer.address();
-
-            tx::validate_from_address(eth.wallet.from, from)?;
-
+            // NOTE(zk): Avoid initializing `signer` twice as it will error out with Ledger, so we
+            // move the signers to their respective blocks.
             if zksync_params.zksync {
+                // Retrieve the signer, and bail if it can't be constructed.
+                let signer = eth.wallet.signer().await?;
+                let from = signer.address();
+
+                tx::validate_from_address(eth.wallet.from, from)?;
+
+                // Zksync transaction
                 let (tx, _) = builder.build(&signer).await?;
+                let signer = Arc::new(signer);
+
+                let zk_wallet = ZksyncWallet::from(signer.clone());
+                let zk_provider = ProviderBuilder::<_, _, Zksync>::default()
+                    .wallet(zk_wallet.clone())
+                    .on_provider(&zk_provider);
+
+                let wallet = EthereumWallet::from(signer);
+                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
+                    .wallet(wallet)
+                    .on_provider(&provider);
+
                 cast_send_zk(
-                    &provider,
-                    zksync_params,
+                    provider,
+                    zk_provider,
                     tx,
+                    zksync_params,
                     cast_async,
                     confirmations,
                     timeout,
-                    signer,
                 )
                 .await
             } else {
+                // Retrieve the signer, and bail if it can't be constructed.
+                let signer = eth.wallet.signer().await?;
+                let from = signer.address();
+
+                tx::validate_from_address(eth.wallet.from, from)?;
+
                 // Standard transaction
                 let (tx, _) = builder.build(&signer).await?;
 
@@ -235,40 +262,38 @@ async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
     handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout).await
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn cast_send_zk<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
+async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Transport + Clone>(
     provider: P,
+    zk_provider: Z,
+    mut tx: WithOtherFields<TransactionRequest>,
     zksync_params: ZksyncParams,
-    tx: WithOtherFields<TransactionRequest>,
     cast_async: bool,
     confs: u64,
     timeout: u64,
-    signer: WalletSigner,
 ) -> Result<()> {
     // ZkSync transaction
     let paymaster_params = zksync_params
         .paymaster_address
         .and_then(|addr| zksync_params.paymaster_input.map(|input| (addr, input)))
         .map(|(addr, input)| PaymasterParams {
-            paymaster: Address::from_str(&addr).expect("Invalid paymaster address").to_h160(),
-            paymaster_input: Bytes::from_str(&input).expect("Invalid paymaster input").to_vec(),
+            paymaster: Address::from_str(&addr).expect("Invalid paymaster address"),
+            paymaster_input: Bytes::from_str(&input).expect("Invalid paymaster input"),
         });
 
-    // Build EIP712 transaction for ZKSync
-    let tx = foundry_zksync_core::new_eip712_transaction(
-        tx,
-        Vec::new(), // Empty factory_deps
-        paymaster_params,
-        &provider,
-        signer,
-    )
-    .await
-    .map_err(|e| eyre::eyre!("Failed to create EIP712 transaction: {}", e))?;
+    tx.inner.transaction_type = Some(zksync_types::l2::TransactionType::EIP712Transaction as u8);
+    let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
+    if let Some(paymaster_params) = paymaster_params {
+        zk_tx.set_paymaster_params(paymaster_params);
+    }
 
-    // Use send_raw_transaction for ZKSync
-    let tx_hash = provider.send_raw_transaction(&tx).await?.tx_hash().to_owned();
-    let cast = Cast::new(provider);
-    handle_transaction_result(&cast, &tx_hash, cast_async, confs, timeout).await
+    foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;
+
+    let cast = ZkCast::new(zk_provider, Cast::new(provider));
+    let pending_tx = cast.send_zk(zk_tx).await?;
+
+    let tx_hash = pending_tx.inner().tx_hash();
+
+    handle_transaction_result(cast.as_ref(), tx_hash, cast_async, confs, timeout).await
 }
 
 async fn handle_transaction_result<P: Provider<T, AnyNetwork>, T: Transport + Clone>(

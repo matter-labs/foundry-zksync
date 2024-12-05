@@ -75,6 +75,7 @@ alloy-signer.workspace = true
 alloy-sol-macro-expander = { workspace = true, features = ["json"] }
 alloy-sol-macro-input.workspace = true
 alloy-transport.workspace = true
+alloy-zksync.workspace = true
 
 async-trait.workspace = true
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
@@ -103,6 +104,7 @@ watchexec-events = "3.0"
 watchexec-signals = "3.0"
 clearscreen = "3.0"
 evm-disassembler.workspace = true
+rustls = { version = "0.23", features = ["ring"] }
 
 # doc server
 axum = { workspace = true, features = ["ws"] }
@@ -115,7 +117,6 @@ soldeer-commands.workspace = true
 quick-junit = "0.5.0"
 
 # zk
-zksync-web3-rs.workspace = true
 zksync_types.workspace = true
 
 [target.'cfg(unix)'.dependencies]

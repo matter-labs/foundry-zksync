@@ -1,13 +1,17 @@
 use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
-use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
+use alloy_network::{AnyNetwork, EthereumWallet, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
 use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
+use alloy_zksync::{
+    network::{unsigned_tx::eip712::PaymasterParams, Zksync},
+    wallet::ZksyncWallet,
+};
 use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
 use forge_verify::{zk_provider::CompilerVerificationContext, RetryArgs, VerifierArgs, VerifyArgs};
@@ -32,7 +36,6 @@ use foundry_config::{
     },
     merge_impl_figment_convert, Config,
 };
-use foundry_wallets::WalletSigner;
 use foundry_zksync_core::convert::ConvertH160;
 use serde_json::json;
 use std::{
@@ -40,11 +43,8 @@ use std::{
     collections::{HashSet, VecDeque},
     marker::PhantomData,
     path::PathBuf,
-    str::FromStr,
     sync::Arc,
 };
-use zksync_types::H256;
-use zksync_web3_rs::eip712::PaymasterParams;
 
 merge_impl_figment_convert!(CreateArgs, opts, eth);
 
@@ -110,8 +110,8 @@ pub struct CreateArgs {
 
 /// Data used to deploy a contract on zksync
 pub struct ZkSyncData {
+    #[allow(dead_code)]
     bytecode: Vec<u8>,
-    bytecode_hash: H256,
     factory_deps: Vec<Vec<u8>>,
     paymaster_params: Option<PaymasterParams>,
 }
@@ -135,8 +135,7 @@ impl CreateArgs {
                             .zk
                             .paymaster_input
                             .clone()
-                            .unwrap_or_default()
-                            .to_vec(),
+                            .unwrap_or_default(),
                     })
                 } else {
                     None
@@ -156,7 +155,7 @@ impl CreateArgs {
             let (artifact, id) =
                 remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
-            let ZkContractArtifact { bytecode, hash, factory_dependencies, abi, .. } = artifact;
+            let ZkContractArtifact { bytecode, factory_dependencies, abi, .. } = artifact;
 
             let abi = abi.expect("Abi not found");
             let bin = bytecode.expect("Bytecode not found");
@@ -180,11 +179,10 @@ impl CreateArgs {
                     eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
                 }
             };
-            let bytecode_hash = H256::from_str(&hash.expect("Contract hash not found"))?;
 
             // Add arguments to constructor
             let config = self.eth.try_load_config_emit_warnings()?;
-            let provider = utils::get_provider(&config)?;
+            let provider = utils::get_provider_zksync(&config)?;
             let params = match abi.constructor {
                 Some(ref v) => {
                     let constructor_args =
@@ -255,9 +253,9 @@ impl CreateArgs {
                 visited_bytecodes.insert(bytecode.clone());
                 visited_bytecodes.into_iter().collect()
             };
-            let zk_data = ZkSyncData { bytecode, bytecode_hash, factory_deps, paymaster_params };
+            let zk_data = ZkSyncData { bytecode, factory_deps, paymaster_params };
 
-            let result = if self.unlocked {
+            return if self.unlocked {
                 // Deploy with unlocked account
                 let sender = self.eth.wallet.from.expect("required");
                 self.deploy_zk(
@@ -270,7 +268,6 @@ impl CreateArgs {
                     config.transaction_timeout,
                     id,
                     zk_data,
-                    None,
                 )
                 .await
             } else {
@@ -279,7 +276,9 @@ impl CreateArgs {
                 // and potentially other devices that rely on HID too
                 let zk_signer = self.eth.wallet.signer().await?;
                 let deployer = zk_signer.address();
-                let provider = ProviderBuilder::<_, _, AnyNetwork>::default().on_provider(provider);
+                let provider = ProviderBuilder::<_, _, Zksync>::default()
+                    .wallet(ZksyncWallet::new(zk_signer))
+                    .on_provider(provider);
                 self.deploy_zk(
                     abi,
                     bin.object(),
@@ -290,12 +289,9 @@ impl CreateArgs {
                     config.transaction_timeout,
                     id,
                     zk_data,
-                    Some(zk_signer),
                 )
                 .await
-            };
-
-            return result;
+            }
         }
 
         let target_path = if let Some(ref mut path) = self.contract.path {
@@ -588,9 +584,9 @@ impl CreateArgs {
         verify.run().await
     }
 
-    // Deploys the zk contract
+    /// Deploys the contract using ZKsync provider.
     #[allow(clippy::too_many_arguments)]
-    async fn deploy_zk<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
+    async fn deploy_zk<P: Provider<T, Zksync>, T: Transport + Clone>(
         self,
         abi: JsonAbi,
         bin: BytecodeObject,
@@ -601,29 +597,34 @@ impl CreateArgs {
         timeout: u64,
         id: ArtifactId,
         zk_data: ZkSyncData,
-        zk_signer: Option<WalletSigner>,
     ) -> Result<()> {
         let bin = bin.into_bytes().unwrap_or_else(|| {
             panic!("no bytecode found in bin object for {}", self.contract.name)
         });
         let provider = Arc::new(provider);
-        let factory = ContractFactory::new(abi.clone(), bin.clone(), provider.clone(), timeout);
+        let factory = ContractFactory::new_zk(abi.clone(), bin.clone(), provider.clone(), timeout);
 
         let is_args_empty = args.is_empty();
         let mut deployer =
-            factory.deploy_tokens_zk(args.clone(), &zk_data).context("failed to deploy contract")
-                .map(|deployer| deployer.set_zk_factory_deps(zk_data.factory_deps.clone()).set_zk_paymaster_params(zk_data.paymaster_params.clone())).map_err(|e| {
+            factory.deploy_tokens_zk(args.clone(), &zk_data).context("failed to deploy contract").map_err(|e| {
                 if is_args_empty {
                     e.wrap_err("no arguments provided for contract constructor; consider --constructor-args or --constructor-args-path")
                 } else {
                     e
                 }
             })?;
+        let is_legacy = self.tx.legacy || Chain::from(chain).is_legacy();
 
+        deployer.tx = deployer.tx.with_factory_deps(
+            zk_data.factory_deps.clone().into_iter().map(|dep| dep.into()).collect(),
+        );
+        if let Some(paymaster_params) = zk_data.paymaster_params {
+            deployer.tx.set_paymaster_params(paymaster_params);
+        }
         deployer.tx.set_from(deployer_address);
         deployer.tx.set_chain_id(chain);
         // `to` field must be set explicitly, cannot be None.
-        if deployer.tx.to.is_none() {
+        if deployer.tx.to().is_none() {
             deployer.tx.set_create();
         }
         deployer.tx.set_nonce(if let Some(nonce) = self.tx.nonce {
@@ -644,33 +645,31 @@ impl CreateArgs {
         };
         deployer.tx.set_gas_price(gas_price);
 
-        let estimated_gas = foundry_zksync_core::estimate_gas(
-            &deployer.tx,
-            zk_data.factory_deps.clone(),
-            &provider,
-        )
-        .await?;
+        // estimate fee
+        foundry_zksync_core::estimate_gas(&mut deployer.tx, &provider).await?;
 
-        deployer.tx.set_gas_limit(if let Some(gas_limit) = self.tx.gas_limit {
-            gas_limit.to::<u64>()
-        } else {
-            estimated_gas.limit
-        });
+        if !is_legacy {
+            let estimate = provider.estimate_eip1559_fees(None).await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
+            let priority_fee = if let Some(priority_fee) = self.tx.priority_gas_price {
+                priority_fee.to()
+            } else {
+                estimate.max_priority_fee_per_gas
+            };
+            let max_fee = if let Some(max_fee) = self.tx.gas_price {
+                max_fee.to()
+            } else {
+                estimate.max_fee_per_gas
+            };
 
-        let zk_constructor_args = match abi.constructor() {
-            None => Default::default(),
-            Some(constructor) => constructor.abi_encode_input(&args).unwrap_or_default(),
+            deployer.tx.set_max_fee_per_gas(max_fee);
+            deployer.tx.set_max_priority_fee_per_gas(priority_fee);
+        }
+
+        if let Some(gas_limit) = self.tx.gas_limit {
+            deployer.tx.set_gas_limit(gas_limit.to::<u64>());
         };
-        let data = foundry_zksync_core::encode_create_params(
-            &forge::revm::primitives::CreateScheme::Create,
-            zk_data.bytecode_hash,
-            zk_constructor_args,
-        );
-        let data = Bytes::from(data);
-        deployer.tx.set_input(data);
 
-        deployer.tx.set_to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address());
-
+        // Before we actually deploy the contract we try check if the verify settings are valid
         let mut constructor_args = None;
         if self.verify {
             if !args.is_empty() {
@@ -678,27 +677,28 @@ impl CreateArgs {
                     .constructor()
                     .ok_or_else(|| eyre::eyre!("could not find constructor"))?
                     .abi_encode_input(&args)?;
-                constructor_args = Some(hex::encode(encoded_args));
+                constructor_args = Some(hex::encode_prefixed(encoded_args));
             }
 
             self.verify_preflight_check(constructor_args.clone(), chain, &id).await?;
         }
 
         // Deploy the actual contract
-        let (deployed_contract, receipt) = deployer.send_with_receipt_zk(zk_signer).await?;
+        let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
+        let tx_hash = receipt.transaction_hash();
 
         let address = deployed_contract;
         if shell::is_json() {
             let output = json!({
                 "deployer": deployer_address.to_string(),
                 "deployedTo": address.to_string(),
-                "transactionHash": receipt.transaction_hash
+                "transactionHash": tx_hash
             });
             sh_println!("{output}")?;
         } else {
             sh_println!("Deployer: {deployer_address}")?;
             sh_println!("Deployed to: {address}")?;
-            sh_println!("Transaction hash: {:?}", receipt.transaction_hash)?;
+            sh_println!("Transaction hash: {:?}", tx_hash)?;
         };
 
         if !self.verify {
@@ -734,7 +734,7 @@ impl CreateArgs {
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
             compilation_profile: None, //TODO(zk): provide comp profile
-            zksync: true,
+            zksync: self.opts.compiler.zk.enabled(),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await
@@ -868,51 +868,6 @@ where
     P: Provider<T, AnyNetwork>,
     T: Transport + Clone,
 {
-    /// Set zksync's factory deps.
-    pub fn set_zk_factory_deps(mut self, deps: Vec<Vec<u8>>) -> Self {
-        self.zk_factory_deps = Some(deps);
-        self
-    }
-
-    /// Set zksync's paymaster params.
-    pub fn set_zk_paymaster_params(mut self, params: Option<PaymasterParams>) -> Self {
-        self.zk_paymaster_params = params;
-        self
-    }
-
-    /// Broadcasts the zk contract deployment transaction and after waiting for it to
-    /// be sufficiently confirmed (default: 1), it returns a tuple with
-    /// the [`Contract`](crate::Contract) struct at the deployed contract's address
-    /// and the corresponding [`AnyReceipt`].
-    pub async fn send_with_receipt_zk(
-        self,
-        signer: Option<WalletSigner>,
-    ) -> Result<(Address, AnyTransactionReceipt), ContractDeploymentError> {
-        let factory_deps = self.zk_factory_deps.unwrap_or_default();
-        let tx = foundry_zksync_core::new_eip712_transaction(
-            self.tx,
-            factory_deps,
-            self.zk_paymaster_params.clone(),
-            self.client.borrow(),
-            signer.expect("No signer was found"),
-        )
-        .await
-        .map_err(|_| ContractDeploymentError::ContractNotDeployed)?;
-        let receipt = self
-            .client
-            .borrow()
-            .send_raw_transaction(&tx)
-            .await?
-            .with_required_confirmations(self.confs as u64)
-            .get_receipt()
-            .await?;
-
-        let address =
-            receipt.contract_address.ok_or(ContractDeploymentError::ContractNotDeployed)?;
-
-        Ok((address, receipt))
-    }
-
     /// Broadcasts the contract deployment transaction and after waiting for it to
     /// be sufficiently confirmed (default: 1), it returns a tuple with
     /// the [`Contract`](crate::Contract) struct at the deployed contract's address
@@ -931,6 +886,68 @@ where
 
         let address =
             receipt.contract_address.ok_or(ContractDeploymentError::ContractNotDeployed)?;
+
+        Ok((address, receipt))
+    }
+}
+
+/// Helper which manages the deployment transaction of a smart contract
+#[derive(Debug)]
+#[must_use = "Deployer does nothing unless you `send` it"]
+pub struct ZkDeployer<B, P, T> {
+    /// The deployer's transaction, exposed for overriding the defaults
+    pub tx: alloy_zksync::network::transaction_request::TransactionRequest,
+    abi: JsonAbi,
+    client: B,
+    confs: usize,
+    timeout: u64,
+    zk_factory_deps: Option<Vec<Vec<u8>>>,
+    _p: PhantomData<P>,
+    _t: PhantomData<T>,
+}
+
+impl<B, P, T> Clone for ZkDeployer<B, P, T>
+where
+    B: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            tx: self.tx.clone(),
+            abi: self.abi.clone(),
+            client: self.client.clone(),
+            confs: self.confs,
+            timeout: self.timeout,
+            zk_factory_deps: self.zk_factory_deps.clone(),
+            _p: PhantomData,
+            _t: PhantomData,
+        }
+    }
+}
+
+impl<B, P, T> ZkDeployer<B, P, T>
+where
+    B: Borrow<P> + Clone,
+    P: Provider<T, Zksync>,
+    T: Transport + Clone,
+{
+    /// Broadcasts the contract deployment transaction and after waiting for it to
+    /// be sufficiently confirmed (default: 1), it returns a tuple with
+    /// the [`Contract`](crate::Contract) struct at the deployed contract's address
+    /// and the corresponding [`AnyReceipt`].
+    pub async fn send_with_receipt(
+        self,
+    ) -> Result<(Address, <Zksync as Network>::ReceiptResponse), ContractDeploymentError> {
+        let receipt = self
+            .client
+            .borrow()
+            .send_transaction(self.tx)
+            .await?
+            .with_required_confirmations(self.confs as u64)
+            .get_receipt()
+            .await?;
+
+        let address =
+            receipt.contract_address().ok_or(ContractDeploymentError::ContractNotDeployed)?;
 
         Ok((address, receipt))
     }
@@ -1049,6 +1066,20 @@ where
             _t: PhantomData,
         })
     }
+}
+
+impl<P, T, B> DeploymentTxFactory<B, P, T>
+where
+    B: Borrow<P> + Clone,
+    P: Provider<T, Zksync>,
+    T: Transport + Clone,
+{
+    /// Creates a factory for deployment of the Contract with bytecode, and the
+    /// constructor defined in the abi. The client will be used to send any deployment
+    /// transaction.
+    pub fn new_zk(abi: JsonAbi, bytecode: Bytes, client: B, timeout: u64) -> Self {
+        Self { client, abi, bytecode, timeout, _p: PhantomData, _t: PhantomData }
+    }
 
     /// Create a deployment tx using the provided tokens as constructor
     /// arguments
@@ -1056,10 +1087,11 @@ where
         self,
         params: Vec<DynSolValue>,
         zk_data: &ZkSyncData,
-    ) -> Result<Deployer<B, P, T>, ContractDeploymentError>
+    ) -> Result<ZkDeployer<B, P, T>, ContractDeploymentError>
     where
         B: Clone,
     {
+        // Encode the constructor args & concatenate with the bytecode if necessary
         if self.abi.constructor().is_none() && !params.is_empty() {
             return Err(ContractDeploymentError::ConstructorError)
         }
@@ -1069,27 +1101,27 @@ where
             None => Default::default(),
             Some(constructor) => constructor.abi_encode_input(&params).unwrap_or_default(),
         };
-        let data: Bytes = foundry_zksync_core::encode_create_params(
-            &forge::revm::primitives::CreateScheme::Create,
-            zk_data.bytecode_hash,
-            constructor_args,
-        )
-        .into();
 
-        // create the tx object.
-        let tx = WithOtherFields::new(
+        let mut tx: alloy_zksync::network::transaction_request::TransactionRequest =
             TransactionRequest::default()
                 .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
-                .input(data.into()),
-        );
-        Ok(Deployer {
+                .into();
+
+        tx = tx
+            .with_create_params(
+                zk_data.bytecode.clone(),
+                constructor_args,
+                zk_data.factory_deps.clone(),
+            )
+            .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
+
+        Ok(ZkDeployer {
             client: self.client.clone(),
             abi: self.abi,
             tx,
             confs: 1,
             timeout: self.timeout,
-            zk_factory_deps: Some(vec![zk_data.bytecode.clone()]),
-            zk_paymaster_params: zk_data.paymaster_params.clone(),
+            zk_factory_deps: None,
             _p: PhantomData,
             _t: PhantomData,
         })
@@ -1107,6 +1139,8 @@ pub enum ContractDeploymentError {
     ContractNotDeployed,
     #[error(transparent)]
     RpcError(#[from] TransportError),
+    #[error("failed building transaction")]
+    TransactionBuildError,
 }
 
 impl From<PendingTransactionError> for ContractDeploymentError {

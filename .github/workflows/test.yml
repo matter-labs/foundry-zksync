@@ -19,6 +19,12 @@ env:
     TARGET_RUST_VERSION: "nightly-2024-09-01"
 
 jobs:
+    nextest:
+      uses: ./.github/workflows/nextest.yml
+      with:
+        profile: default
+      secrets: inherit
+
     doctest:
         runs-on: ubuntu-22.04
         timeout-minutes: 60
@@ -83,7 +89,8 @@ jobs:
             skip: "*.json"
 
     crate-checks:
-        runs-on: ubuntu-22.04
+        # ubuntu-22.04 runs out of disk space
+        runs-on: ubuntu-22.04-github-hosted-16core
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -112,6 +119,9 @@ jobs:
           with:
             toolchain: ${{ env.TARGET_RUST_VERSION }}
 
+        - name: Install cargo-nextest
+          uses: taiki-e/install-action@nextest
+
         - name: Run era-test-node
           uses: dutterbutter/era-test-node-action@v1
           with:
@@ -130,7 +140,8 @@ jobs:
           env:
             RUST_BACKTRACE: full
             TEST_MAINNET_URL: http://localhost:8011
-          run: ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo test zk
+          run: |
+            ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' --filter-expr 'test(~zk)'
 
     check-ci-install:
       name: CI install
