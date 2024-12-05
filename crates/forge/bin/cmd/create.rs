@@ -1,7 +1,7 @@
 use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
-use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
+use alloy_network::{AnyNetwork, EthereumWallet, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
 use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest};
@@ -14,7 +14,7 @@ use alloy_zksync::{
 };
 use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
-use forge_verify::{zk_provider::CompilerVerificationContext, RetryArgs};
+use forge_verify::{zk_provider::CompilerVerificationContext, RetryArgs, VerifierArgs, VerifyArgs};
 use foundry_cli::{
     opts::{CoreBuildArgs, EthereumOpts, EtherscanOpts, TransactionOpts},
     utils::{self, read_constructor_args_file, remove_contract, remove_zk_contract, LoadConfig},
@@ -26,7 +26,7 @@ use foundry_common::{
 };
 use foundry_compilers::{
     artifacts::BytecodeObject, info::ContractInfo, utils::canonicalize,
-    zksync::artifact_output::zk::ZkContractArtifact,
+    zksync::artifact_output::zk::ZkContractArtifact, ArtifactId,
 };
 use foundry_config::{
     figment::{
@@ -102,7 +102,7 @@ pub struct CreateArgs {
     eth: EthereumOpts,
 
     #[command(flatten)]
-    pub verifier: forge_verify::VerifierArgs,
+    pub verifier: VerifierArgs,
 
     #[command(flatten)]
     retry: RetryArgs,
@@ -152,7 +152,8 @@ impl CreateArgs {
             let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
             let mut zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
-            let artifact = remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
+            let (artifact, id) =
+                remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
             let ZkContractArtifact { bytecode, factory_dependencies, abi, .. } = artifact;
 
@@ -265,6 +266,7 @@ impl CreateArgs {
                     chain_id,
                     sender,
                     config.transaction_timeout,
+                    id,
                     zk_data,
                 )
                 .await
@@ -285,6 +287,7 @@ impl CreateArgs {
                     chain_id,
                     deployer,
                     config.transaction_timeout,
+                    id,
                     zk_data,
                 )
                 .await
@@ -297,9 +300,9 @@ impl CreateArgs {
             project.find_contract_path(&self.contract.name)?
         };
 
-        let mut output = compile::compile_target(&target_path, &project, shell::is_json())?;
+        let output = compile::compile_target(&target_path, &project, shell::is_json())?;
 
-        let (abi, bin, _) = remove_contract(&mut output, &target_path, &self.contract.name)?;
+        let (abi, bin, id) = remove_contract(output, &target_path, &self.contract.name)?;
 
         let bin = match bin.object {
             BytecodeObject::Bytecode(_) => bin.object,
@@ -339,8 +342,17 @@ impl CreateArgs {
         if self.unlocked {
             // Deploy with unlocked account
             let sender = self.eth.wallet.from.expect("required");
-            self.deploy(abi, bin, params, provider, chain_id, sender, config.transaction_timeout)
-                .await
+            self.deploy(
+                abi,
+                bin,
+                params,
+                provider,
+                chain_id,
+                sender,
+                config.transaction_timeout,
+                id,
+            )
+            .await
         } else {
             // Deploy with signer
             let signer = self.eth.wallet.signer().await?;
@@ -348,8 +360,17 @@ impl CreateArgs {
             let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
                 .wallet(EthereumWallet::new(signer))
                 .on_provider(provider);
-            self.deploy(abi, bin, params, provider, chain_id, deployer, config.transaction_timeout)
-                .await
+            self.deploy(
+                abi,
+                bin,
+                params,
+                provider,
+                chain_id,
+                deployer,
+                config.transaction_timeout,
+                id,
+            )
+            .await
         }
     }
 
@@ -368,13 +389,14 @@ impl CreateArgs {
         &self,
         constructor_args: Option<String>,
         chain: u64,
+        id: &ArtifactId,
     ) -> Result<()> {
         // NOTE: this does not represent the same `VerifyArgs` that would be sent after deployment,
         // since we don't know the address yet.
-        let mut verify = forge_verify::VerifyArgs {
+        let mut verify = VerifyArgs {
             address: Default::default(),
             contract: Some(self.contract.clone()),
-            compiler_version: None,
+            compiler_version: Some(id.version.to_string()),
             constructor_args,
             constructor_args_path: None,
             num_of_optimizations: None,
@@ -395,6 +417,7 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
+            compilation_profile: Some(id.profile.to_string()),
             zksync: self.opts.compiler.zk.enabled(),
         };
 
@@ -425,6 +448,7 @@ impl CreateArgs {
         chain: u64,
         deployer_address: Address,
         timeout: u64,
+        id: ArtifactId,
     ) -> Result<()> {
         let bin = bin.into_bytes().unwrap_or_else(|| {
             panic!("no bytecode found in bin object for {}", self.contract.name)
@@ -501,7 +525,7 @@ impl CreateArgs {
                 constructor_args = Some(hex::encode_prefixed(encoded_args));
             }
 
-            self.verify_preflight_check(constructor_args.clone(), chain).await?;
+            self.verify_preflight_check(constructor_args.clone(), chain, &id).await?;
         }
 
         // Deploy the actual contract
@@ -532,10 +556,10 @@ impl CreateArgs {
         } else {
             None
         };
-        let verify = forge_verify::VerifyArgs {
+        let verify = VerifyArgs {
             address,
             contract: Some(self.contract),
-            compiler_version: None,
+            compiler_version: Some(id.version.to_string()),
             constructor_args,
             constructor_args_path: None,
             num_of_optimizations,
@@ -553,9 +577,10 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
+            compilation_profile: Some(id.profile.to_string()),
             zksync: self.opts.compiler.zk.enabled(),
         };
-        println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier);
+        sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await
     }
 
@@ -570,6 +595,7 @@ impl CreateArgs {
         chain: u64,
         deployer_address: Address,
         timeout: u64,
+        id: ArtifactId,
         zk_data: ZkSyncData,
     ) -> Result<()> {
         let bin = bin.into_bytes().unwrap_or_else(|| {
@@ -593,7 +619,7 @@ impl CreateArgs {
             zk_data.factory_deps.clone().into_iter().map(|dep| dep.into()).collect(),
         );
         if let Some(paymaster_params) = zk_data.paymaster_params {
-            deployer.tx.set_paymaster(paymaster_params);
+            deployer.tx.set_paymaster_params(paymaster_params);
         }
         deployer.tx.set_from(deployer_address);
         deployer.tx.set_chain_id(chain);
@@ -654,24 +680,25 @@ impl CreateArgs {
                 constructor_args = Some(hex::encode_prefixed(encoded_args));
             }
 
-            self.verify_preflight_check(constructor_args.clone(), chain).await?;
+            self.verify_preflight_check(constructor_args.clone(), chain, &id).await?;
         }
 
         // Deploy the actual contract
         let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
+        let tx_hash = receipt.transaction_hash();
 
         let address = deployed_contract;
         if shell::is_json() {
             let output = json!({
                 "deployer": deployer_address.to_string(),
                 "deployedTo": address.to_string(),
-                "transactionHash": receipt.transaction_hash
+                "transactionHash": tx_hash
             });
             sh_println!("{output}")?;
         } else {
             sh_println!("Deployer: {deployer_address}")?;
             sh_println!("Deployed to: {address}")?;
-            sh_println!("Transaction hash: {:?}", receipt.transaction_hash)?;
+            sh_println!("Transaction hash: {:?}", tx_hash)?;
         };
 
         if !self.verify {
@@ -685,7 +712,7 @@ impl CreateArgs {
         } else {
             None
         };
-        let verify = forge_verify::VerifyArgs {
+        let verify = VerifyArgs {
             address,
             contract: Some(self.contract),
             compiler_version: None,
@@ -706,6 +733,7 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
+            compilation_profile: None, //TODO(zk): provide comp profile
             zksync: self.opts.compiler.zk.enabled(),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
@@ -908,7 +936,7 @@ where
     /// and the corresponding [`AnyReceipt`].
     pub async fn send_with_receipt(
         self,
-    ) -> Result<(Address, AnyTransactionReceipt), ContractDeploymentError> {
+    ) -> Result<(Address, <Zksync as Network>::ReceiptResponse), ContractDeploymentError> {
         let receipt = self
             .client
             .borrow()
@@ -919,7 +947,7 @@ where
             .await?;
 
         let address =
-            receipt.contract_address.ok_or(ContractDeploymentError::ContractNotDeployed)?;
+            receipt.contract_address().ok_or(ContractDeploymentError::ContractNotDeployed)?;
 
         Ok((address, receipt))
     }
@@ -1080,7 +1108,11 @@ where
                 .into();
 
         tx = tx
-            .zksync_deploy(zk_data.bytecode.clone(), constructor_args, zk_data.factory_deps.clone())
+            .with_create_params(
+                zk_data.bytecode.clone(),
+                constructor_args,
+                zk_data.factory_deps.clone(),
+            )
             .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
 
         Ok(ZkDeployer {

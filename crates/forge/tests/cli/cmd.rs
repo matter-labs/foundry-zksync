@@ -34,12 +34,17 @@ Options:
   -h, --help
           Print help (see a summary with '-h')
 
+  -j, --threads <THREADS>
+          Number of threads to use. Specifying 0 defaults to the number of logical cores
+          
+          [aliases: jobs]
+
   -V, --version
           Print version
 
 Display options:
       --color <COLOR>
-          Log messages coloring
+          The color of the log messages
 
           Possible values:
           - auto:   Intelligently guess whether to use color output (default)
@@ -52,8 +57,18 @@ Display options:
   -q, --quiet
           Do not print log messages
 
-      --verbose
-          Use verbose output
+  -v, --verbosity...
+          Verbosity level of the log messages.
+          
+          Pass multiple times to increase the verbosity (e.g. -v, -vv, -vvv).
+          
+          Depending on the context the verbosity levels have different meanings.
+          
+          For example, the verbosity levels of the EVM are:
+          - 2 (-vv): Print logs for all tests.
+          - 3 (-vvv): Print execution traces for failing tests.
+          - 4 (-vvvv): Print execution traces for all tests, and setup traces for failing tests.
+          - 5 (-vvvvv): Print execution and setup traces for all tests.
 
 Find more information in the book: http://book.getfoundry.sh/reference/forge/forge.html
 
@@ -1573,25 +1588,25 @@ forgetest!(gas_report_all_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractOne contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101532                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| foo                                    | 45387           | 45387 | 45387  | 45387 | 1       |
+| foo                                    | 45370           | 45370 | 45370  | 45370 | 1       |
 
 
 | src/Contracts.sol:ContractThree contract |                 |        |        |        |         |
 |------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                          | Deployment Size |        |        |        |         |
-| 103591                                   | 256             |        |        |        |         |
+| 101748                                   | 242             |        |        |        |         |
 | Function Name                            | min             | avg    | median | max    | # calls |
-| baz                                      | 260712          | 260712 | 260712 | 260712 | 1       |
+| baz                                      | 259210          | 259210 | 259210 | 259210 | 1       |
 
 
 | src/Contracts.sol:ContractTwo contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101520                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| bar                                    | 64984           | 64984 | 64984  | 64984 | 1       |
+| bar                                    | 64832           | 64832 | 64832  | 64832 | 1       |
 ...
 
 "#]]);
@@ -1601,48 +1616,48 @@ forgetest!(gas_report_all_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractOne",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101532,
+      "size": 241
     },
     "functions": {
       "foo()": {
         "calls": 1,
-        "min": 45387,
-        "mean": 45387,
-        "median": 45387,
-        "max": 45387
+        "min": 45370,
+        "mean": 45370,
+        "median": 45370,
+        "max": 45370
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractThree",
     "deployment": {
-      "gas": 103591,
-      "size": 256
+      "gas": 101748,
+      "size": 242
     },
     "functions": {
       "baz()": {
         "calls": 1,
-        "min": 260712,
-        "mean": 260712,
-        "median": 260712,
-        "max": 260712
+        "min": 259210,
+        "mean": 259210,
+        "median": 259210,
+        "max": 259210
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractTwo",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101520,
+      "size": 241
     },
     "functions": {
       "bar()": {
         "calls": 1,
-        "min": 64984,
-        "mean": 64984,
-        "median": 64984,
-        "max": 64984
+        "min": 64832,
+        "mean": 64832,
+        "median": 64832,
+        "max": 64832
       }
     }
   }
@@ -1657,25 +1672,25 @@ forgetest!(gas_report_all_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractOne contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101532                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| foo                                    | 45387           | 45387 | 45387  | 45387 | 1       |
+| foo                                    | 45370           | 45370 | 45370  | 45370 | 1       |
 
 
 | src/Contracts.sol:ContractThree contract |                 |        |        |        |         |
 |------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                          | Deployment Size |        |        |        |         |
-| 103591                                   | 256             |        |        |        |         |
+| 101748                                   | 242             |        |        |        |         |
 | Function Name                            | min             | avg    | median | max    | # calls |
-| baz                                      | 260712          | 260712 | 260712 | 260712 | 1       |
+| baz                                      | 259210          | 259210 | 259210 | 259210 | 1       |
 
 
 | src/Contracts.sol:ContractTwo contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101520                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| bar                                    | 64984           | 64984 | 64984  | 64984 | 1       |
+| bar                                    | 64832           | 64832 | 64832  | 64832 | 1       |
 ...
 
 "#]]);
@@ -1685,48 +1700,48 @@ forgetest!(gas_report_all_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractOne",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101532,
+      "size": 241
     },
     "functions": {
       "foo()": {
         "calls": 1,
-        "min": 45387,
-        "mean": 45387,
-        "median": 45387,
-        "max": 45387
+        "min": 45370,
+        "mean": 45370,
+        "median": 45370,
+        "max": 45370
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractThree",
     "deployment": {
-      "gas": 103591,
-      "size": 256
+      "gas": 101748,
+      "size": 242
     },
     "functions": {
       "baz()": {
         "calls": 1,
-        "min": 260712,
-        "mean": 260712,
-        "median": 260712,
-        "max": 260712
+        "min": 259210,
+        "mean": 259210,
+        "median": 259210,
+        "max": 259210
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractTwo",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101520,
+      "size": 241
     },
     "functions": {
       "bar()": {
         "calls": 1,
-        "min": 64984,
-        "mean": 64984,
-        "median": 64984,
-        "max": 64984
+        "min": 64832,
+        "mean": 64832,
+        "median": 64832,
+        "max": 64832
       }
     }
   }
@@ -1741,25 +1756,25 @@ forgetest!(gas_report_all_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractOne contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101532                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| foo                                    | 45387           | 45387 | 45387  | 45387 | 1       |
+| foo                                    | 45370           | 45370 | 45370  | 45370 | 1       |
 
 
 | src/Contracts.sol:ContractThree contract |                 |        |        |        |         |
 |------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                          | Deployment Size |        |        |        |         |
-| 103591                                   | 256             |        |        |        |         |
+| 101748                                   | 242             |        |        |        |         |
 | Function Name                            | min             | avg    | median | max    | # calls |
-| baz                                      | 260712          | 260712 | 260712 | 260712 | 1       |
+| baz                                      | 259210          | 259210 | 259210 | 259210 | 1       |
 
 
 | src/Contracts.sol:ContractTwo contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101520                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| bar                                    | 64984           | 64984 | 64984  | 64984 | 1       |
+| bar                                    | 64832           | 64832 | 64832  | 64832 | 1       |
 ...
 
 "#]]);
@@ -1769,48 +1784,48 @@ forgetest!(gas_report_all_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractOne",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101532,
+      "size": 241
     },
     "functions": {
       "foo()": {
         "calls": 1,
-        "min": 45387,
-        "mean": 45387,
-        "median": 45387,
-        "max": 45387
+        "min": 45370,
+        "mean": 45370,
+        "median": 45370,
+        "max": 45370
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractThree",
     "deployment": {
-      "gas": 103591,
-      "size": 256
+      "gas": 101748,
+      "size": 242
     },
     "functions": {
       "baz()": {
         "calls": 1,
-        "min": 260712,
-        "mean": 260712,
-        "median": 260712,
-        "max": 260712
+        "min": 259210,
+        "mean": 259210,
+        "median": 259210,
+        "max": 259210
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractTwo",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101520,
+      "size": 241
     },
     "functions": {
       "bar()": {
         "calls": 1,
-        "min": 64984,
-        "mean": 64984,
-        "median": 64984,
-        "max": 64984
+        "min": 64832,
+        "mean": 64832,
+        "median": 64832,
+        "max": 64832
       }
     }
   }
@@ -1832,25 +1847,25 @@ forgetest!(gas_report_all_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractOne contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101532                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| foo                                    | 45387           | 45387 | 45387  | 45387 | 1       |
+| foo                                    | 45370           | 45370 | 45370  | 45370 | 1       |
 
 
 | src/Contracts.sol:ContractThree contract |                 |        |        |        |         |
 |------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                          | Deployment Size |        |        |        |         |
-| 103591                                   | 256             |        |        |        |         |
+| 101748                                   | 242             |        |        |        |         |
 | Function Name                            | min             | avg    | median | max    | # calls |
-| baz                                      | 260712          | 260712 | 260712 | 260712 | 1       |
+| baz                                      | 259210          | 259210 | 259210 | 259210 | 1       |
 
 
 | src/Contracts.sol:ContractTwo contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101520                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| bar                                    | 64984           | 64984 | 64984  | 64984 | 1       |
+| bar                                    | 64832           | 64832 | 64832  | 64832 | 1       |
 ...
 
 "#]]);
@@ -1860,48 +1875,48 @@ forgetest!(gas_report_all_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractOne",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101532,
+      "size": 241
     },
     "functions": {
       "foo()": {
         "calls": 1,
-        "min": 45387,
-        "mean": 45387,
-        "median": 45387,
-        "max": 45387
+        "min": 45370,
+        "mean": 45370,
+        "median": 45370,
+        "max": 45370
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractThree",
     "deployment": {
-      "gas": 103591,
-      "size": 256
+      "gas": 101748,
+      "size": 242
     },
     "functions": {
       "baz()": {
         "calls": 1,
-        "min": 260712,
-        "mean": 260712,
-        "median": 260712,
-        "max": 260712
+        "min": 259210,
+        "mean": 259210,
+        "median": 259210,
+        "max": 259210
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractTwo",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101520,
+      "size": 241
     },
     "functions": {
       "bar()": {
         "calls": 1,
-        "min": 64984,
-        "mean": 64984,
-        "median": 64984,
-        "max": 64984
+        "min": 64832,
+        "mean": 64832,
+        "median": 64832,
+        "max": 64832
       }
     }
   }
@@ -1923,9 +1938,9 @@ forgetest!(gas_report_some_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractOne contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101532                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| foo                                    | 45387           | 45387 | 45387  | 45387 | 1       |
+| foo                                    | 45370           | 45370 | 45370  | 45370 | 1       |
 ...
 
 "#]]);
@@ -1935,16 +1950,16 @@ forgetest!(gas_report_some_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractOne",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101532,
+      "size": 241
     },
     "functions": {
       "foo()": {
         "calls": 1,
-        "min": 45387,
-        "mean": 45387,
-        "median": 45387,
-        "max": 45387
+        "min": 45370,
+        "mean": 45370,
+        "median": 45370,
+        "max": 45370
       }
     }
   }
@@ -1961,9 +1976,9 @@ forgetest!(gas_report_some_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractTwo contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101520                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| bar                                    | 64984           | 64984 | 64984  | 64984 | 1       |
+| bar                                    | 64832           | 64832 | 64832  | 64832 | 1       |
 ...
 
 "#]]);
@@ -1973,16 +1988,16 @@ forgetest!(gas_report_some_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractTwo",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101520,
+      "size": 241
     },
     "functions": {
       "bar()": {
         "calls": 1,
-        "min": 64984,
-        "mean": 64984,
-        "median": 64984,
-        "max": 64984
+        "min": 64832,
+        "mean": 64832,
+        "median": 64832,
+        "max": 64832
       }
     }
   }
@@ -2002,9 +2017,9 @@ forgetest!(gas_report_some_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractThree contract |                 |        |        |        |         |
 |------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                          | Deployment Size |        |        |        |         |
-| 103591                                   | 256             |        |        |        |         |
+| 101748                                   | 242             |        |        |        |         |
 | Function Name                            | min             | avg    | median | max    | # calls |
-| baz                                      | 260712          | 260712 | 260712 | 260712 | 1       |
+| baz                                      | 259210          | 259210 | 259210 | 259210 | 1       |
 ...
 
 "#]]);
@@ -2014,16 +2029,16 @@ forgetest!(gas_report_some_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractThree",
     "deployment": {
-      "gas": 103591,
-      "size": 256
+      "gas": 101748,
+      "size": 242
     },
     "functions": {
       "baz()": {
         "calls": 1,
-        "min": 260712,
-        "mean": 260712,
-        "median": 260712,
-        "max": 260712
+        "min": 259210,
+        "mean": 259210,
+        "median": 259210,
+        "max": 259210
       }
     }
   }
@@ -2049,17 +2064,17 @@ forgetest!(gas_report_ignore_some_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractThree contract |                 |        |        |        |         |
 |------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                          | Deployment Size |        |        |        |         |
-| 103591                                   | 256             |        |        |        |         |
+| 101748                                   | 242             |        |        |        |         |
 | Function Name                            | min             | avg    | median | max    | # calls |
-| baz                                      | 260712          | 260712 | 260712 | 260712 | 1       |
+| baz                                      | 259210          | 259210 | 259210 | 259210 | 1       |
 
 
 | src/Contracts.sol:ContractTwo contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101520                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| bar                                    | 64984           | 64984 | 64984  | 64984 | 1       |
+| bar                                    | 64832           | 64832 | 64832  | 64832 | 1       |
 ...
 
 "#]]);
@@ -2069,32 +2084,32 @@ forgetest!(gas_report_ignore_some_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractThree",
     "deployment": {
-      "gas": 103591,
-      "size": 256
+      "gas": 101748,
+      "size": 242
     },
     "functions": {
       "baz()": {
         "calls": 1,
-        "min": 260712,
-        "mean": 260712,
-        "median": 260712,
-        "max": 260712
+        "min": 259210,
+        "mean": 259210,
+        "median": 259210,
+        "max": 259210
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractTwo",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101520,
+      "size": 241
     },
     "functions": {
       "bar()": {
         "calls": 1,
-        "min": 64984,
-        "mean": 64984,
-        "median": 64984,
-        "max": 64984
+        "min": 64832,
+        "mean": 64832,
+        "median": 64832,
+        "max": 64832
       }
     }
   }
@@ -2116,17 +2131,17 @@ forgetest!(gas_report_ignore_some_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractOne contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101532                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| foo                                    | 45387           | 45387 | 45387  | 45387 | 1       |
+| foo                                    | 45370           | 45370 | 45370  | 45370 | 1       |
 
 
 | src/Contracts.sol:ContractThree contract |                 |        |        |        |         |
 |------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                          | Deployment Size |        |        |        |         |
-| 103591                                   | 256             |        |        |        |         |
+| 101748                                   | 242             |        |        |        |         |
 | Function Name                            | min             | avg    | median | max    | # calls |
-| baz                                      | 260712          | 260712 | 260712 | 260712 | 1       |
+| baz                                      | 259210          | 259210 | 259210 | 259210 | 1       |
 ...
 
 "#]]);
@@ -2136,32 +2151,32 @@ forgetest!(gas_report_ignore_some_contracts, |prj, cmd| {
   {
     "contract": "src/Contracts.sol:ContractOne",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101532,
+      "size": 241
     },
     "functions": {
       "foo()": {
         "calls": 1,
-        "min": 45387,
-        "mean": 45387,
-        "median": 45387,
-        "max": 45387
+        "min": 45370,
+        "mean": 45370,
+        "median": 45370,
+        "max": 45370
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractThree",
     "deployment": {
-      "gas": 103591,
-      "size": 256
+      "gas": 101748,
+      "size": 242
     },
     "functions": {
       "baz()": {
         "calls": 1,
-        "min": 260712,
-        "mean": 260712,
-        "median": 260712,
-        "max": 260712
+        "min": 259210,
+        "mean": 259210,
+        "median": 259210,
+        "max": 259210
       }
     }
   }
@@ -2194,25 +2209,25 @@ forgetest!(gas_report_ignore_some_contracts, |prj, cmd| {
 | src/Contracts.sol:ContractOne contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101532                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| foo                                    | 45387           | 45387 | 45387  | 45387 | 1       |
+| foo                                    | 45370           | 45370 | 45370  | 45370 | 1       |
 
 
 | src/Contracts.sol:ContractThree contract |                 |        |        |        |         |
 |------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                          | Deployment Size |        |        |        |         |
-| 103591                                   | 256             |        |        |        |         |
+| 101748                                   | 242             |        |        |        |         |
 | Function Name                            | min             | avg    | median | max    | # calls |
-| baz                                      | 260712          | 260712 | 260712 | 260712 | 1       |
+| baz                                      | 259210          | 259210 | 259210 | 259210 | 1       |
 
 
 | src/Contracts.sol:ContractTwo contract |                 |       |        |       |         |
 |----------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                        | Deployment Size |       |        |       |         |
-| 103375                                 | 255             |       |        |       |         |
+| 101520                                 | 241             |       |        |       |         |
 | Function Name                          | min             | avg   | median | max   | # calls |
-| bar                                    | 64984           | 64984 | 64984  | 64984 | 1       |
+| bar                                    | 64832           | 64832 | 64832  | 64832 | 1       |
 ...
 "#]])
         .stderr_eq(str![[r#"
@@ -2231,48 +2246,48 @@ Warning: ContractThree is listed in both 'gas_reports' and 'gas_reports_ignore'.
   {
     "contract": "src/Contracts.sol:ContractOne",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101532,
+      "size": 241
     },
     "functions": {
       "foo()": {
         "calls": 1,
-        "min": 45387,
-        "mean": 45387,
-        "median": 45387,
-        "max": 45387
+        "min": 45370,
+        "mean": 45370,
+        "median": 45370,
+        "max": 45370
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractThree",
     "deployment": {
-      "gas": 103591,
-      "size": 256
+      "gas": 101748,
+      "size": 242
     },
     "functions": {
       "baz()": {
         "calls": 1,
-        "min": 260712,
-        "mean": 260712,
-        "median": 260712,
-        "max": 260712
+        "min": 259210,
+        "mean": 259210,
+        "median": 259210,
+        "max": 259210
       }
     }
   },
   {
     "contract": "src/Contracts.sol:ContractTwo",
     "deployment": {
-      "gas": 103375,
-      "size": 255
+      "gas": 101520,
+      "size": 241
     },
     "functions": {
       "bar()": {
         "calls": 1,
-        "min": 64984,
-        "mean": 64984,
-        "median": 64984,
-        "max": 64984
+        "min": 64832,
+        "mean": 64832,
+        "median": 64832,
+        "max": 64832
       }
     }
   }
@@ -2337,12 +2352,12 @@ contract CounterTest is DSTest {
 | src/Counter.sol:Counter contract |                 |       |        |       |         |
 |----------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                  | Deployment Size |       |        |       |         |
-| 101137                           | 250             |       |        |       |         |
+| 99711                            | 240             |       |        |       |         |
 | Function Name                    | min             | avg   | median | max   | # calls |
-| a                                | 2261            | 2261  | 2261   | 2261  | 1       |
-| b                                | 2305            | 2305  | 2305   | 2305  | 1       |
-| setNumber(int256)                | 23648           | 33604 | 33604  | 43560 | 2       |
-| setNumber(uint256)               | 23604           | 33560 | 33560  | 43516 | 2       |
+| a                                | 2259            | 2259  | 2259   | 2259  | 1       |
+| b                                | 2304            | 2304  | 2304   | 2304  | 1       |
+| setNumber(int256)                | 23646           | 33602 | 33602  | 43558 | 2       |
+| setNumber(uint256)               | 23601           | 33557 | 33557  | 43513 | 2       |
 ...
 "#]]);
     cmd.forge_fuse().arg("test").arg("--gas-report").arg("--json").assert_success().stdout_eq(
@@ -2351,37 +2366,37 @@ contract CounterTest is DSTest {
   {
     "contract": "src/Counter.sol:Counter",
     "deployment": {
-      "gas": 101137,
-      "size": 250
+      "gas": 99711,
+      "size": 240
     },
     "functions": {
       "a()": {
         "calls": 1,
-        "min": 2261,
-        "mean": 2261,
-        "median": 2261,
-        "max": 2261
+        "min": 2259,
+        "mean": 2259,
+        "median": 2259,
+        "max": 2259
       },
       "b()": {
         "calls": 1,
-        "min": 2305,
-        "mean": 2305,
-        "median": 2305,
-        "max": 2305
+        "min": 2304,
+        "mean": 2304,
+        "median": 2304,
+        "max": 2304
       },
       "setNumber(int256)": {
         "calls": 2,
-        "min": 23648,
-        "mean": 33604,
-        "median": 33604,
-        "max": 43560
+        "min": 23646,
+        "mean": 33602,
+        "median": 33602,
+        "max": 43558
       },
       "setNumber(uint256)": {
         "calls": 2,
-        "min": 23604,
-        "mean": 33560,
-        "median": 33560,
-        "max": 43516
+        "min": 23601,
+        "mean": 33557,
+        "median": 33557,
+        "max": 43513
       }
     }
   }
@@ -2389,6 +2404,276 @@ contract CounterTest is DSTest {
 "#]]
         .is_json(),
     );
+});
+
+// <https://github.com/foundry-rs/foundry/issues/9115>
+forgetest_init!(gas_report_with_fallback, |prj, cmd| {
+    prj.add_test(
+        "DelegateProxyTest.sol",
+        r#"
+import {Test} from "forge-std/Test.sol";
+
+contract ProxiedContract {
+    uint256 public amount;
+
+    function deposit(uint256 aba) external {
+        amount = amount * 2;
+    }
+
+    function deposit() external {
+    }
+}
+
+contract DelegateProxy {
+    address internal implementation;
+
+    constructor(address counter) {
+        implementation = counter;
+    }
+
+    function deposit() external {
+    }
+
+    fallback() external payable {
+        address addr = implementation;
+
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), addr, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+}
+
+contract GasReportFallbackTest is Test {
+    function test_fallback_gas_report() public {
+        ProxiedContract proxied = ProxiedContract(address(new DelegateProxy(address(new ProxiedContract()))));
+        proxied.deposit(100);
+        proxied.deposit();
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    cmd.args(["test", "--mt", "test_fallback_gas_report", "-vvvv", "--gas-report"])
+        .assert_success()
+        .stdout_eq(str![[r#"
+...
+Ran 1 test for test/DelegateProxyTest.sol:GasReportFallbackTest
+[PASS] test_fallback_gas_report() ([GAS])
+Traces:
+  [327404] GasReportFallbackTest::test_fallback_gas_report()
+    ├─ [104475] → new ProxiedContract@[..]
+    │   └─ ← [Return] 236 bytes of code
+    ├─ [107054] → new DelegateProxy@[..]
+    │   └─ ← [Return] 135 bytes of code
+    ├─ [29384] DelegateProxy::fallback(100)
+    │   ├─ [3316] ProxiedContract::deposit(100) [delegatecall]
+    │   │   └─ ← [Stop] 
+    │   └─ ← [Return] 
+    ├─ [21159] DelegateProxy::deposit()
+    │   └─ ← [Stop] 
+    └─ ← [Stop] 
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; [ELAPSED]
+| test/DelegateProxyTest.sol:DelegateProxy contract |                 |       |        |       |         |
+|---------------------------------------------------|-----------------|-------|--------|-------|---------|
+| Deployment Cost                                   | Deployment Size |       |        |       |         |
+| 107054                                            | 300             |       |        |       |         |
+| Function Name                                     | min             | avg   | median | max   | # calls |
+| deposit                                           | 21159           | 21159 | 21159  | 21159 | 1       |
+| fallback                                          | 29384           | 29384 | 29384  | 29384 | 1       |
+
+
+| test/DelegateProxyTest.sol:ProxiedContract contract |                 |      |        |      |         |
+|-----------------------------------------------------|-----------------|------|--------|------|---------|
+| Deployment Cost                                     | Deployment Size |      |        |      |         |
+| 104475                                              | 263             |      |        |      |         |
+| Function Name                                       | min             | avg  | median | max  | # calls |
+| deposit                                             | 3316            | 3316 | 3316   | 3316 | 1       |
+...
+
+"#]]);
+
+    cmd.forge_fuse()
+        .args(["test", "--mt", "test_fallback_gas_report", "--gas-report", "--json"])
+        .assert_success()
+        .stdout_eq(
+            str![[r#"
+[
+  {
+    "contract": "test/DelegateProxyTest.sol:DelegateProxy",
+    "deployment": {
+      "gas": 107054,
+      "size": 300
+    },
+    "functions": {
+      "deposit()": {
+        "calls": 1,
+        "min": 21159,
+        "mean": 21159,
+        "median": 21159,
+        "max": 21159
+      },
+      "fallback()": {
+        "calls": 1,
+        "min": 29384,
+        "mean": 29384,
+        "median": 29384,
+        "max": 29384
+      }
+    }
+  },
+  {
+    "contract": "test/DelegateProxyTest.sol:ProxiedContract",
+    "deployment": {
+      "gas": 104475,
+      "size": 263
+    },
+    "functions": {
+      "deposit(uint256)": {
+        "calls": 1,
+        "min": 3316,
+        "mean": 3316,
+        "median": 3316,
+        "max": 3316
+      }
+    }
+  }
+]
+"#]]
+            .is_json(),
+        );
+});
+
+// <https://github.com/foundry-rs/foundry/issues/9300>
+forgetest_init!(gas_report_size_for_nested_create, |prj, cmd| {
+    prj.add_test(
+        "NestedDeployTest.sol",
+        r#"
+import {Test} from "forge-std/Test.sol";
+contract Child {
+    AnotherChild public child;
+    constructor() {
+        child = new AnotherChild();
+    }
+    function w() external {
+        child.w();
+    }
+}
+contract AnotherChild {
+    function w() external {}
+}
+contract Parent {
+    Child public immutable child;
+    constructor() {
+        child = new Child();
+    }
+}
+contract NestedDeploy is Test {
+    function test_nested_create_gas_report() external {
+        Parent p = new Parent();
+        p.child().child().w();
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    cmd.args(["test", "--mt", "test_nested_create_gas_report", "--gas-report"])
+        .assert_success()
+        .stdout_eq(str![[r#"
+...
+Ran 1 test for test/NestedDeployTest.sol:NestedDeploy
+[PASS] test_nested_create_gas_report() ([GAS])
+Suite result: ok. 1 passed; 0 failed; 0 skipped; [ELAPSED]
+| test/NestedDeployTest.sol:AnotherChild contract |                 |       |        |       |         |
+|-------------------------------------------------|-----------------|-------|--------|-------|---------|
+| Deployment Cost                                 | Deployment Size |       |        |       |         |
+| 0                                               | 124             |       |        |       |         |
+| Function Name                                   | min             | avg   | median | max   | # calls |
+| w                                               | 21161           | 21161 | 21161  | 21161 | 1       |
+
+
+| test/NestedDeployTest.sol:Child contract |                 |     |        |     |         |
+|------------------------------------------|-----------------|-----|--------|-----|---------|
+| Deployment Cost                          | Deployment Size |     |        |     |         |
+| 0                                        | 477             |     |        |     |         |
+| Function Name                            | min             | avg | median | max | # calls |
+| child                                    | 323             | 323 | 323    | 323 | 1       |
+
+
+| test/NestedDeployTest.sol:Parent contract |                 |     |        |     |         |
+|-------------------------------------------|-----------------|-----|--------|-----|---------|
+| Deployment Cost                           | Deployment Size |     |        |     |         |
+| 251997                                    | 739             |     |        |     |         |
+| Function Name                             | min             | avg | median | max | # calls |
+| child                                     | 181             | 181 | 181    | 181 | 1       |
+...
+"#]]);
+
+    cmd.forge_fuse()
+        .args(["test", "--mt", "test_nested_create_gas_report", "--gas-report", "--json"])
+        .assert_success()
+        .stdout_eq(
+            str![[r#"
+[
+  {
+    "contract": "test/NestedDeployTest.sol:AnotherChild",
+    "deployment": {
+      "gas": 0,
+      "size": 124
+    },
+    "functions": {
+      "w()": {
+        "calls": 1,
+        "min": 21161,
+        "mean": 21161,
+        "median": 21161,
+        "max": 21161
+      }
+    }
+  },
+  {
+    "contract": "test/NestedDeployTest.sol:Child",
+    "deployment": {
+      "gas": 0,
+      "size": 477
+    },
+    "functions": {
+      "child()": {
+        "calls": 1,
+        "min": 323,
+        "mean": 323,
+        "median": 323,
+        "max": 323
+      }
+    }
+  },
+  {
+    "contract": "test/NestedDeployTest.sol:Parent",
+    "deployment": {
+      "gas": 251997,
+      "size": 739
+    },
+    "functions": {
+      "child()": {
+        "calls": 1,
+        "min": 181,
+        "mean": 181,
+        "median": 181,
+        "max": 181
+      }
+    }
+  }
+]
+"#]]
+            .is_json(),
+        );
 });
 
 forgetest!(zk_gas_report, |prj, cmd| {
@@ -2622,7 +2907,7 @@ Compiler run successful!
 "#]]);
 
     // Expect compilation to be skipped as no files have changed
-    cmd.arg("build").assert_success().stdout_eq(str![[r#"
+    cmd.forge_fuse().arg("build").assert_success().stdout_eq(str![[r#"
 No files changed, compilation skipped
 
 "#]]);
@@ -2746,6 +3031,14 @@ Compiler run successful!
 Compiler run successful!
 
 "#]]);
+
+    // Fail if no source file found.
+    prj.clear();
+    cmd.forge_fuse();
+    cmd.args(["build", "test/Dummy.sol", "--force"]).assert_failure().stderr_eq(str![[r#"
+Error: No source files found in specified build paths.
+
+"#]]);
 });
 
 // checks that build --sizes includes all contracts even if unchanged
@@ -2758,10 +3051,24 @@ forgetest_init!(can_build_sizes_repeatedly, |prj, cmd| {
 Compiler run successful!
 | Contract | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
 |----------|------------------|-------------------|--------------------|---------------------|
-| Counter  |              247 |               277 |             24,329 |              48,875 |
+| Counter  |              236 |               263 |             24,340 |              48,889 |
 
 
 "#]]);
+
+    cmd.forge_fuse().args(["build", "--sizes", "--json"]).assert_success().stdout_eq(
+        str![[r#"
+{
+  "Counter": {
+    "runtime_size": 236,
+    "init_size": 263,
+    "runtime_margin": 24340,
+    "init_margin": 48889
+  }
+}
+"#]]
+        .is_json(),
+    );
 });
 
 // checks that build --names includes all contracts even if unchanged
@@ -2777,6 +3084,11 @@ Compiler run successful!
 ...
 
 "#]]);
+
+    cmd.forge_fuse()
+        .args(["build", "--names", "--json"])
+        .assert_success()
+        .stdout_eq(str![[r#""{...}""#]].is_json());
 });
 
 // <https://github.com/foundry-rs/foundry/issues/6816>
@@ -2808,20 +3120,20 @@ forgetest_init!(gas_report_include_tests, |prj, cmd| {
 | src/Counter.sol:Counter contract |                 |       |        |       |         |
 |----------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                  | Deployment Size |       |        |       |         |
-| 106715                           | 277             |       |        |       |         |
+| 104475                           | 263             |       |        |       |         |
 | Function Name                    | min             | avg   | median | max   | # calls |
-| increment                        | 43404           | 43404 | 43404  | 43404 | 1       |
-| number                           | 283             | 283   | 283    | 283   | 1       |
-| setNumber                        | 23582           | 23582 | 23582  | 23582 | 1       |
+| increment                        | 43401           | 43401 | 43401  | 43401 | 1       |
+| number                           | 281             | 281   | 281    | 281   | 1       |
+| setNumber                        | 23579           | 23579 | 23579  | 23579 | 1       |
 
 
 | test/Counter.t.sol:CounterTest contract |                 |        |        |        |         |
 |-----------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                         | Deployment Size |        |        |        |         |
-| 965418                                  | 4661            |        |        |        |         |
+| 938190                                  | 4522            |        |        |        |         |
 | Function Name                           | min             | avg    | median | max    | # calls |
-| setUp                                   | 168064          | 168064 | 168064 | 168064 | 1       |
-| test_Increment                          | 52367           | 52367  | 52367  | 52367  | 1       |
+| setUp                                   | 165834          | 165834 | 165834 | 165834 | 1       |
+| test_Increment                          | 52357           | 52357  | 52357  | 52357  | 1       |
 ...
 
 "#]
@@ -2836,53 +3148,53 @@ forgetest_init!(gas_report_include_tests, |prj, cmd| {
   {
     "contract": "src/Counter.sol:Counter",
     "deployment": {
-      "gas": 106715,
-      "size": 277
+      "gas": 104475,
+      "size": 263
     },
     "functions": {
       "increment()": {
         "calls": 1,
-        "min": 43404,
-        "mean": 43404,
-        "median": 43404,
-        "max": 43404
+        "min": 43401,
+        "mean": 43401,
+        "median": 43401,
+        "max": 43401
       },
       "number()": {
         "calls": 1,
-        "min": 283,
-        "mean": 283,
-        "median": 283,
-        "max": 283
+        "min": 281,
+        "mean": 281,
+        "median": 281,
+        "max": 281
       },
       "setNumber(uint256)": {
         "calls": 1,
-        "min": 23582,
-        "mean": 23582,
-        "median": 23582,
-        "max": 23582
+        "min": 23579,
+        "mean": 23579,
+        "median": 23579,
+        "max": 23579
       }
     }
   },
   {
     "contract": "test/Counter.t.sol:CounterTest",
     "deployment": {
-      "gas": 965418,
-      "size": 4661
+      "gas": 938190,
+      "size": 4522
     },
     "functions": {
       "setUp()": {
         "calls": 1,
-        "min": 168064,
-        "mean": 168064,
-        "median": 168064,
-        "max": 168064
+        "min": 165834,
+        "mean": 165834,
+        "median": 165834,
+        "max": 165834
       },
       "test_Increment()": {
         "calls": 1,
-        "min": 52367,
-        "mean": 52367,
-        "median": 52367,
-        "max": 52367
+        "min": 52357,
+        "mean": 52357,
+        "median": 52357,
+        "max": 52357
       }
     }
   }

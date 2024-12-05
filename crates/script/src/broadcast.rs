@@ -126,7 +126,7 @@ pub async fn send_transaction(
                     zk_tx.set_factory_deps(zk.factory_deps.iter().map(Bytes::from_iter).collect());
                 }
                 if let Some(paymaster_data) = &zk.paymaster_data {
-                    zk_tx.set_paymaster(
+                    zk_tx.set_paymaster_params(
                         alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
                             paymaster: paymaster_data.paymaster.to_address(),
                             paymaster_input: paymaster_data.paymaster_input.clone().into(),

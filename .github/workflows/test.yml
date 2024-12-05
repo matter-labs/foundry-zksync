@@ -4,9 +4,11 @@ on:
     push:
         branches:
             - main
+            - "*upstream*"
     pull_request:
         branches:
             - main
+            - "*upstream*"
 
 concurrency:
     cancel-in-progress: true
@@ -24,7 +26,7 @@ jobs:
       secrets: inherit
 
     doctest:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -39,7 +41,7 @@ jobs:
 
     clippy:
         name: clippy
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -52,7 +54,7 @@ jobs:
                   RUSTFLAGS: -Dwarnings
 
     rustfmt:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -63,7 +65,7 @@ jobs:
             - run: cargo fmt --all --check
 
     forge-fmt:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-22.04
         timeout-minutes: 60
         steps:
             - uses: actions/checkout@v4
@@ -78,7 +80,7 @@ jobs:
               run: ./.github/scripts/format.sh --check
 
     codespell:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       timeout-minutes: 30
       steps:
         - uses: actions/checkout@v4
@@ -87,6 +89,7 @@ jobs:
             skip: "*.json"
 
     crate-checks:
+        # ubuntu-22.04 runs out of disk space
         runs-on: ubuntu-22.04-github-hosted-16core
         timeout-minutes: 60
         steps:
@@ -102,7 +105,7 @@ jobs:
               run: cargo hack check
     
     zk-cargo-test:
-        runs-on: ubuntu-22.04-github-hosted-16core
+        runs-on: ubuntu-22.04
   
         steps:
         - name: Checkout code
@@ -128,18 +131,21 @@ jobs:
             logFilePath: era_test_node.log
             target: x86_64-unknown-linux-gnu
             releaseTag: v0.1.0-alpha.29
-
+        - name: Setup Git config
+          run: |
+            git config --global user.name "GitHub Actions Bot"
+            git config --global user.email "<>"
+            git config --global url."https://github.com/".insteadOf "git@github.com:"
         - name: Run zk tests
           env:
             RUST_BACKTRACE: full
             TEST_MAINNET_URL: http://localhost:8011
           run: |
-            git config --global user.name "test-runner"
             ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' --filter-expr 'test(~zk)'
 
     check-ci-install:
       name: CI install
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
       steps:
         - uses: actions/checkout@v4
         - name: Install foundry-zksync

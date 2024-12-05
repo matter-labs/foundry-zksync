@@ -48,10 +48,10 @@ impl VerificationProvider for ZkVerificationProvider {
         let verification_id: u64 = retry
             .run_async(|| {
                 async {
-                    println!(
+                    sh_println!(
                         "\nSubmitting verification for [{}] at address {}.",
                         request.contract_name, request.contract_address
-                    );
+                    )?;
 
                     let verifier_url = args
                     .verifier
@@ -88,7 +88,10 @@ impl VerificationProvider for ZkVerificationProvider {
             })
             .await?;
 
-        println!("Verification submitted successfully. Verification ID: {}", verification_id);
+        let _ = sh_println!(
+            "Verification submitted successfully. Verification ID: {}",
+            verification_id
+        );
 
         self.check(VerifyCheckArgs {
             id: verification_id.to_string(),
@@ -102,12 +105,12 @@ impl VerificationProvider for ZkVerificationProvider {
     }
 
     async fn check(&self, args: VerifyCheckArgs) -> Result<()> {
-        println!(
+        sh_println!(
             "Checking verification status for ID: {} using verifier: {} at URL: {}",
             args.id,
             args.verifier.verifier,
             args.verifier.verifier_url.as_deref().unwrap_or("URL not specified")
-        );
+        )?;
         let max_retries = args.retry.retries;
         let delay_in_seconds = args.retry.delay;
 
@@ -236,7 +239,8 @@ impl ZkVerificationProvider {
 
             if resp.is_pending() || resp.is_queued() {
                 if retries >= max_retries {
-                    println!("Verification is still pending after {max_retries} retries.");
+                    let _ =
+                        sh_println!("Verification is still pending after {max_retries} retries.");
                     return Ok(resp);
                 }
 
@@ -263,17 +267,17 @@ impl ZkVerificationProvider {
         if let Some(resp) = response {
             match resp.status {
                 VerificationStatusEnum::Successful => {
-                    println!("Verification was successful.");
+                    let _ = sh_println!("Verification was successful.");
                 }
                 VerificationStatusEnum::Failed => {
                     let error_message = resp.get_error(verification_url);
                     eyre::bail!("Verification failed:\n\n{}", error_message);
                 }
                 VerificationStatusEnum::Queued => {
-                    println!("Verification is queued.");
+                    let _ = sh_println!("Verification is queued.");
                 }
                 VerificationStatusEnum::InProgress => {
-                    println!("Verification is in progress.");
+                    let _ = sh_println!("Verification is in progress.");
                 }
             }
         } else {

@@ -3,11 +3,11 @@ use alloy_primitives::Address;
 use eyre::{Result, WrapErr};
 use foundry_common::{fs, TestFunctionExt};
 use foundry_compilers::{
-    artifacts::{CompactBytecode, CompactDeployedBytecode, Settings},
+    artifacts::{CompactBytecode, Settings},
     cache::{CacheEntry, CompilerCache},
     utils::read_json_file,
     zksync::artifact_output::zk::ZkContractArtifact,
-    Artifact, ProjectCompileOutput,
+    Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::{error::ExtractConfigError, figment::Figment, Chain, Config, NamedChain};
 use foundry_debugger::Debugger;
@@ -33,17 +33,21 @@ use yansi::Paint;
 /// Runtime Bytecode of the given contract.
 #[track_caller]
 pub fn remove_contract(
-    output: &mut ProjectCompileOutput,
+    output: ProjectCompileOutput,
     path: &Path,
     name: &str,
-) -> Result<(JsonAbi, CompactBytecode, CompactDeployedBytecode)> {
-    let contract = if let Some(contract) = output.remove(path, name) {
-        contract
-    } else {
+) -> Result<(JsonAbi, CompactBytecode, ArtifactId)> {
+    let mut other = Vec::new();
+    let Some((id, contract)) = output.into_artifacts().find_map(|(id, artifact)| {
+        if id.name == name && id.source == path {
+            Some((id, artifact))
+        } else {
+            other.push(id.name);
+            None
+        }
+    }) else {
         let mut err = format!("could not find artifact: `{name}`");
-        if let Some(suggestion) =
-            super::did_you_mean(name, output.artifacts().map(|(name, _)| name)).pop()
-        {
+        if let Some(suggestion) = super::did_you_mean(name, other).pop() {
             if suggestion != name {
                 err = format!(
                     r#"{err}
@@ -65,12 +69,7 @@ pub fn remove_contract(
         .ok_or_else(|| eyre::eyre!("contract {} does not contain bytecode", name))?
         .into_owned();
 
-    let runtime = contract
-        .get_deployed_bytecode()
-        .ok_or_else(|| eyre::eyre!("contract {} does not contain deployed bytecode", name))?
-        .into_owned();
-
-    Ok((abi, bin, runtime))
+    Ok((abi, bin, id))
 }
 
 /// Given a `Project`'s output, removes the matching ABI, Bytecode and
@@ -80,14 +79,19 @@ pub fn remove_zk_contract(
     output: &mut foundry_compilers::zksync::compile::output::ProjectCompileOutput,
     path: &Path,
     name: &str,
-) -> Result<ZkContractArtifact> {
-    let contract = if let Some(contract) = output.remove(path, name) {
-        contract
-    } else {
+) -> Result<(ZkContractArtifact, ArtifactId)> {
+    let mut other = Vec::new();
+
+    let Some(id) = output.artifact_ids().find_map(|(id, _)| {
+        if id.name == name && id.source == path {
+            Some(id)
+        } else {
+            other.push(id.name);
+            None
+        }
+    }) else {
         let mut err = format!("could not find artifact: `{name}`");
-        if let Some(suggestion) =
-            super::did_you_mean(name, output.artifacts().map(|(name, _)| name)).pop()
-        {
+        if let Some(suggestion) = super::did_you_mean(name, other).pop() {
             if suggestion != name {
                 err = format!(
                     r#"{err}
@@ -99,7 +103,10 @@ pub fn remove_zk_contract(
         eyre::bail!(err)
     };
 
-    Ok(contract)
+    let contract =
+        output.remove(id.source.as_ref(), &id.name).expect("contract found to exist in zk output");
+
+    Ok((contract, id))
 }
 
 /// Helper function for finding a contract by ContractName
@@ -158,9 +165,8 @@ pub fn needs_setup(abi: &JsonAbi) -> bool {
 
     for setup_fn in setup_fns.iter() {
         if setup_fn.name != "setUp" {
-            println!(
-                "{} Found invalid setup function \"{}\" did you mean \"setUp()\"?",
-                "Warning:".yellow().bold(),
+            let _ = sh_warn!(
+                "Found invalid setup function \"{}\" did you mean \"setUp()\"?",
                 setup_fn.signature()
             );
         }
@@ -482,19 +488,19 @@ pub async fn print_traces(
 ) -> Result<()> {
     let traces = result.traces.as_mut().expect("No traces found");
 
-    println!("Traces:");
+    sh_println!("Traces:")?;
     for (_, arena) in traces {
         decode_trace_arena(arena, decoder).await?;
-        println!("{}", render_trace_arena_with_bytecodes(arena, verbose));
+        sh_println!("{}", render_trace_arena_with_bytecodes(arena, verbose))?;
     }
-    println!();
+    sh_println!()?;
 
     if result.success {
-        println!("{}", "Transaction successfully executed.".green());
+        sh_println!("{}", "Transaction successfully executed.".green())?;
     } else {
-        println!("{}", "Transaction failed.".red());
+        sh_err!("Transaction failed.")?;
     }
 
-    println!("Gas used: {}", result.gas_used);
+    sh_println!("Gas used: {}", result.gas_used)?;
     Ok(())
 }

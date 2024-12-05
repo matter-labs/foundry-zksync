@@ -23,7 +23,7 @@ use foundry_cli::{
 };
 use foundry_common::ens::NameOrAddress;
 use foundry_config::Config;
-use std::{path::PathBuf, str::FromStr};
+use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 /// ZkSync-specific paymaster parameters for transactions
 #[derive(Debug, Parser)]
@@ -197,20 +197,23 @@ impl SendTxArgs {
             // move the signers to their respective blocks.
             if zksync_params.zksync {
                 // Retrieve the signer, and bail if it can't be constructed.
-                let zk_signer: foundry_wallets::WalletSigner = eth.wallet.signer().await?;
-                let from = zk_signer.address();
+                let signer = eth.wallet.signer().await?;
+                let from = signer.address();
 
                 tx::validate_from_address(eth.wallet.from, from)?;
 
                 // Zksync transaction
-                let (tx, _) = builder.build(&zk_signer).await?;
+                let (tx, _) = builder.build(&signer).await?;
+                let signer = Arc::new(signer);
 
-                let zk_wallet = ZksyncWallet::from(zk_signer);
+                let zk_wallet = ZksyncWallet::from(signer.clone());
                 let zk_provider = ProviderBuilder::<_, _, Zksync>::default()
                     .wallet(zk_wallet.clone())
                     .on_provider(&zk_provider);
+
+                let wallet = EthereumWallet::from(signer);
                 let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                    .wallet(zk_wallet)
+                    .wallet(wallet)
                     .on_provider(&provider);
 
                 cast_send_zk(
@@ -280,7 +283,7 @@ async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Trans
     tx.inner.transaction_type = Some(zksync_types::l2::TransactionType::EIP712Transaction as u8);
     let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
     if let Some(paymaster_params) = paymaster_params {
-        zk_tx.set_paymaster(paymaster_params);
+        zk_tx.set_paymaster_params(paymaster_params);
     }
 
     foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;

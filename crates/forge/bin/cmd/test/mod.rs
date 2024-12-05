@@ -5,7 +5,7 @@ use clap::{Parser, ValueHint};
 use eyre::{Context, OptionExt, Result};
 use forge::{
     decode::decode_console_logs,
-    gas_report::{GasReport, GasReportKind},
+    gas_report::GasReport,
     multi_runner::matches_contract,
     result::{SuiteResult, TestOutcome, TestStatus},
     traces::{
@@ -17,13 +17,13 @@ use forge::{
     MultiContractRunner, MultiContractRunnerBuilder, TestFilter, TestOptions, TestOptionsBuilder,
 };
 use foundry_cli::{
-    opts::CoreBuildArgs,
+    opts::{CoreBuildArgs, GlobalOpts},
     utils::{self, LoadConfig},
 };
-use foundry_common::{compile::ProjectCompiler, evm::EvmArgs, fs, shell};
+use foundry_common::{compile::ProjectCompiler, evm::EvmArgs, fs, shell, TestFunctionExt};
 use foundry_compilers::{
     artifacts::output_selection::OutputSelection,
-    compilers::{multi::MultiCompilerLanguage, CompilerSettings, Language},
+    compilers::{multi::MultiCompilerLanguage, Language},
     utils::source_files_iter,
     ProjectCompileOutput,
 };
@@ -66,6 +66,10 @@ foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
 #[derive(Clone, Debug, Parser)]
 #[command(next_help_heading = "Test options")]
 pub struct TestArgs {
+    // Include global options for users of this struct.
+    #[command(flatten)]
+    pub global: GlobalOpts,
+
     /// The contract file you want to test, it's a shortcut for --match-path.
     #[arg(value_hint = ValueHint::FilePath)]
     pub path: Option<GlobMatcher>,
@@ -146,11 +150,6 @@ pub struct TestArgs {
     #[arg(long)]
     pub fuzz_input_file: Option<String>,
 
-    /// Max concurrent threads to use.
-    /// Default value is the number of available CPUs.
-    #[arg(long, short = 'j', visible_alias = "jobs")]
-    pub threads: Option<usize>,
-
     /// Show test execution progress.
     #[arg(long)]
     pub show_progress: bool,
@@ -201,7 +200,7 @@ impl TestArgs {
         filter: &ProjectPathsAwareFilter,
     ) -> Result<BTreeSet<PathBuf>> {
         let mut project = config.create_project(true, true)?;
-        project.settings.update_output_selection(|selection| {
+        project.update_output_selection(|selection| {
             *selection = OutputSelection::common_output_selection(["abi".to_string()]);
         });
 
@@ -272,13 +271,6 @@ impl TestArgs {
     pub async fn execute_tests(mut self) -> Result<TestOutcome> {
         // Merge all configs.
         let (mut config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
-
-        // Set number of max threads to execute tests.
-        // If not specified then the number of threads determined by rayon will be used.
-        if let Some(test_threads) = config.threads {
-            trace!(target: "forge::test", "execute tests with {} max threads", test_threads);
-            rayon::ThreadPoolBuilder::new().num_threads(test_threads).build_global()?;
-        }
 
         // Explicitly enable isolation for gas reports for more correct gas accounting.
         if self.gas_report {
@@ -604,7 +596,6 @@ impl TestArgs {
                 config.gas_reports.clone(),
                 config.gas_reports_ignore.clone(),
                 config.gas_reports_include_tests,
-                if shell::is_json() { GasReportKind::JSON } else { GasReportKind::Markdown },
             )
         });
 
@@ -919,10 +910,6 @@ impl Provider for TestArgs {
             dict.insert("show_progress".to_string(), true.into());
         }
 
-        if let Some(threads) = self.threads {
-            dict.insert("threads".to_string(), threads.into());
-        }
-
         Ok(Map::from([(Config::selected_profile(), dict)]))
     }
 }
@@ -932,7 +919,7 @@ fn list(runner: MultiContractRunner, filter: &ProjectPathsAwareFilter) -> Result
     let results = runner.list(filter);
 
     if shell::is_json() {
-        println!("{}", serde_json::to_string(&results)?);
+        sh_println!("{}", serde_json::to_string(&results)?)?;
     } else {
         for (file, contracts) in results.iter() {
             sh_println!("{file}")?;
@@ -959,10 +946,12 @@ fn persist_run_failures(config: &Config, outcome: &TestOutcome) {
         let mut filter = String::new();
         let mut failures = outcome.failures().peekable();
         while let Some((test_name, _)) = failures.next() {
-            if let Some(test_match) = test_name.split('(').next() {
-                filter.push_str(test_match);
-                if failures.peek().is_some() {
-                    filter.push('|');
+            if test_name.is_any_test() {
+                if let Some(test_match) = test_name.split("(").next() {
+                    filter.push_str(test_match);
+                    if failures.peek().is_some() {
+                        filter.push('|');
+                    }
                 }
             }
         }
@@ -1015,56 +1004,34 @@ fn junit_xml_report(results: &BTreeMap<String, SuiteResult>, verbosity: u8) -> R
 
 #[cfg(test)]
 mod tests {
-    use crate::opts::{Forge, ForgeSubcommand};
-
     use super::*;
     use foundry_config::{Chain, InvariantConfig};
     use foundry_test_utils::forgetest_async;
 
     #[test]
     fn watch_parse() {
-        let args = match Forge::parse_from(["foundry-cli", "test", "-vw"]).cmd {
-            ForgeSubcommand::Test(args) => args,
-            _ => unreachable!(),
-        };
+        let args: TestArgs = TestArgs::parse_from(["foundry-cli", "-vw"]);
         assert!(args.watch.watch.is_some());
     }
 
     #[test]
     fn fuzz_seed() {
-        let args = match Forge::parse_from(["foundry-cli", "test", "--fuzz-seed", "0x10"]).cmd {
-            ForgeSubcommand::Test(args) => args,
-            _ => unreachable!(),
-        };
+        let args: TestArgs = TestArgs::parse_from(["foundry-cli", "--fuzz-seed", "0x10"]);
         assert!(args.fuzz_seed.is_some());
     }
 
     // <https://github.com/foundry-rs/foundry/issues/5913>
     #[test]
     fn fuzz_seed_exists() {
-        let args = match Forge::parse_from([
-            "foundry-cli",
-            "test",
-            "-vvv",
-            "--gas-report",
-            "--fuzz-seed",
-            "0x10",
-        ])
-        .cmd
-        {
-            ForgeSubcommand::Test(args) => args,
-            _ => unreachable!(),
-        };
+        let args: TestArgs =
+            TestArgs::parse_from(["foundry-cli", "-vvv", "--gas-report", "--fuzz-seed", "0x10"]);
         assert!(args.fuzz_seed.is_some());
     }
 
     #[test]
     fn extract_chain() {
         let test = |arg: &str, expected: Chain| {
-            let args = match Forge::parse_from(["foundry-cli", "test", arg]).cmd {
-                ForgeSubcommand::Test(args) => args,
-                _ => unreachable!(),
-            };
+            let args = TestArgs::parse_from(["foundry-cli", arg]);
             assert_eq!(args.evm_opts.env.chain, Some(expected));
             let (config, evm_opts) = args.load_config_and_evm_opts().unwrap();
             assert_eq!(config.chain, Some(expected));
@@ -1118,19 +1085,12 @@ contract FooBarTest is DSTest {
         )
         .unwrap();
 
-        let args = match Forge::parse_from([
+        let args = TestArgs::parse_from([
             "foundry-cli",
-            "test",
             "--gas-report",
             "--root",
             &prj.root().to_string_lossy(),
-        ])
-        .cmd
-        {
-            ForgeSubcommand::Test(args) => args,
-            _ => unreachable!(),
-        };
-
+        ]);
         let outcome = args.run().await.unwrap();
         let gas_report = outcome.gas_report.unwrap();
 

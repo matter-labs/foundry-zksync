@@ -175,44 +175,44 @@ foundry-zksync-compiler = { path = "crates/zksync/compiler" }
 foundry-zksync-inspectors = { path = "crates/zksync/inspectors" }
 
 # solc & compilation utilities
-# foundry-block-explorers = { version = "0.7.3", default-features = false }
-# foundry-compilers = { version = "0.11.6", default-features = false }
-# foundry-fork-db = "0.6.0"
-foundry-block-explorers = { git = "https://github.com/Moonsong-Labs/block-explorers", branch = "zksync-v0.7.3", default-features = false }
-foundry-compilers = { git = "https://github.com/Moonsong-Labs/compilers", branch = "zksync-v0.11.6" }
-foundry-fork-db = { git = "https://github.com/Moonsong-Labs/foundry-zksync-fork-db", branch = "zksync-v0.6.0" }
+# foundry-block-explorers = { version = "0.9.0", default-features = false }
+# foundry-compilers = { version = "0.12.3", default-features = false }
+# foundry-fork-db = "0.7.0"
+foundry-block-explorers = { git = "https://github.com/Moonsong-Labs/block-explorers", branch = "zksync-v0.9.0", default-features = false }
+foundry-compilers = { git = "https://github.com/Moonsong-Labs/compilers", branch = "zksync-v0.12.3" }
+foundry-fork-db = { git = "https://github.com/Moonsong-Labs/foundry-zksync-fork-db", branch = "zksync-v0.7.1" }
 solang-parser = "=0.3.3"
 
 ## revm
-revm = { version = "17.1.0", default-features = false }
-revm-primitives = { version = "13.0.0", default-features = false }
-revm-inspectors = { version = "0.10.0", features = ["serde"] }
+revm = { version = "18.0.0", default-features = false }
+revm-primitives = { version = "14.0.0", default-features = false }
+revm-inspectors = { version = "0.11.0", features = ["serde"] }
 
 ## ethers
 ethers-contract-abigen = { version = "2.0.14", default-features = false }
 
 ## alloy
-alloy-consensus = { version = "0.5.4", default-features = false }
-alloy-contract = { version = "0.5.4", default-features = false }
-alloy-eips = { version = "0.5.4", default-features = false }
-alloy-genesis = { version = "0.5.4", default-features = false }
-alloy-json-rpc = { version = "0.5.4", default-features = false }
-alloy-network = { version = "0.5.4", default-features = false }
-alloy-provider = { version = "0.5.4", default-features = false }
-alloy-pubsub = { version = "0.5.4", default-features = false }
-alloy-rpc-client = { version = "0.5.4", default-features = false }
-alloy-rpc-types = { version = "0.5.4", default-features = true }
-alloy-serde = { version = "0.5.4", default-features = false }
-alloy-signer = { version = "0.5.4", default-features = false }
-alloy-signer-aws = { version = "0.5.4", default-features = false }
-alloy-signer-gcp = { version = "0.5.4", default-features = false }
-alloy-signer-ledger = { version = "0.5.4", default-features = false }
-alloy-signer-local = { version = "0.5.4", default-features = false }
-alloy-signer-trezor = { version = "0.5.4", default-features = false }
-alloy-transport = { version = "0.5.4", default-features = false }
-alloy-transport-http = { version = "0.5.4", default-features = false }
-alloy-transport-ipc = { version = "0.5.4", default-features = false }
-alloy-transport-ws = { version = "0.5.4", default-features = false }
+alloy-consensus = { version = "0.6.4", default-features = false }
+alloy-contract = { version = "0.6.4", default-features = false }
+alloy-eips = { version = "0.6.4", default-features = false }
+alloy-genesis = { version = "0.6.4", default-features = false }
+alloy-json-rpc = { version = "0.6.4", default-features = false }
+alloy-network = { version = "0.6.4", default-features = false }
+alloy-provider = { version = "0.6.4", default-features = false }
+alloy-pubsub = { version = "0.6.4", default-features = false }
+alloy-rpc-client = { version = "0.6.4", default-features = false }
+alloy-rpc-types = { version = "0.6.4", default-features = true }
+alloy-serde = { version = "0.6.4", default-features = false }
+alloy-signer = { version = "0.6.4", default-features = false }
+alloy-signer-aws = { version = "0.6.4", default-features = false }
+alloy-signer-gcp = { version = "0.6.4", default-features = false }
+alloy-signer-ledger = { version = "0.6.4", default-features = false }
+alloy-signer-local = { version = "0.6.4", default-features = false }
+alloy-signer-trezor = { version = "0.6.4", default-features = false }
+alloy-transport = { version = "0.6.4", default-features = false }
+alloy-transport-http = { version = "0.6.4", default-features = false }
+alloy-transport-ipc = { version = "0.6.4", default-features = false }
+alloy-transport-ws = { version = "0.6.4", default-features = false }
 
 ## alloy-core
 alloy-dyn-abi = "0.8.11"
@@ -230,11 +230,11 @@ syn-solidity = "0.8.11"
 alloy-chains = "0.1"
 alloy-rlp = "0.3"
 alloy-trie = "0.6.0"
-alloy-zksync = "0.5"
+alloy-zksync = "0.6.1"
 
 ## op-alloy 
-op-alloy-rpc-types = "0.5.0"
-op-alloy-consensus = "0.5.0"
+op-alloy-rpc-types = "0.6.5"
+op-alloy-consensus = "0.6.5"
 
 ## cli
 anstream = "0.6"
@@ -299,7 +299,7 @@ semver = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 similar-asserts = "1.6"
-soldeer-commands = "=0.4.1"
+soldeer-commands = "=0.5.1"
 strum = "0.26"
 tempfile = "3.13"
 tikv-jemallocator = "0.6"
@@ -349,32 +349,3 @@ yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
 # alloy-transport-http = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
 # alloy-transport-ipc = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
 # alloy-transport-ws = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-
-alloy-rpc-client = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-signer-ledger = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-rpc-types-txpool = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-signer-trezor = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-json-rpc = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-signer = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-consensus = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-transport-http = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-rpc-types-anvil = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-serde = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-transport-ws = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-signer-local = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-genesis = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-contract = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-provider = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-signer-aws = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-rpc-types-eth = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-network-primitives = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-transport-ipc = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-pubsub = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-transport = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-rpc-types = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-eips = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-network = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-rpc-types-engine = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-rpc-types-trace = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }
-alloy-signer-gcp = { git = "https://github.com/Karrq/alloy", branch = "zksync-v0.5.4" }

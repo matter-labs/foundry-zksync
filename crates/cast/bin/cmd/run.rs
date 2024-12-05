@@ -1,3 +1,5 @@
+use alloy_consensus::Transaction;
+use alloy_network::TransactionResponse;
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockTransactions;
@@ -5,10 +7,10 @@ use cast::revm::primitives::EnvWithHandlerCfg;
 use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_cli::{
-    opts::RpcOpts,
+    opts::{EtherscanOpts, RpcOpts},
     utils::{handle_traces, init_progress, TraceResult},
 };
-use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
+use foundry_common::{is_known_system_sender, shell, SYSTEM_TRANSACTION_TYPE};
 use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{
     figment::{
@@ -48,10 +50,6 @@ pub struct RunArgs {
     #[arg(long)]
     quick: bool,
 
-    /// Prints the full address of the contract.
-    #[arg(long, short)]
-    verbose: bool,
-
     /// Label addresses in the trace.
     ///
     /// Example: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045:vitalik.eth
@@ -59,12 +57,15 @@ pub struct RunArgs {
     label: Vec<String>,
 
     #[command(flatten)]
+    etherscan: EtherscanOpts,
+
+    #[command(flatten)]
     rpc: RpcOpts,
 
     /// The EVM version to use.
     ///
     /// Overrides the version specified in the config.
-    #[arg(long, short)]
+    #[arg(long)]
     evm_version: Option<EvmVersion>,
 
     /// Sets the number of assumed available compute units per second for this provider
@@ -116,10 +117,11 @@ impl RunArgs {
             .ok_or_else(|| eyre::eyre!("tx not found: {:?}", tx_hash))?;
 
         // check if the tx is a system transaction
-        if is_known_system_sender(tx.from) || tx.transaction_type == Some(SYSTEM_TRANSACTION_TYPE) {
+        if is_known_system_sender(tx.from) || tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
+        {
             return Err(eyre::eyre!(
                 "{:?} is a system transaction.\nReplaying system transactions is currently not supported.",
-                tx.hash
+                tx.tx_hash()
             ));
         }
 
@@ -141,7 +143,7 @@ impl RunArgs {
 
         if let Some(block) = &block {
             env.block.timestamp = U256::from(block.header.timestamp);
-            env.block.coinbase = block.header.miner;
+            env.block.coinbase = block.header.beneficiary;
             env.block.difficulty = block.header.difficulty;
             env.block.prevrandao = Some(block.header.mix_hash.unwrap_or_default());
             env.block.basefee = U256::from(block.header.base_fee_per_gas.unwrap_or_default());
@@ -185,27 +187,28 @@ impl RunArgs {
                     // we skip them otherwise this would cause
                     // reverts
                     if is_known_system_sender(tx.from) ||
-                        tx.transaction_type == Some(SYSTEM_TRANSACTION_TYPE)
+                        tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
                     {
                         pb.set_position((index + 1) as u64);
                         continue;
                     }
-                    if tx.hash == tx_hash {
+                    if tx.tx_hash() == tx_hash {
                         break;
                     }
 
                     configure_tx_env(&mut env, &tx.inner);
 
-                    if let Some(to) = tx.to {
-                        trace!(tx=?tx.hash,?to, "executing previous call transaction");
+                    if let Some(to) = Transaction::to(tx) {
+                        trace!(tx=?tx.tx_hash(),?to, "executing previous call transaction");
                         executor.transact_with_env(env.clone()).wrap_err_with(|| {
                             format!(
                                 "Failed to execute transaction: {:?} in block {}",
-                                tx.hash, env.block.number
+                                tx.tx_hash(),
+                                env.block.number
                             )
                         })?;
                     } else {
-                        trace!(tx=?tx.hash, "executing previous create transaction");
+                        trace!(tx=?tx.tx_hash(), "executing previous create transaction");
                         if let Err(error) = executor.deploy_with_env(env.clone(), None) {
                             match error {
                                 // Reverted transactions should be skipped
@@ -214,7 +217,8 @@ impl RunArgs {
                                     return Err(error).wrap_err_with(|| {
                                         format!(
                                             "Failed to deploy transaction: {:?} in block {}",
-                                            tx.hash, env.block.number
+                                            tx.tx_hash(),
+                                            env.block.number
                                         )
                                     })
                                 }
@@ -233,11 +237,11 @@ impl RunArgs {
 
             configure_tx_env(&mut env, &tx.inner);
 
-            if let Some(to) = tx.to {
-                trace!(tx=?tx.hash, to=?to, "executing call transaction");
+            if let Some(to) = Transaction::to(&tx) {
+                trace!(tx=?tx.tx_hash(), to=?to, "executing call transaction");
                 TraceResult::try_from(executor.transact_with_env(env))?
             } else {
-                trace!(tx=?tx.hash, "executing create transaction");
+                trace!(tx=?tx.tx_hash(), "executing create transaction");
                 TraceResult::try_from(executor.deploy_with_env(env, None))?
             }
         };
@@ -249,7 +253,7 @@ impl RunArgs {
             self.label,
             self.debug,
             self.decode_internal,
-            self.verbose,
+            shell::verbosity() > 0,
         )
         .await?;
 
@@ -267,6 +271,10 @@ impl figment::Provider for RunArgs {
 
         if self.alphanet {
             map.insert("alphanet".into(), self.alphanet.into());
+        }
+
+        if let Some(api_key) = &self.etherscan.key {
+            map.insert("etherscan_api_key".into(), api_key.as_str().into());
         }
 
         if let Some(evm_version) = self.evm_version {
