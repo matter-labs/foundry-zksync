@@ -17,7 +17,7 @@ contract DeployCounterWithBytecodeHash is Script {
         Factory factory = new Factory(counterBytecodeHash);
         (bool _success,) = address(vm).call(abi.encodeWithSignature("zkUseFactoryDep(string)", "Counter"));
         require(_success, "Cheatcode failed");
-        address counter = factory.deployAccount(salt);
+        address counter = factory.deployContract(salt, abi.encode());
         require(counter != address(0), "Counter deployment failed");
         vm.stopBroadcast();
     }

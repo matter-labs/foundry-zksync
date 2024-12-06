@@ -247,6 +247,10 @@ impl ForgeTestData {
     pub fn new(profile: ForgeTestProfile) -> Self {
         init_tracing();
 
+        // NOTE(zk): We need to manually install the crypto provider as zksync-era uses `aws-lc-rs`
+        // provider, while foundry uses the `ring` provider. As a result, rustls cannot
+        // disambiguate between the two while selecting a default provider.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let mut project = profile.project();
         let output = get_compiled(&mut project);
         let test_opts = profile.test_opts(&output);

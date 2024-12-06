@@ -3,7 +3,7 @@
 use foundry_test_utils::{
     forgetest_async,
     util::{self, OutputExt},
-    TestProject,
+    TestProject, ZkSyncNode,
 };
 
 use crate::test_helpers::run_zk_script_test;
@@ -35,6 +35,95 @@ async fn test_zk_contract_paymaster() {
     cmd.args(["test", "--zk-startup", "--via-ir", "--match-contract", "TestPaymasterFlow"]);
     assert!(cmd.assert_success().get_output().stdout_lossy().contains("Suite result: ok"));
 }
+
+// Tests the deployment of contracts using a paymaster for fee abstraction
+forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
+    setup_deploy_prj(&mut prj);
+    let node = ZkSyncNode::start();
+    let url = node.url();
+
+    let private_key =
+        ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
+
+    // Install required dependencies
+    cmd.args([
+        "install",
+        "OpenZeppelin/openzeppelin-contracts",
+        "cyfrin/zksync-contracts",
+        "--no-commit",
+        "--shallow",
+    ])
+    .assert_success();
+    cmd.forge_fuse();
+
+    // Deploy the paymaster contract first
+    let paymaster_deployment = cmd
+        .forge_fuse()
+        .args([
+            "create",
+            "./src/MyPaymaster.sol:MyPaymaster",
+            "--rpc-url",
+            url.as_str(),
+            "--private-key",
+            private_key,
+            "--via-ir",
+            "--value",
+            "1000000000000000000",
+            "--zksync",
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    // Extract the deployed paymaster address
+    let re = regex::Regex::new(r"Deployed to: (0x[a-fA-F0-9]{40})").unwrap();
+    let paymaster_address = re
+        .captures(&paymaster_deployment)
+        .and_then(|caps| caps.get(1))
+        .map(|addr| addr.as_str())
+        .expect("Failed to extract paymaster address");
+
+    // Test successful deployment with valid paymaster input
+    let greeter_deployment = cmd.forge_fuse()
+        .args([
+            "create",
+            "./src/Greeter.sol:Greeter",
+            "--rpc-url",
+            url.as_str(),
+            "--private-key",
+            private_key,
+            "--zk-paymaster-address",
+            paymaster_address,
+            "--zk-paymaster-input",
+            "0x8c5a344500000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
+            "--via-ir",
+            "--zksync"
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    // Verify successful deployment
+    assert!(greeter_deployment.contains("Deployed to:"));
+
+    // Test deployment failure with invalid paymaster input
+    cmd.forge_fuse()
+        .args([
+            "create",
+            "./src/Greeter.sol:Greeter",
+            "--rpc-url",
+            url.as_str(),
+            "--private-key",
+            private_key,
+            "--zk-paymaster-address",
+            paymaster_address,
+            "--zk-paymaster-input",
+            "0x0000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
+            "--via-ir",
+            "--zksync"
+        ])
+        .assert_failure();
+});
 
 forgetest_async!(paymaster_script_test, |prj, cmd| {
     setup_deploy_prj(&mut prj);
