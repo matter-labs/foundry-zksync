@@ -19,6 +19,7 @@ use alloy_primitives::{
     Address, Bytes, Log, TxKind, U256,
 };
 use alloy_signer::Signer;
+use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use broadcast::next_nonce;
 use build::PreprocessedState;
 use clap::{Parser, ValueHint};
@@ -614,6 +615,15 @@ impl ScriptConfig {
             .legacy_assertions(self.config.legacy_assertions);
 
         let use_zk = self.config.zksync.run_in_zk_mode();
+        let mut maybe_zk_env = None;
+        if use_zk {
+            if let Some(fork_url) = &self.evm_opts.fork_url {
+                let provider =
+                    zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
+                let details = provider.get_block_details(env.block.number.try_into()?).await;
+                println!("{details:?}");
+            };
+        }
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
@@ -629,6 +639,7 @@ impl ScriptConfig {
                                 Some(target.version),
                                 dual_compiled_contracts,
                                 use_zk,
+                                maybe_zk_env,
                             )
                             .into(),
                         )

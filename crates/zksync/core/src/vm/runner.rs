@@ -24,12 +24,15 @@ use crate::{
     },
 };
 
+use super::ZkVmEnv;
+
 /// Transacts
 pub fn transact<'a, DB>(
     persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
     paymaster_data: Option<PaymasterParams>,
     env: &'a mut Env,
+    zk_env: &ZkVmEnv,
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
 where
@@ -87,6 +90,7 @@ where
     let mut ccx = CheatcodeTracerContext {
         persisted_factory_deps,
         persist_nonce_update: true,
+        zk_env: zk_env.clone(),
         ..Default::default()
     };
 

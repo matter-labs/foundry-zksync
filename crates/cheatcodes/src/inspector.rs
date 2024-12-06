@@ -46,8 +46,9 @@ use foundry_wallets::multi_wallet::MultiWallet;
 use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, Call, ZkPaymasterData,
-    ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+    get_account_code_key, get_balance_key, get_nonce_key,
+    vm::ZkVmEnv,
+    Call, ZkPaymasterData, ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
 use foundry_zksync_inspectors::TraceCollector;
 use itertools::Itertools;
@@ -644,6 +645,8 @@ pub struct Cheatcodes {
 
     /// Nonce update persistence behavior in zkEVM for the tx caller.
     pub zk_persist_nonce_update: ZkPersistNonceUpdate,
+
+    pub zk_env: ZkVmEnv,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
@@ -697,6 +700,7 @@ impl Cheatcodes {
         persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
 
         let zk_startup_migration = config.use_zk.then_some(ZkStartupMigration::Defer);
+        let zk_env = config.zk_env.clone().unwrap_or_default();
 
         Self {
             fs_commit: true,
@@ -742,6 +746,7 @@ impl Cheatcodes {
             paymaster_params: None,
             zk_use_factory_deps: Default::default(),
             zk_persist_nonce_update: Default::default(),
+            zk_env,
         }
     }
 
@@ -1276,6 +1281,7 @@ impl Cheatcodes {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
             persist_nonce_update: self.broadcast.is_some() || zk_persist_nonce_update,
+            zk_env: self.zk_env.clone(),
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -1906,6 +1912,7 @@ where {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
             persist_nonce_update: self.broadcast.is_some() || zk_persist_nonce_update,
+            zk_env: self.zk_env.clone(),
         };
 
         let mut gas = Gas::new(call.gas_limit);

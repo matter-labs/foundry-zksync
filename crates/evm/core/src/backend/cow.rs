@@ -13,7 +13,7 @@ use alloy_primitives::{map::HashMap, Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::WrapErr;
 use foundry_fork_db::DatabaseError;
-use foundry_zksync_core::PaymasterParams;
+use foundry_zksync_core::{vm::ZkVmEnv, PaymasterParams};
 use revm::{
     db::DatabaseRef,
     primitives::{
@@ -65,6 +65,7 @@ impl<'a> CowBackend<'a> {
     pub fn inspect_ref_zk(
         &mut self,
         env: &mut Env,
+        zkvm_env: &ZkVmEnv,
         persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
         factory_deps: Option<Vec<Vec<u8>>>,
         paymaster_data: Option<PaymasterParams>,
@@ -78,6 +79,7 @@ impl<'a> CowBackend<'a> {
             factory_deps,
             paymaster_data,
             env,
+            zkvm_env,
             self,
         )
     }

@@ -436,8 +436,12 @@ impl Executor {
                 // since it won't be run inside zkvm
                 env.block = self.env.block.clone();
                 env.tx.gas_price = self.env.tx.gas_price;
+                let maybe_cheatcodes = &inspector.cheatcodes;
+                let maybe_zk_env = maybe_cheatcodes.as_ref().map(|c| c.zk_env.clone());
+                let zk_env = maybe_zk_env.unwrap_or_default();
                 backend.inspect_ref_zk(
                     &mut env,
+                    &zk_env,
                     &mut self.zk_persisted_factory_deps.clone(),
                     Some(zk_tx.factory_deps.clone()),
                     zk_tx.paymaster_data.clone(),
@@ -459,6 +463,9 @@ impl Executor {
                 // since it won't be run inside zkvm
                 env.block = self.env.block.clone();
                 env.tx.gas_price = self.env.tx.gas_price;
+                let maybe_cheatcodes = &inspector.cheatcodes;
+                let maybe_zk_env = maybe_cheatcodes.as_ref().map(|c| c.zk_env.clone());
+                let zk_env = maybe_zk_env.unwrap_or_default();
                 backend.inspect_ref_zk(
                     &mut env,
                     // this will persist the added factory deps,
@@ -466,6 +473,7 @@ impl Executor {
                     &mut self.zk_persisted_factory_deps,
                     Some(zk_tx.factory_deps),
                     zk_tx.paymaster_data,
+                    &zk_env,
                 )?
             }
         };

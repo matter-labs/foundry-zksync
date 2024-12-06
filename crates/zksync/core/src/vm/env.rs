@@ -12,10 +12,21 @@ use zksync_types::{
 };
 use zksync_utils::h256_to_u256;
 
+#[derive(Debug, Clone)]
+pub struct ZkVmEnv {
+    pub l1_gas_price: u64,
+    pub fair_l2_gas_price: u64,
+}
+
+impl Default for ZkVmEnv {
+    fn default() -> Self {
+        Self { l1_gas_price: 1000, fair_l2_gas_price: 0 }
+    }
+}
+
 pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
     storage: StoragePtr<ST>,
-    l1_gas_price: u64,
-    fair_l2_gas_price: u64,
+    zkvm_env: &ZkVmEnv,
 ) -> L1BatchEnv {
     let mut first_l2_block = if let Some(last_l2_block) = load_last_l2_block(&storage) {
         L2BlockEnv {
@@ -39,7 +50,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
 
     first_l2_block.timestamp = std::cmp::max(batch_timestamp + 1, first_l2_block.timestamp);
     batch_timestamp = first_l2_block.timestamp;
-    tracing::info!(fair_l2_gas_price, l1_gas_price, "batch env");
+    tracing::info!(zkvm_env.fair_l2_gas_price, zkvm_env.l1_gas_price, "batch env");
     L1BatchEnv {
         // TODO: set the previous batch hash properly (take from fork, when forking, and from local
         // storage, when this is not the first block).
@@ -51,8 +62,8 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
         enforced_base_fee: None,
         first_l2_block,
         fee_input: zksync_types::fee_model::BatchFeeInput::L1Pegged(L1PeggedBatchFeeModelInput {
-            fair_l2_gas_price,
-            l1_gas_price,
+            fair_l2_gas_price: zkvm_env.fair_l2_gas_price,
+            l1_gas_price: zkvm_env.l1_gas_price,
         }),
     }
 }
