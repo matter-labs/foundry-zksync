@@ -51,6 +51,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
     first_l2_block.timestamp = std::cmp::max(batch_timestamp + 1, first_l2_block.timestamp);
     batch_timestamp = first_l2_block.timestamp;
     tracing::info!(zkvm_env.fair_l2_gas_price, zkvm_env.l1_gas_price, "batch env");
+    println!("{zkvm_env:?}");
     L1BatchEnv {
         // TODO: set the previous batch hash properly (take from fork, when forking, and from local
         // storage, when this is not the first block).

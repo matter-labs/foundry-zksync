@@ -114,6 +114,7 @@ impl PreSimulationState {
             .into_iter()
             .map(|transaction| async {
                 let mut runner = runners.get(&transaction.rpc).expect("invalid rpc url").write();
+                println!("{:?}", runner.executor.inspector.clone().cheatcodes.map(|c| c.zk_env));
 
                 let zk_metadata = transaction.zk.clone();
                 let tx = transaction.tx();
@@ -229,7 +230,10 @@ impl PreSimulationState {
         let futs = rpcs.into_iter().map(|rpc| async move {
             let mut script_config = self.script_config.clone();
             script_config.evm_opts.fork_url = Some(rpc.clone());
+            println!("=====");
             let runner = script_config.get_runner().await?;
+            println!("{:?}", runner.executor.inspector.clone().cheatcodes.map(|c| c.zk_env));
+            println!("=====");
             Ok((rpc.clone(), runner))
         });
         try_join_all(futs).await

@@ -474,6 +474,7 @@ fn inspect_inner<S: ReadStorage>(
     // let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MIN_L1_GAS_PRICE);
     // let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
+    println!("{batch_env:?}");
 
     let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false);
     let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);
@@ -559,6 +560,7 @@ fn inspect_inner<S: ReadStorage>(
         refunded: bootloader_debug.refund_by_operator,
         bootloader_debug,
     };
+    println!("{gas_usage:?}");
 
     formatter::print_vm_details(&tx_result);
 

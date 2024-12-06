@@ -55,6 +55,7 @@ use foundry_evm::{
 };
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_core::vm::ZkVmEnv;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -620,8 +621,23 @@ impl ScriptConfig {
             if let Some(fork_url) = &self.evm_opts.fork_url {
                 let provider =
                     zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
-                let details = provider.get_block_details(env.block.number.try_into()?).await;
-                println!("{details:?}");
+                let maybe_details =
+                    provider.get_block_details(env.block.number.try_into()?).await?;
+                if let Some(details) = maybe_details {
+                    println!("{details:?}");
+                    let zk_env = ZkVmEnv {
+                        l1_gas_price: details
+                            .l1_gas_price
+                            .try_into()
+                            .expect("failed to convert l1_gas_price to u64"),
+                        fair_l2_gas_price: details
+                            .l2_fair_gas_price
+                            .try_into()
+                            .expect("failed to convert fair_l2_gas_price to u64"),
+                    };
+                    builder = builder.zk_env(zk_env.clone());
+                    maybe_zk_env = Some(zk_env);
+                }
             };
         }
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =

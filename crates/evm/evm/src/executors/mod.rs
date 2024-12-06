@@ -27,7 +27,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
-use foundry_zksync_core::ZkTransactionMetadata;
+use foundry_zksync_core::{vm::ZkVmEnv, ZkTransactionMetadata};
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
     interpreter::{return_ok, InstructionResult},
@@ -97,6 +97,7 @@ pub struct Executor {
     zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
 
     pub use_zk: bool,
+    pub zk_env: ZkVmEnv,
 }
 
 impl Executor {
@@ -137,6 +138,7 @@ impl Executor {
             zk_tx: None,
             zk_persisted_factory_deps: Default::default(),
             use_zk: false,
+            zk_env: Default::default(),
         }
     }
 
@@ -436,12 +438,9 @@ impl Executor {
                 // since it won't be run inside zkvm
                 env.block = self.env.block.clone();
                 env.tx.gas_price = self.env.tx.gas_price;
-                let maybe_cheatcodes = &inspector.cheatcodes;
-                let maybe_zk_env = maybe_cheatcodes.as_ref().map(|c| c.zk_env.clone());
-                let zk_env = maybe_zk_env.unwrap_or_default();
                 backend.inspect_ref_zk(
                     &mut env,
-                    &zk_env,
+                    &self.zk_env,
                     &mut self.zk_persisted_factory_deps.clone(),
                     Some(zk_tx.factory_deps.clone()),
                     zk_tx.paymaster_data.clone(),
@@ -463,17 +462,14 @@ impl Executor {
                 // since it won't be run inside zkvm
                 env.block = self.env.block.clone();
                 env.tx.gas_price = self.env.tx.gas_price;
-                let maybe_cheatcodes = &inspector.cheatcodes;
-                let maybe_zk_env = maybe_cheatcodes.as_ref().map(|c| c.zk_env.clone());
-                let zk_env = maybe_zk_env.unwrap_or_default();
                 backend.inspect_ref_zk(
                     &mut env,
+                    &self.zk_env,
                     // this will persist the added factory deps,
                     // no need to commit them later
                     &mut self.zk_persisted_factory_deps,
                     Some(zk_tx.factory_deps),
                     zk_tx.paymaster_data,
-                    &zk_env,
                 )?
             }
         };

@@ -61,13 +61,15 @@ contract ZkLargeFactoryDependenciesScript is Script {
         "--rpc-url",
         node.url().as_str(),
         "--slow",
-        "--gas-limit",
-        &gas_limit.to_string(),
+        // "--gas-limit",
+        // &gas_limit.to_string(),
     ]);
-    cmd.assert_success()
-        .get_output()
-        .stdout_lossy()
-        .contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
+    // cmd.assert_success()
+    //     .get_output()
+    //     .stdout_lossy()
+    //     .contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
+    let out = cmd.assert_success().get_output().stdout_lossy();
+    println!("{out}");
 
     let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))

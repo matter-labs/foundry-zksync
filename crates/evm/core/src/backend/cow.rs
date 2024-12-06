@@ -65,7 +65,7 @@ impl<'a> CowBackend<'a> {
     pub fn inspect_ref_zk(
         &mut self,
         env: &mut Env,
-        zkvm_env: &ZkVmEnv,
+        zk_env: &ZkVmEnv,
         persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
         factory_deps: Option<Vec<Vec<u8>>>,
         paymaster_data: Option<PaymasterParams>,
@@ -79,7 +79,7 @@ impl<'a> CowBackend<'a> {
             factory_deps,
             paymaster_data,
             env,
-            zkvm_env,
+            zk_env,
             self,
         )
     }
