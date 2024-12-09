@@ -18,7 +18,7 @@ use alloy_primitives::{
 use alloy_sol_types::{sol, SolCall};
 use foundry_evm_core::{
     backend::{
-        strategy::BackendStrategy, Backend, BackendError, BackendResult, CowBackend, DatabaseExt,
+        strategy::{BackendStrategy, GlobalStrategy, ExecutorStrategy}, Backend, BackendError, BackendResult, CowBackend, DatabaseExt,
         GLOBAL_FAIL_SLOT,
     },
     constants::{
@@ -30,6 +30,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
+use foundry_strategy_zksync::ZkBackendInspectData;
 use foundry_zksync_core::ZkTransactionMetadata;
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
@@ -40,7 +41,7 @@ use revm::{
     },
     Database,
 };
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::{Arc, Mutex}};
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -76,13 +77,13 @@ sol! {
 ///   deployment
 /// - `setup`: a special case of `transact`, used to set up the environment for a test
 #[derive(Clone, Debug)]
-pub struct Executor<B> {
+pub struct Executor<G: GlobalStrategy> {
     /// The underlying `revm::Database` that contains the EVM storage.
     // Note: We do not store an EVM here, since we are really
     // only interested in the database. REVM's `EVM` is a thin
     // wrapper around spawning a new EVM on every call anyway,
     // so the performance difference should be negligible.
-    pub backend: Backend<B>,
+    pub backend: Backend<G::Backend>,
     /// The EVM environment.
     pub env: EnvWithHandlerCfg,
     /// The Revm inspector stack.
@@ -99,12 +100,13 @@ pub struct Executor<B> {
     // simulate persisted factory deps
     zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
 
-    pub use_zk: bool,
+    strategy: Arc<Mutex<G::Executor>>,
+    // pub use_zk: bool,
 }
 
-impl<B> Executor<B>
+impl<G> Executor<G>
 where
-    B: BackendStrategy,
+    G: GlobalStrategy,
 {
     /// Creates a new `ExecutorBuilder`.
     #[inline]
@@ -115,7 +117,7 @@ where
     /// Creates a new `Executor` with the given arguments.
     #[inline]
     pub fn new(
-        mut backend: Backend<B>,
+        mut backend: Backend<G::Backend>,
         env: EnvWithHandlerCfg,
         inspector: InspectorStack,
         gas_limit: u64,
@@ -142,22 +144,22 @@ where
             legacy_assertions,
             zk_tx: None,
             zk_persisted_factory_deps: Default::default(),
-            use_zk: false,
+            strategy: G::Executor::new(),
         }
     }
 
-    fn clone_with_backend(&self, backend: Backend<B>) -> Self {
+    fn clone_with_backend(&self, backend: Backend<G::Backend>) -> Self {
         let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(self.env().clone()), self.spec_id());
         Self::new(backend, env, self.inspector().clone(), self.gas_limit, self.legacy_assertions)
     }
 
     /// Returns a reference to the EVM backend.
-    pub fn backend(&self) -> &Backend<B> {
+    pub fn backend(&self) -> &Backend<G::Backend> {
         &self.backend
     }
 
     /// Returns a mutable reference to the EVM backend.
-    pub fn backend_mut(&mut self) -> &mut Backend<B> {
+    pub fn backend_mut(&mut self) -> &mut Backend<G::Backend> {
         &mut self.backend
     }
 
@@ -435,21 +437,38 @@ where
     pub fn call_with_env(&self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector().clone();
         let mut backend = CowBackend::new_borrowed(self.backend());
-        let result = match &self.zk_tx {
-            None => backend.inspect(&mut env, &mut inspector)?,
-            Some(zk_tx) => {
-                // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
-                env.block = self.env.block.clone();
-                env.tx.gas_price = self.env.tx.gas_price;
-                backend.inspect_ref_zk(
-                    &mut env,
-                    &mut self.zk_persisted_factory_deps.clone(),
-                    Some(zk_tx.factory_deps.clone()),
-                    zk_tx.paymaster_data.clone(),
-                )?
+        // let result = match &self.zk_tx {
+        //     None => backend.inspect(&mut env, &mut inspector)?,
+        //     Some(zk_tx) => {
+        //         // apply fork-related env instead of cheatcode handler
+        //         // since it won't be run inside zkvm
+        //         env.block = self.env.block.clone();
+        //         env.tx.gas_price = self.env.tx.gas_price;
+        //         backend.inspect_ref_zk(
+        //             &mut env,
+        //             &mut self.zk_persisted_factory_deps.clone(),
+        //             Some(zk_tx.factory_deps.clone()),
+        //             zk_tx.paymaster_data.clone(),
+        //         )?
+        //     }
+        // };
+        let strategy = backend.backend.strategy.clone(); // clone to take a mutable borrow
+        let extra = match &self.zk_tx {
+            Some(ZkTransactionMetadata { factory_deps, paymaster_data }) => {
+                serde_json::to_vec(&ZkBackendInspectData {
+                    use_evm: false,
+                    factory_deps: Some(factory_deps.clone()),
+                    paymaster_data: paymaster_data.clone(),
+                })
+                .unwrap()
+            }
+            None => {
+                serde_json::to_vec(&ZkBackendInspectData { use_evm: true, ..Default::default() })
+                    .unwrap()
             }
         };
+        let result =
+            strategy.lock().unwrap().inspect(&mut backend, &mut env, &mut inspector, Some(extra))?;
         convert_executed_result(env, inspector, result, backend.has_state_snapshot_failure())
     }
 
@@ -458,10 +477,41 @@ where
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
-        let strategy = backend.strategy.clone(); // to take a mutable borrow
-        let extra = self.zk_tx.take().map(|zk_tx| serde_json::to_vec(&zk_tx).unwrap());
+        println!("TRANSACT HAS ZK? {}", self.zk_tx.is_some());
+        // let result_and_state = match self.zk_tx.take() {
+        //     None => backend.inspect(&mut env, &mut inspector)?,
+        //     Some(zk_tx) => {
+        //         // apply fork-related env instead of cheatcode handler
+        //         // since it won't be run inside zkvm
+        //         env.block = self.env.block.clone();
+        //         env.tx.gas_price = self.env.tx.gas_price;
+        //         backend.inspect_ref_zk(
+        //             &mut env,
+        //             // this will persist the added factory deps,
+        //             // no need to commit them later
+        //             &mut self.zk_persisted_factory_deps,
+        //             Some(zk_tx.factory_deps),
+        //             zk_tx.paymaster_data,
+        //         )?
+        //     }
+        // };
+        let strategy = backend.strategy.clone(); // clone to take a mutable borrow
+        let extra = match &self.zk_tx {
+            Some(ZkTransactionMetadata { factory_deps, paymaster_data }) => {
+                serde_json::to_vec(&ZkBackendInspectData {
+                    use_evm: false,
+                    factory_deps: Some(factory_deps.clone()),
+                    paymaster_data: paymaster_data.clone(),
+                })
+                .unwrap()
+            }
+            None => {
+                serde_json::to_vec(&ZkBackendInspectData { use_evm: true, ..Default::default() })
+                    .unwrap()
+            }
+        };
         let result_and_state =
-            strategy.lock().unwrap().inspect(backend, &mut env, &mut inspector, extra)?;
+            strategy.lock().unwrap().inspect(backend, &mut env, &mut inspector, Some(extra))?;
         let mut result = convert_executed_result(
             env,
             inspector,

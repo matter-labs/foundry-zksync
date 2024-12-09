@@ -1,10 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 
 use crate::InspectorExt;
 
-use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
+use super::{BackendInner, DatabaseExt, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use alloy_primitives::Address;
 use eyre::Context;
+use foundry_zksync_compiler::DualCompiledContracts;
 use revm::{
     db::CacheDB,
     primitives::{EnvWithHandlerCfg, ResultAndState},
@@ -18,8 +22,65 @@ pub struct BackendStrategyForkInfo<'a> {
     pub target_type: ForkType,
 }
 
+pub trait GlobalStrategy: Debug + Send + Sync + Default + Clone {
+    type Backend: BackendStrategy;
+    type Executor: ExecutorStrategy;
+    type CheatcodeInspector: CheatcodeInspectorStrategy;
+
+    fn backend_strategy() -> Arc<Mutex<Self::Backend>> {
+        Self::Backend::new()
+    }
+
+    fn executor_strategy() -> Arc<Mutex<Self::Executor>> {
+        Self::Executor::new()
+    }
+
+    fn cheatcode_strategy() -> Self::CheatcodeInspector {
+        Self::CheatcodeInspector::new()
+    }
+}
+
+pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + Default + Clone {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn initialize(&mut self, dual_compiled_contracts: DualCompiledContracts);
+}
+
+pub trait ExecutorStrategy: Debug + Send + Sync + Default + Clone {
+    fn new() -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Self::default()))
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct EvmStrategy;
+
+impl GlobalStrategy for EvmStrategy {
+    type Backend = EvmBackendStrategy;
+    type Executor = EvmExecutor;
+    type CheatcodeInspector = EvmCheatcodeInspector;
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct EvmExecutor;
+impl ExecutorStrategy for EvmExecutor {
+    fn new() -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Self::default()))
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct EvmCheatcodeInspector;
+impl CheatcodeInspectorStrategy for EvmCheatcodeInspector {
+    fn initialize(&mut self, _dual_compiled_contracts: DualCompiledContracts) {
+        // do nothing
+    }
+}
+
 pub trait BackendStrategy:
-    std::fmt::Debug + Send + Sync + Default + Clone + Serialize + for<'a> Deserialize<'a> + 'static
+    Debug + Send + Sync + Default + Clone + Serialize + for<'a> Deserialize<'a> + 'static
 where
     Self: Sized,
 {
@@ -44,15 +105,15 @@ where
     /// Note: in case there are any cheatcodes executed that modify the environment, this will
     /// update the given `env` with the new values.
     #[instrument(name = "inspect", level = "debug", skip_all)]
-    fn inspect<I: InspectorExt>(
+    fn inspect<'i, 'db, I: InspectorExt>(
         &mut self,
-        backend: &mut Backend<Self>,
+        db: &'db mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
-        inspector: &mut I,
+        inspector: &'i mut I,
         _extra: Option<Vec<u8>>,
     ) -> eyre::Result<ResultAndState> {
-        backend.initialize(env);
-        let mut evm = crate::utils::new_evm_with_inspector(backend, env.clone(), inspector);
+        db.initialize(env);
+        let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
 
         let res = evm.transact().wrap_err("backend: failed while inspecting")?;
 

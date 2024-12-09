@@ -108,6 +108,29 @@ where
         Ok(res)
     }
 
+    /// Executes the configured transaction of the `env` without committing state changes
+    ///
+    /// Note: in case there are any cheatcodes executed that modify the environment, this will
+    /// update the given `env` with the new values.
+    #[instrument(name = "inspect", level = "debug", skip_all)]
+    pub fn inspect_with_extra<I: InspectorExt>(
+        &mut self,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &mut I,
+    ) -> eyre::Result<ResultAndState> {
+        // this is a new call to inspect with a new env, so even if we've cloned the backend
+        // already, we reset the initialized state
+        self.is_initialized = false;
+        self.spec_id = env.handler_cfg.spec_id;
+        let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), inspector);
+
+        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+
+        env.env = evm.context.evm.inner.env;
+
+        Ok(res)
+    }
+
     pub fn new_borrowed(backend: &'a Backend<S>) -> Self {
         Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
     }
@@ -146,6 +169,11 @@ impl<S> DatabaseExt for CowBackend<'_, S>
 where
     S: BackendStrategy,
 {
+    fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+        self.backend.to_mut().initialize(&env);
+        self.is_initialized = true;
+    }
+
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
         self.backend.to_mut().get_fork_info(id)
     }

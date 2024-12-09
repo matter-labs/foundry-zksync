@@ -18,6 +18,7 @@ foundry-cheatcodes-spec.workspace = true
 foundry-common.workspace = true
 foundry-config.workspace = true
 foundry-zksync-core.workspace = true
+foundry-zksync-compiler.workspace = true
 foundry-evm-abi.workspace = true
 
 alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }

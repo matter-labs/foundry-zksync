@@ -276,8 +276,10 @@ impl TestArgs {
         // Merge all configs.
         let (config, evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
         if config.zksync.should_compile() {
+            info!("executing with zksync strategy");
             self.execute_tests_inner::<ZkBackendStrategy>(config, evm_opts).await
         } else {
+            info!("executing with evm strategy");
             self.execute_tests_inner::<EvmBackendStrategy>(config, evm_opts).await
         }
     }
@@ -323,6 +325,7 @@ impl TestArgs {
 
         let output = compiler.compile(&project)?;
 
+        // TODO(zk-new) only compile if zk strategy
         let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
             let zk_project =
                 foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;

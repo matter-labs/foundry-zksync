@@ -32,7 +32,7 @@ use foundry_cheatcodes_common::{
 use foundry_common::{evm::Breakpoints, TransactionMaybeSigned, SELECTOR_LEN};
 use foundry_evm_core::{
     abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
-    backend::{DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
+    backend::{strategy::CheatcodeInspectorStrategy, DatabaseError, DatabaseExt, LocalForkId, RevertDiagnostic},
     constants::{
         CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
         DEFAULT_CREATE2_DEPLOYER_CODE, MAGIC_ASSUME,
@@ -96,7 +96,7 @@ pub type InnerEcx<'a, 'b, 'c> = &'a mut InnerEvmContext<&'b mut (dyn DatabaseExt
 pub trait CheatcodesExecutor {
     /// Core trait method accepting mutable reference to [Cheatcodes] and returning
     /// [revm::Inspector].
-    fn get_inspector<'a>(&'a mut self, cheats: &'a mut Cheatcodes) -> Box<dyn InspectorExt + 'a>;
+    fn get_inspector<'a, S>(&'a mut self, cheats: &'a mut Cheatcodes<S>) -> Box<dyn InspectorExt + 'a>;
 
     /// Obtains [revm::Evm] instance and executes the given CREATE frame.
     fn exec_create(
@@ -152,7 +152,7 @@ pub trait CheatcodesExecutor {
         None
     }
 
-    fn trace_zksync(&mut self, ccx_state: &mut Cheatcodes, ecx: Ecx, call_traces: Vec<Call>) {
+    fn trace_zksync<S>(&mut self, ccx_state: &mut Cheatcodes<S>, ecx: Ecx, call_traces: Vec<Call>) {
         let mut inspector = self.get_inspector(ccx_state);
 
         // We recreate the EvmContext here to satisfy the lifetime parameters as 'static, with
@@ -234,7 +234,7 @@ where
 struct TransparentCheatcodesExecutor;
 
 impl CheatcodesExecutor for TransparentCheatcodesExecutor {
-    fn get_inspector<'a>(&'a mut self, cheats: &'a mut Cheatcodes) -> Box<dyn InspectorExt + 'a> {
+    fn get_inspector<'a, S>(&'a mut self, cheats: &'a mut Cheatcodes<S>) -> Box<dyn InspectorExt + 'a> {
         Box::new(cheats)
     }
 }
@@ -495,7 +495,7 @@ impl ZkStartupMigration {
 ///   cheatcode address: by default, the caller, test contract and newly deployed contracts are
 ///   allowed to execute cheatcodes
 #[derive(Clone, Debug)]
-pub struct Cheatcodes {
+pub struct Cheatcodes<S> {
     /// The block environment
     ///
     /// Used in the cheatcode handler to overwrite the block environment separately from the
@@ -561,7 +561,7 @@ pub struct Cheatcodes {
     pub broadcastable_transactions: BroadcastableTransactions,
 
     /// Additional, user configurable context this Inspector has access to when inspecting a call
-    pub config: Arc<CheatsConfig>,
+    pub config: CheatsConfig<S>,
 
     /// Test-scoped context holding data that needs to be reset every test run
     pub context: Context,
@@ -649,15 +649,15 @@ pub struct Cheatcodes {
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
 // `CheatsConfig` which is unused, and inside it `ProjectPathsConfig` is relatively expensive to
 // create.
-impl Default for Cheatcodes {
+impl<S> Default for Cheatcodes<S> where S: CheatcodeInspectorStrategy {
     fn default() -> Self {
         Self::new(Arc::default())
     }
 }
 
-impl Cheatcodes {
+impl<S> Cheatcodes<S> where S: CheatcodeInspectorStrategy {
     /// Creates a new `Cheatcodes` with the given settings.
-    pub fn new(config: Arc<CheatsConfig>) -> Self {
+    pub fn new(config: Arc<CheatsConfig<S>>) -> Self {
         let mut dual_compiled_contracts = config.dual_compiled_contracts.clone();
 
         // We add the empty bytecode manually so it is correctly translated in zk mode.

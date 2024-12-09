@@ -3,44 +3,214 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy_sol_types::SolValue;
 use foundry_evm_core::{
     backend::{
         strategy::{
             merge_db_account_data, merge_journaled_state_data, BackendStrategy,
-            BackendStrategyForkInfo,
+            BackendStrategyForkInfo, CheatcodeInspectorStrategy, EvmBackendStrategy,
+            ExecutorStrategy, GlobalStrategy,
         },
-        Backend, BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
+        BackendInner, DatabaseExt, Fork, ForkDB, FoundryEvmInMemoryDB,
     },
+    constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH},
     InspectorExt,
 };
 use foundry_strategy_core::RunnerStrategy;
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
-    convert::ConvertH160, PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS, H256,
+    convert::ConvertH160, PaymasterParams, ZkPaymasterData, ACCOUNT_CODE_STORAGE_ADDRESS, H256,
     IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
     NONCE_HOLDER_ADDRESS,
 };
 use revm::{
     db::CacheDB,
-    primitives::{EnvWithHandlerCfg, HashMap, HashSet, ResultAndState},
+    primitives::{Bytecode, EnvWithHandlerCfg, HashMap, HashSet, ResultAndState},
     DatabaseRef, JournaledState,
 };
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
+#[derive(Debug, Default, Clone)]
+pub struct ZksyncStrategy;
+
+impl GlobalStrategy for ZksyncStrategy {
+    type Backend = ZkBackendStrategy;
+    type Executor = ZkExecutor;
+    type CheatcodeInspector = ZkCheatcodeInspector;
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ZkExecutor;
+impl ExecutorStrategy for ZkExecutor {
+    fn new() -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Self::default()))
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ZkCheatcodeInspector {
+    /// When in zkEVM context, execute the next CALL or CREATE in the EVM instead.
+    pub skip_zk_vm: bool,
+
+    /// Any contracts that were deployed in `skip_zk_vm` step.
+    /// This makes it easier to dispatch calls to any of these addresses in zkEVM context, directly
+    /// to EVM. Alternatively, we'd need to add `vm.zkVmSkip()` to these calls manually.
+    pub skip_zk_vm_addresses: HashSet<Address>,
+
+    /// Records the next create address for `skip_zk_vm_addresses`.
+    pub record_next_create_address: bool,
+
+    /// Paymaster params
+    pub paymaster_params: Option<ZkPaymasterData>,
+
+    /// Dual compiled contracts
+    pub dual_compiled_contracts: DualCompiledContracts,
+
+    /// The migration status of the database to zkEVM storage, `None` if we start in EVM context.
+    pub zk_startup_migration: ZkStartupMigration,
+
+    /// Factory deps stored through `zkUseFactoryDep`. These factory deps are used in the next
+    /// CREATE or CALL, and cleared after.
+    pub zk_use_factory_deps: Vec<String>,
+
+    /// The list of factory_deps seen so far during a test or script execution.
+    /// Ideally these would be persisted in the storage, but since modifying [revm::JournaledState]
+    /// would be a significant refactor, we maintain the factory_dep part in the [Cheatcodes].
+    /// This can be done as each test runs with its own [Cheatcodes] instance, thereby
+    /// providing the necessary level of isolation.
+    pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
+
+    /// Nonce update persistence behavior in zkEVM for the tx caller.
+    pub zk_persist_nonce_update: ZkPersistNonceUpdate,
+}
+
+/// Allows overriding nonce update behavior for the tx caller in the zkEVM.
+///
+/// Since each CREATE or CALL is executed as a separate transaction within zkEVM, we currently skip
+/// persisting nonce updates as it erroneously increments the tx nonce. However, under certain
+/// situations, e.g. deploying contracts, transacts, etc. the nonce updates must be persisted.
+#[derive(Default, Debug, Clone)]
+pub enum ZkPersistNonceUpdate {
+    /// Never update the nonce. This is currently the default behavior.
+    #[default]
+    Never,
+    /// Override the default behavior, and persist nonce update for tx caller for the next
+    /// zkEVM execution _only_.
+    PersistNext,
+}
+
+impl ZkPersistNonceUpdate {
+    /// Persist nonce update for the tx caller for next execution.
+    pub fn persist_next(&mut self) {
+        *self = Self::PersistNext;
+    }
+
+    /// Retrieve if a nonce update must be persisted, or not. Resets the state to default.
+    pub fn check(&mut self) -> bool {
+        let persist_nonce_update = match self {
+            Self::Never => false,
+            Self::PersistNext => true,
+        };
+        *self = Default::default();
+
+        persist_nonce_update
+    }
+}
+
+impl CheatcodeInspectorStrategy for ZkCheatcodeInspector {
+    fn initialize(&mut self, mut dual_compiled_contracts: DualCompiledContracts) {
+        // We add the empty bytecode manually so it is correctly translated in zk mode.
+        // This is used in many places in foundry, e.g. in cheatcode contract's account code.
+        let empty_bytes = Bytes::from_static(&[0]);
+        let zk_bytecode_hash = foundry_zksync_core::hash_bytecode(&foundry_zksync_core::EMPTY_CODE);
+        let zk_deployed_bytecode = foundry_zksync_core::EMPTY_CODE.to_vec();
+
+        dual_compiled_contracts.push(DualCompiledContract {
+            name: String::from("EmptyEVMBytecode"),
+            zk_bytecode_hash,
+            zk_deployed_bytecode: zk_deployed_bytecode.clone(),
+            zk_factory_deps: Default::default(),
+            evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
+            evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
+            evm_bytecode: Bytecode::new_raw(empty_bytes).bytecode().to_vec(),
+        });
+
+        let cheatcodes_bytecode = {
+            let mut bytecode = CHEATCODE_ADDRESS.abi_encode_packed();
+            bytecode.append(&mut [0; 12].to_vec());
+            Bytes::from(bytecode)
+        };
+        dual_compiled_contracts.push(DualCompiledContract {
+            name: String::from("CheatcodeBytecode"),
+            // we put a different bytecode hash here so when importing back to EVM
+            // we avoid collision with EmptyEVMBytecode for the cheatcodes
+            zk_bytecode_hash: foundry_zksync_core::hash_bytecode(CHEATCODE_CONTRACT_HASH.as_ref()),
+            zk_deployed_bytecode: cheatcodes_bytecode.to_vec(),
+            zk_factory_deps: Default::default(),
+            evm_bytecode_hash: CHEATCODE_CONTRACT_HASH,
+            evm_deployed_bytecode: cheatcodes_bytecode.to_vec(),
+            evm_bytecode: cheatcodes_bytecode.to_vec(),
+        });
+
+        let mut persisted_factory_deps = HashMap::new();
+        persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
+
+        self.zk_startup_migration = ZkStartupMigration::Defer;
+    }
+}
+
+/// Setting for migrating the database to zkEVM storage when starting in ZKsync mode.
+/// The migration is performed on the DB via the inspector so must only be performed once.
+#[derive(Debug, Default, Clone)]
+pub enum ZkStartupMigration {
+    /// Defer database migration to a later execution point.
+    ///
+    /// This is required as we need to wait for some baseline deployments
+    /// to occur before the test/script execution is performed.
+    #[default]
+    Defer,
+    /// Allow database migration.
+    Allow,
+    /// Database migration has already been performed.
+    Done,
+}
+
+impl ZkStartupMigration {
+    /// Check if startup migration is allowed. Migration is disallowed if it's to be deferred or has
+    /// already been performed.
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, Self::Allow)
+    }
+
+    /// Allow migrating the the DB to zkEVM storage.
+    pub fn allow(&mut self) {
+        *self = Self::Allow
+    }
+
+    /// Mark the migration as completed. It must not be performed again.
+    pub fn done(&mut self) {
+        *self = Self::Done
+    }
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ZkBackendStrategy {
+    evm: EvmBackendStrategy,
     persisted_factory_deps: HashMap<H256, Vec<u8>>,
     persistent_immutable_keys: HashMap<Address, HashSet<U256>>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-struct ZkBackendInspectData {
+pub struct ZkBackendInspectData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub factory_deps: Option<Vec<Vec<u8>>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster_data: Option<PaymasterParams>,
+
+    pub use_evm: bool,
 }
 
 impl BackendStrategy for ZkBackendStrategy {
@@ -66,22 +236,31 @@ impl BackendStrategy for ZkBackendStrategy {
         )
     }
 
-    fn inspect<I: InspectorExt>(
+    fn inspect<'i, 'db, I: InspectorExt>(
         &mut self,
-        backend: &mut Backend<Self>,
+        db: &'db mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
-        _inspector: &mut I,
+        inspector: &'i mut I,
         extra: Option<Vec<u8>>,
     ) -> eyre::Result<ResultAndState> {
-        backend.initialize(env);
+        let zk_extra = extra
+            .as_ref()
+            .map(|bytes| {
+                serde_json::from_slice::<'_, ZkBackendInspectData>(&bytes).unwrap_or_default()
+            })
+            .unwrap_or_default();
 
-        let zk_extra: ZkBackendInspectData = serde_json::from_slice(&extra.unwrap()).unwrap();
+        if zk_extra.use_evm {
+            return self.evm.inspect(db, env, inspector, extra);
+        }
+
+        db.initialize(env);
         foundry_zksync_core::vm::transact(
             Some(&mut self.persisted_factory_deps),
             zk_extra.factory_deps,
             zk_extra.paymaster_data,
             env,
-            backend,
+            db,
         )
     }
 }

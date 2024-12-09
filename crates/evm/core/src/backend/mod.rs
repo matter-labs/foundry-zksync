@@ -88,6 +88,9 @@ pub struct ForkInfo {
 /// An extension trait that allows us to easily extend the `revm::Inspector` capabilities
 #[auto_impl::auto_impl(&mut)]
 pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
+    /// Initialize any settings that must be tracked while switching evms.
+    fn initialize(&mut self, env: &EnvWithHandlerCfg);
+
     /// Creates a new state snapshot at the current point of execution.
     ///
     /// A state snapshot is associated with a new unique id that's created for the snapshot.
@@ -807,14 +810,6 @@ where
         logs
     }
 
-    /// Initializes settings we need to keep track of.
-    ///
-    /// We need to track these mainly to prevent issues when switching between different evms
-    pub fn initialize(&mut self, env: &EnvWithHandlerCfg) {
-        self.set_caller(env.tx.caller);
-        self.set_spec_id(env.handler_cfg.spec_id);
-    }
-
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
     fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
         EnvWithHandlerCfg::new_with_spec_id(Box::new(env), self.inner.spec_id)
@@ -845,24 +840,24 @@ where
         // Ok(res)
     }
 
-    /// Executes the configured test call of the `env` without committing state changes
-    pub fn inspect_ref_zk(
-        &mut self,
-        env: &mut EnvWithHandlerCfg,
-        persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
-        factory_deps: Option<Vec<Vec<u8>>>,
-        paymaster_data: Option<PaymasterParams>,
-    ) -> eyre::Result<ResultAndState> {
-        self.initialize(env);
+    // /// Executes the configured test call of the `env` without committing state changes
+    // pub fn inspect_ref_zk(
+    //     &mut self,
+    //     env: &mut EnvWithHandlerCfg,
+    //     persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
+    //     factory_deps: Option<Vec<Vec<u8>>>,
+    //     paymaster_data: Option<PaymasterParams>,
+    // ) -> eyre::Result<ResultAndState> {
+    //     self.initialize(env);
 
-        foundry_zksync_core::vm::transact(
-            Some(persisted_factory_deps),
-            factory_deps,
-            paymaster_data,
-            env,
-            self,
-        )
-    }
+    //     foundry_zksync_core::vm::transact(
+    //         Some(persisted_factory_deps),
+    //         factory_deps,
+    //         paymaster_data,
+    //         env,
+    //         self,
+    //     )
+    // }
 
     /// Returns true if the address is a precompile
     pub fn is_existing_precompile(&self, addr: &Address) -> bool {
@@ -1003,6 +998,15 @@ impl<S> DatabaseExt for Backend<S>
 where
     S: BackendStrategy,
 {
+    /// Initializes settings we need to keep track of.
+    ///
+    /// We need to track these mainly to prevent issues when switching between different evms
+    fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+        self.set_caller(env.tx.caller);
+        self.set_spec_id(env.handler_cfg.spec_id);
+    }
+
+
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
         let fork_id = self.ensure_fork_id(id).cloned()?;
         let fork_env = self
@@ -1256,7 +1260,6 @@ where
                 caller_account.into()
             });
 
-            // TODO(zk): add zk_state by using it inside strategy
             self.strategy.lock().unwrap().update_fork_db(
                 BackendStrategyForkInfo {
                     active_fork: self.active_fork(),

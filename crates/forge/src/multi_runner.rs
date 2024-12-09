@@ -16,7 +16,10 @@ use foundry_compilers::{
 };
 use foundry_config::Config;
 use foundry_evm::{
-    backend::{strategy::BackendStrategy, Backend},
+    backend::{
+        strategy::{BackendStrategy, GlobalStrategy},
+        Backend,
+    },
     decode::RevertDecoder,
     executors::ExecutorBuilder,
     fork::CreateFork,
@@ -49,7 +52,7 @@ pub type DeployableContracts = BTreeMap<ArtifactId, TestContract>;
 
 /// A multi contract runner receives a set of contracts deployed in an EVM instance and proceeds
 /// to run all test functions in these contracts.
-pub struct MultiContractRunner<B> {
+pub struct MultiContractRunner<G: GlobalStrategy> {
     /// Mapping of contract name to JsonAbi, creation bytecode and library bytecode which
     /// needs to be deployed & linked against
     pub contracts: DeployableContracts,
@@ -88,12 +91,12 @@ pub struct MultiContractRunner<B> {
     /// Dual compiled contracts
     pub dual_compiled_contracts: DualCompiledContracts,
     /// Use zk runner.
-    pub strategy: Arc<Mutex<B>>,
+    pub strategy: G,
 }
 
-impl<B> MultiContractRunner<B>
+impl<G> MultiContractRunner<G>
 where
-    B: BackendStrategy,
+    G: GlobalStrategy,
 {
     /// Returns an iterator over all contracts that match the filter.
     pub fn matching_contracts<'a: 'b, 'b>(
@@ -184,7 +187,7 @@ where
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let db = Backend::spawn(self.fork.take(), self.strategy.clone());
+        let db = Backend::spawn(self.fork.take(), self.strategy.backend_strategy());
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -265,6 +268,7 @@ where
             .with_decode_internal(self.decode_internal)
             .with_verbosity(self.evm_opts.verbosity);
 
+        // TODO(zk-new) disable use_zk_vm
         let executor = ExecutorBuilder::new()
             .inspectors(|stack| {
                 stack
