@@ -137,15 +137,15 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
-      - name: Run era-test-node
-        uses: dutterbutter/era-test-node-action@v1
+      - name: Run anvil-zksync
+        uses: dutterbutter/anvil-zksync-action@v1.1.0
         with:
           mode: fork
-          network: mainnet
+          forkUrl: mainnet
           log: info
-          logFilePath: era_test_node.log
+          logFilePath: anvil_zksync.log
           target: x86_64-unknown-linux-gnu
-          releaseTag: v0.1.0-alpha.29
+          releaseTag: v0.2.1
       - name: Setup Git config
         run: |
           git config --global user.name "GitHub Actions Bot"
