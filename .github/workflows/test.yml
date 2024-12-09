@@ -123,7 +123,7 @@ jobs:
           uses: taiki-e/install-action@nextest
 
         - name: Run era-test-node
-          uses: dutterbutter/era-test-node-action@v1
+          uses: dutterbutter/era-test-node-action@36ffd2eefd46dc16e7e2a8e1715124400ec0a3ba
           with:
             mode: fork
             network: mainnet
