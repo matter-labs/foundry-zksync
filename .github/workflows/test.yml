@@ -1,83 +1,83 @@
 name: test
 
 on:
-    push:
-        branches:
-            - main
-            - "*upstream*"
-    pull_request:
-        branches:
-            - main
-            - "*upstream*"
+  push:
+    branches:
+      - main
+      - "*upstream*"
+  pull_request:
+    branches:
+      - main
+      - "*upstream*"
 
 concurrency:
-    cancel-in-progress: true
-    group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+  group: ${{github.workflow}}-${{github.ref}}
 
 env:
-    CARGO_TERM_COLOR: always
-    TARGET_RUST_VERSION: "nightly-2024-09-01"
+  CARGO_TERM_COLOR: always
+  TARGET_RUST_VERSION: "nightly-2024-09-01"
 
 jobs:
-    nextest:
-      uses: ./.github/workflows/nextest.yml
-      with:
-        profile: default
-      secrets: inherit
+  nextest:
+    uses: ./.github/workflows/nextest.yml
+    with:
+      profile: default
+    secrets: inherit
 
     doctest:
-        runs-on: ubuntu-22.04
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                toolchain: ${{ env.TARGET_RUST_VERSION }}
-            - uses: Swatinem/rust-cache@v2
-              with:
-                cache-on-failure: true
-            - name: cargo test
-              run: cargo test --doc -p forge
+      runs-on: ubuntu-22.04
+      timeout-minutes: 60
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@nightly
+          with:
+            toolchain: ${{ env.TARGET_RUST_VERSION }}
+        - uses: Swatinem/rust-cache@v2
+          with:
+            cache-on-failure: true
+        - name: cargo test
+          run: cargo test --doc -p forge
 
     clippy:
-        name: clippy
-        runs-on: ubuntu-22.04
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@clippy
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  cache-on-failure: true
-            - run: cargo clippy --workspace --all-targets --all-features
-              env:
-                  RUSTFLAGS: -Dwarnings
+      name: clippy
+      runs-on: ubuntu-22.04
+      timeout-minutes: 60
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@clippy
+        - uses: Swatinem/rust-cache@v2
+          with:
+            cache-on-failure: true
+        - run: cargo clippy --workspace --all-targets --all-features
+          env:
+            RUSTFLAGS: -Dwarnings
 
     rustfmt:
-        runs-on: ubuntu-22.04
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                  toolchain: ${{ env.TARGET_RUST_VERSION }}
-                  components: rustfmt
-            - run: cargo fmt --all --check
+      runs-on: ubuntu-22.04
+      timeout-minutes: 60
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@nightly
+          with:
+            toolchain: ${{ env.TARGET_RUST_VERSION }}
+            components: rustfmt
+        - run: cargo fmt --all --check
 
     forge-fmt:
-        runs-on: ubuntu-22.04
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                  toolchain: ${{ env.TARGET_RUST_VERSION }}
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  cache-on-failure: true
-            - name: forge fmt
-              shell: bash
-              run: ./.github/scripts/format.sh --check
+      runs-on: ubuntu-22.04
+      timeout-minutes: 60
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@nightly
+          with:
+            toolchain: ${{ env.TARGET_RUST_VERSION }}
+        - uses: Swatinem/rust-cache@v2
+          with:
+            cache-on-failure: true
+        - name: forge fmt
+          shell: bash
+          run: ./.github/scripts/format.sh --check
 
     codespell:
       runs-on: ubuntu-22.04
@@ -89,66 +89,81 @@ jobs:
             skip: "*.json"
 
     crate-checks:
-        # ubuntu-22.04 runs out of disk space
-        runs-on: ubuntu-22.04-github-hosted-16core
-        timeout-minutes: 60
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                toolchain: ${{ env.TARGET_RUST_VERSION }}
-            - uses: taiki-e/install-action@cargo-hack
-            - uses: Swatinem/rust-cache@v2
-              with:
-                  cache-on-failure: true
-            - name: cargo hack
-              run: cargo hack check
-    
+      # ubuntu-22.04 runs out of disk space
+      runs-on: ubuntu-22.04-github-hosted-16core
+      timeout-minutes: 60
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@nightly
+          with:
+            toolchain: ${{ env.TARGET_RUST_VERSION }}
+        - uses: taiki-e/install-action@cargo-hack
+        - uses: Swatinem/rust-cache@v2
+          with:
+            cache-on-failure: true
+        - name: cargo hack
+          run: cargo hack check
+
     zk-cargo-test:
-        runs-on: ubuntu-22.04
-  
-        steps:
+      runs-on: ubuntu-22.04
+
+      steps:
         - name: Checkout code
           uses: actions/checkout@v4
           with:
             submodules: recursive
             ref: ${{ github.event.pull_request.head.sha }}
-  
+
         - name: Install Rust
           uses: actions-rust-lang/setup-rust-toolchain@v1
           with:
             toolchain: ${{ env.TARGET_RUST_VERSION }}
 
-        - name: Install cargo-nextest
-          uses: taiki-e/install-action@nextest
+  zk-cargo-test:
+    runs-on: ubuntu-22.04
 
-        - name: Run era-test-node
-          uses: dutterbutter/era-test-node-action@v1
-          with:
-            mode: fork
-            network: mainnet
-            log: info
-            logFilePath: era_test_node.log
-            target: x86_64-unknown-linux-gnu
-            releaseTag: v0.1.0-alpha.29
-        - name: Setup Git config
-          run: |
-            git config --global user.name "GitHub Actions Bot"
-            git config --global user.email "<>"
-            git config --global url."https://github.com/".insteadOf "git@github.com:"
-        - name: Run zk tests
-          env:
-            RUST_BACKTRACE: full
-            TEST_MAINNET_URL: http://localhost:8011
-          run: |
-            ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' --filter-expr 'test(~zk)'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha }}
 
-    check-ci-install:
-      name: CI install
-      runs-on: ubuntu-22.04
-      steps:
-        - uses: actions/checkout@v4
-        - name: Install foundry-zksync
-          run: cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/ && cd /tmp && ./install-foundry-zksync
-        - name: Verify installation
-          run: forge --version
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Run anvil-zksync
+        uses: dutterbutter/anvil-zksync-action@v1.1.0
+        with:
+          mode: fork
+          forkUrl: mainnet
+          log: info
+          logFilePath: anvil_zksync.log
+          target: x86_64-unknown-linux-gnu
+          releaseTag: v0.2.1
+      - name: Setup Git config
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "<>"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+      - name: Run zk tests
+        env:
+          RUST_BACKTRACE: full
+          TEST_MAINNET_URL: http://localhost:8011
+        run: |
+          ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' --filter-expr 'test(~zk)'
+
+  check-ci-install:
+    name: CI install
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install foundry-zksync
+        run: cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/ && cd /tmp && ./install-foundry-zksync
+      - name: Verify installation
+        run: forge --version
