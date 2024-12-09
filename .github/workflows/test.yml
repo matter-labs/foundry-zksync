@@ -126,7 +126,7 @@ jobs:
           uses: dutterbutter/anvil-zksync-action@v1.1.0
           with:
             mode: fork
-            network: mainnet
+            forkUrl: mainnet
             log: info
             logFilePath: anvil_zksync.log
             target: x86_64-unknown-linux-gnu
