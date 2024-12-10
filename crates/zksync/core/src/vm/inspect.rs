@@ -56,9 +56,6 @@ use foundry_evm_abi::{
     patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS,
 };
 
-/// Minimum gas price allowed for L1.
-const MIN_L1_GAS_PRICE: u64 = 1000;
-
 /// Represents the result of execution a [`L2Tx`] on EraVM
 #[derive(Debug)]
 pub struct ZKVMExecutionResult {
@@ -471,10 +468,7 @@ fn inspect_inner<S: ReadStorage>(
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> InnerZkVmResult {
-    // let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MIN_L1_GAS_PRICE);
-    // let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
-    println!("{batch_env:?}");
 
     let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false);
     let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);
@@ -560,7 +554,6 @@ fn inspect_inner<S: ReadStorage>(
         refunded: bootloader_debug.refund_by_operator,
         bootloader_debug,
     };
-    println!("{gas_usage:?}");
 
     formatter::print_vm_details(&tx_result);
 

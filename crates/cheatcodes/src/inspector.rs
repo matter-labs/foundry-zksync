@@ -47,7 +47,7 @@ use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key,
-    vm::ZkVmEnv,
+    vm::ZkEnv,
     Call, ZkPaymasterData, ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
 };
 use foundry_zksync_inspectors::TraceCollector;
@@ -646,7 +646,7 @@ pub struct Cheatcodes {
     /// Nonce update persistence behavior in zkEVM for the tx caller.
     pub zk_persist_nonce_update: ZkPersistNonceUpdate,
 
-    pub zk_env: ZkVmEnv,
+    pub zk_env: ZkEnv,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second

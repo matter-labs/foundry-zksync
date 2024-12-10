@@ -44,9 +44,9 @@ contract ZkLargeFactoryDependenciesScript is Script {
 
     let node = ZkSyncNode::start();
 
-    // foundry default gas-limit is not enough to pay for factory deps in our current
-    // default environment
-    let gas_limit = u32::MAX >> 1;
+    // foundry default gas-limit is not enough to pay for factory deps
+    // with era_test_node's environment
+    let gas_limit = (u32::MAX >> 1) * 2;
 
     cmd.arg("script").args([
         "--zk-startup",
@@ -61,15 +61,13 @@ contract ZkLargeFactoryDependenciesScript is Script {
         "--rpc-url",
         node.url().as_str(),
         "--slow",
-        // "--gas-limit",
-        // &gas_limit.to_string(),
+        "--gas-limit",
+        &gas_limit.to_string(),
     ]);
-    // cmd.assert_success()
-    //     .get_output()
-    //     .stdout_lossy()
-    //     .contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
-    let out = cmd.assert_success().get_output().stdout_lossy();
-    println!("{out}");
+    cmd.assert_success()
+        .get_output()
+        .stdout_lossy()
+        .contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL");
 
     let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))

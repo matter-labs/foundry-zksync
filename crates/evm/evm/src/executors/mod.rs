@@ -27,7 +27,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
-use foundry_zksync_core::{vm::ZkVmEnv, ZkTransactionMetadata};
+use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata};
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
     interpreter::{return_ok, InstructionResult},
@@ -97,7 +97,7 @@ pub struct Executor {
     zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
 
     pub use_zk: bool,
-    pub zk_env: ZkVmEnv,
+    pub zk_env: ZkEnv,
 }
 
 impl Executor {

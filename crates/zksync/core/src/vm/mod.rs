@@ -6,7 +6,7 @@ mod runner;
 mod storage_view;
 mod tracers;
 
-pub use env::ZkVmEnv;
+pub use env::ZkEnv;
 pub use farcall::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use inspect::{
     batch_factory_dependencies, inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult,

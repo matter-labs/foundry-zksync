@@ -9,7 +9,7 @@ use foundry_config::{
 };
 use foundry_evm_core::opts::EvmOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
-use foundry_zksync_core::vm::ZkVmEnv;
+use foundry_zksync_core::vm::ZkEnv;
 use semver::Version;
 use std::{
     path::{Path, PathBuf},
@@ -64,11 +64,12 @@ pub struct CheatsConfig {
     /// Optional seed for the RNG algorithm.
     pub seed: Option<U256>,
     /// Era Vm environment
-    pub zk_env: Option<ZkVmEnv>,
+    pub zk_env: Option<ZkEnv>,
 }
 
 impl CheatsConfig {
     /// Extracts the necessary settings from the Config
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: &Config,
         evm_opts: EvmOpts,
@@ -77,7 +78,7 @@ impl CheatsConfig {
         running_version: Option<Version>,
         dual_compiled_contracts: DualCompiledContracts,
         use_zk: bool,
-        zk_env: Option<ZkVmEnv>,
+        zk_env: Option<ZkEnv>,
     ) -> Self {
         let mut allowed_paths = vec![config.root.0.clone()];
         allowed_paths.extend(config.libs.clone());

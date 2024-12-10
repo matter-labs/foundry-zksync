@@ -55,7 +55,7 @@ use foundry_evm::{
 };
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
-use foundry_zksync_core::vm::ZkVmEnv;
+use foundry_zksync_core::vm::ZkEnv;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -624,8 +624,7 @@ impl ScriptConfig {
                 let maybe_details =
                     provider.get_block_details(env.block.number.try_into()?).await?;
                 if let Some(details) = maybe_details {
-                    println!("{details:?}");
-                    let zk_env = ZkVmEnv {
+                    let zk_env = ZkEnv {
                         l1_gas_price: details
                             .l1_gas_price
                             .try_into()
@@ -634,6 +633,14 @@ impl ScriptConfig {
                             .l2_fair_gas_price
                             .try_into()
                             .expect("failed to convert fair_l2_gas_price to u64"),
+                        fair_pubdata_price: details
+                            .fair_pubdata_price
+                            // TODO(zk): None as a value might mean L1Pegged model
+                            // we need to find out if it will ever be relevant to
+                            // us
+                            .unwrap_or_default()
+                            .try_into()
+                            .expect("failed to convert fair_pubdata_price to u64"),
                     };
                     builder = builder.zk_env(zk_env.clone());
                     maybe_zk_env = Some(zk_env);

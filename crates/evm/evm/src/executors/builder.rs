@@ -1,6 +1,6 @@
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::backend::Backend;
-use foundry_zksync_core::vm::ZkVmEnv;
+use foundry_zksync_core::vm::ZkEnv;
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
 
 /// The builder that allows to configure an evm [`Executor`] which a stack of optional
@@ -23,7 +23,7 @@ pub struct ExecutorBuilder {
     legacy_assertions: bool,
 
     use_zk: bool,
-    zk_env: ZkVmEnv,
+    zk_env: ZkEnv,
 }
 
 impl Default for ExecutorBuilder {
@@ -87,7 +87,7 @@ impl ExecutorBuilder {
 
     /// Sets zk_env
     #[inline]
-    pub fn zk_env(mut self, zk_env: ZkVmEnv) -> Self {
+    pub fn zk_env(mut self, zk_env: ZkEnv) -> Self {
         self.zk_env = zk_env;
         self
     }
@@ -107,7 +107,6 @@ impl ExecutorBuilder {
         let mut exec = Executor::new(db, env, stack.build(), gas_limit, legacy_assertions);
         exec.use_zk = use_zk;
         exec.zk_env = zk_env;
-        println!("inside exec: {:?}", exec.inspector.cheatcodes.as_ref().map(|c| &c.zk_env));
         exec
     }
 }

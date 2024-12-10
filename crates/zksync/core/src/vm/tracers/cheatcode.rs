@@ -30,7 +30,7 @@ use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
     vm::{
         farcall::{CallAction, CallDepth, FarCallHandler},
-        ZkVmEnv,
+        ZkEnv,
     },
     ZkPaymasterData, EMPTY_CODE,
 };
@@ -96,7 +96,7 @@ pub struct CheatcodeTracerContext<'a> {
     /// Whether to persist nonce update for the tx caller, or not.
     pub persist_nonce_update: bool,
     /// Era Vm environment
-    pub zk_env: ZkVmEnv,
+    pub zk_env: ZkEnv,
 }
 
 /// Tracer result to return back to foundry.

@@ -174,11 +174,9 @@ impl InspectorStackBuilder {
         } = self;
         let mut stack = InspectorStack::new();
 
-        println!("building inspector stack");
         // inspectors
         if let Some(config) = cheatcodes {
             let mut cheatcodes = Cheatcodes::new(config);
-            println!("inside builder: {:?}", cheatcodes.zk_env);
             // Set wallets if they are provided
             if let Some(wallets) = wallets {
                 cheatcodes.set_wallets(wallets);
