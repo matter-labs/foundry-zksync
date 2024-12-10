@@ -119,44 +119,31 @@ jobs:
           with:
             toolchain: ${{ env.TARGET_RUST_VERSION }}
 
-  zk-cargo-test:
-    runs-on: ubuntu-22.04
+        - name: Install cargo-nextest
+          uses: taiki-e/install-action@nextest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          ref: ${{ github.event.pull_request.head.sha }}
+        - name: Run anvil-zksync
+          uses: dutterbutter/anvil-zksync-action@v1.1.0
+          with:
+            mode: fork
+            forkUrl: mainnet
+            log: info
+            logFilePath: anvil_zksync.log
+            target: x86_64-unknown-linux-gnu
+            releaseTag: v0.2.1
 
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: ${{ env.TARGET_RUST_VERSION }}
+        - name: Setup Git config
+          run: |
+            git config --global user.name "GitHub Actions Bot"
+            git config --global user.email "<>"
+            git config --global url."https://github.com/".insteadOf "git@github.com:"
 
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-
-      - name: Run anvil-zksync
-        uses: dutterbutter/anvil-zksync-action@v1.1.0
-        with:
-          mode: fork
-          forkUrl: mainnet
-          log: info
-          logFilePath: anvil_zksync.log
-          target: x86_64-unknown-linux-gnu
-          releaseTag: v0.2.1
-      - name: Setup Git config
-        run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "<>"
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-      - name: Run zk tests
-        env:
-          RUST_BACKTRACE: full
-          TEST_MAINNET_URL: http://localhost:8011
-        run: |
-          ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' --filter-expr 'test(~zk)'
+        - name: Run zk tests
+          env:
+            RUST_BACKTRACE: full
+            TEST_MAINNET_URL: http://localhost:8011
+          run: |
+            ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' --filter-expr 'test(~zk)'
 
   check-ci-install:
     name: CI install
