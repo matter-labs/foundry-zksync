@@ -8,7 +8,7 @@ use forge::{
     revm::primitives::SpecId,
     traces::{CallKind, CallTraceNode, SparsedTraceArena, TraceKind},
 };
-use foundry_common::fs;
+use foundry_common::{fs, sh_println};
 use foundry_test_utils::Filter;
 use itertools::Itertools;
 use serde::Deserialize;
@@ -335,14 +335,14 @@ fn assert_execution_trace(
 
     let actual = decode_first_execution_trace(traces);
     if let Some(failure) = assert_recursive(&expected, &actual) {
-        println!("---");
-        println!("{failure:#?}");
-        println!("---");
-        println!("Trace:");
+        let _ = sh_println!("---");
+        let _ = sh_println!("{failure:#?}");
+        let _ = sh_println!("---");
+        let _ = sh_println!("Trace:");
         let mut actual = &actual;
         for (depth, idx) in failure.path.iter().enumerate() {
             let trace = &actual[*idx];
-            println!(
+            let _ = sh_println!(
                 "{}{:?} {:?} {:?} {:?}",
                 "  ".repeat(depth),
                 trace.kind,
@@ -353,7 +353,7 @@ fn assert_execution_trace(
 
             actual = &trace.children;
         }
-        println!("---\n");
+        let _ = sh_println!("---\n");
         panic!("trace assertion failure");
     }
 }

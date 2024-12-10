@@ -56,13 +56,14 @@ use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::Rng;
 use revm::{
     interpreter::{
-        opcode as op, CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome,
+        opcode as op, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome,
         EOFCreateInputs, EOFCreateKind, Gas, InstructionResult, Interpreter, InterpreterAction,
         InterpreterResult,
     },
     primitives::{
         AccountInfo, BlockEnv, Bytecode, CreateScheme, EVMError, Env, EvmStorageSlot,
-        ExecutionResult, HashMap as rHashMap, Output, SpecId, EOF_MAGIC_BYTES, KECCAK_EMPTY,
+        ExecutionResult, HashMap as rHashMap, Output, SignedAuthorization, SpecId, EOF_MAGIC_BYTES,
+        KECCAK_EMPTY,
     },
     EvmContext, InnerEvmContext, Inspector,
 };
@@ -503,6 +504,11 @@ pub struct Cheatcodes {
     /// execution block environment.
     pub block: Option<BlockEnv>,
 
+    /// Currently active EIP-7702 delegation that will be consumed when building the next
+    /// transaction. Set by `vm.attachDelegation()` and consumed via `.take()` during
+    /// transaction construction.
+    pub active_delegation: Option<SignedAuthorization>,
+
     /// The gas price.
     ///
     /// Used in the cheatcode handler to overwrite the gas price separately from the gas price
@@ -706,9 +712,8 @@ impl Cheatcodes {
             fs_commit: true,
             labels: config.labels.clone(),
             config,
-            dual_compiled_contracts,
-            zk_startup_migration,
             block: Default::default(),
+            active_delegation: Default::default(),
             gas_price: Default::default(),
             prank: Default::default(),
             expected_revert: Default::default(),
@@ -738,10 +743,13 @@ impl Cheatcodes {
             arbitrary_storage: Default::default(),
             deprecated: Default::default(),
             wallets: Default::default(),
+            dual_compiled_contracts,
+            zk_startup_migration,
             use_zk_vm: Default::default(),
             skip_zk_vm: Default::default(),
             skip_zk_vm_addresses: Default::default(),
             record_next_create_address: Default::default(),
+            //TODO(zk): use initialized above
             persisted_factory_deps: Default::default(),
             paymaster_params: None,
             zk_use_factory_deps: Default::default(),
@@ -1552,15 +1560,14 @@ where {
         call: &mut CallInputs,
         executor: &mut impl CheatcodesExecutor,
     ) -> Option<CallOutcome> {
-        let ecx_inner = &mut ecx.inner;
         let gas = Gas::new(call.gas_limit);
 
         // At the root call to test function or script `run()`/`setUp()` functions, we are
         // decreasing sender nonce to ensure that it matches on-chain nonce once we start
         // broadcasting.
-        if ecx_inner.journaled_state.depth == 0 {
-            let sender = ecx_inner.env.tx.caller;
-            let account = match super::evm::journaled_account(ecx_inner, sender) {
+        if ecx.journaled_state.depth == 0 {
+            let sender = ecx.env.tx.caller;
+            let account = match super::evm::journaled_account(ecx, sender) {
                 Ok(account) => account,
                 Err(err) => {
                     return Some(CallOutcome {
@@ -1578,7 +1585,7 @@ where {
             account.info.nonce = nonce;
             if self.use_zk_vm {
                 // NOTE(zk): We sync with the nonce changes to ensure that the nonce matches
-                foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx_inner);
+                foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx);
             }
 
             trace!(target: "cheatcodes", %sender, nonce, prev, "corrected nonce");
@@ -1604,6 +1611,10 @@ where {
                 }),
             };
         }
+
+        // NOTE(zk): renamed from `ecx` because we need the full one later
+        // and this helps with borrow checker
+        let ecx_inner = &mut ecx.inner;
 
         if call.target_address == HARDHAT_CONSOLE_ADDRESS {
             return None;
@@ -1697,6 +1708,20 @@ where {
 
         // Apply our prank
         if let Some(prank) = &self.prank {
+            // Apply delegate call, `call.caller`` will not equal `prank.prank_caller`
+            // TODO(zk): support delegatecall prank
+            if let CallScheme::DelegateCall | CallScheme::ExtDelegateCall = call.scheme {
+                if prank.delegate_call {
+                    call.target_address = prank.new_caller;
+                    call.caller = prank.new_caller;
+                    let acc = ecx_inner.journaled_state.account(prank.new_caller);
+                    call.value = CallValue::Apparent(acc.info.balance);
+                    if let Some(new_origin) = prank.new_origin {
+                        ecx_inner.env.tx.caller = new_origin;
+                    }
+                }
+            }
+
             if ecx_inner.journaled_state.depth() >= prank.depth && call.caller == prank.prank_caller
             {
                 let mut prank_applied = false;
@@ -1802,18 +1827,26 @@ where {
                         None
                     };
 
+                    let mut tx_req = TransactionRequest {
+                        from: Some(broadcast.new_origin),
+                        to: Some(TxKind::from(Some(call.target_address))),
+                        value: call.transfer_value(),
+                        input: TransactionInput::new(call.input.clone()),
+                        nonce: Some(nonce),
+                        chain_id: Some(ecx_inner.env.cfg.chain_id),
+                        gas: if is_fixed_gas_limit { Some(call.gas_limit) } else { None },
+                        ..Default::default()
+                    };
+
+                    if let Some(auth_list) = self.active_delegation.take() {
+                        tx_req.authorization_list = Some(vec![auth_list]);
+                    } else {
+                        tx_req.authorization_list = None;
+                    }
+
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc: ecx_inner.db.active_fork_url(),
-                        transaction: TransactionRequest {
-                            from: Some(broadcast.new_origin),
-                            to: Some(TxKind::from(Some(call.target_address))),
-                            value: call.transfer_value(),
-                            input: TransactionInput::new(call.input.clone()),
-                            nonce: Some(nonce),
-                            gas: if is_fixed_gas_limit { Some(call.gas_limit) } else { None },
-                            ..Default::default()
-                        }
-                        .into(),
+                        transaction: tx_req.into(),
                         zk_tx,
                     });
                     debug!(target: "cheatcodes", tx=?self.broadcastable_transactions.back().unwrap(), "broadcastable call");
@@ -1845,7 +1878,7 @@ where {
             // nonce, a non-zero KECCAK_EMPTY codehash, or non-empty code
             let initialized;
             let old_balance;
-            if let Ok(acc) = ecx.load_account(call.target_address) {
+            if let Ok(acc) = ecx_inner.load_account(call.target_address) {
                 initialized = acc.info.exists();
                 old_balance = acc.info.balance;
             } else {
@@ -1868,8 +1901,8 @@ where {
             // as "warm" if the call from which they were accessed is reverted
             recorded_account_diffs_stack.push(vec![AccountAccess {
                 chainInfo: crate::Vm::ChainInfo {
-                    forkId: ecx.db.active_fork_id().unwrap_or_default(),
-                    chainId: U256::from(ecx.env.cfg.chain_id),
+                    forkId: ecx_inner.db.active_fork_id().unwrap_or_default(),
+                    chainId: U256::from(ecx_inner.env.cfg.chain_id),
                 },
                 accessor: call.caller,
                 account: call.bytecode_address,
@@ -1882,7 +1915,7 @@ where {
                 reverted: false,
                 deployedCode: Bytes::new(),
                 storageAccesses: vec![], // updated on step
-                depth: ecx.journaled_state.depth(),
+                depth: ecx_inner.journaled_state.depth(),
             }]);
         }
 
