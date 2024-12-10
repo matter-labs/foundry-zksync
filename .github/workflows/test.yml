@@ -25,99 +25,84 @@ jobs:
       profile: default
     secrets: inherit
 
-    doctest:
-      runs-on: ubuntu-22.04
-      timeout-minutes: 60
-      steps:
-        - uses: actions/checkout@v4
-        - uses: dtolnay/rust-toolchain@nightly
-          with:
-            toolchain: ${{ env.TARGET_RUST_VERSION }}
-        - uses: Swatinem/rust-cache@v2
-          with:
-            cache-on-failure: true
-        - name: cargo test
-          run: cargo test --doc -p forge
+  doctest:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo test
+        run: cargo test --doc -p forge
 
-    clippy:
-      name: clippy
-      runs-on: ubuntu-22.04
-      timeout-minutes: 60
-      steps:
-        - uses: actions/checkout@v4
-        - uses: dtolnay/rust-toolchain@clippy
-        - uses: Swatinem/rust-cache@v2
-          with:
-            cache-on-failure: true
-        - run: cargo clippy --workspace --all-targets --all-features
-          env:
-            RUSTFLAGS: -Dwarnings
+  clippy:
+    name: clippy
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo clippy --workspace --all-targets --all-features
+        env:
+          RUSTFLAGS: -Dwarnings
 
-    rustfmt:
-      runs-on: ubuntu-22.04
-      timeout-minutes: 60
-      steps:
-        - uses: actions/checkout@v4
-        - uses: dtolnay/rust-toolchain@nightly
-          with:
-            toolchain: ${{ env.TARGET_RUST_VERSION }}
-            components: rustfmt
-        - run: cargo fmt --all --check
+  rustfmt:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+          components: rustfmt
+      - run: cargo fmt --all --check
 
-    forge-fmt:
-      runs-on: ubuntu-22.04
-      timeout-minutes: 60
-      steps:
-        - uses: actions/checkout@v4
-        - uses: dtolnay/rust-toolchain@nightly
-          with:
-            toolchain: ${{ env.TARGET_RUST_VERSION }}
-        - uses: Swatinem/rust-cache@v2
-          with:
-            cache-on-failure: true
-        - name: forge fmt
-          shell: bash
-          run: ./.github/scripts/format.sh --check
+  forge-fmt:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: forge fmt
+        shell: bash
+        run: ./.github/scripts/format.sh --check
 
-    codespell:
-      runs-on: ubuntu-22.04
-      timeout-minutes: 30
-      steps:
-        - uses: actions/checkout@v4
-        - uses: codespell-project/actions-codespell@v2
-          with:
-            skip: "*.json"
+  codespell:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: codespell-project/actions-codespell@v2
+        with:
+          skip: "*.json"
 
-    crate-checks:
-      # ubuntu-22.04 runs out of disk space
-      runs-on: ubuntu-22.04-github-hosted-16core
-      timeout-minutes: 60
-      steps:
-        - uses: actions/checkout@v4
-        - uses: dtolnay/rust-toolchain@nightly
-          with:
-            toolchain: ${{ env.TARGET_RUST_VERSION }}
-        - uses: taiki-e/install-action@cargo-hack
-        - uses: Swatinem/rust-cache@v2
-          with:
-            cache-on-failure: true
-        - name: cargo hack
-          run: cargo hack check
-
-    zk-cargo-test:
-      runs-on: ubuntu-22.04
-
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-          with:
-            submodules: recursive
-            ref: ${{ github.event.pull_request.head.sha }}
-
-        - name: Install Rust
-          uses: actions-rust-lang/setup-rust-toolchain@v1
-          with:
-            toolchain: ${{ env.TARGET_RUST_VERSION }}
+  crate-checks:
+    # ubuntu-22.04 runs out of disk space
+    runs-on: ubuntu-22.04-github-hosted-16core
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo hack
+        run: cargo hack check
 
   zk-cargo-test:
     runs-on: ubuntu-22.04
@@ -146,11 +131,13 @@ jobs:
           logFilePath: anvil_zksync.log
           target: x86_64-unknown-linux-gnu
           releaseTag: v0.2.1
+
       - name: Setup Git config
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "<>"
           git config --global url."https://github.com/".insteadOf "git@github.com:"
+
       - name: Run zk tests
         env:
           RUST_BACKTRACE: full
