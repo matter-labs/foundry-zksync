@@ -56,9 +56,6 @@ use foundry_evm_abi::{
     patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS,
 };
 
-/// Minimum gas price allowed for L1.
-const MIN_L1_GAS_PRICE: u64 = 1000;
-
 /// Represents the result of execution a [`L2Tx`] on EraVM
 #[derive(Debug)]
 pub struct ZKVMExecutionResult {
@@ -80,7 +77,7 @@ pub type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
 /// Will handle aggregating execution results, where errors, reverts or halts will be propagated
 /// immediately.
 /// All logs will be collected as they happen, and returned with the final result.
-//TODO: should we make this transparent in `inspect` directly?
+// TODO: should we make this transparent in `inspect` directly?
 pub fn inspect_as_batch<DB, E>(
     tx: L2Tx,
     ecx: &mut EvmContext<DB>,
@@ -471,9 +468,7 @@ fn inspect_inner<S: ReadStorage>(
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> InnerZkVmResult {
-    let l1_gas_price = call_ctx.block_basefee.to::<u64>().max(MIN_L1_GAS_PRICE);
-    let fair_l2_gas_price = call_ctx.block_basefee.saturating_to::<u64>();
-    let batch_env = create_l1_batch_env(storage.clone(), l1_gas_price, fair_l2_gas_price);
+    let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
 
     let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false);
     let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);

@@ -256,6 +256,7 @@ impl MultiContractRunner {
             Some(artifact_id.version.clone()),
             self.dual_compiled_contracts.clone(),
             self.use_zk,
+            None,
         );
 
         let trace_mode = TraceMode::default()

@@ -28,7 +28,10 @@ use zksync_utils::bytecode::hash_bytecode;
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
-    vm::farcall::{CallAction, CallDepth, FarCallHandler},
+    vm::{
+        farcall::{CallAction, CallDepth, FarCallHandler},
+        ZkEnv,
+    },
     ZkPaymasterData, EMPTY_CODE,
 };
 
@@ -92,6 +95,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub paymaster_data: Option<ZkPaymasterData>,
     /// Whether to persist nonce update for the tx caller, or not.
     pub persist_nonce_update: bool,
+    /// Era Vm environment
+    pub zk_env: ZkEnv,
 }
 
 /// Tracer result to return back to foundry.

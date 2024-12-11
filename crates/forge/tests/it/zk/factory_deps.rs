@@ -44,9 +44,9 @@ contract ZkLargeFactoryDependenciesScript is Script {
 
     let node = ZkSyncNode::start();
 
-    // foundry default gas-limit is not enough to pay for factory deps in our current
-    // default environment
-    let gas_limit = u32::MAX >> 1;
+    // foundry default gas-limit is not enough to pay for factory deps
+    // with era_test_node's environment
+    let gas_limit = (u32::MAX >> 1) * 2;
 
     cmd.arg("script").args([
         "--zk-startup",

@@ -1,5 +1,6 @@
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::backend::Backend;
+use foundry_zksync_core::vm::ZkEnv;
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
 
 /// The builder that allows to configure an evm [`Executor`] which a stack of optional
@@ -19,8 +20,10 @@ pub struct ExecutorBuilder {
     /// The spec ID.
     spec_id: SpecId,
 
-    use_zk: bool,
     legacy_assertions: bool,
+
+    use_zk: bool,
+    zk_env: ZkEnv,
 }
 
 impl Default for ExecutorBuilder {
@@ -30,8 +33,9 @@ impl Default for ExecutorBuilder {
             stack: InspectorStackBuilder::new(),
             gas_limit: None,
             spec_id: SpecId::LATEST,
-            use_zk: false,
             legacy_assertions: false,
+            use_zk: false,
+            zk_env: Default::default(),
         }
     }
 }
@@ -67,13 +71,6 @@ impl ExecutorBuilder {
         self
     }
 
-    /// Sets the EVM spec to use
-    #[inline]
-    pub fn use_zk_vm(mut self, enable: bool) -> Self {
-        self.use_zk = enable;
-        self
-    }
-
     /// Sets the `legacy_assertions` flag.
     #[inline]
     pub fn legacy_assertions(mut self, legacy_assertions: bool) -> Self {
@@ -81,10 +78,24 @@ impl ExecutorBuilder {
         self
     }
 
+    /// Sets the EVM spec to use
+    #[inline]
+    pub fn use_zk_vm(mut self, enable: bool) -> Self {
+        self.use_zk = enable;
+        self
+    }
+
+    /// Sets zk_env
+    #[inline]
+    pub fn zk_env(mut self, zk_env: ZkEnv) -> Self {
+        self.zk_env = zk_env;
+        self
+    }
+
     /// Builds the executor as configured.
     #[inline]
     pub fn build(self, env: Env, db: Backend) -> Executor {
-        let Self { mut stack, gas_limit, spec_id, legacy_assertions, use_zk } = self;
+        let Self { mut stack, gas_limit, spec_id, legacy_assertions, use_zk, zk_env } = self;
         if stack.block.is_none() {
             stack.block = Some(env.block.clone());
         }
@@ -95,6 +106,7 @@ impl ExecutorBuilder {
         let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(env), spec_id);
         let mut exec = Executor::new(db, env, stack.build(), gas_limit, legacy_assertions);
         exec.use_zk = use_zk;
+        exec.zk_env = zk_env;
         exec
     }
 }
