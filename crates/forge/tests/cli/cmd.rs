@@ -3203,3 +3203,16 @@ forgetest_init!(gas_report_include_tests, |prj, cmd| {
             .is_json(),
         );
 });
+
+forgetest_init!(zk_can_init_with_zksync, |prj, cmd| {
+    cmd.args(["init", "--zksync", "--force"]).assert_success();
+
+    // Check that zkout/ is in .gitignore
+    let gitignore_path = prj.root().join(".gitignore");
+    assert!(gitignore_path.exists());
+    let gitignore_contents = std::fs::read_to_string(&gitignore_path).unwrap();
+    assert!(gitignore_contents.contains("zkout/"));
+
+    // Assert that forge-zksync-std is installed
+    assert!(prj.root().join("lib/forge-zksync-std").exists());
+});
