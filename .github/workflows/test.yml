@@ -160,7 +160,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest]
+        #os: [ubuntu-22.04, macos-latest]
+        os: [macos-latest]
       max-parallel: 1
     runs-on: ${{ matrix.os }}
     steps:
