@@ -178,6 +178,59 @@ EOF
       fi
     done
 
+    # Begin anvil-zksync installation
+    say "downloading anvil-zksync"
+
+    # Supported targets for anvil-zksync
+    SUPPORTED_TARGETS=(
+      "x86_64-apple-darwin"
+      "aarch64-apple-darwin"
+      "x86_64-unknown-linux-gnu"
+      "aarch64-unknown-linux-gnu"
+    )
+
+    if [ "$ARCHITECTURE" = "arm64" ]; then
+      ARCHITECTURE="aarch64"
+    fi
+
+    if [ "$PLATFORM" = "darwin" ]; then
+      TARGET="${ARCHITECTURE}-apple-${PLATFORM}"
+    elif [ "$PLATFORM" = "linux" ]; then
+      TARGET="${ARCHITECTURE}-unknown-${PLATFORM}-gnu"
+    else
+      TARGET="${ARCHITECTURE}-${PLATFORM}"
+    fi
+    
+    if [[ " ${SUPPORTED_TARGETS[*]} " == *" $TARGET "* ]]; then
+      ANVIL_REPO="matter-labs/anvil-zksync"
+
+      say "getting latest tag for anvil-zksync"
+
+      ANVIL_TAG=$(curl -s https://api.github.com/repos/$ANVIL_REPO/releases/latest | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p')
+
+      if [ -z "$ANVIL_TAG" ]; then
+        err "failed to get latest tag for anvil-zksync"
+      fi
+
+      ANVIL_BIN_NAME="anvil-zksync-${ANVIL_TAG}-${TARGET}.${EXT}"
+
+      ANVIL_BIN_URL="https://github.com/$ANVIL_REPO/releases/download/$ANVIL_TAG/$ANVIL_BIN_NAME"
+
+      ANVIL_BIN_PATH="$FOUNDRY_BIN_DIR/anvil-zksync"
+
+      say "downloading anvil-zksync from $ANVIL_BIN_URL"
+
+      ensure download "$ANVIL_BIN_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR"
+
+      mv "$FOUNDRY_BIN_DIR/anvil-zksync" "$ANVIL_BIN_PATH"
+
+      chmod +x "$ANVIL_BIN_PATH"
+
+      say "installed - $(ensure "$ANVIL_BIN_PATH" --version)"
+    else
+      warn "anvil-zksync is not supported on your platform ($TARGET). Skipping anvil-zksync installation."
+    fi
+
     say "done!"
 
   # Install by cloning the repo with the provided branch/tag
@@ -232,8 +285,6 @@ usage() {
 The installer for Foundry-zksync.
 
 Update or revert to a specific Foundry-zksync version with ease.
-
-By default, the latest nightly version is installed from built binaries.
 
 By default, the latest nightly version is installed from built binaries.
 
@@ -313,19 +364,19 @@ banner() {
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 
  ╔═╗ ╔═╗ ╦ ╦ ╔╗╔ ╔╦╗ ╦═╗ ╦ ╦         Portable and modular toolkit
- ╠╣  ║ ║ ║ ║ ║║║  ║║ ╠╦╝ ╚╦╝    for Ethereum Application Development
+ ╠╣  ║ ║ ║ ║ ║║║  ║║ ╠╦╝ ╚╦╝    for ZKsync Application Development
  ╚   ╚═╝ ╚═╝ ╝╚╝ ═╩╝ ╩╚═  ╩                 written in Rust.
 
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 
 Fork of    : https://github.com/foundry-rs/
 Repo       : https://github.com/matter-labs/foundry-zksync/
-Book       : https://book.getfoundry.sh/   
+Book       : https://foundry-book.zksync.io/
 
 .xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx.xOx
 
 '
-}
 
+}
 
 main "$@"
