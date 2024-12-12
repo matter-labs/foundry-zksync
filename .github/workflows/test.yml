@@ -154,3 +154,22 @@ jobs:
         run: cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/ && cd /tmp && ./install-foundry-zksync
       - name: Verify installation
         run: forge --version
+
+  check-ci-install-anvil:
+    name: CI install anvil-zksync
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install foundry-zksync
+        run: |
+          cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/
+          cd /tmp
+          ./install-foundry-zksync
+      
+      - name: Verify anvil-zksync installation
+        run: anvil-zksync --version
