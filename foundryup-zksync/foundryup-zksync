@@ -179,32 +179,42 @@ EOF
     done
 
     # Begin anvil-zksync installation
-    say "downloading anvil-zksync"
+    say "downloading latest anvil-zksync"
 
-    # Supported targets for anvil-zksync
-    SUPPORTED_TARGETS=(
-      "x86_64-apple-darwin"
-      "aarch64-apple-darwin"
-      "x86_64-unknown-linux-gnu"
-      "aarch64-unknown-linux-gnu"
-    )
+    uname_str="$(uname)"
+    case "$uname_str" in
+        "Linux")
+            os="unknown-linux-gnu"
+            # Note: If `lscpu` isn't guaranteed to be available, 
+            # you may want to fallback to `uname -m`
+            arch=$(lscpu | awk '/Architecture:/{print $2}')
+            ;;
+        "Darwin")
+            os="apple-darwin"
+            arch=$(arch)
+            ;;
+        *)
+            err "anvil-zksync only supports Linux and MacOS! Detected OS: $uname_str"
+            ;;
+    esac
 
-    if [ "$ARCHITECTURE" = "arm64" ]; then
-      ARCHITECTURE="aarch64"
-    fi
+    # Normalize architecture
+    case "$arch" in
+        "x86_64")
+            architecture="x86_64"
+            ;;
+        "arm64"|"aarch64")
+            architecture="aarch64"
+            ;;
+        *)
+            err "Unsupported architecture detected!"
+            ;;
+    esac
 
-    if [ "$PLATFORM" = "darwin" ]; then
-      TARGET="${ARCHITECTURE}-apple-${PLATFORM}"
-    elif [ "$PLATFORM" = "linux" ]; then
-      TARGET="${ARCHITECTURE}-unknown-${PLATFORM}-gnu"
-    else
-      TARGET="${ARCHITECTURE}-${PLATFORM}"
-    fi
+    TARGET="${architecture}-${os}"
     
-    if [[ " ${SUPPORTED_TARGETS[*]} " == *" $TARGET "* ]]; then
+    if [ "$PLATFORM" = "linux" ] || [ "$PLATFORM" = "darwin" ]; then
       ANVIL_REPO="matter-labs/anvil-zksync"
-
-      say "getting latest tag for anvil-zksync"
 
       ANVIL_TAG=$(curl -s https://api.github.com/repos/$ANVIL_REPO/releases/latest | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p')
 
@@ -217,8 +227,6 @@ EOF
       ANVIL_BIN_URL="https://github.com/$ANVIL_REPO/releases/download/$ANVIL_TAG/$ANVIL_BIN_NAME"
 
       ANVIL_BIN_PATH="$FOUNDRY_BIN_DIR/anvil-zksync"
-
-      say "downloading anvil-zksync from $ANVIL_BIN_URL"
 
       ensure download "$ANVIL_BIN_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR"
 
