@@ -216,6 +216,9 @@ EOF
     if [ "$PLATFORM" = "linux" ] || [ "$PLATFORM" = "darwin" ]; then
       ANVIL_REPO="matter-labs/anvil-zksync"
 
+      RES=$(curl -s https://api.github.com/repos/$ANVIL_REPO/releases/latest)
+      echo $RES
+
       ANVIL_TAG=$(curl -s https://api.github.com/repos/$ANVIL_REPO/releases/latest | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p')
 
       if [ -z "$ANVIL_TAG" ]; then
