@@ -8,8 +8,10 @@ use eyre::{eyre, ContextCompat, Result};
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use foundry_config::InvariantConfig;
 use foundry_evm_core::{
-    abi::HARDHAT_CONSOLE_ADDRESS,
-    constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, MAGIC_ASSUME},
+    constants::{
+        CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME,
+        TEST_TIMEOUT,
+    },
     precompiles::PRECOMPILES,
 };
 use foundry_evm_fuzz::{
@@ -48,7 +50,7 @@ pub use result::InvariantFuzzTestResult;
 use serde::{Deserialize, Serialize};
 
 mod shrink;
-use crate::executors::EvmError;
+use crate::executors::{EvmError, FuzzTestTimer};
 pub use shrink::check_sequence;
 
 sol! {
@@ -321,6 +323,7 @@ impl<'a> InvariantExecutor<'a> {
         &mut self,
         invariant_contract: InvariantContract<'_>,
         fuzz_fixtures: &FuzzFixtures,
+        deployed_libs: &[Address],
         progress: Option<&ProgressBar>,
     ) -> Result<InvariantFuzzTestResult> {
         // Throw an error to abort test run if the invariant function accepts input params
@@ -329,7 +332,10 @@ impl<'a> InvariantExecutor<'a> {
         }
 
         let (invariant_test, invariant_strategy) =
-            self.prepare_test(&invariant_contract, fuzz_fixtures)?;
+            self.prepare_test(&invariant_contract, fuzz_fixtures, deployed_libs)?;
+
+        // Start timer for this invariant test.
+        let timer = FuzzTestTimer::new(self.config.timeout);
 
         let _ = self.runner.run(&invariant_strategy, |first_input| {
             // Create current invariant run data.
@@ -346,6 +352,15 @@ impl<'a> InvariantExecutor<'a> {
             }
 
             while current_run.depth < self.config.depth {
+                // Check if the timeout has been reached.
+                if timer.is_timed_out() {
+                    // Since we never record a revert here the test is still considered
+                    // successful even though it timed out. We *want*
+                    // this behavior for now, so that's ok, but
+                    // future developers should be aware of this.
+                    return Err(TestCaseError::fail(TEST_TIMEOUT));
+                }
+
                 let tx = current_run.inputs.last().ok_or_else(|| {
                     TestCaseError::fail("No input generated to call fuzzed target.")
                 })?;
@@ -492,6 +507,7 @@ impl<'a> InvariantExecutor<'a> {
         &mut self,
         invariant_contract: &InvariantContract<'_>,
         fuzz_fixtures: &FuzzFixtures,
+        deployed_libs: &[Address],
     ) -> Result<(InvariantTest, impl Strategy<Value = BasicTxDetails>)> {
         // Finds out the chosen deployed contracts and/or senders.
         self.select_contract_artifacts(invariant_contract.address)?;
@@ -502,6 +518,7 @@ impl<'a> InvariantExecutor<'a> {
         let fuzz_state = EvmFuzzState::new(
             self.executor.backend().mem_db(),
             self.config.dictionary,
+            deployed_libs,
             self.config.no_zksync_reserved_addresses,
         );
 

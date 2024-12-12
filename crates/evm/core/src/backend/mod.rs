@@ -10,7 +10,7 @@ use crate::{
 use alloy_consensus::Transaction as TransactionTrait;
 use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
-use alloy_primitives::{keccak256, map::HashMap, uint, Address, B256, U256};
+use alloy_primitives::{keccak256, map::HashMap, uint, Address, TxKind, B256, U256};
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
 use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
@@ -829,7 +829,7 @@ impl Backend {
         self.initialize(env);
         let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), inspector);
 
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+        let res = evm.transact().wrap_err("EVM error")?;
 
         env.env = evm.context.evm.inner.env;
 
@@ -2216,12 +2216,6 @@ fn commit_transaction(
     persistent_accounts: &HashSet<Address>,
     inspector: &mut dyn InspectorExt,
 ) -> eyre::Result<()> {
-    // TODO: Remove after https://github.com/foundry-rs/foundry/pull/9131
-    // if the tx has the blob_versioned_hashes field, we assume it's a Cancun block
-    if tx.blob_versioned_hashes().is_some() {
-        env.handler_cfg.spec_id = SpecId::CANCUN;
-    }
-
     configure_tx_env(&mut env.env, tx);
 
     let now = Instant::now();

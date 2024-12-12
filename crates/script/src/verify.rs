@@ -250,6 +250,7 @@ impl VerifyBundle {
                     evm_version: None,
                     show_standard_json_input: false,
                     guess_constructor_args: false,
+                    // compilation_profile: Some(artifact.profile.to_string()),
                     compilation_profile: None, //TODO(zk): get compilation profile
                     zksync: self.zksync,
                 };
