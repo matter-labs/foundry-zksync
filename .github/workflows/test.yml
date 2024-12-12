@@ -166,7 +166,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Install foundry-zksync
         run: |
           cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/
