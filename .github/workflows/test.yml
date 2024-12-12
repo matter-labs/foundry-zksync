@@ -167,6 +167,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Sleep for 30 seconds
+        run: sleep 30s
+        shell: bash
+
       - name: Install foundry-zksync
         run: |
           cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/
