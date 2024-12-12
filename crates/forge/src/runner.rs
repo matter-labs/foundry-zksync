@@ -150,12 +150,19 @@ impl ContractRunner<'_> {
         // to simulate EVM behavior where only the tx that deploys the test contract increments the
         // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
-            if let Some(zk_startup_migration) = &mut cheatcodes.zk_startup_migration {
-                debug!("test contract deployed, allowing startup storage migration");
-                zk_startup_migration.allow();
-            }
+            debug!("test contract deployed, allowing startup storage migration");
+            cheatcodes
+                .strategy
+                .lock()
+                .expect("failed acquiring strategy")
+                .zksync_allow_startup_migration();
+
             debug!("test contract deployed, allowing persisting next nonce update");
-            cheatcodes.zk_persist_nonce_update.persist_next();
+            cheatcodes
+                .strategy
+                .lock()
+                .expect("failed acquiring strategy")
+                .zksync_persist_next_nonce_update();
         }
 
         // Optionally call the `setUp` function

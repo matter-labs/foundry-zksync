@@ -1,5 +1,8 @@
 use super::Result;
-use crate::Vm::Rpc;
+use crate::{
+    strategy::{CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy},
+    Vm::Rpc,
+};
 use alloy_primitives::{map::AddressHashMap, U256};
 use foundry_common::{fs::normalize_path, ContractsByArtifact};
 use foundry_compilers::{utils::canonicalize, ProjectPathsConfig};
@@ -8,10 +11,10 @@ use foundry_config::{
     ResolvedRpcEndpoints,
 };
 use foundry_evm_core::opts::EvmOpts;
-use foundry_zksync_compiler::DualCompiledContracts;
 use semver::Version;
 use std::{
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -54,10 +57,11 @@ pub struct CheatsConfig {
     pub running_contract: Option<String>,
     /// Version of the script/test contract which is currently running.
     pub running_version: Option<Version>,
-    /// ZKSolc -> Solc Contract codes
-    pub dual_compiled_contracts: DualCompiledContracts,
-    /// Use ZK-VM on startup
-    pub use_zk: bool,
+    // /// ZKSolc -> Solc Contract codes
+    // pub dual_compiled_contracts: DualCompiledContracts,
+    // /// Use ZK-VM on startup
+    // pub use_zk: bool,
+    pub strategy: Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>,
     /// Whether to enable legacy (non-reverting) assertions.
     pub assertions_revert: bool,
     /// Optional seed for the RNG algorithm.
@@ -72,8 +76,7 @@ impl CheatsConfig {
         available_artifacts: Option<ContractsByArtifact>,
         running_contract: Option<String>,
         running_version: Option<Version>,
-        dual_compiled_contracts: DualCompiledContracts,
-        use_zk: bool,
+        strategy: Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>,
     ) -> Self {
         let mut allowed_paths = vec![config.root.0.clone()];
         allowed_paths.extend(config.libs.clone());
@@ -103,8 +106,7 @@ impl CheatsConfig {
             available_artifacts,
             running_contract,
             running_version,
-            dual_compiled_contracts,
-            use_zk,
+            strategy,
             assertions_revert: config.assertions_revert,
             seed: config.fuzz.seed,
         }
@@ -235,8 +237,7 @@ impl Default for CheatsConfig {
             available_artifacts: Default::default(),
             running_contract: Default::default(),
             running_version: Default::default(),
-            dual_compiled_contracts: Default::default(),
-            use_zk: false,
+            strategy: Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy::default())),
             assertions_revert: true,
             seed: None,
         }
@@ -255,8 +256,7 @@ mod tests {
             None,
             None,
             None,
-            Default::default(),
-            false,
+            Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy::default())),
         )
     }
 

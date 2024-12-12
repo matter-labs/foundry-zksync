@@ -32,7 +32,7 @@ pub fn transact<'a, DB>(
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
 where
-    DB: Database,
+    DB: Database + ?Sized,
     <DB as Database>::Error: Debug,
 {
     info!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");

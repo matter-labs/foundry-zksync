@@ -519,7 +519,7 @@ fn expect_emit(
     Ok(Default::default())
 }
 
-pub(crate) fn handle_expect_emit(
+pub fn handle_expect_emit(
     state: &mut Cheatcodes,
     log: &alloy_primitives::Log,
     interpreter: &mut Interpreter,
@@ -644,7 +644,7 @@ fn expect_revert(
     Ok(Default::default())
 }
 
-pub(crate) fn handle_expect_revert(
+pub fn handle_expect_revert(
     is_cheatcode: bool,
     is_create: bool,
     expected_revert: &ExpectedRevert,

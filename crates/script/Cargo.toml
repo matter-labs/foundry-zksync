@@ -24,6 +24,7 @@ foundry-cheatcodes.workspace = true
 foundry-wallets.workspace = true
 foundry-linking.workspace = true
 forge-script-sequence.workspace = true
+foundry-strategy-zksync.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compiler.workspace = true
 

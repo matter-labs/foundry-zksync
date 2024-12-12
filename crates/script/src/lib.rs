@@ -28,7 +28,7 @@ use forge_script_sequence::{AdditionalContract, NestedValue};
 use forge_verify::RetryArgs;
 use foundry_cli::{
     opts::{CoreBuildArgs, GlobalOpts},
-    utils::LoadConfig,
+    utils::{self, LoadConfig},
 };
 use foundry_common::{
     abi::{encode_function_args, get_func},
@@ -591,13 +591,17 @@ impl ScriptConfig {
     ) -> Result<ScriptRunner> {
         trace!("preparing script runner");
         let env = self.evm_opts.evm_env().await?;
+        let strategy = utils::get_executor_strategy(&self.config);
 
         let db = if let Some(fork_url) = self.evm_opts.fork_url.as_ref() {
             match self.backends.get(fork_url) {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(fork);
+                    let backend = Backend::spawn(
+                        fork,
+                        strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
+                    );
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -606,7 +610,10 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(None)
+            Backend::spawn(
+                None,
+                strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
+            )
         };
 
         // We need to enable tracing to decode contract names: local or external.
@@ -620,32 +627,31 @@ impl ScriptConfig {
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions);
 
-        let use_zk = self.config.zksync.run_in_zk_mode();
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
-            builder = builder
-                .inspectors(|stack| {
-                    stack
-                        .cheatcodes(
-                            CheatsConfig::new(
-                                &self.config,
-                                self.evm_opts.clone(),
-                                Some(known_contracts),
-                                Some(target.name),
-                                Some(target.version),
-                                dual_compiled_contracts,
-                                use_zk,
-                            )
-                            .into(),
+            builder = builder.inspectors(|stack| {
+                stack
+                    .cheatcodes(
+                        CheatsConfig::new(
+                            &self.config,
+                            self.evm_opts.clone(),
+                            Some(known_contracts),
+                            Some(target.name),
+                            Some(target.version),
+                            strategy
+                                .lock()
+                                .expect("failed acquiring strategy")
+                                .new_cheatcode_inspector_strategy(dual_compiled_contracts),
                         )
-                        .wallets(script_wallets)
-                        .enable_isolation(self.evm_opts.isolate)
-                })
-                .use_zk_vm(use_zk);
+                        .into(),
+                    )
+                    .wallets(script_wallets)
+                    .enable_isolation(self.evm_opts.isolate)
+            });
         }
 
-        let executor = builder.build(env, db);
+        let executor = builder.build(env, db, strategy);
         Ok(ScriptRunner::new(executor, self.evm_opts.clone()))
     }
 }

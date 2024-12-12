@@ -7,6 +7,7 @@ use crate::{
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
+use foundry_cli::utils;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
     artifacts::{CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Libraries},
@@ -18,7 +19,7 @@ use foundry_config::Config;
 use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
-    executors::ExecutorBuilder,
+    executors::{strategy::ExecutorStrategy, ExecutorBuilder},
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
@@ -35,7 +36,7 @@ use std::{
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
-    sync::{mpsc, Arc},
+    sync::{mpsc, Arc, Mutex},
     time::Instant,
 };
 
@@ -181,7 +182,11 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let mut db = Backend::spawn(self.fork.take());
+        let strategy = utils::get_executor_strategy(&self.config);
+        let mut db = Backend::spawn(
+            self.fork.take(),
+            strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
+        );
         db.is_zk = self.use_zk;
 
         let find_timer = Instant::now();
@@ -210,6 +215,7 @@ impl MultiContractRunner {
                         filter,
                         &tokio_handle,
                         Some(&tests_progress),
+                        strategy.clone(),
                     );
 
                     tests_progress
@@ -229,8 +235,15 @@ impl MultiContractRunner {
         } else {
             contracts.par_iter().for_each(|&(id, contract)| {
                 let _guard = tokio_handle.enter();
-                let result =
-                    self.run_test_suite(id, contract, db.clone(), filter, &tokio_handle, None);
+                let result = self.run_test_suite(
+                    id,
+                    contract,
+                    db.clone(),
+                    filter,
+                    &tokio_handle,
+                    None,
+                    strategy.clone(),
+                );
                 let _ = tx.send((id.identifier(), result));
             })
         }
@@ -244,6 +257,7 @@ impl MultiContractRunner {
         filter: &dyn TestFilter,
         tokio_handle: &tokio::runtime::Handle,
         progress: Option<&TestsProgress>,
+        strategy: Arc<Mutex<dyn ExecutorStrategy>>,
     ) -> SuiteResult {
         let identifier = artifact_id.identifier();
         let mut span_name = identifier.as_str();
@@ -254,8 +268,10 @@ impl MultiContractRunner {
             Some(self.known_contracts.clone()),
             Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
-            self.dual_compiled_contracts.clone(),
-            self.use_zk,
+            strategy
+                .lock()
+                .expect("failed acquiring strategy")
+                .new_cheatcode_inspector_strategy(self.dual_compiled_contracts.clone()),
         );
 
         let trace_mode = TraceMode::default()
@@ -272,11 +288,10 @@ impl MultiContractRunner {
                     .enable_isolation(self.isolation)
                     .alphanet(self.alphanet)
             })
-            .use_zk_vm(self.use_zk)
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
-            .build(self.env.clone(), db);
+            .build(self.env.clone(), db, strategy);
 
         if !enabled!(tracing::Level::TRACE) {
             span_name = get_contract_name(&identifier);

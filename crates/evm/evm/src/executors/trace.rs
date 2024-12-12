@@ -4,7 +4,12 @@ use foundry_config::{utils::evm_spec_id, Chain, Config};
 use foundry_evm_core::{backend::Backend, fork::CreateFork, opts::EvmOpts};
 use foundry_evm_traces::{InternalTraceMode, TraceMode};
 use revm::primitives::{Env, SpecId};
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::{Arc, Mutex},
+};
+
+use super::strategy::ExecutorStrategy;
 
 /// A default executor with tracing enabled
 pub struct TracingExecutor {
@@ -19,8 +24,12 @@ impl TracingExecutor {
         debug: bool,
         decode_internal: bool,
         alphanet: bool,
+        strategy: Arc<Mutex<dyn ExecutorStrategy>>,
     ) -> Self {
-        let db = Backend::spawn(fork);
+        let db = Backend::spawn(
+            fork,
+            strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
+        );
         let trace_mode =
             TraceMode::Call.with_debug(debug).with_decode_internal(if decode_internal {
                 InternalTraceMode::Full
@@ -33,7 +42,7 @@ impl TracingExecutor {
             executor: ExecutorBuilder::new()
                 .inspectors(|stack| stack.trace_mode(trace_mode).alphanet(alphanet))
                 .spec(evm_spec_id(&version.unwrap_or_default(), alphanet))
-                .build(env, db),
+                .build(env, db, strategy),
         }
     }
 

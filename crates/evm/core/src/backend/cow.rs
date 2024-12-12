@@ -9,11 +9,9 @@ use crate::{
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
-use alloy_primitives::{map::HashMap, Address, B256, U256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
-use eyre::WrapErr;
 use foundry_fork_db::DatabaseError;
-use foundry_zksync_core::PaymasterParams;
 use revm::{
     db::DatabaseRef,
     primitives::{
@@ -61,27 +59,6 @@ impl<'a> CowBackend<'a> {
         Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
     }
 
-    /// Executes the configured zk transaction of the `env` without committing state changes
-    pub fn inspect_ref_zk(
-        &mut self,
-        env: &mut Env,
-        persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
-        factory_deps: Option<Vec<Vec<u8>>>,
-        paymaster_data: Option<PaymasterParams>,
-    ) -> eyre::Result<ResultAndState> {
-        // this is a new call to inspect with a new env, so even if we've cloned the backend
-        // already, we reset the initialized state
-        self.is_initialized = false;
-
-        foundry_zksync_core::vm::transact(
-            Some(persisted_factory_deps),
-            factory_deps,
-            paymaster_data,
-            env,
-            self,
-        )
-    }
-
     /// Executes the configured transaction of the `env` without committing state changes
     ///
     /// Note: in case there are any cheatcodes executed that modify the environment, this will
@@ -96,13 +73,10 @@ impl<'a> CowBackend<'a> {
         // already, we reset the initialized state
         self.is_initialized = false;
         self.spec_id = env.handler_cfg.spec_id;
-        let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), inspector);
 
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
-
-        env.env = evm.context.evm.inner.env;
-
-        Ok(res)
+        let strategy = self.backend.strategy.clone();
+        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        guard.call_inspect(self, env, inspector)
     }
 
     pub fn new_borrowed(backend: &'a Backend) -> Self {
@@ -140,6 +114,11 @@ impl<'a> CowBackend<'a> {
 }
 
 impl DatabaseExt for CowBackend<'_> {
+    fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+        self.backend.to_mut().initialize(&env);
+        self.is_initialized = true;
+    }
+
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
         self.backend.to_mut().get_fork_info(id)
     }

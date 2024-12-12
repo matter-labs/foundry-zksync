@@ -15,11 +15,6 @@ use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
 use eyre::Context;
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
-use foundry_zksync_core::{
-    convert::ConvertH160, PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS,
-    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
-    NONCE_HOLDER_ADDRESS,
-};
 use itertools::Itertools;
 use revm::{
     db::{CacheDB, DatabaseRef},
@@ -32,9 +27,11 @@ use revm::{
     Database, DatabaseCommit, JournaledState,
 };
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashSet},
+    collections::{BTreeMap, HashSet},
+    sync::{Arc, Mutex},
     time::Instant,
 };
+use strategy::{BackendStrategy, BackendStrategyForkInfo};
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -54,8 +51,10 @@ pub use snapshot::{BackendStateSnapshot, RevertStateSnapshotAction, StateSnapsho
 mod fork_type;
 pub use fork_type::{CachedForkType, ForkType};
 
+pub mod strategy;
+
 // A `revm::Database` that is used in forking mode
-type ForkDB = CacheDB<SharedBackend>;
+pub type ForkDB = CacheDB<SharedBackend>;
 
 /// Represents a numeric `ForkId` valid only for the existence of the `Backend`.
 ///
@@ -89,6 +88,9 @@ pub struct ForkInfo {
 /// An extension trait that allows us to easily extend the `revm::Inspector` capabilities
 #[auto_impl::auto_impl(&mut)]
 pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
+    /// Initialize any settings that must be tracked while switching evms.
+    fn initialize(&mut self, env: &EnvWithHandlerCfg);
+
     /// Creates a new state snapshot at the current point of execution.
     ///
     /// A state snapshot is associated with a new unique id that's created for the snapshot.
@@ -466,6 +468,8 @@ struct _ObjectSafe(dyn DatabaseExt);
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct Backend {
+    pub strategy: Arc<Mutex<dyn BackendStrategy>>,
+
     /// The access point for managing forks
     forks: MultiFork,
     // The default in memory db
@@ -511,8 +515,8 @@ impl Backend {
     ///
     /// If `fork` is `Some` this will use a `fork` database, otherwise with an in-memory
     /// database.
-    pub fn spawn(fork: Option<CreateFork>) -> Self {
-        Self::new(MultiFork::spawn(), fork)
+    pub fn spawn(fork: Option<CreateFork>, strategy: Arc<Mutex<dyn BackendStrategy>>) -> Self {
+        Self::new(MultiFork::spawn(), fork, strategy)
     }
 
     /// Creates a new instance of `Backend`
@@ -521,7 +525,11 @@ impl Backend {
     /// database.
     ///
     /// Prefer using [`spawn`](Self::spawn) instead.
-    pub fn new(forks: MultiFork, fork: Option<CreateFork>) -> Self {
+    pub fn new(
+        forks: MultiFork,
+        fork: Option<CreateFork>,
+        strategy: Arc<Mutex<dyn BackendStrategy>>,
+    ) -> Self {
         trace!(target: "backend", forking_mode=?fork.is_some(), "creating executor backend");
         // Note: this will take of registering the `fork`
         let inner = BackendInner {
@@ -538,6 +546,7 @@ impl Backend {
             fork_url_type: Default::default(),
             is_zk: false,
             zk_recorded_immutable_keys: Default::default(),
+            strategy,
         };
 
         if let Some(fork) = fork {
@@ -560,8 +569,13 @@ impl Backend {
 
     /// Creates a new instance of `Backend` with fork added to the fork database and sets the fork
     /// as active
-    pub(crate) fn new_with_fork(id: &ForkId, fork: Fork, journaled_state: JournaledState) -> Self {
-        let mut backend = Self::spawn(None);
+    pub(crate) fn new_with_fork(
+        id: &ForkId,
+        fork: Fork,
+        journaled_state: JournaledState,
+        strategy: Arc<Mutex<dyn BackendStrategy>>,
+    ) -> Self {
+        let mut backend = Self::spawn(None, strategy);
         let fork_ids = backend.inner.insert_new_fork(id.clone(), fork.db, journaled_state);
         backend.inner.launched_with_fork = Some((id.clone(), fork_ids.0, fork_ids.1));
         backend.active_fork_ids = Some(fork_ids);
@@ -579,6 +593,7 @@ impl Backend {
             fork_url_type: Default::default(),
             is_zk: false,
             zk_recorded_immutable_keys: Default::default(),
+            strategy: self.strategy.clone(),
         }
     }
 
@@ -680,41 +695,41 @@ impl Backend {
         self.inner.has_state_snapshot_failure = has_state_snapshot_failure
     }
 
-    /// When creating or switching forks, we update the AccountInfo of the contract
-    pub(crate) fn update_fork_db(
-        &self,
-        active_journaled_state: &mut JournaledState,
-        target_fork: &mut Fork,
-        zk_state: Option<ZkMergeState>,
-    ) {
-        self.update_fork_db_contracts(
-            self.inner.persistent_accounts.iter().copied(),
-            active_journaled_state,
-            target_fork,
-            zk_state,
-        )
-    }
+    // /// When creating or switching forks, we update the AccountInfo of the contract
+    // pub(crate) fn update_fork_db(
+    //     &self,
+    //     active_journaled_state: &mut JournaledState,
+    //     target_fork: &mut Fork,
+    //     zk_state: Option<ZkMergeState>,
+    // ) {
+    //     self.update_fork_db_contracts(
+    //         self.inner.persistent_accounts.iter().copied(),
+    //         active_journaled_state,
+    //         target_fork,
+    //         zk_state,
+    //     )
+    // }
 
-    /// Merges the state of all `accounts` from the currently active db into the given `fork`
-    pub(crate) fn update_fork_db_contracts(
-        &self,
-        accounts: impl IntoIterator<Item = Address>,
-        active_journaled_state: &mut JournaledState,
-        target_fork: &mut Fork,
-        zk_state: Option<ZkMergeState>,
-    ) {
-        if let Some(db) = self.active_fork_db() {
-            merge_account_data(accounts, db, active_journaled_state, target_fork, zk_state)
-        } else {
-            merge_account_data(
-                accounts,
-                &self.mem_db,
-                active_journaled_state,
-                target_fork,
-                zk_state,
-            )
-        }
-    }
+    // /// Merges the state of all `accounts` from the currently active db into the given `fork`
+    // pub(crate) fn update_fork_db_contracts(
+    //     &self,
+    //     accounts: impl IntoIterator<Item = Address>,
+    //     active_journaled_state: &mut JournaledState,
+    //     target_fork: &mut Fork,
+    //     zk_state: Option<ZkMergeState>,
+    // ) {
+    //     if let Some(db) = self.active_fork_db() {
+    //         merge_account_data(accounts, db, active_journaled_state, target_fork, zk_state)
+    //     } else {
+    //         merge_account_data(
+    //             accounts,
+    //             &self.mem_db,
+    //             active_journaled_state,
+    //             target_fork,
+    //             zk_state,
+    //         )
+    //     }
+    // }
 
     /// Returns the memory db used if not in forking mode
     pub fn mem_db(&self) -> &FoundryEvmInMemoryDB {
@@ -803,14 +818,6 @@ impl Backend {
         logs
     }
 
-    /// Initializes settings we need to keep track of.
-    ///
-    /// We need to track these mainly to prevent issues when switching between different evms
-    pub(crate) fn initialize(&mut self, env: &EnvWithHandlerCfg) {
-        self.set_caller(env.tx.caller);
-        self.set_spec_id(env.handler_cfg.spec_id);
-    }
-
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
     fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
         EnvWithHandlerCfg::new_with_spec_id(Box::new(env), self.inner.spec_id)
@@ -827,32 +834,10 @@ impl Backend {
         inspector: &mut I,
     ) -> eyre::Result<ResultAndState> {
         self.initialize(env);
-        let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), inspector);
 
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
-
-        env.env = evm.context.evm.inner.env;
-
-        Ok(res)
-    }
-
-    /// Executes the configured test call of the `env` without committing state changes
-    pub fn inspect_ref_zk(
-        &mut self,
-        env: &mut EnvWithHandlerCfg,
-        persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
-        factory_deps: Option<Vec<Vec<u8>>>,
-        paymaster_data: Option<PaymasterParams>,
-    ) -> eyre::Result<ResultAndState> {
-        self.initialize(env);
-
-        foundry_zksync_core::vm::transact(
-            Some(persisted_factory_deps),
-            factory_deps,
-            paymaster_data,
-            env,
-            self,
-        )
+        let strategy = self.strategy.clone();
+        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        guard.call_inspect(self, env, inspector)
     }
 
     /// Returns true if the address is a precompile
@@ -981,6 +966,7 @@ impl Backend {
                 &fork_id,
                 &persistent_accounts,
                 &mut NoOpInspector,
+                self.strategy.clone(),
             )?;
         }
 
@@ -989,6 +975,14 @@ impl Backend {
 }
 
 impl DatabaseExt for Backend {
+    /// Initializes settings we need to keep track of.
+    ///
+    /// We need to track these mainly to prevent issues when switching between different evms
+    fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+        self.set_caller(env.tx.caller);
+        self.set_spec_id(env.handler_cfg.spec_id);
+    }
+
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
         let fork_id = self.ensure_fork_id(id).cloned()?;
         let fork_env = self
@@ -1157,23 +1151,19 @@ impl DatabaseExt for Backend {
         let fork_id = self.ensure_fork_id(id).cloned()?;
         let idx = self.inner.ensure_fork_index(&fork_id)?;
 
-        let is_current_zk_fork = if let Some(active_fork_id) = self.active_fork_id() {
+        let current_fork_type = if let Some(active_fork_id) = self.active_fork_id() {
             self.forks
                 .get_fork_url(self.ensure_fork_id(active_fork_id).cloned()?)?
-                .map(|url| self.fork_url_type.get(&url).is_zk())
-                .unwrap_or_default()
+                .map(|url| self.fork_url_type.get(&url))
+                .unwrap_or(ForkType::Evm)
         } else {
-            self.is_zk
+            ForkType::Zk
         };
-        let is_target_zk_fork = self
+        let target_fork_type = self
             .forks
             .get_fork_url(fork_id.clone())?
-            .map(|url| self.fork_url_type.get(&url).is_zk())
-            .unwrap_or_default();
-        let merge_zk_db = is_current_zk_fork && is_target_zk_fork;
-        let zk_state = merge_zk_db.then(|| ZkMergeState {
-            persistent_immutable_keys: self.zk_recorded_immutable_keys.clone(),
-        });
+            .map(|url| self.fork_url_type.get(&url))
+            .unwrap_or(ForkType::Evm);
 
         let fork_env = self
             .forks
@@ -1242,7 +1232,17 @@ impl DatabaseExt for Backend {
                 caller_account.into()
             });
 
-            self.update_fork_db(active_journaled_state, &mut fork, zk_state);
+            self.strategy.lock().expect("failed acquiring strategy").update_fork_db(
+                BackendStrategyForkInfo {
+                    active_fork: self.active_fork(),
+                    active_type: current_fork_type,
+                    target_type: target_fork_type,
+                },
+                &self.mem_db,
+                &self.inner,
+                active_journaled_state,
+                &mut fork,
+            );
 
             // insert the fork back
             self.inner.set_fork(idx, fork);
@@ -1269,7 +1269,7 @@ impl DatabaseExt for Backend {
         let (fork_id, backend, fork_env) =
             self.forks.roll_fork(self.inner.ensure_fork_id(id).cloned()?, block_number)?;
         // this will update the local mapping
-        self.inner.roll_fork(id, fork_id, backend)?;
+        self.inner.roll_fork(id, fork_id, backend, self.strategy.clone())?;
 
         if let Some((active_id, active_idx)) = self.active_fork_ids {
             // the currently active fork is the targeted fork of this call
@@ -1291,7 +1291,14 @@ impl DatabaseExt for Backend {
 
                 active.journaled_state.depth = journaled_state.depth;
                 for addr in persistent_addrs {
-                    merge_journaled_state_data(addr, journaled_state, &mut active.journaled_state);
+                    self.strategy
+                        .lock()
+                        .expect("failed acquiring strategy")
+                        .merge_journaled_state_data(
+                            addr,
+                            journaled_state,
+                            &mut active.journaled_state,
+                        );
                 }
 
                 // Ensure all previously loaded accounts are present in the journaled state to
@@ -1304,11 +1311,14 @@ impl DatabaseExt for Backend {
                 for (addr, acc) in journaled_state.state.iter() {
                     if acc.is_created() {
                         if acc.is_touched() {
-                            merge_journaled_state_data(
-                                *addr,
-                                journaled_state,
-                                &mut active.journaled_state,
-                            );
+                            self.strategy
+                                .lock()
+                                .expect("failed acquiring strategy")
+                                .merge_journaled_state_data(
+                                    *addr,
+                                    journaled_state,
+                                    &mut active.journaled_state,
+                                );
                         }
                     } else {
                         let _ = active.journaled_state.load_account(*addr, &mut active.db);
@@ -1385,6 +1395,7 @@ impl DatabaseExt for Backend {
             &fork_id,
             &persistent_accounts,
             inspector,
+            self.strategy.clone(),
         )
     }
 
@@ -1690,8 +1701,8 @@ pub enum BackendDatabaseSnapshot {
 /// Represents a fork
 #[derive(Clone, Debug)]
 pub struct Fork {
-    db: ForkDB,
-    journaled_state: JournaledState,
+    pub db: ForkDB,
+    pub journaled_state: JournaledState,
 }
 
 impl Fork {
@@ -1866,6 +1877,7 @@ impl BackendInner {
         id: LocalForkId,
         new_fork_id: ForkId,
         backend: SharedBackend,
+        strategy: Arc<Mutex<dyn BackendStrategy>>,
     ) -> eyre::Result<ForkLookupIndex> {
         let fork_id = self.ensure_fork_id(id)?;
         let idx = self.ensure_fork_index(fork_id)?;
@@ -1874,7 +1886,11 @@ impl BackendInner {
             // we initialize a _new_ `ForkDB` but keep the state of persistent accounts
             let mut new_db = ForkDB::new(backend);
             for addr in self.persistent_accounts.iter().copied() {
-                merge_db_account_data(addr, &active.db, &mut new_db);
+                strategy.lock().expect("failed acquiring strategy").merge_db_account_data(
+                    addr,
+                    &active.db,
+                    &mut new_db,
+                );
             }
             active.db = new_db;
         }
@@ -1960,228 +1976,6 @@ pub(crate) fn update_current_env_with_fork_env(current: &mut Env, fork: Env) {
     current.tx.chain_id = fork.tx.chain_id;
 }
 
-/// Defines the zksync specific state to help during merge.
-#[derive(Debug, Default)]
-pub(crate) struct ZkMergeState {
-    persistent_immutable_keys: HashMap<Address, HashSet<U256>>,
-}
-
-/// Clones the data of the given `accounts` from the `active` database into the `fork_db`
-/// This includes the data held in storage (`CacheDB`) and kept in the `JournaledState`.
-pub(crate) fn merge_account_data<ExtDB: DatabaseRef>(
-    accounts: impl IntoIterator<Item = Address>,
-    active: &CacheDB<ExtDB>,
-    active_journaled_state: &mut JournaledState,
-    target_fork: &mut Fork,
-    zk_state: Option<ZkMergeState>,
-) {
-    for addr in accounts.into_iter() {
-        merge_db_account_data(addr, active, &mut target_fork.db);
-        if let Some(zk_state) = &zk_state {
-            merge_zk_account_data(addr, active, &mut target_fork.db, zk_state);
-        }
-        merge_journaled_state_data(addr, active_journaled_state, &mut target_fork.journaled_state);
-        if let Some(zk_state) = &zk_state {
-            merge_zk_journaled_state_data(
-                addr,
-                active_journaled_state,
-                &mut target_fork.journaled_state,
-                zk_state,
-            );
-        }
-    }
-
-    // need to mock empty journal entries in case the current checkpoint is higher than the existing
-    // journal entries
-    while active_journaled_state.journal.len() > target_fork.journaled_state.journal.len() {
-        target_fork.journaled_state.journal.push(Default::default());
-    }
-
-    *active_journaled_state = target_fork.journaled_state.clone();
-}
-
-/// Clones the account data from the `active_journaled_state`  into the `fork_journaled_state`
-fn merge_journaled_state_data(
-    addr: Address,
-    active_journaled_state: &JournaledState,
-    fork_journaled_state: &mut JournaledState,
-) {
-    if let Some(mut acc) = active_journaled_state.state.get(&addr).cloned() {
-        trace!(?addr, "updating journaled_state account data");
-        if let Some(fork_account) = fork_journaled_state.state.get_mut(&addr) {
-            // This will merge the fork's tracked storage with active storage and update values
-            fork_account.storage.extend(std::mem::take(&mut acc.storage));
-            // swap them so we can insert the account as whole in the next step
-            std::mem::swap(&mut fork_account.storage, &mut acc.storage);
-        }
-        fork_journaled_state.state.insert(addr, acc);
-    }
-}
-
-/// Clones the account data from the `active` db into the `ForkDB`
-fn merge_db_account_data<ExtDB: DatabaseRef>(
-    addr: Address,
-    active: &CacheDB<ExtDB>,
-    fork_db: &mut ForkDB,
-) {
-    trace!(?addr, "merging database data");
-
-    let Some(acc) = active.accounts.get(&addr) else { return };
-
-    // port contract cache over
-    if let Some(code) = active.contracts.get(&acc.info.code_hash) {
-        trace!("merging contract cache");
-        fork_db.contracts.insert(acc.info.code_hash, code.clone());
-    }
-
-    // port account storage over
-    match fork_db.accounts.entry(addr) {
-        Entry::Vacant(vacant) => {
-            trace!("target account not present - inserting from active");
-            // if the fork_db doesn't have the target account
-            // insert the entire thing
-            vacant.insert(acc.clone());
-        }
-        Entry::Occupied(mut occupied) => {
-            trace!("target account present - merging storage slots");
-            // if the fork_db does have the system,
-            // extend the existing storage (overriding)
-            let fork_account = occupied.get_mut();
-            fork_account.storage.extend(&acc.storage);
-        }
-    }
-}
-
-/// Clones the zk account data from the `active` db into the `ForkDB`
-fn merge_zk_account_data<ExtDB: DatabaseRef>(
-    addr: Address,
-    active: &CacheDB<ExtDB>,
-    fork_db: &mut ForkDB,
-    _zk_state: &ZkMergeState,
-) {
-    let merge_system_contract_entry =
-        |fork_db: &mut ForkDB, system_contract: Address, slot: U256| {
-            let Some(acc) = active.accounts.get(&system_contract) else { return };
-
-            // port contract cache over
-            if let Some(code) = active.contracts.get(&acc.info.code_hash) {
-                trace!("merging contract cache");
-                fork_db.contracts.insert(acc.info.code_hash, code.clone());
-            }
-
-            // prepare only the specified slot in account storage
-            let mut new_acc = acc.clone();
-            new_acc.storage = Default::default();
-            if let Some(value) = acc.storage.get(&slot) {
-                new_acc.storage.insert(slot, *value);
-            }
-
-            // port account storage over
-            match fork_db.accounts.entry(system_contract) {
-                Entry::Vacant(vacant) => {
-                    trace!("target account not present - inserting from active");
-                    // if the fork_db doesn't have the target account
-                    // insert the entire thing
-                    vacant.insert(new_acc);
-                }
-                Entry::Occupied(mut occupied) => {
-                    trace!("target account present - merging storage slots");
-                    // if the fork_db does have the system,
-                    // extend the existing storage (overriding)
-                    let fork_account = occupied.get_mut();
-                    fork_account.storage.extend(&new_acc.storage);
-                }
-            }
-        };
-
-    merge_system_contract_entry(
-        fork_db,
-        L2_BASE_TOKEN_ADDRESS.to_address(),
-        foundry_zksync_core::get_balance_key(addr),
-    );
-    merge_system_contract_entry(
-        fork_db,
-        ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
-        foundry_zksync_core::get_account_code_key(addr),
-    );
-    merge_system_contract_entry(
-        fork_db,
-        NONCE_HOLDER_ADDRESS.to_address(),
-        foundry_zksync_core::get_nonce_key(addr),
-    );
-
-    if let Some(acc) = active.accounts.get(&addr) {
-        merge_system_contract_entry(
-            fork_db,
-            KNOWN_CODES_STORAGE_ADDRESS.to_address(),
-            U256::from_be_slice(&acc.info.code_hash.0[..]),
-        );
-    }
-}
-
-/// Clones the account data from the `active_journaled_state` into the `fork_journaled_state` for
-/// zksync storage.
-fn merge_zk_journaled_state_data(
-    addr: Address,
-    active_journaled_state: &JournaledState,
-    fork_journaled_state: &mut JournaledState,
-    zk_state: &ZkMergeState,
-) {
-    let merge_system_contract_entry =
-        |fork_journaled_state: &mut JournaledState, system_contract: Address, slot: U256| {
-            if let Some(acc) = active_journaled_state.state.get(&system_contract) {
-                // prepare only the specified slot in account storage
-                let mut new_acc = acc.clone();
-                new_acc.storage = Default::default();
-                if let Some(value) = acc.storage.get(&slot).cloned() {
-                    new_acc.storage.insert(slot, value);
-                }
-
-                match fork_journaled_state.state.entry(system_contract) {
-                    Entry::Vacant(vacant) => {
-                        vacant.insert(new_acc);
-                    }
-                    Entry::Occupied(mut occupied) => {
-                        let fork_account = occupied.get_mut();
-                        fork_account.storage.extend(new_acc.storage);
-                    }
-                }
-            }
-        };
-
-    merge_system_contract_entry(
-        fork_journaled_state,
-        L2_BASE_TOKEN_ADDRESS.to_address(),
-        foundry_zksync_core::get_balance_key(addr),
-    );
-    merge_system_contract_entry(
-        fork_journaled_state,
-        ACCOUNT_CODE_STORAGE_ADDRESS.to_address(),
-        foundry_zksync_core::get_account_code_key(addr),
-    );
-    merge_system_contract_entry(
-        fork_journaled_state,
-        NONCE_HOLDER_ADDRESS.to_address(),
-        foundry_zksync_core::get_nonce_key(addr),
-    );
-
-    if let Some(acc) = active_journaled_state.state.get(&addr) {
-        merge_system_contract_entry(
-            fork_journaled_state,
-            KNOWN_CODES_STORAGE_ADDRESS.to_address(),
-            U256::from_be_slice(&acc.info.code_hash.0[..]),
-        );
-    }
-
-    // merge immutable storage.
-    let immutable_simulator_addr = IMMUTABLE_SIMULATOR_STORAGE_ADDRESS.to_address();
-    if let Some(immutable_storage_keys) = zk_state.persistent_immutable_keys.get(&addr) {
-        for slot_key in immutable_storage_keys {
-            merge_system_contract_entry(fork_journaled_state, immutable_simulator_addr, *slot_key);
-        }
-    }
-}
-
 /// Returns true of the address is a contract
 fn is_contract_in_state(journaled_state: &JournaledState, acc: Address) -> bool {
     journaled_state
@@ -2215,6 +2009,7 @@ fn commit_transaction(
     fork_id: &ForkId,
     persistent_accounts: &HashSet<Address>,
     inspector: &mut dyn InspectorExt,
+    strategy: Arc<Mutex<dyn BackendStrategy>>,
 ) -> eyre::Result<()> {
     // TODO: Remove after https://github.com/foundry-rs/foundry/pull/9131
     // if the tx has the blob_versioned_hashes field, we assume it's a Cancun block
@@ -2229,7 +2024,7 @@ fn commit_transaction(
         let fork = fork.clone();
         let journaled_state = journaled_state.clone();
         let depth = journaled_state.depth;
-        let mut db = Backend::new_with_fork(fork_id, fork, journaled_state);
+        let mut db = Backend::new_with_fork(fork_id, fork, journaled_state, strategy);
 
         let mut evm = crate::utils::new_evm_with_inspector(&mut db as _, env, inspector);
         // Adjust inner EVM depth to ensure that inspectors receive accurate data.
@@ -2281,7 +2076,13 @@ fn apply_state_changeset(
 #[cfg(test)]
 #[allow(clippy::needless_return)]
 mod tests {
-    use crate::{backend::Backend, fork::CreateFork, opts::EvmOpts};
+    use std::sync::{Arc, Mutex};
+
+    use crate::{
+        backend::{strategy::EvmBackendStrategy, Backend},
+        fork::CreateFork,
+        opts::EvmOpts,
+    };
     use alloy_primitives::{Address, U256};
     use alloy_provider::Provider;
     use foundry_common::provider::get_http_provider;
@@ -2312,7 +2113,7 @@ mod tests {
             evm_opts,
         };
 
-        let backend = Backend::spawn(Some(fork));
+        let backend = Backend::spawn(Some(fork), Arc::new(Mutex::new(EvmBackendStrategy)));
 
         // some rng contract from etherscan
         let address: Address = "63091244180ae240c87d1f528f5f269134cb07b3".parse().unwrap();

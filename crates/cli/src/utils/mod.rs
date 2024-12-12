@@ -9,12 +9,15 @@ use foundry_common::{
     shell,
 };
 use foundry_config::{Chain, Config};
+use foundry_evm::executors::strategy::{EvmExecutorStrategy, ExecutorStrategy};
+use foundry_strategy_zksync::ZksyncExecutorStrategy;
 use serde::de::DeserializeOwned;
 use std::{
     ffi::OsStr,
     future::Future,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tracing_subscriber::prelude::*;
@@ -89,6 +92,14 @@ pub fn abi_to_solidity(abi: &JsonAbi, name: &str) -> Result<String> {
 /// RPC
 pub fn get_provider(config: &Config) -> Result<RetryProvider> {
     get_provider_builder(config)?.build()
+}
+
+pub fn get_executor_strategy(config: &Config) -> Arc<Mutex<dyn ExecutorStrategy>> {
+    if config.zksync.run_in_zk_mode() {
+        Arc::new(Mutex::new(ZksyncExecutorStrategy::default()))
+    } else {
+        Arc::new(Mutex::new(EvmExecutorStrategy::default()))
+    }
 }
 
 /// Returns a [RetryProvider] instantiated using [Config]'s

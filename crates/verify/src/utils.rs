@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::{bytecode::VerifyBytecodeArgs, types::VerificationType};
 use alloy_dyn_abi::DynSolValue;
 use alloy_primitives::{Address, Bytes, U256};
@@ -12,7 +14,11 @@ use foundry_block_explorers::{
 use foundry_common::{abi::encode_args, compile::ProjectCompiler, provider::RetryProvider, shell};
 use foundry_compilers::artifacts::{BytecodeHash, CompactContractBytecode, EvmVersion};
 use foundry_config::Config;
-use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, executors::TracingExecutor, opts::EvmOpts};
+use foundry_evm::{
+    constants::DEFAULT_CREATE2_DEPLOYER,
+    executors::{strategy::ExecutorStrategy, TracingExecutor},
+    opts::EvmOpts,
+};
 use reqwest::Url;
 use revm_primitives::{
     db::Database,
@@ -321,6 +327,7 @@ pub async fn get_tracing_executor(
     fork_blk_num: u64,
     evm_version: EvmVersion,
     evm_opts: EvmOpts,
+    strategy: Arc<Mutex<dyn ExecutorStrategy>>,
 ) -> Result<(Env, TracingExecutor)> {
     fork_config.fork_block_number = Some(fork_blk_num);
     fork_config.evm_version = evm_version;
@@ -335,6 +342,7 @@ pub async fn get_tracing_executor(
         false,
         false,
         is_alphanet,
+        strategy,
     );
 
     Ok((env, executor))

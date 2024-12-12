@@ -12,11 +12,21 @@ use core::fmt::Debug;
 use eyre::{Result, WrapErr};
 use foundry_compilers::Artifact;
 use foundry_evm::{
-    backend::Backend, decode::decode_console_logs, executors::ExecutorBuilder,
-    inspectors::CheatsConfig, traces::TraceMode,
+    backend::Backend,
+    decode::decode_console_logs,
+    executors::{
+        strategy::{EvmExecutorStrategy, ExecutorStrategy},
+        ExecutorBuilder,
+    },
+    inspectors::CheatsConfig,
+    traces::TraceMode,
 };
+use foundry_strategy_zksync::ZksyncExecutorStrategy;
 use solang_parser::pt::{self, CodeLocation};
-use std::str::FromStr;
+use std::{
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 use tracing::debug;
 use yansi::Paint;
 
@@ -315,12 +325,25 @@ impl SessionSource {
         let env =
             self.config.evm_opts.evm_env().await.expect("Could not instantiate fork environment");
 
+        let executor_strategy: Arc<Mutex<dyn ExecutorStrategy>> =
+            if self.config.foundry_config.zksync.run_in_zk_mode() {
+                Arc::new(Mutex::new(ZksyncExecutorStrategy::default()))
+            } else {
+                Arc::new(Mutex::new(EvmExecutorStrategy::default()))
+            };
+
         // Create an in-memory backend
         let backend = match self.config.backend.take() {
             Some(backend) => backend,
             None => {
                 let fork = self.config.evm_opts.get_fork(&self.config.foundry_config, env.clone());
-                let backend = Backend::spawn(fork);
+                let backend = Backend::spawn(
+                    fork,
+                    executor_strategy
+                        .lock()
+                        .expect("failed acquiring strategy")
+                        .new_backend_strategy(),
+                );
                 self.config.backend = Some(backend.clone());
                 backend
             }
@@ -336,8 +359,10 @@ impl SessionSource {
                         None,
                         None,
                         Some(self.solc.version.clone()),
-                        Default::default(),
-                        false,
+                        executor_strategy
+                            .lock()
+                            .expect("failed acquiring strategy")
+                            .new_cheatcode_inspector_strategy(Default::default()),
                     )
                     .into(),
                 )
@@ -345,7 +370,7 @@ impl SessionSource {
             .gas_limit(self.config.evm_opts.gas_limit())
             .spec(self.config.foundry_config.evm_spec_id())
             .legacy_assertions(self.config.foundry_config.legacy_assertions)
-            .build(env, backend);
+            .build(env, backend, executor_strategy);
 
         // Create a [ChiselRunner] with a default balance of [U256::MAX] and
         // the sender [Address::zero].
