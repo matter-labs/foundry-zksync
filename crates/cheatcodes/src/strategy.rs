@@ -19,25 +19,28 @@ use crate::{
 };
 
 pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
+    /// Get nonce.
     fn get_nonce(&mut self, ccx: &mut CheatsCtxt, address: Address) -> Result<u64> {
         let account = ccx.ecx.journaled_state.load_account(address, &mut ccx.ecx.db)?;
         Ok(account.info.nonce)
     }
 
-    fn cheatcode_get_nonce(&mut self, ccx: &mut CheatsCtxt, address: Address) -> Result {
-        evm::get_nonce(ccx, &address)
-    }
+    /// Called when the main test or script contract is deployed.
+    fn base_contract_deployed(&mut self) {}
 
+    /// Cheatcode: roll.
     fn cheatcode_roll(&mut self, ccx: &mut CheatsCtxt, new_height: U256) -> Result {
         ccx.ecx.env.block.number = new_height;
         Ok(Default::default())
     }
 
+    /// Cheatcode: warp.
     fn cheatcode_warp(&mut self, ccx: &mut CheatsCtxt, new_timestamp: U256) -> Result {
         ccx.ecx.env.block.number = new_timestamp;
         Ok(Default::default())
     }
 
+    /// Cheatcode: deal.
     fn cheatcode_deal(
         &mut self,
         ccx: &mut CheatsCtxt,
@@ -51,6 +54,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
         Ok(Default::default())
     }
 
+    /// Cheatcode: etch.
     fn cheatcode_etch(
         &mut self,
         ccx: &mut CheatsCtxt,
@@ -64,6 +68,12 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
         Ok(Default::default())
     }
 
+    /// Cheatcode: getNonce.
+    fn cheatcode_get_nonce(&mut self, ccx: &mut CheatsCtxt, address: Address) -> Result {
+        evm::get_nonce(ccx, &address)
+    }
+
+    /// Cheatcode: resetNonce.
     fn cheatcode_reset_nonce(&mut self, ccx: &mut CheatsCtxt, account: Address) -> Result {
         let account = journaled_account(ccx.ecx, account)?;
         // Per EIP-161, EOA nonces start at 0, but contract nonces
@@ -76,6 +86,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
         Ok(Default::default())
     }
 
+    /// Cheatcode: setNonce.
     fn cheatcode_set_nonce(
         &mut self,
         ccx: &mut CheatsCtxt,
@@ -94,6 +105,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
         Ok(Default::default())
     }
 
+    /// Cheatcode: setNonceUnsafe.
     fn cheatcode_set_nonce_unsafe(
         &mut self,
         ccx: &mut CheatsCtxt,
@@ -105,6 +117,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
         Ok(Default::default())
     }
 
+    /// Mocks a call to return with a value.
     fn mock_call(
         &mut self,
         ccx: &mut CheatsCtxt,
@@ -117,6 +130,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
         Ok(Default::default())
     }
 
+    /// Mocks a call to revert with a value.
     fn mock_call_revert(
         &mut self,
         ccx: &mut CheatsCtxt,
@@ -129,10 +143,12 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
         Ok(Default::default())
     }
 
+    /// Retrieve artifact code.
     fn get_artifact_code(&self, state: &Cheatcodes, path: &str, deployed: bool) -> Result {
         Ok(crate::fs::get_artifact_code(state, path, deployed)?.abi_encode())
     }
 
+    /// Record broadcastable transaction during CREATE.
     fn record_broadcastable_create_transactions(
         &mut self,
         config: Arc<CheatsConfig>,
@@ -142,6 +158,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
         broadcastable_transactions: &mut BroadcastableTransactions,
     );
 
+    /// Record broadcastable transaction during CALL.
     fn record_broadcastable_call_transactions(
         &mut self,
         config: Arc<CheatsConfig>,
@@ -154,7 +171,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
 
     fn post_initialize_interp(&mut self, _interpreter: &mut Interpreter, _ecx: Ecx) {}
 
-    /// Returns true if handled.
+    /// Used to override opcode behaviors. Returns true if handled.
     fn pre_step_end(&mut self, _interpreter: &mut Interpreter, _ecx: Ecx) -> bool {
         false
     }
@@ -228,14 +245,6 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
     }
 
     fn zksync_select_zk_vm(&mut self, _data: InnerEcx, _enable: bool) {
-        unimplemented!()
-    }
-
-    fn zksync_allow_startup_migration(&mut self) {
-        unimplemented!()
-    }
-
-    fn zksync_persist_next_nonce_update(&mut self) {
         unimplemented!()
     }
 }

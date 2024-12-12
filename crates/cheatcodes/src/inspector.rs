@@ -526,44 +526,8 @@ pub struct Cheatcodes {
     /// Unlocked wallets used in scripts and testing of scripts.
     pub wallets: Option<Wallets>,
 
-    /// Cheatcode inspector strategy
+    /// The behavior strategy.
     pub strategy: Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>,
-    // /// Use ZK-VM to execute CALLs and CREATEs.
-    // pub use_zk_vm: bool,
-
-    // /// When in zkEVM context, execute the next CALL or CREATE in the EVM instead.
-    // pub skip_zk_vm: bool,
-
-    // /// Any contracts that were deployed in `skip_zk_vm` step.
-    // /// This makes it easier to dispatch calls to any of these addresses in zkEVM context,
-    // directly /// to EVM. Alternatively, we'd need to add `vm.zkVmSkip()` to these calls
-    // manually. pub skip_zk_vm_addresses: HashSet<Address>,
-
-    // /// Records the next create address for `skip_zk_vm_addresses`.
-    // pub record_next_create_address: bool,
-
-    // /// Paymaster params
-    // pub paymaster_params: Option<ZkPaymasterData>,
-
-    // /// Dual compiled contracts
-    // pub dual_compiled_contracts: DualCompiledContracts,
-
-    // /// The migration status of the database to zkEVM storage, `None` if we start in EVM
-    // context. pub zk_startup_migration: Option<ZkStartupMigration>,
-
-    // /// Factory deps stored through `zkUseFactoryDep`. These factory deps are used in the next
-    // /// CREATE or CALL, and cleared after.
-    // pub zk_use_factory_deps: Vec<String>,
-
-    // /// The list of factory_deps seen so far during a test or script execution.
-    // /// Ideally these would be persisted in the storage, but since modifying
-    // [revm::JournaledState] /// would be a significant refactor, we maintain the factory_dep
-    // part in the [Cheatcodes]. /// This can be done as each test runs with its own
-    // [Cheatcodes] instance, thereby /// providing the necessary level of isolation.
-    // pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
-
-    // /// Nonce update persistence behavior in zkEVM for the tx caller.
-    // pub zk_persist_nonce_update: ZkPersistNonceUpdate,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
@@ -578,53 +542,10 @@ impl Default for Cheatcodes {
 impl Cheatcodes {
     /// Creates a new `Cheatcodes` with the given settings.
     pub fn new(config: Arc<CheatsConfig>) -> Self {
-        // let mut dual_compiled_contracts = config.dual_compiled_contracts.clone();
-
-        // // We add the empty bytecode manually so it is correctly translated in zk mode.
-        // // This is used in many places in foundry, e.g. in cheatcode contract's account code.
-        // let empty_bytes = Bytes::from_static(&[0]);
-        // let zk_bytecode_hash =
-        // foundry_zksync_core::hash_bytecode(&foundry_zksync_core::EMPTY_CODE);
-        // let zk_deployed_bytecode = foundry_zksync_core::EMPTY_CODE.to_vec();
-
-        // dual_compiled_contracts.push(DualCompiledContract {
-        //     name: String::from("EmptyEVMBytecode"),
-        //     zk_bytecode_hash,
-        //     zk_deployed_bytecode: zk_deployed_bytecode.clone(),
-        //     zk_factory_deps: Default::default(),
-        //     evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
-        //     evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
-        //     evm_bytecode: Bytecode::new_raw(empty_bytes).bytecode().to_vec(),
-        // });
-
-        // let cheatcodes_bytecode = {
-        //     let mut bytecode = CHEATCODE_ADDRESS.abi_encode_packed();
-        //     bytecode.append(&mut [0; 12].to_vec());
-        //     Bytes::from(bytecode)
-        // };
-        // dual_compiled_contracts.push(DualCompiledContract {
-        //     name: String::from("CheatcodeBytecode"),
-        //     // we put a different bytecode hash here so when importing back to EVM
-        //     // we avoid collision with EmptyEVMBytecode for the cheatcodes
-        //     zk_bytecode_hash:
-        // foundry_zksync_core::hash_bytecode(CHEATCODE_CONTRACT_HASH.as_ref()),
-        //     zk_deployed_bytecode: cheatcodes_bytecode.to_vec(),
-        //     zk_factory_deps: Default::default(),
-        //     evm_bytecode_hash: CHEATCODE_CONTRACT_HASH,
-        //     evm_deployed_bytecode: cheatcodes_bytecode.to_vec(),
-        //     evm_bytecode: cheatcodes_bytecode.to_vec(),
-        // });
-
-        // let mut persisted_factory_deps = HashMap::new();
-        // persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
-
-        // let zk_startup_migration = config.use_zk.then_some(ZkStartupMigration::Defer);
-
-        let strategy = config.strategy.clone();
-
         Self {
             fs_commit: true,
             labels: config.labels.clone(),
+            strategy: config.strategy.clone(),
             config,
             block: Default::default(),
             active_delegation: Default::default(),
@@ -657,18 +578,6 @@ impl Cheatcodes {
             arbitrary_storage: Default::default(),
             deprecated: Default::default(),
             wallets: Default::default(),
-            strategy,
-            // dual_compiled_contracts,
-            // zk_startup_migration,
-            // use_zk_vm: Default::default(),
-            // skip_zk_vm: Default::default(),
-            // skip_zk_vm_addresses: Default::default(),
-            // record_next_create_address: Default::default(),
-            // //TODO(zk): use initialized above
-            // persisted_factory_deps: Default::default(),
-            // paymaster_params: None,
-            // zk_use_factory_deps: Default::default(),
-            // zk_persist_nonce_update: Default::default(),
         }
     }
 
@@ -810,8 +719,6 @@ impl Cheatcodes {
 
                 if ecx_inner.journaled_state.depth() == broadcast.depth {
                     input.set_caller(broadcast.new_origin);
-                    // let is_fixed_gas_limit = check_if_fixed_gas_limit(ecx_inner,
-                    // input.gas_limit());
 
                     self.strategy
                         .lock()
@@ -823,100 +730,6 @@ impl Cheatcodes {
                             broadcast,
                             &mut self.broadcastable_transactions,
                         );
-
-                    // let mut to = None;
-                    // let mut nonce: u64 =
-                    //     ecx_inner.journaled_state.state()[&broadcast.new_origin].info.nonce;
-                    // //drop the mutable borrow of account
-                    // let mut call_init_code = input.init_code();
-                    // let mut zk_tx = if self.use_zk_vm {
-                    //     to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
-                    //     nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as
-                    // u64;     let init_code = input.init_code();
-                    //     let find_contract = self
-                    //         .dual_compiled_contracts
-                    //         .find_bytecode(&init_code.0)
-                    //         .unwrap_or_else(|| panic!("failed finding contract for
-                    // {init_code:?}"));
-
-                    //     let constructor_args = find_contract.constructor_args();
-                    //     let contract = find_contract.contract();
-
-                    //     let factory_deps =
-                    //         self.dual_compiled_contracts.fetch_all_factory_deps(contract);
-
-                    //     let create_input = foundry_zksync_core::encode_create_params(
-                    //         &input.scheme().unwrap_or(CreateScheme::Create),
-                    //         contract.zk_bytecode_hash,
-                    //         constructor_args.to_vec(),
-                    //     );
-                    //     call_init_code = Bytes::from(create_input);
-
-                    //     Some(factory_deps)
-                    // } else {
-                    //     None
-                    // };
-                    // let rpc = ecx_inner.db.active_fork_url();
-                    // let paymaster_params =
-                    //     self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
-                    //         paymaster: paymaster_data.address.to_h160(),
-                    //         paymaster_input: paymaster_data.input.to_vec(),
-                    //     });
-                    // if let Some(mut factory_deps) = zk_tx {
-                    //     let injected_factory_deps =
-                    // self.zk_use_factory_deps.iter().map(|contract| {
-                    //         crate::fs::get_artifact_code(self, contract, false)
-                    //             .inspect(|_| info!(contract, "pushing factory dep"))
-                    //             .unwrap_or_else(|_| {
-                    //                 panic!("failed to get bytecode for factory deps contract
-                    // {contract}")             })
-                    //             .to_vec()
-                    //     }).collect_vec();
-                    //     factory_deps.extend(injected_factory_deps);
-                    //     let mut batched =
-                    //         foundry_zksync_core::vm::batch_factory_dependencies(factory_deps);
-                    //     debug!(batches = batched.len(), "splitting factory deps for broadcast");
-                    //     // the last batch is the final one that does the deployment
-                    //     zk_tx = batched.pop();
-
-                    //     for factory_deps in batched {
-                    //         self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                    //             rpc: rpc.clone(),
-                    //             transaction: TransactionRequest {
-                    //                 from: Some(broadcast.new_origin),
-                    //                 to: Some(TxKind::Call(Address::ZERO)),
-                    //                 value: Some(input.value()),
-                    //                 nonce: Some(nonce),
-                    //                 ..Default::default()
-                    //             }
-                    //             .into(),
-                    //             zk_tx: Some(ZkTransactionMetadata {
-                    //                 factory_deps,
-                    //                 paymaster_data: paymaster_params.clone(),
-                    //             }),
-                    //         });
-
-                    //         //update nonce for each tx
-                    //         nonce += 1;
-                    //     }
-                    // }
-
-                    // self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                    //     rpc,
-                    //     transaction: TransactionRequest {
-                    //         from: Some(broadcast.new_origin),
-                    //         to,
-                    //         value: Some(input.value()),
-                    //         input: TransactionInput::new(call_init_code),
-                    //         nonce: Some(nonce),
-                    //         gas: if is_fixed_gas_limit { Some(input.gas_limit()) } else { None },
-                    //         ..Default::default()
-                    //     }
-                    //     .into(),
-                    //     zk_tx: zk_tx.map(|factory_deps| {
-                    //         ZkTransactionMetadata::new(factory_deps, paymaster_params)
-                    //     }),
-                    // });
 
                     input.log_debug(self, &input.scheme().unwrap_or(CreateScheme::Create));
                 }

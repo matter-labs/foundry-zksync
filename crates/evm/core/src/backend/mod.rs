@@ -88,9 +88,6 @@ pub struct ForkInfo {
 /// An extension trait that allows us to easily extend the `revm::Inspector` capabilities
 #[auto_impl::auto_impl(&mut)]
 pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
-    /// Initialize any settings that must be tracked while switching evms.
-    fn initialize(&mut self, env: &EnvWithHandlerCfg);
-
     /// Creates a new state snapshot at the current point of execution.
     ///
     /// A state snapshot is associated with a new unique id that's created for the snapshot.
@@ -468,6 +465,7 @@ struct _ObjectSafe(dyn DatabaseExt);
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct Backend {
+    /// The behavior strategy.
     pub strategy: Arc<Mutex<dyn BackendStrategy>>,
 
     /// The access point for managing forks
@@ -818,6 +816,14 @@ impl Backend {
         logs
     }
 
+    /// Initializes settings we need to keep track of.
+    ///
+    /// We need to track these mainly to prevent issues when switching between different evms
+    pub(crate) fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+        self.set_caller(env.tx.caller);
+        self.set_spec_id(env.handler_cfg.spec_id);
+    }
+
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
     fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
         EnvWithHandlerCfg::new_with_spec_id(Box::new(env), self.inner.spec_id)
@@ -975,14 +981,6 @@ impl Backend {
 }
 
 impl DatabaseExt for Backend {
-    /// Initializes settings we need to keep track of.
-    ///
-    /// We need to track these mainly to prevent issues when switching between different evms
-    fn initialize(&mut self, env: &EnvWithHandlerCfg) {
-        self.set_caller(env.tx.caller);
-        self.set_spec_id(env.handler_cfg.spec_id);
-    }
-
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
         let fork_id = self.ensure_fork_id(id).cloned()?;
         let fork_env = self

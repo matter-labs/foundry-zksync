@@ -57,10 +57,7 @@ pub struct CheatsConfig {
     pub running_contract: Option<String>,
     /// Version of the script/test contract which is currently running.
     pub running_version: Option<Version>,
-    // /// ZKSolc -> Solc Contract codes
-    // pub dual_compiled_contracts: DualCompiledContracts,
-    // /// Use ZK-VM on startup
-    // pub use_zk: bool,
+    /// The behavior strategy.
     pub strategy: Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>,
     /// Whether to enable legacy (non-reverting) assertions.
     pub assertions_revert: bool,

@@ -14,7 +14,6 @@ workspace = true
 
 [dependencies]
 alloy-sol-types.workspace = true
-alloy-serde.workspace = true
 alloy-json-abi.workspace = true
 foundry-common.workspace = true
 foundry-config.workspace = true
@@ -23,7 +22,6 @@ foundry-evm.workspace = true
 foundry-evm-traces.workspace = true
 foundry-evm-core.workspace = true
 foundry-cheatcodes.workspace = true
-foundry-strategy-core.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compiler.workspace = true
 revm-inspectors.workspace = true

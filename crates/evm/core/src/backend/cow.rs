@@ -114,11 +114,6 @@ impl<'a> CowBackend<'a> {
 }
 
 impl DatabaseExt for CowBackend<'_> {
-    fn initialize(&mut self, env: &EnvWithHandlerCfg) {
-        self.backend.to_mut().initialize(&env);
-        self.is_initialized = true;
-    }
-
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
         self.backend.to_mut().get_fork_info(id)
     }

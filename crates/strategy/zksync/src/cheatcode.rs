@@ -216,6 +216,13 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         Ok(nonce)
     }
 
+    fn base_contract_deployed(&mut self) {
+        debug!("allowing startup storage migration");
+        self.zk_startup_migration.allow();
+        debug!("allowing persisting next nonce update");
+        self.zk_persist_nonce_update.persist_next();
+    }
+
     fn cheatcode_get_nonce(
         &mut self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
@@ -1091,14 +1098,6 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
         } else {
             self.select_evm(data);
         }
-    }
-
-    fn zksync_allow_startup_migration(&mut self) {
-        self.zk_startup_migration.allow();
-    }
-
-    fn zksync_persist_next_nonce_update(&mut self) {
-        self.zk_persist_nonce_update.persist_next();
     }
 }
 

@@ -73,8 +73,9 @@ impl BackendStrategy for ZksyncBackendStrategy {
         fork_journaled_state: &mut JournaledState,
     ) {
         self.evm.merge_journaled_state_data(addr, active_journaled_state, fork_journaled_state);
-        let zk_state = &ZkMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
-        ZkBackendMergeStrategy::merge_zk_journaled_state_data(
+        let zk_state =
+            &ZksyncMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
+        ZksyncBackendMerge::merge_zk_journaled_state_data(
             addr,
             active_journaled_state,
             fork_journaled_state,
@@ -84,8 +85,9 @@ impl BackendStrategy for ZksyncBackendStrategy {
 
     fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB) {
         self.evm.merge_db_account_data(addr, active, fork_db);
-        let zk_state = &ZkMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
-        ZkBackendMergeStrategy::merge_zk_account_data(addr, active, fork_db, zk_state);
+        let zk_state =
+            &ZksyncMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
+        ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
     }
 
     fn set_inspect_context(&mut self, other_fields: OtherFields) {
@@ -157,9 +159,10 @@ impl ZksyncBackendStrategy {
         // }
 
         let accounts = backend_inner.persistent_accounts.iter().copied();
-        let zk_state = &ZkMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
+        let zk_state =
+            &ZksyncMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
         if let Some(db) = fork_info.active_fork.map(|f| &f.db) {
-            ZkBackendMergeStrategy::merge_account_data(
+            ZksyncBackendMerge::merge_account_data(
                 accounts,
                 db,
                 active_journaled_state,
@@ -167,7 +170,7 @@ impl ZksyncBackendStrategy {
                 zk_state,
             )
         } else {
-            ZkBackendMergeStrategy::merge_account_data(
+            ZksyncBackendMerge::merge_account_data(
                 accounts,
                 mem_db,
                 active_journaled_state,
@@ -178,14 +181,14 @@ impl ZksyncBackendStrategy {
     }
 }
 
-pub(crate) struct ZkBackendMergeStrategy;
+pub(crate) struct ZksyncBackendMerge;
 
 /// Defines the zksync specific state to help during merge.
-pub(crate) struct ZkMergeState<'a> {
+pub(crate) struct ZksyncMergeState<'a> {
     persistent_immutable_keys: &'a HashMap<Address, HashSet<U256>>,
 }
 
-impl ZkBackendMergeStrategy {
+impl ZksyncBackendMerge {
     /// Clones the data of the given `accounts` from the `active` database into the `fork_db`
     /// This includes the data held in storage (`CacheDB`) and kept in the `JournaledState`.
     pub fn merge_account_data<ExtDB: DatabaseRef>(
@@ -193,7 +196,7 @@ impl ZkBackendMergeStrategy {
         active: &CacheDB<ExtDB>,
         active_journaled_state: &mut JournaledState,
         target_fork: &mut Fork,
-        zk_state: &ZkMergeState<'_>,
+        zk_state: &ZksyncMergeState<'_>,
     ) {
         for addr in accounts.into_iter() {
             EvmBackendMergeStrategy::merge_db_account_data(addr, active, &mut target_fork.db);
@@ -225,7 +228,7 @@ impl ZkBackendMergeStrategy {
         addr: Address,
         active: &CacheDB<ExtDB>,
         fork_db: &mut ForkDB,
-        _zk_state: &ZkMergeState<'_>,
+        _zk_state: &ZksyncMergeState<'_>,
     ) {
         let merge_system_contract_entry =
             |fork_db: &mut ForkDB, system_contract: Address, slot: U256| {
@@ -293,7 +296,7 @@ impl ZkBackendMergeStrategy {
         addr: Address,
         active_journaled_state: &JournaledState,
         fork_journaled_state: &mut JournaledState,
-        zk_state: &ZkMergeState<'_>,
+        zk_state: &ZksyncMergeState<'_>,
     ) {
         let merge_system_contract_entry =
             |fork_journaled_state: &mut JournaledState, system_contract: Address, slot: U256| {
