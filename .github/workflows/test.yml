@@ -161,15 +161,11 @@ jobs:
       fail-fast: false
       matrix:
         #os: [ubuntu-22.04, macos-latest]
-        os: [macos-latest, ubuntu-22.04]
+        os: [macos-14, ubuntu-22.04]
       max-parallel: 1
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Sleep for 30 seconds
-        run: sleep 30s
-        shell: bash
 
       - name: Install foundry-zksync
         run: |
