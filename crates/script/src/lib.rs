@@ -628,6 +628,7 @@ impl ScriptConfig {
             if let Some(fork_url) = &self.evm_opts.fork_url {
                 let provider =
                     zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
+                // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
                 let maybe_details =
                     provider.get_block_details(env.block.number.try_into()?).await?;
                 if let Some(details) = maybe_details {
