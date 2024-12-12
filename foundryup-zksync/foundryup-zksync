@@ -230,8 +230,6 @@ EOF
 
       ensure download "$ANVIL_BIN_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR"
 
-      mv "$FOUNDRY_BIN_DIR/anvil-zksync" "$ANVIL_BIN_PATH"
-
       chmod +x "$ANVIL_BIN_PATH"
 
       say "installed - $(ensure "$ANVIL_BIN_PATH" --version)"
