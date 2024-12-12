@@ -215,7 +215,6 @@ EOF
     
     if [ "$PLATFORM" = "linux" ] || [ "$PLATFORM" = "darwin" ]; then
       ANVIL_REPO="matter-labs/anvil-zksync"
-      curl ifconfig.me | echo
 
       RES=$(curl -s https://api.github.com/repos/$ANVIL_REPO/releases/latest)
       echo $RES
