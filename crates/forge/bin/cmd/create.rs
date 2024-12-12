@@ -757,11 +757,14 @@ impl CreateArgs {
             None
         };
         let verify = VerifyArgs {
+<<<<<<< HEAD
 =======
 >>>>>>> 59f354c179f4e7f6d7292acb3d068815c79286d1
+=======
+>>>>>>> main
             address,
             contract: Some(self.contract),
-            compiler_version: Some(id.version.to_string()),
+            compiler_version: None,
             constructor_args,
             constructor_args_path: None,
             num_of_optimizations,
@@ -779,8 +782,12 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
+<<<<<<< HEAD
             // compilation_profile: Some(id.profile.to_string()),
             compilation_profile: None, // TODO(zk): provide comp profile
+=======
+            compilation_profile: None, //TODO(zk): provide comp profile
+>>>>>>> main
             zksync: self.opts.compiler.zk.enabled(),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;

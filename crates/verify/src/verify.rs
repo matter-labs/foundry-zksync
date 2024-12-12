@@ -424,8 +424,10 @@ impl VerifyArgs {
                     SolcReq::Version(version) => version.to_owned(),
                     SolcReq::Local(solc) => Solc::new(solc)?.version,
                 }
-            } else if let Some(entry) =
-                cache.as_ref().and_then(|cache| cache.files.get(&contract_path).cloned())
+            } else if let Some(entry) = project
+                .read_cache_file()
+                .ok()
+                .and_then(|mut cache| cache.files.remove(&contract_path))
             {
                 let unique_versions = entry
                     .artifacts

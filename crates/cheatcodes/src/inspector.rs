@@ -1846,23 +1846,6 @@ where {
                         tx_req.authorization_list = None;
                     }
 
-                    let mut tx_req = TransactionRequest {
-                        from: Some(broadcast.new_origin),
-                        to: Some(TxKind::from(Some(call.target_address))),
-                        value: call.transfer_value(),
-                        input: TransactionInput::new(call.input.clone()),
-                        nonce: Some(account.info.nonce),
-                        chain_id: Some(ecx.env.cfg.chain_id),
-                        gas: if is_fixed_gas_limit { Some(call.gas_limit) } else { None },
-                        ..Default::default()
-                    };
-
-                    if let Some(auth_list) = self.active_delegation.take() {
-                        tx_req.authorization_list = Some(vec![auth_list]);
-                    } else {
-                        tx_req.authorization_list = None;
-                    }
-
                     self.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc: ecx_inner.db.active_fork_url(),
                         transaction: tx_req.into(),

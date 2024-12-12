@@ -157,8 +157,6 @@ impl BuildArgs {
             // solc output. This is safe currently as the output is simply dropped.
             Ok(())
         }
-=======
->>>>>>> 59f354c179f4e7f6d7292acb3d068815c79286d1
     }
 
     /// Returns the `Project` for the current workspace
