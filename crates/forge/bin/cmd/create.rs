@@ -1115,6 +1115,9 @@ where
             )
             .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
 
+        // NOTE(zk): We need to prepare the tx for submission to set the tx type to EIP712
+        tx.prep_for_submission();
+
         Ok(ZkDeployer {
             client: self.client.clone(),
             abi: self.abi,
