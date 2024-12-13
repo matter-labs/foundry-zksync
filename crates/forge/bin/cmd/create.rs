@@ -1102,21 +1102,14 @@ where
             Some(constructor) => constructor.abi_encode_input(&params).unwrap_or_default(),
         };
 
-        let mut tx: alloy_zksync::network::transaction_request::TransactionRequest =
-            TransactionRequest::default()
-                .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
-                .into();
-
-        tx = tx
+        let tx = alloy_zksync::network::transaction_request::TransactionRequest::default()
+            .with_to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
             .with_create_params(
                 zk_data.bytecode.clone(),
                 constructor_args,
                 zk_data.factory_deps.clone(),
             )
             .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
-
-        // NOTE(zk): We need to prepare the tx for submission to set the tx type to EIP712
-        tx.prep_for_submission();
 
         Ok(ZkDeployer {
             client: self.client.clone(),
