@@ -31,7 +31,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
-use strategy::{BackendStrategy, BackendStrategyForkInfo};
+use strategy::{BackendStrategyExt, BackendStrategyForkInfo};
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -102,13 +102,8 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
     /// and the the fork environment.
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo>;
 
-    /// Saves the storage keys for immutable variables per address.
-    ///
-    /// These are required during fork to help merge the persisted addresses, as they are stored
-    /// hashed so there is currently no way to retrieve all the address associated storage keys.
-    /// We store all the storage keys here, even if the addresses are not marked persistent as
-    /// they can be marked at a later stage as well.
-    fn save_zk_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>);
+    /// Retrieve the strategy.
+    fn get_strategy(&mut self) -> Arc<Mutex<dyn BackendStrategyExt>>;
 
     /// Reverts the snapshot if it exists
     ///
@@ -466,7 +461,7 @@ struct _ObjectSafe(dyn DatabaseExt);
 #[must_use]
 pub struct Backend {
     /// The behavior strategy.
-    pub strategy: Arc<Mutex<dyn BackendStrategy>>,
+    pub strategy: Arc<Mutex<dyn BackendStrategyExt>>,
 
     /// The access point for managing forks
     forks: MultiFork,
@@ -497,15 +492,6 @@ pub struct Backend {
     inner: BackendInner,
     /// Keeps track of the fork type
     fork_url_type: CachedForkType,
-    /// TODO: Ensure this parameter is updated on `select_fork`.
-    ///
-    /// Keeps track if the backend is in ZK mode.
-    /// This is required to correctly merge storage when selecting another ZK fork.
-    /// The balance, nonce and code are stored under zkSync's respective system contract
-    /// storages. These need to be merged into the forked storage.
-    pub is_zk: bool,
-    /// Store storage keys per contract address for immutable variables.
-    zk_recorded_immutable_keys: HashMap<Address, HashSet<U256>>,
 }
 
 impl Backend {
@@ -513,7 +499,7 @@ impl Backend {
     ///
     /// If `fork` is `Some` this will use a `fork` database, otherwise with an in-memory
     /// database.
-    pub fn spawn(fork: Option<CreateFork>, strategy: Arc<Mutex<dyn BackendStrategy>>) -> Self {
+    pub fn spawn(fork: Option<CreateFork>, strategy: Arc<Mutex<dyn BackendStrategyExt>>) -> Self {
         Self::new(MultiFork::spawn(), fork, strategy)
     }
 
@@ -526,7 +512,7 @@ impl Backend {
     pub fn new(
         forks: MultiFork,
         fork: Option<CreateFork>,
-        strategy: Arc<Mutex<dyn BackendStrategy>>,
+        strategy: Arc<Mutex<dyn BackendStrategyExt>>,
     ) -> Self {
         trace!(target: "backend", forking_mode=?fork.is_some(), "creating executor backend");
         // Note: this will take of registering the `fork`
@@ -542,8 +528,6 @@ impl Backend {
             active_fork_ids: None,
             inner,
             fork_url_type: Default::default(),
-            is_zk: false,
-            zk_recorded_immutable_keys: Default::default(),
             strategy,
         };
 
@@ -571,7 +555,7 @@ impl Backend {
         id: &ForkId,
         fork: Fork,
         journaled_state: JournaledState,
-        strategy: Arc<Mutex<dyn BackendStrategy>>,
+        strategy: Arc<Mutex<dyn BackendStrategyExt>>,
     ) -> Self {
         let mut backend = Self::spawn(None, strategy);
         let fork_ids = backend.inner.insert_new_fork(id.clone(), fork.db, journaled_state);
@@ -589,8 +573,6 @@ impl Backend {
             active_fork_ids: None,
             inner: Default::default(),
             fork_url_type: Default::default(),
-            is_zk: false,
-            zk_recorded_immutable_keys: Default::default(),
             strategy: self.strategy.clone(),
         }
     }
@@ -996,11 +978,8 @@ impl DatabaseExt for Backend {
         Ok(ForkInfo { fork_type, fork_env })
     }
 
-    fn save_zk_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
-        self.zk_recorded_immutable_keys
-            .entry(addr)
-            .and_modify(|entry| entry.extend(&keys))
-            .or_insert(keys);
+    fn get_strategy(&mut self) -> Arc<Mutex<dyn BackendStrategyExt>> {
+        self.strategy.clone()
     }
 
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
@@ -1875,7 +1854,7 @@ impl BackendInner {
         id: LocalForkId,
         new_fork_id: ForkId,
         backend: SharedBackend,
-        strategy: Arc<Mutex<dyn BackendStrategy>>,
+        strategy: Arc<Mutex<dyn BackendStrategyExt>>,
     ) -> eyre::Result<ForkLookupIndex> {
         let fork_id = self.ensure_fork_id(id)?;
         let idx = self.ensure_fork_index(fork_id)?;
@@ -2007,7 +1986,7 @@ fn commit_transaction(
     fork_id: &ForkId,
     persistent_accounts: &HashSet<Address>,
     inspector: &mut dyn InspectorExt,
-    strategy: Arc<Mutex<dyn BackendStrategy>>,
+    strategy: Arc<Mutex<dyn BackendStrategyExt>>,
 ) -> eyre::Result<()> {
     // TODO: Remove after https://github.com/foundry-rs/foundry/pull/9131
     // if the tx has the blob_versioned_hashes field, we assume it's a Cancun block

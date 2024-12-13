@@ -271,6 +271,7 @@ impl TestArgs {
     pub async fn execute_tests(mut self) -> Result<TestOutcome> {
         // Merge all configs.
         let (mut config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
+        let strategy = utils::get_executor_strategy(&config);
 
         // Explicitly enable isolation for gas reports for more correct gas accounting.
         if self.gas_report {
@@ -367,6 +368,11 @@ impl TestArgs {
         // Prepare the test builder.
         let config = Arc::new(config);
 
+        strategy
+            .lock()
+            .expect("failed acquiring strategy")
+            .zksync_set_dual_compiled_contracts(dual_compiled_contracts.unwrap_or_default());
+
         let runner = MultiContractRunnerBuilder::new(config.clone())
             .set_debug(should_debug)
             .set_decode_internal(decode_internal)
@@ -377,14 +383,7 @@ impl TestArgs {
             .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
             .alphanet(evm_opts.alphanet)
-            .build(
-                project_root,
-                output.clone(),
-                zk_output,
-                env,
-                evm_opts,
-                dual_compiled_contracts.unwrap_or_default(),
-            )?;
+            .build(project_root, output.clone(), zk_output, env, evm_opts, strategy)?;
 
         let mut maybe_override_mt = |flag, maybe_regex: Option<&Option<Regex>>| {
             if let Some(Some(regex)) = maybe_regex {

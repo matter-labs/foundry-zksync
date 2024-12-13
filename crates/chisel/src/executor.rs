@@ -15,7 +15,7 @@ use foundry_evm::{
     backend::Backend,
     decode::decode_console_logs,
     executors::{
-        strategy::{EvmExecutorStrategy, ExecutorStrategy},
+        strategy::{EvmExecutorStrategy, ExecutorStrategyExt},
         ExecutorBuilder,
     },
     inspectors::CheatsConfig,
@@ -325,7 +325,7 @@ impl SessionSource {
         let env =
             self.config.evm_opts.evm_env().await.expect("Could not instantiate fork environment");
 
-        let executor_strategy: Arc<Mutex<dyn ExecutorStrategy>> =
+        let executor_strategy: Arc<Mutex<dyn ExecutorStrategyExt>> =
             if self.config.foundry_config.zksync.run_in_zk_mode() {
                 Arc::new(Mutex::new(ZksyncExecutorStrategy::default()))
             } else {
@@ -362,7 +362,7 @@ impl SessionSource {
                         executor_strategy
                             .lock()
                             .expect("failed acquiring strategy")
-                            .new_cheatcode_inspector_strategy(Default::default()),
+                            .new_cheatcode_inspector_strategy(),
                     )
                     .into(),
                 )

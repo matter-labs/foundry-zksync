@@ -6,7 +6,7 @@ use std::{
 use alloy_primitives::{Address, U256};
 use foundry_cheatcodes::strategy::{CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy};
 use foundry_evm_core::backend::{
-    strategy::{BackendStrategy, EvmBackendStrategy},
+    strategy::{BackendStrategyExt, EvmBackendStrategy},
     BackendResult,
 };
 use foundry_zksync_compiler::DualCompiledContracts;
@@ -15,6 +15,8 @@ use revm::DatabaseRef;
 use super::Executor;
 
 pub trait ExecutorStrategy: Debug + Send + Sync {
+    fn name(&self) -> &'static str;
+
     fn set_balance(
         &mut self,
         executor: &mut Executor,
@@ -29,19 +31,28 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
         nonce: u64,
     ) -> BackendResult<()>;
 
-    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategy>>;
-    fn new_cheatcode_inspector_strategy(
-        &self,
-        dual_compiled_contracts: DualCompiledContracts,
-    ) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>;
+    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategyExt>>;
+    fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>;
 
     // TODO perhaps need to create fresh strategies as well
+}
+
+pub trait ExecutorStrategyExt: ExecutorStrategy {
+    fn zksync_set_dual_compiled_contracts(
+        &mut self,
+        _dual_compiled_contracts: DualCompiledContracts,
+    ) {
+    }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct EvmExecutorStrategy {}
 
 impl ExecutorStrategy for EvmExecutorStrategy {
+    fn name(&self) -> &'static str {
+        "evm"
+    }
+
     fn set_balance(
         &mut self,
         executor: &mut Executor,
@@ -69,14 +80,13 @@ impl ExecutorStrategy for EvmExecutorStrategy {
         Ok(())
     }
 
-    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategy>> {
+    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategyExt>> {
         Arc::new(Mutex::new(EvmBackendStrategy))
     }
 
-    fn new_cheatcode_inspector_strategy(
-        &self,
-        _dual_compiled_contracts: DualCompiledContracts,
-    ) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
+    fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
         Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy))
     }
 }
+
+impl ExecutorStrategyExt for EvmExecutorStrategy {}

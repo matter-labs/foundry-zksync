@@ -7,7 +7,6 @@ use crate::{
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
-use foundry_cli::utils;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
     artifacts::{CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Libraries},
@@ -19,7 +18,7 @@ use foundry_config::Config;
 use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
-    executors::{strategy::ExecutorStrategy, ExecutorBuilder},
+    executors::{strategy::ExecutorStrategyExt, ExecutorBuilder},
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
@@ -27,7 +26,6 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use foundry_linking::{LinkOutput, Linker};
-use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
 
@@ -86,10 +84,8 @@ pub struct MultiContractRunner {
     pub libs_to_deploy: Vec<Bytes>,
     /// Library addresses used to link contracts.
     pub libraries: Libraries,
-    /// Dual compiled contracts
-    pub dual_compiled_contracts: DualCompiledContracts,
-    /// Use zk runner.
-    pub use_zk: bool,
+    /// Execution strategy.
+    pub strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
 }
 
 impl MultiContractRunner {
@@ -182,12 +178,10 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let strategy = utils::get_executor_strategy(&self.config);
-        let mut db = Backend::spawn(
+        let db = Backend::spawn(
             self.fork.take(),
-            strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
+            self.strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
         );
-        db.is_zk = self.use_zk;
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -215,7 +209,6 @@ impl MultiContractRunner {
                         filter,
                         &tokio_handle,
                         Some(&tests_progress),
-                        strategy.clone(),
                     );
 
                     tests_progress
@@ -235,15 +228,8 @@ impl MultiContractRunner {
         } else {
             contracts.par_iter().for_each(|&(id, contract)| {
                 let _guard = tokio_handle.enter();
-                let result = self.run_test_suite(
-                    id,
-                    contract,
-                    db.clone(),
-                    filter,
-                    &tokio_handle,
-                    None,
-                    strategy.clone(),
-                );
+                let result =
+                    self.run_test_suite(id, contract, db.clone(), filter, &tokio_handle, None);
                 let _ = tx.send((id.identifier(), result));
             })
         }
@@ -257,7 +243,6 @@ impl MultiContractRunner {
         filter: &dyn TestFilter,
         tokio_handle: &tokio::runtime::Handle,
         progress: Option<&TestsProgress>,
-        strategy: Arc<Mutex<dyn ExecutorStrategy>>,
     ) -> SuiteResult {
         let identifier = artifact_id.identifier();
         let mut span_name = identifier.as_str();
@@ -268,10 +253,10 @@ impl MultiContractRunner {
             Some(self.known_contracts.clone()),
             Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
-            strategy
+            self.strategy
                 .lock()
                 .expect("failed acquiring strategy")
-                .new_cheatcode_inspector_strategy(self.dual_compiled_contracts.clone()),
+                .new_cheatcode_inspector_strategy(),
         );
 
         let trace_mode = TraceMode::default()
@@ -291,7 +276,7 @@ impl MultiContractRunner {
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
-            .build(self.env.clone(), db, strategy);
+            .build(self.env.clone(), db, self.strategy.clone());
 
         if !enabled!(tracing::Level::TRACE) {
             span_name = get_contract_name(&identifier);
@@ -428,9 +413,8 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        dual_compiled_contracts: DualCompiledContracts,
+        strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
     ) -> Result<MultiContractRunner> {
-        let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);
         let linker = Linker::new(root, output.artifact_ids().collect());
@@ -472,7 +456,7 @@ impl MultiContractRunnerBuilder {
             }
         }
 
-        if !use_zk {
+        if zk_output.is_none() {
             known_contracts = ContractsByArtifact::new(linked_contracts);
         } else if let Some(zk_output) = zk_output {
             let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
@@ -530,8 +514,7 @@ impl MultiContractRunnerBuilder {
             known_contracts,
             libs_to_deploy,
             libraries,
-            dual_compiled_contracts,
-            use_zk,
+            strategy,
         })
     }
 }

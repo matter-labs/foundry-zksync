@@ -16,7 +16,7 @@ use foundry_compilers::artifacts::{BytecodeHash, CompactContractBytecode, EvmVer
 use foundry_config::Config;
 use foundry_evm::{
     constants::DEFAULT_CREATE2_DEPLOYER,
-    executors::{strategy::ExecutorStrategy, TracingExecutor},
+    executors::{strategy::ExecutorStrategyExt, TracingExecutor},
     opts::EvmOpts,
 };
 use reqwest::Url;
@@ -327,7 +327,7 @@ pub async fn get_tracing_executor(
     fork_blk_num: u64,
     evm_version: EvmVersion,
     evm_opts: EvmOpts,
-    strategy: Arc<Mutex<dyn ExecutorStrategy>>,
+    strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
 ) -> Result<(Env, TracingExecutor)> {
     fork_config.fork_block_number = Some(fork_blk_num);
     fork_config.evm_version = evm_version;

@@ -3,12 +3,12 @@ use std::fmt::Debug;
 use crate::InspectorExt;
 
 use super::{BackendInner, DatabaseExt, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
-use alloy_primitives::Address;
+use alloy_primitives::{Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use eyre::Context;
 use revm::{
     db::CacheDB,
-    primitives::{EnvWithHandlerCfg, ResultAndState},
+    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
     DatabaseRef, JournaledState,
 };
 use serde::{Deserialize, Serialize};
@@ -20,10 +20,6 @@ pub struct BackendStrategyForkInfo<'a> {
 }
 
 pub trait BackendStrategy: Debug + Send + Sync {
-    // fn new() -> Arc<Mutex<Self>> {
-    //     Arc::new(Mutex::new(Self::default()))
-    // }
-
     fn name(&self) -> &'static str;
 
     /// When creating or switching forks, we update the AccountInfo of the contract
@@ -90,6 +86,16 @@ pub trait BackendStrategy: Debug + Send + Sync {
     }
 }
 
+pub trait BackendStrategyExt: BackendStrategy {
+    /// Saves the storage keys for immutable variables per address.
+    ///
+    /// These are required during fork to help merge the persisted addresses, as they are stored
+    /// hashed so there is currently no way to retrieve all the address associated storage keys.
+    /// We store all the storage keys here, even if the addresses are not marked persistent as
+    /// they can be marked at a later stage as well.
+    fn zksync_save_immutable_storage(&mut self, _addr: Address, _keys: HashSet<U256>) {}
+}
+
 struct _ObjectSafe(dyn BackendStrategy);
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -136,6 +142,8 @@ impl BackendStrategy for EvmBackendStrategy {
 
     fn set_inspect_context(&mut self, _other_fields: OtherFields) {}
 }
+
+impl BackendStrategyExt for EvmBackendStrategy {}
 
 impl EvmBackendStrategy {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`

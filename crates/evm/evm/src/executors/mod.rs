@@ -40,7 +40,7 @@ use std::{
     borrow::Cow,
     sync::{Arc, Mutex},
 };
-use strategy::ExecutorStrategy;
+use strategy::ExecutorStrategyExt;
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -96,7 +96,7 @@ pub struct Executor {
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
 
-    strategy: Arc<Mutex<dyn ExecutorStrategy>>,
+    strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
 }
 
 impl Executor {
@@ -114,7 +114,7 @@ impl Executor {
         inspector: InspectorStack,
         gas_limit: u64,
         legacy_assertions: bool,
-        strategy: Arc<Mutex<dyn ExecutorStrategy>>,
+        strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
     ) -> Self {
         // Need to create a non-empty contract on the cheatcodes address so `extcodesize` checks
         // do not fail.

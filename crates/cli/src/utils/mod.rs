@@ -9,7 +9,7 @@ use foundry_common::{
     shell,
 };
 use foundry_config::{Chain, Config};
-use foundry_evm::executors::strategy::{EvmExecutorStrategy, ExecutorStrategy};
+use foundry_evm::executors::strategy::{EvmExecutorStrategy, ExecutorStrategyExt};
 use foundry_strategy_zksync::ZksyncExecutorStrategy;
 use serde::de::DeserializeOwned;
 use std::{
@@ -94,7 +94,7 @@ pub fn get_provider(config: &Config) -> Result<RetryProvider> {
     get_provider_builder(config)?.build()
 }
 
-pub fn get_executor_strategy(config: &Config) -> Arc<Mutex<dyn ExecutorStrategy>> {
+pub fn get_executor_strategy(config: &Config) -> Arc<Mutex<dyn ExecutorStrategyExt>> {
     if config.zksync.run_in_zk_mode() {
         Arc::new(Mutex::new(ZksyncExecutorStrategy::default()))
     } else {

@@ -630,6 +630,11 @@ impl ScriptConfig {
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
+            strategy
+                .lock()
+                .expect("failed acquiring strategy")
+                .zksync_set_dual_compiled_contracts(dual_compiled_contracts);
+
             builder = builder.inspectors(|stack| {
                 stack
                     .cheatcodes(
@@ -642,7 +647,7 @@ impl ScriptConfig {
                             strategy
                                 .lock()
                                 .expect("failed acquiring strategy")
-                                .new_cheatcode_inspector_strategy(dual_compiled_contracts),
+                                .new_cheatcode_inspector_strategy(),
                         )
                         .into(),
                     )

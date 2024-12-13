@@ -2,10 +2,11 @@ use std::sync::{Arc, Mutex};
 
 use alloy_primitives::{Address, U256};
 use foundry_cheatcodes::strategy::CheatcodeInspectorStrategyExt;
+
 use foundry_evm::{
-    backend::{strategy::BackendStrategy, BackendResult},
+    backend::{strategy::BackendStrategyExt, BackendResult},
     executors::{
-        strategy::{EvmExecutorStrategy, ExecutorStrategy},
+        strategy::{EvmExecutorStrategy, ExecutorStrategy, ExecutorStrategyExt},
         Executor,
     },
 };
@@ -17,9 +18,14 @@ use crate::{ZksyncBackendStrategy, ZksyncCheatcodeInspectorStrategy};
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncExecutorStrategy {
     evm: EvmExecutorStrategy,
+    dual_compiled_contracts: DualCompiledContracts,
 }
 
 impl ExecutorStrategy for ZksyncExecutorStrategy {
+    fn name(&self) -> &'static str {
+        "zk"
+    }
+
     fn set_balance(
         &mut self,
         executor: &mut Executor,
@@ -53,14 +59,22 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
         Ok(())
     }
 
-    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategy>> {
+    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategyExt>> {
         Arc::new(Mutex::new(ZksyncBackendStrategy::default()))
     }
 
-    fn new_cheatcode_inspector_strategy(
-        &self,
+    fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
+        Arc::new(Mutex::new(ZksyncCheatcodeInspectorStrategy::new(
+            self.dual_compiled_contracts.clone(),
+        )))
+    }
+}
+
+impl ExecutorStrategyExt for ZksyncExecutorStrategy {
+    fn zksync_set_dual_compiled_contracts(
+        &mut self,
         dual_compiled_contracts: DualCompiledContracts,
-    ) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
-        Arc::new(Mutex::new(ZksyncCheatcodeInspectorStrategy::new(dual_compiled_contracts)))
+    ) {
+        self.dual_compiled_contracts = dual_compiled_contracts;
     }
 }

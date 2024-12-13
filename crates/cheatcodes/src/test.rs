@@ -19,7 +19,7 @@ impl Cheatcode for zkVmCall {
             .strategy
             .lock()
             .expect("failed acquiring strategy")
-            .zksync_select_zk_vm(ccx.ecx, enable);
+            .zksync_cheatcode_select_zk_vm(ccx.ecx, enable);
 
         Ok(Default::default())
     }
@@ -27,7 +27,7 @@ impl Cheatcode for zkVmCall {
 
 impl Cheatcode for zkVmSkipCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        ccx.state.strategy.lock().expect("failed acquiring strategy").zksync_skip_zkvm()
+        ccx.state.strategy.lock().expect("failed acquiring strategy").zksync_cheatcode_skip_zkvm()
     }
 }
 
@@ -38,7 +38,7 @@ impl Cheatcode for zkUsePaymasterCall {
             .strategy
             .lock()
             .expect("failed acquiring strategy")
-            .zksync_set_paymaster(*paymaster_address, paymaster_input)
+            .zksync_cheatcode_set_paymaster(*paymaster_address, paymaster_input)
     }
 }
 
@@ -49,7 +49,7 @@ impl Cheatcode for zkUseFactoryDepCall {
             .strategy
             .lock()
             .expect("failed acquiring strategy")
-            .zksync_use_factory_deps(name.clone())
+            .zksync_cheatcode_use_factory_deps(name.clone())
     }
 }
 
@@ -64,15 +64,19 @@ impl Cheatcode for zkRegisterContractCall {
             zkDeployedBytecode,
         } = self;
 
-        ccx.state.strategy.lock().expect("failed acquiring strategy").zksync_register_contract(
-            name.clone(),
-            zkBytecodeHash.0.into(),
-            zkDeployedBytecode.to_vec(),
-            vec![], //TODO: add argument to cheatcode
-            *evmBytecodeHash,
-            evmDeployedBytecode.to_vec(),
-            evmBytecode.to_vec(),
-        )
+        ccx.state
+            .strategy
+            .lock()
+            .expect("failed acquiring strategy")
+            .zksync_cheatcode_register_contract(
+                name.clone(),
+                zkBytecodeHash.0.into(),
+                zkDeployedBytecode.to_vec(),
+                vec![], //TODO: add argument to cheatcode
+                *evmBytecodeHash,
+                evmDeployedBytecode.to_vec(),
+                evmBytecode.to_vec(),
+            )
     }
 }
 

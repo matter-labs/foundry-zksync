@@ -3,9 +3,10 @@
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
-    revm::primitives::SpecId, MultiContractRunner, MultiContractRunnerBuilder, TestOptions,
-    TestOptionsBuilder,
+    executors::strategy::EvmExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
+    MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
 };
+use foundry_cli::utils;
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
     utils::RuntimeOrHandle,
@@ -35,7 +36,7 @@ use std::{
     env, fmt,
     io::Write,
     path::{Path, PathBuf},
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, Mutex},
 };
 
 type ZkProject = Project<ZkSolcCompiler, ZkArtifactOutput>;
@@ -322,13 +323,14 @@ impl ForgeTestData {
 
         let sender = config.sender;
 
+        let strategy = utils::get_executor_strategy(&config);
         let mut builder = self.base_runner();
         builder.config = Arc::new(config);
         builder
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(self.test_opts.clone())
-            .build(root, output, None, env, opts, Default::default())
+            .build(root, output, None, env, opts, strategy)
             .unwrap()
     }
 
@@ -356,13 +358,18 @@ impl ForgeTestData {
         test_opts.fuzz.no_zksync_reserved_addresses = zk_config.fuzz.no_zksync_reserved_addresses;
         let sender = zk_config.sender;
 
+        let strategy = utils::get_executor_strategy(&zk_config);
+        strategy
+            .lock()
+            .expect("failed acquiring strategy")
+            .zksync_set_dual_compiled_contracts(dual_compiled_contracts);
         let mut builder = self.base_runner();
         builder.config = Arc::new(zk_config);
         builder
             .enable_isolation(opts.isolate)
             .sender(sender)
             .with_test_options(test_opts)
-            .build(root, output, Some(zk_output), env, opts, dual_compiled_contracts)
+            .build(root, output, Some(zk_output), env, opts, strategy)
             .unwrap()
     }
 
@@ -377,7 +384,7 @@ impl ForgeTestData {
                 None,
                 opts.local_evm_env(),
                 opts,
-                Default::default(),
+                Arc::new(Mutex::new(EvmExecutorStrategy::default())),
             )
             .unwrap()
     }
@@ -394,7 +401,14 @@ impl ForgeTestData {
 
         self.base_runner()
             .with_fork(fork)
-            .build(self.project.root(), self.output.clone(), None, env, opts, Default::default())
+            .build(
+                self.project.root(),
+                self.output.clone(),
+                None,
+                env,
+                opts,
+                Arc::new(Mutex::new(EvmExecutorStrategy::default())),
+            )
             .unwrap()
     }
 }

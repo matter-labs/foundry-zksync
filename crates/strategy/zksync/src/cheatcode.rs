@@ -211,6 +211,10 @@ impl ZkPersistNonceUpdate {
 }
 
 impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
+    fn name(&self) -> &'static str {
+        "zk"
+    }
+
     fn get_nonce(&mut self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, address: Address) -> Result<u64> {
         let nonce = foundry_zksync_core::nonce(address, ccx.ecx) as u64;
         Ok(nonce)
@@ -615,12 +619,12 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
 }
 
 impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
-    fn zksync_skip_zkvm(&mut self) -> Result {
+    fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
         self.skip_zk_vm = true;
         Ok(Default::default())
     }
 
-    fn zksync_set_paymaster(
+    fn zksync_cheatcode_set_paymaster(
         &mut self,
         paymaster_address: Address,
         paymaster_input: &Bytes,
@@ -630,13 +634,13 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
         Ok(Default::default())
     }
 
-    fn zksync_use_factory_deps(&mut self, name: String) -> foundry_cheatcodes::Result {
+    fn zksync_cheatcode_use_factory_deps(&mut self, name: String) -> foundry_cheatcodes::Result {
         info!("Adding factory dependency: {:?}", name);
         self.zk_use_factory_deps.push(name);
         Ok(Default::default())
     }
 
-    fn zksync_register_contract(
+    fn zksync_cheatcode_register_contract(
         &mut self,
         name: String,
         zk_bytecode_hash: FixedBytes<32>,
@@ -866,8 +870,12 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
                                 foundry_zksync_core::get_immutable_slot_key(addr, slot_index)
                                     .to_ru256()
                             })
-                            .collect::<std::collections::HashSet<_>>();
-                        ecx.db.save_zk_immutable_storage(addr, keys);
+                            .collect::<HashSet<_>>();
+                        ecx.db
+                            .get_strategy()
+                            .lock()
+                            .expect("failed acquiring strategy")
+                            .zksync_save_immutable_storage(addr, keys);
                     }
                 }
 
@@ -1092,7 +1100,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
         self.select_fork_vm(data, fork_id);
     }
 
-    fn zksync_select_zk_vm(&mut self, data: InnerEcx<'_, '_, '_>, enable: bool) {
+    fn zksync_cheatcode_select_zk_vm(&mut self, data: InnerEcx<'_, '_, '_>, enable: bool) {
         if enable {
             self.select_zk_vm(data, None)
         } else {

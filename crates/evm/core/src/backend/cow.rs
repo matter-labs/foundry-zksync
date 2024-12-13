@@ -1,6 +1,6 @@
 //! A wrapper around `Backend` that is clone-on-write used for fuzzing.
 
-use super::{BackendError, ForkInfo};
+use super::{strategy::BackendStrategyExt, BackendError, ForkInfo};
 use crate::{
     backend::{
         diagnostic::RevertDiagnostic, Backend, DatabaseExt, LocalForkId, RevertStateSnapshotAction,
@@ -22,7 +22,8 @@ use revm::{
 };
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, HashSet},
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
 };
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
@@ -118,8 +119,8 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend.to_mut().get_fork_info(id)
     }
 
-    fn save_zk_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
-        self.backend.to_mut().save_zk_immutable_storage(addr, keys)
+    fn get_strategy(&mut self) -> Arc<Mutex<dyn BackendStrategyExt>> {
+        self.backend.as_ref().strategy.clone()
     }
 
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {

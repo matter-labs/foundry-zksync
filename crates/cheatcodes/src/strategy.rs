@@ -19,6 +19,8 @@ use crate::{
 };
 
 pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
+    fn name(&self) -> &'static str;
+
     /// Get nonce.
     fn get_nonce(&mut self, ccx: &mut CheatsCtxt, address: Address) -> Result<u64> {
         let account = ccx.ecx.journaled_state.load_account(address, &mut ccx.ecx.db)?;
@@ -179,11 +181,11 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
 
 /// We define this in our fork
 pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
-    fn zksync_skip_zkvm(&mut self) -> Result {
+    fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
         unimplemented!()
     }
 
-    fn zksync_set_paymaster(
+    fn zksync_cheatcode_set_paymaster(
         &mut self,
         _paymaster_address: Address,
         _paymaster_input: &Bytes,
@@ -191,11 +193,11 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
         unimplemented!()
     }
 
-    fn zksync_use_factory_deps(&mut self, _name: String) -> Result {
+    fn zksync_cheatcode_use_factory_deps(&mut self, _name: String) -> Result {
         unimplemented!()
     }
 
-    fn zksync_register_contract(
+    fn zksync_cheatcode_register_contract(
         &mut self,
         _name: String,
         _zk_bytecode_hash: FixedBytes<32>,
@@ -208,17 +210,15 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
         unimplemented!()
     }
 
-    fn zksync_record_create_address(&mut self, _outcome: &CreateOutcome) {
+    fn zksync_cheatcode_select_zk_vm(&mut self, _data: InnerEcx, _enable: bool) {
         unimplemented!()
     }
 
-    fn zksync_sync_nonce(&mut self, _sender: Address, _nonce: u64, _ecx: Ecx) {
-        unimplemented!()
-    }
+    fn zksync_record_create_address(&mut self, _outcome: &CreateOutcome) {}
 
-    fn zksync_set_deployer_call_input(&mut self, _call: &mut CallInputs) {
-        unimplemented!()
-    }
+    fn zksync_sync_nonce(&mut self, _sender: Address, _nonce: u64, _ecx: Ecx) {}
+
+    fn zksync_set_deployer_call_input(&mut self, _call: &mut CallInputs) {}
 
     fn zksync_try_create(
         &mut self,
@@ -227,7 +227,7 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
         _input: &dyn CommonCreateInput,
         _executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CreateOutcome> {
-        unimplemented!()
+        None
     }
 
     fn zksync_try_call(
@@ -237,22 +237,20 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
         _input: &CallInputs,
         _executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CallOutcome> {
-        unimplemented!()
+        None
     }
 
-    fn zksync_select_fork_vm(&mut self, _data: InnerEcx, _fork_id: LocalForkId) {
-        unimplemented!()
-    }
-
-    fn zksync_select_zk_vm(&mut self, _data: InnerEcx, _enable: bool) {
-        unimplemented!()
-    }
+    fn zksync_select_fork_vm(&mut self, _data: InnerEcx, _fork_id: LocalForkId) {}
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct EvmCheatcodeInspectorStrategy;
 
 impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
+    fn name(&self) -> &'static str {
+        "evm"
+    }
+
     fn record_broadcastable_create_transactions(
         &mut self,
         _config: Arc<CheatsConfig>,

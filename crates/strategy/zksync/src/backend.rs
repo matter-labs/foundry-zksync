@@ -2,6 +2,7 @@ use std::collections::hash_map::Entry;
 
 use alloy_primitives::{map::HashMap, Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
+use foundry_evm::backend::strategy::BackendStrategyExt;
 use foundry_evm_core::{
     backend::{
         strategy::{
@@ -29,6 +30,7 @@ pub struct ZksyncBackendStrategy {
     evm: EvmBackendStrategy,
     inspect_context: Option<ZkTransactionMetadata>,
     persisted_factory_deps: HashMap<H256, Vec<u8>>,
+    /// Store storage keys per contract address for immutable variables.
     persistent_immutable_keys: HashMap<Address, HashSet<U256>>,
 }
 
@@ -178,6 +180,15 @@ impl ZksyncBackendStrategy {
                 zk_state,
             )
         }
+    }
+}
+
+impl BackendStrategyExt for ZksyncBackendStrategy {
+    fn zksync_save_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
+        self.persistent_immutable_keys
+            .entry(addr)
+            .and_modify(|entry| entry.extend(&keys))
+            .or_insert(keys);
     }
 }
 

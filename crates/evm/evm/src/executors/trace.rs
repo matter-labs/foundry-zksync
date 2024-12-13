@@ -9,7 +9,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::strategy::ExecutorStrategy;
+use super::strategy::ExecutorStrategyExt;
 
 /// A default executor with tracing enabled
 pub struct TracingExecutor {
@@ -24,7 +24,7 @@ impl TracingExecutor {
         debug: bool,
         decode_internal: bool,
         alphanet: bool,
-        strategy: Arc<Mutex<dyn ExecutorStrategy>>,
+        strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
     ) -> Self {
         let db = Backend::spawn(
             fork,
