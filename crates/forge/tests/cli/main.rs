@@ -28,3 +28,7 @@ mod verify;
 mod verify_bytecode;
 
 mod ext_integration;
+mod zk_build;
+mod zk_cmd;
+mod zk_ext_integration;
+mod zk_script;
