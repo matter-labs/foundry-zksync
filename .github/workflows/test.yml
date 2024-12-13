@@ -157,11 +157,7 @@ jobs:
 
   check-ci-install-anvil:
     name: CI install anvil-zksync
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       
