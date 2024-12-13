@@ -108,6 +108,7 @@ pub struct CreateArgs {
     retry: RetryArgs,
 }
 
+#[derive(Debug, Default)]
 /// Data used to deploy a contract on zksync
 pub struct ZkSyncData {
     #[allow(dead_code)]
@@ -1102,21 +1103,14 @@ where
             Some(constructor) => constructor.abi_encode_input(&params).unwrap_or_default(),
         };
 
-        let mut tx: alloy_zksync::network::transaction_request::TransactionRequest =
-            TransactionRequest::default()
-                .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
-                .into();
-
-        tx = tx
+        let tx = alloy_zksync::network::transaction_request::TransactionRequest::default()
+            .with_to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
             .with_create_params(
                 zk_data.bytecode.clone(),
                 constructor_args,
                 zk_data.factory_deps.clone(),
             )
             .map_err(|_| ContractDeploymentError::TransactionBuildError)?;
-
-        // NOTE(zk): We need to prepare the tx for submission to set the tx type to EIP712
-        tx.prep_for_submission();
 
         Ok(ZkDeployer {
             client: self.client.clone(),
@@ -1156,6 +1150,8 @@ impl From<PendingTransactionError> for ContractDeploymentError {
 mod tests {
     use super::*;
     use alloy_primitives::I256;
+    use alloy_zksync::network::tx_type::TxType;
+    use utils::get_provider_zksync;
 
     #[test]
     fn can_parse_create() {
@@ -1223,5 +1219,21 @@ mod tests {
         let constructor: Constructor = serde_json::from_str(r#"{"type":"constructor","inputs":[{"name":"_name","type":"int256","internalType":"int256"}],"stateMutability":"nonpayable"}"#).unwrap();
         let params = args.parse_constructor_args(&constructor, &args.constructor_args).unwrap();
         assert_eq!(params, vec![DynSolValue::Int(I256::unchecked_from(-5), 256)]);
+    }
+
+    #[test]
+    fn test_zk_deployer_builds_eip712_transactions() {
+        let client = get_provider_zksync(&Default::default()).expect("failed creating client");
+        let factory =
+            DeploymentTxFactory::new_zk(Default::default(), Default::default(), client, 0);
+
+        let deployer = factory
+            .deploy_tokens_zk(
+                Default::default(),
+                &ZkSyncData { bytecode: [0u8; 32].into(), ..Default::default() },
+            )
+            .expect("failed deploying tokens");
+
+        assert_eq!(TxType::Eip712, deployer.tx.output_tx_type());
     }
 }
