@@ -6,6 +6,7 @@ use foundry_test_utils::{
     util::{self, OutputExt},
     Filter, ZkSyncNode,
 };
+use foundry_zksync_core::utils::MAX_L2_GAS_LIMIT;
 
 use crate::{config::TestConfig, test_helpers::TEST_DATA_DEFAULT};
 
@@ -46,7 +47,7 @@ contract ZkLargeFactoryDependenciesScript is Script {
 
     // foundry default gas-limit is not enough to pay for factory deps
     // with era_test_node's environment
-    let gas_limit = (u32::MAX >> 1) * 2;
+    let gas_limit = MAX_L2_GAS_LIMIT;
 
     cmd.arg("script").args([
         "--zk-startup",

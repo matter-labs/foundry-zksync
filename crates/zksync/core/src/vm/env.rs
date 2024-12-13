@@ -12,6 +12,9 @@ use zksync_types::{
 };
 use zksync_utils::h256_to_u256;
 
+// https://github.com/matter-labs/era-contracts/blob/aafee035db892689df3f7afe4b89fd6467a39313/system-contracts/bootloader/bootloader.yul#L86
+const MAX_L2_GAS_PER_PUBDATA: u64 = 50000;
+
 #[derive(Debug, Clone)]
 /// Values related to the era vm environment
 pub struct ZkEnv {
@@ -34,11 +37,10 @@ impl Default for ZkEnv {
 impl ZkEnv {
     /// Compute gas per pubdata
     pub fn gas_per_pubdata(&self) -> u64 {
-        // https://github.com/matter-labs/era-contracts/blob/aafee035db892689df3f7afe4b89fd6467a39313/system-contracts/bootloader/bootloader.yul#L86
-        let max_l2_gas_per_pubdata: u64 = 50000;
+        // source: https://github.com/matter-labs/era-contracts/blob/aafee035db892689df3f7afe4b89fd6467a39313/system-contracts/bootloader/bootloader.yul#L59
         let base_fee = std::cmp::max(
             self.fair_l2_gas_price,
-            self.fair_pubdata_price.div_ceil(max_l2_gas_per_pubdata),
+            self.fair_pubdata_price.div_ceil(MAX_L2_GAS_PER_PUBDATA),
         );
         if base_fee == 0 {
             0
