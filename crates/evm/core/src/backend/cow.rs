@@ -14,10 +14,7 @@ use alloy_rpc_types::TransactionRequest;
 use foundry_fork_db::DatabaseError;
 use revm::{
     db::DatabaseRef,
-    primitives::{
-        Account, AccountInfo, Bytecode, Env, EnvWithHandlerCfg, HashMap as Map, ResultAndState,
-        SpecId,
-    },
+    primitives::{Account, AccountInfo, Bytecode, Env, EnvWithHandlerCfg, HashMap as Map, SpecId},
     Database, DatabaseCommit, JournaledState,
 };
 use std::{
@@ -49,35 +46,15 @@ pub struct CowBackend<'a> {
     /// No calls on the `CowBackend` will ever persistently modify the `backend`'s state.
     pub backend: Cow<'a, Backend>,
     /// Keeps track of whether the backed is already initialized
-    is_initialized: bool,
+    pub is_initialized: bool,
     /// The [SpecId] of the current backend.
-    spec_id: SpecId,
+    pub spec_id: SpecId,
 }
 
 impl<'a> CowBackend<'a> {
     /// Creates a new `CowBackend` with the given `Backend`.
     pub fn new(backend: &'a Backend) -> Self {
         Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
-    }
-
-    /// Executes the configured transaction of the `env` without committing state changes
-    ///
-    /// Note: in case there are any cheatcodes executed that modify the environment, this will
-    /// update the given `env` with the new values.
-    #[instrument(name = "inspect", level = "debug", skip_all)]
-    pub fn inspect<I: InspectorExt>(
-        &mut self,
-        env: &mut EnvWithHandlerCfg,
-        inspector: &mut I,
-    ) -> eyre::Result<ResultAndState> {
-        // this is a new call to inspect with a new env, so even if we've cloned the backend
-        // already, we reset the initialized state
-        self.is_initialized = false;
-        self.spec_id = env.handler_cfg.spec_id;
-
-        let strategy = self.backend.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
-        guard.call_inspect(self, env, inspector)
     }
 
     pub fn new_borrowed(backend: &'a Backend) -> Self {

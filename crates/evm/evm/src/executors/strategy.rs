@@ -4,13 +4,21 @@ use std::{
 };
 
 use alloy_primitives::{Address, U256};
+use alloy_serde::OtherFields;
+use eyre::Context;
 use foundry_cheatcodes::strategy::{CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy};
-use foundry_evm_core::backend::{
-    strategy::{BackendStrategyExt, EvmBackendStrategy},
-    BackendResult,
+use foundry_evm_core::{
+    backend::{
+        strategy::{BackendStrategyExt, EvmBackendStrategy},
+        BackendResult, DatabaseExt,
+    },
+    InspectorExt,
 };
 use foundry_zksync_compiler::DualCompiledContracts;
-use revm::DatabaseRef;
+use revm::{
+    primitives::{EnvWithHandlerCfg, ResultAndState},
+    DatabaseRef,
+};
 
 use super::Executor;
 
@@ -30,6 +38,23 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
         address: Address,
         nonce: u64,
     ) -> BackendResult<()>;
+
+    fn set_inspect_context(&mut self, other_fields: OtherFields);
+
+    fn call_inspect<'i, 'db>(
+        &mut self,
+        db: &'db mut dyn DatabaseExt,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &'i mut dyn InspectorExt,
+    ) -> eyre::Result<ResultAndState>;
+
+    fn transact_inspect<'i, 'db>(
+        &mut self,
+        db: &'db mut dyn DatabaseExt,
+        env: &mut EnvWithHandlerCfg,
+        _executor_env: &EnvWithHandlerCfg,
+        inspector: &'i mut dyn InspectorExt,
+    ) -> eyre::Result<ResultAndState>;
 
     fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategyExt>>;
     fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>;
@@ -51,6 +76,47 @@ pub struct EvmExecutorStrategy {}
 impl ExecutorStrategy for EvmExecutorStrategy {
     fn name(&self) -> &'static str {
         "evm"
+    }
+
+    fn set_inspect_context(&mut self, other_fields: OtherFields) {}
+
+    /// Executes the configured test call of the `env` without committing state changes.
+    ///
+    /// Note: in case there are any cheatcodes executed that modify the environment, this will
+    /// update the given `env` with the new values.
+    fn call_inspect<'i, 'db>(
+        &mut self,
+        db: &'db mut dyn DatabaseExt,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &'i mut dyn InspectorExt,
+    ) -> eyre::Result<ResultAndState> {
+        let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
+
+        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+
+        env.env = evm.context.evm.inner.env;
+
+        Ok(res)
+    }
+
+    /// Executes the configured test call of the `env` without committing state changes.
+    ///
+    /// Note: in case there are any cheatcodes executed that modify the environment, this will
+    /// update the given `env` with the new values.
+    fn transact_inspect<'i, 'db>(
+        &mut self,
+        db: &'db mut dyn DatabaseExt,
+        env: &mut EnvWithHandlerCfg,
+        _executor_env: &EnvWithHandlerCfg,
+        inspector: &'i mut dyn InspectorExt,
+    ) -> eyre::Result<ResultAndState> {
+        let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
+
+        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+
+        env.env = evm.context.evm.inner.env;
+
+        Ok(res)
     }
 
     fn set_balance(

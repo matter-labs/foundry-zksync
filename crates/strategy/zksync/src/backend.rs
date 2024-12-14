@@ -1,35 +1,25 @@
 use std::collections::hash_map::Entry;
 
 use alloy_primitives::{map::HashMap, Address, U256};
-use alloy_rpc_types::serde_helpers::OtherFields;
 use foundry_evm::backend::strategy::BackendStrategyExt;
-use foundry_evm_core::{
-    backend::{
-        strategy::{
-            BackendStrategy, BackendStrategyForkInfo, EvmBackendMergeStrategy, EvmBackendStrategy,
-        },
-        BackendInner, DatabaseExt, Fork, ForkDB, FoundryEvmInMemoryDB,
+use foundry_evm_core::backend::{
+    strategy::{
+        BackendStrategy, BackendStrategyForkInfo, EvmBackendMergeStrategy, EvmBackendStrategy,
     },
-    InspectorExt,
+    BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
 };
 use foundry_zksync_core::{
-    convert::ConvertH160, PaymasterParams, ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS,
-    H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
+    convert::ConvertH160, PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS,
+    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
     NONCE_HOLDER_ADDRESS,
 };
-use revm::{
-    db::CacheDB,
-    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
-    DatabaseRef, JournaledState,
-};
+use revm::{db::CacheDB, primitives::HashSet, DatabaseRef, JournaledState};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ZksyncBackendStrategy {
     evm: EvmBackendStrategy,
-    inspect_context: Option<ZkTransactionMetadata>,
-    persisted_factory_deps: HashMap<H256, Vec<u8>>,
     /// Store storage keys per contract address for immutable variables.
     persistent_immutable_keys: HashMap<Address, HashSet<U256>>,
 }
@@ -90,55 +80,6 @@ impl BackendStrategy for ZksyncBackendStrategy {
         let zk_state =
             &ZksyncMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
         ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
-    }
-
-    fn set_inspect_context(&mut self, other_fields: OtherFields) {
-        let maybe_context = get_zksync_transaction_metadata(&other_fields);
-        self.inspect_context = maybe_context;
-    }
-
-    fn call_inspect<'i, 'db>(
-        &mut self,
-        db: &'db mut dyn DatabaseExt,
-        env: &mut EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
-    ) -> eyre::Result<ResultAndState> {
-        match self.inspect_context.take() {
-            None => self.evm.call_inspect(db, env, inspector),
-            Some(zk_tx) => foundry_zksync_core::vm::transact(
-                Some(&mut self.persisted_factory_deps),
-                Some(zk_tx.factory_deps),
-                zk_tx.paymaster_data,
-                env,
-                db,
-            ),
-        }
-    }
-
-    fn transact_inspect<'i, 'db>(
-        &mut self,
-        db: &'db mut dyn DatabaseExt,
-        env: &mut EnvWithHandlerCfg,
-        executor_env: &EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
-    ) -> eyre::Result<ResultAndState> {
-        match self.inspect_context.take() {
-            None => self.evm.transact_inspect(db, env, executor_env, inspector),
-            Some(zk_tx) => {
-                // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
-                env.block = executor_env.block.clone();
-                env.tx.gas_price = executor_env.tx.gas_price;
-
-                foundry_zksync_core::vm::transact(
-                    Some(&mut self.persisted_factory_deps),
-                    Some(zk_tx.factory_deps),
-                    zk_tx.paymaster_data,
-                    env,
-                    db,
-                )
-            }
-        }
     }
 }
 
@@ -367,11 +308,4 @@ impl ZksyncBackendMerge {
             }
         }
     }
-}
-
-/// Retrieve metadata for zksync tx
-pub fn get_zksync_transaction_metadata(
-    other_fields: &OtherFields,
-) -> Option<ZkTransactionMetadata> {
-    other_fields.get_deserialized::<ZkTransactionMetadata>("zk_tx").transpose().ok().flatten()
 }

@@ -298,6 +298,7 @@ impl ForgeTestData {
     /// TODO: This needs to be implemented as currently it is a copy of the original function
     pub fn runner_zksync(&self) -> MultiContractRunner {
         let mut zk_config = self.zk_test_data.zk_config.clone();
+        println!("{:?}", self.zk_test_data.zk_config);
         zk_config.fs_permissions =
             FsPermissions::new(vec![PathPermission::read_write(manifest_root())]);
         self.runner_with_zksync_config(zk_config)

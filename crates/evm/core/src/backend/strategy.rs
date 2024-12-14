@@ -1,16 +1,8 @@
 use std::fmt::Debug;
 
-use crate::InspectorExt;
-
-use super::{BackendInner, DatabaseExt, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
+use super::{BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use alloy_primitives::{Address, U256};
-use alloy_rpc_types::serde_helpers::OtherFields;
-use eyre::Context;
-use revm::{
-    db::CacheDB,
-    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
-    DatabaseRef, JournaledState,
-};
+use revm::{db::CacheDB, primitives::HashSet, DatabaseRef, JournaledState};
 use serde::{Deserialize, Serialize};
 
 pub struct BackendStrategyForkInfo<'a> {
@@ -41,49 +33,6 @@ pub trait BackendStrategy: Debug + Send + Sync {
     );
 
     fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB);
-
-    fn set_inspect_context(&mut self, other_fields: OtherFields);
-
-    /// Executes the configured test call of the `env` without committing state changes.
-    ///
-    /// Note: in case there are any cheatcodes executed that modify the environment, this will
-    /// update the given `env` with the new values.
-    #[instrument(name = "inspect", level = "debug", skip_all)]
-    fn call_inspect<'i, 'db>(
-        &mut self,
-        db: &'db mut dyn DatabaseExt,
-        env: &mut EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
-    ) -> eyre::Result<ResultAndState> {
-        let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
-
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
-
-        env.env = evm.context.evm.inner.env;
-
-        Ok(res)
-    }
-
-    /// Executes the configured test call of the `env` without committing state changes.
-    ///
-    /// Note: in case there are any cheatcodes executed that modify the environment, this will
-    /// update the given `env` with the new values.
-    #[instrument(name = "inspect", level = "debug", skip_all)]
-    fn transact_inspect<'i, 'db>(
-        &mut self,
-        db: &'db mut dyn DatabaseExt,
-        env: &mut EnvWithHandlerCfg,
-        _executor_env: &EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
-    ) -> eyre::Result<ResultAndState> {
-        let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
-
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
-
-        env.env = evm.context.evm.inner.env;
-
-        Ok(res)
-    }
 }
 
 pub trait BackendStrategyExt: BackendStrategy {
@@ -139,8 +88,6 @@ impl BackendStrategy for EvmBackendStrategy {
     fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB) {
         EvmBackendMergeStrategy::merge_db_account_data(addr, active, fork_db);
     }
-
-    fn set_inspect_context(&mut self, _other_fields: OtherFields) {}
 }
 
 impl BackendStrategyExt for EvmBackendStrategy {}
@@ -246,30 +193,3 @@ impl EvmBackendMergeStrategy {
         fork_db.accounts.insert(addr, acc);
     }
 }
-
-// pub trait GlobalStrategy: Debug + Send + Sync + Default + Clone {
-//     type Backend: BackendStrategy;
-//     type Executor: ExecutorStrategy;
-//     type CheatcodeInspector: CheatcodeInspectorStrategy;
-
-//     fn backend_strategy() -> Arc<Mutex<Self::Backend>> {
-//         Self::Backend::new()
-//     }
-
-//     fn executor_strategy() -> Arc<Mutex<Self::Executor>> {
-//         Self::Executor::new()
-//     }
-
-//     fn cheatcode_strategy() -> Self::CheatcodeInspector {
-//         Self::CheatcodeInspector::new()
-//     }
-// }
-
-// #[derive(Debug, Default, Clone)]
-// pub struct EvmStrategy;
-
-// impl GlobalStrategy for EvmStrategy {
-//     type Backend = EvmBackendStrategy;
-//     type Executor = EvmExecutor;
-//     type CheatcodeInspector = EvmCheatcodeInspector;
-// }

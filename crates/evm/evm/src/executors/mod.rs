@@ -254,11 +254,7 @@ impl Executor {
 
     #[inline]
     pub fn set_transaction_other_fields(&mut self, other_fields: OtherFields) {
-        self.backend
-            .strategy
-            .lock()
-            .expect("failed acquiring strategy")
-            .set_inspect_context(other_fields);
+        self.strategy.lock().expect("failed acquiring strategy").set_inspect_context(other_fields);
     }
 
     /// Deploys a contract and commits the new state to the underlying database.
@@ -436,23 +432,38 @@ impl Executor {
     pub fn call_with_env(&self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector().clone();
         let mut backend = CowBackend::new_borrowed(self.backend());
+        // this is a new call to inspect with a new env, so even if we've cloned the backend
+        // already, we reset the initialized state
+        backend.is_initialized = false;
+        backend.spec_id = env.spec_id();
 
-        let strategy = backend.backend.strategy.clone(); // clone to take a mutable borrow
-        let mut guard = strategy.lock().unwrap();
-        let result = guard.call_inspect(&mut backend, &mut env, &mut inspector)?;
+        let result = self.strategy.lock().expect("failed acquiring strategy").call_inspect(
+            &mut backend,
+            &mut env,
+            &mut inspector,
+        )?;
+
         convert_executed_result(env, inspector, result, backend.has_state_snapshot_failure())
     }
 
     /// Execute the transaction configured in `env.tx`.
+    ///
+    /// Executes the configured transaction of the `env` without committing state changes
+    ///
+    /// Note: in case there are any cheatcodes executed that modify the environment, this will
+    /// update the given `env` with the new values.
     #[instrument(name = "transact", level = "debug", skip_all)]
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
+        backend.initialize(&env);
 
-        let strategy = backend.strategy.clone(); // clone to take a mutable borrow
-        let mut guard = strategy.lock().unwrap();
-        let result_and_state =
-            guard.transact_inspect(backend, &mut env, &self.env, &mut inspector)?;
+        let result_and_state = self
+            .strategy
+            .lock()
+            .expect("failed acquiring strategy")
+            .transact_inspect(backend, &mut env, &self.env, &mut inspector)?;
+
         let mut result = convert_executed_result(
             env,
             inspector,

@@ -9,6 +9,6 @@ mod backend;
 mod cheatcode;
 mod executor;
 
-pub use backend::{get_zksync_transaction_metadata, ZksyncBackendStrategy};
+pub use backend::ZksyncBackendStrategy;
 pub use cheatcode::ZksyncCheatcodeInspectorStrategy;
-pub use executor::ZksyncExecutorStrategy;
+pub use executor::{get_zksync_transaction_metadata, ZksyncExecutorStrategy};

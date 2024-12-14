@@ -22,7 +22,7 @@ use revm::{
     precompile::{PrecompileSpecId, Precompiles},
     primitives::{
         Account, AccountInfo, BlobExcessGasAndPrice, Bytecode, Env, EnvWithHandlerCfg, EvmState,
-        EvmStorageSlot, HashMap as Map, Log, ResultAndState, SpecId, KECCAK_EMPTY,
+        EvmStorageSlot, HashMap as Map, Log, SpecId, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, JournaledState,
 };
@@ -675,42 +675,6 @@ impl Backend {
         self.inner.has_state_snapshot_failure = has_state_snapshot_failure
     }
 
-    // /// When creating or switching forks, we update the AccountInfo of the contract
-    // pub(crate) fn update_fork_db(
-    //     &self,
-    //     active_journaled_state: &mut JournaledState,
-    //     target_fork: &mut Fork,
-    //     zk_state: Option<ZkMergeState>,
-    // ) {
-    //     self.update_fork_db_contracts(
-    //         self.inner.persistent_accounts.iter().copied(),
-    //         active_journaled_state,
-    //         target_fork,
-    //         zk_state,
-    //     )
-    // }
-
-    // /// Merges the state of all `accounts` from the currently active db into the given `fork`
-    // pub(crate) fn update_fork_db_contracts(
-    //     &self,
-    //     accounts: impl IntoIterator<Item = Address>,
-    //     active_journaled_state: &mut JournaledState,
-    //     target_fork: &mut Fork,
-    //     zk_state: Option<ZkMergeState>,
-    // ) {
-    //     if let Some(db) = self.active_fork_db() {
-    //         merge_account_data(accounts, db, active_journaled_state, target_fork, zk_state)
-    //     } else {
-    //         merge_account_data(
-    //             accounts,
-    //             &self.mem_db,
-    //             active_journaled_state,
-    //             target_fork,
-    //             zk_state,
-    //         )
-    //     }
-    // }
-
     /// Returns the memory db used if not in forking mode
     pub fn mem_db(&self) -> &FoundryEvmInMemoryDB {
         &self.mem_db
@@ -801,7 +765,7 @@ impl Backend {
     /// Initializes settings we need to keep track of.
     ///
     /// We need to track these mainly to prevent issues when switching between different evms
-    pub(crate) fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+    pub fn initialize(&mut self, env: &EnvWithHandlerCfg) {
         self.set_caller(env.tx.caller);
         self.set_spec_id(env.handler_cfg.spec_id);
     }
@@ -809,23 +773,6 @@ impl Backend {
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
     fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
         EnvWithHandlerCfg::new_with_spec_id(Box::new(env), self.inner.spec_id)
-    }
-
-    /// Executes the configured test call of the `env` without committing state changes.
-    ///
-    /// Note: in case there are any cheatcodes executed that modify the environment, this will
-    /// update the given `env` with the new values.
-    #[instrument(name = "inspect", level = "debug", skip_all)]
-    pub fn inspect<I: InspectorExt>(
-        &mut self,
-        env: &mut EnvWithHandlerCfg,
-        inspector: &mut I,
-    ) -> eyre::Result<ResultAndState> {
-        self.initialize(env);
-
-        let strategy = self.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
-        guard.call_inspect(self, env, inspector)
     }
 
     /// Returns true if the address is a precompile
@@ -1978,6 +1925,7 @@ fn update_env_block(env: &mut Env, block: &AnyRpcBlock) {
 
 /// Executes the given transaction and commits state changes to the database _and_ the journaled
 /// state, with an inspector.
+#[allow(clippy::too_many_arguments)]
 fn commit_transaction(
     tx: &Transaction<AnyTxEnvelope>,
     mut env: EnvWithHandlerCfg,
