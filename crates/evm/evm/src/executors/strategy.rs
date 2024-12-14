@@ -78,7 +78,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
         "evm"
     }
 
-    fn set_inspect_context(&mut self, other_fields: OtherFields) {}
+    fn set_inspect_context(&mut self, _other_fields: OtherFields) {}
 
     /// Executes the configured test call of the `env` without committing state changes.
     ///
