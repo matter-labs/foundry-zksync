@@ -52,6 +52,9 @@ use zksync_types::{
     CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
 };
 
+/// Key used to set transaction metadata in other fields.
+pub const ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY: &'static str = "zksync";
+
 macro_rules! fmt_err {
     ($msg:literal $(,)?) => {
         Error::fmt(::std::format_args!($msg))
@@ -448,7 +451,7 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
                 ..Default::default()
             });
             tx.other.insert(
-                "zksync".to_string(),
+                ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
                 serde_json::to_value(ZkTransactionMetadata::new(
                     factory_deps,
                     paymaster_params.clone(),
@@ -475,7 +478,7 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
             ..Default::default()
         });
         tx.other.insert(
-            "zksync".to_string(),
+            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
             serde_json::to_value(ZkTransactionMetadata::new(zk_tx_factory_deps, paymaster_params))
                 .expect("failed encoding json"),
         );
@@ -566,7 +569,7 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         let mut tx = WithOtherFields::new(tx_req);
 
         tx.other.insert(
-            "zksync".to_string(),
+            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
             serde_json::to_value(zk_tx).expect("failed encoding json"),
         );
 

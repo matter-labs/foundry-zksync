@@ -20,7 +20,10 @@ use revm::{
 };
 use zksync_types::H256;
 
-use crate::{ZksyncBackendStrategy, ZksyncCheatcodeInspectorStrategy};
+use crate::{
+    cheatcode::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZksyncBackendStrategy,
+    ZksyncCheatcodeInspectorStrategy,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncExecutorStrategy {
@@ -141,5 +144,9 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategy {
 pub fn get_zksync_transaction_metadata(
     other_fields: &OtherFields,
 ) -> Option<ZkTransactionMetadata> {
-    other_fields.get_deserialized::<ZkTransactionMetadata>("zk_tx").transpose().ok().flatten()
+    other_fields
+        .get_deserialized::<ZkTransactionMetadata>(ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY)
+        .transpose()
+        .ok()
+        .flatten()
 }

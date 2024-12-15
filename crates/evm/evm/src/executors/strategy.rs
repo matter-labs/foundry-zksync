@@ -84,11 +84,11 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     ///
     /// Note: in case there are any cheatcodes executed that modify the environment, this will
     /// update the given `env` with the new values.
-    fn call_inspect<'i, 'db>(
+    fn call_inspect(
         &mut self,
-        db: &'db mut dyn DatabaseExt,
+        db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
+        inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState> {
         let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
 
@@ -103,12 +103,12 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     ///
     /// Note: in case there are any cheatcodes executed that modify the environment, this will
     /// update the given `env` with the new values.
-    fn transact_inspect<'i, 'db>(
+    fn transact_inspect(
         &mut self,
-        db: &'db mut dyn DatabaseExt,
+        db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
         _executor_env: &EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
+        inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState> {
         let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
 
