@@ -83,11 +83,11 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
         )))
     }
 
-    fn call_inspect<'i, 'db>(
+    fn call_inspect(
         &mut self,
-        db: &'db mut dyn DatabaseExt,
+        db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
+        inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState> {
         match self.inspect_context.take() {
             None => self.evm.call_inspect(db, env, inspector),
@@ -101,12 +101,12 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
         }
     }
 
-    fn transact_inspect<'i, 'db>(
+    fn transact_inspect(
         &mut self,
-        db: &'db mut dyn DatabaseExt,
+        db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
         executor_env: &EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
+        inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState> {
         match self.inspect_context.take() {
             None => self.evm.transact_inspect(db, env, executor_env, inspector),

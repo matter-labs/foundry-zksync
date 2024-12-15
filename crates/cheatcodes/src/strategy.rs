@@ -182,7 +182,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
 /// We define this in our fork
 pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
     fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
-        unimplemented!()
+        Ok(Default::default())
     }
 
     fn zksync_cheatcode_set_paymaster(
@@ -190,13 +190,14 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
         _paymaster_address: Address,
         _paymaster_input: &Bytes,
     ) -> Result {
-        unimplemented!()
+        Ok(Default::default())
     }
 
     fn zksync_cheatcode_use_factory_deps(&mut self, _name: String) -> Result {
-        unimplemented!()
+        Ok(Default::default())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn zksync_cheatcode_register_contract(
         &mut self,
         _name: String,
@@ -207,12 +208,10 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
         _evm_deployed_bytecode: Vec<u8>,
         _evm_bytecode: Vec<u8>,
     ) -> Result {
-        unimplemented!()
+        Ok(Default::default())
     }
 
-    fn zksync_cheatcode_select_zk_vm(&mut self, _data: InnerEcx, _enable: bool) {
-        unimplemented!()
-    }
+    fn zksync_cheatcode_select_zk_vm(&mut self, _data: InnerEcx, _enable: bool) {}
 
     fn zksync_record_create_address(&mut self, _outcome: &CreateOutcome) {}
 
@@ -244,7 +243,7 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct EvmCheatcodeInspectorStrategy;
+pub struct EvmCheatcodeInspectorStrategy {}
 
 impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     fn name(&self) -> &'static str {

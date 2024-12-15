@@ -41,19 +41,19 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
 
     fn set_inspect_context(&mut self, other_fields: OtherFields);
 
-    fn call_inspect<'i, 'db>(
+    fn call_inspect(
         &mut self,
-        db: &'db mut dyn DatabaseExt,
+        db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
+        inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState>;
 
-    fn transact_inspect<'i, 'db>(
+    fn transact_inspect(
         &mut self,
-        db: &'db mut dyn DatabaseExt,
+        db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
         _executor_env: &EnvWithHandlerCfg,
-        inspector: &'i mut dyn InspectorExt,
+        inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState>;
 
     fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategyExt>>;
@@ -151,7 +151,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     }
 
     fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
-        Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy))
+        Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy::default()))
     }
 }
 

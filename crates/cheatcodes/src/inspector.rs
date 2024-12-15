@@ -1102,7 +1102,7 @@ where {
                         .expect("failed acquiring strategy")
                         .record_broadcastable_call_transactions(
                             self.config.clone(),
-                            &call,
+                            call,
                             ecx_inner,
                             broadcast,
                             &mut self.broadcastable_transactions,
@@ -1182,7 +1182,7 @@ where {
 
         let strategy = self.strategy.clone();
         let mut guard = strategy.lock().expect("failed acquiring strategy");
-        if let Some(result) = guard.zksync_try_call(self, ecx, &call, executor) {
+        if let Some(result) = guard.zksync_try_call(self, ecx, call, executor) {
             return Some(result);
         }
 
