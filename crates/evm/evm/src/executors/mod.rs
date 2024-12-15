@@ -208,7 +208,7 @@ impl Executor {
     pub fn set_balance(&mut self, address: Address, amount: U256) -> BackendResult<()> {
         trace!(?address, ?amount, "setting account balance");
         let strategy = self.strategy.clone();
-        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
+        let mut guard = strategy.lock().expect("failed acquiring strategy");
         guard.set_balance(self, address, amount)
     }
 
@@ -220,7 +220,7 @@ impl Executor {
     /// Set the nonce of an account.
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> BackendResult<()> {
         let strategy = self.strategy.clone();
-        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
+        let mut guard = strategy.lock().expect("failed acquiring strategy");
         guard.set_nonce(self, address, nonce)
     }
 
@@ -440,7 +440,7 @@ impl Executor {
         backend.is_initialized = false;
         backend.spec_id = env.spec_id();
 
-        let result = self.strategy.try_lock().expect("failed acquiring strategy").call_inspect(
+        let result = self.strategy.lock().expect("failed acquiring strategy").call_inspect(
             &mut backend,
             &mut env,
             &mut inspector,

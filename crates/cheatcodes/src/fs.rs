@@ -284,7 +284,7 @@ impl Cheatcode for getCodeCall {
     fn apply(&self, state: &mut Cheatcodes) -> Result {
         let Self { artifactPath: path } = self;
         let strategy = state.strategy.clone();
-        let guard = strategy.try_lock().expect("failed acquiring strategy");
+        let guard = strategy.lock().expect("failed acquiring strategy");
         guard.get_artifact_code(state, path, false)
     }
 }

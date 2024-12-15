@@ -180,7 +180,7 @@ impl MultiContractRunner {
         // The DB backend that serves all the data.
         let db = Backend::spawn(
             self.fork.take(),
-            self.strategy.try_lock().expect("failed acquiring strategy").new_backend_strategy(),
+            self.strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
         );
 
         let find_timer = Instant::now();

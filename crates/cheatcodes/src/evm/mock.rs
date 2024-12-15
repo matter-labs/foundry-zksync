@@ -16,7 +16,7 @@ impl Cheatcode for mockCall_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, returnData } = self;
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
+        let mut guard = strategy.lock().expect("failed acquiring strategy");
         guard.mock_call(ccx, *callee, data, returnData)
     }
 }
@@ -86,7 +86,7 @@ impl Cheatcode for mockCallRevert_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, revertData } = self;
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
+        let mut guard = strategy.lock().expect("failed acquiring strategy");
         guard.mock_call_revert(ccx, *callee, data, revertData)
     }
 }

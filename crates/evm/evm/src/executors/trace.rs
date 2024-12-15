@@ -28,7 +28,7 @@ impl TracingExecutor {
     ) -> Self {
         let db = Backend::spawn(
             fork,
-            strategy.try_lock().expect("failed acquiring strategy").new_backend_strategy(),
+            strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
         );
         let trace_mode =
             TraceMode::Call.with_debug(debug).with_decode_internal(if decode_internal {

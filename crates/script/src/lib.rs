@@ -615,7 +615,7 @@ impl ScriptConfig {
             // to cache the backend for.
             Backend::spawn(
                 None,
-                strategy.try_lock().expect("failed acquiring strategy").new_backend_strategy(),
+                strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
             )
         };
 
