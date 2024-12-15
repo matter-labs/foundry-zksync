@@ -237,6 +237,7 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn cheatcode_roll(&mut self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, new_height: U256) -> Result {
+        ccx.ecx.env.block.number = new_height;
         foundry_zksync_core::cheatcodes::roll(new_height, ccx.ecx);
         Ok(Default::default())
     }
@@ -246,6 +247,7 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         new_timestamp: U256,
     ) -> Result {
+        ccx.ecx.env.block.number = new_timestamp;
         foundry_zksync_core::cheatcodes::warp(new_timestamp, ccx.ecx);
         Ok(Default::default())
     }

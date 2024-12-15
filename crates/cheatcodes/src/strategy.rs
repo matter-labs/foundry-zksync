@@ -38,7 +38,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
 
     /// Cheatcode: warp.
     fn cheatcode_warp(&mut self, ccx: &mut CheatsCtxt, new_timestamp: U256) -> Result {
-        ccx.ecx.env.block.number = new_timestamp;
+        ccx.ecx.env.block.timestamp = new_timestamp;
         Ok(Default::default())
     }
 
