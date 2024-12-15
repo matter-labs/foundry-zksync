@@ -42,7 +42,7 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
     fn set_inspect_context(&mut self, other_fields: OtherFields);
 
     fn call_inspect(
-        &mut self,
+        &self,
         db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
         inspector: &mut dyn InspectorExt,
@@ -85,7 +85,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     /// Note: in case there are any cheatcodes executed that modify the environment, this will
     /// update the given `env` with the new values.
     fn call_inspect(
-        &mut self,
+        &self,
         db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
         inspector: &mut dyn InspectorExt,
@@ -100,6 +100,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     }
 
     /// Executes the configured test call of the `env` without committing state changes.
+    /// Modifications to the state are however allowed.
     ///
     /// Note: in case there are any cheatcodes executed that modify the environment, this will
     /// update the given `env` with the new values.

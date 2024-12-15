@@ -77,6 +77,7 @@ pub async fn send_transaction(
         } else {
             None
         };
+    println!("ZK_TX {zk_tx_meta:#?}");
 
     if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
         if sequential_broadcast {

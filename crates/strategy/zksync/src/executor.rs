@@ -87,17 +87,17 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
     }
 
     fn call_inspect(
-        &mut self,
+        &self,
         db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState> {
-        match self.inspect_context.take() {
+        match self.inspect_context.as_ref() {
             None => self.evm.call_inspect(db, env, inspector),
             Some(zk_tx) => foundry_zksync_core::vm::transact(
-                Some(&mut self.persisted_factory_deps),
-                Some(zk_tx.factory_deps),
-                zk_tx.paymaster_data,
+                Some(&mut self.persisted_factory_deps.clone()),
+                Some(zk_tx.factory_deps.clone()),
+                zk_tx.paymaster_data.clone(),
                 env,
                 db,
             ),

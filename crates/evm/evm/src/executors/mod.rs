@@ -254,6 +254,7 @@ impl Executor {
 
     #[inline]
     pub fn set_transaction_other_fields(&mut self, other_fields: OtherFields) {
+        println!("SET CONTEXT");
         self.strategy
             .try_lock()
             .expect("failed acquiring strategy")
@@ -450,11 +451,6 @@ impl Executor {
     }
 
     /// Execute the transaction configured in `env.tx`.
-    ///
-    /// Executes the configured transaction of the `env` without committing state changes
-    ///
-    /// Note: in case there are any cheatcodes executed that modify the environment, this will
-    /// update the given `env` with the new values.
     #[instrument(name = "transact", level = "debug", skip_all)]
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();

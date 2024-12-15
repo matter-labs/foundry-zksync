@@ -260,6 +260,7 @@ impl ScriptRunner {
         authorization_list: Option<Vec<SignedAuthorization>>,
         other_fields: Option<OtherFields>,
     ) -> Result<ScriptResult> {
+        println!("others {:?}", other_fields);
         if let Some(other_fields) = other_fields {
             self.executor.set_transaction_other_fields(other_fields);
         }
