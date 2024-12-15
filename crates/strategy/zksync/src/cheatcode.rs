@@ -162,7 +162,7 @@ impl ZksyncCheatcodeInspectorStrategy {
 
         Self {
             evm: EvmCheatcodeInspectorStrategy::default(),
-            using_zk_vm: true, // always start in zksync mode
+            using_zk_vm: false, // We need to migrate once on initialize_interp
             skip_zk_vm: false,
             skip_zk_vm_addresses: Default::default(),
             record_next_create_address: Default::default(),

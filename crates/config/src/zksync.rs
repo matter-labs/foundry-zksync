@@ -70,8 +70,8 @@ pub struct ZkSyncConfig {
 impl Default for ZkSyncConfig {
     fn default() -> Self {
         Self {
-            compile: true,
-            startup: true,
+            compile: false,
+            startup: false,
             zksolc: Default::default(),
             solc_path: Default::default(),
             bytecode_hash: Default::default(),

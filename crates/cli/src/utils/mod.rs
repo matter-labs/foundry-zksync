@@ -96,8 +96,10 @@ pub fn get_provider(config: &Config) -> Result<RetryProvider> {
 
 pub fn get_executor_strategy(config: &Config) -> Arc<Mutex<dyn ExecutorStrategyExt>> {
     if config.zksync.should_compile() {
+        info!("using zksync strategy");
         Arc::new(Mutex::new(ZksyncExecutorStrategy::default()))
     } else {
+        info!("using evm strategy");
         Arc::new(Mutex::new(EvmExecutorStrategy::default()))
     }
 }
