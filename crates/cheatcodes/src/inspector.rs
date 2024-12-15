@@ -762,7 +762,7 @@ impl Cheatcodes {
         }
 
         let strategy = self.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         if let Some(result) = guard.zksync_try_create(self, ecx, &input, executor) {
             return Some(result);
         }
@@ -1181,7 +1181,7 @@ where {
         }
 
         let strategy = self.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         if let Some(result) = guard.zksync_try_call(self, ecx, &call, executor) {
             return Some(result);
         }
@@ -1291,7 +1291,12 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
 
     #[inline]
     fn step_end(&mut self, interpreter: &mut Interpreter, ecx: Ecx) {
-        if self.strategy.lock().expect("failed acquiring strategy").pre_step_end(interpreter, ecx) {
+        if self
+            .strategy
+            .try_lock()
+            .expect("failed acquiring strategy")
+            .pre_step_end(interpreter, ecx)
+        {
             return;
         }
 

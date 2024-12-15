@@ -65,7 +65,7 @@ impl Cheatcode for getNonce_0Call {
         let Self { account } = self;
 
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         guard.cheatcode_get_nonce(ccx, *account)
     }
 }
@@ -353,7 +353,7 @@ impl Cheatcode for rollCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newHeight } = self;
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         guard.cheatcode_roll(ccx, *newHeight)
     }
 }
@@ -377,7 +377,7 @@ impl Cheatcode for warpCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newTimestamp } = self;
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         guard.cheatcode_warp(ccx, *newTimestamp)
     }
 }
@@ -414,7 +414,7 @@ impl Cheatcode for dealCall {
         let Self { account: address, newBalance: new_balance } = *self;
 
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         guard.cheatcode_deal(ccx, address, new_balance)
     }
 }
@@ -424,7 +424,7 @@ impl Cheatcode for etchCall {
         let Self { target, newRuntimeBytecode } = self;
 
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         guard.cheatcode_etch(ccx, *target, newRuntimeBytecode)
     }
 }
@@ -433,7 +433,7 @@ impl Cheatcode for resetNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         guard.cheatcode_reset_nonce(ccx, *account)
     }
 }
@@ -443,7 +443,7 @@ impl Cheatcode for setNonceCall {
         let Self { account, newNonce } = *self;
 
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         guard.cheatcode_set_nonce(ccx, account, newNonce)
     }
 }
@@ -453,7 +453,7 @@ impl Cheatcode for setNonceUnsafeCall {
         let Self { account, newNonce } = *self;
 
         let strategy = ccx.state.strategy.clone();
-        let mut guard = strategy.lock().expect("failed acquiring strategy");
+        let mut guard = strategy.try_lock().expect("failed acquiring strategy");
         guard.cheatcode_set_nonce_unsafe(ccx, account, newNonce)
     }
 }

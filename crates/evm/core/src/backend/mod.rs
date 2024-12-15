@@ -1156,7 +1156,7 @@ impl DatabaseExt for Backend {
                 caller_account.into()
             });
 
-            self.strategy.lock().expect("failed acquiring strategy").update_fork_db(
+            self.strategy.try_lock().expect("failed acquiring strategy").update_fork_db(
                 BackendStrategyForkInfo {
                     active_fork: self.active_fork(),
                     active_type: current_fork_type,
@@ -1810,7 +1810,7 @@ impl BackendInner {
             // we initialize a _new_ `ForkDB` but keep the state of persistent accounts
             let mut new_db = ForkDB::new(backend);
             for addr in self.persistent_accounts.iter().copied() {
-                strategy.lock().expect("failed acquiring strategy").merge_db_account_data(
+                strategy.try_lock().expect("failed acquiring strategy").merge_db_account_data(
                     addr,
                     &active.db,
                     &mut new_db,

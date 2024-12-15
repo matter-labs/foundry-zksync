@@ -151,7 +151,11 @@ impl ContractRunner<'_> {
         // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
             debug!("test contract deployed");
-            cheatcodes.strategy.lock().expect("failed acquiring strategy").base_contract_deployed();
+            cheatcodes
+                .strategy
+                .try_lock()
+                .expect("failed acquiring strategy")
+                .base_contract_deployed();
         }
 
         // Optionally call the `setUp` function

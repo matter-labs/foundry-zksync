@@ -27,7 +27,11 @@ impl Cheatcode for zkVmCall {
 
 impl Cheatcode for zkVmSkipCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        ccx.state.strategy.lock().expect("failed acquiring strategy").zksync_cheatcode_skip_zkvm()
+        ccx.state
+            .strategy
+            .try_lock()
+            .expect("failed acquiring strategy")
+            .zksync_cheatcode_skip_zkvm()
     }
 }
 

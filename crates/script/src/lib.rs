@@ -600,7 +600,10 @@ impl ScriptConfig {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
                     let backend = Backend::spawn(
                         fork,
-                        strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
+                        strategy
+                            .try_lock()
+                            .expect("failed acquiring strategy")
+                            .new_backend_strategy(),
                     );
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
@@ -612,7 +615,7 @@ impl ScriptConfig {
             // to cache the backend for.
             Backend::spawn(
                 None,
-                strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
+                strategy.try_lock().expect("failed acquiring strategy").new_backend_strategy(),
             )
         };
 
