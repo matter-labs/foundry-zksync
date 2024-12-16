@@ -57,7 +57,7 @@ async fn test_cheats_local_with_seed(test_data: &ForgeTestData) {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_cheats_local_default_foo() {
+async fn test_cheats_local_default() {
     test_cheats_local(&TEST_DATA_DEFAULT).await
 }
 

@@ -410,10 +410,6 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn get_artifact_code(&self, state: &Cheatcodes, path: &str, deployed: bool) -> Result {
-        if !self.using_zk_vm {
-            return self.evm.get_artifact_code(state, path, deployed);
-        }
-
         Ok(get_artifact_code(
             &self.dual_compiled_contracts,
             self.using_zk_vm,

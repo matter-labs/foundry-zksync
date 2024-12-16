@@ -501,7 +501,7 @@ impl Clone for Backend {
             forks: self.forks.clone(),
             mem_db: self.mem_db.clone(),
             fork_init_journaled_state: self.fork_init_journaled_state.clone(),
-            active_fork_ids: self.active_fork_ids.clone(),
+            active_fork_ids: self.active_fork_ids,
             inner: self.inner.clone(),
             fork_url_type: self.fork_url_type.clone(),
         }
