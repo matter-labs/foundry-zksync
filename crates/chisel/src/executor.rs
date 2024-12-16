@@ -338,6 +338,7 @@ impl SessionSource {
                         Some(self.solc.version.clone()),
                         Default::default(),
                         false,
+                        None,
                     )
                     .into(),
                 )
