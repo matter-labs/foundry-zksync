@@ -2,7 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use alloy_primitives::{Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
-use alloy_zksync::types::BlockDetails;
+use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
+use eyre::Result;
 use foundry_cheatcodes::strategy::CheatcodeInspectorStrategyExt;
 
 use foundry_evm::{
@@ -16,7 +17,7 @@ use foundry_evm::{
 use foundry_zksync_compiler::DualCompiledContracts;
 use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata};
 use revm::{
-    primitives::{EnvWithHandlerCfg, HashMap, ResultAndState},
+    primitives::{Env, EnvWithHandlerCfg, HashMap, ResultAndState},
     Database,
 };
 use zksync_types::H256;
@@ -152,25 +153,38 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategy {
         self.dual_compiled_contracts = dual_compiled_contracts;
     }
 
-    fn zksync_set_env(&mut self, block_details: BlockDetails) {
-        self.zk_env = ZkEnv {
-            l1_gas_price: block_details
-                .l1_gas_price
-                .try_into()
-                .expect("failed to convert l1_gas_price to u64"),
-            fair_l2_gas_price: block_details
-                .l2_fair_gas_price
-                .try_into()
-                .expect("failed to convert fair_l2_gas_price to u64"),
-            fair_pubdata_price: block_details
-                .fair_pubdata_price
-                // TODO(zk): None as a value might mean L1Pegged model
-                // we need to find out if it will ever be relevant to
-                // us
-                .unwrap_or_default()
-                .try_into()
-                .expect("failed to convert fair_pubdata_price to u64"),
-        };
+    fn zksync_set_fork_env(&mut self, fork_url: &str, env: &Env) -> Result<()> {
+        let provider = zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
+        let block_number = env.block.number.try_into()?;
+        // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
+        let maybe_block_details = tokio::task::block_in_place(move || {
+            tokio::runtime::Handle::current().block_on(provider.get_block_details(block_number))
+        })
+        .ok()
+        .flatten();
+
+        if let Some(block_details) = maybe_block_details {
+            self.zk_env = ZkEnv {
+                l1_gas_price: block_details
+                    .l1_gas_price
+                    .try_into()
+                    .expect("failed to convert l1_gas_price to u64"),
+                fair_l2_gas_price: block_details
+                    .l2_fair_gas_price
+                    .try_into()
+                    .expect("failed to convert fair_l2_gas_price to u64"),
+                fair_pubdata_price: block_details
+                    .fair_pubdata_price
+                    // TODO(zk): None as a value might mean L1Pegged model
+                    // we need to find out if it will ever be relevant to
+                    // us
+                    .unwrap_or_default()
+                    .try_into()
+                    .expect("failed to convert fair_pubdata_price to u64"),
+            };
+        }
+
+        Ok(())
     }
 }
 

@@ -33,6 +33,7 @@ eyre.workspace = true
 revm.workspace = true
 itertools.workspace = true
 tracing.workspace = true
+tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 semver.workspace = true

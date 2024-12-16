@@ -5153,7 +5153,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-serde",
  "alloy-sol-types",
- "alloy-zksync",
  "eyre",
  "foundry-cheatcodes",
  "foundry-common",
@@ -5361,6 +5360,7 @@ dependencies = [
  "semver 1.0.23",
  "serde",
  "serde_json",
+ "tokio",
  "tracing",
  "zksync_types",
 ]

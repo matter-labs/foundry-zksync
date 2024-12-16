@@ -5,8 +5,7 @@ use std::{
 
 use alloy_primitives::{Address, U256};
 use alloy_serde::OtherFields;
-use alloy_zksync::types::BlockDetails;
-use eyre::Context;
+use eyre::{Context, Result};
 use foundry_cheatcodes::strategy::{CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy};
 use foundry_evm_core::{
     backend::{
@@ -17,7 +16,7 @@ use foundry_evm_core::{
 };
 use foundry_zksync_compiler::DualCompiledContracts;
 use revm::{
-    primitives::{EnvWithHandlerCfg, ResultAndState},
+    primitives::{Env, EnvWithHandlerCfg, ResultAndState},
     DatabaseRef,
 };
 
@@ -74,7 +73,9 @@ pub trait ExecutorStrategyExt: ExecutorStrategy {
     ) {
     }
 
-    fn zksync_set_env(&mut self, _block_details: BlockDetails) {}
+    fn zksync_set_fork_env(&mut self, _fork_url: &str, _env: &Env) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Default, Clone)]
