@@ -17,7 +17,7 @@ impl Cheatcode for mockCall_0Call {
         let Self { callee, data, returnData } = self;
         let strategy = ccx.state.strategy.clone();
         let mut guard = strategy.lock().expect("failed acquiring strategy");
-        guard.mock_call(ccx, *callee, data, returnData)
+        guard.cheatcode_mock_call(ccx, *callee, data, returnData)
     }
 }
 
@@ -87,7 +87,7 @@ impl Cheatcode for mockCallRevert_0Call {
         let Self { callee, data, revertData } = self;
         let strategy = ccx.state.strategy.clone();
         let mut guard = strategy.lock().expect("failed acquiring strategy");
-        guard.mock_call_revert(ccx, *callee, data, revertData)
+        guard.cheatcode_mock_call_revert(ccx, *callee, data, revertData)
     }
 }
 

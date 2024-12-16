@@ -124,7 +124,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
     }
 
     /// Mocks a call to return with a value.
-    fn mock_call(
+    fn cheatcode_mock_call(
         &mut self,
         ccx: &mut CheatsCtxt,
         callee: Address,
@@ -137,7 +137,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
     }
 
     /// Mocks a call to revert with a value.
-    fn mock_call_revert(
+    fn cheatcode_mock_call_revert(
         &mut self,
         ccx: &mut CheatsCtxt,
         callee: Address,

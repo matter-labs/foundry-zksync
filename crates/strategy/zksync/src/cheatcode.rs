@@ -227,6 +227,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn get_nonce(&mut self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, address: Address) -> Result<u64> {
+        if !self.using_zk_vm {
+            return self.evm.get_nonce(ccx, address);
+        }
+
         let nonce = foundry_zksync_core::nonce(address, ccx.ecx) as u64;
         Ok(nonce)
     }
@@ -243,11 +247,20 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         address: Address,
     ) -> foundry_cheatcodes::Result {
+        if !self.using_zk_vm {
+            let nonce = self.evm.get_nonce(ccx, address)?;
+            return Ok(nonce.abi_encode());
+        }
+
         let nonce = foundry_zksync_core::cheatcodes::get_nonce(address, ccx.ecx);
         Ok(nonce.abi_encode())
     }
 
     fn cheatcode_roll(&mut self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, new_height: U256) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_roll(ccx, new_height);
+        }
+
         ccx.ecx.env.block.number = new_height;
         foundry_zksync_core::cheatcodes::roll(new_height, ccx.ecx);
         Ok(Default::default())
@@ -258,6 +271,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         new_timestamp: U256,
     ) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_warp(ccx, new_timestamp);
+        }
+
         ccx.ecx.env.block.number = new_timestamp;
         foundry_zksync_core::cheatcodes::warp(new_timestamp, ccx.ecx);
         Ok(Default::default())
@@ -269,6 +286,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         address: Address,
         new_balance: U256,
     ) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_deal(ccx, address, new_balance);
+        }
+
         let old_balance = foundry_zksync_core::cheatcodes::deal(address, new_balance, ccx.ecx);
         let record = DealRecord { address, old_balance, new_balance };
         ccx.state.eth_deals.push(record);
@@ -281,6 +302,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         target: Address,
         new_runtime_bytecode: &Bytes,
     ) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_etch(ccx, target, new_runtime_bytecode);
+        }
+
         foundry_zksync_core::cheatcodes::etch(target, new_runtime_bytecode, ccx.ecx);
         Ok(Default::default())
     }
@@ -290,6 +315,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         account: Address,
     ) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_reset_nonce(ccx, account);
+        }
+
         foundry_zksync_core::cheatcodes::set_nonce(account, U256::ZERO, ccx.ecx);
         Ok(Default::default())
     }
@@ -300,6 +329,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         account: Address,
         new_nonce: u64,
     ) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_set_nonce(ccx, account, new_nonce);
+        }
+
         // nonce must increment only
         let current = foundry_zksync_core::cheatcodes::get_nonce(account, ccx.ecx);
         if U256::from(new_nonce) < current {
@@ -319,17 +352,25 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         account: Address,
         new_nonce: u64,
     ) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_set_nonce_unsafe(ccx, account, new_nonce);
+        }
+
         foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(new_nonce), ccx.ecx);
         Ok(Default::default())
     }
 
-    fn mock_call(
+    fn cheatcode_mock_call(
         &mut self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         callee: Address,
         data: &Bytes,
         return_data: &Bytes,
     ) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_mock_call(ccx, callee, data, return_data);
+        }
+
         let _ = foundry_cheatcodes::make_acc_non_empty(&callee, ccx.ecx)?;
         foundry_zksync_core::cheatcodes::set_mocked_account(callee, ccx.ecx, ccx.caller);
         foundry_cheatcodes::mock_call(
@@ -343,13 +384,17 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         Ok(Default::default())
     }
 
-    fn mock_call_revert(
+    fn cheatcode_mock_call_revert(
         &mut self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         callee: Address,
         data: &Bytes,
         revert_data: &Bytes,
     ) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.cheatcode_mock_call_revert(ccx, callee, data, revert_data);
+        }
+
         let _ = make_acc_non_empty(&callee, ccx.ecx)?;
         foundry_zksync_core::cheatcodes::set_mocked_account(callee, ccx.ecx, ccx.caller);
         // not calling
@@ -365,6 +410,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn get_artifact_code(&self, state: &Cheatcodes, path: &str, deployed: bool) -> Result {
+        if !self.using_zk_vm {
+            return self.evm.get_artifact_code(state, path, deployed);
+        }
+
         Ok(get_artifact_code(
             &self.dual_compiled_contracts,
             self.using_zk_vm,
@@ -599,33 +648,35 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     /// Returns true if handled.
     fn pre_step_end(&mut self, interpreter: &mut Interpreter, ecx: Ecx<'_, '_, '_>) -> bool {
         // override address(x).balance retrieval to make it consistent between EraVM and EVM
-        if self.using_zk_vm {
-            let address = match interpreter.current_opcode() {
-                op::SELFBALANCE => interpreter.contract().target_address,
-                op::BALANCE => {
-                    if interpreter.stack.is_empty() {
-                        interpreter.instruction_result = InstructionResult::StackUnderflow;
-                        return true;
-                    }
-
-                    Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }))
-                }
-                _ => return true,
-            };
-
-            // Safety: Length is checked above.
-            let balance = foundry_zksync_core::balance(address, ecx);
-
-            // Skip the current BALANCE instruction since we've already handled it
-            match interpreter.stack.push(balance) {
-                Ok(_) => unsafe {
-                    interpreter.instruction_pointer = interpreter.instruction_pointer.add(1);
-                },
-                Err(e) => {
-                    interpreter.instruction_result = e;
-                }
-            }
+        if !self.using_zk_vm {
+            return false;
         }
+
+        let address = match interpreter.current_opcode() {
+            op::SELFBALANCE => interpreter.contract().target_address,
+            op::BALANCE => {
+                if interpreter.stack.is_empty() {
+                    interpreter.instruction_result = InstructionResult::StackUnderflow;
+                    return true;
+                }
+
+                Address::from_word(B256::from(unsafe { interpreter.stack.pop_unsafe() }))
+            }
+            _ => return true,
+        };
+
+        // Safety: Length is checked above.
+        let balance = foundry_zksync_core::balance(address, ecx);
+
+        // Skip the current BALANCE instruction since we've already handled it
+        match interpreter.stack.push(balance) {
+            Ok(_) => unsafe {
+                interpreter.instruction_pointer = interpreter.instruction_pointer.add(1);
+            },
+            Err(e) => {
+                interpreter.instruction_result = e;
+            }
+        };
 
         false
     }
