@@ -25,7 +25,7 @@ foundry-wallets.workspace = true
 foundry-linking.workspace = true
 forge-script-sequence.workspace = true
 foundry-zksync-core.workspace = true
-foundry-zksync-compiler.workspace = true
+foundry-zksync-compilers.workspace = true
 
 serde.workspace = true
 eyre.workspace = true

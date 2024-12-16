@@ -4962,7 +4962,7 @@ dependencies = [
  "foundry-linking",
  "foundry-test-utils",
  "foundry-wallets",
- "foundry-zksync-compiler",
+ "foundry-zksync-compilers",
  "foundry-zksync-core",
  "futures 0.3.31",
  "globset",
@@ -5082,7 +5082,7 @@ dependencies = [
  "foundry-evm",
  "foundry-linking",
  "foundry-wallets",
- "foundry-zksync-compiler",
+ "foundry-zksync-compilers",
  "foundry-zksync-core",
  "futures 0.3.31",
  "indicatif",
@@ -5153,7 +5153,7 @@ dependencies = [
  "foundry-config",
  "foundry-evm",
  "foundry-test-utils",
- "foundry-zksync-compiler",
+ "foundry-zksync-compilers",
  "futures 0.3.31",
  "itertools 0.13.0",
  "regex",
@@ -5225,7 +5225,7 @@ dependencies = [
  "foundry-evm-core",
  "foundry-evm-traces",
  "foundry-wallets",
- "foundry-zksync-compiler",
+ "foundry-zksync-compilers",
  "foundry-zksync-core",
  "foundry-zksync-inspectors",
  "itertools 0.13.0",
@@ -5342,7 +5342,7 @@ dependencies = [
  "foundry-common-fmt",
  "foundry-compilers",
  "foundry-config",
- "foundry-zksync-compiler",
+ "foundry-zksync-compilers",
  "itertools 0.13.0",
  "num-format",
  "reqwest 0.12.9",
@@ -5501,6 +5501,7 @@ dependencies = [
  "figment",
  "foundry-block-explorers",
  "foundry-compilers",
+ "foundry-zksync-compilers",
  "glob",
  "globset",
  "itertools 0.13.0",
@@ -5679,7 +5680,7 @@ dependencies = [
  "foundry-config",
  "foundry-evm-core",
  "foundry-linking",
- "foundry-zksync-compiler",
+ "foundry-zksync-compilers",
  "futures 0.3.31",
  "itertools 0.13.0",
  "rayon",
@@ -5796,17 +5797,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "foundry-zksync-compiler"
+name = "foundry-zksync-compilers"
 version = "0.0.2"
 dependencies = [
+ "alloy-json-abi",
  "alloy-primitives",
+ "dirs 5.0.1",
  "eyre",
+ "fd-lock",
  "foundry-compilers",
- "foundry-config",
+ "foundry-compilers-artifacts-solc",
+ "fs4 0.8.4",
+ "itertools 0.13.0",
+ "reqwest 0.12.9",
  "semver 1.0.23",
  "serde",
  "serde_json",
+ "similar-asserts",
  "tracing",
+ "walkdir",
+ "yansi",
  "zksync_types",
 ]
 
@@ -5886,6 +5896,16 @@ dependencies = [
  "splitmut",
  "tiny-keccak 1.5.0",
  "zksync_bellman",
+]
+
+[[package]]
+name = "fs4"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7e180ac76c23b45e767bd7ae9579bc0bb458618c4bc71835926e098e61d15f8"
+dependencies = [
+ "rustix",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -12537,7 +12557,7 @@ checksum = "4aebac1b1ef2b46e2e2bdf3c09db304800f2a77c1fa902bd5231490203042be8"
 dependencies = [
  "const-hex",
  "dirs 5.0.1",
- "fs4",
+ "fs4 0.9.1",
  "reqwest 0.12.9",
  "semver 1.0.23",
  "serde",

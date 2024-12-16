@@ -6,6 +6,7 @@ use crate::{
     term::SpinnerReporter,
     TestFunctionExt,
 };
+use alloy_zksync::provider::ZksyncProvider;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Color, Table};
 use eyre::Result;
 use foundry_block_explorers::contract::Metadata;
@@ -17,14 +18,16 @@ use foundry_compilers::{
     },
     report::{BasicStdoutReporter, NoReporter, Report},
     solc::SolcSettings,
-    zksolc::{ZkSolc, ZkSolcCompiler},
-    zksync::{
-        artifact_output::zk::ZkArtifactOutput,
-        compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
-    },
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
-use foundry_zksync_compiler::libraries::{self, ZkMissingLibrary};
+use foundry_zksync_compilers::{
+    compilers::{
+        artifact_output::zk::ZkArtifactOutput,
+        zksolc::{ZkSolc, ZkSolcCompiler},
+    },
+    libraries::{self, ZkMissingLibrary},
+};
+
 use num_format::{Locale, ToFormattedString};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -315,7 +318,7 @@ impl ProjectCompiler {
     pub fn zksync_compile(
         self,
         project: &Project<ZkSolcCompiler, ZkArtifactOutput>,
-    ) -> Result<ZkProjectCompileOutput> {
+    ) -> Result<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>> {
         // TODO: Avoid process::exit
         if !project.paths.has_input_files() && self.files.is_empty() {
             sh_println!("Nothing to compile")?;
@@ -338,11 +341,9 @@ impl ProjectCompiler {
             let files_to_compile =
                 if !files.is_empty() { files } else { project.paths.input_files() };
             let sources = Source::read_all(files_to_compile)?;
-            foundry_compilers::zksync::compile::project::ProjectCompiler::with_sources(
-                project, sources,
-            )?
-            .compile()
-            .map_err(Into::into)
+            foundry_compilers::project::ProjectCompiler::with_sources(project, sources)?
+                .compile()
+                .map_err(Into::into)
         })
     }
 
@@ -351,9 +352,9 @@ impl ProjectCompiler {
         self,
         root_path: impl AsRef<Path>,
         f: F,
-    ) -> Result<ZkProjectCompileOutput>
+    ) -> Result<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>
     where
-        F: FnOnce() -> Result<ZkProjectCompileOutput>,
+        F: FnOnce() -> Result<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
     {
         let quiet = self.quiet.unwrap_or(false);
         let bail = self.bail.unwrap_or(true);
@@ -404,7 +405,7 @@ impl ProjectCompiler {
     fn zksync_handle_output(
         &self,
         root_path: impl AsRef<Path>,
-        output: &ZkProjectCompileOutput,
+        output: &ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
     ) -> Result<()> {
         let print_names = self.print_names.unwrap_or(false);
         let print_sizes = self.print_sizes.unwrap_or(false);

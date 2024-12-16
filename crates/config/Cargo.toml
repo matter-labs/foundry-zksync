@@ -46,6 +46,9 @@ tracing.workspace = true
 walkdir.workspace = true
 yansi.workspace = true
 
+# zksync
+foundry-zksync-compilers.workspace = true
+
 [target.'cfg(target_os = "windows")'.dependencies]
 path-slash = "0.2"
 
