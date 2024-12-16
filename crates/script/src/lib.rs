@@ -19,6 +19,7 @@ use alloy_primitives::{
     Address, Bytes, Log, TxKind, U256,
 };
 use alloy_signer::Signer;
+use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use broadcast::next_nonce;
 use build::PreprocessedState;
 use clap::{Parser, ValueHint};
@@ -57,6 +58,7 @@ use foundry_evm::{
 };
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_core::vm::ZkEnv;
 use serde::Serialize;
 use std::path::PathBuf;
 

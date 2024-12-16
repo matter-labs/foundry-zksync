@@ -126,6 +126,9 @@ pub struct ZksyncCheatcodeInspectorStrategy {
     /// Stores the factory deps that were detected as part of CREATE2 deployer call.
     /// Must be cleared every call.
     pub set_deployer_call_input_factory_deps: Vec<Vec<u8>>,
+
+    /// Era Vm environment
+    pub zk_env: Option<ZkEnv>,
 }
 
 impl ZksyncCheatcodeInspectorStrategy {

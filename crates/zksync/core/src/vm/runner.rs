@@ -23,12 +23,15 @@ use crate::{
     },
 };
 
+use super::ZkEnv;
+
 /// Transacts
 pub fn transact<'a, DB>(
     persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
     paymaster_data: Option<PaymasterParams>,
     env: &'a mut Env,
+    zk_env: &ZkEnv,
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
 where
@@ -62,7 +65,7 @@ where
             gas_limit,
             max_fee_per_gas,
             max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-            gas_per_pubdata_limit: U256::from(20000),
+            gas_per_pubdata_limit: zk_env.gas_per_pubdata().into(),
         },
         caller.to_h160(),
         env.tx.value.to_u256(),
@@ -86,6 +89,7 @@ where
     let mut ccx = CheatcodeTracerContext {
         persisted_factory_deps,
         persist_nonce_update: true,
+        zk_env: zk_env.clone(),
         ..Default::default()
     };
 
@@ -176,7 +180,7 @@ where
             gas_limit,
             max_fee_per_gas,
             max_priority_fee_per_gas: ecx.env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-            gas_per_pubdata_limit: U256::from(20000),
+            gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
         },
         caller.to_h160(),
         value,
@@ -235,7 +239,7 @@ where
             gas_limit,
             max_fee_per_gas,
             max_priority_fee_per_gas: ecx.env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
-            gas_per_pubdata_limit: U256::from(20000),
+            gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
         },
         caller.to_h160(),
         match call.value {
