@@ -639,17 +639,20 @@ impl ScriptConfig {
                 .expect("failed acquiring strategy")
                 .zksync_set_dual_compiled_contracts(dual_compiled_contracts);
 
-            if let Some(fork_url) = &self.evm_opts.fork_url {
-                let provider =
-                    zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
-                // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
-                let maybe_details =
-                    provider.get_block_details(env.block.number.try_into()?).await?;
-                if let Some(block_details) = maybe_details {
-                    strategy
-                        .lock()
-                        .expect("failed acquiring strategy")
-                        .zksync_set_env(block_details);
+            // TODO(zk): Move this to strategy instead
+            if strategy.lock().expect("failed acquiring strategy").name() == "zk" {
+                if let Some(fork_url) = &self.evm_opts.fork_url {
+                    let provider =
+                        zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
+                    // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
+                    let maybe_details =
+                        provider.get_block_details(env.block.number.try_into()?).await?;
+                    if let Some(block_details) = maybe_details {
+                        strategy
+                            .lock()
+                            .expect("failed acquiring strategy")
+                            .zksync_set_env(block_details);
+                    }
                 }
             }
 
