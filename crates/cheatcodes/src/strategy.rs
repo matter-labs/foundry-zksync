@@ -1,4 +1,7 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 
 use alloy_primitives::{Address, Bytes, FixedBytes, TxKind, U256};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
@@ -21,6 +24,7 @@ use crate::{
 pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
     fn name(&self) -> &'static str;
 
+    fn new_cloned(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategy>>;
     /// Get nonce.
     fn get_nonce(&mut self, ccx: &mut CheatsCtxt, address: Address) -> Result<u64> {
         let account = ccx.ecx.journaled_state.load_account(address, &mut ccx.ecx.db)?;
@@ -181,6 +185,8 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
 
 /// We define this in our fork
 pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
+    fn new_cloned_ext(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>;
+
     fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
         Ok(Default::default())
     }
@@ -248,6 +254,10 @@ pub struct EvmCheatcodeInspectorStrategy {}
 impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     fn name(&self) -> &'static str {
         "evm"
+    }
+
+    fn new_cloned(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategy>> {
+        Arc::new(Mutex::new(self.clone()))
     }
 
     fn record_broadcastable_create_transactions(
@@ -320,7 +330,11 @@ impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     }
 }
 
-impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategy {}
+impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategy {
+    fn new_cloned_ext(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
+        Arc::new(Mutex::new(self.clone()))
+    }
+}
 
 struct _ObjectSafe0(dyn CheatcodeInspectorStrategy);
 struct _ObjectSafe1(dyn CheatcodeInspectorStrategyExt);

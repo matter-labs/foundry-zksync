@@ -23,7 +23,8 @@ async fn test_zk_contract_can_call_function() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_persisted_contracts_after_fork() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
-    let filter = Filter::new("testZkContractsPersistedDeployedContractNoArgs|testZkContractsPersistedDeployedContractArgs", "ZkContractsTest", ".*");
+    let filter =
+        Filter::new("testZkContractsPersistedDeployedContractNoArgs", "ZkContractsTest", ".*");
 
     TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
 }

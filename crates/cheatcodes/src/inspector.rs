@@ -407,7 +407,7 @@ pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 ///   contract deployed on the live network is able to execute cheatcodes by simply calling the
 ///   cheatcode address: by default, the caller, test contract and newly deployed contracts are
 ///   allowed to execute cheatcodes
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Cheatcodes {
     /// The block environment
     ///
@@ -528,6 +528,48 @@ pub struct Cheatcodes {
 
     /// The behavior strategy.
     pub strategy: Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>,
+}
+
+impl Clone for Cheatcodes {
+    fn clone(&self) -> Self {
+        Self {
+            block: self.block.clone(),
+            active_delegation: self.active_delegation.clone(),
+            gas_price: self.gas_price.clone(),
+            labels: self.labels.clone(),
+            prank: self.prank.clone(),
+            expected_revert: self.expected_revert.clone(),
+            assume_no_revert: self.assume_no_revert.clone(),
+            fork_revert_diagnostic: self.fork_revert_diagnostic.clone(),
+            accesses: self.accesses.clone(),
+            recorded_account_diffs_stack: self.recorded_account_diffs_stack.clone(),
+            record_debug_steps_info: self.record_debug_steps_info.clone(),
+            recorded_logs: self.recorded_logs.clone(),
+            mocked_calls: self.mocked_calls.clone(),
+            mocked_functions: self.mocked_functions.clone(),
+            expected_calls: self.expected_calls.clone(),
+            expected_emits: self.expected_emits.clone(),
+            allowed_mem_writes: self.allowed_mem_writes.clone(),
+            broadcast: self.broadcast.clone(),
+            broadcastable_transactions: self.broadcastable_transactions.clone(),
+            config: self.config.clone(),
+            context: self.context.clone(),
+            fs_commit: self.fs_commit.clone(),
+            serialized_jsons: self.serialized_jsons.clone(),
+            eth_deals: self.eth_deals.clone(),
+            gas_metering: self.gas_metering.clone(),
+            gas_snapshots: self.gas_snapshots.clone(),
+            mapping_slots: self.mapping_slots.clone(),
+            pc: self.pc.clone(),
+            breakpoints: self.breakpoints.clone(),
+            test_runner: self.test_runner.clone(),
+            ignored_traces: self.ignored_traces.clone(),
+            arbitrary_storage: self.arbitrary_storage.clone(),
+            deprecated: self.deprecated.clone(),
+            wallets: self.wallets.clone(),
+            strategy: self.strategy.lock().expect("failed acquiring strategy").new_cloned_ext(),
+        }
+    }
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second

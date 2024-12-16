@@ -457,7 +457,7 @@ struct _ObjectSafe(dyn DatabaseExt);
 /// **Note:** State snapshots work across fork-swaps, e.g. if fork `A` is currently active, then a
 /// snapshot is created before fork `B` is selected, then fork `A` will be the active fork again
 /// after reverting the snapshot.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[must_use]
 pub struct Backend {
     /// The behavior strategy.
@@ -492,6 +492,20 @@ pub struct Backend {
     inner: BackendInner,
     /// Keeps track of the fork type
     fork_url_type: CachedForkType,
+}
+
+impl Clone for Backend {
+    fn clone(&self) -> Self {
+        Self {
+            strategy: self.strategy.lock().expect("failed acquiring strategy").new_cloned_ext(),
+            forks: self.forks.clone(),
+            mem_db: self.mem_db.clone(),
+            fork_init_journaled_state: self.fork_init_journaled_state.clone(),
+            active_fork_ids: self.active_fork_ids.clone(),
+            inner: self.inner.clone(),
+            fork_url_type: self.fork_url_type.clone(),
+        }
+    }
 }
 
 impl Backend {

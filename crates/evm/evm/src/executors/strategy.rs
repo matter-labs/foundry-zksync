@@ -25,6 +25,8 @@ use super::Executor;
 pub trait ExecutorStrategy: Debug + Send + Sync {
     fn name(&self) -> &'static str;
 
+    fn new_cloned(&self) -> Arc<Mutex<dyn ExecutorStrategy>>;
+
     fn set_balance(
         &mut self,
         executor: &mut Executor,
@@ -63,6 +65,8 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
 }
 
 pub trait ExecutorStrategyExt: ExecutorStrategy {
+    fn new_cloned_ext(&self) -> Arc<Mutex<dyn ExecutorStrategyExt>>;
+
     fn zksync_set_dual_compiled_contracts(
         &mut self,
         _dual_compiled_contracts: DualCompiledContracts,
@@ -76,6 +80,10 @@ pub struct EvmExecutorStrategy {}
 impl ExecutorStrategy for EvmExecutorStrategy {
     fn name(&self) -> &'static str {
         "evm"
+    }
+
+    fn new_cloned(&self) -> Arc<Mutex<dyn ExecutorStrategy>> {
+        Arc::new(Mutex::new(self.clone()))
     }
 
     fn set_inspect_context(&mut self, _other_fields: OtherFields) {}
@@ -156,4 +164,8 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     }
 }
 
-impl ExecutorStrategyExt for EvmExecutorStrategy {}
+impl ExecutorStrategyExt for EvmExecutorStrategy {
+    fn new_cloned_ext(&self) -> Arc<Mutex<dyn ExecutorStrategyExt>> {
+        Arc::new(Mutex::new(self.clone()))
+    }
+}

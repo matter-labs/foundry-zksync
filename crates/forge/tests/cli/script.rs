@@ -2047,13 +2047,13 @@ forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
     #[derive(serde::Deserialize, Debug)]
     #[allow(dead_code)]
     struct ZkTransaction {
-        zk: Zk,
+        zksync: Zksync,
     }
 
     #[derive(serde::Deserialize, Debug)]
     #[serde(rename_all = "camelCase")]
     #[allow(dead_code)]
-    struct Zk {
+    struct Zksync {
         #[serde(default)]
         factory_deps: Vec<Vec<u8>>,
     }

@@ -38,6 +38,10 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
         "zk"
     }
 
+    fn new_cloned(&self) -> Arc<Mutex<dyn ExecutorStrategy>> {
+        Arc::new(Mutex::new(self.clone()))
+    }
+
     fn set_inspect_context(&mut self, other_fields: OtherFields) {
         let maybe_context = get_zksync_transaction_metadata(&other_fields);
         self.inspect_context = maybe_context;
@@ -132,6 +136,10 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
 }
 
 impl ExecutorStrategyExt for ZksyncExecutorStrategy {
+    fn new_cloned_ext(&self) -> Arc<Mutex<dyn ExecutorStrategyExt>> {
+        Arc::new(Mutex::new(self.clone()))
+    }
+
     fn zksync_set_dual_compiled_contracts(
         &mut self,
         dual_compiled_contracts: DualCompiledContracts,

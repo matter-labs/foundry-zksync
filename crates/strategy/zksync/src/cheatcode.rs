@@ -1,4 +1,8 @@
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use alloy_json_abi::ContractObject;
 use alloy_primitives::{keccak256, map::HashMap, Address, Bytes, FixedBytes, TxKind, B256, U256};
@@ -216,6 +220,10 @@ impl ZkPersistNonceUpdate {
 impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     fn name(&self) -> &'static str {
         "zk"
+    }
+
+    fn new_cloned(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategy>> {
+        Arc::new(Mutex::new(self.clone()))
     }
 
     fn get_nonce(&mut self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, address: Address) -> Result<u64> {
@@ -624,6 +632,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
 }
 
 impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
+    fn new_cloned_ext(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
+        Arc::new(Mutex::new(self.clone()))
+    }
+
     fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
         self.skip_zk_vm = true;
         Ok(Default::default())

@@ -77,7 +77,7 @@ sol! {
 /// - `deploy`: a special case of `transact`, specialized for persisting the state of a contract
 ///   deployment
 /// - `setup`: a special case of `transact`, used to set up the environment for a test
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Executor {
     /// The underlying `revm::Database` that contains the EVM storage.
     // Note: We do not store an EVM here, since we are really
@@ -97,6 +97,19 @@ pub struct Executor {
     legacy_assertions: bool,
 
     strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
+}
+
+impl Clone for Executor {
+    fn clone(&self) -> Self {
+        Self {
+            backend: self.backend.clone(),
+            env: self.env.clone(),
+            inspector: self.inspector.clone(),
+            gas_limit: self.gas_limit.clone(),
+            legacy_assertions: self.legacy_assertions.clone(),
+            strategy: self.strategy.lock().expect("failed acquiring strategy").new_cloned_ext(),
+        }
+    }
 }
 
 impl Executor {

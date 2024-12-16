@@ -1,4 +1,7 @@
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    sync::{Arc, Mutex},
+};
 
 use super::{BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use alloy_primitives::{Address, U256};
@@ -13,6 +16,8 @@ pub struct BackendStrategyForkInfo<'a> {
 
 pub trait BackendStrategy: Debug + Send + Sync {
     fn name(&self) -> &'static str;
+
+    fn new_cloned(&self) -> Arc<Mutex<dyn BackendStrategy>>;
 
     /// When creating or switching forks, we update the AccountInfo of the contract
     fn update_fork_db(
@@ -36,6 +41,7 @@ pub trait BackendStrategy: Debug + Send + Sync {
 }
 
 pub trait BackendStrategyExt: BackendStrategy {
+    fn new_cloned_ext(&self) -> Arc<Mutex<dyn BackendStrategyExt>>;
     /// Saves the storage keys for immutable variables per address.
     ///
     /// These are required during fork to help merge the persisted addresses, as they are stored
@@ -53,6 +59,10 @@ pub struct EvmBackendStrategy;
 impl BackendStrategy for EvmBackendStrategy {
     fn name(&self) -> &'static str {
         "evm"
+    }
+
+    fn new_cloned(&self) -> Arc<Mutex<dyn BackendStrategy>> {
+        Arc::new(Mutex::new(self.clone()))
     }
 
     fn update_fork_db(
@@ -90,7 +100,11 @@ impl BackendStrategy for EvmBackendStrategy {
     }
 }
 
-impl BackendStrategyExt for EvmBackendStrategy {}
+impl BackendStrategyExt for EvmBackendStrategy {
+    fn new_cloned_ext(&self) -> Arc<Mutex<dyn BackendStrategyExt>> {
+        Arc::new(Mutex::new(self.clone()))
+    }
+}
 
 impl EvmBackendStrategy {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`
