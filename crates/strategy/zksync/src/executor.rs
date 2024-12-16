@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use alloy_primitives::{Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
+use alloy_zksync::types::BlockDetails;
 use foundry_cheatcodes::strategy::CheatcodeInspectorStrategyExt;
 
 use foundry_evm::{
@@ -13,7 +14,7 @@ use foundry_evm::{
     InspectorExt,
 };
 use foundry_zksync_compiler::DualCompiledContracts;
-use foundry_zksync_core::ZkTransactionMetadata;
+use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata};
 use revm::{
     primitives::{EnvWithHandlerCfg, HashMap, ResultAndState},
     Database,
@@ -31,6 +32,7 @@ pub struct ZksyncExecutorStrategy {
     inspect_context: Option<ZkTransactionMetadata>,
     persisted_factory_deps: HashMap<H256, Vec<u8>>,
     dual_compiled_contracts: DualCompiledContracts,
+    zk_env: ZkEnv,
 }
 
 impl ExecutorStrategy for ZksyncExecutorStrategy {
@@ -87,6 +89,7 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
     fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
         Arc::new(Mutex::new(ZksyncCheatcodeInspectorStrategy::new(
             self.dual_compiled_contracts.clone(),
+            self.zk_env.clone(),
         )))
     }
 
@@ -103,6 +106,7 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
                 Some(zk_tx.factory_deps.clone()),
                 zk_tx.paymaster_data.clone(),
                 env,
+                &self.zk_env,
                 db,
             ),
         }
@@ -128,6 +132,7 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
                     Some(zk_tx.factory_deps),
                     zk_tx.paymaster_data,
                     env,
+                    &self.zk_env,
                     db,
                 )
             }
@@ -145,6 +150,27 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategy {
         dual_compiled_contracts: DualCompiledContracts,
     ) {
         self.dual_compiled_contracts = dual_compiled_contracts;
+    }
+
+    fn zksync_set_env(&mut self, block_details: BlockDetails) {
+        self.zk_env = ZkEnv {
+            l1_gas_price: block_details
+                .l1_gas_price
+                .try_into()
+                .expect("failed to convert l1_gas_price to u64"),
+            fair_l2_gas_price: block_details
+                .l2_fair_gas_price
+                .try_into()
+                .expect("failed to convert fair_l2_gas_price to u64"),
+            fair_pubdata_price: block_details
+                .fair_pubdata_price
+                // TODO(zk): None as a value might mean L1Pegged model
+                // we need to find out if it will ever be relevant to
+                // us
+                .unwrap_or_default()
+                .try_into()
+                .expect("failed to convert fair_pubdata_price to u64"),
+        };
     }
 }
 

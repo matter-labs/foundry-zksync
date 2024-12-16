@@ -32,10 +32,11 @@ use foundry_evm_core::{
 use foundry_zksync_compiler::{ContractType, DualCompiledContract, DualCompiledContracts};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, PaymasterParams, ZkPaymasterData,
-    ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, H256, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
-    NONCE_HOLDER_ADDRESS,
+    get_account_code_key, get_balance_key, get_nonce_key,
+    vm::ZkEnv,
+    PaymasterParams, ZkPaymasterData, ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, H256, KNOWN_CODES_STORAGE_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
 use itertools::Itertools;
 use revm::{
@@ -128,11 +129,11 @@ pub struct ZksyncCheatcodeInspectorStrategy {
     pub set_deployer_call_input_factory_deps: Vec<Vec<u8>>,
 
     /// Era Vm environment
-    pub zk_env: Option<ZkEnv>,
+    pub zk_env: ZkEnv,
 }
 
 impl ZksyncCheatcodeInspectorStrategy {
-    pub fn new(dual_compiled_contracts: DualCompiledContracts) -> Self {
+    pub fn new(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv) -> Self {
         // We add the empty bytecode manually so it is correctly translated in zk mode.
         // This is used in many places in foundry, e.g. in cheatcode contract's account code.
         let empty_bytes = Bytes::from_static(&[0]);
@@ -183,6 +184,7 @@ impl ZksyncCheatcodeInspectorStrategy {
             persisted_factory_deps: Default::default(),
             zk_persist_nonce_update: Default::default(),
             set_deployer_call_input_factory_deps: Default::default(),
+            zk_env,
         }
     }
 }
@@ -877,6 +879,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
             persist_nonce_update: state.broadcast.is_some() || zk_persist_nonce_update,
+            zk_env: self.zk_env.clone(),
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -1058,6 +1061,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
             persisted_factory_deps: Some(&mut self.persisted_factory_deps),
             paymaster_data: self.paymaster_params.take(),
             persist_nonce_update: state.broadcast.is_some() || zk_persist_nonce_update,
+            zk_env: self.zk_env.clone(),
         };
 
         let mut gas = Gas::new(call.gas_limit);

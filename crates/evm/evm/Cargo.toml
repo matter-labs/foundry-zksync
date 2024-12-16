@@ -29,6 +29,7 @@ foundry-zksync-inspectors.workspace = true
 alloy-dyn-abi = { workspace = true, features = [ "arbitrary", "eip712" ] }
 alloy-json-abi.workspace = true
 alloy-serde.workspace = true
+alloy-zksync.workspace = true
 alloy-primitives = { workspace = true, features = [
     "serde",
     "getrandom",

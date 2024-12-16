@@ -2,7 +2,6 @@ use std::sync::{Arc, Mutex};
 
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::backend::Backend;
-use foundry_zksync_core::vm::ZkEnv;
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
 
 use super::strategy::ExecutorStrategyExt;
@@ -25,9 +24,6 @@ pub struct ExecutorBuilder {
     spec_id: SpecId,
 
     legacy_assertions: bool,
-
-    use_zk: bool,
-    zk_env: ZkEnv,
 }
 
 impl Default for ExecutorBuilder {
@@ -38,8 +34,6 @@ impl Default for ExecutorBuilder {
             gas_limit: None,
             spec_id: SpecId::LATEST,
             legacy_assertions: false,
-            use_zk: false,
-            zk_env: Default::default(),
         }
     }
 }
@@ -79,20 +73,6 @@ impl ExecutorBuilder {
     #[inline]
     pub fn legacy_assertions(mut self, legacy_assertions: bool) -> Self {
         self.legacy_assertions = legacy_assertions;
-        self
-    }
-
-    /// Sets the EVM spec to use
-    #[inline]
-    pub fn use_zk_vm(mut self, enable: bool) -> Self {
-        self.use_zk = enable;
-        self
-    }
-
-    /// Sets zk_env
-    #[inline]
-    pub fn zk_env(mut self, zk_env: ZkEnv) -> Self {
-        self.zk_env = zk_env;
         self
     }
 

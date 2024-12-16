@@ -5,6 +5,7 @@ use std::{
 
 use alloy_primitives::{Address, U256};
 use alloy_serde::OtherFields;
+use alloy_zksync::types::BlockDetails;
 use eyre::Context;
 use foundry_cheatcodes::strategy::{CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy};
 use foundry_evm_core::{
@@ -72,6 +73,8 @@ pub trait ExecutorStrategyExt: ExecutorStrategy {
         _dual_compiled_contracts: DualCompiledContracts,
     ) {
     }
+
+    fn zksync_set_env(&mut self, _block_details: BlockDetails) {}
 }
 
 #[derive(Debug, Default, Clone)]

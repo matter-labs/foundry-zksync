@@ -63,7 +63,6 @@ pub struct CheatsConfig {
     pub assertions_revert: bool,
     /// Optional seed for the RNG algorithm.
     pub seed: Option<U256>,
-    
 }
 
 impl CheatsConfig {
@@ -108,7 +107,6 @@ impl CheatsConfig {
             strategy,
             assertions_revert: config.assertions_revert,
             seed: config.fuzz.seed,
-            zk_env,
         }
     }
 
@@ -240,7 +238,6 @@ impl Default for CheatsConfig {
             strategy: Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy::default())),
             assertions_revert: true,
             seed: None,
-            zk_env: Default::default(),
         }
     }
 }

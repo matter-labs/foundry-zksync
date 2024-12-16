@@ -58,7 +58,6 @@ use foundry_evm::{
 };
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compiler::DualCompiledContracts;
-use foundry_zksync_core::vm::ZkEnv;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -639,6 +638,20 @@ impl ScriptConfig {
                 .lock()
                 .expect("failed acquiring strategy")
                 .zksync_set_dual_compiled_contracts(dual_compiled_contracts);
+
+            if let Some(fork_url) = &self.evm_opts.fork_url {
+                let provider =
+                    zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
+                // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
+                let maybe_details =
+                    provider.get_block_details(env.block.number.try_into()?).await?;
+                if let Some(block_details) = maybe_details {
+                    strategy
+                        .lock()
+                        .expect("failed acquiring strategy")
+                        .zksync_set_env(block_details);
+                }
+            }
 
             builder = builder.inspectors(|stack| {
                 stack
