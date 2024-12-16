@@ -152,7 +152,7 @@ impl InitArgs {
                 }
             }
 
-            // install forge-zksync-std
+            // NOTE(zk): install forge-zksync-std
             if zksync && !offline {
                 if root.join("lib/forge-zksync-std").exists() {
                     sh_println!("\"lib/forge-zksync-std\" already exists, skipping install....")?;
@@ -160,6 +160,20 @@ impl InitArgs {
                 } else {
                     let dep = "https://github.com/Moonsong-Labs/forge-zksync-std".parse()?;
                     self.opts.install(&mut config, vec![dep])?;
+                }
+
+                //Add zkout/ to .gitignore under compiler files if it doesn't exist
+                let gitignore_path = root.join(".gitignore");
+                if gitignore_path.exists() {
+                    let mut content = fs::read_to_string(&gitignore_path)?;
+                    if !content.contains("zkout/") {
+                        // Find the compiler files section and add zkout/
+                        if let Some(pos) = content.find("out/") {
+                            let insert_pos = pos + "out/".len();
+                            content.insert_str(insert_pos, "\nzkout/");
+                            fs::write(&gitignore_path, content)?;
+                        }
+                    }
                 }
             }
 

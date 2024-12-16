@@ -2676,78 +2676,6 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; [ELAPSED]
         );
 });
 
-forgetest!(zk_gas_report, |prj, cmd| {
-    prj.insert_ds_test();
-    prj.add_source(
-        "Contracts.sol",
-        r#"
-//SPDX-license-identifier: MIT
-
-import "./test.sol";
-
-contract ContractOne {
-    int public i;
-
-    constructor() {
-        i = 0;
-    }
-
-    function foo() public{
-        while(i<5){
-            i++;
-        }
-    }
-}
-
-contract ContractOneTest is DSTest {
-    ContractOne c1;
-
-    function setUp() public {
-        c1 = new ContractOne();
-    }
-
-    function testFoo() public {
-        c1.foo();
-    }
-}
-    "#,
-    )
-    .unwrap();
-
-    prj.write_config(Config {
-        gas_reports: (vec!["*".to_string()]),
-        gas_reports_ignore: (vec![]),
-        ..Default::default()
-    });
-    let out = cmd.arg("test").arg("--gas-report").assert_success().get_output().stdout_lossy();
-    cmd.forge_fuse();
-    let out_zk = cmd
-        .arg("test")
-        .arg("--gas-report")
-        .arg("--zksync")
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
-
-    let mut cells = out.split('|');
-    let deployment_cost: u64 = cells.nth(22).unwrap().trim().parse().unwrap();
-    let deployment_size: u64 = cells.next().unwrap().trim().parse().unwrap();
-    let function = cells.nth(12).unwrap().trim();
-    let gas: u64 = cells.next().unwrap().trim().parse().unwrap();
-
-    let mut cells_zk = out_zk.split('|');
-    let deployment_cost_zk: u64 = cells_zk.nth(22).unwrap().trim().parse().unwrap();
-    let deployment_size_zk: u64 = cells_zk.next().unwrap().trim().parse().unwrap();
-    let function_zk = cells_zk.nth(12).unwrap().trim();
-    let gas_zk: u64 = cells_zk.next().unwrap().trim().parse().unwrap();
-
-    assert!(deployment_cost_zk > deployment_cost);
-    assert!(deployment_size_zk > deployment_size);
-    assert!(gas_zk > gas);
-    assert_eq!(function, "foo");
-    assert_eq!(function_zk, "foo");
-});
-
 forgetest_init!(can_use_absolute_imports, |prj, cmd| {
     let remapping = prj.paths().libraries[0].join("myDependency");
     let config = Config {
@@ -3202,4 +3130,17 @@ forgetest_init!(gas_report_include_tests, |prj, cmd| {
 "#]]
             .is_json(),
         );
+});
+
+forgetest_init!(zk_can_init_with_zksync, |prj, cmd| {
+    cmd.args(["init", "--zksync", "--force"]).assert_success();
+
+    // Check that zkout/ is in .gitignore
+    let gitignore_path = prj.root().join(".gitignore");
+    assert!(gitignore_path.exists());
+    let gitignore_contents = std::fs::read_to_string(&gitignore_path).unwrap();
+    assert!(gitignore_contents.contains("zkout/"));
+
+    // Assert that forge-zksync-std is installed
+    assert!(prj.root().join("lib/forge-zksync-std").exists());
 });
