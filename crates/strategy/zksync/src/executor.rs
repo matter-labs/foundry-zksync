@@ -119,7 +119,7 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
             None => self.evm.transact_inspect(db, env, executor_env, inspector),
             Some(zk_tx) => {
                 // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
+                // since it won't be set by zkEVM
                 env.block = executor_env.block.clone();
                 env.tx.gas_price = executor_env.tx.gas_price;
 

@@ -105,8 +105,8 @@ impl Clone for Executor {
             backend: self.backend.clone(),
             env: self.env.clone(),
             inspector: self.inspector.clone(),
-            gas_limit: self.gas_limit.clone(),
-            legacy_assertions: self.legacy_assertions.clone(),
+            gas_limit: self.gas_limit,
+            legacy_assertions: self.legacy_assertions,
             strategy: self.strategy.lock().expect("failed acquiring strategy").new_cloned_ext(),
         }
     }
@@ -267,7 +267,6 @@ impl Executor {
 
     #[inline]
     pub fn set_transaction_other_fields(&mut self, other_fields: OtherFields) {
-        println!("SET CONTEXT");
         self.strategy
             .try_lock()
             .expect("failed acquiring strategy")

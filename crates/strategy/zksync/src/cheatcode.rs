@@ -57,7 +57,7 @@ use zksync_types::{
 };
 
 /// Key used to set transaction metadata in other fields.
-pub const ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY: &'static str = "zksync";
+pub const ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY: &str = "zksync";
 
 macro_rules! fmt_err {
     ($msg:literal $(,)?) => {

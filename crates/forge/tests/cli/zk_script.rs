@@ -1,6 +1,7 @@
 //! Contains tests related to `forge script` with zksync.
 
 use foundry_test_utils::util::OutputExt;
+use foundry_zksync_core::ZkTransactionMetadata;
 
 forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
     #[derive(serde::Deserialize, Debug)]
@@ -12,15 +13,13 @@ forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
     #[derive(serde::Deserialize, Debug)]
     #[allow(dead_code)]
     struct ZkTransaction {
-        zksync: Zksync,
+        transaction: ZkTransactionInner,
     }
 
     #[derive(serde::Deserialize, Debug)]
-    #[serde(rename_all = "camelCase")]
     #[allow(dead_code)]
-    struct Zksync {
-        #[serde(default)]
-        factory_deps: Vec<Vec<u8>>,
+    struct ZkTransactionInner {
+        zksync: ZkTransactionMetadata,
     }
 
     let node = foundry_test_utils::ZkSyncNode::start();
