@@ -5,7 +5,7 @@ use alloy_primitives::Address;
 use alloy_sol_types::SolValue;
 use chrono::DateTime;
 use foundry_evm_core::constants::MAGIC_SKIP;
-use foundry_zksync_compiler::DualCompiledContract;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::ZkPaymasterData;
 use std::env;
 

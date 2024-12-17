@@ -10,8 +10,7 @@ use forge_verify::{provider::VerificationProviderType, RetryArgs, VerifierArgs, 
 use foundry_cli::opts::{EtherscanOpts, ProjectPathsArgs};
 use foundry_common::ContractsByArtifact;
 use foundry_compilers::{info::ContractInfo, Project};
-use foundry_config::{Chain, Config};
-use foundry_zksync_compiler::ZKSYNC_ARTIFACTS_DIR;
+use foundry_config::{zksync::ZKSYNC_ARTIFACTS_DIR, Chain, Config};
 use semver::Version;
 
 /// State after we have broadcasted the script.

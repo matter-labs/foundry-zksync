@@ -41,7 +41,7 @@ use foundry_config::{
 };
 use foundry_debugger::Debugger;
 use foundry_evm::traces::identifier::TraceIdentifiers;
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -306,7 +306,7 @@ impl TestArgs {
 
         let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
             let zk_project =
-                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
 
             let sources_to_compile = self.get_sources_to_compile(&config, &filter)?;
             let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
@@ -371,7 +371,14 @@ impl TestArgs {
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .enable_isolation(evm_opts.isolate)
             .odyssey(evm_opts.odyssey)
-            .build::<MultiCompiler>(project_root, &output, env, evm_opts)?;
+            .build::<MultiCompiler>(
+                project_root,
+                &output,
+                zk_output,
+                env,
+                evm_opts,
+                dual_compiled_contracts.unwrap_or_default(),
+            )?;
 
         let mut maybe_override_mt = |flag, maybe_regex: Option<&Option<Regex>>| {
             if let Some(Some(regex)) = maybe_regex {

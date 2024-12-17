@@ -1047,10 +1047,6 @@ impl InspectorExt for InspectorStackRefMut<'_> {
         ));
     }
 
-    fn is_alphanet(&self) -> bool {
-        self.inner.alphanet
-    }
-
     fn is_odyssey(&self) -> bool {
         self.inner.odyssey
     }

@@ -19,12 +19,14 @@ use foundry_compilers::{
     info::ContractInfo,
     solc::SolcLanguage,
     utils::source_files_iter,
-    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     ArtifactId, ProjectCompileOutput,
 };
 use foundry_evm::traces::debug::ContractSources;
 use foundry_linking::Linker;
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::{
+    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
+    dual_compiled_contracts::DualCompiledContracts,
+};
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr, sync::Arc};
 
 /// Container for the compiled contracts.
@@ -35,7 +37,7 @@ pub struct BuildData {
     /// The compiler output.
     pub output: ProjectCompileOutput,
     /// The zk compiler output
-    pub zk_output: Option<ZkProjectCompileOutput>,
+    pub zk_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
     /// ID of target contract artifact.
     pub target: ArtifactId,
     pub dual_compiled_contracts: Option<DualCompiledContracts>,
@@ -234,7 +236,7 @@ impl PreprocessedState {
         let mut zk_output = None;
         // ZK
         let dual_compiled_contracts = if script_config.config.zksync.should_compile() {
-            let zk_project = foundry_zksync_compiler::config_create_project(
+            let zk_project = foundry_config::zksync::config_create_project(
                 &script_config.config,
                 script_config.config.cache,
                 false,

@@ -23,7 +23,7 @@ use foundry_compilers::{
     Artifact, ArtifactId, Project, ProjectCompileOutput,
 };
 use foundry_config::{Config, SolcReq};
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use rayon::prelude::*;
 use semver::{Version, VersionReq};
 use std::{
@@ -247,7 +247,14 @@ impl CoverageArgs {
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .set_coverage(true)
-            .build::<MultiCompiler>(&root, output, env, evm_opts)?;
+            .build::<MultiCompiler>(
+                &root,
+                output,
+                None,
+                env,
+                evm_opts,
+                DualCompiledContracts::default(),
+            )?;
 
         let known_contracts = runner.known_contracts.clone();
 

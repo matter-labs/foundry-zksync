@@ -12,7 +12,7 @@ use dialoguer::{Input, Password};
 use forge_script_sequence::{BroadcastReader, TransactionWithMetadata};
 use foundry_common::fs;
 use foundry_config::fs_permissions::FsAccessKind;
-use foundry_zksync_compiler::ContractType;
+use foundry_zksync_compilers::dual_compiled_contracts::ContractType;
 use revm::interpreter::CreateInputs;
 use revm_inspectors::tracing::types::CallKind;
 use semver::Version;

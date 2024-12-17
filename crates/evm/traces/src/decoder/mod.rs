@@ -15,6 +15,7 @@ use foundry_cheatcodes_spec::Vm;
 use foundry_common::{
     abi::get_indexed_event, fmt::format_token, get_contract_name, ContractsByArtifact, SELECTOR_LEN,
 };
+use foundry_config::zksync::ZKSYNC_ARTIFACTS_DIR;
 use foundry_evm_core::{
     abi::{Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS, HARDHAT_CONSOLE_SELECTOR_PATCHES},
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
@@ -24,7 +25,6 @@ use foundry_evm_core::{
         RIPEMD_160, SHA_256,
     },
 };
-use foundry_zksync_compiler::ZKSYNC_ARTIFACTS_DIR;
 use itertools::Itertools;
 use revm_inspectors::tracing::types::{DecodedCallLog, DecodedCallTrace};
 use std::{

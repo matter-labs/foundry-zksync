@@ -230,7 +230,8 @@ syn-solidity = "0.8.14"
 
 alloy-chains = "0.1"
 alloy-rlp = "0.3"
-alloy-zksync = "0.6.1"
+#alloy-zksync = "0.6.1"
+alloy-zksync = { path = "../alloy-zksync/" }
 
 alloy-trie = "0.7.0"
 

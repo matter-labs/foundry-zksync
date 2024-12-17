@@ -116,13 +116,14 @@ use soldeer::{SoldeerConfig, SoldeerDependencyConfig};
 mod vyper;
 use vyper::VyperConfig;
 
-mod zksync;
-pub use zksync::*;
 mod bind_json;
 use bind_json::BindJsonConfig;
 
 mod compilation;
 use compilation::{CompilationRestrictions, SettingsOverrides};
+
+pub mod zksync;
+use zksync::ZkSyncConfig;
 
 /// Foundry configuration
 ///

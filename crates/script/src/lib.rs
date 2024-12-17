@@ -55,7 +55,7 @@ use foundry_evm::{
     traces::{TraceMode, Traces},
 };
 use foundry_wallets::MultiWalletOpts;
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use serde::Serialize;
 use std::path::PathBuf;
 

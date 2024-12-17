@@ -5,10 +5,7 @@ use foundry_compilers::{
     Project, ProjectBuilder, ProjectPathsConfig,
 };
 use foundry_zksync_compilers::{
-    artifacts::{
-        contract::Contract,
-        output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
-    },
+    artifacts::output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
     compilers::{
         artifact_output::zk::{ZkArtifactOutput, ZkContractArtifact},
         zksolc::{

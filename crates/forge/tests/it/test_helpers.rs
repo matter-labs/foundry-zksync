@@ -88,7 +88,7 @@ impl ForgeTestProfile {
     pub fn zk_project(&self) -> ZkProject {
         let zk_config = self.zk_config();
         let mut zk_project =
-            foundry_zksync_compiler::config_create_project(&zk_config, zk_config.cache, false)
+            foundry_config::zksync::config_create_project(&zk_config, zk_config.cache, false)
                 .expect("failed creating zksync project");
         zk_project.paths.artifacts = zk_config.root.as_ref().join("zk").join(ZKSYNC_ARTIFACTS_DIR);
         zk_project.paths.cache = zk_config

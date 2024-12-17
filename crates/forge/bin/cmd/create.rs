@@ -2,7 +2,9 @@ use crate::cmd::install;
 use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
-use alloy_network::{AnyNetwork, AnyTransactionReceipt, EthereumWallet, Network, ReceiptResponse, TransactionBuilder};
+use alloy_network::{
+    AnyNetwork, AnyTransactionReceipt, EthereumWallet, Network, ReceiptResponse, TransactionBuilder,
+};
 use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
@@ -26,8 +28,7 @@ use foundry_common::{
     shell,
 };
 use foundry_compilers::{
-    artifacts::BytecodeObject, info::ContractInfo, utils::canonicalize,
-    zksync::artifact_output::zk::ZkContractArtifact, ArtifactId,
+    artifacts::BytecodeObject, info::ContractInfo, utils::canonicalize, ArtifactId,
 };
 use foundry_config::{
     figment::{
@@ -37,6 +38,7 @@ use foundry_config::{
     },
     merge_impl_figment_convert, Config,
 };
+use foundry_zksync_compilers::compilers::artifact_output::zk::ZkContractArtifact;
 use foundry_zksync_core::convert::ConvertH160;
 use serde_json::json;
 use std::{
@@ -161,7 +163,7 @@ impl CreateArgs {
 
             let config = self.opts.try_load_config_emit_warnings()?;
             let zk_project =
-                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
             let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
             let mut zk_output = zk_compiler.zksync_compile(&zk_project)?;
 
@@ -570,7 +572,6 @@ impl CreateArgs {
             }
 
             return Ok(());
->>>>>>> 59f354c179f4e7f6d7292acb3d068815c79286d1
         }
 
         // Deploy the actual contract
@@ -758,11 +759,6 @@ impl CreateArgs {
             None
         };
         let verify = VerifyArgs {
-<<<<<<< HEAD
-=======
->>>>>>> 59f354c179f4e7f6d7292acb3d068815c79286d1
-=======
->>>>>>> main
             address,
             contract: Some(self.contract),
             compiler_version: None,
@@ -783,12 +779,7 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
-<<<<<<< HEAD
-            // compilation_profile: Some(id.profile.to_string()),
-            compilation_profile: None, // TODO(zk): provide comp profile
-=======
             compilation_profile: None, //TODO(zk): provide comp profile
->>>>>>> main
             zksync: self.opts.compiler.zk.enabled(),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;

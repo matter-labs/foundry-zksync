@@ -6,7 +6,6 @@ use foundry_compilers::{
     artifacts::{CompactBytecode, Settings},
     cache::{CacheEntry, CompilerCache},
     utils::read_json_file,
-    zksync::artifact_output::zk::ZkContractArtifact,
     Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::{error::ExtractConfigError, figment::Figment, Chain, Config, NamedChain};
@@ -20,6 +19,10 @@ use foundry_evm::{
         identifier::{CachedSignatures, SignaturesIdentifier, TraceIdentifiers},
         render_trace_arena_inner, CallTraceDecoder, CallTraceDecoderBuilder, TraceKind, Traces,
     },
+};
+use foundry_zksync_compilers::compilers::{
+    artifact_output::zk::{ZkArtifactOutput, ZkContractArtifact},
+    zksolc::ZkSolcCompiler,
 };
 use std::{
     fmt::Write,
@@ -75,7 +78,7 @@ pub fn remove_contract(
 /// Runtime Bytecode of the given contract.
 #[track_caller]
 pub fn remove_zk_contract(
-    output: &mut foundry_compilers::zksync::compile::output::ProjectCompileOutput,
+    output: &mut ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
     path: &Path,
     name: &str,
 ) -> Result<(ZkContractArtifact, ArtifactId)> {
@@ -222,11 +225,7 @@ pub fn has_different_gas_calc(chain_id: u64) -> bool {
 /// True if it supports broadcasting in batches.
 pub fn has_batch_support(chain_id: u64) -> bool {
     if let Some(chain) = Chain::from(chain_id).named() {
-        if  matches!(
-            chain,
-                NamedChain::ZkSync |
-                NamedChain::ZkSyncTestnet
-        ) {
+        if matches!(chain, NamedChain::ZkSync | NamedChain::ZkSyncTestnet) {
             return false
         };
         return !chain.is_arbitrum();
@@ -553,6 +552,5 @@ pub fn cache_local_signatures(output: &ProjectCompileOutput, cache_path: PathBuf
     });
 
     fs::write_json_file(&path, &cached_signatures)?;
->>>>>>> 59f354c179f4e7f6d7292acb3d068815c79286d1
     Ok(())
 }

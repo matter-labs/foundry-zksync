@@ -375,7 +375,7 @@ impl VerifyArgs {
             let provider = utils::get_provider(&config)?;
             let code = provider.get_code_at(self.address).await?;
 
-            let output = ProjectCompiler::new().zksync_compile(&project)?;
+            let output = ProjectCompiler::new().compile(&project)?;
             let contracts = ContractsByArtifact::new(
                 output.artifact_ids().map(|(id, artifact)| (id, artifact.clone().into())),
             );
@@ -408,7 +408,7 @@ impl VerifyArgs {
         let mut config = self.load_config_emit_warnings();
         config.libraries.extend(self.libraries.clone());
 
-        let project = foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+        let project = foundry_config::zksync::config_create_project(&config, config.cache, false)?;
 
         if let Some(ref contract) = self.contract {
             let contract_path = if let Some(ref path) = contract.path {
@@ -417,7 +417,7 @@ impl VerifyArgs {
                 project.find_contract_path(&contract.name)?
             };
 
-            let mut version = if let Some(ref version) = self.compiler_version {
+            let version = if let Some(ref version) = self.compiler_version {
                 version.trim_start_matches('v').parse()?
             } else if let Some(ref solc) = config.solc {
                 match solc {

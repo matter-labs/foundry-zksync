@@ -8,7 +8,7 @@ use foundry_config::{
     ResolvedRpcEndpoints,
 };
 use foundry_evm_core::opts::EvmOpts;
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use semver::Version;
 use std::{
     path::{Path, PathBuf},
@@ -118,6 +118,8 @@ impl CheatsConfig {
             self.available_artifacts.clone(),
             self.running_contract.clone(),
             self.running_version.clone(),
+            self.dual_compiled_contracts.clone(),
+            self.use_zk,
         )
     }
 

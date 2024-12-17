@@ -13,7 +13,6 @@ use foundry_compilers::{
         CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Contract, Libraries,
     },
     compilers::Compiler,
-    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::{Config, InlineConfig};
@@ -28,7 +27,10 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use foundry_linking::{LinkOutput, Linker};
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::{
+    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
+    dual_compiled_contracts::DualCompiledContracts,
+};
 use rayon::prelude::*;
 use revm::primitives::SpecId;
 
@@ -378,7 +380,7 @@ impl TestRunnerConfig {
                     .odyssey(self.odyssey)
                     .create2_deployer(self.evm_opts.create2_deployer)
             })
-            .use_zk_vm(self.use_zk)
+            .use_zk_vm(use_zk)
             .spec_id(self.spec_id)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
@@ -488,15 +490,17 @@ impl MultiContractRunnerBuilder {
         self,
         root: &Path,
         output: &ProjectCompileOutput,
-        zk_output: Option<ZkProjectCompileOutput>,
+        zk_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
         dual_compiled_contracts: DualCompiledContracts,
     ) -> Result<MultiContractRunner> {
         let use_zk = zk_output.is_some();
-        let mut known_contracts = ContractsByArtifact::default();
-        let output = output.with_stripped_file_prefixes(root);
-        let linker = Linker::new(root, output.artifact_ids().collect());
+        let contracts = output
+            .artifact_ids()
+            .map(|(id, v)| (id.with_stripped_file_prefixes(root), v))
+            .collect();
+        let linker = Linker::new(root, contracts);
 
         // Build revert decoder from ABIs of all artifacts.
         let abis = linker
@@ -535,6 +539,7 @@ impl MultiContractRunnerBuilder {
             }
         }
 
+        let mut known_contracts = ContractsByArtifact::default();
         if !use_zk {
             known_contracts = ContractsByArtifact::new(linked_contracts);
         } else if let Some(zk_output) = zk_output {
@@ -592,7 +597,7 @@ impl MultiContractRunnerBuilder {
                 coverage: self.coverage,
                 debug: self.debug,
                 decode_internal: self.decode_internal,
-                inline_config: Arc::new(InlineConfig::new_parsed(output, &self.config)?),
+                inline_config: Arc::new(InlineConfig::new_parsed(&output, &self.config)?),
                 isolation: self.isolation,
                 odyssey: self.odyssey,
 

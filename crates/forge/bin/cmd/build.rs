@@ -123,7 +123,7 @@ impl BuildArgs {
             Ok(())
         } else {
             let zk_project =
-                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
 
             // Collect sources to compile if build subdirectories specified.
             let mut files = vec![];

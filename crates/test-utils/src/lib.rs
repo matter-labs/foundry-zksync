@@ -10,9 +10,6 @@
 extern crate foundry_common;
 
 #[macro_use]
-extern crate foundry_common;
-
-#[macro_use]
 extern crate tracing;
 
 // Macros useful for testing.

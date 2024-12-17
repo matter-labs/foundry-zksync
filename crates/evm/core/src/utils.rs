@@ -213,7 +213,8 @@ pub fn create2_handler_register<I: InspectorExt>(
                 .push((ctx.evm.journaled_state.depth(), call_inputs.clone()));
 
             // Sanity check that CREATE2 deployer exists.
-            let code_hash = ctx.evm.load_account(create2_deployer)?.info.code_hash;
+            // NOTE(zk): made mut to apply later check
+            let mut code_hash = ctx.evm.load_account(create2_deployer)?.info.code_hash;
             // NOTE(zk): We check which deployer we are using to separate the logic for zkSync
             // and original foundry.
             if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {

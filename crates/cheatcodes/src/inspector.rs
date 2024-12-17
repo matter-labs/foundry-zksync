@@ -43,7 +43,9 @@ use foundry_evm_core::{
 };
 use foundry_evm_traces::TracingInspectorConfig;
 use foundry_wallets::multi_wallet::MultiWallet;
-use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
+use foundry_zksync_compilers::dual_compiled_contracts::{
+    DualCompiledContract, DualCompiledContracts,
+};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key, Call, ZkPaymasterData,

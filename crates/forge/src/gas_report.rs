@@ -123,16 +123,6 @@ impl GasReport {
         if is_create_call {
             trace!(contract_name, "adding create gas info");
             contract_info.gas = trace.gas_used;
-<<<<<<< HEAD
-=======
-            contract_info.size = trace.data.len();
-
-            if decoder.zk_contracts.contains(&node.trace.address) {
-                // Intercepted creates in zkvm mode will have the evm bytecode as input
-                // and the zkvm bytecode as output on the trace.
-                contract_info.size = trace.output.len();
-            }
->>>>>>> main
         } else if let Some(DecodedCallData { signature, .. }) = decoded().await.call_data {
             let name = signature.split('(').next().unwrap();
             // ignore any test/setup functions
