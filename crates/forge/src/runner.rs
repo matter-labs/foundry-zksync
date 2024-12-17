@@ -153,7 +153,7 @@ impl ContractRunner<'_> {
             debug!("test contract deployed");
             cheatcodes
                 .strategy
-                .try_lock()
+                .as_mut()
                 .expect("failed acquiring strategy")
                 .base_contract_deployed();
         }

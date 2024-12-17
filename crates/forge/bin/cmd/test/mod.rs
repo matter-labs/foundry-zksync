@@ -271,7 +271,7 @@ impl TestArgs {
     pub async fn execute_tests(mut self) -> Result<TestOutcome> {
         // Merge all configs.
         let (mut config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
-        let strategy = utils::get_executor_strategy(&config);
+        let mut strategy = utils::get_executor_strategy(&config);
 
         // Explicitly enable isolation for gas reports for more correct gas accounting.
         if self.gas_report {
@@ -368,10 +368,7 @@ impl TestArgs {
         // Prepare the test builder.
         let config = Arc::new(config);
 
-        strategy
-            .lock()
-            .expect("failed acquiring strategy")
-            .zksync_set_dual_compiled_contracts(dual_compiled_contracts.unwrap_or_default());
+        strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts.unwrap_or_default());
 
         let runner = MultiContractRunnerBuilder::new(config.clone())
             .set_debug(should_debug)

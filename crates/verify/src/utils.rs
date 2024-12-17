@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use crate::{bytecode::VerifyBytecodeArgs, types::VerificationType};
 use alloy_dyn_abi::DynSolValue;
 use alloy_primitives::{Address, Bytes, U256};
@@ -327,7 +325,7 @@ pub async fn get_tracing_executor(
     fork_blk_num: u64,
     evm_version: EvmVersion,
     evm_opts: EvmOpts,
-    strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
+    strategy: Box<dyn ExecutorStrategyExt>,
 ) -> Result<(Env, TracingExecutor)> {
     fork_config.fork_block_number = Some(fork_blk_num);
     fork_config.evm_version = evm_version;

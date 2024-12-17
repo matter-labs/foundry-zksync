@@ -283,9 +283,7 @@ impl Cheatcode for getArtifactPathByDeployedCodeCall {
 impl Cheatcode for getCodeCall {
     fn apply(&self, state: &mut Cheatcodes) -> Result {
         let Self { artifactPath: path } = self;
-        let strategy = state.strategy.clone();
-        let guard = strategy.lock().expect("failed acquiring strategy");
-        guard.get_artifact_code(state, path, false)
+        state.with_strategy(|strategy, state| strategy.get_artifact_code(state, path, false))
     }
 }
 

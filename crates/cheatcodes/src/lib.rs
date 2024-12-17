@@ -17,6 +17,7 @@ extern crate tracing;
 
 use alloy_primitives::Address;
 use foundry_evm_core::backend::DatabaseExt;
+use inspector::Strategy;
 use revm::{ContextPrecompiles, InnerEvmContext};
 use spec::Status;
 
@@ -173,5 +174,16 @@ impl CheatsCtxt<'_, '_, '_, '_> {
     #[inline]
     pub(crate) fn is_precompile(&self, address: &Address) -> bool {
         self.precompiles.contains(address)
+    }
+
+    pub(crate) fn with_strategy<F, R>(&mut self, mut f: F) -> R
+    where
+        F: FnMut(Strategy, &mut Self) -> R,
+    {
+        let mut strategy = self.state.strategy.take();
+        let result = f(strategy.as_mut().expect("failed acquiring strategy").as_mut(), self);
+        self.state.strategy = strategy;
+
+        result
     }
 }

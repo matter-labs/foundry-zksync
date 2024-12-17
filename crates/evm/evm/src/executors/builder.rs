@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::backend::Backend;
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
@@ -78,12 +76,7 @@ impl ExecutorBuilder {
 
     /// Builds the executor as configured.
     #[inline]
-    pub fn build(
-        self,
-        env: Env,
-        db: Backend,
-        strategy: Arc<Mutex<dyn ExecutorStrategyExt>>,
-    ) -> Executor {
+    pub fn build(self, env: Env, db: Backend, strategy: Box<dyn ExecutorStrategyExt>) -> Executor {
         let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
         if stack.block.is_none() {
             stack.block = Some(env.block.clone());

@@ -1,7 +1,4 @@
-use std::{
-    fmt::Debug,
-    sync::{Arc, Mutex},
-};
+use std::{fmt::Debug, sync::Arc};
 
 use alloy_primitives::{Address, Bytes, FixedBytes, TxKind, U256};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
@@ -24,7 +21,8 @@ use crate::{
 pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn new_cloned(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategy>>;
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy>;
+
     /// Get nonce.
     fn get_nonce(&mut self, ccx: &mut CheatsCtxt, address: Address) -> Result<u64> {
         let account = ccx.ecx.journaled_state.load_account(address, &mut ccx.ecx.db)?;
@@ -185,7 +183,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
 
 /// We define this in our fork
 pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>;
+    fn new_cloned_ext(&self) -> Box<dyn CheatcodeInspectorStrategyExt>;
 
     fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
         Ok(Default::default())
@@ -256,8 +254,8 @@ impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
         "evm"
     }
 
-    fn new_cloned(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategy>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy> {
+        Box::new(self.clone())
     }
 
     fn record_broadcastable_create_transactions(
@@ -331,8 +329,20 @@ impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
 }
 
 impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned_ext(&self) -> Box<dyn CheatcodeInspectorStrategyExt> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn CheatcodeInspectorStrategy> {
+    fn clone(&self) -> Self {
+        self.new_cloned()
+    }
+}
+
+impl Clone for Box<dyn CheatcodeInspectorStrategyExt> {
+    fn clone(&self) -> Self {
+        self.new_cloned_ext()
     }
 }
 

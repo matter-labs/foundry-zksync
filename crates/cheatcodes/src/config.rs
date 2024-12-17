@@ -14,7 +14,6 @@ use foundry_evm_core::opts::EvmOpts;
 use semver::Version;
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -58,7 +57,7 @@ pub struct CheatsConfig {
     /// Version of the script/test contract which is currently running.
     pub running_version: Option<Version>,
     /// The behavior strategy.
-    pub strategy: Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>,
+    pub strategy: Box<dyn CheatcodeInspectorStrategyExt>,
     /// Whether to enable legacy (non-reverting) assertions.
     pub assertions_revert: bool,
     /// Optional seed for the RNG algorithm.
@@ -74,7 +73,7 @@ impl CheatsConfig {
         available_artifacts: Option<ContractsByArtifact>,
         running_contract: Option<String>,
         running_version: Option<Version>,
-        strategy: Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>,
+        strategy: Box<dyn CheatcodeInspectorStrategyExt>,
     ) -> Self {
         let mut allowed_paths = vec![config.root.0.clone()];
         allowed_paths.extend(config.libs.clone());
@@ -235,7 +234,7 @@ impl Default for CheatsConfig {
             available_artifacts: Default::default(),
             running_contract: Default::default(),
             running_version: Default::default(),
-            strategy: Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy::default())),
+            strategy: Box::new(EvmCheatcodeInspectorStrategy::default()),
             assertions_revert: true,
             seed: None,
         }
@@ -254,7 +253,7 @@ mod tests {
             None,
             None,
             None,
-            Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy::default())),
+            Box::new(EvmCheatcodeInspectorStrategy::default()),
         )
     }
 

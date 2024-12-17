@@ -132,8 +132,8 @@ impl ZksyncBackendStrategy {
 }
 
 impl BackendStrategyExt for ZksyncBackendStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn BackendStrategyExt>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt> {
+        Box::new(self.clone())
     }
 
     fn zksync_save_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {

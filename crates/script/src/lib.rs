@@ -591,20 +591,14 @@ impl ScriptConfig {
     ) -> Result<ScriptRunner> {
         trace!("preparing script runner");
         let env = self.evm_opts.evm_env().await?;
-        let strategy = utils::get_executor_strategy(&self.config);
+        let mut strategy = utils::get_executor_strategy(&self.config);
 
         let db = if let Some(fork_url) = self.evm_opts.fork_url.as_ref() {
             match self.backends.get(fork_url) {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(
-                        fork,
-                        strategy
-                            .try_lock()
-                            .expect("failed acquiring strategy")
-                            .new_backend_strategy(),
-                    );
+                    let backend = Backend::spawn(fork, strategy.new_backend_strategy());
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -613,10 +607,7 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(
-                None,
-                strategy.lock().expect("failed acquiring strategy").new_backend_strategy(),
-            )
+            Backend::spawn(None, strategy.new_backend_strategy())
         };
 
         // We need to enable tracing to decode contract names: local or external.
@@ -633,16 +624,10 @@ impl ScriptConfig {
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
-            strategy
-                .lock()
-                .expect("failed acquiring strategy")
-                .zksync_set_dual_compiled_contracts(dual_compiled_contracts);
+            strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts);
 
             if let Some(fork_url) = &self.evm_opts.fork_url {
-                strategy
-                    .lock()
-                    .expect("failed acquiring strategy")
-                    .zksync_set_fork_env(fork_url, &env)?;
+                strategy.zksync_set_fork_env(fork_url, &env)?;
             }
 
             builder = builder.inspectors(|stack| {
@@ -654,10 +639,7 @@ impl ScriptConfig {
                             Some(known_contracts),
                             Some(target.name),
                             Some(target.version),
-                            strategy
-                                .lock()
-                                .expect("failed acquiring strategy")
-                                .new_cheatcode_inspector_strategy(),
+                            strategy.new_cheatcode_inspector_strategy(),
                         )
                         .into(),
                     )

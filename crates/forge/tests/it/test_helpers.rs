@@ -36,7 +36,7 @@ use std::{
     env, fmt,
     io::Write,
     path::{Path, PathBuf},
-    sync::{Arc, LazyLock, Mutex},
+    sync::{Arc, LazyLock},
 };
 
 type ZkProject = Project<ZkSolcCompiler, ZkArtifactOutput>;
@@ -359,11 +359,8 @@ impl ForgeTestData {
         test_opts.fuzz.no_zksync_reserved_addresses = zk_config.fuzz.no_zksync_reserved_addresses;
         let sender = zk_config.sender;
 
-        let strategy = utils::get_executor_strategy(&zk_config);
-        strategy
-            .lock()
-            .expect("failed acquiring strategy")
-            .zksync_set_dual_compiled_contracts(dual_compiled_contracts);
+        let mut strategy = utils::get_executor_strategy(&zk_config);
+        strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts);
         let mut builder = self.base_runner();
         builder.config = Arc::new(zk_config);
         builder
@@ -385,7 +382,7 @@ impl ForgeTestData {
                 None,
                 opts.local_evm_env(),
                 opts,
-                Arc::new(Mutex::new(EvmExecutorStrategy::default())),
+                Box::new(EvmExecutorStrategy::default()),
             )
             .unwrap()
     }
@@ -408,7 +405,7 @@ impl ForgeTestData {
                 None,
                 env,
                 opts,
-                Arc::new(Mutex::new(EvmExecutorStrategy::default())),
+                Box::new(EvmExecutorStrategy::default()),
             )
             .unwrap()
     }

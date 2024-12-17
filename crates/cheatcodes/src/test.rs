@@ -15,11 +15,7 @@ impl Cheatcode for zkVmCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { enable } = *self;
 
-        ccx.state
-            .strategy
-            .lock()
-            .expect("failed acquiring strategy")
-            .zksync_cheatcode_select_zk_vm(ccx.ecx, enable);
+        ccx.with_strategy(|strategy, ccx| strategy.zksync_cheatcode_select_zk_vm(ccx.ecx, enable));
 
         Ok(Default::default())
     }
@@ -27,33 +23,23 @@ impl Cheatcode for zkVmCall {
 
 impl Cheatcode for zkVmSkipCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        ccx.state
-            .strategy
-            .try_lock()
-            .expect("failed acquiring strategy")
-            .zksync_cheatcode_skip_zkvm()
+        ccx.with_strategy(|strategy, _ccx| strategy.zksync_cheatcode_skip_zkvm())
     }
 }
 
 impl Cheatcode for zkUsePaymasterCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { paymaster_address, paymaster_input } = self;
-        ccx.state
-            .strategy
-            .lock()
-            .expect("failed acquiring strategy")
-            .zksync_cheatcode_set_paymaster(*paymaster_address, paymaster_input)
+        ccx.with_strategy(|strategy, _ccx| {
+            strategy.zksync_cheatcode_set_paymaster(*paymaster_address, paymaster_input)
+        })
     }
 }
 
 impl Cheatcode for zkUseFactoryDepCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { name } = self;
-        ccx.state
-            .strategy
-            .lock()
-            .expect("failed acquiring strategy")
-            .zksync_cheatcode_use_factory_deps(name.clone())
+        ccx.with_strategy(|strategy, _ccx| strategy.zksync_cheatcode_use_factory_deps(name.clone()))
     }
 }
 
@@ -68,11 +54,8 @@ impl Cheatcode for zkRegisterContractCall {
             zkDeployedBytecode,
         } = self;
 
-        ccx.state
-            .strategy
-            .lock()
-            .expect("failed acquiring strategy")
-            .zksync_cheatcode_register_contract(
+        ccx.with_strategy(|strategy, _ccx| {
+            strategy.zksync_cheatcode_register_contract(
                 name.clone(),
                 zkBytecodeHash.0.into(),
                 zkDeployedBytecode.to_vec(),
@@ -81,6 +64,7 @@ impl Cheatcode for zkRegisterContractCall {
                 evmDeployedBytecode.to_vec(),
                 evmBytecode.to_vec(),
             )
+        })
     }
 }
 

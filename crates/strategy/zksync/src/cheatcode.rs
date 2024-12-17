@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::{fs, path::PathBuf, sync::Arc};
 
 use alloy_json_abi::ContractObject;
 use alloy_primitives::{keccak256, map::HashMap, Address, Bytes, FixedBytes, TxKind, B256, U256};
@@ -227,8 +223,8 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         "zk"
     }
 
-    fn new_cloned(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategy>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy> {
+        Box::new(self.clone())
     }
 
     fn get_nonce(&mut self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, address: Address) -> Result<u64> {
@@ -684,8 +680,8 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
 }
 
 impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned_ext(&self) -> Box<dyn CheatcodeInspectorStrategyExt> {
+        Box::new(self.clone())
     }
 
     fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
@@ -941,11 +937,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
                                     .to_ru256()
                             })
                             .collect::<HashSet<_>>();
-                        ecx.db
-                            .get_strategy()
-                            .lock()
-                            .expect("failed acquiring strategy")
-                            .zksync_save_immutable_storage(addr, keys);
+                        ecx.db.get_strategy().zksync_save_immutable_storage(addr, keys);
                     }
                 }
 

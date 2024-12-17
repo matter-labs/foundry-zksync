@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use alloy_primitives::{Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
@@ -41,8 +39,8 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
         "zk"
     }
 
-    fn new_cloned(&self) -> Arc<Mutex<dyn ExecutorStrategy>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned(&self) -> Box<dyn ExecutorStrategy> {
+        Box::new(self.clone())
     }
 
     fn set_inspect_context(&mut self, other_fields: OtherFields) {
@@ -83,15 +81,15 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
         Ok(())
     }
 
-    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategyExt>> {
-        Arc::new(Mutex::new(ZksyncBackendStrategy::default()))
+    fn new_backend_strategy(&self) -> Box<dyn BackendStrategyExt> {
+        Box::new(ZksyncBackendStrategy::default())
     }
 
-    fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
-        Arc::new(Mutex::new(ZksyncCheatcodeInspectorStrategy::new(
+    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategyExt> {
+        Box::new(ZksyncCheatcodeInspectorStrategy::new(
             self.dual_compiled_contracts.clone(),
             self.zk_env.clone(),
-        )))
+        ))
     }
 
     fn call_inspect(
@@ -142,8 +140,8 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
 }
 
 impl ExecutorStrategyExt for ZksyncExecutorStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn ExecutorStrategyExt>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned_ext(&self) -> Box<dyn ExecutorStrategyExt> {
+        Box::new(self.clone())
     }
 
     fn zksync_set_dual_compiled_contracts(

@@ -41,7 +41,7 @@ pub trait BackendStrategy: Debug + Send + Sync {
 }
 
 pub trait BackendStrategyExt: BackendStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn BackendStrategyExt>>;
+    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt>;
     /// Saves the storage keys for immutable variables per address.
     ///
     /// These are required during fork to help merge the persisted addresses, as they are stored
@@ -101,8 +101,8 @@ impl BackendStrategy for EvmBackendStrategy {
 }
 
 impl BackendStrategyExt for EvmBackendStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn BackendStrategyExt>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt> {
+        Box::new(self.clone())
     }
 }
 

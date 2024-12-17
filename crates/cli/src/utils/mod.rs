@@ -17,7 +17,6 @@ use std::{
     future::Future,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
-    sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tracing_subscriber::prelude::*;
@@ -94,13 +93,13 @@ pub fn get_provider(config: &Config) -> Result<RetryProvider> {
     get_provider_builder(config)?.build()
 }
 
-pub fn get_executor_strategy(config: &Config) -> Arc<Mutex<dyn ExecutorStrategyExt>> {
+pub fn get_executor_strategy(config: &Config) -> Box<dyn ExecutorStrategyExt> {
     if config.zksync.should_compile() {
         info!("using zksync strategy");
-        Arc::new(Mutex::new(ZksyncExecutorStrategy::default()))
+        Box::new(ZksyncExecutorStrategy::default())
     } else {
         info!("using evm strategy");
-        Arc::new(Mutex::new(EvmExecutorStrategy::default()))
+        Box::new(EvmExecutorStrategy::default())
     }
 }
 

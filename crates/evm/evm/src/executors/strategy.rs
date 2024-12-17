@@ -1,7 +1,4 @@
-use std::{
-    fmt::Debug,
-    sync::{Arc, Mutex},
-};
+use std::fmt::Debug;
 
 use alloy_primitives::{Address, U256};
 use alloy_serde::OtherFields;
@@ -25,7 +22,7 @@ use super::Executor;
 pub trait ExecutorStrategy: Debug + Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn new_cloned(&self) -> Arc<Mutex<dyn ExecutorStrategy>>;
+    fn new_cloned(&self) -> Box<dyn ExecutorStrategy>;
 
     fn set_balance(
         &mut self,
@@ -58,14 +55,14 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState>;
 
-    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategyExt>>;
-    fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>>;
+    fn new_backend_strategy(&self) -> Box<dyn BackendStrategyExt>;
+    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategyExt>;
 
     // TODO perhaps need to create fresh strategies as well
 }
 
 pub trait ExecutorStrategyExt: ExecutorStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn ExecutorStrategyExt>>;
+    fn new_cloned_ext(&self) -> Box<dyn ExecutorStrategyExt>;
 
     fn zksync_set_dual_compiled_contracts(
         &mut self,
@@ -86,8 +83,8 @@ impl ExecutorStrategy for EvmExecutorStrategy {
         "evm"
     }
 
-    fn new_cloned(&self) -> Arc<Mutex<dyn ExecutorStrategy>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned(&self) -> Box<dyn ExecutorStrategy> {
+        Box::new(self.clone())
     }
 
     fn set_inspect_context(&mut self, _other_fields: OtherFields) {}
@@ -159,17 +156,17 @@ impl ExecutorStrategy for EvmExecutorStrategy {
         Ok(())
     }
 
-    fn new_backend_strategy(&self) -> Arc<Mutex<dyn BackendStrategyExt>> {
-        Arc::new(Mutex::new(EvmBackendStrategy))
+    fn new_backend_strategy(&self) -> Box<dyn BackendStrategyExt> {
+        Box::new(EvmBackendStrategy)
     }
 
-    fn new_cheatcode_inspector_strategy(&self) -> Arc<Mutex<dyn CheatcodeInspectorStrategyExt>> {
-        Arc::new(Mutex::new(EvmCheatcodeInspectorStrategy::default()))
+    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategyExt> {
+        Box::new(EvmCheatcodeInspectorStrategy::default())
     }
 }
 
 impl ExecutorStrategyExt for EvmExecutorStrategy {
-    fn new_cloned_ext(&self) -> Arc<Mutex<dyn ExecutorStrategyExt>> {
-        Arc::new(Mutex::new(self.clone()))
+    fn new_cloned_ext(&self) -> Box<dyn ExecutorStrategyExt> {
+        Box::new(self.clone())
     }
 }

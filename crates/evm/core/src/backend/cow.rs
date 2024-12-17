@@ -17,11 +17,7 @@ use revm::{
     primitives::{Account, AccountInfo, Bytecode, Env, EnvWithHandlerCfg, HashMap as Map, SpecId},
     Database, DatabaseCommit, JournaledState,
 };
-use std::{
-    borrow::Cow,
-    collections::BTreeMap,
-    sync::{Arc, Mutex},
-};
+use std::{borrow::Cow, collections::BTreeMap};
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
@@ -96,8 +92,8 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend.to_mut().get_fork_info(id)
     }
 
-    fn get_strategy(&mut self) -> Arc<Mutex<dyn BackendStrategyExt>> {
-        self.backend.as_ref().strategy.clone()
+    fn get_strategy(&mut self) -> &mut dyn BackendStrategyExt {
+        self.backend.to_mut().strategy.as_mut()
     }
 
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {
