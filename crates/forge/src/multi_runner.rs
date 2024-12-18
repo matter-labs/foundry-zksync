@@ -368,6 +368,7 @@ impl TestRunnerConfig {
             Some(artifact_id.version.clone()),
             dual_compiled_contracts,
             use_zk,
+            None,
         ));
 
         ExecutorBuilder::new()

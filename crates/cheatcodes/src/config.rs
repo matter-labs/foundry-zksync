@@ -9,6 +9,7 @@ use foundry_config::{
 };
 use foundry_evm_core::opts::EvmOpts;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
+use foundry_zksync_core::vm::ZkEnv;
 use semver::Version;
 use std::{
     path::{Path, PathBuf},
@@ -62,10 +63,13 @@ pub struct CheatsConfig {
     pub assertions_revert: bool,
     /// Optional seed for the RNG algorithm.
     pub seed: Option<U256>,
+    /// Era Vm environment
+    pub zk_env: Option<ZkEnv>,
 }
 
 impl CheatsConfig {
     /// Extracts the necessary settings from the Config
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: &Config,
         evm_opts: EvmOpts,
@@ -74,6 +78,7 @@ impl CheatsConfig {
         running_version: Option<Version>,
         dual_compiled_contracts: DualCompiledContracts,
         use_zk: bool,
+        zk_env: Option<ZkEnv>,
     ) -> Self {
         let mut allowed_paths = vec![config.root.clone()];
         allowed_paths.extend(config.libs.iter().cloned());
@@ -107,6 +112,7 @@ impl CheatsConfig {
             use_zk,
             assertions_revert: config.assertions_revert,
             seed: config.fuzz.seed,
+            zk_env,
         }
     }
 
@@ -252,6 +258,7 @@ impl Default for CheatsConfig {
             use_zk: false,
             assertions_revert: true,
             seed: None,
+            zk_env: Default::default(),
         }
     }
 }
@@ -270,6 +277,7 @@ mod tests {
             None,
             Default::default(),
             false,
+            None,
         )
     }
 

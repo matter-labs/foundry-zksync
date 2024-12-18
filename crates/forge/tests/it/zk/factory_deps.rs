@@ -6,6 +6,7 @@ use foundry_test_utils::{
     util::{self, OutputExt},
     Filter, ZkSyncNode,
 };
+use foundry_zksync_core::utils::MAX_L2_GAS_LIMIT;
 
 use crate::{config::TestConfig, test_helpers::TEST_DATA_DEFAULT};
 
@@ -44,9 +45,9 @@ contract ZkLargeFactoryDependenciesScript is Script {
 
     let node = ZkSyncNode::start();
 
-    // foundry default gas-limit is not enough to pay for factory deps in our current
-    // default environment
-    let gas_limit = u32::MAX >> 1;
+    // foundry default gas-limit is not enough to pay for factory deps
+    // with Anvil-zksync's environment
+    let gas_limit = MAX_L2_GAS_LIMIT;
 
     cmd.arg("script").args([
         "--zk-startup",

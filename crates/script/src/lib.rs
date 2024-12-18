@@ -19,6 +19,7 @@ use alloy_primitives::{
     Address, Bytes, Log, TxKind, U256,
 };
 use alloy_signer::Signer;
+use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use broadcast::next_nonce;
 use build::PreprocessedState;
 use clap::{Parser, ValueHint};
@@ -56,6 +57,7 @@ use foundry_evm::{
 };
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
+use foundry_zksync_core::vm::ZkEnv;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -631,6 +633,38 @@ impl ScriptConfig {
             .legacy_assertions(self.config.legacy_assertions);
 
         let use_zk = self.config.zksync.run_in_zk_mode();
+        let mut maybe_zk_env = None;
+        if use_zk {
+            if let Some(fork_url) = &self.evm_opts.fork_url {
+                let provider =
+                    zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
+                // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
+                let maybe_details =
+                    provider.get_block_details(env.block.number.try_into()?).await?;
+                if let Some(details) = maybe_details {
+                    let zk_env = ZkEnv {
+                        l1_gas_price: details
+                            .l1_gas_price
+                            .try_into()
+                            .expect("failed to convert l1_gas_price to u64"),
+                        fair_l2_gas_price: details
+                            .l2_fair_gas_price
+                            .try_into()
+                            .expect("failed to convert fair_l2_gas_price to u64"),
+                        fair_pubdata_price: details
+                            .fair_pubdata_price
+                            // TODO(zk): None as a value might mean L1Pegged model
+                            // we need to find out if it will ever be relevant to
+                            // us
+                            .unwrap_or_default()
+                            .try_into()
+                            .expect("failed to convert fair_pubdata_price to u64"),
+                    };
+                    builder = builder.zk_env(zk_env.clone());
+                    maybe_zk_env = Some(zk_env);
+                }
+            };
+        }
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
@@ -646,6 +680,7 @@ impl ScriptConfig {
                                 Some(target.version),
                                 dual_compiled_contracts,
                                 use_zk,
+                                maybe_zk_env,
                             )
                             .into(),
                         )
