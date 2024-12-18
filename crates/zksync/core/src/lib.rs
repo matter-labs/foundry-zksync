@@ -23,7 +23,7 @@ use alloy_primitives::{address, hex, keccak256, Address, Bytes, U256 as rU256};
 use alloy_transport::Transport;
 use alloy_zksync::{
     network::transaction_request::TransactionRequest as ZkTransactionRequest,
-    provider::ZksyncProvider,
+    provider::ZkyncProvider,
 };
 use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 use eyre::eyre;

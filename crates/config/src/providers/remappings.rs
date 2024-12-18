@@ -39,7 +39,12 @@ impl Remappings {
     pub fn with_figment(mut self, figment: &Figment) -> Self {
         let mut add_project_remapping = |path: &str| {
             if let Ok(path) = figment.find_value(path) {
-                if let Some(remapping) = path.into_string().and_then(get_dir_remapping) {
+                if let Some(path) = path.into_string() {
+                    let remapping = Remapping {
+                        context: None,
+                        name: format!("{path}/"),
+                        path: format!("{path}/"),
+                    };
                     self.project_paths.push(remapping);
                 }
             }
@@ -114,7 +119,7 @@ pub struct RemappingsProvider<'a> {
     pub lib_paths: Cow<'a, Vec<PathBuf>>,
     /// the root path used to turn an absolute `Remapping`, as we're getting it from
     /// `Remapping::find_many` into a relative one.
-    pub root: &'a PathBuf,
+    pub root: &'a Path,
     /// This contains either:
     ///   - previously set remappings
     ///   - a `MissingField` error, which means previous provider didn't set the "remappings" field

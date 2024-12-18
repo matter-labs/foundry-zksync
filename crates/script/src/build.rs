@@ -22,7 +22,7 @@ use foundry_compilers::{
     zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
     ArtifactId, ProjectCompileOutput,
 };
-use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, traces::debug::ContractSources};
+use foundry_evm::traces::debug::ContractSources;
 use foundry_linking::Linker;
 use foundry_zksync_compiler::DualCompiledContracts;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr, sync::Arc};
@@ -49,9 +49,10 @@ impl BuildData {
     /// Links contracts. Uses CREATE2 linking when possible, otherwise falls back to
     /// default linking with sender nonce and address.
     pub async fn link(self, script_config: &ScriptConfig) -> Result<LinkedBuildData> {
+        let create2_deployer = script_config.evm_opts.create2_deployer;
         let can_use_create2 = if let Some(fork_url) = &script_config.evm_opts.fork_url {
             let provider = try_get_http_provider(fork_url)?;
-            let deployer_code = provider.get_code_at(DEFAULT_CREATE2_DEPLOYER).await?;
+            let deployer_code = provider.get_code_at(create2_deployer).await?;
 
             !deployer_code.is_empty()
         } else {
@@ -66,7 +67,7 @@ impl BuildData {
                 self.get_linker()
                     .link_with_create2(
                         known_libraries.clone(),
-                        DEFAULT_CREATE2_DEPLOYER,
+                        create2_deployer,
                         script_config.config.create2_library_salt,
                         &self.target,
                     )
@@ -263,8 +264,8 @@ impl PreprocessedState {
                 if id.name != *name {
                     continue;
                 }
-            } else if contract.abi.as_ref().map_or(true, |abi| abi.is_empty()) ||
-                contract.bytecode.as_ref().map_or(true, |b| match &b.object {
+            } else if contract.abi.as_ref().is_none_or(|abi| abi.is_empty()) ||
+                contract.bytecode.as_ref().is_none_or(|b| match &b.object {
                     BytecodeObject::Bytecode(b) => b.is_empty(),
                     BytecodeObject::Unlinked(_) => false,
                 })
