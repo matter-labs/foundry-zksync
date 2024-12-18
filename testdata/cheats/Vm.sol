@@ -149,7 +149,7 @@ interface Vm {
     function assertTrue(bool condition, string calldata error) external pure;
     function assume(bool condition) external pure;
     function assumeNoRevert() external pure;
-    function attachDelegation(SignedDelegation memory signedDelegation) external;
+    function attachDelegation(SignedDelegation calldata signedDelegation) external;
     function blobBaseFee(uint256 newBlobBaseFee) external;
     function blobhashes(bytes32[] calldata hashes) external;
     function breakpoint(string calldata char) external pure;
@@ -224,7 +224,7 @@ interface Vm {
     function envUint(string calldata name) external view returns (uint256 value);
     function envUint(string calldata name, string calldata delim) external view returns (uint256[] memory value);
     function etch(address target, bytes calldata newRuntimeBytecode) external;
-    function eth_getLogs(uint256 fromBlock, uint256 toBlock, address target, bytes32[] memory topics) external returns (EthGetLogs[] memory logs);
+    function eth_getLogs(uint256 fromBlock, uint256 toBlock, address target, bytes32[] calldata topics) external returns (EthGetLogs[] memory logs);
     function exists(string calldata path) external view returns (bool result);
     function expectCallMinGas(address callee, uint256 msgValue, uint64 minGas, bytes calldata data) external;
     function expectCallMinGas(address callee, uint256 msgValue, uint64 minGas, bytes calldata data, uint64 count) external;
@@ -246,10 +246,16 @@ interface Vm {
     function expectPartialRevert(bytes4 revertData, address reverter) external;
     function expectRevert() external;
     function expectRevert(bytes4 revertData) external;
+    function expectRevert(bytes4 revertData, address reverter, uint64 count) external;
+    function expectRevert(bytes calldata revertData, address reverter, uint64 count) external;
     function expectRevert(bytes calldata revertData) external;
     function expectRevert(address reverter) external;
     function expectRevert(bytes4 revertData, address reverter) external;
     function expectRevert(bytes calldata revertData, address reverter) external;
+    function expectRevert(uint64 count) external;
+    function expectRevert(bytes4 revertData, uint64 count) external;
+    function expectRevert(bytes calldata revertData, uint64 count) external;
+    function expectRevert(address reverter, uint64 count) external;
     function expectSafeMemory(uint64 min, uint64 max) external;
     function expectSafeMemoryCall(uint64 min, uint64 max) external;
     function fee(uint256 newBasefee) external;
@@ -261,14 +267,14 @@ interface Vm {
     function getBlobhashes() external view returns (bytes32[] memory hashes);
     function getBlockNumber() external view returns (uint256 height);
     function getBlockTimestamp() external view returns (uint256 timestamp);
-    function getBroadcast(string memory contractName, uint64 chainId, BroadcastTxType txType) external view returns (BroadcastTxSummary memory);
-    function getBroadcasts(string memory contractName, uint64 chainId, BroadcastTxType txType) external view returns (BroadcastTxSummary[] memory);
-    function getBroadcasts(string memory contractName, uint64 chainId) external view returns (BroadcastTxSummary[] memory);
+    function getBroadcast(string calldata contractName, uint64 chainId, BroadcastTxType txType) external view returns (BroadcastTxSummary memory);
+    function getBroadcasts(string calldata contractName, uint64 chainId, BroadcastTxType txType) external view returns (BroadcastTxSummary[] memory);
+    function getBroadcasts(string calldata contractName, uint64 chainId) external view returns (BroadcastTxSummary[] memory);
     function getCode(string calldata artifactPath) external view returns (bytes memory creationBytecode);
     function getDeployedCode(string calldata artifactPath) external view returns (bytes memory runtimeBytecode);
-    function getDeployment(string memory contractName) external view returns (address deployedAddress);
-    function getDeployment(string memory contractName, uint64 chainId) external view returns (address deployedAddress);
-    function getDeployments(string memory contractName, uint64 chainId) external view returns (address[] memory deployedAddresses);
+    function getDeployment(string calldata contractName) external view returns (address deployedAddress);
+    function getDeployment(string calldata contractName, uint64 chainId) external view returns (address deployedAddress);
+    function getDeployments(string calldata contractName, uint64 chainId) external view returns (address[] memory deployedAddresses);
     function getFoundryVersion() external view returns (string memory version);
     function getLabel(address account) external view returns (string memory currentLabel);
     function getMappingKeyAndParentOf(address target, bytes32 elementSlot) external returns (bool found, bytes32 key, bytes32 parent);
@@ -277,6 +283,8 @@ interface Vm {
     function getNonce(address account) external view returns (uint64 nonce);
     function getNonce(Wallet calldata wallet) external returns (uint64 nonce);
     function getRecordedLogs() external returns (Log[] memory logs);
+    function getStateDiff() external view returns (string memory diff);
+    function getStateDiffJson() external view returns (string memory diff);
     function getWallets() external returns (address[] memory wallets);
     function indexOf(string calldata input, string calldata key) external pure returns (uint256);
     function isContext(ForgeContext context) external view returns (bool result);
@@ -424,8 +432,8 @@ interface Vm {
     function serializeInt(string calldata objectKey, string calldata valueKey, int256 value) external returns (string memory json);
     function serializeInt(string calldata objectKey, string calldata valueKey, int256[] calldata values) external returns (string memory json);
     function serializeJson(string calldata objectKey, string calldata value) external returns (string memory json);
-    function serializeJsonType(string calldata typeDescription, bytes memory value) external pure returns (string memory json);
-    function serializeJsonType(string calldata objectKey, string calldata valueKey, string calldata typeDescription, bytes memory value) external returns (string memory json);
+    function serializeJsonType(string calldata typeDescription, bytes calldata value) external pure returns (string memory json);
+    function serializeJsonType(string calldata objectKey, string calldata valueKey, string calldata typeDescription, bytes calldata value) external returns (string memory json);
     function serializeString(string calldata objectKey, string calldata valueKey, string calldata value) external returns (string memory json);
     function serializeString(string calldata objectKey, string calldata valueKey, string[] calldata values) external returns (string memory json);
     function serializeUintToHex(string calldata objectKey, string calldata valueKey, uint256 value) external returns (string memory json);
@@ -505,9 +513,4 @@ interface Vm {
     function writeLine(string calldata path, string calldata data) external;
     function writeToml(string calldata json, string calldata path) external;
     function writeToml(string calldata json, string calldata path, string calldata valueKey) external;
-    function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;
-    function zkUseFactoryDep(string calldata name) external pure;
-    function zkUsePaymaster(address paymaster_address, bytes calldata paymaster_input) external pure;
-    function zkVm(bool enable) external pure;
-    function zkVmSkip() external pure;
 }

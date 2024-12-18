@@ -123,7 +123,7 @@ impl BuildArgs {
             Ok(())
         } else {
             let zk_project =
-                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
 
             // Collect sources to compile if build subdirectories specified.
             let mut files = vec![];
@@ -180,7 +180,7 @@ impl BuildArgs {
         // directories as well as the `foundry.toml` configuration file.
         self.watch.watchexec_config(|| {
             let config = Config::from(self);
-            let foundry_toml: PathBuf = config.root.0.join(Config::FILE_NAME);
+            let foundry_toml: PathBuf = config.root.join(Config::FILE_NAME);
             [config.src, config.test, config.script, foundry_toml]
         })
     }
