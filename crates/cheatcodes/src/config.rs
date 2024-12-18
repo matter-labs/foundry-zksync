@@ -126,6 +126,7 @@ impl CheatsConfig {
             self.running_version.clone(),
             self.dual_compiled_contracts.clone(),
             self.use_zk,
+            self.zk_env.clone(),
         )
     }
 
