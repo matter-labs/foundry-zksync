@@ -7,16 +7,19 @@ use foundry_compilers_artifacts_solc::{
 };
 use serde::{Deserialize, Serialize};
 
+/// Bytecode compiled by zksolc
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ZkArtifactBytecode {
     object: Bytes,
     is_unlinked: bool,
 
+    /// Bytecode missing libraries
     #[serde(default)]
     pub missing_libraries: Vec<String>,
 }
 
 impl ZkArtifactBytecode {
+    /// Get Bytecode from parts
     pub fn with_object(
         object: BytecodeObject,
         is_unlinked: bool,
@@ -35,6 +38,7 @@ impl ZkArtifactBytecode {
         Contract::missing_libs_to_link_references(self.missing_libraries.as_slice())
     }
 
+    /// Get bytecode object
     pub fn object(&self) -> BytecodeObject {
         if self.is_unlinked {
             // convert to unlinked

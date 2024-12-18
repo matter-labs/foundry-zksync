@@ -1,14 +1,11 @@
-/// ZKsolc compiler artifacts to be used in foundry-compilers
+//! zksolc artifacts to be used in `foundry-compilers`
 use foundry_compilers_artifacts_solc::{
     BytecodeObject, CompactContractRef, FileToContractsMap, SourceFile, SourceFiles,
 };
 
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashSet},
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
 pub mod contract;
 pub mod error;
@@ -59,6 +56,7 @@ impl CompilerOutput {
     }
 }
 
+/// `zksolc` eravm output field
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EraVM {
@@ -72,6 +70,7 @@ pub struct EraVM {
 }
 
 impl EraVM {
+    /// Get bytecode object
     pub fn bytecode(&self, should_be_unlinked: bool) -> Option<BytecodeObject> {
         self.bytecode.as_ref().map(|object| match (should_be_unlinked, object) {
             (true, BytecodeObject::Bytecode(bc)) => {
@@ -88,6 +87,7 @@ impl EraVM {
         })
     }
 
+    /// Get bytecode object ref
     // TODO: tmp to make compiler abstraction sample work, needs some thought on
     // how do transform linked/to unlinked
     pub fn bytecode_ref(&self) -> Option<&BytecodeObject> {

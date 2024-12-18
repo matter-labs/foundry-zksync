@@ -1,3 +1,4 @@
+//! zksolc settings
 use crate::artifacts::output_selection::OutputSelection as ZkOutputSelection;
 use foundry_compilers::{
     artifacts::{serde_helpers, EvmVersion, Libraries},

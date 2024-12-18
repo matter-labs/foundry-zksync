@@ -1,3 +1,4 @@
+//! ZK Sync artifact output
 use crate::artifacts::contract::Contract;
 use alloy_json_abi::JsonAbi;
 use foundry_compilers::{
@@ -15,26 +16,37 @@ use std::{borrow::Cow, collections::BTreeMap, path::Path};
 mod bytecode;
 pub use bytecode::ZkArtifactBytecode;
 
+/// Artifact representing a compiled contract
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ZkContractArtifact {
+    /// contract abi
     pub abi: Option<JsonAbi>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// contract bytecodee
     pub bytecode: Option<ZkArtifactBytecode>,
+    /// contract assembly
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assembly: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// contract metadata
     pub metadata: Option<serde_json::Value>,
+    /// contract storage layout
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage_layout: Option<StorageLayout>,
+    /// contract userdoc
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub userdoc: Option<UserDoc>,
+    /// contract devdoc
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub devdoc: Option<DevDoc>,
+    /// contract optimized IR code
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ir_optimized: Option<String>,
+    /// contract hash
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
+    /// contract factory dependencies
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factory_dependencies: Option<BTreeMap<String, String>>,
     /// The identifier of the source file
@@ -43,6 +55,7 @@ pub struct ZkContractArtifact {
 }
 
 impl ZkContractArtifact {
+    /// Get contract missing libraries
     pub fn missing_libraries(&self) -> Option<&Vec<String>> {
         self.bytecode.as_ref().map(|bc| &bc.missing_libraries)
     }
@@ -90,6 +103,7 @@ impl From<ZkContractArtifact> for CompactContract {
     }
 }
 
+/// ZK Sync ArtifactOutput
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct ZkArtifactOutput();
 

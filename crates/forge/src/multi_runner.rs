@@ -598,7 +598,7 @@ impl MultiContractRunnerBuilder {
                 coverage: self.coverage,
                 debug: self.debug,
                 decode_internal: self.decode_internal,
-                inline_config: Arc::new(InlineConfig::new_parsed(&output, &self.config)?),
+                inline_config: Arc::new(InlineConfig::new_parsed(output, &self.config)?),
                 isolation: self.isolation,
                 odyssey: self.odyssey,
 

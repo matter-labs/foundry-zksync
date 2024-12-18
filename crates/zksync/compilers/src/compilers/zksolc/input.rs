@@ -1,3 +1,4 @@
+//! zksolc input
 use super::{
     settings::{ZkSolcError, ZkSolcSettings, ZkSolcWarning},
     ZkSettings,
@@ -16,11 +17,15 @@ use std::{
 };
 use tracing::warn;
 
+/// Versioned input for zksolc
 #[derive(Debug, Clone, Serialize)]
 pub struct ZkSolcVersionedInput {
+    /// zksolc json input
     #[serde(flatten)]
     pub input: ZkSolcInput,
+    /// solc version to be used along zksolc
     pub solc_version: Version,
+    /// zksolc cli settings
     pub cli_settings: solc::CliSettings,
 }
 
@@ -72,14 +77,19 @@ impl CompilerInput for ZkSolcVersionedInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ZkSolcInput {
+    /// source code language
     pub language: SolcLanguage,
+    /// sources to compile
     pub sources: Sources,
+    /// compiler settings set by the user
     pub settings: ZkSettings,
+    /// suppressed warnings
     // For `zksolc` versions <1.5.7, suppressed warnings / errors were specified on the same level
     // as `settings`. For `zksolc` 1.5.7+, they are specified inside `settings`. Since we want to
     // support both options at the time, we duplicate fields from `settings` here.
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     pub suppressed_warnings: HashSet<ZkSolcWarning>,
+    /// suppressed errors
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     pub suppressed_errors: HashSet<ZkSolcError>,
 }
@@ -125,6 +135,7 @@ impl ZkSolcInput {
         self
     }
 
+    /// Add remappings to settings
     pub fn with_remappings(mut self, remappings: Vec<Remapping>) -> Self {
         if self.language == SolcLanguage::Yul {
             if !remappings.is_empty() {
@@ -146,13 +157,17 @@ impl ZkSolcInput {
 /// the verified contracts
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StandardJsonCompilerInput {
+    /// compiler language
     pub language: SolcLanguage,
+    /// sources to compile
     #[serde(with = "serde_helpers::tuple_vec_map")]
     pub sources: Vec<(PathBuf, Source)>,
+    /// compiler settings
     pub settings: ZkSettings,
 }
 
 impl StandardJsonCompilerInput {
+    /// new StandardJsonCompilerInput
     pub fn new(sources: Vec<(PathBuf, Source)>, settings: ZkSettings) -> Self {
         Self { language: SolcLanguage::Solidity, sources, settings }
     }

@@ -1,3 +1,4 @@
+//! foundry-compilers trait implementations for zksolc
 use self::input::{ZkSolcInput, ZkSolcVersionedInput};
 use crate::artifacts::{contract::Contract, error::Error, CompilerOutput as ZkCompilerOutput};
 use alloy_json_abi::JsonAbi;
@@ -34,8 +35,11 @@ pub mod input;
 pub mod settings;
 pub use settings::{ZkSettings, ZkSolcSettings};
 
+/// zksolc command
 pub const ZKSOLC: &str = "zksolc";
+/// ZKsync solc release used for all ZKsync solc versions
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
+/// Default zksolc version
 pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 7);
 
 #[cfg(test)]
@@ -116,9 +120,12 @@ impl ZkSolcOS {
     }
 }
 
+/// ZkSolc compiler
 #[derive(Debug, Clone)]
 pub struct ZkSolcCompiler {
+    /// zksolc path
     pub zksolc: PathBuf,
+    /// solc compiler to use along zksolc
     pub solc: SolcCompiler,
 }
 
@@ -204,6 +211,7 @@ impl Compiler for ZkSolcCompiler {
 }
 
 impl ZkSolcCompiler {
+    /// Get zksolc command wrapper
     pub fn zksolc(&self, input: &ZkSolcVersionedInput) -> Result<ZkSolc> {
         let solc = match &self.solc {
             SolcCompiler::Specific(solc) => Some(solc.solc.clone()),
@@ -321,6 +329,7 @@ impl ZkSolc {
         })
     }
 
+    /// Get zksolc path for a given version
     pub fn get_path_for_version(version: &Version) -> Result<PathBuf> {
         let maybe_zksolc = Self::find_installed_version(version)?;
 
@@ -363,6 +372,7 @@ impl ZkSolc {
         Ok(compiler_output)
     }
 
+    /// Get installed versions of zksync solc
     pub fn solc_installed_versions() -> Vec<Version> {
         if let Ok(dir) = Self::compilers_dir() {
             let os = get_operating_system().unwrap();
@@ -387,6 +397,7 @@ impl ZkSolc {
         }
     }
 
+    /// Get available zksync solc versions
     pub fn solc_available_versions() -> Vec<Version> {
         let mut ret = vec![];
         let min_max_patch_by_minor_versions =
@@ -529,6 +540,7 @@ impl ZkSolc {
         compiler_blocking_install(solc_path, lock_path, &download_url, &label)
     }
 
+    /// Get path for installed zksolc version. Returns `Ok(None)` if not installed
     pub fn find_installed_version(version: &Version) -> Result<Option<PathBuf>> {
         let zksolc = Self::compiler_path(version)?;
 
@@ -538,6 +550,7 @@ impl ZkSolc {
         Ok(Some(zksolc))
     }
 
+    /// Get path for installed ZKsync solc version. Returns `Ok(None)` if not installed
     pub fn find_solc_installed_version(version_str: &str) -> Result<Option<PathBuf>> {
         let solc = Self::solc_path(version_str)?;
 

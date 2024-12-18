@@ -12,11 +12,15 @@ use std::{borrow::Cow, collections::BTreeMap};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Contract {
+    /// The contract abi
     pub abi: Option<JsonAbi>,
+    /// The contract metadata
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    /// The contract userdoc
     #[serde(default)]
     pub userdoc: UserDoc,
+    /// The contract devdoc
     #[serde(default)]
     pub devdoc: DevDoc,
     /// The contract optimized IR code.
@@ -44,10 +48,12 @@ fn storage_layout_is_empty(storage_layout: &StorageLayout) -> bool {
 }
 
 impl Contract {
+    /// Returns true if contract is not linked
     pub fn is_unlinked(&self) -> bool {
         self.hash.is_none() || !self.missing_libraries.is_empty()
     }
 
+    /// takes missing libraries output and transforms into link references
     pub fn missing_libs_to_link_references(
         missing_libraries: &[String],
     ) -> BTreeMap<String, BTreeMap<String, Vec<Offsets>>> {
@@ -72,6 +78,7 @@ impl Contract {
         Self::missing_libs_to_link_references(self.missing_libraries.as_slice())
     }
 
+    /// Get bytecode
     pub fn bytecode(&self) -> Option<Bytecode> {
         self.eravm.as_ref().and_then(|eravm| eravm.bytecode(self.is_unlinked())).map(|object| {
             let mut bytecode: Bytecode = object.into();

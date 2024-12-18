@@ -1,3 +1,4 @@
+//! zksolc output selection
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashSet;
@@ -11,6 +12,7 @@ pub struct OutputSelection {
     pub all: FileOutputSelection,
 }
 
+/// The `solc --standard-json` expected output selection value.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FileOutputSelection {
     /// The per-file output selections.

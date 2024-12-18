@@ -1,3 +1,4 @@
+//! zksolc error from std json output
 use foundry_compilers_artifacts_solc::error::{Severity, SourceLocation};
 
 use foundry_compilers_artifacts_solc::serde_helpers;

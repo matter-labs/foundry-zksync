@@ -1,3 +1,4 @@
+//! `foundry-compilers` core trait implementations and overrides for ZK Sync
 pub mod artifact_output;
 pub mod zksolc;
 
@@ -12,6 +13,7 @@ use foundry_compilers::{
 };
 use zksolc::{input::StandardJsonCompilerInput, ZkSolcCompiler, ZkSolcSettings};
 
+/// zksolc specific standard_json_input to be used in verification
 // https://github.com/foundry-rs/compilers/blob/ff2a8d68a0d85d8f40c545a7a948e84d1bc2488e/crates/compilers/src/lib.rs#L165
 // TODO: foundry_compilers only implements this for compilers that impment Into<SolcSettings>.
 // Maybe this works for us or maybe we can submit required changes upstream
