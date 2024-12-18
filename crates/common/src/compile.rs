@@ -6,7 +6,6 @@ use crate::{
     term::SpinnerReporter,
     TestFunctionExt,
 };
-use alloy_zksync::provider::ZksyncProvider;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Color, Table};
 use eyre::Result;
 use foundry_block_explorers::contract::Metadata;

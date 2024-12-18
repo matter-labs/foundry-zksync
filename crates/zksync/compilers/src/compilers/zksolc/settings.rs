@@ -80,6 +80,7 @@ pub struct ZkSettings {
     pub codegen: Codegen,
     // TODO: era-compiler-solidity uses a BTreeSet of strings. In theory the serialization
     // should be the same but maybe we should double check
+    /// Solidity remappings
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remappings: Vec<Remapping>,
     #[serde(
@@ -87,6 +88,7 @@ pub struct ZkSettings {
         with = "serde_helpers::display_from_str_opt",
         skip_serializing_if = "Option::is_none"
     )]
+    /// EVM version
     pub evm_version: Option<EvmVersion>,
 
     // check if the same (and use `compilers version`)
@@ -98,11 +100,13 @@ pub struct ZkSettings {
     pub output_selection: ZkOutputSelection,
 
     #[serde(default)]
+    /// Optimizer options
     pub optimizer: Optimizer,
     /// Metadata settings
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<SettingsMetadata>,
     #[serde(default)]
+    /// Libraries
     pub libraries: Libraries,
     /// Switch to missing deployable libraries detection mode.
     /// Contracts are not compiled in this mode, and all compilation artifacts are not included.
@@ -127,7 +131,7 @@ pub struct ZkSettings {
     pub suppressed_errors: HashSet<ZkSolcError>,
 }
 
-// Analogous to SolcSettings for Zk compiler
+/// Analogous to SolcSettings for zksolc compiler
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ZkSolcSettings {
@@ -158,6 +162,7 @@ impl ZkSettings {
         }
     }
 
+    /// Removes prefix from all paths
     pub fn strip_prefix(&mut self, base: impl AsRef<Path>) {
         let base = base.as_ref();
         self.remappings.iter_mut().for_each(|r| {
@@ -210,6 +215,7 @@ impl Default for ZkSettings {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+/// Restrictions for zksolc
 pub struct ZkSolcRestrictions();
 
 impl CompilerSettingsRestrictions for ZkSolcRestrictions {
@@ -292,8 +298,10 @@ impl CompilerSettings for ZkSolcSettings {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Optimizer settings
 pub struct Optimizer {
     // TODO: does this have to be an option?
+    /// Enable the optimizer
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
     /// Switch optimizer components on or off in detail.
@@ -301,6 +309,7 @@ pub struct Optimizer {
     /// tweaked here. If "details" is given, "enabled" can be omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub details: Option<OptimizerDetails>,
+    /// Optimizer mode
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<char>,
     /// Whether to try to recompile with -Oz if the bytecode is too large.
@@ -315,10 +324,12 @@ pub struct Optimizer {
 }
 
 impl Optimizer {
+    /// Disable optimizer
     pub fn disable(&mut self) {
         self.enabled.take();
     }
 
+    /// Enable optimizer
     pub fn enable(&mut self) {
         self.enabled = Some(true)
     }
@@ -337,6 +348,7 @@ impl Default for Optimizer {
     }
 }
 
+/// Optimizer details
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct OptimizerDetails {
@@ -380,6 +392,7 @@ impl OptimizerDetails {
     }
 }
 
+/// Settings metadata
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SettingsMetadata {
     /// Use the given hash method for the metadata hash that is appended to the bytecode.
@@ -395,6 +408,7 @@ pub struct SettingsMetadata {
 }
 
 impl SettingsMetadata {
+    /// New SettingsMetadata
     pub fn new(hash: BytecodeHash) -> Self {
         Self { bytecode_hash: Some(hash) }
     }

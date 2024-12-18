@@ -897,6 +897,7 @@ dependencies = [
 [[package]]
 name = "alloy-zksync"
 version = "0.8.0"
+source = "git+https://github.com/popzxc/alloy-zksync.git?rev=4554f91924efca588ad947c4c9ed2242e93d997d#4554f91924efca588ad947c4c9ed2242e93d997d"
 dependencies = [
  "alloy",
  "alloy-consensus-any",
@@ -5317,7 +5318,6 @@ dependencies = [
  "foundry-config",
  "foundry-evm-core",
  "foundry-linking",
- "foundry-zksync-compilers",
  "futures 0.3.31",
  "itertools 0.13.0",
  "rayon",

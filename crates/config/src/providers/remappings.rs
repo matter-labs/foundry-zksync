@@ -1,7 +1,4 @@
-use crate::{
-    foundry_toml_dirs, remappings_from_env_var, remappings_from_newline, utils::get_dir_remapping,
-    Config,
-};
+use crate::{foundry_toml_dirs, remappings_from_env_var, remappings_from_newline, Config};
 use figment::{
     value::{Dict, Map},
     Error, Figment, Metadata, Profile, Provider,

@@ -7,26 +7,21 @@ use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
     compilers::multi::MultiCompiler,
     utils::RuntimeOrHandle,
-    zksolc::ZkSolcCompiler,
-    zksync::{
-        artifact_output::zk::ZkArtifactOutput,
-        compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
-    },
     Project, ProjectCompileOutput, SolcConfig, Vyper,
 };
 use foundry_config::{
-    fs_permissions::PathPermission, Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig,
-    InvariantConfig, RpcEndpoint, RpcEndpoints,
+    fs_permissions::PathPermission,
+    zksync::{ZKSYNC_ARTIFACTS_DIR, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME},
+    Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig, InvariantConfig, RpcEndpoint,
+    RpcEndpoints,
 };
-use foundry_evm::{
-    constants::CALLER,
-    opts::{Env, EvmOpts},
-};
+use foundry_evm::{constants::CALLER, opts::EvmOpts};
 use foundry_test_utils::{
     fd_lock, init_tracing, rpc::next_rpc_endpoint, util::OutputExt, TestCommand, ZkSyncNode,
 };
-use foundry_zksync_compiler::{
-    DualCompiledContracts, ZKSYNC_ARTIFACTS_DIR, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME,
+use foundry_zksync_compilers::{
+    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
+    dual_compiled_contracts::DualCompiledContracts,
 };
 use semver::Version;
 use std::{
@@ -90,13 +85,9 @@ impl ForgeTestProfile {
         let mut zk_project =
             foundry_config::zksync::config_create_project(&zk_config, zk_config.cache, false)
                 .expect("failed creating zksync project");
-        zk_project.paths.artifacts = zk_config.root.as_ref().join("zk").join(ZKSYNC_ARTIFACTS_DIR);
-        zk_project.paths.cache = zk_config
-            .root
-            .as_ref()
-            .join("zk")
-            .join("cache")
-            .join(ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME);
+        zk_project.paths.artifacts = zk_config.root.join("zk").join(ZKSYNC_ARTIFACTS_DIR);
+        zk_project.paths.cache =
+            zk_config.root.join("zk").join("cache").join(ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME);
 
         zk_project
     }
@@ -153,6 +144,7 @@ impl ForgeTestProfile {
             failure_persist_file: Some("testfailure".to_string()),
             show_logs: false,
             timeout: None,
+            no_zksync_reserved_addresses: false,
         };
         config.invariant = InvariantConfig {
             runs: 256,
@@ -178,6 +170,7 @@ impl ForgeTestProfile {
             ),
             show_metrics: false,
             timeout: None,
+            no_zksync_reserved_addresses: false,
         };
 
         config.sanitized()
@@ -216,7 +209,7 @@ pub struct ZkTestData {
     pub zk_config: Config,
     pub zk_project: ZkProject,
     pub output: ProjectCompileOutput,
-    pub zk_output: ZkProjectCompileOutput,
+    pub zk_output: ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
 }
 
 /// Container for test data for a specific test profile.
@@ -234,7 +227,6 @@ impl ForgeTestData {
     /// Uses [get_compiled] to lazily compile the project.
     pub fn new(profile: ForgeTestProfile) -> Self {
         init_tracing();
-<<<<<<< HEAD
 
         // NOTE(zk): We need to manually install the crypto provider as zksync-era uses `aws-lc-rs`
         // provider, while foundry uses the `ring` provider. As a result, rustls cannot
@@ -309,7 +301,14 @@ impl ForgeTestData {
         builder
             .enable_isolation(opts.isolate)
             .sender(config.sender)
-            .build::<MultiCompiler>(root, &self.output, opts.local_evm_env(), opts)
+            .build::<MultiCompiler>(
+                root,
+                &self.output,
+                None,
+                opts.local_evm_env(),
+                opts,
+                DualCompiledContracts::default(),
+            )
             .unwrap()
     }
 
@@ -323,7 +322,7 @@ impl ForgeTestData {
         zk_config.prompt_timeout = 0;
 
         let root = self.zk_test_data.zk_project.root();
-        let mut opts = self.evm_opts.clone();
+        let mut opts = config_evm_opts(&zk_config);
 
         if zk_config.isolate {
             opts.isolate = true;
@@ -333,8 +332,6 @@ impl ForgeTestData {
         let output = self.zk_test_data.output.clone();
         let zk_output = self.zk_test_data.zk_output.clone();
         let dual_compiled_contracts = self.zk_test_data.dual_compiled_contracts.clone();
-        let mut test_opts = self.test_opts.clone();
-        test_opts.fuzz.no_zksync_reserved_addresses = zk_config.fuzz.no_zksync_reserved_addresses;
         let sender = zk_config.sender;
 
         let mut builder = self.base_runner();
@@ -342,8 +339,14 @@ impl ForgeTestData {
         builder
             .enable_isolation(opts.isolate)
             .sender(sender)
-            .with_test_options(test_opts)
-            .build(root, output, Some(zk_output), env, opts, dual_compiled_contracts)
+            .build::<MultiCompiler>(
+                root,
+                &output,
+                Some(zk_output),
+                env,
+                opts,
+                dual_compiled_contracts,
+            )
             .unwrap()
     }
 
@@ -352,7 +355,14 @@ impl ForgeTestData {
         let mut opts = config_evm_opts(&self.config);
         opts.verbosity = 5;
         self.base_runner()
-            .build::<MultiCompiler>(self.project.root(), &self.output, opts.local_evm_env(), opts)
+            .build::<MultiCompiler>(
+                self.project.root(),
+                &self.output,
+                None,
+                opts.local_evm_env(),
+                opts,
+                DualCompiledContracts::default(),
+            )
             .unwrap()
     }
 
@@ -368,7 +378,14 @@ impl ForgeTestData {
 
         self.base_runner()
             .with_fork(fork)
-            .build::<MultiCompiler>(self.project.root(), &self.output, env, opts)
+            .build::<MultiCompiler>(
+                self.project.root(),
+                &self.output,
+                None,
+                env,
+                opts,
+                DualCompiledContracts::default(),
+            )
             .unwrap()
     }
 }
@@ -444,7 +461,9 @@ pub fn get_compiled(project: &mut Project) -> ProjectCompileOutput {
     out
 }
 
-pub fn get_zk_compiled(zk_project: &ZkProject) -> ZkProjectCompileOutput {
+pub fn get_zk_compiled(
+    zk_project: &ZkProject,
+) -> ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput> {
     let lock_file_path = zk_project.sources_path().join(".lock-zk");
     // Compile only once per test run.
     // We need to use a file lock because `cargo-nextest` runs tests in different processes.
@@ -468,30 +487,14 @@ pub fn get_zk_compiled(zk_project: &ZkProject) -> ZkProjectCompileOutput {
         write.write_all(b"1").unwrap();
     }
 
-    let out: ZkProjectCompileOutput = out.expect("failed compiling zksync project");
+    let out: ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput> =
+        out.expect("failed compiling zksync project");
 
     if let Some(ref mut write) = write {
         write.write_all(b"1").unwrap();
     }
     out
 }
-
-pub static EVM_OPTS: LazyLock<EvmOpts> = LazyLock::new(|| EvmOpts {
-    env: Env {
-        gas_limit: u64::MAX,
-        chain_id: None,
-        tx_origin: Config::DEFAULT_SENDER,
-        block_number: 1,
-        block_timestamp: 1,
-        ..Default::default()
-    },
-    sender: Config::DEFAULT_SENDER,
-    initial_balance: U256::MAX,
-    ffi: true,
-    verbosity: 3,
-    memory_limit: 1 << 26,
-    ..Default::default()
-});
 
 /// Default data for the tests group.
 pub static TEST_DATA_DEFAULT: LazyLock<ForgeTestData> =

@@ -7,7 +7,7 @@ use foundry_compilers::{
 use foundry_zksync_compilers::{
     artifacts::output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
     compilers::{
-        artifact_output::zk::{ZkArtifactOutput, ZkContractArtifact},
+        artifact_output::zk::ZkArtifactOutput,
         zksolc::{
             get_solc_version_info,
             settings::{

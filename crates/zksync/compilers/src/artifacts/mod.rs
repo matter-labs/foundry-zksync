@@ -1,3 +1,4 @@
+/// ZKsolc compiler artifacts to be used in foundry-compilers
 use foundry_compilers_artifacts_solc::{
     BytecodeObject, CompactContractRef, FileToContractsMap, SourceFile, SourceFiles,
 };
@@ -21,10 +22,13 @@ pub type Contracts = FileToContractsMap<Contract>;
 /// Output type `zksolc` produces
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct CompilerOutput {
+    /// `zksolc` compiler errors
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<Error>,
+    /// sources that have been compiled
     #[serde(default)]
     pub sources: BTreeMap<PathBuf, SourceFile>,
+    /// compiled contracts
     #[serde(default)]
     pub contracts: FileToContractsMap<Contract>,
     /// The `solc` compiler version.
@@ -52,39 +56,6 @@ impl CompilerOutput {
     /// provide several helper methods
     pub fn split(self) -> (SourceFiles, OutputContracts) {
         (SourceFiles(self.sources), OutputContracts(self.contracts))
-    }
-
-    /// Retains only those files the given iterator yields
-    ///
-    /// In other words, removes all contracts for files not included in the iterator
-    pub fn retain_files<'a, I>(&mut self, files: I)
-    where
-        I: IntoIterator<Item = &'a Path>,
-    {
-        // Note: use `to_lowercase` here because solc not necessarily emits the exact file name,
-        // e.g. `src/utils/upgradeProxy.sol` is emitted as `src/utils/UpgradeProxy.sol`
-        let files: HashSet<_> =
-            files.into_iter().map(|s| s.to_string_lossy().to_lowercase()).collect();
-        self.contracts.retain(|f, _| files.contains(&f.to_string_lossy().to_lowercase()));
-        self.sources.retain(|f, _| files.contains(&f.to_string_lossy().to_lowercase()));
-    }
-
-    pub fn merge(&mut self, other: Self) {
-        self.errors.extend(other.errors);
-        self.contracts.extend(other.contracts);
-        self.sources.extend(other.sources);
-    }
-
-    pub fn join_all(&mut self, root: impl AsRef<Path>) {
-        let root = root.as_ref();
-        self.contracts = std::mem::take(&mut self.contracts)
-            .into_iter()
-            .map(|(path, contracts)| (root.join(path), contracts))
-            .collect();
-        self.sources = std::mem::take(&mut self.sources)
-            .into_iter()
-            .map(|(path, source)| (root.join(path), source))
-            .collect();
     }
 }
 
