@@ -897,7 +897,8 @@ dependencies = [
 [[package]]
 name = "alloy-zksync"
 version = "0.8.0"
-source = "git+https://github.com/popzxc/alloy-zksync.git?rev=4554f91924efca588ad947c4c9ed2242e93d997d#4554f91924efca588ad947c4c9ed2242e93d997d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f13856958a09fecdedde2379b2f53eee29d68eb767021412ade4a92e051c74e9"
 dependencies = [
  "alloy",
  "alloy-consensus-any",
