@@ -12,16 +12,12 @@ use foundry_config::{fs_permissions::PathPermission, FsPermissions};
 use foundry_test_utils::Filter;
 
 // zk-specific repros configuration
-async fn repro_config(
-    issue: usize,
-    should_fail: bool,
-    sender: Option<Address>,
-    test_data: &ForgeTestData,
-) -> TestConfig {
+async fn repro_config(issue: usize, should_fail: bool, sender: Option<Address>) -> TestConfig {
     foundry_test_utils::init_tracing();
     let filter = Filter::path(&format!(".*repros/Issue{issue}.t.sol"));
 
-    let mut config = test_data.config.clone();
+    let test_data = &TEST_DATA_DEFAULT;
+    let mut config = test_data.clone().config.to_owned();
     config.fs_permissions = FsPermissions::new(vec![
         PathPermission::read("./fixtures/zk"),
         PathPermission::read("zkout"),
