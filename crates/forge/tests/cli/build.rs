@@ -1,8 +1,7 @@
 use crate::utils::generate_large_contract;
 use foundry_config::Config;
-use foundry_test_utils::{forgetest, snapbox::IntoData, str, util::OutputExt};
+use foundry_test_utils::{forgetest, snapbox::IntoData, str};
 use globset::Glob;
-use regex::Regex;
 
 forgetest_init!(can_parse_build_filters, |prj, cmd| {
     prj.clear();
@@ -74,15 +73,19 @@ contract Dummy {
 
 forgetest!(initcode_size_exceeds_limit, |prj, cmd| {
     prj.add_source("LargeContract", generate_large_contract(5450).as_str()).unwrap();
-    cmd.args(["build", "--sizes"]).assert_failure().stdout_eq(str![
-        r#"
-...
+    cmd.args(["build", "--sizes"]).assert_failure().stdout_eq(str![[r#"
+[COMPILING_FILES] with [SOLC_VERSION]
+[SOLC_VERSION] [ELAPSED]
+Compiler run successful!
+
+╭--------------+------------------+-------------------+--------------------+---------------------╮
 | Contract     | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
-|--------------|------------------|-------------------|--------------------|---------------------|
-| HugeContract |              194 |            49,344 |             24,382 |                -192 |
-...
-"#
-    ]);
++================================================================================================+
+| HugeContract | 194              | 49,344            | 24,382             | -192                |
+╰--------------+------------------+-------------------+--------------------+---------------------╯
+
+
+"#]]);
 
     cmd.forge_fuse().args(["build", "--sizes", "--json"]).assert_failure().stdout_eq(
         str![[r#"
@@ -101,15 +104,19 @@ forgetest!(initcode_size_exceeds_limit, |prj, cmd| {
 
 forgetest!(initcode_size_limit_can_be_ignored, |prj, cmd| {
     prj.add_source("LargeContract", generate_large_contract(5450).as_str()).unwrap();
-    cmd.args(["build", "--sizes", "--ignore-eip-3860"]).assert_success().stdout_eq(str![
-        r#"
-...
+    cmd.args(["build", "--sizes", "--ignore-eip-3860"]).assert_success().stdout_eq(str![[r#"
+[COMPILING_FILES] with [SOLC_VERSION]
+[SOLC_VERSION] [ELAPSED]
+Compiler run successful!
+
+╭--------------+------------------+-------------------+--------------------+---------------------╮
 | Contract     | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
-|--------------|------------------|-------------------|--------------------|---------------------|
-| HugeContract |              194 |            49,344 |             24,382 |                -192 |
-...
-"#
-    ]);
++================================================================================================+
+| HugeContract | 194              | 49,344            | 24,382             | -192                |
+╰--------------+------------------+-------------------+--------------------+---------------------╯
+
+
+"#]]);
 
     cmd.forge_fuse()
         .args(["build", "--sizes", "--ignore-eip-3860", "--json"])
@@ -141,40 +148,36 @@ Compiler run successful!
 
 // tests build output is as expected
 forgetest_init!(build_sizes_no_forge_std, |prj, cmd| {
-    cmd.args(["build", "--sizes"]).assert_success().stdout_eq(str![
-        r#"
+    prj.write_config(Config {
+        solc: Some(foundry_config::SolcReq::Version(semver::Version::new(0, 8, 27))),
+        ..Default::default()
+    });
+
+    cmd.args(["build", "--sizes"]).assert_success().stdout_eq(str![[r#"
 ...
+
+╭----------+------------------+-------------------+--------------------+---------------------╮
 | Contract | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
-|----------|------------------|-------------------|--------------------|---------------------|
-| Counter  |              236 |               263 |             24,340 |              48,889 |
-...
-"#
-    ]);
++============================================================================================+
+| Counter  | 236              | 263               | 24,340             | 48,889              |
+╰----------+------------------+-------------------+--------------------+---------------------╯
+
+
+"#]]);
 
     cmd.forge_fuse().args(["build", "--sizes", "--json"]).assert_success().stdout_eq(
         str![[r#"
 {
   "Counter": {
-    "runtime_size": 247,
-    "init_size": 277,
-    "runtime_margin": 24329,
-    "init_margin": 48875
+    "runtime_size": 236,
+    "init_size": 263,
+    "runtime_margin": 24340,
+    "init_margin": 48889
   }
-} 
+}
 "#]]
         .is_json(),
     );
-});
-
-// tests build output is as expected in zksync mode
-forgetest_init!(test_zk_build_sizes, |prj, cmd| {
-    cmd.args(["build", "--sizes", "--zksync", "--evm-version", "shanghai"]);
-    let stdout = cmd.assert_success().get_output().stdout_lossy();
-    let pattern =
-        Regex::new(r"\|\s*Counter\s*\|\s*800\s*\|\s*800\s*\|\s*450,199\s*\|\s*450,199\s*\|")
-            .unwrap();
-
-    assert!(pattern.is_match(&stdout), "Unexpected size output:\n{stdout}");
 });
 
 // tests that skip key in config can be used to skip non-compilable contract

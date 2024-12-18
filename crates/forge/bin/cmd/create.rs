@@ -1,10 +1,11 @@
+use crate::cmd::install;
 use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
-use alloy_network::{AnyNetwork, EthereumWallet, Network, ReceiptResponse, TransactionBuilder};
+use alloy_network::{AnyNetwork, AnyTransactionReceipt, EthereumWallet, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
-use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest};
+use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
@@ -73,6 +74,10 @@ pub struct CreateArgs {
     )]
     constructor_args_path: Option<PathBuf>,
 
+    /// Broadcast the transaction.
+    #[arg(long)]
+    pub broadcast: bool,
+
     /// Verify contract after creation.
     #[arg(long)]
     verify: bool,
@@ -108,6 +113,7 @@ pub struct CreateArgs {
     retry: RetryArgs,
 }
 
+#[derive(Debug, Default)]
 /// Data used to deploy a contract on zksync
 pub struct ZkSyncData {
     #[allow(dead_code)]
@@ -119,7 +125,14 @@ pub struct ZkSyncData {
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> Result<()> {
-        let config = self.try_load_config_emit_warnings()?;
+        let mut config = self.try_load_config_emit_warnings()?;
+
+        // Install missing dependencies.
+        if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
+            // need to re-configure here to also catch additional remappings
+            config = self.load_config();
+        }
+
         // Find Project & Compile
         let project = config.project()?;
 
@@ -339,6 +352,10 @@ impl CreateArgs {
         } else {
             provider.get_chain_id().await?
         };
+
+        // Whether to broadcast the transaction or not
+        let dry_run = !self.broadcast;
+
         if self.unlocked {
             // Deploy with unlocked account
             let sender = self.eth.wallet.from.expect("required");
@@ -351,6 +368,7 @@ impl CreateArgs {
                 sender,
                 config.transaction_timeout,
                 id,
+                dry_run,
             )
             .await
         } else {
@@ -369,6 +387,7 @@ impl CreateArgs {
                 deployer,
                 config.transaction_timeout,
                 id,
+                dry_run,
             )
             .await
         }
@@ -449,6 +468,7 @@ impl CreateArgs {
         deployer_address: Address,
         timeout: u64,
         id: ArtifactId,
+        dry_run: bool,
     ) -> Result<()> {
         let bin = bin.into_bytes().unwrap_or_else(|| {
             panic!("no bytecode found in bin object for {}", self.contract.name)
@@ -528,6 +548,31 @@ impl CreateArgs {
             self.verify_preflight_check(constructor_args.clone(), chain, &id).await?;
         }
 
+        if dry_run {
+            if !shell::is_json() {
+                sh_warn!("Dry run enabled, not broadcasting transaction\n")?;
+
+                sh_println!("Contract: {}", self.contract.name)?;
+                sh_println!(
+                    "Transaction: {}",
+                    serde_json::to_string_pretty(&deployer.tx.clone())?
+                )?;
+                sh_println!("ABI: {}\n", serde_json::to_string_pretty(&abi)?)?;
+
+                sh_warn!("To broadcast this transaction, add --broadcast to the previous command. See forge create --help for more.")?;
+            } else {
+                let output = json!({
+                    "contract": self.contract.name,
+                    "transaction": &deployer.tx,
+                    "abi":&abi
+                });
+                sh_println!("{}", serde_json::to_string_pretty(&output)?)?;
+            }
+
+            return Ok(());
+>>>>>>> 59f354c179f4e7f6d7292acb3d068815c79286d1
+        }
+
         // Deploy the actual contract
         let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
 
@@ -538,7 +583,7 @@ impl CreateArgs {
                 "deployedTo": address.to_string(),
                 "transactionHash": receipt.transaction_hash
             });
-            sh_println!("{output}")?;
+            sh_println!("{}", serde_json::to_string_pretty(&output)?)?;
         } else {
             sh_println!("Deployer: {deployer_address}")?;
             sh_println!("Deployed to: {address}")?;
@@ -713,6 +758,11 @@ impl CreateArgs {
             None
         };
         let verify = VerifyArgs {
+<<<<<<< HEAD
+=======
+>>>>>>> 59f354c179f4e7f6d7292acb3d068815c79286d1
+=======
+>>>>>>> main
             address,
             contract: Some(self.contract),
             compiler_version: None,
@@ -733,7 +783,12 @@ impl CreateArgs {
             evm_version: self.opts.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
+<<<<<<< HEAD
+            // compilation_profile: Some(id.profile.to_string()),
+            compilation_profile: None, // TODO(zk): provide comp profile
+=======
             compilation_profile: None, //TODO(zk): provide comp profile
+>>>>>>> main
             zksync: self.opts.compiler.zk.enabled(),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
@@ -1102,12 +1157,8 @@ where
             Some(constructor) => constructor.abi_encode_input(&params).unwrap_or_default(),
         };
 
-        let mut tx: alloy_zksync::network::transaction_request::TransactionRequest =
-            TransactionRequest::default()
-                .to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
-                .into();
-
-        tx = tx
+        let tx = alloy_zksync::network::transaction_request::TransactionRequest::default()
+            .with_to(foundry_zksync_core::CONTRACT_DEPLOYER_ADDRESS.to_address())
             .with_create_params(
                 zk_data.bytecode.clone(),
                 constructor_args,
@@ -1153,6 +1204,8 @@ impl From<PendingTransactionError> for ContractDeploymentError {
 mod tests {
     use super::*;
     use alloy_primitives::I256;
+    use alloy_zksync::network::tx_type::TxType;
+    use utils::get_provider_zksync;
 
     #[test]
     fn can_parse_create() {
@@ -1220,5 +1273,21 @@ mod tests {
         let constructor: Constructor = serde_json::from_str(r#"{"type":"constructor","inputs":[{"name":"_name","type":"int256","internalType":"int256"}],"stateMutability":"nonpayable"}"#).unwrap();
         let params = args.parse_constructor_args(&constructor, &args.constructor_args).unwrap();
         assert_eq!(params, vec![DynSolValue::Int(I256::unchecked_from(-5), 256)]);
+    }
+
+    #[test]
+    fn test_zk_deployer_builds_eip712_transactions() {
+        let client = get_provider_zksync(&Default::default()).expect("failed creating client");
+        let factory =
+            DeploymentTxFactory::new_zk(Default::default(), Default::default(), client, 0);
+
+        let deployer = factory
+            .deploy_tokens_zk(
+                Default::default(),
+                &ZkSyncData { bytecode: [0u8; 32].into(), ..Default::default() },
+            )
+            .expect("failed deploying tokens");
+
+        assert_eq!(TxType::Eip712, deployer.tx.output_tx_type());
     }
 }

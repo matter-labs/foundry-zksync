@@ -2,12 +2,10 @@
 
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
-use forge::{
-    revm::primitives::SpecId, MultiContractRunner, MultiContractRunnerBuilder, TestOptions,
-    TestOptionsBuilder,
-};
+use forge::{revm::primitives::SpecId, MultiContractRunner, MultiContractRunnerBuilder};
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
+    compilers::multi::MultiCompiler,
     utils::RuntimeOrHandle,
     zksolc::ZkSolcCompiler,
     zksync::{
@@ -87,10 +85,6 @@ impl ForgeTestProfile {
         SolcConfig { settings }
     }
 
-    pub fn project(&self) -> Project {
-        self.config().project().expect("Failed to build project")
-    }
-
     pub fn zk_project(&self) -> ZkProject {
         let zk_config = self.zk_config();
         let mut zk_project =
@@ -105,67 +99,6 @@ impl ForgeTestProfile {
             .join(ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME);
 
         zk_project
-    }
-
-    pub fn test_opts(&self, output: &ProjectCompileOutput) -> TestOptions {
-        TestOptionsBuilder::default()
-            .fuzz(FuzzConfig {
-                runs: 256,
-                max_test_rejects: 65536,
-                seed: None,
-                dictionary: FuzzDictionaryConfig {
-                    include_storage: true,
-                    include_push_bytes: true,
-                    dictionary_weight: 40,
-                    max_fuzz_dictionary_addresses: 10_000,
-                    max_fuzz_dictionary_values: 10_000,
-                },
-                gas_report_samples: 256,
-                failure_persist_dir: Some(tempfile::tempdir().unwrap().into_path()),
-                failure_persist_file: Some("testfailure".to_string()),
-                no_zksync_reserved_addresses: false,
-                show_logs: false,
-            })
-            .invariant(InvariantConfig {
-                runs: 256,
-                depth: 15,
-                fail_on_revert: false,
-                call_override: false,
-                dictionary: FuzzDictionaryConfig {
-                    dictionary_weight: 80,
-                    include_storage: true,
-                    include_push_bytes: true,
-                    max_fuzz_dictionary_addresses: 10_000,
-                    max_fuzz_dictionary_values: 10_000,
-                },
-                shrink_run_limit: 5000,
-                max_assume_rejects: 65536,
-                gas_report_samples: 256,
-                failure_persist_dir: Some(tempfile::tempdir().unwrap().into_path()),
-                show_metrics: false,
-                no_zksync_reserved_addresses: false,
-            })
-            .build(output, Path::new(self.project().root()))
-            .expect("Config loaded")
-    }
-
-    pub fn evm_opts(&self) -> EvmOpts {
-        EvmOpts {
-            env: Env {
-                gas_limit: u64::MAX,
-                chain_id: None,
-                tx_origin: CALLER,
-                block_number: 1,
-                block_timestamp: 1,
-                ..Default::default()
-            },
-            sender: CALLER,
-            initial_balance: U256::MAX,
-            ffi: true,
-            verbosity: 3,
-            memory_limit: 1 << 26,
-            ..Default::default()
-        }
     }
 
     /// Build [Config] for test profile.
@@ -186,11 +119,68 @@ impl ForgeTestProfile {
             "fork/Fork.t.sol:DssExecLib:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4".to_string(),
         ];
 
+        config.prompt_timeout = 0;
+
+        config.gas_limit = u64::MAX.into();
+        config.chain = None;
+        config.tx_origin = CALLER;
+        config.block_number = 1;
+        config.block_timestamp = 1;
+
+        config.sender = CALLER;
+        config.initial_balance = U256::MAX;
+        config.ffi = true;
+        config.verbosity = 3;
+        config.memory_limit = 1 << 26;
+
         if self.is_paris() {
             config.evm_version = EvmVersion::Paris;
         }
 
-        config
+        config.fuzz = FuzzConfig {
+            runs: 256,
+            max_test_rejects: 65536,
+            seed: None,
+            dictionary: FuzzDictionaryConfig {
+                include_storage: true,
+                include_push_bytes: true,
+                dictionary_weight: 40,
+                max_fuzz_dictionary_addresses: 10_000,
+                max_fuzz_dictionary_values: 10_000,
+            },
+            gas_report_samples: 256,
+            failure_persist_dir: Some(tempfile::tempdir().unwrap().into_path()),
+            failure_persist_file: Some("testfailure".to_string()),
+            show_logs: false,
+            timeout: None,
+        };
+        config.invariant = InvariantConfig {
+            runs: 256,
+            depth: 15,
+            fail_on_revert: false,
+            call_override: false,
+            dictionary: FuzzDictionaryConfig {
+                dictionary_weight: 80,
+                include_storage: true,
+                include_push_bytes: true,
+                max_fuzz_dictionary_addresses: 10_000,
+                max_fuzz_dictionary_values: 10_000,
+            },
+            shrink_run_limit: 5000,
+            max_assume_rejects: 65536,
+            gas_report_samples: 256,
+            failure_persist_dir: Some(
+                tempfile::Builder::new()
+                    .prefix(&format!("foundry-{self}"))
+                    .tempdir()
+                    .unwrap()
+                    .into_path(),
+            ),
+            show_metrics: false,
+            timeout: None,
+        };
+
+        config.sanitized()
     }
 
     /// Build [Config] for zksync test profile.
@@ -233,9 +223,7 @@ pub struct ZkTestData {
 pub struct ForgeTestData {
     pub project: Project,
     pub output: ProjectCompileOutput,
-    pub test_opts: TestOptions,
-    pub evm_opts: EvmOpts,
-    pub config: Config,
+    pub config: Arc<Config>,
     pub profile: ForgeTestProfile,
     pub zk_test_data: ZkTestData,
 }
@@ -246,16 +234,15 @@ impl ForgeTestData {
     /// Uses [get_compiled] to lazily compile the project.
     pub fn new(profile: ForgeTestProfile) -> Self {
         init_tracing();
+<<<<<<< HEAD
 
         // NOTE(zk): We need to manually install the crypto provider as zksync-era uses `aws-lc-rs`
         // provider, while foundry uses the `ring` provider. As a result, rustls cannot
         // disambiguate between the two while selecting a default provider.
         let _ = rustls::crypto::ring::default_provider().install_default();
-        let mut project = profile.project();
+        let config = Arc::new(profile.config());
+        let mut project = config.project().unwrap();
         let output = get_compiled(&mut project);
-        let test_opts = profile.test_opts(&output);
-        let config = profile.config();
-        let evm_opts = profile.evm_opts();
 
         let zk_test_data = {
             let zk_config = profile.zk_config();
@@ -269,28 +256,23 @@ impl ForgeTestData {
             ZkTestData { dual_compiled_contracts, zk_config, zk_project, output, zk_output }
         };
 
-        Self { project, output, test_opts, evm_opts, config, profile, zk_test_data }
+        Self { project, output, config, profile, zk_test_data }
     }
 
     /// Builds a base runner
     pub fn base_runner(&self) -> MultiContractRunnerBuilder {
         init_tracing();
-        let mut runner = MultiContractRunnerBuilder::new(Arc::new(self.config.clone()))
-            .sender(self.evm_opts.sender)
-            .with_test_options(self.test_opts.clone());
+        let config = self.config.clone();
+        let mut runner = MultiContractRunnerBuilder::new(config).sender(self.config.sender);
         if self.profile.is_paris() {
             runner = runner.evm_spec(SpecId::MERGE);
         }
-
         runner
     }
 
     /// Builds a non-tracing runner
     pub fn runner(&self) -> MultiContractRunner {
-        let mut config = self.config.clone();
-        config.fs_permissions =
-            FsPermissions::new(vec![PathPermission::read_write(manifest_root())]);
-        self.runner_with_config(config)
+        self.runner_with(|_| {})
     }
 
     /// Builds a non-tracing zksync runner
@@ -303,32 +285,31 @@ impl ForgeTestData {
     }
 
     /// Builds a non-tracing runner
-    pub fn runner_with_config(&self, mut config: Config) -> MultiContractRunner {
+    pub fn runner_with(&self, modify: impl FnOnce(&mut Config)) -> MultiContractRunner {
+        let mut config = (*self.config).clone();
+        modify(&mut config);
+        self.runner_with_config(config)
+    }
+
+    fn runner_with_config(&self, mut config: Config) -> MultiContractRunner {
         config.rpc_endpoints = rpc_endpoints();
         config.allow_paths.push(manifest_root().to_path_buf());
 
-        // no prompt testing
-        config.prompt_timeout = 0;
-
-        let root = self.project.root();
-        let mut opts = self.evm_opts.clone();
-
-        if config.isolate {
-            opts.isolate = true;
+        if config.fs_permissions.is_empty() {
+            config.fs_permissions =
+                FsPermissions::new(vec![PathPermission::read_write(manifest_root())]);
         }
 
-        let env = opts.local_evm_env();
-        let output = self.output.clone();
-
-        let sender = config.sender;
+        let opts = config_evm_opts(&config);
 
         let mut builder = self.base_runner();
-        builder.config = Arc::new(config);
+        let config = Arc::new(config);
+        let root = self.project.root();
+        builder.config = config.clone();
         builder
             .enable_isolation(opts.isolate)
-            .sender(sender)
-            .with_test_options(self.test_opts.clone())
-            .build(root, output, None, env, opts, Default::default())
+            .sender(config.sender)
+            .build::<MultiCompiler>(root, &self.output, opts.local_evm_env(), opts)
             .unwrap()
     }
 
@@ -368,23 +349,16 @@ impl ForgeTestData {
 
     /// Builds a tracing runner
     pub fn tracing_runner(&self) -> MultiContractRunner {
-        let mut opts = self.evm_opts.clone();
+        let mut opts = config_evm_opts(&self.config);
         opts.verbosity = 5;
         self.base_runner()
-            .build(
-                self.project.root(),
-                self.output.clone(),
-                None,
-                opts.local_evm_env(),
-                opts,
-                Default::default(),
-            )
+            .build::<MultiCompiler>(self.project.root(), &self.output, opts.local_evm_env(), opts)
             .unwrap()
     }
 
     /// Builds a runner that runs against forked state
     pub async fn forked_runner(&self, rpc: &str) -> MultiContractRunner {
-        let mut opts = self.evm_opts.clone();
+        let mut opts = config_evm_opts(&self.config);
 
         opts.env.chain_id = None; // clear chain id so the correct one gets fetched from the RPC
         opts.fork_url = Some(rpc.to_string());
@@ -394,7 +368,7 @@ impl ForgeTestData {
 
         self.base_runner()
             .with_fork(fork)
-            .build(self.project.root(), self.output.clone(), None, env, opts, Default::default())
+            .build::<MultiCompiler>(self.project.root(), &self.output, env, opts)
             .unwrap()
     }
 }
@@ -551,6 +525,7 @@ pub fn rpc_endpoints() -> RpcEndpoints {
         ("arbitrum", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Arbitrum))),
         ("polygon", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Polygon))),
         ("avaxTestnet", RpcEndpoint::Url("https://api.avax-test.network/ext/bc/C/rpc".into())),
+        ("moonbeam", RpcEndpoint::Url("https://moonbeam-rpc.publicnode.com".into())),
         ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".into())),
     ])
 }
@@ -675,4 +650,8 @@ pub fn deploy_zk_contract(
     } else {
         Err(format!("Deployment failed. Stdout: {stdout}\nStderr: {stderr}"))
     }
+}
+
+fn config_evm_opts(config: &Config) -> EvmOpts {
+    config.to_figment(foundry_config::FigmentProviders::None).extract().unwrap()
 }

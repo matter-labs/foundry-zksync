@@ -100,6 +100,7 @@ fn lil_web3() {
 
 #[test]
 #[cfg_attr(windows, ignore = "Windows cannot find installed programs")]
+#[cfg(not(feature = "isolate-by-default"))]
 fn snekmate() {
     ExtTester::new("pcaversaccio", "snekmate", "df226f4a45e86c8f8c3ff1f9fa3443d260002050")
         .install_command(&["pnpm", "install", "--prefer-offline"])
@@ -145,11 +146,4 @@ fn convex_shutdown_simulation() {
     )
     .fork_block(14445961)
     .run();
-}
-
-#[test]
-fn test_zk_aave_di() {
-    ExtTester::new("Moonsong-Labs", "aave-delivery-infrastructure", "ci")
-        .args(["--zksync", "--skip", "\"*/PayloadScripts.t.sol\""])
-        .run()
 }

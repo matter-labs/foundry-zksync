@@ -106,7 +106,6 @@ jobs:
 
   zk-cargo-test:
     runs-on: ubuntu-22.04-github-hosted-16core
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -145,6 +144,14 @@ jobs:
         run: |
           ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' --filter-expr 'test(~zk)'
 
+  deny:
+    uses: ithacaxyz/ci/.github/workflows/deny.yml@main
+    with:
+      # Clear out arguments to not pass `--all-features` to `cargo deny`.
+      # Many crates have an `openssl` feature which enables banned dependencies.
+      deny-flags: ""
+
+
   check-ci-install:
     name: CI install
     runs-on: ubuntu-22.04
@@ -154,3 +161,18 @@ jobs:
         run: cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/ && cd /tmp && ./install-foundry-zksync
       - name: Verify installation
         run: forge --version
+
+  check-ci-install-anvil:
+    name: CI install anvil-zksync
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install foundry-zksync
+        run: |
+          cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/
+          cd /tmp
+          ./install-foundry-zksync
+      
+      - name: Verify anvil-zksync installation
+        run: anvil-zksync --version

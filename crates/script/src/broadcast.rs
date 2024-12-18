@@ -26,7 +26,7 @@ use foundry_common::{
     provider::{
         get_http_provider, try_get_http_provider, try_get_zksync_http_provider, RetryProvider,
     },
-    TransactionMaybeSigned,
+    shell, TransactionMaybeSigned,
 };
 use foundry_config::Config;
 use foundry_zksync_core::{convert::ConvertH160, ZkTransactionMetadata};
@@ -248,7 +248,12 @@ impl BundledState {
             .sequence
             .sequences()
             .iter()
-            .flat_map(|sequence| sequence.transactions().map(|tx| tx.from().expect("missing from")))
+            .flat_map(|sequence| {
+                sequence
+                    .transactions()
+                    .filter(|tx| tx.is_unsigned())
+                    .map(|tx| tx.from().expect("missing from"))
+            })
             .collect::<AddressHashSet>();
 
         if required_addresses.contains(&Config::DEFAULT_SENDER) {
@@ -463,8 +468,10 @@ impl BundledState {
             seq_progress.inner.write().finish();
         }
 
-        sh_println!("\n\n==========================")?;
-        sh_println!("\nONCHAIN EXECUTION COMPLETE & SUCCESSFUL.")?;
+        if !shell::is_json() {
+            sh_println!("\n\n==========================")?;
+            sh_println!("\nONCHAIN EXECUTION COMPLETE & SUCCESSFUL.")?;
+        }
 
         Ok(BroadcastedState {
             args: self.args,

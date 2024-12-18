@@ -32,6 +32,7 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rand.workspace = true
 snapbox = { version = "0.6", features = ["json", "regex"] }
 tokio.workspace = true
+tempfile.workspace = true
 
 # zk
 zksync_types.workspace = true
