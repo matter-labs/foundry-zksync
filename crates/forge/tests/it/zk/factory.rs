@@ -13,7 +13,7 @@ async fn test_zk_can_deploy_in_method() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     {
         let filter = Filter::new("testClassicFactory|testNestedFactory", "ZkFactoryTest", ".*");
-        TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+        TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
     }
 }
 
@@ -26,7 +26,7 @@ async fn test_zk_can_deploy_in_constructor() {
             "ZkFactoryTest",
             ".*",
         );
-        TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+        TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
     }
 }
 
@@ -35,7 +35,7 @@ async fn test_zk_can_use_predeployed_factory() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     {
         let filter = Filter::new("testUser.*", "ZkFactoryTest", ".*");
-        TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+        TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
     }
 }
 

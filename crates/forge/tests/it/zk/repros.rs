@@ -2,13 +2,11 @@
 //!
 //! Issue list: https://github.com/matter-labs/foundry-zksync/issues
 
-use crate::{
-    config::*,
-    repros::test_repro,
-    test_helpers::{ForgeTestData, TEST_DATA_DEFAULT},
-};
+use std::sync::Arc;
+
+use crate::{config::*, repros::test_repro, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::Address;
-use foundry_config::{fs_permissions::PathPermission, FsPermissions};
+use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_test_utils::Filter;
 
 // zk-specific repros configuration
@@ -17,7 +15,7 @@ async fn repro_config(issue: usize, should_fail: bool, sender: Option<Address>) 
     let filter = Filter::path(&format!(".*repros/Issue{issue}.t.sol"));
 
     let test_data = &TEST_DATA_DEFAULT;
-    let mut config = test_data.clone().config.to_owned();
+    let mut config = Config::clone(&test_data.config);
     config.fs_permissions = FsPermissions::new(vec![
         PathPermission::read("./fixtures/zk"),
         PathPermission::read("zkout"),
@@ -35,9 +33,12 @@ test_repro!(497);
 
 test_repro!(565; |cfg| {
     // FIXME: just use the inline config
-    cfg.runner.test_options.invariant.no_zksync_reserved_addresses = true;
-    cfg.runner.test_options.invariant.fail_on_revert = true;
-    cfg.runner.test_options.invariant.runs = 2;
+    let mut config = Config::clone(&cfg.runner.config);
+    config.invariant.no_zksync_reserved_addresses = true;
+    config.invariant.fail_on_revert = true;
+    config.invariant.runs = 2;
+
+    cfg.runner.config = Arc::new(config);
 });
 
 // https://github.com/matter-labs/foundry-zksync/issues/687
