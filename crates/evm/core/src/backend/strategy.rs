@@ -1,47 +1,110 @@
-use std::{
-    fmt::Debug,
-    sync::{Arc, Mutex},
-};
+use std::fmt::Debug;
 
 use super::{BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
-use alloy_primitives::{Address, U256};
-use revm::{db::CacheDB, primitives::HashSet, DatabaseRef, JournaledState};
-use serde::{Deserialize, Serialize};
+use alloy_primitives::{Address, Log, U256};
+use revm::{
+    db::CacheDB,
+    primitives::{EvmState, HashSet},
+    DatabaseRef,
+};
 
-pub struct BackendStrategyForkInfo<'a> {
-    pub active_fork: Option<&'a Fork>,
+/// A backend-agnostic trait that defines the behavior of a journaled state.
+pub trait JournaledState: Sized + Clone + Debug {
+    // TODO: Probably should be VM-agnostic as well, e.g. we should not expose the state
+    // directly, but rather a set of methods to interact with it.
+    fn evm_state(&self) -> &EvmState;
+    fn evm_state_mut(&mut self) -> &mut EvmState;
+
+    fn logs(&self) -> &[Log];
+    fn logs_mut(&mut self) -> &mut Vec<Log>;
+
+    fn depth(&self) -> usize;
+    fn set_depth(&mut self, depth: usize);
+
+    fn load_account<DB: revm::Database>(
+        &mut self,
+        address: Address,
+        db: &mut DB,
+    ) -> Result<
+        revm::interpreter::StateLoad<&mut revm::primitives::Account>,
+        revm::primitives::EVMError<DB::Error>,
+    >;
+
+    fn touch(&mut self, address: &Address);
+}
+
+impl JournaledState for revm::JournaledState {
+    fn evm_state(&self) -> &EvmState {
+        &self.state
+    }
+
+    fn evm_state_mut(&mut self) -> &mut EvmState {
+        &mut self.state
+    }
+
+    fn logs(&self) -> &[Log] {
+        &self.logs
+    }
+
+    fn logs_mut(&mut self) -> &mut Vec<Log> {
+        &mut self.logs
+    }
+
+    fn depth(&self) -> usize {
+        self.depth
+    }
+
+    fn set_depth(&mut self, depth: usize) {
+        self.depth = depth;
+    }
+
+    fn load_account<DB: revm::Database>(
+        &mut self,
+        address: Address,
+        db: &mut DB,
+    ) -> Result<
+        revm::interpreter::StateLoad<&mut revm::primitives::Account>,
+        revm::primitives::EVMError<DB::Error>,
+    > {
+        self.load_account(address, db)
+    }
+
+    fn touch(&mut self, address: &Address) {
+        self.touch(address)
+    }
+}
+
+pub struct BackendStrategyForkInfo<'a, S: BackendStrategy> {
+    pub active_fork: Option<&'a Fork<S>>,
     pub active_type: ForkType,
     pub target_type: ForkType,
 }
 
-pub trait BackendStrategy: Debug + Send + Sync {
-    fn name(&self) -> &'static str;
-
-    fn new_cloned(&self) -> Arc<Mutex<dyn BackendStrategy>>;
+pub trait BackendStrategy: Debug + Send + Sync + Clone + Copy {
+    type JournaledState: JournaledState;
 
     /// When creating or switching forks, we update the AccountInfo of the contract
     fn update_fork_db(
-        &self,
-        fork_info: BackendStrategyForkInfo<'_>,
+        fork_info: BackendStrategyForkInfo<'_, Self>,
         mem_db: &FoundryEvmInMemoryDB,
-        backend_inner: &BackendInner,
-        active_journaled_state: &mut JournaledState,
-        target_fork: &mut Fork,
+        backend_inner: &BackendInner<Self>,
+        active_journaled_state: &mut Self::JournaledState,
+        target_fork: &mut Fork<Self>,
     );
 
     /// Clones the account data from the `active_journaled_state` into the `fork_journaled_state`
     fn merge_journaled_state_data(
-        &self,
         addr: Address,
-        active_journaled_state: &JournaledState,
-        fork_journaled_state: &mut JournaledState,
+        active_journaled_state: &Self::JournaledState,
+        fork_journaled_state: &mut Self::JournaledState,
     );
 
-    fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB);
+    fn merge_db_account_data(addr: Address, active: &ForkDB, fork_db: &mut ForkDB);
+
+    fn new_journaled_state(backend_inner: &BackendInner<Self>) -> Self::JournaledState;
 }
 
 pub trait BackendStrategyExt: BackendStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt>;
     /// Saves the storage keys for immutable variables per address.
     ///
     /// These are required during fork to help merge the persisted addresses, as they are stored
@@ -51,29 +114,20 @@ pub trait BackendStrategyExt: BackendStrategy {
     fn zksync_save_immutable_storage(&mut self, _addr: Address, _keys: HashSet<U256>) {}
 }
 
-struct _ObjectSafe(dyn BackendStrategy);
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct EvmBackendStrategy;
 
 impl BackendStrategy for EvmBackendStrategy {
-    fn name(&self) -> &'static str {
-        "evm"
-    }
-
-    fn new_cloned(&self) -> Arc<Mutex<dyn BackendStrategy>> {
-        Arc::new(Mutex::new(self.clone()))
-    }
+    type JournaledState = revm::JournaledState;
 
     fn update_fork_db(
-        &self,
-        fork_info: BackendStrategyForkInfo<'_>,
+        fork_info: BackendStrategyForkInfo<'_, Self>,
         mem_db: &FoundryEvmInMemoryDB,
         backend_inner: &BackendInner,
-        active_journaled_state: &mut JournaledState,
+        active_journaled_state: &mut Self::JournaledState,
         target_fork: &mut Fork,
     ) {
-        self.update_fork_db_contracts(
+        Self::update_fork_db_contracts(
             fork_info,
             mem_db,
             backend_inner,
@@ -83,10 +137,9 @@ impl BackendStrategy for EvmBackendStrategy {
     }
 
     fn merge_journaled_state_data(
-        &self,
         addr: Address,
-        active_journaled_state: &JournaledState,
-        fork_journaled_state: &mut JournaledState,
+        active_journaled_state: &Self::JournaledState,
+        fork_journaled_state: &mut Self::JournaledState,
     ) {
         EvmBackendMergeStrategy::merge_journaled_state_data(
             addr,
@@ -95,25 +148,25 @@ impl BackendStrategy for EvmBackendStrategy {
         );
     }
 
-    fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB) {
+    fn merge_db_account_data(addr: Address, active: &ForkDB, fork_db: &mut ForkDB) {
         EvmBackendMergeStrategy::merge_db_account_data(addr, active, fork_db);
     }
-}
 
-impl BackendStrategyExt for EvmBackendStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt> {
-        Box::new(self.clone())
+    fn new_journaled_state(backend_inner: &BackendInner) -> Self::JournaledState {
+        revm::JournaledState::new(
+            backend_inner.spec_id,
+            backend_inner.precompiles().addresses().copied().collect(),
+        )
     }
 }
 
 impl EvmBackendStrategy {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`
     pub(crate) fn update_fork_db_contracts(
-        &self,
-        fork_info: BackendStrategyForkInfo<'_>,
+        fork_info: BackendStrategyForkInfo<'_, Self>,
         mem_db: &FoundryEvmInMemoryDB,
         backend_inner: &BackendInner,
-        active_journaled_state: &mut JournaledState,
+        active_journaled_state: &mut revm::JournaledState,
         target_fork: &mut Fork,
     ) {
         let accounts = backend_inner.persistent_accounts.iter().copied();
@@ -141,7 +194,7 @@ impl EvmBackendMergeStrategy {
     pub fn merge_account_data<ExtDB: DatabaseRef>(
         accounts: impl IntoIterator<Item = Address>,
         active: &CacheDB<ExtDB>,
-        active_journaled_state: &mut JournaledState,
+        active_journaled_state: &mut revm::JournaledState,
         target_fork: &mut Fork,
     ) {
         for addr in accounts.into_iter() {
@@ -165,8 +218,8 @@ impl EvmBackendMergeStrategy {
     /// Clones the account data from the `active_journaled_state`  into the `fork_journaled_state`
     pub fn merge_journaled_state_data(
         addr: Address,
-        active_journaled_state: &JournaledState,
-        fork_journaled_state: &mut JournaledState,
+        active_journaled_state: &revm::JournaledState,
+        fork_journaled_state: &mut revm::JournaledState,
     ) {
         if let Some(mut acc) = active_journaled_state.state.get(&addr).cloned() {
             trace!(?addr, "updating journaled_state account data");
