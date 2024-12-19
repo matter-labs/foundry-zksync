@@ -513,4 +513,9 @@ interface Vm {
     function writeLine(string calldata path, string calldata data) external;
     function writeToml(string calldata json, string calldata path) external;
     function writeToml(string calldata json, string calldata path, string calldata valueKey) external;
+    function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;
+    function zkUseFactoryDep(string calldata name) external pure;
+    function zkUsePaymaster(address paymaster_address, bytes calldata paymaster_input) external pure;
+    function zkVm(bool enable) external pure;
+    function zkVmSkip() external pure;
 }
