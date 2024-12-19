@@ -30,7 +30,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     time::Instant,
 };
-use strategy::{BackendStrategyExt, BackendStrategyForkInfo};
+use strategy::{BackendStrategy, BackendStrategyForkInfo};
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -102,7 +102,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
     fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo>;
 
     /// Retrieve the strategy.
-    fn get_strategy(&mut self) -> &mut dyn BackendStrategyExt;
+    fn get_strategy(&mut self) -> &mut dyn BackendStrategy;
 
     /// Reverts the snapshot if it exists
     ///
@@ -460,7 +460,7 @@ struct _ObjectSafe(dyn DatabaseExt);
 #[must_use]
 pub struct Backend {
     /// The behavior strategy.
-    pub strategy: Box<dyn BackendStrategyExt>,
+    pub strategy: Box<dyn BackendStrategy>,
 
     /// The access point for managing forks
     forks: MultiFork,
@@ -496,7 +496,7 @@ pub struct Backend {
 impl Clone for Backend {
     fn clone(&self) -> Self {
         Self {
-            strategy: self.strategy.new_cloned_ext(),
+            strategy: self.strategy.new_cloned(),
             forks: self.forks.clone(),
             mem_db: self.mem_db.clone(),
             fork_init_journaled_state: self.fork_init_journaled_state.clone(),
@@ -512,7 +512,7 @@ impl Backend {
     ///
     /// If `fork` is `Some` this will use a `fork` database, otherwise with an in-memory
     /// database.
-    pub fn spawn(fork: Option<CreateFork>, strategy: Box<dyn BackendStrategyExt>) -> Self {
+    pub fn spawn(fork: Option<CreateFork>, strategy: Box<dyn BackendStrategy>) -> Self {
         Self::new(MultiFork::spawn(), fork, strategy)
     }
 
@@ -525,7 +525,7 @@ impl Backend {
     pub fn new(
         forks: MultiFork,
         fork: Option<CreateFork>,
-        strategy: Box<dyn BackendStrategyExt>,
+        strategy: Box<dyn BackendStrategy>,
     ) -> Self {
         trace!(target: "backend", forking_mode=?fork.is_some(), "creating executor backend");
         // Note: this will take of registering the `fork`
@@ -568,7 +568,7 @@ impl Backend {
         id: &ForkId,
         fork: Fork,
         journaled_state: JournaledState,
-        strategy: Box<dyn BackendStrategyExt>,
+        strategy: Box<dyn BackendStrategy>,
     ) -> Self {
         let mut backend = Self::spawn(None, strategy);
         let fork_ids = backend.inner.insert_new_fork(id.clone(), fork.db, journaled_state);
@@ -586,7 +586,7 @@ impl Backend {
             active_fork_ids: None,
             inner: Default::default(),
             fork_url_type: Default::default(),
-            strategy: self.strategy.new_cloned_ext(),
+            strategy: self.strategy.new_cloned(),
         }
     }
 
@@ -938,7 +938,7 @@ impl DatabaseExt for Backend {
         Ok(ForkInfo { fork_type, fork_env })
     }
 
-    fn get_strategy(&mut self) -> &mut dyn BackendStrategyExt {
+    fn get_strategy(&mut self) -> &mut dyn BackendStrategy {
         self.strategy.as_mut()
     }
 
@@ -1808,7 +1808,7 @@ impl BackendInner {
         id: LocalForkId,
         new_fork_id: ForkId,
         backend: SharedBackend,
-        strategy: &mut dyn BackendStrategyExt,
+        strategy: &mut dyn BackendStrategy,
     ) -> eyre::Result<ForkLookupIndex> {
         let fork_id = self.ensure_fork_id(id)?;
         let idx = self.ensure_fork_index(fork_id)?;
@@ -1937,7 +1937,7 @@ fn commit_transaction(
     fork_id: &ForkId,
     persistent_accounts: &HashSet<Address>,
     inspector: &mut dyn InspectorExt,
-    strategy: &mut dyn BackendStrategyExt,
+    strategy: &mut dyn BackendStrategy,
 ) -> eyre::Result<()> {
     // TODO: Remove after https://github.com/foundry-rs/foundry/pull/9131
     // if the tx has the blob_versioned_hashes field, we assume it's a Cancun block
@@ -1952,8 +1952,7 @@ fn commit_transaction(
         let fork = fork.clone();
         let journaled_state = journaled_state.clone();
         let depth = journaled_state.depth;
-        let mut db =
-            Backend::new_with_fork(fork_id, fork, journaled_state, strategy.new_cloned_ext());
+        let mut db = Backend::new_with_fork(fork_id, fork, journaled_state, strategy.new_cloned());
 
         let mut evm = crate::utils::new_evm_with_inspector(&mut db as _, env, inspector);
         // Adjust inner EVM depth to ensure that inspectors receive accurate data.

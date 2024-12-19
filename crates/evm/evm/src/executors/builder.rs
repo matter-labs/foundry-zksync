@@ -2,7 +2,7 @@ use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::backend::Backend;
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
 
-use super::strategy::ExecutorStrategyExt;
+use super::strategy::ExecutorStrategy;
 
 /// The builder that allows to configure an evm [`Executor`] which a stack of optional
 /// [`revm::Inspector`]s, such as [`Cheatcodes`].
@@ -76,7 +76,7 @@ impl ExecutorBuilder {
 
     /// Builds the executor as configured.
     #[inline]
-    pub fn build(self, env: Env, db: Backend, strategy: Box<dyn ExecutorStrategyExt>) -> Executor {
+    pub fn build(self, env: Env, db: Backend, strategy: Box<dyn ExecutorStrategy>) -> Executor {
         let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
         if stack.block.is_none() {
             stack.block = Some(env.block.clone());

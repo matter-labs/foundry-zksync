@@ -3,10 +3,10 @@ use std::fmt::Debug;
 use alloy_primitives::{Address, U256};
 use alloy_serde::OtherFields;
 use eyre::{Context, Result};
-use foundry_cheatcodes::strategy::{CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy};
+use foundry_cheatcodes::strategy::{CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategy};
 use foundry_evm_core::{
     backend::{
-        strategy::{BackendStrategyExt, EvmBackendStrategy},
+        strategy::{BackendStrategy, EvmBackendStrategy},
         BackendResult, DatabaseExt,
     },
     InspectorExt,
@@ -19,7 +19,7 @@ use revm::{
 
 use super::Executor;
 
-pub trait ExecutorStrategy: Debug + Send + Sync {
+pub trait ExecutorStrategy: Debug + Send + Sync + ExecutorStrategyExt {
     fn name(&self) -> &'static str;
 
     fn new_cloned(&self) -> Box<dyn ExecutorStrategy>;
@@ -55,15 +55,13 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<ResultAndState>;
 
-    fn new_backend_strategy(&self) -> Box<dyn BackendStrategyExt>;
-    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategyExt>;
+    fn new_backend_strategy(&self) -> Box<dyn BackendStrategy>;
+    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategy>;
 
     // TODO perhaps need to create fresh strategies as well
 }
 
-pub trait ExecutorStrategyExt: ExecutorStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn ExecutorStrategyExt>;
-
+pub trait ExecutorStrategyExt {
     fn zksync_set_dual_compiled_contracts(
         &mut self,
         _dual_compiled_contracts: DualCompiledContracts,
@@ -156,17 +154,13 @@ impl ExecutorStrategy for EvmExecutorStrategy {
         Ok(())
     }
 
-    fn new_backend_strategy(&self) -> Box<dyn BackendStrategyExt> {
+    fn new_backend_strategy(&self) -> Box<dyn BackendStrategy> {
         Box::new(EvmBackendStrategy)
     }
 
-    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategyExt> {
+    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategy> {
         Box::new(EvmCheatcodeInspectorStrategy::default())
     }
 }
 
-impl ExecutorStrategyExt for EvmExecutorStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn ExecutorStrategyExt> {
-        Box::new(self.clone())
-    }
-}
+impl ExecutorStrategyExt for EvmExecutorStrategy {}

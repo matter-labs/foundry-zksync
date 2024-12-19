@@ -9,7 +9,7 @@ use foundry_common::{
     shell,
 };
 use foundry_config::{Chain, Config};
-use foundry_evm::executors::strategy::{EvmExecutorStrategy, ExecutorStrategyExt};
+use foundry_evm::executors::strategy::{EvmExecutorStrategy, ExecutorStrategy};
 use foundry_strategy_zksync::ZksyncExecutorStrategy;
 use serde::de::DeserializeOwned;
 use std::{
@@ -93,7 +93,7 @@ pub fn get_provider(config: &Config) -> Result<RetryProvider> {
     get_provider_builder(config)?.build()
 }
 
-pub fn get_executor_strategy(config: &Config) -> Box<dyn ExecutorStrategyExt> {
+pub fn get_executor_strategy(config: &Config) -> Box<dyn ExecutorStrategy> {
     if config.zksync.should_compile() {
         info!("using zksync strategy");
         Box::new(ZksyncExecutorStrategy::default())

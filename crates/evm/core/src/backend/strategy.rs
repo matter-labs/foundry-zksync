@@ -11,7 +11,7 @@ pub struct BackendStrategyForkInfo<'a> {
     pub target_type: ForkType,
 }
 
-pub trait BackendStrategy: Debug + Send + Sync {
+pub trait BackendStrategy: Debug + Send + Sync + BackendStrategyExt {
     fn name(&self) -> &'static str;
 
     fn new_cloned(&self) -> Box<dyn BackendStrategy>;
@@ -37,8 +37,7 @@ pub trait BackendStrategy: Debug + Send + Sync {
     fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB);
 }
 
-pub trait BackendStrategyExt: BackendStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt>;
+pub trait BackendStrategyExt {
     /// Saves the storage keys for immutable variables per address.
     ///
     /// These are required during fork to help merge the persisted addresses, as they are stored
@@ -97,11 +96,7 @@ impl BackendStrategy for EvmBackendStrategy {
     }
 }
 
-impl BackendStrategyExt for EvmBackendStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt> {
-        Box::new(self.clone())
-    }
-}
+impl BackendStrategyExt for EvmBackendStrategy {}
 
 impl EvmBackendStrategy {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`

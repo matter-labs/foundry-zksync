@@ -18,7 +18,7 @@ use crate::{
     CheatsConfig, CheatsCtxt, Result,
 };
 
-pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
+pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorStrategyExt {
     fn name(&self) -> &'static str;
 
     fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy>;
@@ -182,9 +182,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
 }
 
 /// We define this in our fork
-pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn CheatcodeInspectorStrategyExt>;
-
+pub trait CheatcodeInspectorStrategyExt {
     fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
         Ok(Default::default())
     }
@@ -223,10 +221,10 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
 
     fn zksync_set_deployer_call_input(&mut self, _call: &mut CallInputs) {}
 
-    fn zksync_try_create(
+    fn zksync_try_create<'c>(
         &mut self,
         _state: &mut Cheatcodes,
-        _ecx: Ecx,
+        _ecx: Ecx<'_, '_, 'c>,
         _input: &dyn CommonCreateInput,
         _executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CreateOutcome> {
@@ -328,21 +326,11 @@ impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     }
 }
 
-impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn CheatcodeInspectorStrategyExt> {
-        Box::new(self.clone())
-    }
-}
+impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategy {}
 
 impl Clone for Box<dyn CheatcodeInspectorStrategy> {
     fn clone(&self) -> Self {
         self.new_cloned()
-    }
-}
-
-impl Clone for Box<dyn CheatcodeInspectorStrategyExt> {
-    fn clone(&self) -> Self {
-        self.new_cloned_ext()
     }
 }
 

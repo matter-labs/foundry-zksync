@@ -2,10 +2,10 @@ use alloy_primitives::{Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
-use foundry_cheatcodes::strategy::CheatcodeInspectorStrategyExt;
+use foundry_cheatcodes::strategy::CheatcodeInspectorStrategy;
 
 use foundry_evm::{
-    backend::{strategy::BackendStrategyExt, BackendResult, DatabaseExt},
+    backend::{strategy::BackendStrategy, BackendResult, DatabaseExt},
     executors::{
         strategy::{EvmExecutorStrategy, ExecutorStrategy, ExecutorStrategyExt},
         Executor,
@@ -81,11 +81,11 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
         Ok(())
     }
 
-    fn new_backend_strategy(&self) -> Box<dyn BackendStrategyExt> {
+    fn new_backend_strategy(&self) -> Box<dyn BackendStrategy> {
         Box::new(ZksyncBackendStrategy::default())
     }
 
-    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategyExt> {
+    fn new_cheatcode_inspector_strategy(&self) -> Box<dyn CheatcodeInspectorStrategy> {
         Box::new(ZksyncCheatcodeInspectorStrategy::new(
             self.dual_compiled_contracts.clone(),
             self.zk_env.clone(),
@@ -140,10 +140,6 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
 }
 
 impl ExecutorStrategyExt for ZksyncExecutorStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn ExecutorStrategyExt> {
-        Box::new(self.clone())
-    }
-
     fn zksync_set_dual_compiled_contracts(
         &mut self,
         dual_compiled_contracts: DualCompiledContracts,

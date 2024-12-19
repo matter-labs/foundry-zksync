@@ -240,7 +240,7 @@ impl VerifyBytecodeArgs {
                 gen_blk_num,
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
-                strategy.new_cloned_ext(),
+                strategy.new_cloned(),
             )
             .await?;
 
@@ -444,7 +444,7 @@ impl VerifyBytecodeArgs {
                 simulation_block - 1, // env.fork_block_number
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
-                strategy.new_cloned_ext(),
+                strategy.new_cloned(),
             )
             .await?;
             env.block.number = U256::from(simulation_block);

@@ -680,10 +680,6 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
 }
 
 impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn CheatcodeInspectorStrategyExt> {
-        Box::new(self.clone())
-    }
-
     fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
         self.skip_zk_vm = true;
         Ok(Default::default())

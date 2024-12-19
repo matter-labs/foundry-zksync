@@ -37,7 +37,7 @@ use revm::{
     },
 };
 use std::borrow::Cow;
-use strategy::ExecutorStrategyExt;
+use strategy::ExecutorStrategy;
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -93,7 +93,7 @@ pub struct Executor {
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
 
-    strategy: Option<Box<dyn ExecutorStrategyExt>>,
+    strategy: Option<Box<dyn ExecutorStrategy>>,
 }
 
 impl Clone for Executor {
@@ -104,7 +104,7 @@ impl Clone for Executor {
             inspector: self.inspector.clone(),
             gas_limit: self.gas_limit,
             legacy_assertions: self.legacy_assertions,
-            strategy: self.strategy.as_ref().map(|s| s.new_cloned_ext()),
+            strategy: self.strategy.as_ref().map(|s| s.new_cloned()),
         }
     }
 }
@@ -124,7 +124,7 @@ impl Executor {
         inspector: InspectorStack,
         gas_limit: u64,
         legacy_assertions: bool,
-        strategy: Box<dyn ExecutorStrategyExt>,
+        strategy: Box<dyn ExecutorStrategy>,
     ) -> Self {
         // Need to create a non-empty contract on the cheatcodes address so `extcodesize` checks
         // do not fail.
@@ -150,7 +150,7 @@ impl Executor {
             self.inspector().clone(),
             self.gas_limit,
             self.legacy_assertions,
-            self.strategy.as_ref().map(|s| s.new_cloned_ext()).expect("failed acquiring strategy"),
+            self.strategy.as_ref().map(|s| s.new_cloned()).expect("failed acquiring strategy"),
         )
     }
 
@@ -216,7 +216,7 @@ impl Executor {
 
     pub fn with_strategy<F, R>(&mut self, mut f: F) -> R
     where
-        F: FnMut(&mut dyn ExecutorStrategyExt, &mut Self) -> R,
+        F: FnMut(&mut dyn ExecutorStrategy, &mut Self) -> R,
     {
         let mut strategy = self.strategy.take();
         let result = f(strategy.as_mut().expect("failed acquiring strategy").as_mut(), self);
@@ -461,7 +461,7 @@ impl Executor {
             .strategy
             .as_ref()
             .expect("failed acquiring strategy")
-            .new_cloned_ext()
+            .new_cloned()
             .call_inspect(&mut backend, &mut env, &mut inspector)?;
 
         convert_executed_result(

@@ -129,10 +129,6 @@ impl ZksyncBackendStrategy {
 }
 
 impl BackendStrategyExt for ZksyncBackendStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt> {
-        Box::new(self.clone())
-    }
-
     fn zksync_save_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
         self.persistent_immutable_keys
             .entry(addr)

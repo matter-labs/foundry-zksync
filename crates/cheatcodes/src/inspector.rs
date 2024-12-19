@@ -7,7 +7,7 @@ use crate::{
         DealRecord, GasRecord,
     },
     script::{Broadcast, Wallets},
-    strategy::CheatcodeInspectorStrategyExt,
+    strategy::CheatcodeInspectorStrategy,
     test::{
         assume::AssumeNoRevert,
         expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
@@ -69,7 +69,7 @@ pub use utils::CommonCreateInput;
 
 pub type Ecx<'a, 'b, 'c> = &'a mut EvmContext<&'b mut (dyn DatabaseExt + 'c)>;
 pub type InnerEcx<'a, 'b, 'c> = &'a mut InnerEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
-pub type Strategy<'a> = &'a mut dyn CheatcodeInspectorStrategyExt;
+pub type Strategy<'a> = &'a mut dyn CheatcodeInspectorStrategy;
 
 /// Helper trait for obtaining complete [revm::Inspector] instance from mutable reference to
 /// [Cheatcodes].
@@ -528,7 +528,7 @@ pub struct Cheatcodes {
     pub wallets: Option<Wallets>,
 
     /// The behavior strategy.
-    pub strategy: Option<Box<dyn CheatcodeInspectorStrategyExt>>,
+    pub strategy: Option<Box<dyn CheatcodeInspectorStrategy>>,
 }
 
 impl Clone for Cheatcodes {
@@ -568,7 +568,7 @@ impl Clone for Cheatcodes {
             arbitrary_storage: self.arbitrary_storage.clone(),
             deprecated: self.deprecated.clone(),
             wallets: self.wallets.clone(),
-            strategy: self.strategy.as_ref().map(|s| s.new_cloned_ext()),
+            strategy: self.strategy.as_ref().map(|s| s.new_cloned()),
         }
     }
 }

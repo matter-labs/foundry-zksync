@@ -18,7 +18,7 @@ use foundry_config::Config;
 use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
-    executors::{strategy::ExecutorStrategyExt, ExecutorBuilder},
+    executors::{strategy::ExecutorStrategy, ExecutorBuilder},
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
@@ -85,7 +85,7 @@ pub struct MultiContractRunner {
     /// Library addresses used to link contracts.
     pub libraries: Libraries,
     /// Execution strategy.
-    pub strategy: Box<dyn ExecutorStrategyExt>,
+    pub strategy: Box<dyn ExecutorStrategy>,
 }
 
 impl MultiContractRunner {
@@ -270,7 +270,7 @@ impl MultiContractRunner {
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
-            .build(self.env.clone(), db, self.strategy.new_cloned_ext());
+            .build(self.env.clone(), db, self.strategy.new_cloned());
 
         if !enabled!(tracing::Level::TRACE) {
             span_name = get_contract_name(&identifier);
@@ -407,7 +407,7 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        strategy: Box<dyn ExecutorStrategyExt>,
+        strategy: Box<dyn ExecutorStrategy>,
     ) -> Result<MultiContractRunner> {
         let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);
