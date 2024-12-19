@@ -129,7 +129,6 @@ pub struct ZkSolcCompiler {
     pub solc: SolcCompiler,
 }
 
-#[cfg(feature = "project-util")]
 impl Default for ZkSolcCompiler {
     fn default() -> Self {
         let zksolc =

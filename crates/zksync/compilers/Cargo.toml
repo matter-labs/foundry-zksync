@@ -25,8 +25,6 @@ eyre.workspace = true
 walkdir.workspace = true
 reqwest.workspace = true
 yansi.workspace = true
-similar-asserts.workspace = true
-fd-lock = "4.0.2"
 fs4 = "0.8.2"
 dirs = "5"
 path-slash = "0.2"
@@ -34,3 +32,8 @@ path-slash = "0.2"
 # zk
 zksync_types.workspace = true
 
+[dev-dependencies]
+similar-asserts.workspace = true
+fd-lock = "4.0.2"
+tempfile.workspace = true
+foundry-test-utils.workspace = true

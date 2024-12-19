@@ -7,3 +7,10 @@ pub mod artifacts;
 pub mod compilers;
 pub mod dual_compiled_contracts;
 pub mod libraries;
+
+// TODO: Used in integration tests.
+// find out why cargo complains about unused dev_dependency for these cases
+#[cfg(test)]
+use foundry_test_utils as _;
+#[cfg(test)]
+use tempfile as _;
