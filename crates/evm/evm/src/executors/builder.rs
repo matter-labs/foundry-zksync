@@ -1,7 +1,8 @@
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::backend::Backend;
-use foundry_zksync_core::vm::ZkEnv;
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
+
+use super::strategy::ExecutorStrategy;
 
 /// The builder that allows to configure an evm [`Executor`] which a stack of optional
 /// [`revm::Inspector`]s, such as [`Cheatcodes`].
@@ -21,9 +22,6 @@ pub struct ExecutorBuilder {
     spec_id: SpecId,
 
     legacy_assertions: bool,
-
-    use_zk: bool,
-    zk_env: ZkEnv,
 }
 
 impl Default for ExecutorBuilder {
@@ -34,8 +32,6 @@ impl Default for ExecutorBuilder {
             gas_limit: None,
             spec_id: SpecId::LATEST,
             legacy_assertions: false,
-            use_zk: false,
-            zk_env: Default::default(),
         }
     }
 }
@@ -78,24 +74,10 @@ impl ExecutorBuilder {
         self
     }
 
-    /// Sets the EVM spec to use
-    #[inline]
-    pub fn use_zk_vm(mut self, enable: bool) -> Self {
-        self.use_zk = enable;
-        self
-    }
-
-    /// Sets zk_env
-    #[inline]
-    pub fn zk_env(mut self, zk_env: ZkEnv) -> Self {
-        self.zk_env = zk_env;
-        self
-    }
-
     /// Builds the executor as configured.
     #[inline]
-    pub fn build(self, env: Env, db: Backend) -> Executor {
-        let Self { mut stack, gas_limit, spec_id, legacy_assertions, use_zk, zk_env } = self;
+    pub fn build(self, env: Env, db: Backend, strategy: Box<dyn ExecutorStrategy>) -> Executor {
+        let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
         if stack.block.is_none() {
             stack.block = Some(env.block.clone());
         }
@@ -104,9 +86,6 @@ impl ExecutorBuilder {
         }
         let gas_limit = gas_limit.unwrap_or_else(|| env.block.gas_limit.saturating_to());
         let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(env), spec_id);
-        let mut exec = Executor::new(db, env, stack.build(), gas_limit, legacy_assertions);
-        exec.use_zk = use_zk;
-        exec.zk_env = zk_env;
-        exec
+        Executor::new(db, env, stack.build(), gas_limit, legacy_assertions, strategy)
     }
 }

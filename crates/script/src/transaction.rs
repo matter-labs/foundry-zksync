@@ -5,7 +5,6 @@ use eyre::Result;
 use forge_script_sequence::TransactionWithMetadata;
 use foundry_common::{fmt::format_token_raw, ContractData, TransactionMaybeSigned, SELECTOR_LEN};
 use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, traces::CallTraceDecoder};
-use foundry_zksync_core::ZkTransactionMetadata;
 use itertools::Itertools;
 use revm_inspectors::tracing::types::CallKind;
 use std::collections::BTreeMap;
@@ -16,16 +15,11 @@ pub struct ScriptTransactionBuilder {
 }
 
 impl ScriptTransactionBuilder {
-    pub fn new(
-        transaction: TransactionMaybeSigned,
-        rpc: String,
-        zk: Option<ZkTransactionMetadata>,
-    ) -> Self {
+    pub fn new(transaction: TransactionMaybeSigned, rpc: String) -> Self {
         let mut transaction = TransactionWithMetadata::from_tx_request(transaction);
         transaction.rpc = rpc;
         // If tx.gas is already set that means it was specified in script
         transaction.is_fixed_gas_limit = transaction.tx().gas().is_some();
-        transaction.zk = zk;
 
         Self { transaction }
     }

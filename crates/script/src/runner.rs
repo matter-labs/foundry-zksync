@@ -3,6 +3,7 @@ use crate::build::ScriptPredeployLibraries;
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_rpc_types::TransactionRequest;
+use alloy_serde::OtherFields;
 use eyre::Result;
 use foundry_cheatcodes::BroadcastableTransaction;
 use foundry_config::Config;
@@ -13,7 +14,6 @@ use foundry_evm::{
     revm::interpreter::{return_ok, InstructionResult},
     traces::{TraceKind, Traces},
 };
-use foundry_zksync_core::ZkTransactionMetadata;
 use std::collections::VecDeque;
 
 /// Drives script execution
@@ -81,7 +81,6 @@ impl ScriptRunner {
                         ..Default::default()
                     }
                     .into(),
-                    zk_tx: None,
                 })
             }),
             ScriptPredeployLibraries::Create2(libraries, salt) => {
@@ -117,7 +116,6 @@ impl ScriptRunner {
                             ..Default::default()
                         }
                         .into(),
-                        zk_tx: None,
                     });
                 }
 
@@ -175,12 +173,12 @@ impl ScriptRunner {
         // to simulate EVM behavior where only the tx that deploys the test contract increments the
         // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
-            if let Some(zk_startup_migration) = &mut cheatcodes.zk_startup_migration {
-                debug!("script deployed, allowing startup storage migration");
-                zk_startup_migration.allow();
-            }
-            debug!("script deployed, allowing persisting next nonce update");
-            cheatcodes.zk_persist_nonce_update.persist_next();
+            debug!("script deployed");
+            cheatcodes
+                .strategy
+                .as_mut()
+                .expect("failed acquiring strategy")
+                .base_contract_deployed();
         }
 
         // Optionally call the `setUp` function
@@ -260,11 +258,10 @@ impl ScriptRunner {
         calldata: Option<Bytes>,
         value: Option<U256>,
         authorization_list: Option<Vec<SignedAuthorization>>,
-        (use_zk, zk_tx): (bool, Option<ZkTransactionMetadata>),
+        other_fields: Option<OtherFields>,
     ) -> Result<ScriptResult> {
-        self.executor.use_zk = use_zk;
-        if let Some(zk_tx) = zk_tx {
-            self.executor.setup_zk_tx(zk_tx);
+        if let Some(other_fields) = other_fields {
+            self.executor.set_transaction_other_fields(other_fields);
         }
 
         if let Some(to) = to {

@@ -18,7 +18,7 @@ use foundry_config::Config;
 use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
-    executors::ExecutorBuilder,
+    executors::{strategy::ExecutorStrategy, ExecutorBuilder},
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
@@ -26,7 +26,6 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use foundry_linking::{LinkOutput, Linker};
-use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
 
@@ -85,10 +84,8 @@ pub struct MultiContractRunner {
     pub libs_to_deploy: Vec<Bytes>,
     /// Library addresses used to link contracts.
     pub libraries: Libraries,
-    /// Dual compiled contracts
-    pub dual_compiled_contracts: DualCompiledContracts,
-    /// Use zk runner.
-    pub use_zk: bool,
+    /// Execution strategy.
+    pub strategy: Box<dyn ExecutorStrategy>,
 }
 
 impl MultiContractRunner {
@@ -181,8 +178,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let mut db = Backend::spawn(self.fork.take());
-        db.is_zk = self.use_zk;
+        let db = Backend::spawn(self.fork.take(), self.strategy.new_backend_strategy());
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -254,9 +250,7 @@ impl MultiContractRunner {
             Some(self.known_contracts.clone()),
             Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
-            self.dual_compiled_contracts.clone(),
-            self.use_zk,
-            None,
+            self.strategy.new_cheatcode_inspector_strategy(),
         );
 
         let trace_mode = TraceMode::default()
@@ -273,11 +267,10 @@ impl MultiContractRunner {
                     .enable_isolation(self.isolation)
                     .alphanet(self.alphanet)
             })
-            .use_zk_vm(self.use_zk)
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
-            .build(self.env.clone(), db);
+            .build(self.env.clone(), db, self.strategy.new_cloned());
 
         if !enabled!(tracing::Level::TRACE) {
             span_name = get_contract_name(&identifier);
@@ -414,9 +407,8 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        dual_compiled_contracts: DualCompiledContracts,
+        strategy: Box<dyn ExecutorStrategy>,
     ) -> Result<MultiContractRunner> {
-        let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);
         let linker = Linker::new(root, output.artifact_ids().collect());
@@ -458,7 +450,7 @@ impl MultiContractRunnerBuilder {
             }
         }
 
-        if !use_zk {
+        if zk_output.is_none() {
             known_contracts = ContractsByArtifact::new(linked_contracts);
         } else if let Some(zk_output) = zk_output {
             let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
@@ -516,8 +508,7 @@ impl MultiContractRunnerBuilder {
             known_contracts,
             libs_to_deploy,
             libraries,
-            dual_compiled_contracts,
-            use_zk,
+            strategy,
         })
     }
 }
