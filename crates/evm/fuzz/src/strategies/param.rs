@@ -149,16 +149,27 @@ pub fn fuzz_param_from_state(
 
     // Convert the value based on the parameter type
     match *param {
-        DynSolType::Address => value()
-            .prop_map(move |value| {
-                let addr = Address::from_word(value);
-                if no_zksync_reserved_addresses {
-                    DynSolValue::Address(foundry_zksync_core::to_safe_address(addr))
-                } else {
-                    DynSolValue::Address(addr)
-                }
-            })
-            .boxed(),
+        DynSolType::Address => {
+            let deployed_libs = state.deployed_libs.clone();
+            value()
+                .prop_filter_map("filter address fuzzed from state", move |value| {
+                    let fuzzed_addr = Address::from_word(value);
+                    // Do not use addresses of deployed libraries as fuzz input.
+                    // See <https://github.com/foundry-rs/foundry/issues/8639>.
+                    if !deployed_libs.contains(&fuzzed_addr) {
+                        if no_zksync_reserved_addresses {
+                            Some(DynSolValue::Address(foundry_zksync_core::to_safe_address(
+                                fuzzed_addr,
+                            )))
+                        } else {
+                            Some(DynSolValue::Address(fuzzed_addr))
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .boxed()
+        }
         DynSolType::Function => value()
             .prop_map(move |value| {
                 DynSolValue::Function(alloy_primitives::Function::from_word(value))
@@ -244,7 +255,7 @@ mod tests {
         let f = "testArray(uint64[2] calldata values)";
         let func = get_func(f).unwrap();
         let db = CacheDB::new(EmptyDB::default());
-        let state = EvmFuzzState::new(&db, FuzzDictionaryConfig::default(), false);
+        let state = EvmFuzzState::new(&db, FuzzDictionaryConfig::default(), &[], false);
         let strategy = proptest::prop_oneof![
             60 => fuzz_calldata(func.clone(), &FuzzFixtures::default(), false),
             40 => fuzz_calldata_from_state(func, &state),

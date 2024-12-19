@@ -66,7 +66,7 @@ async fn test_zk_traces_work_during_call() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkTraceOutputDuringCall", "ZkTraceTest", ".*");
 
-    let results = TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).test();
+    let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test();
     let traces =
         &results["zk/Trace.t.sol:ZkTraceTest"].test_results["testZkTraceOutputDuringCall()"].traces;
 
@@ -160,7 +160,7 @@ async fn test_zk_traces_work_during_create() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkTraceOutputDuringCreate", "ZkTraceTest", ".*");
 
-    let results = TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).test();
+    let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test();
     let traces = results["zk/Trace.t.sol:ZkTraceTest"].test_results
         ["testZkTraceOutputDuringCreate()"]
         .traces

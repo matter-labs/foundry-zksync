@@ -43,7 +43,7 @@ itertools.workspace = true
 ciborium = "0.2"
 
 # zk
-foundry-zksync-compiler.workspace = true
+foundry-zksync-compilers.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros"] }
