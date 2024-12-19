@@ -1,6 +1,8 @@
 //! Implementations of [`Testing`](spec::Group::Testing) cheatcodes.
 
-use crate::{Cheatcode, Cheatcodes, CheatsCtxt, Result, Vm::*};
+use crate::{
+    strategy::CheatcodeInspectorStrategyExt, Cheatcode, Cheatcodes, CheatsCtxt, Result, Vm::*,
+};
 use alloy_primitives::Address;
 use alloy_sol_types::SolValue;
 use chrono::DateTime;

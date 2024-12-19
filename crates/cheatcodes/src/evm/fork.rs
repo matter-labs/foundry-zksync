@@ -1,6 +1,6 @@
 use crate::{
-    json::json_value_to_token, Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, DatabaseExt,
-    Result, Vm::*,
+    json::json_value_to_token, strategy::CheatcodeInspectorStrategyExt, Cheatcode, Cheatcodes,
+    CheatcodesExecutor, CheatsCtxt, DatabaseExt, Result, Vm::*,
 };
 use alloy_dyn_abi::DynSolValue;
 use alloy_primitives::{B256, U256};
