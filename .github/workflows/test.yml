@@ -16,7 +16,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  TARGET_RUST_VERSION: "nightly-2024-09-01"
+  TARGET_RUST_VERSION: "nightly-2024-09-05"
 
 jobs:
   nextest:
