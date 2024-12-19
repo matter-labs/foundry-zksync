@@ -47,7 +47,7 @@ use foundry_config::{
 use foundry_evm::{
     backend::Backend,
     constants::DEFAULT_CREATE2_DEPLOYER,
-    executors::{strategy::ExecutorStrategyExt, ExecutorBuilder},
+    executors::ExecutorBuilder,
     inspectors::{
         cheatcodes::{BroadcastableTransactions, Wallets},
         CheatsConfig,

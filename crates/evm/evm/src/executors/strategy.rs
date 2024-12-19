@@ -19,7 +19,7 @@ use revm::{
 
 use super::Executor;
 
-pub trait ExecutorStrategy: Debug + Send + Sync {
+pub trait ExecutorStrategy: Debug + Send + Sync + ExecutorStrategyExt {
     fn name(&self) -> &'static str;
 
     fn new_cloned(&self) -> Box<dyn ExecutorStrategy>;
@@ -163,4 +163,4 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     }
 }
 
-impl<'a> ExecutorStrategyExt for dyn ExecutorStrategy + 'a {}
+impl ExecutorStrategyExt for EvmExecutorStrategy {}

@@ -7,7 +7,7 @@ use crate::{
         DealRecord, GasRecord,
     },
     script::{Broadcast, Wallets},
-    strategy::{CheatcodeInspectorStrategy, CheatcodeInspectorStrategyExt},
+    strategy::CheatcodeInspectorStrategy,
     test::{
         assume::AssumeNoRevert,
         expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},

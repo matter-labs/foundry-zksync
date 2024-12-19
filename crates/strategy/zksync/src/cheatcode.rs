@@ -18,7 +18,7 @@ use foundry_cheatcodes::{
 use foundry_common::TransactionMaybeSigned;
 use foundry_config::fs_permissions::FsAccessKind;
 use foundry_evm::{
-    backend::{strategy::BackendStrategyExt, DatabaseError, LocalForkId},
+    backend::{DatabaseError, LocalForkId},
     constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE},
 };
 use foundry_evm_core::{

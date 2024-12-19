@@ -18,7 +18,7 @@ use crate::{
     CheatsConfig, CheatsCtxt, Result,
 };
 
-pub trait CheatcodeInspectorStrategy: Debug + Send + Sync {
+pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorStrategyExt {
     fn name(&self) -> &'static str;
 
     fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy>;
@@ -326,7 +326,7 @@ impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     }
 }
 
-impl<'a> CheatcodeInspectorStrategyExt for dyn CheatcodeInspectorStrategy + 'a {}
+impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategy {}
 
 impl Clone for Box<dyn CheatcodeInspectorStrategy> {
     fn clone(&self) -> Self {

@@ -11,7 +11,7 @@ pub struct BackendStrategyForkInfo<'a> {
     pub target_type: ForkType,
 }
 
-pub trait BackendStrategy: Debug + Send + Sync {
+pub trait BackendStrategy: Debug + Send + Sync + BackendStrategyExt {
     fn name(&self) -> &'static str;
 
     fn new_cloned(&self) -> Box<dyn BackendStrategy>;
@@ -96,7 +96,7 @@ impl BackendStrategy for EvmBackendStrategy {
     }
 }
 
-impl<'a> BackendStrategyExt for dyn BackendStrategy + 'a {}
+impl BackendStrategyExt for EvmBackendStrategy {}
 
 impl EvmBackendStrategy {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`
