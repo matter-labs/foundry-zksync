@@ -3,9 +3,8 @@
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
-    executors::strategy::{EvmExecutorStrategy, ExecutorStrategyExt},
-    revm::primitives::SpecId,
-    MultiContractRunner, MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
+    executors::strategy::EvmExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
+    MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
 };
 use foundry_cli::utils;
 use foundry_compilers::{
