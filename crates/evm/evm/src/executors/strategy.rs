@@ -19,26 +19,22 @@ use revm::{
 
 use super::Executor;
 
-pub trait ExecutorStrategy: Debug + Send + Sync {
+pub trait ExecutorStrategy: Debug + Send {
     fn name(&self) -> &'static str;
 
     fn new_cloned(&self) -> Box<dyn ExecutorStrategy>;
 
     fn set_balance(
-        &mut self,
+        &self,
         executor: &mut Executor,
         address: Address,
         amount: U256,
     ) -> BackendResult<()>;
 
-    fn set_nonce(
-        &mut self,
-        executor: &mut Executor,
-        address: Address,
-        nonce: u64,
-    ) -> BackendResult<()>;
+    fn set_nonce(&self, executor: &mut Executor, address: Address, nonce: u64)
+        -> BackendResult<()>;
 
-    fn set_inspect_context(&mut self, other_fields: OtherFields);
+    fn set_inspect_context(&self, other_fields: OtherFields);
 
     fn call_inspect(
         &self,
@@ -48,7 +44,7 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
     ) -> eyre::Result<ResultAndState>;
 
     fn transact_inspect(
-        &mut self,
+        &self,
         db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
         _executor_env: &EnvWithHandlerCfg,
@@ -64,13 +60,9 @@ pub trait ExecutorStrategy: Debug + Send + Sync {
 pub trait ExecutorStrategyExt: ExecutorStrategy {
     fn new_cloned_ext(&self) -> Box<dyn ExecutorStrategyExt>;
 
-    fn zksync_set_dual_compiled_contracts(
-        &mut self,
-        _dual_compiled_contracts: DualCompiledContracts,
-    ) {
-    }
+    fn zksync_set_dual_compiled_contracts(&self, _dual_compiled_contracts: DualCompiledContracts) {}
 
-    fn zksync_set_fork_env(&mut self, _fork_url: &str, _env: &Env) -> Result<()> {
+    fn zksync_set_fork_env(&self, _fork_url: &str, _env: &Env) -> Result<()> {
         Ok(())
     }
 }
@@ -87,7 +79,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
         Box::new(self.clone())
     }
 
-    fn set_inspect_context(&mut self, _other_fields: OtherFields) {}
+    fn set_inspect_context(&self, _other_fields: OtherFields) {}
 
     /// Executes the configured test call of the `env` without committing state changes.
     ///
@@ -114,7 +106,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     /// Note: in case there are any cheatcodes executed that modify the environment, this will
     /// update the given `env` with the new values.
     fn transact_inspect(
-        &mut self,
+        &self,
         db: &mut dyn DatabaseExt,
         env: &mut EnvWithHandlerCfg,
         _executor_env: &EnvWithHandlerCfg,
@@ -130,7 +122,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     }
 
     fn set_balance(
-        &mut self,
+        &self,
         executor: &mut Executor,
         address: Address,
         amount: U256,
@@ -144,7 +136,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     }
 
     fn set_nonce(
-        &mut self,
+        &self,
         executor: &mut Executor,
         address: Address,
         nonce: u64,

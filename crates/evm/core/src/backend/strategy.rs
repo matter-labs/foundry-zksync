@@ -1,7 +1,4 @@
-use std::{
-    fmt::Debug,
-    sync::{Arc, Mutex},
-};
+use std::fmt::Debug;
 
 use super::{BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use alloy_primitives::{Address, U256};
@@ -16,8 +13,6 @@ pub struct BackendStrategyForkInfo<'a> {
 
 pub trait BackendStrategy: Debug + Send + Sync {
     fn name(&self) -> &'static str;
-
-    fn new_cloned(&self) -> Arc<Mutex<dyn BackendStrategy>>;
 
     /// When creating or switching forks, we update the AccountInfo of the contract
     fn update_fork_db(
@@ -59,10 +54,6 @@ pub struct EvmBackendStrategy;
 impl BackendStrategy for EvmBackendStrategy {
     fn name(&self) -> &'static str {
         "evm"
-    }
-
-    fn new_cloned(&self) -> Arc<Mutex<dyn BackendStrategy>> {
-        Arc::new(Mutex::new(self.clone()))
     }
 
     fn update_fork_db(

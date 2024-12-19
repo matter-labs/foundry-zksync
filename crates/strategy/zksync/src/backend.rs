@@ -1,7 +1,4 @@
-use std::{
-    collections::hash_map::Entry,
-    sync::{Arc, Mutex},
-};
+use std::collections::hash_map::Entry;
 
 use alloy_primitives::{map::HashMap, Address, U256};
 use foundry_evm::backend::strategy::BackendStrategyExt;
@@ -41,10 +38,6 @@ pub struct ZkBackendInspectData {
 impl BackendStrategy for ZksyncBackendStrategy {
     fn name(&self) -> &'static str {
         "zk"
-    }
-
-    fn new_cloned(&self) -> Arc<Mutex<dyn BackendStrategy>> {
-        Arc::new(Mutex::new(self.clone()))
     }
 
     /// When creating or switching forks, we update the AccountInfo of the contract.
