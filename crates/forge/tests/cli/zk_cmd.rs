@@ -58,15 +58,15 @@ contract ContractOneTest is DSTest {
         .stdout_lossy();
 
     let mut cells = out.split('|');
-    let deployment_cost: u64 = cells.nth(22).unwrap().trim().parse().unwrap();
+    let deployment_cost: u64 = cells.nth(17).unwrap().trim().parse().unwrap();
     let deployment_size: u64 = cells.next().unwrap().trim().parse().unwrap();
-    let function = cells.nth(12).unwrap().trim();
+    let function = cells.nth(25).unwrap().trim();
     let gas: u64 = cells.next().unwrap().trim().parse().unwrap();
 
     let mut cells_zk = out_zk.split('|');
-    let deployment_cost_zk: u64 = cells_zk.nth(22).unwrap().trim().parse().unwrap();
+    let deployment_cost_zk: u64 = cells_zk.nth(17).unwrap().trim().parse().unwrap();
     let deployment_size_zk: u64 = cells_zk.next().unwrap().trim().parse().unwrap();
-    let function_zk = cells_zk.nth(12).unwrap().trim();
+    let function_zk = cells_zk.nth(25).unwrap().trim();
     let gas_zk: u64 = cells_zk.next().unwrap().trim().parse().unwrap();
 
     assert!(deployment_cost_zk > deployment_cost);
