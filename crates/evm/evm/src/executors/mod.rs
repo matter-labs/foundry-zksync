@@ -15,6 +15,7 @@ use alloy_primitives::{
     map::{AddressHashMap, HashMap},
     Address, Bytes, Log, U256,
 };
+use alloy_serde::OtherFields;
 use alloy_sol_types::{sol, SolCall};
 use foundry_evm_core::{
     backend::{Backend, BackendError, BackendResult, CowBackend, DatabaseExt, GLOBAL_FAIL_SLOT},
@@ -27,7 +28,6 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
-use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata};
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
     interpreter::{return_ok, InstructionResult},
@@ -35,9 +35,9 @@ use revm::{
         AuthorizationList, BlockEnv, Bytecode, Env, EnvWithHandlerCfg, ExecutionResult, Output,
         ResultAndState, SignedAuthorization, SpecId, TxEnv, TxKind,
     },
-    Database,
 };
 use std::borrow::Cow;
+use strategy::ExecutorStrategy;
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -50,6 +50,8 @@ pub use invariant::InvariantExecutor;
 
 mod trace;
 pub use trace::TracingExecutor;
+
+pub mod strategy;
 
 sol! {
     interface ITest {
@@ -72,7 +74,7 @@ sol! {
 /// - `deploy`: a special case of `transact`, specialized for persisting the state of a contract
 ///   deployment
 /// - `setup`: a special case of `transact`, used to set up the environment for a test
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Executor {
     /// The underlying `revm::Database` that contains the EVM storage.
     // Note: We do not store an EVM here, since we are really
@@ -91,13 +93,20 @@ pub struct Executor {
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
 
-    /// Sets up the next transaction to be executed as a ZK transaction.
-    zk_tx: Option<ZkTransactionMetadata>,
-    // simulate persisted factory deps
-    zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
+    strategy: Option<Box<dyn ExecutorStrategy>>,
+}
 
-    pub use_zk: bool,
-    pub zk_env: ZkEnv,
+impl Clone for Executor {
+    fn clone(&self) -> Self {
+        Self {
+            backend: self.backend.clone(),
+            env: self.env.clone(),
+            inspector: self.inspector.clone(),
+            gas_limit: self.gas_limit,
+            legacy_assertions: self.legacy_assertions,
+            strategy: self.strategy.as_ref().map(|s| s.new_cloned()),
+        }
+    }
 }
 
 impl Executor {
@@ -115,6 +124,7 @@ impl Executor {
         inspector: InspectorStack,
         gas_limit: u64,
         legacy_assertions: bool,
+        strategy: Box<dyn ExecutorStrategy>,
     ) -> Self {
         // Need to create a non-empty contract on the cheatcodes address so `extcodesize` checks
         // do not fail.
@@ -129,22 +139,19 @@ impl Executor {
             },
         );
 
-        Self {
-            backend,
-            env,
-            inspector,
-            gas_limit,
-            legacy_assertions,
-            zk_tx: None,
-            zk_persisted_factory_deps: Default::default(),
-            use_zk: false,
-            zk_env: Default::default(),
-        }
+        Self { backend, env, inspector, gas_limit, legacy_assertions, strategy: Some(strategy) }
     }
 
     fn clone_with_backend(&self, backend: Backend) -> Self {
         let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(self.env().clone()), self.spec_id());
-        Self::new(backend, env, self.inspector().clone(), self.gas_limit, self.legacy_assertions)
+        Self::new(
+            backend,
+            env,
+            self.inspector().clone(),
+            self.gas_limit,
+            self.legacy_assertions,
+            self.strategy.as_ref().map(|s| s.new_cloned()).expect("failed acquiring strategy"),
+        )
     }
 
     /// Returns a reference to the EVM backend.
@@ -207,18 +214,21 @@ impl Executor {
         Ok(())
     }
 
+    pub fn with_strategy<F, R>(&mut self, mut f: F) -> R
+    where
+        F: FnMut(&mut dyn ExecutorStrategy, &mut Self) -> R,
+    {
+        let mut strategy = self.strategy.take();
+        let result = f(strategy.as_mut().expect("failed acquiring strategy").as_mut(), self);
+        self.strategy = strategy;
+
+        result
+    }
+
     /// Set the balance of an account.
     pub fn set_balance(&mut self, address: Address, amount: U256) -> BackendResult<()> {
-        trace!(?address, ?amount, "setting account balance ZK={}", self.use_zk);
-        let mut account = self.backend().basic_ref(address)?.unwrap_or_default();
-        account.balance = amount;
-        self.backend_mut().insert_account_info(address, account);
-
-        if self.use_zk {
-            let (address, slot) = foundry_zksync_core::state::get_balance_storage(address);
-            self.backend.insert_account_storage(address, slot, amount)?;
-        }
-        Ok(())
+        trace!(?address, ?amount, "setting account balance");
+        self.with_strategy(|strategy, executor| strategy.set_balance(executor, address, amount))
     }
 
     /// Gets the balance of an account
@@ -228,19 +238,7 @@ impl Executor {
 
     /// Set the nonce of an account.
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> BackendResult<()> {
-        let mut account = self.backend().basic_ref(address)?.unwrap_or_default();
-        account.nonce = nonce;
-        self.backend_mut().insert_account_info(address, account);
-        if self.use_zk {
-            let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
-            // fetch the full nonce to preserve account's deployment nonce
-            let full_nonce = self.backend.storage(address, slot)?;
-            let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
-            let new_full_nonce =
-                foundry_zksync_core::state::new_full_nonce(nonce, full_nonce.deploy_nonce);
-            self.backend.insert_account_storage(address, slot, new_full_nonce)?;
-        }
-        Ok(())
+        self.with_strategy(|strategy, executor| strategy.set_nonce(executor, address, nonce))
     }
 
     /// Returns the nonce of an account.
@@ -269,6 +267,14 @@ impl Executor {
     pub fn set_gas_limit(&mut self, gas_limit: u64) -> &mut Self {
         self.gas_limit = gas_limit;
         self
+    }
+
+    #[inline]
+    pub fn set_transaction_other_fields(&mut self, other_fields: OtherFields) {
+        self.strategy
+            .as_mut()
+            .expect("failed acquiring strategy")
+            .set_inspect_context(other_fields);
     }
 
     /// Deploys a contract and commits the new state to the underlying database.
@@ -446,57 +452,47 @@ impl Executor {
     pub fn call_with_env(&self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector().clone();
         let mut backend = CowBackend::new_borrowed(self.backend());
-        let result = match &self.zk_tx {
-            None => backend.inspect(&mut env, &mut inspector)?,
-            Some(zk_tx) => {
-                // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
-                env.block = self.env.block.clone();
-                env.tx.gas_price = self.env.tx.gas_price;
-                backend.inspect_ref_zk(
-                    &mut env,
-                    &self.zk_env,
-                    &mut self.zk_persisted_factory_deps.clone(),
-                    Some(zk_tx.factory_deps.clone()),
-                    zk_tx.paymaster_data.clone(),
-                )?
-            }
-        };
-        convert_executed_result(env, inspector, result, backend.has_state_snapshot_failure())
+        // this is a new call to inspect with a new env, so even if we've cloned the backend
+        // already, we reset the initialized state
+        backend.is_initialized = false;
+        backend.spec_id = env.spec_id();
+
+        let result = self
+            .strategy
+            .as_ref()
+            .expect("failed acquiring strategy")
+            .new_cloned()
+            .call_inspect(&mut backend, &mut env, &mut inspector)?;
+
+        convert_executed_result(
+            env.clone(),
+            inspector,
+            result,
+            backend.has_state_snapshot_failure(),
+        )
     }
 
     /// Execute the transaction configured in `env.tx`.
     #[instrument(name = "transact", level = "debug", skip_all)]
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
-        let mut inspector = self.inspector.clone();
-        let backend = &mut self.backend;
-        let result_and_state = match self.zk_tx.take() {
-            None => backend.inspect(&mut env, &mut inspector)?,
-            Some(zk_tx) => {
-                // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
-                env.block = self.env.block.clone();
-                env.tx.gas_price = self.env.tx.gas_price;
-                backend.inspect_ref_zk(
-                    &mut env,
-                    &self.zk_env,
-                    // this will persist the added factory deps,
-                    // no need to commit them later
-                    &mut self.zk_persisted_factory_deps,
-                    Some(zk_tx.factory_deps),
-                    zk_tx.paymaster_data,
-                )?
-            }
-        };
-        let mut result = convert_executed_result(
-            env,
-            inspector,
-            result_and_state,
-            backend.has_state_snapshot_failure(),
-        )?;
+        self.with_strategy(|strategy, executor| {
+            let mut inspector = executor.inspector.clone();
+            let backend = &mut executor.backend;
+            backend.initialize(&env);
 
-        self.commit(&mut result);
-        Ok(result)
+            let result_and_state =
+                strategy.transact_inspect(backend, &mut env, &executor.env, &mut inspector)?;
+
+            let mut result = convert_executed_result(
+                env.clone(),
+                inspector,
+                result_and_state,
+                backend.has_state_snapshot_failure(),
+            )?;
+
+            executor.commit(&mut result);
+            Ok(result)
+        })
     }
 
     /// Commit the changeset to the database and adjust `self.inspector_config` values according to
@@ -660,10 +656,6 @@ impl Executor {
                 }
             }
         }
-    }
-
-    pub fn setup_zk_tx(&mut self, zk_tx: ZkTransactionMetadata) {
-        self.zk_tx = Some(zk_tx);
     }
 
     /// Creates the environment to use when executing a transaction in a test context

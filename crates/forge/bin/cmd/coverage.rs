@@ -13,14 +13,13 @@ use forge::{
     utils::IcPcMap,
     MultiContractRunnerBuilder, TestOptions,
 };
-use foundry_cli::utils::{LoadConfig, STATIC_FUZZ_SEED};
+use foundry_cli::utils::{self, LoadConfig, STATIC_FUZZ_SEED};
 use foundry_common::{compile::ProjectCompiler, fs};
 use foundry_compilers::{
     artifacts::{sourcemap::SourceMap, CompactBytecode, CompactDeployedBytecode, SolcLanguage},
     Artifact, ArtifactId, Project, ProjectCompileOutput,
 };
 use foundry_config::{Config, SolcReq};
-use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
 use semver::Version;
 use std::{
@@ -223,6 +222,7 @@ impl CoverageArgs {
     ) -> Result<()> {
         let root = project.paths.root;
         let verbosity = evm_opts.verbosity;
+        let strategy = utils::get_executor_strategy(&config);
 
         // Build the contract runner
         let env = evm_opts.evm_env().await?;
@@ -237,7 +237,7 @@ impl CoverageArgs {
                 ..Default::default()
             })
             .set_coverage(true)
-            .build(&root, output.clone(), None, env, evm_opts, DualCompiledContracts::default())?;
+            .build(&root, output.clone(), None, env, evm_opts, strategy)?;
 
         let known_contracts = runner.known_contracts.clone();
 

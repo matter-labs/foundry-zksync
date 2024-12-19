@@ -9,6 +9,8 @@ use foundry_common::{
     shell,
 };
 use foundry_config::{Chain, Config};
+use foundry_evm::executors::strategy::{EvmExecutorStrategy, ExecutorStrategy};
+use foundry_strategy_zksync::ZksyncExecutorStrategy;
 use serde::de::DeserializeOwned;
 use std::{
     ffi::OsStr,
@@ -89,6 +91,16 @@ pub fn abi_to_solidity(abi: &JsonAbi, name: &str) -> Result<String> {
 /// RPC
 pub fn get_provider(config: &Config) -> Result<RetryProvider> {
     get_provider_builder(config)?.build()
+}
+
+pub fn get_executor_strategy(config: &Config) -> Box<dyn ExecutorStrategy> {
+    if config.zksync.should_compile() {
+        info!("using zksync strategy");
+        Box::new(ZksyncExecutorStrategy::default())
+    } else {
+        info!("using evm strategy");
+        Box::new(EvmExecutorStrategy::default())
+    }
 }
 
 /// Returns a [RetryProvider] instantiated using [Config]'s
