@@ -221,10 +221,10 @@ pub trait CheatcodeInspectorStrategyExt {
 
     fn zksync_set_deployer_call_input(&mut self, _call: &mut CallInputs) {}
 
-    fn zksync_try_create<'c>(
+    fn zksync_try_create(
         &mut self,
         _state: &mut Cheatcodes,
-        _ecx: Ecx<'_, '_, 'c>,
+        _ecx: Ecx<'_, '_, '_>,
         _input: &dyn CommonCreateInput,
         _executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CreateOutcome> {
