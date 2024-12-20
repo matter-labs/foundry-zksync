@@ -1,6 +1,5 @@
 //! Invariant tests
 
-/*
 use std::sync::Arc;
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
@@ -16,11 +15,10 @@ async fn test_zk_invariant_deposit() {
     let mut config = Config::clone(&runner.config);
     config.invariant.no_zksync_reserved_addresses = true;
     config.invariant.fail_on_revert = true;
-    config.invariant.runs = 1;
+    config.invariant.runs = 10;
     runner.config = Arc::new(config);
 
     let filter = Filter::new(".*", "ZkInvariantTest", ".*");
 
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
-*/
