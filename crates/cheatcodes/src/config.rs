@@ -1,5 +1,8 @@
 use super::Result;
-use crate::Vm::Rpc;
+use crate::{
+    strategy::{CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategy},
+    Vm::Rpc,
+};
 use alloy_primitives::{map::AddressHashMap, U256};
 use foundry_common::{fs::normalize_path, ContractsByArtifact};
 use foundry_compilers::{utils::canonicalize, ProjectPathsConfig};
@@ -8,8 +11,6 @@ use foundry_config::{
     ResolvedRpcEndpoints,
 };
 use foundry_evm_core::opts::EvmOpts;
-use foundry_zksync_compiler::DualCompiledContracts;
-use foundry_zksync_core::vm::ZkEnv;
 use semver::Version;
 use std::{
     path::{Path, PathBuf},
@@ -55,16 +56,12 @@ pub struct CheatsConfig {
     pub running_contract: Option<String>,
     /// Version of the script/test contract which is currently running.
     pub running_version: Option<Version>,
-    /// ZKSolc -> Solc Contract codes
-    pub dual_compiled_contracts: DualCompiledContracts,
-    /// Use ZK-VM on startup
-    pub use_zk: bool,
+    /// The behavior strategy.
+    pub strategy: Box<dyn CheatcodeInspectorStrategy>,
     /// Whether to enable legacy (non-reverting) assertions.
     pub assertions_revert: bool,
     /// Optional seed for the RNG algorithm.
     pub seed: Option<U256>,
-    /// Era Vm environment
-    pub zk_env: Option<ZkEnv>,
 }
 
 impl CheatsConfig {
@@ -76,9 +73,7 @@ impl CheatsConfig {
         available_artifacts: Option<ContractsByArtifact>,
         running_contract: Option<String>,
         running_version: Option<Version>,
-        dual_compiled_contracts: DualCompiledContracts,
-        use_zk: bool,
-        zk_env: Option<ZkEnv>,
+        strategy: Box<dyn CheatcodeInspectorStrategy>,
     ) -> Self {
         let mut allowed_paths = vec![config.root.0.clone()];
         allowed_paths.extend(config.libs.clone());
@@ -108,11 +103,9 @@ impl CheatsConfig {
             available_artifacts,
             running_contract,
             running_version,
-            dual_compiled_contracts,
-            use_zk,
+            strategy,
             assertions_revert: config.assertions_revert,
             seed: config.fuzz.seed,
-            zk_env,
         }
     }
 
@@ -241,11 +234,9 @@ impl Default for CheatsConfig {
             available_artifacts: Default::default(),
             running_contract: Default::default(),
             running_version: Default::default(),
-            dual_compiled_contracts: Default::default(),
-            use_zk: false,
+            strategy: Box::new(EvmCheatcodeInspectorStrategy::default()),
             assertions_revert: true,
             seed: None,
-            zk_env: Default::default(),
         }
     }
 }
@@ -262,9 +253,7 @@ mod tests {
             None,
             None,
             None,
-            Default::default(),
-            false,
-            None,
+            Box::new(EvmCheatcodeInspectorStrategy::default()),
         )
     }
 

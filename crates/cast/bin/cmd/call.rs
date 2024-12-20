@@ -112,6 +112,7 @@ impl CallArgs {
         let figment = Into::<Figment>::into(&self.eth).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
         let mut config = Config::try_from(figment)?.sanitized();
+        let strategy = utils::get_executor_strategy(&config);
 
         let Self {
             to,
@@ -177,8 +178,15 @@ impl CallArgs {
             env.cfg.disable_block_gas_limit = true;
             env.block.gas_limit = U256::MAX;
 
-            let mut executor =
-                TracingExecutor::new(env, fork, evm_version, debug, decode_internal, alphanet);
+            let mut executor = TracingExecutor::new(
+                env,
+                fork,
+                evm_version,
+                debug,
+                decode_internal,
+                alphanet,
+                strategy,
+            );
 
             let value = tx.value.unwrap_or_default();
             let input = tx.inner.input.into_input().unwrap_or_default();

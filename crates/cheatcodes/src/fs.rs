@@ -12,7 +12,6 @@ use dialoguer::{Input, Password};
 use forge_script_sequence::{BroadcastReader, TransactionWithMetadata};
 use foundry_common::fs;
 use foundry_config::fs_permissions::FsAccessKind;
-use foundry_zksync_compiler::ContractType;
 use revm::interpreter::CreateInputs;
 use revm_inspectors::tracing::types::CallKind;
 use semver::Version;
@@ -284,7 +283,7 @@ impl Cheatcode for getArtifactPathByDeployedCodeCall {
 impl Cheatcode for getCodeCall {
     fn apply(&self, state: &mut Cheatcodes) -> Result {
         let Self { artifactPath: path } = self;
-        Ok(get_artifact_code(state, path, false)?.abi_encode())
+        state.with_strategy(|strategy, state| strategy.get_artifact_code(state, path, false))
     }
 }
 
@@ -350,7 +349,7 @@ impl Cheatcode for deployCode_1Call {
 /// - `path/to/contract.sol:0.8.23`
 /// - `ContractName`
 /// - `ContractName:0.8.23`
-pub(crate) fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<Bytes> {
+pub fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Result<Bytes> {
     let path = if path.ends_with(".json") {
         PathBuf::from(path)
     } else {
@@ -416,27 +415,18 @@ pub(crate) fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) 
                 [] => Err(fmt_err!("no matching artifact found")),
                 [artifact] => Ok(artifact),
                 filtered => {
-                    // If we find more than one artifact, we need to filter by contract type
-                    // depending on whether we are using the zkvm or evm
-                    filtered
-                        .iter()
-                        .find(|(id, _)| {
-                            let contract_type = state
-                                .config
-                                .dual_compiled_contracts
-                                .get_contract_type_by_artifact(id);
-                            match contract_type {
-                                Some(ContractType::ZK) => state.use_zk_vm,
-                                Some(ContractType::EVM) => !state.use_zk_vm,
-                                None => false,
-                            }
-                        })
-                        .or_else(|| {
-                            // If we know the current script/test contract solc version, try to
-                            // filter by it
-                            state.config.running_version.as_ref().and_then(|version| {
-                                filtered.iter().find(|(id, _)| id.version == *version)
-                            })
+                    // If we know the current script/test contract solc version, try to filter
+                    // by it
+                    state
+                        .config
+                        .running_version
+                        .as_ref()
+                        .and_then(|version| {
+                            let filtered = filtered
+                                .iter()
+                                .filter(|(id, _)| id.version == *version)
+                                .collect::<Vec<_>>();
+                            (filtered.len() == 1).then(|| filtered[0])
                         })
                         .ok_or_else(|| fmt_err!("multiple matching artifacts found"))
                 }

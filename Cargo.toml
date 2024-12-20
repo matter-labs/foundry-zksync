@@ -23,6 +23,7 @@ members = [
     "crates/script-sequence/",
     "crates/macros/",
     "crates/test-utils/",
+    "crates/strategy/zksync/",
 ]
 resolver = "2"
 
@@ -173,6 +174,7 @@ foundry-linking = { path = "crates/linking" }
 foundry-zksync-core = { path = "crates/zksync/core" }
 foundry-zksync-compiler = { path = "crates/zksync/compiler" }
 foundry-zksync-inspectors = { path = "crates/zksync/inspectors" }
+foundry-strategy-zksync = { path = "crates/strategy/zksync" }
 
 # solc & compilation utilities
 # foundry-block-explorers = { version = "0.9.0", default-features = false }

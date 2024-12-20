@@ -123,6 +123,7 @@ impl VerifyBytecodeArgs {
         // Setup
         let config = self.load_config_emit_warnings();
         let provider = utils::get_provider(&config)?;
+        let strategy = utils::get_executor_strategy(&config);
 
         // If chain is not set, we try to get it from the RPC.
         // If RPC is not set, the default chain is used.
@@ -239,6 +240,7 @@ impl VerifyBytecodeArgs {
                 gen_blk_num,
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
+                strategy.new_cloned(),
             )
             .await?;
 
@@ -442,6 +444,7 @@ impl VerifyBytecodeArgs {
                 simulation_block - 1, // env.fork_block_number
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
+                strategy.new_cloned(),
             )
             .await?;
             env.block.number = U256::from(simulation_block);

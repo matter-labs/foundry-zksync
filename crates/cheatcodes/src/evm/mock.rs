@@ -15,14 +15,9 @@ impl Cheatcode for clearMockedCallsCall {
 impl Cheatcode for mockCall_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, returnData } = self;
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
-
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_mocked_account(*callee, ccx.ecx, ccx.caller);
-        }
-
-        mock_call(ccx.state, callee, data, None, returnData, InstructionResult::Return);
-        Ok(Default::default())
+        ccx.with_strategy(|strategy, ccx| {
+            strategy.cheatcode_mock_call(ccx, *callee, data, returnData)
+        })
     }
 }
 
@@ -90,14 +85,9 @@ impl Cheatcode for mockCalls_1Call {
 impl Cheatcode for mockCallRevert_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, revertData } = self;
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
-
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_mocked_account(*callee, ccx.ecx, ccx.caller);
-        }
-
-        mock_call(ccx.state, callee, data, None, revertData, InstructionResult::Revert);
-        Ok(Default::default())
+        ccx.with_strategy(|strategy, ccx| {
+            strategy.cheatcode_mock_call_revert(ccx, *callee, data, revertData)
+        })
     }
 }
 
@@ -154,7 +144,7 @@ impl Cheatcode for mockFunctionCall {
     }
 }
 
-fn mock_call(
+pub fn mock_call(
     state: &mut Cheatcodes,
     callee: &Address,
     cdata: &Bytes,
@@ -184,7 +174,7 @@ fn mock_calls(
 
 // Etches a single byte onto the account if it is empty to circumvent the `extcodesize`
 // check Solidity might perform.
-fn make_acc_non_empty(callee: &Address, ecx: InnerEcx) -> Result {
+pub fn make_acc_non_empty(callee: &Address, ecx: InnerEcx) -> Result {
     let acc = ecx.load_account(*callee)?;
 
     let empty_bytecode = acc.info.code.as_ref().map_or(true, Bytecode::is_empty);
