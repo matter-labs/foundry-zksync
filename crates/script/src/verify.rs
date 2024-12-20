@@ -11,20 +11,21 @@ use foundry_cli::opts::{EtherscanOpts, ProjectPathsArgs};
 use foundry_common::ContractsByArtifact;
 use foundry_compilers::{info::ContractInfo, Project};
 use foundry_config::{Chain, Config};
+use foundry_evm::executors::strategy::ExecutorStrategy;
 use foundry_zksync_compiler::ZKSYNC_ARTIFACTS_DIR;
 use semver::Version;
 
 /// State after we have broadcasted the script.
 /// It is assumed that at this point [BroadcastedState::sequence] contains receipts for all
 /// broadcasted transactions.
-pub struct BroadcastedState {
+pub struct BroadcastedState<S: ExecutorStrategy> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<S>,
     pub build_data: LinkedBuildData,
     pub sequence: ScriptSequenceKind,
 }
 
-impl BroadcastedState {
+impl<S: ExecutorStrategy> BroadcastedState<S> {
     pub async fn verify(self) -> Result<()> {
         let Self { args, script_config, build_data, mut sequence, .. } = self;
 

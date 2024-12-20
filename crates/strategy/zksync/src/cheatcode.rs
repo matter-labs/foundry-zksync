@@ -937,7 +937,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
                                     .to_ru256()
                             })
                             .collect::<HashSet<_>>();
-                        ecx.db.get_strategy().zksync_save_immutable_storage(addr, keys);
+                        // ecx.db.get_strategy().zksync_save_immutable_storage(addr, keys);
+                        todo!() // TODO TODO TODO popzxc
                     }
                 }
 

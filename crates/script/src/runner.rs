@@ -9,7 +9,9 @@ use foundry_cheatcodes::BroadcastableTransaction;
 use foundry_config::Config;
 use foundry_evm::{
     constants::{CALLER, DEFAULT_CREATE2_DEPLOYER},
-    executors::{DeployResult, EvmError, ExecutionErr, Executor, RawCallResult},
+    executors::{
+        strategy::ExecutorStrategy, DeployResult, EvmError, ExecutionErr, Executor, RawCallResult,
+    },
     opts::EvmOpts,
     revm::interpreter::{return_ok, InstructionResult},
     traces::{TraceKind, Traces},
@@ -18,13 +20,13 @@ use std::collections::VecDeque;
 
 /// Drives script execution
 #[derive(Debug)]
-pub struct ScriptRunner {
-    pub executor: Executor,
+pub struct ScriptRunner<S: ExecutorStrategy> {
+    pub executor: Executor<S>,
     pub evm_opts: EvmOpts,
 }
 
-impl ScriptRunner {
-    pub fn new(executor: Executor, evm_opts: EvmOpts) -> Self {
+impl<S: ExecutorStrategy> ScriptRunner<S> {
+    pub fn new(executor: Executor<S>, evm_opts: EvmOpts) -> Self {
         Self { executor, evm_opts }
     }
 

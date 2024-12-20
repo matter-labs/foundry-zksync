@@ -22,7 +22,9 @@ use foundry_cli::{
 use foundry_common::shell;
 use foundry_compilers::{artifacts::EvmVersion, info::ContractInfo};
 use foundry_config::{figment, impl_figment_convert, Config};
-use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, utils::configure_tx_req_env};
+use foundry_evm::{
+    backend::DatabaseExt as _, constants::DEFAULT_CREATE2_DEPLOYER, utils::configure_tx_req_env,
+};
 use revm_primitives::{AccountInfo, TxKind};
 use std::path::PathBuf;
 
@@ -240,7 +242,6 @@ impl VerifyBytecodeArgs {
                 gen_blk_num,
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
-                strategy.new_cloned_ext(),
             )
             .await?;
 
@@ -444,7 +445,6 @@ impl VerifyBytecodeArgs {
                 simulation_block - 1, // env.fork_block_number
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
-                strategy.new_cloned_ext(),
             )
             .await?;
             env.block.number = U256::from(simulation_block);

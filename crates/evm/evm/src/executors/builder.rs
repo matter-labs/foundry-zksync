@@ -2,7 +2,7 @@ use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::backend::Backend;
 use revm::primitives::{Env, EnvWithHandlerCfg, SpecId};
 
-use super::strategy::ExecutorStrategyExt;
+use super::strategy::ExecutorStrategy;
 
 /// The builder that allows to configure an evm [`Executor`] which a stack of optional
 /// [`revm::Inspector`]s, such as [`Cheatcodes`].
@@ -13,7 +13,7 @@ use super::strategy::ExecutorStrategyExt;
 /// [`InspectorStack`]: super::InspectorStack
 #[derive(Clone, Debug)]
 #[must_use = "builders do nothing unless you call `build` on them"]
-pub struct ExecutorBuilder {
+pub struct ExecutorBuilder<S: ExecutorStrategy> {
     /// The configuration used to build an `InspectorStack`.
     stack: InspectorStackBuilder,
     /// The gas limit.
@@ -22,9 +22,11 @@ pub struct ExecutorBuilder {
     spec_id: SpecId,
 
     legacy_assertions: bool,
+
+    _s: std::marker::PhantomData<S>,
 }
 
-impl Default for ExecutorBuilder {
+impl<S: ExecutorStrategy> Default for ExecutorBuilder<S> {
     #[inline]
     fn default() -> Self {
         Self {
@@ -32,11 +34,12 @@ impl Default for ExecutorBuilder {
             gas_limit: None,
             spec_id: SpecId::LATEST,
             legacy_assertions: false,
+            _s: Default::default(),
         }
     }
 }
 
-impl ExecutorBuilder {
+impl<S: ExecutorStrategy> ExecutorBuilder<S> {
     /// Create a new executor builder.
     #[inline]
     pub fn new() -> Self {
@@ -76,8 +79,13 @@ impl ExecutorBuilder {
 
     /// Builds the executor as configured.
     #[inline]
-    pub fn build(self, env: Env, db: Backend, strategy: Box<dyn ExecutorStrategyExt>) -> Executor {
-        let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
+    pub fn build(
+        self,
+        env: Env,
+        db: Backend<S::BackendStrategy>,
+        ctx: S::ExecutorContext,
+    ) -> Executor<S> {
+        let Self { mut stack, gas_limit, spec_id, legacy_assertions, _s } = self;
         if stack.block.is_none() {
             stack.block = Some(env.block.clone());
         }
@@ -86,6 +94,6 @@ impl ExecutorBuilder {
         }
         let gas_limit = gas_limit.unwrap_or_else(|| env.block.gas_limit.saturating_to());
         let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(env), spec_id);
-        Executor::new(db, env, stack.build(), gas_limit, legacy_assertions, strategy)
+        Executor::new(db, env, stack.build(), gas_limit, legacy_assertions, ctx)
     }
 }

@@ -247,7 +247,7 @@ pub trait CheatcodeInspectorStrategyExt: CheatcodeInspectorStrategy {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct EvmCheatcodeInspectorStrategy {}
+pub struct EvmCheatcodeInspectorStrategy;
 
 impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     fn name(&self) -> &'static str {

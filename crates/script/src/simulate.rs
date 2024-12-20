@@ -17,7 +17,10 @@ use forge_script_sequence::{ScriptSequence, TransactionWithMetadata};
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_different_gas_calc, now};
 use foundry_common::{ContractData, TransactionMaybeSigned};
-use foundry_evm::traces::{decode_trace_arena, render_trace_arena};
+use foundry_evm::{
+    executors::strategy::ExecutorStrategy,
+    traces::{decode_trace_arena, render_trace_arena},
+};
 use futures::future::{join_all, try_join_all};
 use parking_lot::RwLock;
 use std::{
@@ -30,9 +33,9 @@ use std::{
 ///
 /// Can be either converted directly to [BundledState] or driven to it through
 /// [FilledTransactionsState].
-pub struct PreSimulationState {
+pub struct PreSimulationState<S: ExecutorStrategy> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<S>,
     pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub execution_data: ExecutionData,
@@ -40,13 +43,13 @@ pub struct PreSimulationState {
     pub execution_artifacts: ExecutionArtifacts,
 }
 
-impl PreSimulationState {
+impl<S: ExecutorStrategy> PreSimulationState<S> {
     /// If simulation is enabled, simulates transactions against fork and fills gas estimation and
     /// metadata. Otherwise, metadata (e.g. additional contracts, created contract names) is
     /// left empty.
     ///
     /// Both modes will panic if any of the transactions have None for the `rpc` field.
-    pub async fn fill_metadata(self) -> Result<FilledTransactionsState> {
+    pub async fn fill_metadata(self) -> Result<FilledTransactionsState<S>> {
         let address_to_abi = self.build_address_to_abi_map();
 
         let mut transactions = self
@@ -222,7 +225,7 @@ impl PreSimulationState {
     }
 
     /// Build [ScriptRunner] forking given RPC for each RPC used in the script.
-    async fn build_runners(&self) -> Result<Vec<(String, ScriptRunner)>> {
+    async fn build_runners(&self) -> Result<Vec<(String, ScriptRunner<S>)>> {
         let rpcs = self.execution_artifacts.rpc_data.total_rpcs.clone();
 
         let n = rpcs.len();
@@ -242,22 +245,22 @@ impl PreSimulationState {
 /// At this point we have converted transactions collected during script execution to
 /// [TransactionWithMetadata] objects which contain additional metadata needed for broadcasting and
 /// verification.
-pub struct FilledTransactionsState {
+pub struct FilledTransactionsState<S: ExecutorStrategy> {
     pub args: ScriptArgs,
-    pub script_config: ScriptConfig,
+    pub script_config: ScriptConfig<S>,
     pub script_wallets: Wallets,
     pub build_data: LinkedBuildData,
     pub execution_artifacts: ExecutionArtifacts,
     pub transactions: VecDeque<TransactionWithMetadata>,
 }
 
-impl FilledTransactionsState {
+impl<S: ExecutorStrategy> FilledTransactionsState<S> {
     /// Bundles all transactions of the [`TransactionWithMetadata`] type in a list of
     /// [`ScriptSequence`]. List length will be higher than 1, if we're dealing with a multi
     /// chain deployment.
     ///
     /// Each transaction will be added with the correct transaction type and gas estimation.
-    pub async fn bundle(self) -> Result<BundledState> {
+    pub async fn bundle(self) -> Result<BundledState<S>> {
         let is_multi_deployment = self.execution_artifacts.rpc_data.total_rpcs.len() > 1;
 
         if is_multi_deployment && !self.build_data.libraries.is_empty() {

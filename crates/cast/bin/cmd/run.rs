@@ -167,7 +167,6 @@ impl RunArgs {
             self.debug,
             self.decode_internal,
             alphanet,
-            strategy,
         );
         let mut env =
             EnvWithHandlerCfg::new_with_spec_id(Box::new(env.clone()), executor.spec_id());

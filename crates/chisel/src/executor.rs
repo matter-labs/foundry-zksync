@@ -13,8 +13,11 @@ use eyre::{Result, WrapErr};
 use foundry_cli::utils;
 use foundry_compilers::Artifact;
 use foundry_evm::{
-    backend::Backend, decode::decode_console_logs, executors::ExecutorBuilder,
-    inspectors::CheatsConfig, traces::TraceMode,
+    backend::Backend,
+    decode::decode_console_logs,
+    executors::ExecutorBuilder,
+    inspectors::{cheatcodes::strategy::EvmCheatcodeInspectorStrategy, CheatsConfig},
+    traces::TraceMode,
 };
 use solang_parser::pt::{self, CodeLocation};
 use std::str::FromStr;
@@ -323,7 +326,7 @@ impl SessionSource {
             Some(backend) => backend,
             None => {
                 let fork = self.config.evm_opts.get_fork(&self.config.foundry_config, env.clone());
-                let backend = Backend::spawn(fork, strategy.new_backend_strategy());
+                let backend = Backend::spawn(fork, ());
                 self.config.backend = Some(backend.clone());
                 backend
             }
@@ -339,7 +342,7 @@ impl SessionSource {
                         None,
                         None,
                         Some(self.solc.version.clone()),
-                        strategy.new_cheatcode_inspector_strategy(),
+                        Box::new(EvmCheatcodeInspectorStrategy),
                     )
                     .into(),
                 )
@@ -347,7 +350,7 @@ impl SessionSource {
             .gas_limit(self.config.evm_opts.gas_limit())
             .spec(self.config.foundry_config.evm_spec_id())
             .legacy_assertions(self.config.foundry_config.legacy_assertions)
-            .build(env, backend, strategy);
+            .build(env, backend, ());
 
         // Create a [ChiselRunner] with a default balance of [U256::MAX] and
         // the sender [Address::zero].

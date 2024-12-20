@@ -47,7 +47,7 @@ use foundry_config::{
 use foundry_evm::{
     backend::Backend,
     constants::DEFAULT_CREATE2_DEPLOYER,
-    executors::ExecutorBuilder,
+    executors::{strategy::ExecutorStrategy, ExecutorBuilder},
     inspectors::{
         cheatcodes::{BroadcastableTransactions, Wallets},
         CheatsConfig,
@@ -535,23 +535,28 @@ struct JsonResult<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ScriptConfig {
+pub struct ScriptConfig<S: ExecutorStrategy> {
     pub config: Config,
     pub evm_opts: EvmOpts,
     pub sender_nonce: u64,
     /// Maps a rpc url to a backend
-    pub backends: HashMap<String, Backend>,
+    pub backends: HashMap<String, Backend<S::BackendStrategy>>,
+    pub extra_ctx: S::ExecutorContext,
 }
 
-impl ScriptConfig {
-    pub async fn new(config: Config, evm_opts: EvmOpts) -> Result<Self> {
+impl<S: ExecutorStrategy> ScriptConfig<S> {
+    pub async fn new(
+        config: Config,
+        evm_opts: EvmOpts,
+        extra_ctx: S::ExecutorContext,
+    ) -> Result<Self> {
         let sender_nonce = if let Some(fork_url) = evm_opts.fork_url.as_ref() {
             next_nonce(evm_opts.sender, fork_url).await?
         } else {
             // dapptools compatibility
             1
         };
-        Ok(Self { config, evm_opts, sender_nonce, backends: HashMap::default() })
+        Ok(Self { config, evm_opts, sender_nonce, backends: HashMap::default(), extra_ctx })
     }
 
     pub async fn update_sender(&mut self, sender: Address) -> Result<()> {
@@ -565,7 +570,7 @@ impl ScriptConfig {
         Ok(())
     }
 
-    async fn get_runner(&mut self) -> Result<ScriptRunner> {
+    async fn get_runner(&mut self) -> Result<ScriptRunner<S>> {
         self._get_runner(None, false).await
     }
 
@@ -576,7 +581,7 @@ impl ScriptConfig {
         debug: bool,
         target: ArtifactId,
         dual_compiled_contracts: DualCompiledContracts,
-    ) -> Result<ScriptRunner> {
+    ) -> Result<ScriptRunner<S>> {
         self._get_runner(
             Some((known_contracts, script_wallets, target, dual_compiled_contracts)),
             debug,
@@ -588,17 +593,18 @@ impl ScriptConfig {
         &mut self,
         cheats_data: Option<(ContractsByArtifact, Wallets, ArtifactId, DualCompiledContracts)>,
         debug: bool,
-    ) -> Result<ScriptRunner> {
+    ) -> Result<ScriptRunner<S>> {
         trace!("preparing script runner");
         let env = self.evm_opts.evm_env().await?;
         let mut strategy = utils::get_executor_strategy(&self.config);
 
+        let backend_context = S::backend_ctx(&self.extra_ctx);
         let db = if let Some(fork_url) = self.evm_opts.fork_url.as_ref() {
             match self.backends.get(fork_url) {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(fork, strategy.new_backend_strategy());
+                    let backend = Backend::<S::BackendStrategy>::spawn(fork, backend_context);
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -607,7 +613,7 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(None, strategy.new_backend_strategy())
+            Backend::<S::BackendStrategy>::spawn(None, backend_context)
         };
 
         // We need to enable tracing to decode contract names: local or external.
@@ -624,11 +630,11 @@ impl ScriptConfig {
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
-            strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts);
+            // strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts);
 
-            if let Some(fork_url) = &self.evm_opts.fork_url {
-                strategy.zksync_set_fork_env(fork_url, &env)?;
-            }
+            // if let Some(fork_url) = &self.evm_opts.fork_url {
+            //     strategy.zksync_set_fork_env(fork_url, &env)?;
+            // }
 
             builder = builder.inspectors(|stack| {
                 stack
@@ -639,7 +645,7 @@ impl ScriptConfig {
                             Some(known_contracts),
                             Some(target.name),
                             Some(target.version),
-                            strategy.new_cheatcode_inspector_strategy(),
+                            S::new_cheatcode_inspector_strategy(&self.extra_ctx),
                         )
                         .into(),
                     )

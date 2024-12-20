@@ -22,6 +22,8 @@ use std::{cell::RefCell, collections::BTreeMap};
 mod types;
 pub use types::{CaseOutcome, CounterExampleOutcome, FuzzOutcome};
 
+use super::strategy::ExecutorStrategy;
+
 /// Contains data collected during fuzz test runs.
 #[derive(Default)]
 pub struct FuzzTestData {
@@ -50,9 +52,9 @@ pub struct FuzzTestData {
 /// After instantiation, calling `fuzz` will proceed to hammer the deployed smart contract with
 /// inputs, until it finds a counterexample. The provided [`TestRunner`] contains all the
 /// configuration which can be overridden via [environment variables](proptest::test_runner::Config)
-pub struct FuzzedExecutor {
+pub struct FuzzedExecutor<S: ExecutorStrategy> {
     /// The EVM executor
-    executor: Executor,
+    executor: Executor<S>,
     /// The fuzzer
     runner: TestRunner,
     /// The account that calls tests
@@ -61,10 +63,10 @@ pub struct FuzzedExecutor {
     config: FuzzConfig,
 }
 
-impl FuzzedExecutor {
+impl<S: ExecutorStrategy> FuzzedExecutor<S> {
     /// Instantiates a fuzzed executor given a testrunner
     pub fn new(
-        executor: Executor,
+        executor: Executor<S>,
         runner: TestRunner,
         sender: Address,
         config: FuzzConfig,

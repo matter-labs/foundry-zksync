@@ -178,15 +178,8 @@ impl CallArgs {
             env.cfg.disable_block_gas_limit = true;
             env.block.gas_limit = U256::MAX;
 
-            let mut executor = TracingExecutor::new(
-                env,
-                fork,
-                evm_version,
-                debug,
-                decode_internal,
-                alphanet,
-                strategy,
-            );
+            let mut executor =
+                TracingExecutor::new(env, fork, evm_version, debug, decode_internal, alphanet);
 
             let value = tx.value.unwrap_or_default();
             let input = tx.inner.input.into_input().unwrap_or_default();

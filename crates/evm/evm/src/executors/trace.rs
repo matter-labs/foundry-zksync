@@ -6,14 +6,14 @@ use foundry_evm_traces::{InternalTraceMode, TraceMode};
 use revm::primitives::{Env, SpecId};
 use std::ops::{Deref, DerefMut};
 
-use super::strategy::ExecutorStrategyExt;
+use super::strategy::{EvmExecutorStrategy, ExecutorStrategy};
 
 /// A default executor with tracing enabled
-pub struct TracingExecutor {
-    executor: Executor,
+pub struct TracingExecutor<S: ExecutorStrategy = EvmExecutorStrategy> {
+    executor: Executor<S>,
 }
 
-impl TracingExecutor {
+impl TracingExecutor<EvmExecutorStrategy> {
     pub fn new(
         env: revm::primitives::Env,
         fork: Option<CreateFork>,
@@ -21,9 +21,22 @@ impl TracingExecutor {
         debug: bool,
         decode_internal: bool,
         alphanet: bool,
-        strategy: Box<dyn ExecutorStrategyExt>,
     ) -> Self {
-        let db = Backend::spawn(fork, strategy.new_backend_strategy());
+        Self::new_with_context(env, fork, version, debug, decode_internal, alphanet, ())
+    }
+}
+
+impl<S: ExecutorStrategy> TracingExecutor<S> {
+    pub fn new_with_context(
+        env: revm::primitives::Env,
+        fork: Option<CreateFork>,
+        version: Option<EvmVersion>,
+        debug: bool,
+        decode_internal: bool,
+        alphanet: bool,
+        extra_ctx: S::ExecutorContext,
+    ) -> Self {
+        let db = Backend::<S::BackendStrategy>::spawn(fork, S::backend_ctx(&extra_ctx));
         let trace_mode =
             TraceMode::Call.with_debug(debug).with_decode_internal(if decode_internal {
                 InternalTraceMode::Full
@@ -36,7 +49,7 @@ impl TracingExecutor {
             executor: ExecutorBuilder::new()
                 .inspectors(|stack| stack.trace_mode(trace_mode).alphanet(alphanet))
                 .spec(evm_spec_id(&version.unwrap_or_default(), alphanet))
-                .build(env, db, strategy),
+                .build(env, db, extra_ctx),
         }
     }
 
@@ -44,7 +57,9 @@ impl TracingExecutor {
     pub fn spec_id(&self) -> SpecId {
         self.executor.spec_id()
     }
+}
 
+impl TracingExecutor<EvmExecutorStrategy> {
     /// uses the fork block number from the config
     pub async fn get_fork_material(
         config: &Config,
@@ -61,15 +76,15 @@ impl TracingExecutor {
     }
 }
 
-impl Deref for TracingExecutor {
-    type Target = Executor;
+impl<S: ExecutorStrategy> Deref for TracingExecutor<S> {
+    type Target = Executor<S>;
 
     fn deref(&self) -> &Self::Target {
         &self.executor
     }
 }
 
-impl DerefMut for TracingExecutor {
+impl<S: ExecutorStrategy> DerefMut for TracingExecutor<S> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.executor
     }

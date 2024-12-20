@@ -1,7 +1,6 @@
 use std::collections::hash_map::Entry;
 
 use alloy_primitives::{map::HashMap, Address, U256};
-use foundry_evm::backend::strategy::BackendStrategyExt;
 use foundry_evm_core::backend::{
     strategy::{
         BackendStrategy, BackendStrategyForkInfo, EvmBackendMergeStrategy, EvmBackendStrategy,
@@ -18,8 +17,10 @@ use serde::{Deserialize, Serialize};
 use tracing::trace;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct ZksyncBackendStrategy {
-    evm: EvmBackendStrategy,
+pub struct ZksyncBackendStrategy;
+
+#[derive(Debug, Default, Clone)]
+pub struct Context {
     /// Store storage keys per contract address for immutable variables.
     persistent_immutable_keys: HashMap<Address, HashSet<U256>>,
 }
@@ -36,37 +37,41 @@ pub struct ZkBackendInspectData {
 }
 
 impl BackendStrategy for ZksyncBackendStrategy {
-    fn name(&self) -> &'static str {
-        "zk"
-    }
+    type BackendContext = Context;
 
     /// When creating or switching forks, we update the AccountInfo of the contract.
     fn update_fork_db(
-        &self,
         fork_info: BackendStrategyForkInfo<'_>,
         mem_db: &FoundryEvmInMemoryDB,
         backend_inner: &BackendInner,
         active_journaled_state: &mut JournaledState,
         target_fork: &mut Fork,
+        ctx: &mut Self::BackendContext,
     ) {
-        self.update_fork_db_contracts(
+        Self::update_fork_db_contracts(
             fork_info,
             mem_db,
             backend_inner,
             active_journaled_state,
             target_fork,
+            ctx,
         )
     }
 
     fn merge_journaled_state_data(
-        &self,
         addr: Address,
         active_journaled_state: &JournaledState,
         fork_journaled_state: &mut JournaledState,
+        ctx: &mut Self::BackendContext,
     ) {
-        self.evm.merge_journaled_state_data(addr, active_journaled_state, fork_journaled_state);
+        EvmBackendStrategy::merge_journaled_state_data(
+            addr,
+            active_journaled_state,
+            fork_journaled_state,
+            &mut (),
+        );
         let zk_state =
-            &ZksyncMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
+            &ZksyncMergeState { persistent_immutable_keys: &ctx.persistent_immutable_keys };
         ZksyncBackendMerge::merge_zk_journaled_state_data(
             addr,
             active_journaled_state,
@@ -75,10 +80,15 @@ impl BackendStrategy for ZksyncBackendStrategy {
         );
     }
 
-    fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB) {
-        self.evm.merge_db_account_data(addr, active, fork_db);
+    fn merge_db_account_data(
+        addr: Address,
+        active: &ForkDB,
+        fork_db: &mut ForkDB,
+        ctx: &mut Self::BackendContext,
+    ) {
+        EvmBackendStrategy::merge_db_account_data(addr, active, fork_db, &mut ());
         let zk_state =
-            &ZksyncMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
+            &ZksyncMergeState { persistent_immutable_keys: &ctx.persistent_immutable_keys };
         ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
     }
 }
@@ -86,12 +96,12 @@ impl BackendStrategy for ZksyncBackendStrategy {
 impl ZksyncBackendStrategy {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`
     pub(crate) fn update_fork_db_contracts(
-        &self,
         fork_info: BackendStrategyForkInfo<'_>,
         mem_db: &FoundryEvmInMemoryDB,
         backend_inner: &BackendInner,
         active_journaled_state: &mut JournaledState,
         target_fork: &mut Fork,
+        ctx: &mut Context,
     ) {
         let _require_zk_storage_merge =
             fork_info.active_type.is_zk() && fork_info.target_type.is_zk();
@@ -103,7 +113,7 @@ impl ZksyncBackendStrategy {
 
         let accounts = backend_inner.persistent_accounts.iter().copied();
         let zk_state =
-            &ZksyncMergeState { persistent_immutable_keys: &self.persistent_immutable_keys };
+            &ZksyncMergeState { persistent_immutable_keys: &ctx.persistent_immutable_keys };
         if let Some(db) = fork_info.active_fork.map(|f| &f.db) {
             ZksyncBackendMerge::merge_account_data(
                 accounts,
@@ -124,18 +134,18 @@ impl ZksyncBackendStrategy {
     }
 }
 
-impl BackendStrategyExt for ZksyncBackendStrategy {
-    fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt> {
-        Box::new(self.clone())
-    }
+// impl BackendStrategyExt for ZksyncBackendStrategy {
+//     fn new_cloned_ext(&self) -> Box<dyn BackendStrategyExt> {
+//         Box::new(self.clone())
+//     }
 
-    fn zksync_save_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
-        self.persistent_immutable_keys
-            .entry(addr)
-            .and_modify(|entry| entry.extend(&keys))
-            .or_insert(keys);
-    }
-}
+//     fn zksync_save_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
+//         self.persistent_immutable_keys
+//             .entry(addr)
+//             .and_modify(|entry| entry.extend(&keys))
+//             .or_insert(keys);
+//     }
+// }
 
 pub(crate) struct ZksyncBackendMerge;
 
