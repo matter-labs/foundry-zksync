@@ -1,5 +1,6 @@
 //! Invariant tests
 
+/*
 use std::sync::Arc;
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
@@ -7,7 +8,6 @@ use forge::revm::primitives::SpecId;
 use foundry_config::Config;
 use foundry_test_utils::Filter;
 
-/*
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_invariant_deposit() {
     let mut runner = TEST_DATA_DEFAULT.runner_zksync();
