@@ -132,10 +132,8 @@ impl DualCompiledContracts {
         let mut zksolc_all_bytecodes: HashMap<String, Vec<u8>> = Default::default();
         for (_, zk_artifact) in zk_output.artifacts() {
             if let (Some(hash), Some(bytecode)) = (&zk_artifact.hash, &zk_artifact.bytecode) {
-                // TODO: we can do this because no bytecode object could be unlinked
-                // at this stage for zksolc, and BytecodeObject as ref will get the bytecode bytes.
-                // We should be careful however and check/handle errors in
-                // case an Unlinked BytecodeObject gets here somehow
+                // NOTE(zk): unlinked objects are _still_ encoded as valid hex
+                // but the hash wouldn't be present
                 let bytes = bytecode.object().into_bytes().unwrap();
                 zksolc_all_bytecodes.insert(hash.clone(), bytes.to_vec());
             }
@@ -162,11 +160,8 @@ impl DualCompiledContracts {
                 if let Some((solc_bytecode, solc_deployed_bytecode)) =
                     solc_bytecodes.get(&contract_file)
                 {
-                    // TODO: we can do this because no bytecode object could be unlinked
-                    // at this stage for zksolc, and BytecodeObject as ref will get the bytecode
-                    // bytes. However, we should check and
-                    // handle errors in case an Unlinked BytecodeObject gets
-                    // here somehow
+                    // NOTE(zk): unlinked objects are _still_ encoded as valid hex
+                    // but the hash wouldn't be present in the artifact
                     let bytecode_vec = bytecode.object().into_bytes().unwrap().to_vec();
                     let mut factory_deps_vec: Vec<Vec<u8>> = factory_deps_map
                         .keys()
@@ -298,5 +293,27 @@ impl DualCompiledContracts {
     /// Adds a new `[DualCompiledContract]` to the collection
     pub fn push(&mut self, contract: DualCompiledContract) {
         self.contracts.push(contract);
+    }
+
+    /// Extend the inner set of contracts with the given iterator
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = DualCompiledContract>) {
+        self.contracts.extend(iter.into_iter());
+        self.contracts.sort_by(|a, b| a.name.cmp(&b.name));
+        self.contracts.dedup_by(|a, b| a.name == b.name);
+    }
+
+    /// Populate the target's factory deps based on the new list
+    pub fn extend_factory_deps_by_hash(
+        &self,
+        mut target: DualCompiledContract,
+        factory_deps: impl IntoIterator<Item = H256>,
+    ) -> DualCompiledContract {
+        let deps_bytecodes = factory_deps
+            .into_iter()
+            .flat_map(|hash| self.find_by_zk_bytecode_hash(hash))
+            .map(|contract| contract.zk_deployed_bytecode.clone());
+
+        target.zk_factory_deps.extend(deps_bytecodes);
+        target
     }
 }

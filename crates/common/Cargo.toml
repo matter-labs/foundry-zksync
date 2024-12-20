@@ -14,7 +14,6 @@ workspace = true
 
 [dependencies]
 foundry-block-explorers = { workspace = true, features = ["foundry-compilers"] }
-foundry-zksync-compiler.workspace = true
 foundry-common-fmt.workspace = true
 foundry-compilers.workspace = true
 foundry-config.workspace = true

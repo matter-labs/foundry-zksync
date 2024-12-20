@@ -24,10 +24,9 @@ use foundry_compilers::{
     },
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
-use foundry_zksync_compiler::libraries::{self, ZkMissingLibrary};
 use num_format::{Locale, ToFormattedString};
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::BTreeMap,
     fmt::Display,
     io::IsTerminal,
     path::{Path, PathBuf},
@@ -325,7 +324,7 @@ impl ProjectCompiler {
             let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
             Report::new(SpinnerReporter::spawn_with(format!("Using zksolc-{zksolc_version}")));
         }
-        self.zksync_compile_with(&project.paths.root, || {
+        self.zksync_compile_with(|| {
             let files_to_compile =
                 if !files.is_empty() { files } else { project.paths.input_files() };
             let sources = Source::read_all(files_to_compile)?;
@@ -338,11 +337,7 @@ impl ProjectCompiler {
     }
 
     #[instrument(target = "forge::compile", skip_all)]
-    fn zksync_compile_with<F>(
-        self,
-        root_path: impl AsRef<Path>,
-        f: F,
-    ) -> Result<ZkProjectCompileOutput>
+    fn zksync_compile_with<F>(self, f: F) -> Result<ZkProjectCompileOutput>
     where
         F: FnOnce() -> Result<ZkProjectCompileOutput>,
     {
@@ -385,79 +380,16 @@ impl ProjectCompiler {
                 sh_println!("{output}")?;
             }
 
-            self.zksync_handle_output(root_path, &output)?;
+            self.zksync_handle_output(&output)?;
         }
 
         Ok(output)
     }
 
     /// If configured, this will print sizes or names
-    fn zksync_handle_output(
-        &self,
-        root_path: impl AsRef<Path>,
-        output: &ZkProjectCompileOutput,
-    ) -> Result<()> {
+    fn zksync_handle_output(&self, output: &ZkProjectCompileOutput) -> Result<()> {
         let print_names = self.print_names.unwrap_or(false);
         let print_sizes = self.print_sizes.unwrap_or(false);
-
-        // Process missing libraries
-        // TODO: skip this if project was not compiled using --detect-missing-libraries
-        let mut missing_libs_unique: HashSet<String> = HashSet::new();
-        for (artifact_id, artifact) in output.artifact_ids() {
-            // TODO: when compiling specific files, the output might still add cached artifacts
-            // that are not part of the file list to the output, which may cause missing libraries
-            // error to trigger for files that were not intended to be compiled.
-            // This behaviour needs to be investigated better on the foundry-compilers side.
-            // For now we filter, checking only the files passed to compile.
-            let is_target_file =
-                self.files.is_empty() || self.files.iter().any(|f| artifact_id.path == *f);
-            if is_target_file {
-                if let Some(mls) = artifact.missing_libraries() {
-                    missing_libs_unique.extend(mls.clone());
-                }
-            }
-        }
-
-        let missing_libs: Vec<ZkMissingLibrary> = missing_libs_unique
-            .into_iter()
-            .map(|ml| {
-                let mut split = ml.split(':');
-                let contract_path =
-                    split.next().expect("Failed to extract contract path for missing library");
-                let contract_name =
-                    split.next().expect("Failed to extract contract name for missing library");
-
-                let mut abs_path_buf = PathBuf::new();
-                abs_path_buf.push(root_path.as_ref());
-                abs_path_buf.push(contract_path);
-
-                let art = output.find(abs_path_buf.as_path(), contract_name).unwrap_or_else(|| {
-                    panic!(
-                        "Could not find contract {contract_name} at path {contract_path} for compilation output"
-                    )
-                });
-
-                ZkMissingLibrary {
-                    contract_path: contract_path.to_string(),
-                    contract_name: contract_name.to_string(),
-                    missing_libraries: art.missing_libraries().cloned().unwrap_or_default(),
-                }
-            })
-            .collect();
-
-        if !missing_libs.is_empty() {
-            libraries::add_dependencies_to_missing_libraries_cache(
-                root_path,
-                missing_libs.as_slice(),
-            )
-            .expect("Error while adding missing libraries");
-            let missing_libs_list = missing_libs
-                .iter()
-                .map(|ml| format!("{}:{}", ml.contract_path, ml.contract_name))
-                .collect::<Vec<String>>()
-                .join(", ");
-            eyre::bail!("Missing libraries detected: {missing_libs_list}\n\nRun the following command in order to deploy each missing library:\n\nforge create <LIBRARY> --private-key <PRIVATE_KEY> --rpc-url <RPC_URL> --chain <CHAIN_ID> --zksync\n\nThen pass the library addresses using the --libraries option");
-        }
 
         // print any sizes or names
         if print_names {

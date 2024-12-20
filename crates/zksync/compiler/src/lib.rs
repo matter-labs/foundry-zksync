@@ -5,14 +5,16 @@
 
 /// ZKSolc specific logic.
 mod zksolc;
+pub use zksolc::*;
 
 use std::path::PathBuf;
 
 use foundry_config::{Config, SkipBuildFilters, SolcReq};
 use semver::Version;
-pub use zksolc::*;
 
 pub mod libraries;
+
+pub mod link;
 
 use foundry_compilers::{
     artifacts::Severity,

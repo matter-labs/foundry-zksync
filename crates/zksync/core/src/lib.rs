@@ -176,6 +176,20 @@ pub fn try_decode_create2(data: &[u8]) -> Result<(H256, H256, Vec<u8>)> {
     Ok((H256(salt.0), H256(bytecode_hash.0), constructor_args.to_vec()))
 }
 
+/// Compute a CREATE address according to zksync
+pub fn compute_create_address(sender: Address, nonce: u64) -> Address {
+    const CREATE_PREFIX: &'static [u8] = b"zksyncCreate";
+    let sender = sender.to_h256();
+    let nonce = H256::from_low_u64_be(nonce);
+    let prefix = keccak256(CREATE_PREFIX);
+
+    let payload = [prefix.as_slice(), sender.0.as_slice(), nonce.0.as_slice()].concat();
+    let hash = keccak256(payload);
+    let address = &hash[..20];
+
+    Address::from_slice(address)
+}
+
 /// Try decoding the provided transaction data into create parameters.
 pub fn try_decode_create(data: &[u8]) -> Result<(H256, Vec<u8>)> {
     let decoded_calldata =

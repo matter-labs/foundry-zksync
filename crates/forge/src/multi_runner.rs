@@ -5,14 +5,13 @@ use crate::{
     TestFilter, TestOptions,
 };
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use eyre::Result;
 use foundry_common::{get_contract_name, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    artifacts::{CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Libraries},
-    compilers::Compiler,
-    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
-    Artifact, ArtifactId, ProjectCompileOutput,
+    artifacts::Libraries, compilers::Compiler,
+    zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput, Artifact, ArtifactId,
+    ProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm::{
@@ -26,9 +25,11 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use foundry_linking::{LinkOutput, Linker};
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compiler::{DualCompiledContract, DualCompiledContracts};
+use foundry_zksync_core::hash_bytecode;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
+use zksync_types::H256;
 
 use std::{
     borrow::Borrow,
@@ -414,12 +415,17 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        dual_compiled_contracts: DualCompiledContracts,
+        mut dual_compiled_contracts: DualCompiledContracts,
     ) -> Result<MultiContractRunner> {
         let use_zk = zk_output.is_some();
         let mut known_contracts = ContractsByArtifact::default();
+
         let output = output.with_stripped_file_prefixes(root);
         let linker = Linker::new(root, output.artifact_ids().collect());
+
+        let zk_output = zk_output.map(|zk| zk.with_stripped_file_prefixes(&root));
+        let zk_linker =
+            zk_output.as_ref().map(|output| Linker::new(root, output.artifact_ids().collect()));
 
         // Build revert decoder from ABIs of all artifacts.
         let abis = linker
@@ -435,11 +441,74 @@ impl MultiContractRunnerBuilder {
             linker.contracts.keys(),
         )?;
 
+        let zk_libs = zk_linker
+            .as_ref()
+            .map(|zk| {
+                zk.zk_link_with_nonce_or_address(
+                    Default::default(),
+                    LIBRARY_DEPLOYER,
+                    // NOTE(zk): normally 0, this way we avoid overlaps with EVM libs
+                    // FIXME: needed or 0 is ok?
+                    libs_to_deploy.len() as u64,
+                    zk.contracts.keys(),
+                )
+                .map(|output|
+
+            // NOTE(zk): zk_linked_contracts later will also contain
+            // `libs_to_deploy` bytecodes, so those will
+            // get registered in DualCompiledContracts
+
+            output.libraries)
+            })
+            .transpose()?;
+
         let linked_contracts = linker.get_linked_artifacts(&libraries)?;
+        let zk_linked_contracts = zk_linker
+            .as_ref()
+            .and_then(|linker| zk_libs.as_ref().map(|libs| (linker, libs)))
+            .map(|(zk, libs)| zk.zk_get_linked_artifacts(zk.contracts.keys(), libs))
+            .transpose()?;
 
+        let newly_linked_dual_compiled_contracts = zk_linked_contracts
+            .iter()
+            .flat_map(|arts| arts.iter())
+            .flat_map(|(needle, zk)| {
+                linked_contracts
+                    .iter()
+                    .find(|(id, _)| id.source == needle.source && id.name == needle.name)
+                    .map(|(_, evm)| (needle, zk, evm))
+            })
+            .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
+            .map(|(id, linked_zk, evm)| {
+                let (_, unlinked_zk_artifact) =
+                    zk_output.as_ref().unwrap().artifact_ids().find(|(id, _)| id == id).unwrap();
+                let zk_bytecode = linked_zk.get_bytecode_bytes().unwrap();
+                let zk_hash = hash_bytecode(&zk_bytecode);
+                let evm = evm.get_bytecode_bytes().unwrap();
+                let contract = DualCompiledContract {
+                    name: id.name.clone(),
+                    zk_bytecode_hash: zk_hash,
+                    zk_deployed_bytecode: zk_bytecode.to_vec(),
+                    // FIXME: retrieve unlinked factory deps (1.5.9)
+                    zk_factory_deps: vec![zk_bytecode.to_vec()],
+                    evm_bytecode_hash: B256::from_slice(&keccak256(evm.as_ref())[..]),
+                    evm_deployed_bytecode: evm.to_vec(), // FIXME: is this ok? not really used
+                    evm_bytecode: evm.to_vec(),
+                };
+
+                // populate factory deps that were already linked
+                dual_compiled_contracts.extend_factory_deps_by_hash(
+                    contract,
+                    unlinked_zk_artifact.factory_dependencies.iter().flatten().map(|(_, hash)| {
+                        H256::from_slice(alloy_primitives::hex::decode(hash).unwrap().as_slice())
+                    }),
+                )
+            });
+        dual_compiled_contracts.extend(newly_linked_dual_compiled_contracts.collect::<Vec<_>>());
+
+        // FIXME: is this comment outdated? I don't see the library deployment code anywhere
         // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
-        let mut deployable_contracts = DeployableContracts::default();
-
+        let mut contracts = DeployableContracts::default();
         for (id, contract) in linked_contracts.iter() {
             let Some(abi) = &contract.abi else { continue };
 
@@ -453,43 +522,13 @@ impl MultiContractRunnerBuilder {
                     continue;
                 };
 
-                deployable_contracts
-                    .insert(id.clone(), TestContract { abi: abi.clone(), bytecode });
+                contracts.insert(id.clone(), TestContract { abi: abi.clone(), bytecode });
             }
         }
 
         if !use_zk {
             known_contracts = ContractsByArtifact::new(linked_contracts);
-        } else if let Some(zk_output) = zk_output {
-            let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
-            let mut zk_contracts_map = BTreeMap::new();
-
-            for (id, contract) in zk_contracts {
-                if let Some(abi) = contract.abi {
-                    let bytecode = contract.bytecode.as_ref();
-
-                    // TODO(zk): retrieve link_references
-                    if let Some(bytecode_object) = bytecode.map(|b| b.object()) {
-                        let compact_bytecode = CompactBytecode {
-                            object: bytecode_object.clone(),
-                            source_map: None,
-                            link_references: BTreeMap::new(),
-                        };
-                        let compact_contract = CompactContractBytecode {
-                            abi: Some(abi),
-                            bytecode: Some(compact_bytecode.clone()),
-                            deployed_bytecode: Some(CompactDeployedBytecode {
-                                bytecode: Some(compact_bytecode),
-                                immutable_references: BTreeMap::new(),
-                            }),
-                        };
-                        zk_contracts_map.insert(id.clone(), compact_contract);
-                    }
-                } else {
-                    warn!("Abi not found for contract {}", id.identifier());
-                }
-            }
-
+        } else if let Some(mut zk_contracts_map) = zk_linked_contracts {
             // Extend zk contracts with solc contracts as well. This is required for traces to
             // accurately detect contract names deployed in EVM mode, and when using
             // `vm.zkVmSkip()` cheatcode.
@@ -499,7 +538,7 @@ impl MultiContractRunnerBuilder {
         }
 
         Ok(MultiContractRunner {
-            contracts: deployable_contracts,
+            contracts,
             evm_opts,
             env,
             evm_spec: self.evm_spec.unwrap_or(SpecId::CANCUN),

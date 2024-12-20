@@ -156,10 +156,10 @@ impl CreateArgs {
             let (artifact, id) =
                 remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
-            let ZkContractArtifact { bytecode, factory_dependencies, abi, .. } = artifact;
+            let ZkContractArtifact { bytecode, abi, factory_dependencies, .. } = &artifact;
 
-            let abi = abi.expect("Abi not found");
-            let bin = bytecode.expect("Bytecode not found");
+            let abi = abi.clone().expect("Abi not found");
+            let bin = bytecode.as_ref().expect("Bytecode not found");
 
             let bytecode = match bin.object() {
                 BytecodeObject::Bytecode(bytes) => bytes.to_vec(),
@@ -206,7 +206,7 @@ impl CreateArgs {
 
             let factory_deps: Vec<Vec<u8>> = {
                 let factory_dependencies_map =
-                    factory_dependencies.expect("factory deps not found");
+                    factory_dependencies.as_ref().expect("factory deps not found");
                 let mut visited_paths = HashSet::new();
                 let mut visited_bytecodes = HashSet::new();
                 let mut queue = VecDeque::new();
@@ -234,12 +234,12 @@ impl CreateArgs {
                                 )
                             });
                         let fdep_fdeps_map =
-                            fdep_art.factory_dependencies.clone().expect("factory deps not found");
+                            fdep_art.factory_dependencies.as_ref().expect("factory deps not found");
                         for dep in fdep_fdeps_map.values() {
                             queue.push_back(dep.clone())
                         }
 
-                        // TODO(zk): ensure factory deps are also linked
+                        // NOTE(zk): unlinked factory deps don't show up in `factory_dependencies`
                         let fdep_bytecode = fdep_art
                             .bytecode
                             .clone()
