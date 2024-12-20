@@ -99,7 +99,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     ) -> eyre::Result<ResultAndState> {
         let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
 
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+        let res = evm.transact().wrap_err("EVM error")?;
 
         env.env = evm.context.evm.inner.env;
 
@@ -120,7 +120,7 @@ impl ExecutorStrategy for EvmExecutorStrategy {
     ) -> eyre::Result<ResultAndState> {
         let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
 
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+        let res = evm.transact().wrap_err("EVM error")?;
 
         env.env = evm.context.evm.inner.env;
 
