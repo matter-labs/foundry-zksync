@@ -653,7 +653,7 @@ fn compiler_blocking_install(
             let _lock = try_lock_file(lock_path)?;
             trace!("got lock for {label}");
 
-            // Only write to file if it is not there. The check is doneafter adquiring the lock
+            // Only write to file if it is not there. The check is done after acquiring the lock
             // to ensure the thread remains blocked until the required compiler is
             // fully installed
             if !compiler_path.exists() {
@@ -679,7 +679,7 @@ fn compiler_blocking_install(
                 response.status()
             )));
         }
-        trace!("{label} instalation completed");
+        trace!("{label} installation completed");
         Ok(compiler_path)
     })
 }

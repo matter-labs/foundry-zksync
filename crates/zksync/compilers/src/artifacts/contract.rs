@@ -90,7 +90,7 @@ impl Contract {
 
 // CompactContract variants
 // TODO: for zkEvm, the distinction between bytecode and deployed_bytecode makes little sense,
-// and there some fields that the ouptut doesn't provide (e.g: source_map)
+// and there some fields that the output doesn't provide (e.g: source_map)
 // However, we implement these because we get the Artifact trait and can reuse lots of
 // the crate's helpers without needing to duplicate everything. Maybe there's a way
 // we can get all these without having to add the same bytecode twice on each struct.
