@@ -7,7 +7,7 @@ use crate::{
 };
 use alloy_consensus::TxEnvelope;
 use alloy_genesis::{Genesis, GenesisAccount};
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
 use foundry_common::fs::{read_json_file, write_json_file};
@@ -18,7 +18,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_traces::StackSnapshotType;
 use rand::Rng;
-use revm::primitives::{Account, Bytecode, SpecId, KECCAK_EMPTY};
+use revm::primitives::{Account, SpecId};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Display,
@@ -134,12 +134,7 @@ impl Cheatcode for getNonce_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
 
-        if ccx.state.use_zk_vm {
-            let nonce = foundry_zksync_core::cheatcodes::get_nonce(*account, ccx.ecx);
-            return Ok(nonce.abi_encode());
-        }
-
-        get_nonce(ccx, account)
+        ccx.with_strategy(|strategy, ccx| strategy.cheatcode_get_nonce(ccx, *account))
     }
 }
 
@@ -425,13 +420,7 @@ impl Cheatcode for getBlobhashesCall {
 impl Cheatcode for rollCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newHeight } = self;
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::roll(*newHeight, ccx.ecx);
-            return Ok(Default::default())
-        }
-
-        ccx.ecx.env.block.number = *newHeight;
-        Ok(Default::default())
+        ccx.with_strategy(|strategy, ccx| strategy.cheatcode_roll(ccx, *newHeight))
     }
 }
 
@@ -453,13 +442,7 @@ impl Cheatcode for txGasPriceCall {
 impl Cheatcode for warpCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newTimestamp } = self;
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::warp(*newTimestamp, ccx.ecx);
-            return Ok(Default::default())
-        }
-        ccx.ecx.env.block.timestamp = *newTimestamp;
-
-        Ok(Default::default())
+        ccx.with_strategy(|strategy, ccx| strategy.cheatcode_warp(ccx, *newTimestamp))
     }
 }
 
@@ -493,52 +476,23 @@ impl Cheatcode for getBlobBaseFeeCall {
 impl Cheatcode for dealCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account: address, newBalance: new_balance } = *self;
-        let old_balance = if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::deal(address, new_balance, ccx.ecx)
-        } else {
-            let account = journaled_account(ccx.ecx, address)?;
-            std::mem::replace(&mut account.info.balance, new_balance)
-        };
-        let record = DealRecord { address, old_balance, new_balance };
-        ccx.state.eth_deals.push(record);
-        Ok(Default::default())
+
+        ccx.with_strategy(|strategy, ccx| strategy.cheatcode_deal(ccx, address, new_balance))
     }
 }
 
 impl Cheatcode for etchCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { target, newRuntimeBytecode } = self;
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::etch(*target, newRuntimeBytecode, ccx.ecx);
 
-            return Ok(Default::default());
-        }
-
-        ensure_not_precompile!(target, ccx);
-        ccx.ecx.load_account(*target)?;
-        let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(newRuntimeBytecode));
-        ccx.ecx.journaled_state.set_code(*target, bytecode);
-        Ok(Default::default())
+        ccx.with_strategy(|strategy, ccx| strategy.cheatcode_etch(ccx, *target, newRuntimeBytecode))
     }
 }
 
 impl Cheatcode for resetNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_nonce(*account, U256::ZERO, ccx.ecx);
-            return Ok(Default::default());
-        }
-
-        let account = journaled_account(ccx.ecx, *account)?;
-        // Per EIP-161, EOA nonces start at 0, but contract nonces
-        // start at 1. Comparing by code_hash instead of code
-        // to avoid hitting the case where account's code is None.
-        let empty = account.info.code_hash == KECCAK_EMPTY;
-        let nonce = if empty { 0 } else { 1 };
-        account.info.nonce = nonce;
-        debug!(target: "cheatcodes", nonce, "reset");
-        Ok(Default::default())
+        ccx.with_strategy(|strategy, ccx| strategy.cheatcode_reset_nonce(ccx, *account))
     }
 }
 
@@ -546,21 +500,7 @@ impl Cheatcode for setNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
 
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(newNonce), ccx.ecx);
-            return Ok(Default::default());
-        }
-
-        let account = journaled_account(ccx.ecx, account)?;
-        // nonce must increment only
-        let current = account.info.nonce;
-        ensure!(
-            newNonce >= current,
-            "new nonce ({newNonce}) must be strictly equal to or higher than the \
-             account's current nonce ({current})"
-        );
-        account.info.nonce = newNonce;
-        Ok(Default::default())
+        ccx.with_strategy(|strategy, ccx| strategy.cheatcode_set_nonce(ccx, account, newNonce))
     }
 }
 
@@ -568,14 +508,9 @@ impl Cheatcode for setNonceUnsafeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
 
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(newNonce), ccx.ecx);
-            return Ok(Default::default());
-        }
-
-        let account = journaled_account(ccx.ecx, account)?;
-        account.info.nonce = newNonce;
-        Ok(Default::default())
+        ccx.with_strategy(|strategy, ccx| {
+            strategy.cheatcode_set_nonce_unsafe(ccx, account, newNonce)
+        })
     }
 }
 
@@ -807,7 +742,6 @@ impl Cheatcode for broadcastRawTransactionCall {
             ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
                 rpc: ccx.db.active_fork_url(),
                 transaction: tx.try_into()?,
-                zk_tx: None,
             });
         }
 
@@ -1111,10 +1045,7 @@ fn read_callers(state: &Cheatcodes, default_sender: &Address) -> Result {
 }
 
 /// Ensures the `Account` is loaded and touched.
-pub(super) fn journaled_account<'a>(
-    ecx: InnerEcx<'a, '_, '_>,
-    addr: Address,
-) -> Result<&'a mut Account> {
+pub fn journaled_account<'a>(ecx: InnerEcx<'a, '_, '_>, addr: Address) -> Result<&'a mut Account> {
     ecx.load_account(addr)?;
     ecx.journaled_state.touch(&addr);
     Ok(ecx.journaled_state.state.get_mut(&addr).expect("account is loaded"))

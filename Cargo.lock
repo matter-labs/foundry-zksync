@@ -2613,6 +2613,7 @@ dependencies = [
  "foundry-compilers",
  "foundry-config",
  "foundry-evm",
+ "foundry-strategy-zksync",
  "regex",
  "reqwest 0.12.9",
  "revm",
@@ -4719,6 +4720,7 @@ dependencies = [
  "foundry-debugger",
  "foundry-evm",
  "foundry-linking",
+ "foundry-strategy-zksync",
  "foundry-wallets",
  "foundry-zksync-compilers",
  "foundry-zksync-core",
@@ -4863,7 +4865,6 @@ dependencies = [
  "foundry-evm-core",
  "foundry-evm-traces",
  "foundry-wallets",
- "foundry-zksync-compilers",
  "foundry-zksync-core",
  "foundry-zksync-inspectors",
  "itertools 0.13.0",
@@ -4884,7 +4885,6 @@ dependencies = [
  "tracing",
  "vergen",
  "walkdir",
- "zksync_types",
 ]
 
 [[package]]
@@ -4929,6 +4929,7 @@ dependencies = [
  "foundry-config",
  "foundry-debugger",
  "foundry-evm",
+ "foundry-strategy-zksync",
  "foundry-wallets",
  "foundry-zksync-compilers",
  "futures 0.3.31",
@@ -5190,6 +5191,7 @@ dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
  "alloy-primitives",
+ "alloy-serde",
  "alloy-sol-types",
  "eyre",
  "foundry-cheatcodes",
@@ -5200,6 +5202,7 @@ dependencies = [
  "foundry-evm-coverage",
  "foundry-evm-fuzz",
  "foundry-evm-traces",
+ "foundry-zksync-compilers",
  "foundry-zksync-core",
  "foundry-zksync-inspectors",
  "indicatif",
@@ -5374,6 +5377,33 @@ dependencies = [
  "proc-macro2 1.0.92",
  "quote 1.0.37",
  "syn 2.0.90",
+]
+
+[[package]]
+name = "foundry-strategy-zksync"
+version = "0.0.2"
+dependencies = [
+ "alloy-json-abi",
+ "alloy-primitives",
+ "alloy-rpc-types",
+ "alloy-sol-types",
+ "alloy-zksync",
+ "eyre",
+ "foundry-cheatcodes",
+ "foundry-common",
+ "foundry-config",
+ "foundry-evm",
+ "foundry-evm-core",
+ "foundry-zksync-compilers",
+ "foundry-zksync-core",
+ "itertools 0.13.0",
+ "revm",
+ "semver 1.0.23",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "zksync_types",
 ]
 
 [[package]]

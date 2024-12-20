@@ -1,6 +1,6 @@
 //! A wrapper around `Backend` that is clone-on-write used for fuzzing.
 
-use super::{BackendError, ForkInfo};
+use super::{strategy::BackendStrategy, BackendError, ForkInfo};
 use crate::{
     backend::{
         diagnostic::RevertDiagnostic, Backend, DatabaseExt, LocalForkId, RevertStateSnapshotAction,
@@ -9,23 +9,15 @@ use crate::{
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
-use alloy_primitives::{map::HashMap, Address, B256, U256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
-use eyre::WrapErr;
 use foundry_fork_db::DatabaseError;
-use foundry_zksync_core::{vm::ZkEnv, PaymasterParams};
 use revm::{
     db::DatabaseRef,
-    primitives::{
-        Account, AccountInfo, Bytecode, Env, EnvWithHandlerCfg, HashMap as Map, ResultAndState,
-        SpecId,
-    },
+    primitives::{Account, AccountInfo, Bytecode, Env, EnvWithHandlerCfg, HashMap as Map, SpecId},
     Database, DatabaseCommit, JournaledState,
 };
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashSet},
-};
+use std::{borrow::Cow, collections::BTreeMap};
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
@@ -50,63 +42,13 @@ pub struct CowBackend<'a> {
     /// No calls on the `CowBackend` will ever persistently modify the `backend`'s state.
     pub backend: Cow<'a, Backend>,
     /// Keeps track of whether the backed is already initialized
-    is_initialized: bool,
+    pub is_initialized: bool,
     /// The [SpecId] of the current backend.
-    spec_id: SpecId,
+    pub spec_id: SpecId,
 }
 
 impl<'a> CowBackend<'a> {
     /// Creates a new `CowBackend` with the given `Backend`.
-    pub fn new(backend: &'a Backend) -> Self {
-        Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
-    }
-
-    /// Executes the configured zk transaction of the `env` without committing state changes
-    pub fn inspect_ref_zk(
-        &mut self,
-        env: &mut Env,
-        zk_env: &ZkEnv,
-        persisted_factory_deps: &mut HashMap<foundry_zksync_core::H256, Vec<u8>>,
-        factory_deps: Option<Vec<Vec<u8>>>,
-        paymaster_data: Option<PaymasterParams>,
-    ) -> eyre::Result<ResultAndState> {
-        // this is a new call to inspect with a new env, so even if we've cloned the backend
-        // already, we reset the initialized state
-        self.is_initialized = false;
-
-        foundry_zksync_core::vm::transact(
-            Some(persisted_factory_deps),
-            factory_deps,
-            paymaster_data,
-            env,
-            zk_env,
-            self,
-        )
-    }
-
-    /// Executes the configured transaction of the `env` without committing state changes
-    ///
-    /// Note: in case there are any cheatcodes executed that modify the environment, this will
-    /// update the given `env` with the new values.
-    #[instrument(name = "inspect", level = "debug", skip_all)]
-    pub fn inspect<I: InspectorExt>(
-        &mut self,
-        env: &mut EnvWithHandlerCfg,
-        inspector: &mut I,
-    ) -> eyre::Result<ResultAndState> {
-        // this is a new call to inspect with a new env, so even if we've cloned the backend
-        // already, we reset the initialized state
-        self.is_initialized = false;
-        self.spec_id = env.handler_cfg.spec_id;
-        let mut evm = crate::utils::new_evm_with_inspector(self, env.clone(), inspector);
-
-        let res = evm.transact().wrap_err("EVM error")?;
-
-        env.env = evm.context.evm.inner.env;
-
-        Ok(res)
-    }
-
     pub fn new_borrowed(backend: &'a Backend) -> Self {
         Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
     }
@@ -146,8 +88,8 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend.to_mut().get_fork_info(id)
     }
 
-    fn save_zk_immutable_storage(&mut self, addr: Address, keys: HashSet<U256>) {
-        self.backend.to_mut().save_zk_immutable_storage(addr, keys)
+    fn get_strategy(&mut self) -> &mut dyn BackendStrategy {
+        self.backend.to_mut().strategy.as_mut()
     }
 
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {

@@ -16,7 +16,7 @@ use eyre::{Context, Result};
 use forge_script_sequence::{ScriptSequence, TransactionWithMetadata};
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_different_gas_calc, now};
-use foundry_common::{shell, ContractData};
+use foundry_common::{shell, ContractData, TransactionMaybeSigned};
 use foundry_evm::traces::{decode_trace_arena, render_trace_arena};
 use futures::future::{join_all, try_join_all};
 use parking_lot::RwLock;
@@ -61,7 +61,7 @@ impl PreSimulationState {
                 let nonce = tx.transaction.nonce().expect("all transactions should have a sender");
                 let to = tx.transaction.to();
 
-                let mut builder = ScriptTransactionBuilder::new(tx.transaction, rpc, tx.zk_tx);
+                let mut builder = ScriptTransactionBuilder::new(tx.transaction, rpc);
 
                 if let Some(TxKind::Call(_)) = to {
                     builder.set_call(
@@ -118,9 +118,12 @@ impl PreSimulationState {
             .into_iter()
             .map(|mut transaction| async {
                 let mut runner = runners.get(&transaction.rpc).expect("invalid rpc url").write();
-                let zk_metadata = transaction.zk.clone();
                 let tx = transaction.tx_mut();
 
+                let other_fields = match &tx {
+                    TransactionMaybeSigned::Unsigned(tx) => Some(tx.other.clone()),
+                    _ => None,
+                };
                 let to = if let Some(TxKind::Call(to)) = tx.to() { Some(to) } else { None };
                 let result = runner
                     .simulate(
@@ -130,7 +133,7 @@ impl PreSimulationState {
                         tx.input().map(Bytes::copy_from_slice),
                         tx.value(),
                         tx.authorization_list(),
-                        (self.script_config.config.zksync.run_in_zk_mode(), zk_metadata),
+                        other_fields,
                     )
                     .wrap_err("Internal EVM error during simulation")?;
 

@@ -32,10 +32,7 @@ foundry-evm-traces.workspace = true
 foundry-wallets.workspace = true
 forge-script-sequence.workspace = true
 foundry-zksync-core.workspace = true
-foundry-zksync-compilers.workspace = true
 foundry-zksync-inspectors.workspace = true
-
-zksync_types.workspace = true
 
 alloy-dyn-abi.workspace = true
 alloy-json-abi.workspace = true

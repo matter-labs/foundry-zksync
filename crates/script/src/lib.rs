@@ -19,7 +19,6 @@ use alloy_primitives::{
     Address, Bytes, Log, TxKind, U256,
 };
 use alloy_signer::Signer;
-use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use broadcast::next_nonce;
 use build::PreprocessedState;
 use clap::{Parser, ValueHint};
@@ -29,7 +28,7 @@ use forge_script_sequence::{AdditionalContract, NestedValue};
 use forge_verify::RetryArgs;
 use foundry_cli::{
     opts::{CoreBuildArgs, GlobalOpts},
-    utils::LoadConfig,
+    utils::{self, LoadConfig},
 };
 use foundry_common::{
     abi::{encode_function_args, get_func},
@@ -57,7 +56,6 @@ use foundry_evm::{
 };
 use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
-use foundry_zksync_core::vm::ZkEnv;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -602,13 +600,14 @@ impl ScriptConfig {
     ) -> Result<ScriptRunner> {
         trace!("preparing script runner");
         let env = self.evm_opts.evm_env().await?;
+        let mut strategy = utils::get_executor_strategy(&self.config);
 
         let db = if let Some(fork_url) = self.evm_opts.fork_url.as_ref() {
             match self.backends.get(fork_url) {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(fork);
+                    let backend = Backend::spawn(fork, strategy.new_backend_strategy());
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -617,7 +616,7 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(None)
+            Backend::spawn(None, strategy.new_backend_strategy())
         };
 
         // We need to enable tracing to decode contract names: local or external.
@@ -632,65 +631,34 @@ impl ScriptConfig {
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions);
 
-        let use_zk = self.config.zksync.run_in_zk_mode();
-        let mut maybe_zk_env = None;
-        if use_zk {
-            if let Some(fork_url) = &self.evm_opts.fork_url {
-                let provider =
-                    zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
-                // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
-                let maybe_details =
-                    provider.get_block_details(env.block.number.try_into()?).await?;
-                if let Some(details) = maybe_details {
-                    let zk_env = ZkEnv {
-                        l1_gas_price: details
-                            .l1_gas_price
-                            .try_into()
-                            .expect("failed to convert l1_gas_price to u64"),
-                        fair_l2_gas_price: details
-                            .l2_fair_gas_price
-                            .try_into()
-                            .expect("failed to convert fair_l2_gas_price to u64"),
-                        fair_pubdata_price: details
-                            .fair_pubdata_price
-                            // TODO(zk): None as a value might mean L1Pegged model
-                            // we need to find out if it will ever be relevant to
-                            // us
-                            .unwrap_or_default()
-                            .try_into()
-                            .expect("failed to convert fair_pubdata_price to u64"),
-                    };
-                    builder = builder.zk_env(zk_env.clone());
-                    maybe_zk_env = Some(zk_env);
-                }
-            };
-        }
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
-            builder = builder
-                .inspectors(|stack| {
-                    stack
-                        .cheatcodes(
-                            CheatsConfig::new(
-                                &self.config,
-                                self.evm_opts.clone(),
-                                Some(known_contracts),
-                                Some(target.name),
-                                Some(target.version),
-                                dual_compiled_contracts,
-                                use_zk,
-                                maybe_zk_env,
-                            )
-                            .into(),
+            strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts);
+
+            if let Some(fork_url) = &self.evm_opts.fork_url {
+                strategy.zksync_set_fork_env(fork_url, &env)?;
+            }
+
+            builder = builder.inspectors(|stack| {
+                stack
+                    .cheatcodes(
+                        CheatsConfig::new(
+                            &self.config,
+                            self.evm_opts.clone(),
+                            Some(known_contracts),
+                            Some(target.name),
+                            Some(target.version),
+                            strategy.new_cheatcode_inspector_strategy(),
                         )
-                        .wallets(script_wallets)
-                        .enable_isolation(self.evm_opts.isolate)
-                })
-                .use_zk_vm(use_zk);
+                        .into(),
+                    )
+                    .wallets(script_wallets)
+                    .enable_isolation(self.evm_opts.isolate)
+            });
         }
 
-        let executor = builder.build(env, db);
+        let executor = builder.build(env, db, strategy);
         Ok(ScriptRunner::new(executor, self.evm_opts.clone()))
     }
 }

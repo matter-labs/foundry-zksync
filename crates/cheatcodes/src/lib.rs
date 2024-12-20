@@ -17,6 +17,7 @@ extern crate tracing;
 
 use alloy_primitives::Address;
 use foundry_evm_core::backend::DatabaseExt;
+use inspector::Strategy;
 use revm::{ContextPrecompiles, InnerEvmContext};
 use spec::Status;
 
@@ -41,23 +42,32 @@ mod env;
 pub use env::set_execution_context;
 
 mod evm;
+pub use evm::{
+    journaled_account,
+    mock::{make_acc_non_empty, mock_call},
+    DealRecord,
+};
 
 mod fs;
 
 mod inspector;
+pub use inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx, InnerEcx};
 
 mod json;
 
 mod script;
-pub use script::{Wallets, WalletsInner};
+pub use script::{Broadcast, Wallets, WalletsInner};
 
 mod string;
 
 mod test;
+pub use test::expect::{handle_expect_emit, handle_expect_revert};
 
 mod toml;
 
 mod utils;
+
+pub mod strategy;
 
 /// Cheatcode implementation.
 pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
@@ -133,15 +143,15 @@ impl dyn DynCheatcode {
 /// The cheatcode context, used in `Cheatcode`.
 pub struct CheatsCtxt<'cheats, 'evm, 'db, 'db2> {
     /// The cheatcodes inspector state.
-    pub(crate) state: &'cheats mut Cheatcodes,
+    pub state: &'cheats mut Cheatcodes,
     /// The EVM data.
-    pub(crate) ecx: &'evm mut InnerEvmContext<&'db mut (dyn DatabaseExt + 'db2)>,
+    pub ecx: &'evm mut InnerEvmContext<&'db mut (dyn DatabaseExt + 'db2)>,
     /// The precompiles context.
-    pub(crate) precompiles: &'evm mut ContextPrecompiles<&'db mut (dyn DatabaseExt + 'db2)>,
+    pub precompiles: &'evm mut ContextPrecompiles<&'db mut (dyn DatabaseExt + 'db2)>,
     /// The original `msg.sender`.
-    pub(crate) caller: Address,
+    pub caller: Address,
     /// Gas limit of the current cheatcode call.
-    pub(crate) gas_limit: u64,
+    pub gas_limit: u64,
 }
 
 impl<'db, 'db2> std::ops::Deref for CheatsCtxt<'_, '_, 'db, 'db2> {
@@ -164,5 +174,16 @@ impl CheatsCtxt<'_, '_, '_, '_> {
     #[inline]
     pub(crate) fn is_precompile(&self, address: &Address) -> bool {
         self.precompiles.contains(address)
+    }
+
+    pub(crate) fn with_strategy<F, R>(&mut self, mut f: F) -> R
+    where
+        F: FnMut(Strategy, &mut Self) -> R,
+    {
+        let mut strategy = self.state.strategy.take();
+        let result = f(strategy.as_mut().expect("failed acquiring strategy").as_mut(), self);
+        self.state.strategy = strategy;
+
+        result
     }
 }

@@ -86,6 +86,7 @@ pub struct ZkPaymasterData {
 
 /// Represents additional data for ZK transactions.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ZkTransactionMetadata {
     /// Factory Deps for ZK transactions.
     pub factory_deps: Vec<Vec<u8>>,

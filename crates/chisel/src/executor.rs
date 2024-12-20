@@ -10,6 +10,7 @@ use alloy_json_abi::EventParam;
 use alloy_primitives::{hex, Address, B256, U256};
 use core::fmt::Debug;
 use eyre::{Result, WrapErr};
+use foundry_cli::utils;
 use foundry_compilers::Artifact;
 use foundry_evm::{
     backend::Backend, decode::decode_console_logs, executors::ExecutorBuilder,
@@ -315,12 +316,14 @@ impl SessionSource {
         let env =
             self.config.evm_opts.evm_env().await.expect("Could not instantiate fork environment");
 
+        let strategy = utils::get_executor_strategy(&self.config.foundry_config);
+
         // Create an in-memory backend
         let backend = match self.config.backend.take() {
             Some(backend) => backend,
             None => {
                 let fork = self.config.evm_opts.get_fork(&self.config.foundry_config, env.clone());
-                let backend = Backend::spawn(fork);
+                let backend = Backend::spawn(fork, strategy.new_backend_strategy());
                 self.config.backend = Some(backend.clone());
                 backend
             }
@@ -336,9 +339,7 @@ impl SessionSource {
                         None,
                         None,
                         Some(self.solc.version.clone()),
-                        Default::default(),
-                        false,
-                        None,
+                        strategy.new_cheatcode_inspector_strategy(),
                     )
                     .into(),
                 )
@@ -346,7 +347,7 @@ impl SessionSource {
             .gas_limit(self.config.evm_opts.gas_limit())
             .spec_id(self.config.foundry_config.evm_spec_id())
             .legacy_assertions(self.config.foundry_config.legacy_assertions)
-            .build(env, backend);
+            .build(env, backend, strategy);
 
         // Create a [ChiselRunner] with a default balance of [U256::MAX] and
         // the sender [Address::zero].

@@ -19,7 +19,7 @@ use foundry_config::{Config, InlineConfig};
 use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
-    executors::{Executor, ExecutorBuilder},
+    executors::{strategy::ExecutorStrategy, Executor, ExecutorBuilder},
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
@@ -27,10 +27,6 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use foundry_linking::{LinkOutput, Linker};
-use foundry_zksync_compilers::{
-    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
-    dual_compiled_contracts::DualCompiledContracts,
-};
 use rayon::prelude::*;
 use revm::primitives::SpecId;
 
@@ -41,6 +37,10 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
     time::Instant,
+};
+
+use foundry_zksync_compilers::compilers::{
+    artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
 };
 
 #[derive(Debug, Clone)]
@@ -72,10 +72,8 @@ pub struct MultiContractRunner {
     /// The base configuration for the test runner.
     pub tcfg: TestRunnerConfig,
 
-    /// Dual compiled contracts
-    pub dual_compiled_contracts: DualCompiledContracts,
-    /// Use zk runner.
-    pub use_zk: bool,
+    /// Execution strategy.
+    pub strategy: Box<dyn ExecutorStrategy>,
 }
 
 impl std::ops::Deref for MultiContractRunner {
@@ -182,8 +180,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let mut db = Backend::spawn(self.fork.take());
-        db.is_zk = self.use_zk;
+        let db = Backend::spawn(self.fork.take(), self.strategy.new_backend_strategy());
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -247,10 +244,10 @@ impl MultiContractRunner {
     ) -> SuiteResult {
         let identifier = artifact_id.identifier();
         let mut span_name = identifier.as_str();
-
         if !enabled!(tracing::Level::TRACE) {
             span_name = get_contract_name(&identifier);
         }
+
         let span = debug_span!("suite", name = %span_name);
         let span_local = span.clone();
         let _guard = span_local.enter();
@@ -264,8 +261,7 @@ impl MultiContractRunner {
                 self.known_contracts.clone(),
                 artifact_id,
                 db.clone(),
-                self.dual_compiled_contracts.clone(),
-                self.use_zk,
+                self.strategy.new_cloned(),
             ),
             progress,
             tokio_handle,
@@ -357,8 +353,7 @@ impl TestRunnerConfig {
         known_contracts: ContractsByArtifact,
         artifact_id: &ArtifactId,
         db: Backend,
-        dual_compiled_contracts: DualCompiledContracts,
-        use_zk: bool,
+        strategy: Box<dyn ExecutorStrategy>,
     ) -> Executor {
         let cheats_config = Arc::new(CheatsConfig::new(
             &self.config,
@@ -366,9 +361,7 @@ impl TestRunnerConfig {
             Some(known_contracts),
             Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
-            dual_compiled_contracts,
-            use_zk,
-            None,
+            strategy.new_cheatcode_inspector_strategy(),
         ));
 
         ExecutorBuilder::new()
@@ -381,11 +374,10 @@ impl TestRunnerConfig {
                     .odyssey(self.odyssey)
                     .create2_deployer(self.evm_opts.create2_deployer)
             })
-            .use_zk_vm(use_zk)
             .spec_id(self.spec_id)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
-            .build(self.env.clone(), db)
+            .build(self.env.clone(), db, strategy)
     }
 
     fn trace_mode(&self) -> TraceMode {
@@ -494,9 +486,8 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        dual_compiled_contracts: DualCompiledContracts,
+        strategy: Box<dyn ExecutorStrategy>,
     ) -> Result<MultiContractRunner> {
-        let use_zk = zk_output.is_some();
         let contracts = output
             .artifact_ids()
             .map(|(id, v)| (id.with_stripped_file_prefixes(root), v))
@@ -541,7 +532,7 @@ impl MultiContractRunnerBuilder {
         }
 
         let mut known_contracts = ContractsByArtifact::default();
-        if !use_zk {
+        if zk_output.is_none() {
             known_contracts = ContractsByArtifact::new(linked_contracts);
         } else if let Some(zk_output) = zk_output {
             let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
@@ -604,8 +595,7 @@ impl MultiContractRunnerBuilder {
 
                 config: self.config,
             },
-            dual_compiled_contracts,
-            use_zk,
+            strategy,
         })
     }
 }

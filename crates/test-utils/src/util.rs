@@ -884,6 +884,7 @@ impl TestCommand {
     #[track_caller]
     pub fn assert(&mut self) -> OutputAssert {
         let assert = OutputAssert::new(self.execute());
+
         if self.redact_output {
             return assert.with_assert(test_assert());
         }

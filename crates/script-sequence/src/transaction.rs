@@ -1,6 +1,5 @@
 use alloy_primitives::{Address, Bytes, B256};
 use foundry_common::TransactionMaybeSigned;
-use foundry_zksync_core::ZkTransactionMetadata;
 use revm_inspectors::tracing::types::CallKind;
 use serde::{Deserialize, Serialize};
 
@@ -32,8 +31,6 @@ pub struct TransactionWithMetadata {
     pub transaction: TransactionMaybeSigned,
     pub additional_contracts: Vec<AdditionalContract>,
     pub is_fixed_gas_limit: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub zk: Option<ZkTransactionMetadata>,
 }
 
 fn default_string() -> Option<String> {
@@ -61,7 +58,6 @@ impl TransactionWithMetadata {
             is_fixed_gas_limit: Default::default(),
             additional_contracts: Default::default(),
             rpc: Default::default(),
-            zk: Default::default(),
         }
     }
 

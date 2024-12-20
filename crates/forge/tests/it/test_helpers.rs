@@ -2,7 +2,11 @@
 
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
-use forge::{revm::primitives::SpecId, MultiContractRunner, MultiContractRunnerBuilder};
+use forge::{
+    executors::strategy::EvmExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
+    MultiContractRunnerBuilder,
+};
+use foundry_cli::utils;
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
     compilers::multi::MultiCompiler,
@@ -193,6 +197,7 @@ impl ForgeTestProfile {
         zk_config.cache_path = self.root().join("zk").join("cache");
         zk_config.evm_version = EvmVersion::London;
 
+        zk_config.zksync.compile = true;
         zk_config.zksync.startup = true;
         zk_config.zksync.fallback_oz = true;
         zk_config.zksync.optimizer_mode = '3';
@@ -294,6 +299,7 @@ impl ForgeTestData {
 
         let opts = config_evm_opts(&config);
 
+        let strategy = utils::get_executor_strategy(&config);
         let mut builder = self.base_runner();
         let config = Arc::new(config);
         let root = self.project.root();
@@ -301,14 +307,7 @@ impl ForgeTestData {
         builder
             .enable_isolation(opts.isolate)
             .sender(config.sender)
-            .build::<MultiCompiler>(
-                root,
-                &self.output,
-                None,
-                opts.local_evm_env(),
-                opts,
-                DualCompiledContracts::default(),
-            )
+            .build::<MultiCompiler>(root, &self.output, None, opts.local_evm_env(), opts, strategy)
             .unwrap()
     }
 
@@ -334,19 +333,14 @@ impl ForgeTestData {
         let dual_compiled_contracts = self.zk_test_data.dual_compiled_contracts.clone();
         let sender = zk_config.sender;
 
+        let mut strategy = utils::get_executor_strategy(&zk_config);
+        strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts);
         let mut builder = self.base_runner();
         builder.config = Arc::new(zk_config);
         builder
             .enable_isolation(opts.isolate)
             .sender(sender)
-            .build::<MultiCompiler>(
-                root,
-                &output,
-                Some(zk_output),
-                env,
-                opts,
-                dual_compiled_contracts,
-            )
+            .build::<MultiCompiler>(root, &output, Some(zk_output), env, opts, strategy)
             .unwrap()
     }
 
@@ -361,7 +355,7 @@ impl ForgeTestData {
                 None,
                 opts.local_evm_env(),
                 opts,
-                DualCompiledContracts::default(),
+                Box::new(EvmExecutorStrategy::default()),
             )
             .unwrap()
     }
@@ -384,7 +378,7 @@ impl ForgeTestData {
                 None,
                 env,
                 opts,
-                DualCompiledContracts::default(),
+                Box::new(EvmExecutorStrategy::default()),
             )
             .unwrap()
     }
