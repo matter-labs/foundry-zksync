@@ -17,7 +17,7 @@ async fn test_zk_contract_can_call_function() {
         ".*",
     );
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -26,7 +26,7 @@ async fn test_zk_contract_persisted_contracts_after_fork() {
     let filter =
         Filter::new("testZkContractsPersistedDeployedContractNoArgs|testZkContractsPersistedDeployedContractArgs", "ZkContractsTest", ".*");
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -34,7 +34,7 @@ async fn test_zk_contract_deployment() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkContractsInlineDeployedContractNoArgs|testZkContractsInlineDeployedContractComplexArgs", "ZkContractsTest", ".*");
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -43,7 +43,7 @@ async fn test_zk_contract_deployment_balance() {
     let filter =
         Filter::new("testZkContractsInlineDeployedContractBalance", "ZkContractsTest", ".*");
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -51,7 +51,7 @@ async fn test_zk_contract_deployment_balance_transfer() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkContractsExpectedBalances", "ZkContractsTest", ".*");
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -88,7 +88,7 @@ async fn test_zk_contract_can_call_system_contracts() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkContractsCallSystemContract", "ZkContractsTest", ".*");
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -96,7 +96,7 @@ async fn test_zk_contract_deployed_in_setup_can_be_mocked() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkContractsDeployedInSetupAreMockable", "ZkContractsTest", ".*");
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -104,5 +104,5 @@ async fn test_zk_contract_static_calls_keep_nonce_consistent() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkStaticCalls", "ZkContractsTest", ".*");
 
-    TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }

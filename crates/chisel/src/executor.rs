@@ -7,7 +7,7 @@ use crate::prelude::{
 };
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_json_abi::EventParam;
-use alloy_primitives::{hex, Address, U256};
+use alloy_primitives::{hex, Address, B256, U256};
 use core::fmt::Debug;
 use eyre::{Result, WrapErr};
 use foundry_cli::utils;
@@ -345,7 +345,7 @@ impl SessionSource {
                 )
             })
             .gas_limit(self.config.evm_opts.gas_limit())
-            .spec(self.config.foundry_config.evm_spec_id())
+            .spec_id(self.config.foundry_config.evm_spec_id())
             .legacy_assertions(self.config.foundry_config.legacy_assertions)
             .build(env, backend, strategy);
 
@@ -383,7 +383,7 @@ fn format_token(token: DynSolValue) -> String {
                         .collect::<String>()
                 )
                 .cyan(),
-                format!("{i:#x}").cyan(),
+                hex::encode_prefixed(B256::from(i)).cyan(),
                 i.cyan()
             )
         }
@@ -401,7 +401,7 @@ fn format_token(token: DynSolValue) -> String {
                         .collect::<String>()
                 )
                 .cyan(),
-                format!("{i:#x}").cyan(),
+                hex::encode_prefixed(B256::from(i)).cyan(),
                 i.cyan()
             )
         }
@@ -508,7 +508,7 @@ fn format_event_definition(event_definition: &pt::EventDefinition) -> Result<Str
     Ok(format!(
         "Type: {}\n├ Name: {}\n├ Signature: {:?}\n└ Selector: {:?}",
         "event".red(),
-        SolidityHelper::highlight(&format!(
+        SolidityHelper::new().highlight(&format!(
             "{}({})",
             &event.name,
             &event

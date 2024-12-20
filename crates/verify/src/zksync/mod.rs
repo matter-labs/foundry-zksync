@@ -5,7 +5,7 @@ use alloy_primitives::hex;
 use eyre::{eyre, Result};
 use foundry_cli::opts::EtherscanOpts;
 use foundry_common::{abi::encode_function_args, retry::Retry};
-use foundry_compilers::zksolc::input::StandardJsonCompilerInput;
+use foundry_zksync_compilers::compilers::zksolc::input::StandardJsonCompilerInput;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, thread::sleep, time::Duration};
@@ -44,7 +44,7 @@ impl VerificationProvider for ZkVerificationProvider {
 
         let client = reqwest::Client::new();
 
-        let retry: Retry = args.retry.into();
+        let retry: Retry = args.retry.into_retry();
         let verification_id: u64 = retry
             .run_async(|| {
                 async {

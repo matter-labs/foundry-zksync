@@ -12,7 +12,7 @@ use foundry_evm::{
     },
     InspectorExt,
 };
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata};
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, HashMap, ResultAndState},
