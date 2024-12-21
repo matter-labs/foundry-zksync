@@ -7,7 +7,7 @@ use crate::{
         DealRecord, GasRecord,
     },
     script::{Broadcast, Wallets},
-    strategy::CheatcodeInspectorStrategy,
+    strategy::Strategy,
     test::{
         assume::AssumeNoRevert,
         expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
@@ -69,7 +69,6 @@ pub use utils::CommonCreateInput;
 
 pub type Ecx<'a, 'b, 'c> = &'a mut EvmContext<&'b mut (dyn DatabaseExt + 'c)>;
 pub type InnerEcx<'a, 'b, 'c> = &'a mut InnerEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
-pub type Strategy<'a> = &'a mut dyn CheatcodeInspectorStrategy;
 
 /// Helper trait for obtaining complete [revm::Inspector] instance from mutable reference to
 /// [Cheatcodes].
@@ -528,7 +527,7 @@ pub struct Cheatcodes {
     pub wallets: Option<Wallets>,
 
     /// The behavior strategy.
-    pub strategy: Option<Box<dyn CheatcodeInspectorStrategy>>,
+    pub strategy: Strategy,
 }
 
 impl Clone for Cheatcodes {
@@ -568,7 +567,7 @@ impl Clone for Cheatcodes {
             arbitrary_storage: self.arbitrary_storage.clone(),
             deprecated: self.deprecated.clone(),
             wallets: self.wallets.clone(),
-            strategy: self.strategy.as_ref().map(|s| s.new_cloned()),
+            strategy: self.strategy.clone(),
         }
     }
 }
@@ -588,7 +587,7 @@ impl Cheatcodes {
         Self {
             fs_commit: true,
             labels: config.labels.clone(),
-            strategy: Some(config.strategy.clone()),
+            strategy: config.strategy.clone(),
             config,
             block: Default::default(),
             active_delegation: Default::default(),
@@ -763,7 +762,8 @@ impl Cheatcodes {
                 if ecx_inner.journaled_state.depth() == broadcast.depth {
                     input.set_caller(broadcast.new_origin);
 
-                    self.strategy.as_mut().unwrap().record_broadcastable_create_transactions(
+                    self.strategy.inner.record_broadcastable_create_transactions(
+                        self.strategy.context.as_mut(),
                         self.config.clone(),
                         &input,
                         ecx_inner,
@@ -801,9 +801,9 @@ impl Cheatcodes {
             }]);
         }
 
-        if let Some(result) = self.with_strategy(|strategy, cheatcodes| {
-            strategy.zksync_try_create(cheatcodes, ecx, &input, executor)
-        }) {
+        if let Some(result) =
+            self.strategy.inner.clone().zksync_try_create(self, ecx, &input, executor)
+        {
             return Some(result);
         }
 
@@ -917,10 +917,7 @@ where {
             }
         }
 
-        self.strategy
-            .as_mut()
-            .expect("failed acquiring strategy")
-            .zksync_record_create_address(&outcome);
+        self.strategy.inner.zksync_record_create_address(self.strategy.context.as_mut(), &outcome);
 
         outcome
     }
@@ -963,10 +960,12 @@ where {
             let prev = account.info.nonce;
             let nonce = prev.saturating_sub(1);
             account.info.nonce = nonce;
-            self.strategy
-                .as_mut()
-                .expect("failed acquiring strategy")
-                .zksync_sync_nonce(sender, nonce, ecx);
+            self.strategy.inner.zksync_sync_nonce(
+                self.strategy.context.as_mut(),
+                sender,
+                nonce,
+                ecx,
+            );
 
             trace!(target: "cheatcodes", %sender, nonce, prev, "corrected nonce");
         }
@@ -1000,10 +999,7 @@ where {
             return None;
         }
 
-        self.strategy
-            .as_mut()
-            .expect("failed acquiring strategy")
-            .zksync_set_deployer_call_input(call);
+        self.strategy.inner.zksync_set_deployer_call_input(self.strategy.context.as_mut(), call);
 
         // Handle expected calls
 
@@ -1137,17 +1133,15 @@ where {
                         })
                     }
 
-                    self.strategy
-                        .as_mut()
-                        .expect("failed acquiring strategy")
-                        .record_broadcastable_call_transactions(
-                            self.config.clone(),
-                            call,
-                            ecx_inner,
-                            broadcast,
-                            &mut self.broadcastable_transactions,
-                            &mut self.active_delegation,
-                        );
+                    self.strategy.inner.record_broadcastable_call_transactions(
+                        self.strategy.context.as_mut(),
+                        self.config.clone(),
+                        call,
+                        ecx_inner,
+                        broadcast,
+                        &mut self.broadcastable_transactions,
+                        &mut self.active_delegation,
+                    );
 
                     let account =
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
@@ -1220,9 +1214,8 @@ where {
             }]);
         }
 
-        if let Some(result) = self.with_strategy(|strategy, cheatcodes| {
-            strategy.zksync_try_call(cheatcodes, ecx, call, executor)
-        }) {
+        if let Some(result) = self.strategy.inner.clone().zksync_try_call(self, ecx, call, executor)
+        {
             return Some(result);
         }
 
@@ -1264,17 +1257,6 @@ where {
             None => false,
         }
     }
-
-    pub fn with_strategy<F, R>(&mut self, mut f: F) -> R
-    where
-        F: FnMut(Strategy, &mut Self) -> R,
-    {
-        let mut strategy = self.strategy.take();
-        let result = f(strategy.as_mut().expect("failed acquiring strategy").as_mut(), self);
-        self.strategy = strategy;
-
-        result
-    }
 }
 
 impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
@@ -1294,10 +1276,11 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
             self.gas_metering.paused_frames.push(interpreter.gas);
         }
 
-        self.strategy
-            .as_mut()
-            .expect("failed acquiring strategy")
-            .post_initialize_interp(interpreter, ecx);
+        self.strategy.inner.post_initialize_interp(
+            self.strategy.context.as_mut(),
+            interpreter,
+            ecx,
+        );
     }
 
     #[inline]
@@ -1342,8 +1325,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
 
     #[inline]
     fn step_end(&mut self, interpreter: &mut Interpreter, ecx: Ecx) {
-        if self.strategy.as_mut().expect("failed acquiring strategy").pre_step_end(interpreter, ecx)
-        {
+        if self.strategy.inner.pre_step_end(self.strategy.context.as_mut(), interpreter, ecx) {
             return;
         }
 

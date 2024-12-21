@@ -1,6 +1,6 @@
 use super::Result;
 use crate::{
-    strategy::{CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategy},
+    strategy::{new_evm_strategy, Strategy},
     Vm::Rpc,
 };
 use alloy_primitives::{map::AddressHashMap, U256};
@@ -57,7 +57,7 @@ pub struct CheatsConfig {
     /// Version of the script/test contract which is currently running.
     pub running_version: Option<Version>,
     /// The behavior strategy.
-    pub strategy: Box<dyn CheatcodeInspectorStrategy>,
+    pub strategy: Strategy,
     /// Whether to enable legacy (non-reverting) assertions.
     pub assertions_revert: bool,
     /// Optional seed for the RNG algorithm.
@@ -73,7 +73,7 @@ impl CheatsConfig {
         available_artifacts: Option<ContractsByArtifact>,
         running_contract: Option<String>,
         running_version: Option<Version>,
-        strategy: Box<dyn CheatcodeInspectorStrategy>,
+        strategy: Strategy,
     ) -> Self {
         let mut allowed_paths = vec![config.root.0.clone()];
         allowed_paths.extend(config.libs.clone());
@@ -234,7 +234,7 @@ impl Default for CheatsConfig {
             available_artifacts: Default::default(),
             running_contract: Default::default(),
             running_version: Default::default(),
-            strategy: Box::new(EvmCheatcodeInspectorStrategy::default()),
+            strategy: new_evm_strategy(),
             assertions_revert: true,
             seed: None,
         }
@@ -253,7 +253,7 @@ mod tests {
             None,
             None,
             None,
-            Box::new(EvmCheatcodeInspectorStrategy::default()),
+            new_evm_strategy(),
         )
     }
 

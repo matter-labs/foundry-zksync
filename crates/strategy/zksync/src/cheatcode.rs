@@ -10,7 +10,8 @@ use alloy_sol_types::SolValue;
 use foundry_cheatcodes::{
     journaled_account, make_acc_non_empty,
     strategy::{
-        CheatcodeInspectorStrategy, CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy,
+        CheatcodeInspectorStrategy, CheatcodeInspectorStrategyContext,
+        CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy,
     },
     Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
     CheatsConfig, CheatsCtxt, CommonCreateInput, DealRecord, Ecx, Error, InnerEcx, Result, Vm,
@@ -83,7 +84,10 @@ macro_rules! bail {
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncCheatcodeInspectorStrategy {
     evm: EvmCheatcodeInspectorStrategy,
+}
 
+#[derive(Debug, Default, Clone)]
+pub struct ZksyncCheatcodeInspectorStrategyContext {
     pub using_zk_vm: bool,
 
     /// When in zkEVM context, execute the next CALL or CREATE in the EVM instead.
@@ -128,7 +132,7 @@ pub struct ZksyncCheatcodeInspectorStrategy {
     pub zk_env: ZkEnv,
 }
 
-impl ZksyncCheatcodeInspectorStrategy {
+impl ZksyncCheatcodeInspectorStrategyContext {
     pub fn new(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv) -> Self {
         // We add the empty bytecode manually so it is correctly translated in zk mode.
         // This is used in many places in foundry, e.g. in cheatcode contract's account code.
@@ -168,7 +172,6 @@ impl ZksyncCheatcodeInspectorStrategy {
         persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
 
         Self {
-            evm: EvmCheatcodeInspectorStrategy::default(),
             using_zk_vm: false, // We need to migrate once on initialize_interp
             skip_zk_vm: false,
             skip_zk_vm_addresses: Default::default(),
@@ -183,6 +186,32 @@ impl ZksyncCheatcodeInspectorStrategy {
             zk_env,
         }
     }
+}
+
+impl CheatcodeInspectorStrategyContext for ZksyncCheatcodeInspectorStrategyContext {
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyContext> {
+        Box::new(self.clone())
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn as_any_ref(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+fn get_context(
+    ctx: &mut dyn CheatcodeInspectorStrategyContext,
+) -> &mut ZksyncCheatcodeInspectorStrategyContext {
+    ctx.as_any_mut().downcast_mut().expect("expected ZksyncCheatcodeInspectorStrategyContext")
+}
+
+fn get_context_ref(
+    ctx: &dyn CheatcodeInspectorStrategyContext,
+) -> &ZksyncCheatcodeInspectorStrategyContext {
+    ctx.as_any_ref().downcast_ref().expect("expected ZksyncCheatcodeInspectorStrategyContext")
 }
 
 /// Allows overriding nonce update behavior for the tx caller in the zkEVM.
@@ -227,8 +256,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         Box::new(self.clone())
     }
 
-    fn get_nonce(&mut self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, address: Address) -> Result<u64> {
-        if !self.using_zk_vm {
+    fn get_nonce(&self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, address: Address) -> Result<u64> {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.get_nonce(ccx, address);
         }
 
@@ -236,19 +267,23 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         Ok(nonce)
     }
 
-    fn base_contract_deployed(&mut self) {
+    fn base_contract_deployed(&self, ctx: &mut dyn CheatcodeInspectorStrategyContext) {
+        let ctx = get_context(ctx);
+
         debug!("allowing startup storage migration");
-        self.zk_startup_migration.allow();
+        ctx.zk_startup_migration.allow();
         debug!("allowing persisting next nonce update");
-        self.zk_persist_nonce_update.persist_next();
+        ctx.zk_persist_nonce_update.persist_next();
     }
 
     fn cheatcode_get_nonce(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         address: Address,
     ) -> foundry_cheatcodes::Result {
-        if !self.using_zk_vm {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             let nonce = self.evm.get_nonce(ccx, address)?;
             return Ok(nonce.abi_encode());
         }
@@ -257,8 +292,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         Ok(nonce.abi_encode())
     }
 
-    fn cheatcode_roll(&mut self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, new_height: U256) -> Result {
-        if !self.using_zk_vm {
+    fn cheatcode_roll(&self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, new_height: U256) -> Result {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_roll(ccx, new_height);
         }
 
@@ -267,12 +304,10 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         Ok(Default::default())
     }
 
-    fn cheatcode_warp(
-        &mut self,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        new_timestamp: U256,
-    ) -> Result {
-        if !self.using_zk_vm {
+    fn cheatcode_warp(&self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, new_timestamp: U256) -> Result {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_warp(ccx, new_timestamp);
         }
 
@@ -282,12 +317,14 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn cheatcode_deal(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         address: Address,
         new_balance: U256,
     ) -> Result {
-        if !self.using_zk_vm {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_deal(ccx, address, new_balance);
         }
 
@@ -298,12 +335,14 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn cheatcode_etch(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         target: Address,
         new_runtime_bytecode: &Bytes,
     ) -> Result {
-        if !self.using_zk_vm {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_etch(ccx, target, new_runtime_bytecode);
         }
 
@@ -312,11 +351,13 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn cheatcode_reset_nonce(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         account: Address,
     ) -> Result {
-        if !self.using_zk_vm {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_reset_nonce(ccx, account);
         }
 
@@ -325,12 +366,14 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn cheatcode_set_nonce(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         account: Address,
         new_nonce: u64,
     ) -> Result {
-        if !self.using_zk_vm {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_set_nonce(ccx, account, new_nonce);
         }
 
@@ -348,12 +391,14 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn cheatcode_set_nonce_unsafe(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         account: Address,
         new_nonce: u64,
     ) -> Result {
-        if !self.using_zk_vm {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_set_nonce_unsafe(ccx, account, new_nonce);
         }
 
@@ -362,13 +407,15 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn cheatcode_mock_call(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         callee: Address,
         data: &Bytes,
         return_data: &Bytes,
     ) -> Result {
-        if !self.using_zk_vm {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_mock_call(ccx, callee, data, return_data);
         }
 
@@ -386,13 +433,15 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn cheatcode_mock_call_revert(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
         callee: Address,
         data: &Bytes,
         revert_data: &Bytes,
     ) -> Result {
-        if !self.using_zk_vm {
+        let ctx = get_context(ccx.state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return self.evm.cheatcode_mock_call_revert(ccx, callee, data, revert_data);
         }
 
@@ -411,9 +460,11 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn get_artifact_code(&self, state: &Cheatcodes, path: &str, deployed: bool) -> Result {
+        let ctx = get_context_ref(state.strategy.context.as_ref());
+
         Ok(get_artifact_code(
-            &self.dual_compiled_contracts,
-            self.using_zk_vm,
+            &ctx.dual_compiled_contracts,
+            ctx.using_zk_vm,
             &state.config,
             path,
             deployed,
@@ -422,15 +473,18 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn record_broadcastable_create_transactions(
-        &mut self,
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
         config: Arc<CheatsConfig>,
         input: &dyn CommonCreateInput,
         ecx_inner: InnerEcx<'_, '_, '_>,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
     ) {
-        if !self.using_zk_vm {
+        let ctx_zk = get_context(ctx);
+        if !ctx_zk.using_zk_vm {
             return self.evm.record_broadcastable_create_transactions(
+                ctx,
                 config,
                 input,
                 ecx_inner,
@@ -439,13 +493,15 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
             );
         }
 
+        let ctx = ctx_zk;
+
         let is_fixed_gas_limit =
             foundry_cheatcodes::check_if_fixed_gas_limit(ecx_inner, input.gas_limit());
 
         let init_code = input.init_code();
         let to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
         let mut nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as u64;
-        let find_contract = self
+        let find_contract = ctx
             .dual_compiled_contracts
             .find_bytecode(&init_code.0)
             .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
@@ -453,7 +509,7 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         let constructor_args = find_contract.constructor_args();
         let contract = find_contract.contract();
 
-        let factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
+        let factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(contract);
 
         let create_input = foundry_zksync_core::encode_create_params(
             &input.scheme().unwrap_or(CreateScheme::Create),
@@ -464,21 +520,20 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
 
         let mut zk_tx_factory_deps = factory_deps;
 
-        let paymaster_params =
-            self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
-                paymaster: paymaster_data.address.to_h160(),
-                paymaster_input: paymaster_data.input.to_vec(),
-            });
+        let paymaster_params = ctx.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
+            paymaster: paymaster_data.address.to_h160(),
+            paymaster_input: paymaster_data.input.to_vec(),
+        });
 
         let rpc = ecx_inner.db.active_fork_url();
 
-        let injected_factory_deps = self
+        let injected_factory_deps = ctx
             .zk_use_factory_deps
             .iter()
             .map(|contract| {
                 get_artifact_code(
-                    &self.dual_compiled_contracts,
-                    self.using_zk_vm,
+                    &ctx.dual_compiled_contracts,
+                    ctx.using_zk_vm,
                     &config,
                     contract,
                     false,
@@ -543,7 +598,8 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 
     fn record_broadcastable_call_transactions(
-        &mut self,
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
         config: Arc<CheatsConfig>,
         call: &CallInputs,
         ecx_inner: InnerEcx<'_, '_, '_>,
@@ -551,8 +607,11 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         broadcastable_transactions: &mut BroadcastableTransactions,
         active_delegation: &mut Option<SignedAuthorization>,
     ) {
-        if !self.using_zk_vm {
+        let ctx_zk = get_context(ctx);
+
+        if !ctx_zk.using_zk_vm {
             return self.evm.record_broadcastable_call_transactions(
+                ctx,
                 config,
                 call,
                 ecx_inner,
@@ -562,19 +621,21 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
             );
         }
 
+        let ctx = ctx_zk;
+
         let is_fixed_gas_limit =
             foundry_cheatcodes::check_if_fixed_gas_limit(ecx_inner, call.gas_limit);
 
         let nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as u64;
 
-        let factory_deps = &mut self.set_deployer_call_input_factory_deps;
-        let injected_factory_deps = self
+        let factory_deps = &mut ctx.set_deployer_call_input_factory_deps;
+        let injected_factory_deps = ctx
             .zk_use_factory_deps
             .iter()
             .flat_map(|contract| {
                 let artifact_code = get_artifact_code(
-                    &self.dual_compiled_contracts,
-                    self.using_zk_vm,
+                    &ctx.dual_compiled_contracts,
+                    ctx.using_zk_vm,
                     &config,
                     contract,
                     false,
@@ -584,17 +645,16 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
                     panic!("failed to get bytecode for factory deps contract {contract}")
                 })
                 .to_vec();
-                let res = self.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
-                self.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
+                let res = ctx.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
+                ctx.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
             })
             .collect_vec();
         factory_deps.extend(injected_factory_deps.clone());
 
-        let paymaster_params =
-            self.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
-                paymaster: paymaster_data.address.to_h160(),
-                paymaster_input: paymaster_data.input.to_vec(),
-            });
+        let paymaster_params = ctx.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
+            paymaster: paymaster_data.address.to_h160(),
+            paymaster_input: paymaster_data.input.to_vec(),
+        });
         let factory_deps = if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
             // We shouldn't need factory_deps for CALLs
             factory_deps.clone()
@@ -634,18 +694,32 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
         debug!(target: "cheatcodes", tx=?broadcastable_transactions.back().unwrap(), "broadcastable call");
     }
 
-    fn post_initialize_interp(&mut self, _interpreter: &mut Interpreter, ecx: Ecx<'_, '_, '_>) {
-        if self.zk_startup_migration.is_allowed() && !self.using_zk_vm {
-            self.select_zk_vm(ecx, None);
-            self.zk_startup_migration.done();
+    fn post_initialize_interp(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _interpreter: &mut Interpreter,
+        ecx: Ecx<'_, '_, '_>,
+    ) {
+        let ctx = get_context(ctx);
+
+        if ctx.zk_startup_migration.is_allowed() && !ctx.using_zk_vm {
+            self.select_zk_vm(ctx, ecx, None);
+            ctx.zk_startup_migration.done();
             debug!("startup zkEVM storage migration completed");
         }
     }
 
     /// Returns true if handled.
-    fn pre_step_end(&mut self, interpreter: &mut Interpreter, ecx: Ecx<'_, '_, '_>) -> bool {
+    fn pre_step_end(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        interpreter: &mut Interpreter,
+        ecx: Ecx<'_, '_, '_>,
+    ) -> bool {
         // override address(x).balance retrieval to make it consistent between EraVM and EVM
-        if !self.using_zk_vm {
+        let ctx = get_context(ctx);
+
+        if !ctx.using_zk_vm {
             return false;
         }
 
@@ -680,29 +754,44 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
 }
 
 impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
-    fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
-        self.skip_zk_vm = true;
+    fn zksync_cheatcode_skip_zkvm(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+    ) -> Result {
+        let ctx = get_context(ctx);
+
+        ctx.skip_zk_vm = true;
         Ok(Default::default())
     }
 
     fn zksync_cheatcode_set_paymaster(
-        &mut self,
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
         paymaster_address: Address,
         paymaster_input: &Bytes,
     ) -> Result {
-        self.paymaster_params =
+        let ctx = get_context(ctx);
+
+        ctx.paymaster_params =
             Some(ZkPaymasterData { address: paymaster_address, input: paymaster_input.clone() });
         Ok(Default::default())
     }
 
-    fn zksync_cheatcode_use_factory_deps(&mut self, name: String) -> foundry_cheatcodes::Result {
+    fn zksync_cheatcode_use_factory_deps(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        name: String,
+    ) -> foundry_cheatcodes::Result {
+        let ctx = get_context(ctx);
+
         info!("Adding factory dependency: {:?}", name);
-        self.zk_use_factory_deps.push(name);
+        ctx.zk_use_factory_deps.push(name);
         Ok(Default::default())
     }
 
     fn zksync_cheatcode_register_contract(
-        &mut self,
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
         name: String,
         zk_bytecode_hash: FixedBytes<32>,
         zk_deployed_bytecode: Vec<u8>,
@@ -711,6 +800,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
         evm_deployed_bytecode: Vec<u8>,
         evm_bytecode: Vec<u8>,
     ) -> Result {
+        let ctx = get_context(ctx);
+
         let new_contract = DualCompiledContract {
             name,
             zk_bytecode_hash: H256(zk_bytecode_hash.0),
@@ -721,7 +812,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
             evm_bytecode,
         };
 
-        if let Some(existing) = self.dual_compiled_contracts.iter().find(|contract| {
+        if let Some(existing) = ctx.dual_compiled_contracts.iter().find(|contract| {
             contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
                 contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
         }) {
@@ -729,33 +820,51 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
             return Ok(Default::default())
         }
 
-        self.dual_compiled_contracts.push(new_contract);
+        ctx.dual_compiled_contracts.push(new_contract);
 
         Ok(Default::default())
     }
 
-    fn zksync_record_create_address(&mut self, outcome: &CreateOutcome) {
-        if self.record_next_create_address {
-            self.record_next_create_address = false;
+    fn zksync_record_create_address(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        outcome: &CreateOutcome,
+    ) {
+        let ctx = get_context(ctx);
+
+        if ctx.record_next_create_address {
+            ctx.record_next_create_address = false;
             if let Some(address) = outcome.address {
-                self.skip_zk_vm_addresses.insert(address);
+                ctx.skip_zk_vm_addresses.insert(address);
             }
         }
     }
 
-    fn zksync_sync_nonce(&mut self, sender: Address, nonce: u64, ecx: Ecx<'_, '_, '_>) {
+    fn zksync_sync_nonce(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        sender: Address,
+        nonce: u64,
+        ecx: Ecx<'_, '_, '_>,
+    ) {
         // NOTE(zk): We sync with the nonce changes to ensure that the nonce matches
         foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx);
     }
 
-    fn zksync_set_deployer_call_input(&mut self, call: &mut CallInputs) {
-        self.set_deployer_call_input_factory_deps.clear();
-        if call.target_address == DEFAULT_CREATE2_DEPLOYER && self.using_zk_vm {
+    fn zksync_set_deployer_call_input(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        call: &mut CallInputs,
+    ) {
+        let ctx = get_context(ctx);
+
+        ctx.set_deployer_call_input_factory_deps.clear();
+        if call.target_address == DEFAULT_CREATE2_DEPLOYER && ctx.using_zk_vm {
             call.target_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
             call.bytecode_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
 
             let (salt, init_code) = call.input.split_at(32);
-            let find_contract = self
+            let find_contract = ctx
                 .dual_compiled_contracts
                 .find_bytecode(init_code)
                 .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
@@ -764,8 +873,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
             let contract = find_contract.contract();
 
             // store these for broadcast reasons
-            self.set_deployer_call_input_factory_deps =
-                self.dual_compiled_contracts.fetch_all_factory_deps(contract);
+            ctx.set_deployer_call_input_factory_deps =
+                ctx.dual_compiled_contracts.fetch_all_factory_deps(contract);
 
             let create_input = foundry_zksync_core::encode_create_params(
                 &CreateScheme::Create2 { salt: U256::from_be_slice(salt) },
@@ -781,19 +890,21 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
     /// If `Some` is returned then the result must be returned immediately, else the call must be
     /// handled in EVM.
     fn zksync_try_create(
-        &mut self,
+        &self,
         state: &mut Cheatcodes,
         ecx: Ecx<'_, '_, '_>,
         input: &dyn CommonCreateInput,
         executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CreateOutcome> {
-        if !self.using_zk_vm {
+        let ctx = get_context(state.strategy.context.as_mut());
+
+        if !ctx.using_zk_vm {
             return None;
         }
 
-        if self.skip_zk_vm {
-            self.skip_zk_vm = false; // handled the skip, reset flag
-            self.record_next_create_address = true;
+        if ctx.skip_zk_vm {
+            ctx.skip_zk_vm = false; // handled the skip, reset flag
+            ctx.record_next_create_address = true;
             info!("running create in EVM, instead of zkEVM (skipped)");
             return None
         }
@@ -822,7 +933,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
 
         info!("running create in zkEVM");
 
-        let find_contract = self
+        let find_contract = ctx
             .dual_compiled_contracts
             .find_bytecode(&init_code.0)
             .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
@@ -836,14 +947,14 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
             constructor_args.to_vec(),
         );
 
-        let mut factory_deps = self.dual_compiled_contracts.fetch_all_factory_deps(contract);
-        let injected_factory_deps = self
+        let mut factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(contract);
+        let injected_factory_deps = ctx
             .zk_use_factory_deps
             .iter()
             .flat_map(|contract| {
                 let artifact_code = get_artifact_code(
-                    &self.dual_compiled_contracts,
-                    self.using_zk_vm,
+                    &ctx.dual_compiled_contracts,
+                    ctx.using_zk_vm,
                     &state.config,
                     contract,
                     false,
@@ -853,25 +964,25 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
                     panic!("failed to get bytecode for injected factory deps contract {contract}")
                 })
                 .to_vec();
-                let res = self.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
-                self.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
+                let res = ctx.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
+                ctx.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
             })
             .collect_vec();
         factory_deps.extend(injected_factory_deps);
 
         // NOTE(zk): Clear injected factory deps so that they are not sent on further transactions
-        self.zk_use_factory_deps.clear();
+        ctx.zk_use_factory_deps.clear();
         tracing::debug!(contract = contract.name, "using dual compiled contract");
 
-        let zk_persist_nonce_update = self.zk_persist_nonce_update.check();
+        let zk_persist_nonce_update = ctx.zk_persist_nonce_update.check();
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: state.mocked_calls.clone(),
             expected_calls: Some(&mut state.expected_calls),
             accesses: state.accesses.as_mut(),
-            persisted_factory_deps: Some(&mut self.persisted_factory_deps),
-            paymaster_data: self.paymaster_params.take(),
+            persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
+            paymaster_data: ctx.paymaster_params.take(),
             persist_nonce_update: state.broadcast.is_some() || zk_persist_nonce_update,
-            zk_env: self.zk_env.clone(),
+            zk_env: ctx.zk_env.clone(),
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -933,7 +1044,12 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
                                     .to_ru256()
                             })
                             .collect::<HashSet<_>>();
-                        ecx.db.get_strategy().zksync_save_immutable_storage(addr, keys);
+                        let strategy = ecx.db.get_strategy();
+                        strategy.inner.zksync_save_immutable_storage(
+                            strategy.context.as_mut(),
+                            addr,
+                            keys,
+                        );
                     }
                 }
 
@@ -1000,24 +1116,25 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
     /// If `Some` is returned then the result must be returned immediately, else the call must be
     /// handled in EVM.
     fn zksync_try_call(
-        &mut self,
+        &self,
         state: &mut Cheatcodes,
         ecx: Ecx<'_, '_, '_>,
         call: &CallInputs,
         executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CallOutcome> {
-        // We need to clear them out for the next call.
-        let factory_deps = std::mem::take(&mut self.set_deployer_call_input_factory_deps);
+        let ctx = get_context(state.strategy.context.as_mut());
 
-        if !self.using_zk_vm {
+        // We need to clear them out for the next call.
+        let factory_deps = std::mem::take(&mut ctx.set_deployer_call_input_factory_deps);
+
+        if !ctx.using_zk_vm {
             return None;
         }
 
         // also skip if the target was created during a zkEVM skip
-        self.skip_zk_vm =
-            self.skip_zk_vm || self.skip_zk_vm_addresses.contains(&call.target_address);
-        if self.skip_zk_vm {
-            self.skip_zk_vm = false; // handled the skip, reset flag
+        ctx.skip_zk_vm = ctx.skip_zk_vm || ctx.skip_zk_vm_addresses.contains(&call.target_address);
+        if ctx.skip_zk_vm {
+            ctx.skip_zk_vm = false; // handled the skip, reset flag
             info!("running create in EVM, instead of zkEVM (skipped) {:#?}", call);
             return None;
         }
@@ -1036,20 +1153,20 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
         }
 
         info!("running call in zkEVM {:#?}", call);
-        let zk_persist_nonce_update = self.zk_persist_nonce_update.check();
+        let zk_persist_nonce_update = ctx.zk_persist_nonce_update.check();
 
         // NOTE(zk): Clear injected factory deps here even though it's actually used in broadcast.
         // To be consistent with where we clear factory deps in try_create_in_zk.
-        self.zk_use_factory_deps.clear();
+        ctx.zk_use_factory_deps.clear();
 
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: state.mocked_calls.clone(),
             expected_calls: Some(&mut state.expected_calls),
             accesses: state.accesses.as_mut(),
-            persisted_factory_deps: Some(&mut self.persisted_factory_deps),
-            paymaster_data: self.paymaster_params.take(),
+            persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
+            paymaster_data: ctx.paymaster_params.take(),
             persist_nonce_update: state.broadcast.is_some() || zk_persist_nonce_update,
-            zk_env: self.zk_env.clone(),
+            zk_env: ctx.zk_env.clone(),
         };
 
         let mut gas = Gas::new(call.gas_limit);
@@ -1155,15 +1272,27 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
         }
     }
 
-    fn zksync_select_fork_vm(&mut self, data: InnerEcx<'_, '_, '_>, fork_id: LocalForkId) {
-        self.select_fork_vm(data, fork_id);
+    fn zksync_select_fork_vm(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        data: InnerEcx<'_, '_, '_>,
+        fork_id: LocalForkId,
+    ) {
+        let ctx = get_context(ctx);
+        self.select_fork_vm(ctx, data, fork_id);
     }
 
-    fn zksync_cheatcode_select_zk_vm(&mut self, data: InnerEcx<'_, '_, '_>, enable: bool) {
+    fn zksync_cheatcode_select_zk_vm(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        data: InnerEcx<'_, '_, '_>,
+        enable: bool,
+    ) {
+        let ctx = get_context(ctx);
         if enable {
-            self.select_zk_vm(data, None)
+            self.select_zk_vm(ctx, data, None)
         } else {
-            self.select_evm(data);
+            self.select_evm(ctx, data);
         }
     }
 }
@@ -1175,25 +1304,34 @@ impl ZksyncCheatcodeInspectorStrategy {
     /// Additionally:
     /// * Translates block information
     /// * Translates all persisted addresses
-    pub fn select_fork_vm(&mut self, data: InnerEcx<'_, '_, '_>, fork_id: LocalForkId) {
+    pub fn select_fork_vm(
+        &self,
+        ctx: &mut ZksyncCheatcodeInspectorStrategyContext,
+        data: InnerEcx<'_, '_, '_>,
+        fork_id: LocalForkId,
+    ) {
         let fork_info = data.db.get_fork_info(fork_id).expect("failed getting fork info");
         if fork_info.fork_type.is_evm() {
-            self.select_evm(data)
+            self.select_evm(ctx, data)
         } else {
-            self.select_zk_vm(data, Some(&fork_info.fork_env))
+            self.select_zk_vm(ctx, data, Some(&fork_info.fork_env))
         }
     }
 
     /// Switch to EVM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    pub fn select_evm(&mut self, data: InnerEcx<'_, '_, '_>) {
-        if !self.using_zk_vm {
+    pub fn select_evm(
+        &self,
+        ctx: &mut ZksyncCheatcodeInspectorStrategyContext,
+        data: InnerEcx<'_, '_, '_>,
+    ) {
+        if !ctx.using_zk_vm {
             tracing::info!("already in EVM");
             return
         }
 
         tracing::info!("switching to EVM");
-        self.using_zk_vm = false;
+        ctx.using_zk_vm = false;
 
         let system_account = SYSTEM_CONTEXT_ADDRESS.to_address();
         journaled_account(data, system_account).expect("failed to load account");
@@ -1230,7 +1368,7 @@ impl ZksyncCheatcodeInspectorStrategy {
                 .sload(account_code_account, account_code_key)
                 .ok()
                 .and_then(|zk_bytecode_hash| {
-                    self.dual_compiled_contracts
+                    ctx.dual_compiled_contracts
                         .find_by_zk_bytecode_hash(zk_bytecode_hash.to_h256())
                         .map(|contract| {
                             (
@@ -1258,14 +1396,19 @@ impl ZksyncCheatcodeInspectorStrategy {
 
     /// Switch to ZK-VM and translate block info, balances, nonces and deployed codes for persistent
     /// accounts
-    pub fn select_zk_vm(&mut self, data: InnerEcx<'_, '_, '_>, new_env: Option<&Env>) {
-        if self.using_zk_vm {
+    pub fn select_zk_vm(
+        &self,
+        ctx: &mut ZksyncCheatcodeInspectorStrategyContext,
+        data: InnerEcx<'_, '_, '_>,
+        new_env: Option<&Env>,
+    ) {
+        if ctx.using_zk_vm {
             tracing::info!("already in ZK-VM");
             return
         }
 
         tracing::info!("switching to ZK-VM");
-        self.using_zk_vm = true;
+        ctx.using_zk_vm = true;
 
         let env = new_env.unwrap_or(data.env.as_ref());
 
@@ -1303,7 +1446,7 @@ impl ZksyncCheatcodeInspectorStrategy {
                 continue;
             }
 
-            if let Some(contract) = self.dual_compiled_contracts.iter().find(|contract| {
+            if let Some(contract) = ctx.dual_compiled_contracts.iter().find(|contract| {
                 info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
             }) {
                 account_code_storage.insert(

@@ -174,11 +174,7 @@ impl ScriptRunner {
         // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
             debug!("script deployed");
-            cheatcodes
-                .strategy
-                .as_mut()
-                .expect("failed acquiring strategy")
-                .base_contract_deployed();
+            cheatcodes.strategy.inner.base_contract_deployed(cheatcodes.strategy.context.as_mut());
         }
 
         // Optionally call the `setUp` function

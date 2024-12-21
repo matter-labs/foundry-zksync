@@ -6,7 +6,7 @@ use foundry_evm_traces::{InternalTraceMode, TraceMode};
 use revm::primitives::{Env, SpecId};
 use std::ops::{Deref, DerefMut};
 
-use super::strategy::ExecutorStrategy;
+use super::strategy::Strategy;
 
 /// A default executor with tracing enabled
 pub struct TracingExecutor {
@@ -21,9 +21,9 @@ impl TracingExecutor {
         debug: bool,
         decode_internal: bool,
         alphanet: bool,
-        strategy: Box<dyn ExecutorStrategy>,
+        strategy: Strategy,
     ) -> Self {
-        let db = Backend::spawn(fork, strategy.new_backend_strategy());
+        let db = Backend::spawn(fork, strategy.inner.new_backend_strategy());
         let trace_mode =
             TraceMode::Call.with_debug(debug).with_decode_internal(if decode_internal {
                 InternalTraceMode::Full

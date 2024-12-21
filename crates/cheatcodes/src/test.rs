@@ -15,7 +15,11 @@ impl Cheatcode for zkVmCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { enable } = *self;
 
-        ccx.with_strategy(|strategy, ccx| strategy.zksync_cheatcode_select_zk_vm(ccx.ecx, enable));
+        ccx.state.strategy.inner.zksync_cheatcode_select_zk_vm(
+            ccx.state.strategy.context.as_mut(),
+            ccx.ecx,
+            enable,
+        );
 
         Ok(Default::default())
     }
@@ -23,23 +27,28 @@ impl Cheatcode for zkVmCall {
 
 impl Cheatcode for zkVmSkipCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        ccx.with_strategy(|strategy, _ccx| strategy.zksync_cheatcode_skip_zkvm())
+        ccx.state.strategy.inner.zksync_cheatcode_skip_zkvm(ccx.state.strategy.context.as_mut())
     }
 }
 
 impl Cheatcode for zkUsePaymasterCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { paymaster_address, paymaster_input } = self;
-        ccx.with_strategy(|strategy, _ccx| {
-            strategy.zksync_cheatcode_set_paymaster(*paymaster_address, paymaster_input)
-        })
+        ccx.state.strategy.inner.zksync_cheatcode_set_paymaster(
+            ccx.state.strategy.context.as_mut(),
+            *paymaster_address,
+            paymaster_input,
+        )
     }
 }
 
 impl Cheatcode for zkUseFactoryDepCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { name } = self;
-        ccx.with_strategy(|strategy, _ccx| strategy.zksync_cheatcode_use_factory_deps(name.clone()))
+        ccx.state
+            .strategy
+            .inner
+            .zksync_cheatcode_use_factory_deps(ccx.state.strategy.context.as_mut(), name.clone())
     }
 }
 
@@ -54,17 +63,16 @@ impl Cheatcode for zkRegisterContractCall {
             zkDeployedBytecode,
         } = self;
 
-        ccx.with_strategy(|strategy, _ccx| {
-            strategy.zksync_cheatcode_register_contract(
-                name.clone(),
-                zkBytecodeHash.0.into(),
-                zkDeployedBytecode.to_vec(),
-                vec![], //TODO: add argument to cheatcode
-                *evmBytecodeHash,
-                evmDeployedBytecode.to_vec(),
-                evmBytecode.to_vec(),
-            )
-        })
+        ccx.state.strategy.inner.zksync_cheatcode_register_contract(
+            ccx.state.strategy.context.as_mut(),
+            name.clone(),
+            zkBytecodeHash.0.into(),
+            zkDeployedBytecode.to_vec(),
+            vec![], //TODO: add argument to cheatcode
+            *evmBytecodeHash,
+            evmDeployedBytecode.to_vec(),
+            evmBytecode.to_vec(),
+        )
     }
 }
 
