@@ -24,7 +24,7 @@ pub trait ExecutorStrategyContext: Debug + Send + Sync + Any {
 
 impl ExecutorStrategyContext for () {
     fn new_cloned(&self) -> Box<dyn ExecutorStrategyContext> {
-        Box::new(self.clone())
+        Box::new(*self)
     }
 
     fn as_any_ref(&self) -> &dyn Any {

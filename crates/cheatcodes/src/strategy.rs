@@ -26,7 +26,7 @@ pub trait CheatcodeInspectorStrategyContext: Debug + Send + Sync + Any {
 
 impl CheatcodeInspectorStrategyContext for () {
     fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyContext> {
-        Box::new(self.clone())
+        Box::new(*self)
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -195,6 +195,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
     );
 
     /// Record broadcastable transaction during CALL.
+    #[allow(clippy::too_many_arguments)]
     fn record_broadcastable_call_transactions(
         &self,
         _ctx: &mut dyn CheatcodeInspectorStrategyContext,

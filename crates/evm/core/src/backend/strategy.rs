@@ -19,7 +19,7 @@ pub trait BackendStrategyContext: Debug + Send + Sync + Any {
 
 impl BackendStrategyContext for () {
     fn new_cloned(&self) -> Box<dyn BackendStrategyContext> {
-        Box::new(self.clone())
+        Box::new(())
     }
 
     fn as_any_ref(&self) -> &dyn Any {

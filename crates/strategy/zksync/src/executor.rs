@@ -195,7 +195,6 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategy {
     ) {
         let ctx = get_context(ctx);
         ctx.dual_compiled_contracts = dual_compiled_contracts;
-        println!("SAVE {}", ctx.dual_compiled_contracts.len());
     }
 
     fn zksync_set_fork_env(
