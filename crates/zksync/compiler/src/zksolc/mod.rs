@@ -304,4 +304,9 @@ impl DualCompiledContracts {
     pub fn len(&self) -> usize {
         self.contracts.len()
     }
+
+    /// Retrieves if the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.contracts.is_empty()
+    }
 }
