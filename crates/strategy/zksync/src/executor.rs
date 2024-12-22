@@ -7,7 +7,8 @@ use foundry_evm::{
     backend::{BackendResult, DatabaseExt},
     executors::{
         strategy::{
-            EvmExecutorStrategy, ExecutorStrategy, ExecutorStrategyContext, ExecutorStrategyExt,
+            EvmExecutorStrategyRunner, ExecutorStrategy, ExecutorStrategyContext,
+            ExecutorStrategyExt, ExecutorStrategyRunner,
         },
         Executor,
     },
@@ -22,11 +23,11 @@ use revm::{
 use zksync_types::H256;
 
 use crate::{
-    backend::ZksyncBackendStrategyContext,
-    cheatcode::{ZksyncCheatcodeInspectorStrategyContext, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY},
-    ZksyncBackendStrategy, ZksyncCheatcodeInspectorStrategy,
+    backend::ZksyncBackendStrategyBuilder,
+    cheatcode::{ZksyncCheatcodeInspectorStrategyBuilder, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY},
 };
 
+/// Defines the context for [ZksyncExecutorStrategyRunner].
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncExecutorStrategyContext {
     inspect_context: Option<ZkTransactionMetadata>,
@@ -49,9 +50,10 @@ impl ExecutorStrategyContext for ZksyncExecutorStrategyContext {
     }
 }
 
+/// Defines the [ExecutorStrategyRunner] strategy for ZKsync.
 #[derive(Debug, Default, Clone)]
-pub struct ZksyncExecutorStrategy {
-    evm: EvmExecutorStrategy,
+pub struct ZksyncExecutorStrategyRunner {
+    evm: EvmExecutorStrategyRunner,
 }
 
 fn get_context_ref(ctx: &dyn ExecutorStrategyContext) -> &ZksyncExecutorStrategyContext {
@@ -62,12 +64,12 @@ fn get_context(ctx: &mut dyn ExecutorStrategyContext) -> &mut ZksyncExecutorStra
     ctx.as_any_mut().downcast_mut().expect("expected ZksyncExecutorStrategyContext")
 }
 
-impl ExecutorStrategy for ZksyncExecutorStrategy {
+impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
     fn name(&self) -> &'static str {
         "zk"
     }
 
-    fn new_cloned(&self) -> Box<dyn ExecutorStrategy> {
+    fn new_cloned(&self) -> Box<dyn ExecutorStrategyRunner> {
         Box::new(self.clone())
     }
 
@@ -114,25 +116,19 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
         Ok(())
     }
 
-    fn new_backend_strategy(&self) -> foundry_evm_core::backend::strategy::Strategy {
-        foundry_evm_core::backend::strategy::Strategy {
-            inner: Box::new(ZksyncBackendStrategy::default()),
-            context: Box::new(ZksyncBackendStrategyContext::default()),
-        }
+    fn new_backend_strategy(&self) -> foundry_evm_core::backend::strategy::BackendStrategy {
+        foundry_evm_core::backend::strategy::BackendStrategy::new_zksync()
     }
 
     fn new_cheatcode_inspector_strategy(
         &self,
         ctx: &dyn ExecutorStrategyContext,
-    ) -> foundry_cheatcodes::strategy::Strategy {
+    ) -> foundry_cheatcodes::strategy::CheatcodeInspectorStrategy {
         let ctx = get_context_ref(ctx);
-        foundry_cheatcodes::strategy::Strategy {
-            inner: Box::new(ZksyncCheatcodeInspectorStrategy::default()),
-            context: Box::new(ZksyncCheatcodeInspectorStrategyContext::new(
-                ctx.dual_compiled_contracts.clone(),
-                ctx.zk_env.clone(),
-            )),
-        }
+        foundry_cheatcodes::strategy::CheatcodeInspectorStrategy::new_zksync(
+            ctx.dual_compiled_contracts.clone(),
+            ctx.zk_env.clone(),
+        )
     }
 
     fn call_inspect(
@@ -187,7 +183,7 @@ impl ExecutorStrategy for ZksyncExecutorStrategy {
     }
 }
 
-impl ExecutorStrategyExt for ZksyncExecutorStrategy {
+impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
     fn zksync_set_dual_compiled_contracts(
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
@@ -239,7 +235,7 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategy {
     }
 }
 
-/// Retrieve metadata for zksync tx
+/// Retrieve metadata for ZKsync tx.
 pub fn get_zksync_transaction_metadata(
     other_fields: &OtherFields,
 ) -> Option<ZkTransactionMetadata> {
@@ -250,9 +246,17 @@ pub fn get_zksync_transaction_metadata(
         .flatten()
 }
 
-pub fn new_zkysnc_strategy() -> foundry_evm::executors::strategy::Strategy {
-    foundry_evm::executors::strategy::Strategy {
-        inner: Box::new(ZksyncExecutorStrategy::default()),
-        context: Box::new(ZksyncExecutorStrategyContext::default()),
+/// Create ZKsync strategy for [ExecutorStrategy].
+pub trait ZksyncExecutorStrategyBuilder {
+    /// Create new zksync strategy.
+    fn new_zksync() -> Self;
+}
+
+impl ZksyncExecutorStrategyBuilder for ExecutorStrategy {
+    fn new_zksync() -> Self {
+        Self {
+            runner: Box::new(ZksyncExecutorStrategyRunner::default()),
+            context: Box::new(ZksyncExecutorStrategyContext::default()),
+        }
     }
 }

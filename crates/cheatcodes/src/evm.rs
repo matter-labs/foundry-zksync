@@ -64,7 +64,7 @@ impl Cheatcode for getNonce_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
 
-        ccx.state.strategy.inner.clone().cheatcode_get_nonce(ccx, *account)
+        ccx.state.strategy.runner.clone().cheatcode_get_nonce(ccx, *account)
     }
 }
 
@@ -350,7 +350,7 @@ impl Cheatcode for getBlobhashesCall {
 impl Cheatcode for rollCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newHeight } = self;
-        ccx.state.strategy.inner.clone().cheatcode_roll(ccx, *newHeight)
+        ccx.state.strategy.runner.clone().cheatcode_roll(ccx, *newHeight)
     }
 }
 
@@ -372,7 +372,7 @@ impl Cheatcode for txGasPriceCall {
 impl Cheatcode for warpCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newTimestamp } = self;
-        ccx.state.strategy.inner.clone().cheatcode_warp(ccx, *newTimestamp)
+        ccx.state.strategy.runner.clone().cheatcode_warp(ccx, *newTimestamp)
     }
 }
 
@@ -407,7 +407,7 @@ impl Cheatcode for dealCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account: address, newBalance: new_balance } = *self;
 
-        ccx.state.strategy.inner.clone().cheatcode_deal(ccx, address, new_balance)
+        ccx.state.strategy.runner.clone().cheatcode_deal(ccx, address, new_balance)
     }
 }
 
@@ -415,14 +415,14 @@ impl Cheatcode for etchCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { target, newRuntimeBytecode } = self;
 
-        ccx.state.strategy.inner.clone().cheatcode_etch(ccx, *target, newRuntimeBytecode)
+        ccx.state.strategy.runner.clone().cheatcode_etch(ccx, *target, newRuntimeBytecode)
     }
 }
 
 impl Cheatcode for resetNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
-        ccx.state.strategy.inner.clone().cheatcode_reset_nonce(ccx, *account)
+        ccx.state.strategy.runner.clone().cheatcode_reset_nonce(ccx, *account)
     }
 }
 
@@ -430,7 +430,7 @@ impl Cheatcode for setNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
 
-        ccx.state.strategy.inner.clone().cheatcode_set_nonce(ccx, account, newNonce)
+        ccx.state.strategy.runner.clone().cheatcode_set_nonce(ccx, account, newNonce)
     }
 }
 
@@ -438,7 +438,7 @@ impl Cheatcode for setNonceUnsafeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
 
-        ccx.state.strategy.inner.clone().cheatcode_set_nonce_unsafe(ccx, account, newNonce)
+        ccx.state.strategy.runner.clone().cheatcode_set_nonce_unsafe(ccx, account, newNonce)
     }
 }
 

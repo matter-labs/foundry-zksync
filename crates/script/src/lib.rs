@@ -598,7 +598,7 @@ impl ScriptConfig {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(fork, strategy.inner.new_backend_strategy());
+                    let backend = Backend::spawn(fork, strategy.runner.new_backend_strategy());
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -607,7 +607,7 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(None, strategy.inner.new_backend_strategy())
+            Backend::spawn(None, strategy.runner.new_backend_strategy())
         };
 
         // We need to enable tracing to decode contract names: local or external.
@@ -624,13 +624,13 @@ impl ScriptConfig {
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
-            strategy.inner.zksync_set_dual_compiled_contracts(
+            strategy.runner.zksync_set_dual_compiled_contracts(
                 strategy.context.as_mut(),
                 dual_compiled_contracts,
             );
 
             if let Some(fork_url) = &self.evm_opts.fork_url {
-                strategy.inner.zksync_set_fork_env(strategy.context.as_mut(), fork_url, &env)?;
+                strategy.runner.zksync_set_fork_env(strategy.context.as_mut(), fork_url, &env)?;
             }
 
             builder = builder.inspectors(|stack| {
@@ -643,7 +643,7 @@ impl ScriptConfig {
                             Some(target.name),
                             Some(target.version),
                             strategy
-                                .inner
+                                .runner
                                 .new_cheatcode_inspector_strategy(strategy.context.as_ref()),
                         )
                         .into(),

@@ -18,7 +18,7 @@ use foundry_config::Config;
 use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
-    executors::{strategy::Strategy, ExecutorBuilder},
+    executors::{strategy::ExecutorStrategy, ExecutorBuilder},
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
@@ -85,7 +85,7 @@ pub struct MultiContractRunner {
     /// Library addresses used to link contracts.
     pub libraries: Libraries,
     /// Execution strategy.
-    pub strategy: Strategy,
+    pub strategy: ExecutorStrategy,
 }
 
 impl MultiContractRunner {
@@ -178,7 +178,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let db = Backend::spawn(self.fork.take(), self.strategy.inner.new_backend_strategy());
+        let db = Backend::spawn(self.fork.take(), self.strategy.runner.new_backend_strategy());
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -250,7 +250,7 @@ impl MultiContractRunner {
             Some(self.known_contracts.clone()),
             Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
-            self.strategy.inner.new_cheatcode_inspector_strategy(self.strategy.context.as_ref()),
+            self.strategy.runner.new_cheatcode_inspector_strategy(self.strategy.context.as_ref()),
         );
 
         let trace_mode = TraceMode::default()
@@ -407,7 +407,7 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        strategy: Strategy,
+        strategy: ExecutorStrategy,
     ) -> Result<MultiContractRunner> {
         let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);

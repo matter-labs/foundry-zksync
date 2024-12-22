@@ -37,7 +37,7 @@ use revm::{
     },
 };
 use std::borrow::Cow;
-use strategy::Strategy;
+use strategy::ExecutorStrategy;
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -93,7 +93,7 @@ pub struct Executor {
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
 
-    strategy: Strategy,
+    strategy: ExecutorStrategy,
 }
 
 impl Clone for Executor {
@@ -124,7 +124,7 @@ impl Executor {
         inspector: InspectorStack,
         gas_limit: u64,
         legacy_assertions: bool,
-        strategy: Strategy,
+        strategy: ExecutorStrategy,
     ) -> Self {
         // Need to create a non-empty contract on the cheatcodes address so `extcodesize` checks
         // do not fail.
@@ -217,7 +217,7 @@ impl Executor {
     /// Set the balance of an account.
     pub fn set_balance(&mut self, address: Address, amount: U256) -> BackendResult<()> {
         trace!(?address, ?amount, "setting account balance");
-        self.strategy.inner.clone().set_balance(self, address, amount)
+        self.strategy.runner.clone().set_balance(self, address, amount)
     }
 
     /// Gets the balance of an account
@@ -227,7 +227,7 @@ impl Executor {
 
     /// Set the nonce of an account.
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> BackendResult<()> {
-        self.strategy.inner.clone().set_nonce(self, address, nonce)
+        self.strategy.runner.clone().set_nonce(self, address, nonce)
     }
 
     /// Returns the nonce of an account.
@@ -260,7 +260,7 @@ impl Executor {
 
     #[inline]
     pub fn set_transaction_other_fields(&mut self, other_fields: OtherFields) {
-        self.strategy.inner.set_inspect_context(self.strategy.context.as_mut(), other_fields);
+        self.strategy.runner.set_inspect_context(self.strategy.context.as_mut(), other_fields);
     }
 
     /// Deploys a contract and commits the new state to the underlying database.
@@ -443,7 +443,7 @@ impl Executor {
         backend.is_initialized = false;
         backend.spec_id = env.spec_id();
 
-        let result = self.strategy.inner.call_inspect(
+        let result = self.strategy.runner.call_inspect(
             self.strategy.context.as_ref(),
             &mut backend,
             &mut env,
@@ -465,7 +465,7 @@ impl Executor {
         let backend = &mut self.backend;
         backend.initialize(&env);
 
-        let result_and_state = self.strategy.inner.transact_inspect(
+        let result_and_state = self.strategy.runner.transact_inspect(
             self.strategy.context.as_mut(),
             backend,
             &mut env,

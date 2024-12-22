@@ -11,7 +11,8 @@ use foundry_cheatcodes::{
     journaled_account, make_acc_non_empty,
     strategy::{
         CheatcodeInspectorStrategy, CheatcodeInspectorStrategyContext,
-        CheatcodeInspectorStrategyExt, EvmCheatcodeInspectorStrategy,
+        CheatcodeInspectorStrategyExt, CheatcodeInspectorStrategyRunner,
+        EvmCheatcodeInspectorStrategyRunner,
     },
     Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
     CheatsConfig, CheatsCtxt, CommonCreateInput, DealRecord, Ecx, Error, InnerEcx, Result, Vm,
@@ -81,11 +82,13 @@ macro_rules! bail {
     };
 }
 
+/// ZKsync implementation for [CheatcodeInspectorStrategyRunner].
 #[derive(Debug, Default, Clone)]
-pub struct ZksyncCheatcodeInspectorStrategy {
-    evm: EvmCheatcodeInspectorStrategy,
+pub struct ZksyncCheatcodeInspectorStrategyRunner {
+    evm: EvmCheatcodeInspectorStrategyRunner,
 }
 
+/// Context for [ZksyncCheatcodeInspectorStrategyRunner].
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncCheatcodeInspectorStrategyContext {
     pub using_zk_vm: bool,
@@ -202,18 +205,6 @@ impl CheatcodeInspectorStrategyContext for ZksyncCheatcodeInspectorStrategyConte
     }
 }
 
-fn get_context(
-    ctx: &mut dyn CheatcodeInspectorStrategyContext,
-) -> &mut ZksyncCheatcodeInspectorStrategyContext {
-    ctx.as_any_mut().downcast_mut().expect("expected ZksyncCheatcodeInspectorStrategyContext")
-}
-
-fn get_context_ref(
-    ctx: &dyn CheatcodeInspectorStrategyContext,
-) -> &ZksyncCheatcodeInspectorStrategyContext {
-    ctx.as_any_ref().downcast_ref().expect("expected ZksyncCheatcodeInspectorStrategyContext")
-}
-
 /// Allows overriding nonce update behavior for the tx caller in the zkEVM.
 ///
 /// Since each CREATE or CALL is executed as a separate transaction within zkEVM, we currently skip
@@ -247,12 +238,12 @@ impl ZkPersistNonceUpdate {
     }
 }
 
-impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
+impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner {
     fn name(&self) -> &'static str {
         "zk"
     }
 
-    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy> {
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyRunner> {
         Box::new(self.clone())
     }
 
@@ -753,7 +744,7 @@ impl CheatcodeInspectorStrategy for ZksyncCheatcodeInspectorStrategy {
     }
 }
 
-impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
+impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
     fn zksync_cheatcode_skip_zkvm(
         &self,
         ctx: &mut dyn CheatcodeInspectorStrategyContext,
@@ -1045,7 +1036,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
                             })
                             .collect::<HashSet<_>>();
                         let strategy = ecx.db.get_strategy();
-                        strategy.inner.zksync_save_immutable_storage(
+                        strategy.runner.zksync_save_immutable_storage(
                             strategy.context.as_mut(),
                             addr,
                             keys,
@@ -1297,7 +1288,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategy {
     }
 }
 
-impl ZksyncCheatcodeInspectorStrategy {
+impl ZksyncCheatcodeInspectorStrategyRunner {
     /// Selects the appropriate VM for the fork. Options: EVM, ZK-VM.
     /// CALL and CREATE are handled by the selected VM.
     ///
@@ -1506,6 +1497,58 @@ impl ZksyncCheatcodeInspectorStrategy {
     }
 }
 
+/// Setting for migrating the database to zkEVM storage when starting in ZKsync mode.
+/// The migration is performed on the DB via the inspector so must only be performed once.
+#[derive(Debug, Default, Clone)]
+pub enum ZkStartupMigration {
+    /// Defer database migration to a later execution point.
+    ///
+    /// This is required as we need to wait for some baseline deployments
+    /// to occur before the test/script execution is performed.
+    #[default]
+    Defer,
+    /// Allow database migration.
+    Allow,
+    /// Database migration has already been performed.
+    Done,
+}
+
+impl ZkStartupMigration {
+    /// Check if startup migration is allowed. Migration is disallowed if it's to be deferred or has
+    /// already been performed.
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, Self::Allow)
+    }
+
+    /// Allow migrating the the DB to zkEVM storage.
+    pub fn allow(&mut self) {
+        *self = Self::Allow
+    }
+
+    /// Mark the migration as completed. It must not be performed again.
+    pub fn done(&mut self) {
+        *self = Self::Done
+    }
+}
+
+/// Create ZKsync strategy for [CheatcodeInspectorStrategy].
+pub trait ZksyncCheatcodeInspectorStrategyBuilder {
+    /// Create new ZKsync strategy.
+    fn new_zksync(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv) -> Self;
+}
+
+impl ZksyncCheatcodeInspectorStrategyBuilder for CheatcodeInspectorStrategy {
+    fn new_zksync(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv) -> Self {
+        Self {
+            runner: Box::new(ZksyncCheatcodeInspectorStrategyRunner::default()),
+            context: Box::new(ZksyncCheatcodeInspectorStrategyContext::new(
+                dual_compiled_contracts,
+                zk_env,
+            )),
+        }
+    }
+}
+
 fn get_artifact_code(
     dual_compiled_contracts: &DualCompiledContracts,
     using_zk_vm: bool,
@@ -1637,36 +1680,14 @@ fn get_artifact_code(
     maybe_bytecode.ok_or_else(|| fmt_err!("no bytecode for contract; is it abstract or unlinked?"))
 }
 
-/// Setting for migrating the database to zkEVM storage when starting in ZKsync mode.
-/// The migration is performed on the DB via the inspector so must only be performed once.
-#[derive(Debug, Default, Clone)]
-pub enum ZkStartupMigration {
-    /// Defer database migration to a later execution point.
-    ///
-    /// This is required as we need to wait for some baseline deployments
-    /// to occur before the test/script execution is performed.
-    #[default]
-    Defer,
-    /// Allow database migration.
-    Allow,
-    /// Database migration has already been performed.
-    Done,
+fn get_context(
+    ctx: &mut dyn CheatcodeInspectorStrategyContext,
+) -> &mut ZksyncCheatcodeInspectorStrategyContext {
+    ctx.as_any_mut().downcast_mut().expect("expected ZksyncCheatcodeInspectorStrategyContext")
 }
 
-impl ZkStartupMigration {
-    /// Check if startup migration is allowed. Migration is disallowed if it's to be deferred or has
-    /// already been performed.
-    pub fn is_allowed(&self) -> bool {
-        matches!(self, Self::Allow)
-    }
-
-    /// Allow migrating the the DB to zkEVM storage.
-    pub fn allow(&mut self) {
-        *self = Self::Allow
-    }
-
-    /// Mark the migration as completed. It must not be performed again.
-    pub fn done(&mut self) {
-        *self = Self::Done
-    }
+fn get_context_ref(
+    ctx: &dyn CheatcodeInspectorStrategyContext,
+) -> &ZksyncCheatcodeInspectorStrategyContext {
+    ctx.as_any_ref().downcast_ref().expect("expected ZksyncCheatcodeInspectorStrategyContext")
 }

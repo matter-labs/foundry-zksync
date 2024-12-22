@@ -361,7 +361,7 @@ impl ForgeTestData {
 
         let mut strategy = utils::get_executor_strategy(&zk_config);
         strategy
-            .inner
+            .runner
             .zksync_set_dual_compiled_contracts(strategy.context.as_mut(), dual_compiled_contracts);
         let mut builder = self.base_runner();
         builder.config = Arc::new(zk_config);

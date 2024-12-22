@@ -18,15 +18,19 @@ use crate::{
     CheatsConfig, CheatsCtxt, Result,
 };
 
+/// Represents the context for [CheatcodeInspectorStrategy].
 pub trait CheatcodeInspectorStrategyContext: Debug + Send + Sync + Any {
+    /// Clone the strategy context.
     fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyContext>;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
+    /// Alias as immutable reference of [Any].
     fn as_any_ref(&self) -> &dyn Any;
+    /// Alias as mutable reference of [Any].
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 impl CheatcodeInspectorStrategyContext for () {
     fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyContext> {
-        Box::new(*self)
+        Box::new(())
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -38,26 +42,36 @@ impl CheatcodeInspectorStrategyContext for () {
     }
 }
 
+/// Represents the strategy.
 #[derive(Debug)]
-pub struct Strategy {
-    pub inner: Box<dyn CheatcodeInspectorStrategy>,
+pub struct CheatcodeInspectorStrategy {
+    /// Strategy runner.
+    pub runner: Box<dyn CheatcodeInspectorStrategyRunner>,
+    /// Strategy context.
     pub context: Box<dyn CheatcodeInspectorStrategyContext>,
 }
 
-pub fn new_evm_strategy() -> Strategy {
-    Strategy { inner: Box::new(EvmCheatcodeInspectorStrategy::default()), context: Box::new(()) }
-}
-
-impl Clone for Strategy {
-    fn clone(&self) -> Self {
-        Self { inner: self.inner.new_cloned(), context: self.context.new_cloned() }
+impl CheatcodeInspectorStrategy {
+    pub fn new_evm() -> Self {
+        Self {
+            runner: Box::new(EvmCheatcodeInspectorStrategyRunner::default()),
+            context: Box::new(()),
+        }
     }
 }
 
-pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorStrategyExt {
+impl Clone for CheatcodeInspectorStrategy {
+    fn clone(&self) -> Self {
+        Self { runner: self.runner.new_cloned(), context: self.context.new_cloned() }
+    }
+}
+
+pub trait CheatcodeInspectorStrategyRunner:
+    Debug + Send + Sync + CheatcodeInspectorStrategyExt
+{
     fn name(&self) -> &'static str;
 
-    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy>;
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyRunner>;
 
     /// Get nonce.
     fn get_nonce(&self, ccx: &mut CheatsCtxt, address: Address) -> Result<u64> {
@@ -328,14 +342,14 @@ pub trait CheatcodeInspectorStrategyExt {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct EvmCheatcodeInspectorStrategy {}
+pub struct EvmCheatcodeInspectorStrategyRunner {}
 
-impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
+impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
     fn name(&self) -> &'static str {
         "evm"
     }
 
-    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy> {
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyRunner> {
         Box::new(self.clone())
     }
 
@@ -411,13 +425,13 @@ impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     }
 }
 
-impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategy {}
+impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategyRunner {}
 
-impl Clone for Box<dyn CheatcodeInspectorStrategy> {
+impl Clone for Box<dyn CheatcodeInspectorStrategyRunner> {
     fn clone(&self) -> Self {
         self.new_cloned()
     }
 }
 
-struct _ObjectSafe0(dyn CheatcodeInspectorStrategy);
+struct _ObjectSafe0(dyn CheatcodeInspectorStrategyRunner);
 struct _ObjectSafe1(dyn CheatcodeInspectorStrategyExt);

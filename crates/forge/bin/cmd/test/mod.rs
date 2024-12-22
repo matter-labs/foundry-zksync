@@ -368,7 +368,7 @@ impl TestArgs {
         // Prepare the test builder.
         let config = Arc::new(config);
 
-        strategy.inner.zksync_set_dual_compiled_contracts(
+        strategy.runner.zksync_set_dual_compiled_contracts(
             strategy.context.as_mut(),
             dual_compiled_contracts.unwrap_or_default(),
         );

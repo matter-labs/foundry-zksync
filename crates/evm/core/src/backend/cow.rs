@@ -1,6 +1,6 @@
 //! A wrapper around `Backend` that is clone-on-write used for fuzzing.
 
-use super::{strategy::Strategy, BackendError, ForkInfo};
+use super::{strategy::BackendStrategy, BackendError, ForkInfo};
 use crate::{
     backend::{
         diagnostic::RevertDiagnostic, Backend, DatabaseExt, LocalForkId, RevertStateSnapshotAction,
@@ -92,7 +92,7 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend.to_mut().get_fork_info(id)
     }
 
-    fn get_strategy(&mut self) -> &mut Strategy {
+    fn get_strategy(&mut self) -> &mut BackendStrategy {
         &mut self.backend.to_mut().strategy
     }
 

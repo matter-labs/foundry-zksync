@@ -125,7 +125,7 @@ impl Cheatcode for selectForkCall {
         persist_caller(ccx);
         check_broadcast(ccx.state)?;
 
-        ccx.state.strategy.inner.zksync_select_fork_vm(
+        ccx.state.strategy.runner.zksync_select_fork_vm(
             ccx.state.strategy.context.as_mut(),
             ccx.ecx,
             *forkId,
@@ -285,7 +285,7 @@ fn create_select_fork(ccx: &mut CheatsCtxt, url_or_alias: &str, block: Option<u6
 
     let fork = create_fork_request(ccx, url_or_alias, block)?;
     let id = ccx.ecx.db.create_fork(fork)?;
-    ccx.state.strategy.inner.zksync_select_fork_vm(
+    ccx.state.strategy.runner.zksync_select_fork_vm(
         ccx.state.strategy.context.as_mut(),
         ccx.ecx,
         id,

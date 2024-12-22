@@ -1,10 +1,13 @@
 use std::{any::Any, collections::hash_map::Entry};
 
 use alloy_primitives::{map::HashMap, Address, U256};
-use foundry_evm::backend::strategy::{BackendStrategyContext, BackendStrategyExt};
+use foundry_evm::backend::strategy::{
+    BackendStrategy, BackendStrategyContext, BackendStrategyRunnerExt,
+};
 use foundry_evm_core::backend::{
     strategy::{
-        BackendStrategy, BackendStrategyForkInfo, EvmBackendMergeStrategy, EvmBackendStrategy,
+        BackendStrategyForkInfo, BackendStrategyRunner, EvmBackendMergeStrategy,
+        EvmBackendStrategyRunner,
     },
     BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
 };
@@ -17,6 +20,7 @@ use revm::{db::CacheDB, primitives::HashSet, DatabaseRef, JournaledState};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
+/// Context for [ZksyncBackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ZksyncBackendStrategyContext {
     /// Store storage keys per contract address for immutable variables.
@@ -37,32 +41,18 @@ impl BackendStrategyContext for ZksyncBackendStrategyContext {
     }
 }
 
+/// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct ZksyncBackendStrategy {
-    evm: EvmBackendStrategy,
+pub struct ZksyncBackendStrategyRunner {
+    evm: EvmBackendStrategyRunner,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct ZkBackendInspectData {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub factory_deps: Option<Vec<Vec<u8>>>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub paymaster_data: Option<PaymasterParams>,
-
-    pub use_evm: bool,
-}
-
-fn get_context(ctx: &mut dyn BackendStrategyContext) -> &mut ZksyncBackendStrategyContext {
-    ctx.as_any_mut().downcast_mut().expect("expected ZksyncBackendStrategyContext")
-}
-
-impl BackendStrategy for ZksyncBackendStrategy {
+impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
     fn name(&self) -> &'static str {
         "zk"
     }
 
-    fn new_cloned(&self) -> Box<dyn BackendStrategy> {
+    fn new_cloned(&self) -> Box<dyn BackendStrategyRunner> {
         Box::new(self.clone())
     }
 
@@ -126,7 +116,7 @@ impl BackendStrategy for ZksyncBackendStrategy {
     }
 }
 
-impl ZksyncBackendStrategy {
+impl ZksyncBackendStrategyRunner {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`
     pub(crate) fn update_fork_db_contracts(
         &self,
@@ -168,7 +158,7 @@ impl ZksyncBackendStrategy {
     }
 }
 
-impl BackendStrategyExt for ZksyncBackendStrategy {
+impl BackendStrategyRunnerExt for ZksyncBackendStrategyRunner {
     fn zksync_save_immutable_storage(
         &self,
         ctx: &mut dyn BackendStrategyContext,
@@ -180,6 +170,21 @@ impl BackendStrategyExt for ZksyncBackendStrategy {
             .entry(addr)
             .and_modify(|entry| entry.extend(&keys))
             .or_insert(keys);
+    }
+}
+
+/// Create ZKsync strategy for [BackendStrategy].
+pub trait ZksyncBackendStrategyBuilder {
+    /// Create new zksync strategy.
+    fn new_zksync() -> Self;
+}
+
+impl ZksyncBackendStrategyBuilder for BackendStrategy {
+    fn new_zksync() -> Self {
+        Self {
+            runner: Box::new(ZksyncBackendStrategyRunner::default()),
+            context: Box::new(ZksyncBackendStrategyContext::default()),
+        }
     }
 }
 
@@ -358,4 +363,8 @@ impl ZksyncBackendMerge {
             }
         }
     }
+}
+
+fn get_context(ctx: &mut dyn BackendStrategyContext) -> &mut ZksyncBackendStrategyContext {
+    ctx.as_any_mut().downcast_mut().expect("expected ZksyncBackendStrategyContext")
 }

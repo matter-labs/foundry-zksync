@@ -7,7 +7,7 @@ use crate::{
         DealRecord, GasRecord,
     },
     script::{Broadcast, Wallets},
-    strategy::Strategy,
+    strategy::CheatcodeInspectorStrategy,
     test::{
         assume::AssumeNoRevert,
         expect::{self, ExpectedEmit, ExpectedRevert, ExpectedRevertKind},
@@ -527,7 +527,7 @@ pub struct Cheatcodes {
     pub wallets: Option<Wallets>,
 
     /// The behavior strategy.
-    pub strategy: Strategy,
+    pub strategy: CheatcodeInspectorStrategy,
 }
 
 impl Clone for Cheatcodes {
@@ -762,7 +762,7 @@ impl Cheatcodes {
                 if ecx_inner.journaled_state.depth() == broadcast.depth {
                     input.set_caller(broadcast.new_origin);
 
-                    self.strategy.inner.record_broadcastable_create_transactions(
+                    self.strategy.runner.record_broadcastable_create_transactions(
                         self.strategy.context.as_mut(),
                         self.config.clone(),
                         &input,
@@ -802,7 +802,7 @@ impl Cheatcodes {
         }
 
         if let Some(result) =
-            self.strategy.inner.clone().zksync_try_create(self, ecx, &input, executor)
+            self.strategy.runner.clone().zksync_try_create(self, ecx, &input, executor)
         {
             return Some(result);
         }
@@ -917,7 +917,7 @@ where {
             }
         }
 
-        self.strategy.inner.zksync_record_create_address(self.strategy.context.as_mut(), &outcome);
+        self.strategy.runner.zksync_record_create_address(self.strategy.context.as_mut(), &outcome);
 
         outcome
     }
@@ -960,7 +960,7 @@ where {
             let prev = account.info.nonce;
             let nonce = prev.saturating_sub(1);
             account.info.nonce = nonce;
-            self.strategy.inner.zksync_sync_nonce(
+            self.strategy.runner.zksync_sync_nonce(
                 self.strategy.context.as_mut(),
                 sender,
                 nonce,
@@ -999,7 +999,7 @@ where {
             return None;
         }
 
-        self.strategy.inner.zksync_set_deployer_call_input(self.strategy.context.as_mut(), call);
+        self.strategy.runner.zksync_set_deployer_call_input(self.strategy.context.as_mut(), call);
 
         // Handle expected calls
 
@@ -1133,7 +1133,7 @@ where {
                         })
                     }
 
-                    self.strategy.inner.record_broadcastable_call_transactions(
+                    self.strategy.runner.record_broadcastable_call_transactions(
                         self.strategy.context.as_mut(),
                         self.config.clone(),
                         call,
@@ -1214,7 +1214,8 @@ where {
             }]);
         }
 
-        if let Some(result) = self.strategy.inner.clone().zksync_try_call(self, ecx, call, executor)
+        if let Some(result) =
+            self.strategy.runner.clone().zksync_try_call(self, ecx, call, executor)
         {
             return Some(result);
         }
@@ -1276,7 +1277,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
             self.gas_metering.paused_frames.push(interpreter.gas);
         }
 
-        self.strategy.inner.post_initialize_interp(
+        self.strategy.runner.post_initialize_interp(
             self.strategy.context.as_mut(),
             interpreter,
             ecx,
@@ -1325,7 +1326,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
 
     #[inline]
     fn step_end(&mut self, interpreter: &mut Interpreter, ecx: Ecx) {
-        if self.strategy.inner.pre_step_end(self.strategy.context.as_mut(), interpreter, ecx) {
+        if self.strategy.runner.pre_step_end(self.strategy.context.as_mut(), interpreter, ecx) {
             return;
         }
 

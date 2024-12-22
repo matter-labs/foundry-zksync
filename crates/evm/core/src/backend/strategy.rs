@@ -11,9 +11,13 @@ pub struct BackendStrategyForkInfo<'a> {
     pub target_type: ForkType,
 }
 
+/// Context for [BackendStrategyRunner].
 pub trait BackendStrategyContext: Debug + Send + Sync + Any {
+    /// Clone the strategy context.
     fn new_cloned(&self) -> Box<dyn BackendStrategyContext>;
+    /// Alias as immutable reference of [Any].
     fn as_any_ref(&self) -> &dyn Any;
+    /// Alias as mutable reference of [Any].
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
@@ -31,26 +35,32 @@ impl BackendStrategyContext for () {
     }
 }
 
+/// Strategy for [super::Backend].
 #[derive(Debug)]
-pub struct Strategy {
-    pub inner: Box<dyn BackendStrategy>,
+pub struct BackendStrategy {
+    /// Strategy runner.
+    pub runner: Box<dyn BackendStrategyRunner>,
+    /// Strategy context.
     pub context: Box<dyn BackendStrategyContext>,
 }
 
-pub fn new_evm_strategy() -> Strategy {
-    Strategy { inner: Box::new(EvmBackendStrategy), context: Box::new(()) }
-}
-
-impl Clone for Strategy {
-    fn clone(&self) -> Self {
-        Self { inner: self.inner.new_cloned(), context: self.context.new_cloned() }
+impl BackendStrategy {
+    /// Create a new instance of [BackendStrategy]
+    pub fn new_evm() -> Self {
+        Self { runner: Box::new(EvmBackendStrategyRunner), context: Box::new(()) }
     }
 }
 
-pub trait BackendStrategy: Debug + Send + Sync + BackendStrategyExt {
+impl Clone for BackendStrategy {
+    fn clone(&self) -> Self {
+        Self { runner: self.runner.new_cloned(), context: self.context.new_cloned() }
+    }
+}
+
+pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt {
     fn name(&self) -> &'static str;
 
-    fn new_cloned(&self) -> Box<dyn BackendStrategy>;
+    fn new_cloned(&self) -> Box<dyn BackendStrategyRunner>;
 
     /// When creating or switching forks, we update the AccountInfo of the contract
     fn update_fork_db(
@@ -81,7 +91,7 @@ pub trait BackendStrategy: Debug + Send + Sync + BackendStrategyExt {
     );
 }
 
-pub trait BackendStrategyExt {
+pub trait BackendStrategyRunnerExt {
     /// Saves the storage keys for immutable variables per address.
     ///
     /// These are required during fork to help merge the persisted addresses, as they are stored
@@ -97,17 +107,17 @@ pub trait BackendStrategyExt {
     }
 }
 
-struct _ObjectSafe(dyn BackendStrategy);
+struct _ObjectSafe(dyn BackendStrategyRunner);
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct EvmBackendStrategy;
+pub struct EvmBackendStrategyRunner;
 
-impl BackendStrategy for EvmBackendStrategy {
+impl BackendStrategyRunner for EvmBackendStrategyRunner {
     fn name(&self) -> &'static str {
         "evm"
     }
 
-    fn new_cloned(&self) -> Box<dyn BackendStrategy> {
+    fn new_cloned(&self) -> Box<dyn BackendStrategyRunner> {
         Box::new(self.clone())
     }
 
@@ -154,9 +164,9 @@ impl BackendStrategy for EvmBackendStrategy {
     }
 }
 
-impl BackendStrategyExt for EvmBackendStrategy {}
+impl BackendStrategyRunnerExt for EvmBackendStrategyRunner {}
 
-impl EvmBackendStrategy {
+impl EvmBackendStrategyRunner {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`
     pub(crate) fn update_fork_db_contracts(
         &self,
@@ -258,7 +268,7 @@ impl EvmBackendMergeStrategy {
     }
 }
 
-impl Clone for Box<dyn BackendStrategy> {
+impl Clone for Box<dyn BackendStrategyRunner> {
     fn clone(&self) -> Self {
         self.new_cloned()
     }
