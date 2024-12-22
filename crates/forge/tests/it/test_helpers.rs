@@ -3,7 +3,7 @@
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
-    executors::strategy::new_evm_strategy, revm::primitives::SpecId, MultiContractRunner,
+    executors::strategy::ExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
     MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
 };
 use foundry_cli::utils;
@@ -384,7 +384,7 @@ impl ForgeTestData {
                 None,
                 opts.local_evm_env(),
                 opts,
-                new_evm_strategy(),
+                ExecutorStrategy::new_evm(),
             )
             .unwrap()
     }
@@ -401,7 +401,14 @@ impl ForgeTestData {
 
         self.base_runner()
             .with_fork(fork)
-            .build(self.project.root(), self.output.clone(), None, env, opts, new_evm_strategy())
+            .build(
+                self.project.root(),
+                self.output.clone(),
+                None,
+                env,
+                opts,
+                ExecutorStrategy::new_evm(),
+            )
             .unwrap()
     }
 }
