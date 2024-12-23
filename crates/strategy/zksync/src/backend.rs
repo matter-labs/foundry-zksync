@@ -86,7 +86,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         inspector: &mut dyn InspectorExt,
         inspect_ctx: Box<dyn Any>,
     ) -> Result<ResultAndState> {
-        if !is_zksync_cainspect_context(&inspect_ctx) {
+        if !is_zksync_inspect_context(&inspect_ctx) {
             return self.evm.inspect(backend, env, inspector, inspect_ctx);
         }
 
