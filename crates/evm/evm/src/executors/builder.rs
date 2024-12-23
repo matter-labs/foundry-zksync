@@ -76,7 +76,7 @@ impl ExecutorBuilder {
 
     /// Builds the executor as configured.
     #[inline]
-    pub fn build(self, env: Env, db: Backend, strategy: Box<dyn ExecutorStrategy>) -> Executor {
+    pub fn build(self, env: Env, db: Backend, strategy: ExecutorStrategy) -> Executor {
         let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
         if stack.block.is_none() {
             stack.block = Some(env.block.clone());

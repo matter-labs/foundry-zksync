@@ -93,7 +93,7 @@ pub struct Executor {
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
 
-    strategy: Option<Box<dyn ExecutorStrategy>>,
+    strategy: ExecutorStrategy,
 }
 
 impl Clone for Executor {
@@ -104,7 +104,7 @@ impl Clone for Executor {
             inspector: self.inspector.clone(),
             gas_limit: self.gas_limit,
             legacy_assertions: self.legacy_assertions,
-            strategy: self.strategy.as_ref().map(|s| s.new_cloned()),
+            strategy: self.strategy.clone(),
         }
     }
 }
@@ -124,7 +124,7 @@ impl Executor {
         inspector: InspectorStack,
         gas_limit: u64,
         legacy_assertions: bool,
-        strategy: Box<dyn ExecutorStrategy>,
+        strategy: ExecutorStrategy,
     ) -> Self {
         // Need to create a non-empty contract on the cheatcodes address so `extcodesize` checks
         // do not fail.
@@ -139,7 +139,7 @@ impl Executor {
             },
         );
 
-        Self { backend, env, inspector, gas_limit, legacy_assertions, strategy: Some(strategy) }
+        Self { backend, env, inspector, gas_limit, legacy_assertions, strategy }
     }
 
     fn clone_with_backend(&self, backend: Backend) -> Self {
@@ -150,7 +150,7 @@ impl Executor {
             self.inspector().clone(),
             self.gas_limit,
             self.legacy_assertions,
-            self.strategy.as_ref().map(|s| s.new_cloned()).expect("failed acquiring strategy"),
+            self.strategy.clone(),
         )
     }
 
@@ -214,21 +214,10 @@ impl Executor {
         Ok(())
     }
 
-    pub fn with_strategy<F, R>(&mut self, mut f: F) -> R
-    where
-        F: FnMut(&mut dyn ExecutorStrategy, &mut Self) -> R,
-    {
-        let mut strategy = self.strategy.take();
-        let result = f(strategy.as_mut().expect("failed acquiring strategy").as_mut(), self);
-        self.strategy = strategy;
-
-        result
-    }
-
     /// Set the balance of an account.
     pub fn set_balance(&mut self, address: Address, amount: U256) -> BackendResult<()> {
         trace!(?address, ?amount, "setting account balance");
-        self.with_strategy(|strategy, executor| strategy.set_balance(executor, address, amount))
+        self.strategy.runner.clone().set_balance(self, address, amount)
     }
 
     /// Gets the balance of an account
@@ -238,7 +227,7 @@ impl Executor {
 
     /// Set the nonce of an account.
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> BackendResult<()> {
-        self.with_strategy(|strategy, executor| strategy.set_nonce(executor, address, nonce))
+        self.strategy.runner.clone().set_nonce(self, address, nonce)
     }
 
     /// Returns the nonce of an account.
@@ -271,10 +260,7 @@ impl Executor {
 
     #[inline]
     pub fn set_transaction_other_fields(&mut self, other_fields: OtherFields) {
-        self.strategy
-            .as_mut()
-            .expect("failed acquiring strategy")
-            .set_inspect_context(other_fields);
+        self.strategy.runner.set_inspect_context(self.strategy.context.as_mut(), other_fields);
     }
 
     /// Deploys a contract and commits the new state to the underlying database.
@@ -457,12 +443,12 @@ impl Executor {
         backend.is_initialized = false;
         backend.spec_id = env.spec_id();
 
-        let result = self
-            .strategy
-            .as_ref()
-            .expect("failed acquiring strategy")
-            .new_cloned()
-            .call_inspect(&mut backend, &mut env, &mut inspector)?;
+        let result = self.strategy.runner.call_inspect(
+            self.strategy.context.as_ref(),
+            &mut backend,
+            &mut env,
+            &mut inspector,
+        )?;
 
         convert_executed_result(
             env.clone(),
@@ -475,24 +461,27 @@ impl Executor {
     /// Execute the transaction configured in `env.tx`.
     #[instrument(name = "transact", level = "debug", skip_all)]
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
-        self.with_strategy(|strategy, executor| {
-            let mut inspector = executor.inspector.clone();
-            let backend = &mut executor.backend;
-            backend.initialize(&env);
+        let mut inspector = self.inspector.clone();
+        let backend = &mut self.backend;
+        backend.initialize(&env);
 
-            let result_and_state =
-                strategy.transact_inspect(backend, &mut env, &executor.env, &mut inspector)?;
+        let result_and_state = self.strategy.runner.transact_inspect(
+            self.strategy.context.as_mut(),
+            backend,
+            &mut env,
+            &self.env,
+            &mut inspector,
+        )?;
 
-            let mut result = convert_executed_result(
-                env.clone(),
-                inspector,
-                result_and_state,
-                backend.has_state_snapshot_failure(),
-            )?;
+        let mut result = convert_executed_result(
+            env.clone(),
+            inspector,
+            result_and_state,
+            backend.has_state_snapshot_failure(),
+        )?;
 
-            executor.commit(&mut result);
-            Ok(result)
-        })
+        self.commit(&mut result);
+        Ok(result)
     }
 
     /// Commit the changeset to the database and adjust `self.inspector_config` values according to

@@ -92,8 +92,8 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend.to_mut().get_fork_info(id)
     }
 
-    fn get_strategy(&mut self) -> &mut dyn BackendStrategy {
-        self.backend.to_mut().strategy.as_mut()
+    fn get_strategy(&mut self) -> &mut BackendStrategy {
+        &mut self.backend.to_mut().strategy
     }
 
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {

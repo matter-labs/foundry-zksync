@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{any::Any, fmt::Debug};
 
 use super::{BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use alloy_primitives::{Address, U256};
@@ -11,14 +11,61 @@ pub struct BackendStrategyForkInfo<'a> {
     pub target_type: ForkType,
 }
 
-pub trait BackendStrategy: Debug + Send + Sync + BackendStrategyExt {
+/// Context for [BackendStrategyRunner].
+pub trait BackendStrategyContext: Debug + Send + Sync + Any {
+    /// Clone the strategy context.
+    fn new_cloned(&self) -> Box<dyn BackendStrategyContext>;
+    /// Alias as immutable reference of [Any].
+    fn as_any_ref(&self) -> &dyn Any;
+    /// Alias as mutable reference of [Any].
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl BackendStrategyContext for () {
+    fn new_cloned(&self) -> Box<dyn BackendStrategyContext> {
+        Box::new(())
+    }
+
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+/// Strategy for [super::Backend].
+#[derive(Debug)]
+pub struct BackendStrategy {
+    /// Strategy runner.
+    pub runner: Box<dyn BackendStrategyRunner>,
+    /// Strategy context.
+    pub context: Box<dyn BackendStrategyContext>,
+}
+
+impl BackendStrategy {
+    /// Create a new instance of [BackendStrategy]
+    pub fn new_evm() -> Self {
+        Self { runner: Box::new(EvmBackendStrategyRunner), context: Box::new(()) }
+    }
+}
+
+impl Clone for BackendStrategy {
+    fn clone(&self) -> Self {
+        Self { runner: self.runner.new_cloned(), context: self.context.new_cloned() }
+    }
+}
+
+pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt {
     fn name(&self) -> &'static str;
 
-    fn new_cloned(&self) -> Box<dyn BackendStrategy>;
+    fn new_cloned(&self) -> Box<dyn BackendStrategyRunner>;
 
     /// When creating or switching forks, we update the AccountInfo of the contract
     fn update_fork_db(
         &self,
+        ctx: &mut dyn BackendStrategyContext,
         fork_info: BackendStrategyForkInfo<'_>,
         mem_db: &FoundryEvmInMemoryDB,
         backend_inner: &BackendInner,
@@ -29,40 +76,54 @@ pub trait BackendStrategy: Debug + Send + Sync + BackendStrategyExt {
     /// Clones the account data from the `active_journaled_state` into the `fork_journaled_state`
     fn merge_journaled_state_data(
         &self,
+        ctx: &mut dyn BackendStrategyContext,
         addr: Address,
         active_journaled_state: &JournaledState,
         fork_journaled_state: &mut JournaledState,
     );
 
-    fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB);
+    fn merge_db_account_data(
+        &self,
+        ctx: &mut dyn BackendStrategyContext,
+        addr: Address,
+        active: &ForkDB,
+        fork_db: &mut ForkDB,
+    );
 }
 
-pub trait BackendStrategyExt {
+pub trait BackendStrategyRunnerExt {
     /// Saves the storage keys for immutable variables per address.
     ///
     /// These are required during fork to help merge the persisted addresses, as they are stored
     /// hashed so there is currently no way to retrieve all the address associated storage keys.
     /// We store all the storage keys here, even if the addresses are not marked persistent as
     /// they can be marked at a later stage as well.
-    fn zksync_save_immutable_storage(&mut self, _addr: Address, _keys: HashSet<U256>) {}
+    fn zksync_save_immutable_storage(
+        &self,
+        _ctx: &mut dyn BackendStrategyContext,
+        _addr: Address,
+        _keys: HashSet<U256>,
+    ) {
+    }
 }
 
-struct _ObjectSafe(dyn BackendStrategy);
+struct _ObjectSafe(dyn BackendStrategyRunner);
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct EvmBackendStrategy;
+pub struct EvmBackendStrategyRunner;
 
-impl BackendStrategy for EvmBackendStrategy {
+impl BackendStrategyRunner for EvmBackendStrategyRunner {
     fn name(&self) -> &'static str {
         "evm"
     }
 
-    fn new_cloned(&self) -> Box<dyn BackendStrategy> {
+    fn new_cloned(&self) -> Box<dyn BackendStrategyRunner> {
         Box::new(self.clone())
     }
 
     fn update_fork_db(
         &self,
+        _ctx: &mut dyn BackendStrategyContext,
         fork_info: BackendStrategyForkInfo<'_>,
         mem_db: &FoundryEvmInMemoryDB,
         backend_inner: &BackendInner,
@@ -80,6 +141,7 @@ impl BackendStrategy for EvmBackendStrategy {
 
     fn merge_journaled_state_data(
         &self,
+        _ctx: &mut dyn BackendStrategyContext,
         addr: Address,
         active_journaled_state: &JournaledState,
         fork_journaled_state: &mut JournaledState,
@@ -91,14 +153,20 @@ impl BackendStrategy for EvmBackendStrategy {
         );
     }
 
-    fn merge_db_account_data(&self, addr: Address, active: &ForkDB, fork_db: &mut ForkDB) {
+    fn merge_db_account_data(
+        &self,
+        _ctx: &mut dyn BackendStrategyContext,
+        addr: Address,
+        active: &ForkDB,
+        fork_db: &mut ForkDB,
+    ) {
         EvmBackendMergeStrategy::merge_db_account_data(addr, active, fork_db);
     }
 }
 
-impl BackendStrategyExt for EvmBackendStrategy {}
+impl BackendStrategyRunnerExt for EvmBackendStrategyRunner {}
 
-impl EvmBackendStrategy {
+impl EvmBackendStrategyRunner {
     /// Merges the state of all `accounts` from the currently active db into the given `fork`
     pub(crate) fn update_fork_db_contracts(
         &self,
@@ -197,5 +265,11 @@ impl EvmBackendMergeStrategy {
         }
 
         fork_db.accounts.insert(addr, acc);
+    }
+}
+
+impl Clone for Box<dyn BackendStrategyRunner> {
+    fn clone(&self) -> Self {
+        self.new_cloned()
     }
 }

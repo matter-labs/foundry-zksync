@@ -21,9 +21,9 @@ impl TracingExecutor {
         debug: bool,
         decode_internal: bool,
         alphanet: bool,
-        strategy: Box<dyn ExecutorStrategy>,
+        strategy: ExecutorStrategy,
     ) -> Self {
-        let db = Backend::spawn(fork, strategy.new_backend_strategy());
+        let db = Backend::spawn(fork, strategy.runner.new_backend_strategy());
         let trace_mode =
             TraceMode::Call.with_debug(debug).with_decode_internal(if decode_internal {
                 InternalTraceMode::Full

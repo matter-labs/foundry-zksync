@@ -299,4 +299,14 @@ impl DualCompiledContracts {
     pub fn push(&mut self, contract: DualCompiledContract) {
         self.contracts.push(contract);
     }
+
+    /// Retrieves the length of the collection.
+    pub fn len(&self) -> usize {
+        self.contracts.len()
+    }
+
+    /// Retrieves if the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.contracts.is_empty()
+    }
 }

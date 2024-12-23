@@ -368,7 +368,10 @@ impl TestArgs {
         // Prepare the test builder.
         let config = Arc::new(config);
 
-        strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts.unwrap_or_default());
+        strategy.runner.zksync_set_dual_compiled_contracts(
+            strategy.context.as_mut(),
+            dual_compiled_contracts.unwrap_or_default(),
+        );
 
         let runner = MultiContractRunnerBuilder::new(config.clone())
             .set_debug(should_debug)

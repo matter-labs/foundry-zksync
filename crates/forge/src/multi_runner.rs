@@ -85,7 +85,7 @@ pub struct MultiContractRunner {
     /// Library addresses used to link contracts.
     pub libraries: Libraries,
     /// Execution strategy.
-    pub strategy: Box<dyn ExecutorStrategy>,
+    pub strategy: ExecutorStrategy,
 }
 
 impl MultiContractRunner {
@@ -178,7 +178,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let db = Backend::spawn(self.fork.take(), self.strategy.new_backend_strategy());
+        let db = Backend::spawn(self.fork.take(), self.strategy.runner.new_backend_strategy());
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -250,7 +250,7 @@ impl MultiContractRunner {
             Some(self.known_contracts.clone()),
             Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
-            self.strategy.new_cheatcode_inspector_strategy(),
+            self.strategy.runner.new_cheatcode_inspector_strategy(self.strategy.context.as_ref()),
         );
 
         let trace_mode = TraceMode::default()
@@ -270,7 +270,7 @@ impl MultiContractRunner {
             .spec(self.evm_spec)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
-            .build(self.env.clone(), db, self.strategy.new_cloned());
+            .build(self.env.clone(), db, self.strategy.clone());
 
         if !enabled!(tracing::Level::TRACE) {
             span_name = get_contract_name(&identifier);
@@ -407,7 +407,7 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ZkProjectCompileOutput>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        strategy: Box<dyn ExecutorStrategy>,
+        strategy: ExecutorStrategy,
     ) -> Result<MultiContractRunner> {
         let mut known_contracts = ContractsByArtifact::default();
         let output = output.with_stripped_file_prefixes(root);
