@@ -207,7 +207,7 @@ EOF
             architecture="aarch64"
             ;;
         *)
-            err "Unsupported architecture detected!"
+            err "Unsupported architecture '$arch' detected!"
             ;;
     esac
 
