@@ -232,12 +232,12 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
         other_fields: OtherFields,
     ) {
         let ctx = get_context(ctx);
-        let transaction_context = try_get_zksync_transaction_context(&other_fields);
+        let transaction_context = try_get_zksync_transaction_metadata(&other_fields);
         ctx.transaction_context = transaction_context;
     }
 }
 
-pub fn try_get_zksync_transaction_context(
+pub fn try_get_zksync_transaction_metadata(
     other_fields: &OtherFields,
 ) -> Option<ZkTransactionMetadata> {
     other_fields
