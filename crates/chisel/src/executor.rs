@@ -316,14 +316,14 @@ impl SessionSource {
         let env =
             self.config.evm_opts.evm_env().await.expect("Could not instantiate fork environment");
 
-        let strategy = utils::get_executor_strategy(&self.config.foundry_config);
+        let mut strategy = utils::get_executor_strategy(&self.config.foundry_config);
 
         // Create an in-memory backend
         let backend = match self.config.backend.take() {
             Some(backend) => backend,
             None => {
                 let fork = self.config.evm_opts.get_fork(&self.config.foundry_config, env.clone());
-                let backend = Backend::spawn(fork, strategy.new_backend_strategy());
+                let backend = Backend::spawn(fork, strategy.runner.new_backend_strategy());
                 self.config.backend = Some(backend.clone());
                 backend
             }
@@ -339,7 +339,7 @@ impl SessionSource {
                         None,
                         None,
                         Some(self.solc.version.clone()),
-                        strategy.new_cheatcode_inspector_strategy(),
+                        strategy.runner.new_cheatcode_inspector_strategy(strategy.context.as_mut()),
                     )
                     .into(),
                 )

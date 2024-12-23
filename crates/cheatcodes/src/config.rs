@@ -1,8 +1,5 @@
 use super::Result;
-use crate::{
-    strategy::{CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategy},
-    Vm::Rpc,
-};
+use crate::{strategy::CheatcodeInspectorStrategy, Vm::Rpc};
 use alloy_primitives::{map::AddressHashMap, U256};
 use foundry_common::{fs::normalize_path, ContractsByArtifact};
 use foundry_compilers::{utils::canonicalize, ProjectPathsConfig};
@@ -57,7 +54,7 @@ pub struct CheatsConfig {
     /// Version of the script/test contract which is currently running.
     pub running_version: Option<Version>,
     /// The behavior strategy.
-    pub strategy: Box<dyn CheatcodeInspectorStrategy>,
+    pub strategy: CheatcodeInspectorStrategy,
     /// Whether to enable legacy (non-reverting) assertions.
     pub assertions_revert: bool,
     /// Optional seed for the RNG algorithm.
@@ -73,7 +70,7 @@ impl CheatsConfig {
         available_artifacts: Option<ContractsByArtifact>,
         running_contract: Option<String>,
         running_version: Option<Version>,
-        strategy: Box<dyn CheatcodeInspectorStrategy>,
+        strategy: CheatcodeInspectorStrategy,
     ) -> Self {
         let mut allowed_paths = vec![config.root.clone()];
         allowed_paths.extend(config.libs.iter().cloned());
@@ -117,7 +114,7 @@ impl CheatsConfig {
             self.available_artifacts.clone(),
             self.running_contract.clone(),
             self.running_version.clone(),
-            self.strategy.new_cloned(),
+            self.strategy.clone(),
         )
     }
 
@@ -246,7 +243,7 @@ impl Default for CheatsConfig {
             available_artifacts: Default::default(),
             running_contract: Default::default(),
             running_version: Default::default(),
-            strategy: Box::new(EvmCheatcodeInspectorStrategy::default()),
+            strategy: CheatcodeInspectorStrategy::new_evm(),
             assertions_revert: true,
             seed: None,
         }
@@ -265,7 +262,7 @@ mod tests {
             None,
             None,
             None,
-            Box::new(EvmCheatcodeInspectorStrategy::default()),
+            CheatcodeInspectorStrategy::new_evm(),
         )
     }
 

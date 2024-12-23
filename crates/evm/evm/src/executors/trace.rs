@@ -22,9 +22,9 @@ impl TracingExecutor {
         trace_mode: TraceMode,
         odyssey: bool,
         create2_deployer: Address,
-        strategy: Box<dyn ExecutorStrategy>,
+        strategy: ExecutorStrategy,
     ) -> Self {
-        let db = Backend::spawn(fork, strategy.new_backend_strategy());
+        let db = Backend::spawn(fork, strategy.runner.new_backend_strategy());
         Self {
             // configures a bare version of the evm executor: no cheatcode inspector is enabled,
             // tracing will be enabled only for the targeted transaction

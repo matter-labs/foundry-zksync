@@ -174,11 +174,7 @@ impl ScriptRunner {
         // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
             debug!("script deployed");
-            cheatcodes
-                .strategy
-                .as_mut()
-                .expect("failed acquiring strategy")
-                .base_contract_deployed();
+            cheatcodes.strategy.runner.base_contract_deployed(cheatcodes.strategy.context.as_mut());
         }
 
         // Optionally call the `setUp` function
@@ -261,7 +257,10 @@ impl ScriptRunner {
         other_fields: Option<OtherFields>,
     ) -> Result<ScriptResult> {
         if let Some(other_fields) = other_fields {
-            self.executor.set_transaction_other_fields(other_fields);
+            self.executor.strategy.runner.zksync_set_transaction_context(
+                self.executor.strategy.context.as_mut(),
+                other_fields,
+            );
         }
 
         if let Some(to) = to {

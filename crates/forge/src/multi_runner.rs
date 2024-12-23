@@ -73,7 +73,7 @@ pub struct MultiContractRunner {
     pub tcfg: TestRunnerConfig,
 
     /// Execution strategy.
-    pub strategy: Box<dyn ExecutorStrategy>,
+    pub strategy: ExecutorStrategy,
 }
 
 impl std::ops::Deref for MultiContractRunner {
@@ -180,7 +180,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let db = Backend::spawn(self.fork.take(), self.strategy.new_backend_strategy());
+        let db = Backend::spawn(self.fork.take(), self.strategy.runner.new_backend_strategy());
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -244,10 +244,10 @@ impl MultiContractRunner {
     ) -> SuiteResult {
         let identifier = artifact_id.identifier();
         let mut span_name = identifier.as_str();
+
         if !enabled!(tracing::Level::TRACE) {
             span_name = get_contract_name(&identifier);
         }
-
         let span = debug_span!("suite", name = %span_name);
         let span_local = span.clone();
         let _guard = span_local.enter();
@@ -261,7 +261,7 @@ impl MultiContractRunner {
                 self.known_contracts.clone(),
                 artifact_id,
                 db.clone(),
-                self.strategy.new_cloned(),
+                self.strategy.clone(),
             ),
             progress,
             tokio_handle,
@@ -353,7 +353,7 @@ impl TestRunnerConfig {
         known_contracts: ContractsByArtifact,
         artifact_id: &ArtifactId,
         db: Backend,
-        strategy: Box<dyn ExecutorStrategy>,
+        strategy: ExecutorStrategy,
     ) -> Executor {
         let cheats_config = Arc::new(CheatsConfig::new(
             &self.config,
@@ -361,7 +361,7 @@ impl TestRunnerConfig {
             Some(known_contracts),
             Some(artifact_id.name.clone()),
             Some(artifact_id.version.clone()),
-            strategy.new_cheatcode_inspector_strategy(),
+            strategy.runner.new_cheatcode_inspector_strategy(strategy.context.as_ref()),
         ));
 
         ExecutorBuilder::new()
@@ -486,7 +486,7 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        strategy: Box<dyn ExecutorStrategy>,
+        strategy: ExecutorStrategy,
     ) -> Result<MultiContractRunner> {
         let contracts = output
             .artifact_ids()

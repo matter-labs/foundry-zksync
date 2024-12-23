@@ -14,10 +14,13 @@ use alloy_rpc_types::TransactionRequest;
 use foundry_fork_db::DatabaseError;
 use revm::{
     db::DatabaseRef,
-    primitives::{Account, AccountInfo, Bytecode, Env, EnvWithHandlerCfg, HashMap as Map, SpecId},
+    primitives::{
+        Account, AccountInfo, Bytecode, Env, EnvWithHandlerCfg, HashMap as Map, ResultAndState,
+        SpecId,
+    },
     Database, DatabaseCommit, JournaledState,
 };
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{any::Any, borrow::Cow, collections::BTreeMap};
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
@@ -51,6 +54,30 @@ impl<'a> CowBackend<'a> {
     /// Creates a new `CowBackend` with the given `Backend`.
     pub fn new_borrowed(backend: &'a Backend) -> Self {
         Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
+    }
+
+    /// Executes the configured transaction of the `env` without committing state changes
+    ///
+    /// Note: in case there are any cheatcodes executed that modify the environment, this will
+    /// update the given `env` with the new values.
+    #[instrument(name = "inspect", level = "debug", skip_all)]
+    pub fn inspect<I: InspectorExt>(
+        &mut self,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &mut I,
+        inspect_ctx: Box<dyn Any>,
+    ) -> eyre::Result<ResultAndState> {
+        // this is a new call to inspect with a new env, so even if we've cloned the backend
+        // already, we reset the initialized state
+        self.is_initialized = false;
+        self.spec_id = env.handler_cfg.spec_id;
+
+        self.backend.strategy.runner.clone().inspect(
+            self.backend.to_mut(),
+            env,
+            inspector,
+            inspect_ctx,
+        )
     }
 
     /// Returns whether there was a state snapshot failure in the backend.
@@ -88,8 +115,8 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend.to_mut().get_fork_info(id)
     }
 
-    fn get_strategy(&mut self) -> &mut dyn BackendStrategy {
-        self.backend.to_mut().strategy.as_mut()
+    fn get_strategy(&mut self) -> &mut BackendStrategy {
+        &mut self.backend.to_mut().strategy
     }
 
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &Env) -> U256 {

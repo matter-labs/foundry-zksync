@@ -3,8 +3,8 @@
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
-    executors::strategy::EvmExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
-    MultiContractRunnerBuilder,
+    executors::strategy::ExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
+    MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
 };
 use foundry_cli::utils;
 use foundry_compilers::{
@@ -334,7 +334,9 @@ impl ForgeTestData {
         let sender = zk_config.sender;
 
         let mut strategy = utils::get_executor_strategy(&zk_config);
-        strategy.zksync_set_dual_compiled_contracts(dual_compiled_contracts);
+        strategy
+            .runner
+            .zksync_set_dual_compiled_contracts(strategy.context.as_mut(), dual_compiled_contracts);
         let mut builder = self.base_runner();
         builder.config = Arc::new(zk_config);
         builder
@@ -355,7 +357,7 @@ impl ForgeTestData {
                 None,
                 opts.local_evm_env(),
                 opts,
-                Box::new(EvmExecutorStrategy::default()),
+                ExecutorStrategy::new_evm(),
             )
             .unwrap()
     }
@@ -378,7 +380,7 @@ impl ForgeTestData {
                 None,
                 env,
                 opts,
-                Box::new(EvmExecutorStrategy::default()),
+                ExecutorStrategy::new_evm(),
             )
             .unwrap()
     }

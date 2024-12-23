@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{any::Any, fmt::Debug, sync::Arc};
 
 use alloy_primitives::{Address, Bytes, FixedBytes, TxKind, U256};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
@@ -18,39 +18,84 @@ use crate::{
     CheatsConfig, CheatsCtxt, Result,
 };
 
-pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorStrategyExt {
+/// Represents the context for [CheatcodeInspectorStrategy].
+pub trait CheatcodeInspectorStrategyContext: Debug + Send + Sync + Any {
+    /// Clone the strategy context.
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyContext>;
+    /// Alias as immutable reference of [Any].
+    fn as_any_ref(&self) -> &dyn Any;
+    /// Alias as mutable reference of [Any].
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl CheatcodeInspectorStrategyContext for () {
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyContext> {
+        Box::new(())
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn as_any_ref(&self) -> &dyn Any {
+        self
+    }
+}
+
+/// Represents the strategy.
+#[derive(Debug)]
+pub struct CheatcodeInspectorStrategy {
+    /// Strategy runner.
+    pub runner: Box<dyn CheatcodeInspectorStrategyRunner>,
+    /// Strategy context.
+    pub context: Box<dyn CheatcodeInspectorStrategyContext>,
+}
+
+impl CheatcodeInspectorStrategy {
+    pub fn new_evm() -> Self {
+        Self {
+            runner: Box::new(EvmCheatcodeInspectorStrategyRunner::default()),
+            context: Box::new(()),
+        }
+    }
+}
+
+impl Clone for CheatcodeInspectorStrategy {
+    fn clone(&self) -> Self {
+        Self { runner: self.runner.new_cloned(), context: self.context.new_cloned() }
+    }
+}
+
+pub trait CheatcodeInspectorStrategyRunner:
+    Debug + Send + Sync + CheatcodeInspectorStrategyExt
+{
     fn name(&self) -> &'static str;
 
-    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy>;
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyRunner>;
 
     /// Get nonce.
-    fn get_nonce(&mut self, ccx: &mut CheatsCtxt, address: Address) -> Result<u64> {
+    fn get_nonce(&self, ccx: &mut CheatsCtxt, address: Address) -> Result<u64> {
         let account = ccx.ecx.journaled_state.load_account(address, &mut ccx.ecx.db)?;
         Ok(account.info.nonce)
     }
 
     /// Called when the main test or script contract is deployed.
-    fn base_contract_deployed(&mut self) {}
+    fn base_contract_deployed(&self, _ctx: &mut dyn CheatcodeInspectorStrategyContext) {}
 
     /// Cheatcode: roll.
-    fn cheatcode_roll(&mut self, ccx: &mut CheatsCtxt, new_height: U256) -> Result {
+    fn cheatcode_roll(&self, ccx: &mut CheatsCtxt, new_height: U256) -> Result {
         ccx.ecx.env.block.number = new_height;
         Ok(Default::default())
     }
 
     /// Cheatcode: warp.
-    fn cheatcode_warp(&mut self, ccx: &mut CheatsCtxt, new_timestamp: U256) -> Result {
+    fn cheatcode_warp(&self, ccx: &mut CheatsCtxt, new_timestamp: U256) -> Result {
         ccx.ecx.env.block.timestamp = new_timestamp;
         Ok(Default::default())
     }
 
     /// Cheatcode: deal.
-    fn cheatcode_deal(
-        &mut self,
-        ccx: &mut CheatsCtxt,
-        address: Address,
-        new_balance: U256,
-    ) -> Result {
+    fn cheatcode_deal(&self, ccx: &mut CheatsCtxt, address: Address, new_balance: U256) -> Result {
         let account = journaled_account(ccx.ecx, address)?;
         let old_balance = std::mem::replace(&mut account.info.balance, new_balance);
         let record = DealRecord { address, old_balance, new_balance };
@@ -60,7 +105,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
 
     /// Cheatcode: etch.
     fn cheatcode_etch(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt,
         target: Address,
         new_runtime_bytecode: &Bytes,
@@ -73,12 +118,12 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
     }
 
     /// Cheatcode: getNonce.
-    fn cheatcode_get_nonce(&mut self, ccx: &mut CheatsCtxt, address: Address) -> Result {
+    fn cheatcode_get_nonce(&self, ccx: &mut CheatsCtxt, address: Address) -> Result {
         evm::get_nonce(ccx, &address)
     }
 
     /// Cheatcode: resetNonce.
-    fn cheatcode_reset_nonce(&mut self, ccx: &mut CheatsCtxt, account: Address) -> Result {
+    fn cheatcode_reset_nonce(&self, ccx: &mut CheatsCtxt, account: Address) -> Result {
         let account = journaled_account(ccx.ecx, account)?;
         // Per EIP-161, EOA nonces start at 0, but contract nonces
         // start at 1. Comparing by code_hash instead of code
@@ -92,7 +137,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
 
     /// Cheatcode: setNonce.
     fn cheatcode_set_nonce(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt,
         account: Address,
         new_nonce: u64,
@@ -111,7 +156,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
 
     /// Cheatcode: setNonceUnsafe.
     fn cheatcode_set_nonce_unsafe(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt,
         account: Address,
         new_nonce: u64,
@@ -123,7 +168,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
 
     /// Mocks a call to return with a value.
     fn cheatcode_mock_call(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt,
         callee: Address,
         data: &Bytes,
@@ -136,7 +181,7 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
 
     /// Mocks a call to revert with a value.
     fn cheatcode_mock_call_revert(
-        &mut self,
+        &self,
         ccx: &mut CheatsCtxt,
         callee: Address,
         data: &Bytes,
@@ -154,7 +199,8 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
 
     /// Record broadcastable transaction during CREATE.
     fn record_broadcastable_create_transactions(
-        &mut self,
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
         config: Arc<CheatsConfig>,
         input: &dyn CommonCreateInput,
         ecx_inner: InnerEcx,
@@ -163,8 +209,10 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
     );
 
     /// Record broadcastable transaction during CALL.
+    #[allow(clippy::too_many_arguments)]
     fn record_broadcastable_call_transactions(
-        &mut self,
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
         config: Arc<CheatsConfig>,
         input: &CallInputs,
         ecx_inner: InnerEcx,
@@ -173,35 +221,55 @@ pub trait CheatcodeInspectorStrategy: Debug + Send + Sync + CheatcodeInspectorSt
         active_delegation: &mut Option<SignedAuthorization>,
     );
 
-    fn post_initialize_interp(&mut self, _interpreter: &mut Interpreter, _ecx: Ecx) {}
+    fn post_initialize_interp(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _interpreter: &mut Interpreter,
+        _ecx: Ecx,
+    ) {
+    }
 
     /// Used to override opcode behaviors. Returns true if handled.
-    fn pre_step_end(&mut self, _interpreter: &mut Interpreter, _ecx: Ecx) -> bool {
+    fn pre_step_end(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _interpreter: &mut Interpreter,
+        _ecx: Ecx,
+    ) -> bool {
         false
     }
 }
 
 /// We define this in our fork
 pub trait CheatcodeInspectorStrategyExt {
-    fn zksync_cheatcode_skip_zkvm(&mut self) -> Result {
+    fn zksync_cheatcode_skip_zkvm(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+    ) -> Result {
         Ok(Default::default())
     }
 
     fn zksync_cheatcode_set_paymaster(
-        &mut self,
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
         _paymaster_address: Address,
         _paymaster_input: &Bytes,
     ) -> Result {
         Ok(Default::default())
     }
 
-    fn zksync_cheatcode_use_factory_deps(&mut self, _name: String) -> Result {
+    fn zksync_cheatcode_use_factory_deps(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _name: String,
+    ) -> Result {
         Ok(Default::default())
     }
 
     #[allow(clippy::too_many_arguments)]
     fn zksync_cheatcode_register_contract(
-        &mut self,
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
         _name: String,
         _zk_bytecode_hash: FixedBytes<32>,
         _zk_deployed_bytecode: Vec<u8>,
@@ -213,16 +281,39 @@ pub trait CheatcodeInspectorStrategyExt {
         Ok(Default::default())
     }
 
-    fn zksync_cheatcode_select_zk_vm(&mut self, _data: InnerEcx, _enable: bool) {}
+    fn zksync_cheatcode_select_zk_vm(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _data: InnerEcx,
+        _enable: bool,
+    ) {
+    }
 
-    fn zksync_record_create_address(&mut self, _outcome: &CreateOutcome) {}
+    fn zksync_record_create_address(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _outcome: &CreateOutcome,
+    ) {
+    }
 
-    fn zksync_sync_nonce(&mut self, _sender: Address, _nonce: u64, _ecx: Ecx) {}
+    fn zksync_sync_nonce(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _sender: Address,
+        _nonce: u64,
+        _ecx: Ecx,
+    ) {
+    }
 
-    fn zksync_set_deployer_call_input(&mut self, _call: &mut CallInputs) {}
+    fn zksync_set_deployer_call_input(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _call: &mut CallInputs,
+    ) {
+    }
 
     fn zksync_try_create(
-        &mut self,
+        &self,
         _state: &mut Cheatcodes,
         _ecx: Ecx<'_, '_, '_>,
         _input: &dyn CommonCreateInput,
@@ -232,7 +323,7 @@ pub trait CheatcodeInspectorStrategyExt {
     }
 
     fn zksync_try_call(
-        &mut self,
+        &self,
         _state: &mut Cheatcodes,
         _ecx: Ecx,
         _input: &CallInputs,
@@ -241,23 +332,30 @@ pub trait CheatcodeInspectorStrategyExt {
         None
     }
 
-    fn zksync_select_fork_vm(&mut self, _data: InnerEcx, _fork_id: LocalForkId) {}
+    fn zksync_select_fork_vm(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _data: InnerEcx,
+        _fork_id: LocalForkId,
+    ) {
+    }
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct EvmCheatcodeInspectorStrategy {}
+pub struct EvmCheatcodeInspectorStrategyRunner {}
 
-impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
+impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
     fn name(&self) -> &'static str {
         "evm"
     }
 
-    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategy> {
+    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyRunner> {
         Box::new(self.clone())
     }
 
     fn record_broadcastable_create_transactions(
-        &mut self,
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
         _config: Arc<CheatsConfig>,
         input: &dyn CommonCreateInput,
         ecx_inner: InnerEcx,
@@ -288,7 +386,8 @@ impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     }
 
     fn record_broadcastable_call_transactions(
-        &mut self,
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
         _config: Arc<CheatsConfig>,
         call: &CallInputs,
         ecx_inner: InnerEcx,
@@ -326,13 +425,13 @@ impl CheatcodeInspectorStrategy for EvmCheatcodeInspectorStrategy {
     }
 }
 
-impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategy {}
+impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategyRunner {}
 
-impl Clone for Box<dyn CheatcodeInspectorStrategy> {
+impl Clone for Box<dyn CheatcodeInspectorStrategyRunner> {
     fn clone(&self) -> Self {
         self.new_cloned()
     }
 }
 
-struct _ObjectSafe0(dyn CheatcodeInspectorStrategy);
+struct _ObjectSafe0(dyn CheatcodeInspectorStrategyRunner);
 struct _ObjectSafe1(dyn CheatcodeInspectorStrategyExt);
