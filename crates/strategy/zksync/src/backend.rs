@@ -83,13 +83,17 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         &self,
         backend: &mut Backend,
         env: &mut EnvWithHandlerCfg,
-        _inspector: &mut dyn InspectorExt,
+        inspector: &mut dyn InspectorExt,
         inspect_ctx: Box<dyn Any>,
     ) -> Result<ResultAndState> {
+        if !is_zksync_cainspect_context(&inspect_ctx) {
+            return self.evm.inspect(backend, env, inspector, inspect_ctx);
+        }
+
+        let inspect_ctx = get_inspect_context(inspect_ctx);
         let mut persisted_factory_deps =
             get_context(backend.strategy.context.as_mut()).persisted_factory_deps.clone();
 
-        let inspect_ctx = get_inspect_context(inspect_ctx);
         let result = foundry_zksync_core::vm::transact(
             Some(&mut persisted_factory_deps),
             Some(inspect_ctx.factory_deps),
@@ -420,4 +424,8 @@ fn get_context(ctx: &mut dyn BackendStrategyContext) -> &mut ZksyncBackendStrate
 
 fn get_inspect_context(ctx: Box<dyn Any>) -> Box<ZksyncInspectContext> {
     ctx.downcast().expect("expected ZksyncInspectContext")
+}
+
+fn is_zksync_inspect_context(ctx: &dyn Any) -> bool {
+    ctx.downcast_ref::<ZksyncInspectContext>().is_some()
 }
