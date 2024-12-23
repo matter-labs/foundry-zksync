@@ -217,9 +217,13 @@ pub fn create2_handler_register<I: InspectorExt>(
             let mut code_hash = ctx.evm.load_account(create2_deployer)?.info.code_hash;
             // NOTE(zk): We check which deployer we are using to separate the logic for zkSync
             // and original foundry.
+            // TODO(zk): adding this check to skip comparing to evm create2 deployer
+            // hash, should we compare vs zkevm one?
+            let mut zk_is_create2_deployer = false;
             if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
                 code_hash = ctx.evm.load_account(call_inputs.target_address)?.info.code_hash;
-            };
+                zk_is_create2_deployer = true;
+            }
             if code_hash == KECCAK_EMPTY {
                 return Ok(FrameOrResult::Result(FrameResult::Call(CallOutcome {
                     result: InterpreterResult {
@@ -229,7 +233,7 @@ pub fn create2_handler_register<I: InspectorExt>(
                     },
                     memory_offset: 0..0,
                 })))
-            } else if code_hash != DEFAULT_CREATE2_DEPLOYER_CODEHASH {
+            } else if code_hash != DEFAULT_CREATE2_DEPLOYER_CODEHASH && !zk_is_create2_deployer {
                 return Ok(FrameOrResult::Result(FrameResult::Call(CallOutcome {
                     result: InterpreterResult {
                         result: InstructionResult::Revert,
