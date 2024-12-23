@@ -1,8 +1,15 @@
 use std::{any::Any, fmt::Debug};
 
-use super::{BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
+use crate::InspectorExt;
+
+use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use alloy_primitives::{Address, U256};
-use revm::{db::CacheDB, primitives::HashSet, DatabaseRef, JournaledState};
+use eyre::{Context, Result};
+use revm::{
+    db::CacheDB,
+    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
+    DatabaseRef, JournaledState,
+};
 use serde::{Deserialize, Serialize};
 
 pub struct BackendStrategyForkInfo<'a> {
@@ -62,6 +69,14 @@ pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt 
 
     fn new_cloned(&self) -> Box<dyn BackendStrategyRunner>;
 
+    fn inspect(
+        &self,
+        backend: &mut Backend,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &mut dyn InspectorExt,
+        inspect_ctx: Box<dyn Any>,
+    ) -> Result<ResultAndState>;
+
     /// When creating or switching forks, we update the AccountInfo of the contract
     fn update_fork_db(
         &self,
@@ -119,6 +134,22 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
 
     fn new_cloned(&self) -> Box<dyn BackendStrategyRunner> {
         Box::new(self.clone())
+    }
+
+    fn inspect(
+        &self,
+        backend: &mut Backend,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &mut dyn InspectorExt,
+        _inspect_ctx: Box<dyn Any>,
+    ) -> Result<ResultAndState> {
+        let mut evm = crate::utils::new_evm_with_inspector(backend, env.clone(), inspector);
+
+        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+
+        env.env = evm.context.evm.inner.env;
+
+        Ok(res)
     }
 
     fn update_fork_db(

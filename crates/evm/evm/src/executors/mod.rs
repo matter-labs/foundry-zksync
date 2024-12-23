@@ -15,7 +15,6 @@ use alloy_primitives::{
     map::{AddressHashMap, HashMap},
     Address, Bytes, Log, U256,
 };
-use alloy_serde::OtherFields;
 use alloy_sol_types::{sol, SolCall};
 use foundry_evm_core::{
     backend::{Backend, BackendError, BackendResult, CowBackend, DatabaseExt, GLOBAL_FAIL_SLOT},
@@ -93,7 +92,7 @@ pub struct Executor {
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
 
-    strategy: ExecutorStrategy,
+    pub strategy: ExecutorStrategy,
 }
 
 impl Clone for Executor {
@@ -256,11 +255,6 @@ impl Executor {
     pub fn set_gas_limit(&mut self, gas_limit: u64) -> &mut Self {
         self.gas_limit = gas_limit;
         self
-    }
-
-    #[inline]
-    pub fn set_transaction_other_fields(&mut self, other_fields: OtherFields) {
-        self.strategy.runner.set_inspect_context(self.strategy.context.as_mut(), other_fields);
     }
 
     /// Deploys a contract and commits the new state to the underlying database.
@@ -438,15 +432,12 @@ impl Executor {
     pub fn call_with_env(&self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector().clone();
         let mut backend = CowBackend::new_borrowed(self.backend());
-        // this is a new call to inspect with a new env, so even if we've cloned the backend
-        // already, we reset the initialized state
-        backend.is_initialized = false;
-        backend.spec_id = env.spec_id();
 
-        let result = self.strategy.runner.call_inspect(
+        let result = self.strategy.runner.call(
             self.strategy.context.as_ref(),
             &mut backend,
             &mut env,
+            &self.env,
             &mut inspector,
         )?;
 
@@ -463,9 +454,8 @@ impl Executor {
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
-        backend.initialize(&env);
 
-        let result_and_state = self.strategy.runner.transact_inspect(
+        let result_and_state = self.strategy.runner.transact(
             self.strategy.context.as_mut(),
             backend,
             &mut env,

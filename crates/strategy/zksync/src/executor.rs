@@ -4,7 +4,7 @@ use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
 
 use foundry_evm::{
-    backend::{BackendResult, DatabaseExt},
+    backend::{Backend, BackendResult, CowBackend},
     executors::{
         strategy::{
             EvmExecutorStrategyRunner, ExecutorStrategy, ExecutorStrategyContext,
@@ -12,26 +12,24 @@ use foundry_evm::{
         },
         Executor,
     },
-    InspectorExt,
+    inspectors::InspectorStack,
 };
 use foundry_zksync_compiler::DualCompiledContracts;
-use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata};
+use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY};
 use revm::{
-    primitives::{Env, EnvWithHandlerCfg, HashMap, ResultAndState},
+    primitives::{Env, EnvWithHandlerCfg, ResultAndState},
     Database,
 };
-use zksync_types::H256;
 
 use crate::{
-    backend::ZksyncBackendStrategyBuilder,
-    cheatcode::{ZksyncCheatcodeInspectorStrategyBuilder, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY},
+    backend::{ZksyncBackendStrategyBuilder, ZksyncInspectContext},
+    cheatcode::ZksyncCheatcodeInspectorStrategyBuilder,
 };
 
 /// Defines the context for [ZksyncExecutorStrategyRunner].
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncExecutorStrategyContext {
-    inspect_context: Option<ZkTransactionMetadata>,
-    persisted_factory_deps: HashMap<H256, Vec<u8>>,
+    transaction_context: Option<ZkTransactionMetadata>,
     dual_compiled_contracts: DualCompiledContracts,
     zk_env: ZkEnv,
 }
@@ -71,16 +69,6 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
 
     fn new_cloned(&self) -> Box<dyn ExecutorStrategyRunner> {
         Box::new(self.clone())
-    }
-
-    fn set_inspect_context(
-        &self,
-        ctx: &mut dyn ExecutorStrategyContext,
-        other_fields: OtherFields,
-    ) {
-        let ctx = get_context(ctx);
-        let maybe_context = get_zksync_transaction_metadata(&other_fields);
-        ctx.inspect_context = maybe_context;
     }
 
     fn set_balance(
@@ -131,52 +119,56 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         )
     }
 
-    fn call_inspect(
+    fn call(
         &self,
         ctx: &dyn ExecutorStrategyContext,
-        db: &mut dyn DatabaseExt,
+        backend: &mut CowBackend<'_>,
         env: &mut EnvWithHandlerCfg,
-        inspector: &mut dyn InspectorExt,
+        executor_env: &EnvWithHandlerCfg,
+        inspector: &mut InspectorStack,
     ) -> eyre::Result<ResultAndState> {
-        let ctx_zk = get_context_ref(ctx);
-        match ctx_zk.inspect_context.as_ref() {
-            None => self.evm.call_inspect(ctx, db, env, inspector),
-            Some(zk_tx) => foundry_zksync_core::vm::transact(
-                Some(&mut ctx_zk.persisted_factory_deps.clone()),
-                Some(zk_tx.factory_deps.clone()),
-                zk_tx.paymaster_data.clone(),
+        let ctx = get_context_ref(ctx);
+
+        match ctx.transaction_context.as_ref() {
+            None => self.evm.call(ctx, backend, env, executor_env, inspector),
+            Some(zk_tx) => backend.inspect(
                 env,
-                &ctx_zk.zk_env,
-                db,
+                inspector,
+                Box::new(ZksyncInspectContext {
+                    factory_deps: zk_tx.factory_deps.clone(),
+                    paymaster_data: zk_tx.paymaster_data.clone(),
+                    zk_env: ctx.zk_env.clone(),
+                }),
             ),
         }
     }
 
-    fn transact_inspect(
+    fn transact(
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
-        db: &mut dyn DatabaseExt,
+        backend: &mut Backend,
         env: &mut EnvWithHandlerCfg,
         executor_env: &EnvWithHandlerCfg,
-        inspector: &mut dyn InspectorExt,
+        inspector: &mut InspectorStack,
     ) -> eyre::Result<ResultAndState> {
-        let ctx_zk = get_context(ctx);
+        let ctx = get_context(ctx);
 
-        match ctx_zk.inspect_context.take() {
-            None => self.evm.transact_inspect(ctx, db, env, executor_env, inspector),
+        match ctx.transaction_context.take() {
+            None => self.evm.transact(ctx, backend, env, executor_env, inspector),
             Some(zk_tx) => {
                 // apply fork-related env instead of cheatcode handler
                 // since it won't be set by zkEVM
                 env.block = executor_env.block.clone();
                 env.tx.gas_price = executor_env.tx.gas_price;
 
-                foundry_zksync_core::vm::transact(
-                    Some(&mut ctx_zk.persisted_factory_deps),
-                    Some(zk_tx.factory_deps),
-                    zk_tx.paymaster_data,
+                backend.inspect(
                     env,
-                    &ctx_zk.zk_env,
-                    db,
+                    inspector,
+                    Box::new(ZksyncInspectContext {
+                        factory_deps: zk_tx.factory_deps,
+                        paymaster_data: zk_tx.paymaster_data,
+                        zk_env: ctx.zk_env.clone(),
+                    }),
                 )
             }
         }
@@ -233,10 +225,19 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
 
         Ok(())
     }
+
+    fn zksync_set_transaction_context(
+        &self,
+        ctx: &mut dyn ExecutorStrategyContext,
+        other_fields: OtherFields,
+    ) {
+        let ctx = get_context(ctx);
+        let transaction_context = try_get_zksync_transaction_context(&other_fields);
+        ctx.transaction_context = transaction_context;
+    }
 }
 
-/// Retrieve metadata for ZKsync tx.
-pub fn get_zksync_transaction_metadata(
+pub fn try_get_zksync_transaction_context(
     other_fields: &OtherFields,
 ) -> Option<ZkTransactionMetadata> {
     other_fields

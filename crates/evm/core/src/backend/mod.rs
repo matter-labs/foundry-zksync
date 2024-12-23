@@ -22,11 +22,12 @@ use revm::{
     precompile::{PrecompileSpecId, Precompiles},
     primitives::{
         Account, AccountInfo, BlobExcessGasAndPrice, Bytecode, Env, EnvWithHandlerCfg, EvmState,
-        EvmStorageSlot, HashMap as Map, Log, SpecId, KECCAK_EMPTY,
+        EvmStorageSlot, HashMap as Map, Log, ResultAndState, SpecId, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, JournaledState,
 };
 use std::{
+    any::Any,
     collections::{BTreeMap, HashSet},
     time::Instant,
 };
@@ -773,9 +774,24 @@ impl Backend {
     /// Initializes settings we need to keep track of.
     ///
     /// We need to track these mainly to prevent issues when switching between different evms
-    pub fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+    pub(crate) fn initialize(&mut self, env: &EnvWithHandlerCfg) {
         self.set_caller(env.tx.caller);
         self.set_spec_id(env.handler_cfg.spec_id);
+    }
+
+    /// Executes the configured test call of the `env` without committing state changes.
+    ///
+    /// Note: in case there are any cheatcodes executed that modify the environment, this will
+    /// update the given `env` with the new values.
+    #[instrument(name = "inspect", level = "debug", skip_all)]
+    pub fn inspect<I: InspectorExt>(
+        &mut self,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &mut I,
+        inspect_ctx: Box<dyn Any>,
+    ) -> eyre::Result<ResultAndState> {
+        self.initialize(env);
+        self.strategy.runner.clone().inspect(self, env, inspector, inspect_ctx)
     }
 
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
