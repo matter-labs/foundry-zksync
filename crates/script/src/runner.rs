@@ -257,7 +257,10 @@ impl ScriptRunner {
         other_fields: Option<OtherFields>,
     ) -> Result<ScriptResult> {
         if let Some(other_fields) = other_fields {
-            self.executor.set_transaction_other_fields(other_fields);
+            self.executor.strategy.runner.zksync_set_transaction_context(
+                self.executor.strategy.context.as_mut(),
+                other_fields,
+            );
         }
 
         if let Some(to) = to {

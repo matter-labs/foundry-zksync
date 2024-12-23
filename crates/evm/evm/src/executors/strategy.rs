@@ -2,19 +2,18 @@ use std::{any::Any, fmt::Debug};
 
 use alloy_primitives::{Address, U256};
 use alloy_serde::OtherFields;
-use eyre::{Context, Result};
+use eyre::Result;
 use foundry_cheatcodes::strategy::{
     CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategyRunner,
 };
-use foundry_evm_core::{
-    backend::{strategy::BackendStrategy, BackendResult, DatabaseExt},
-    InspectorExt,
-};
+use foundry_evm_core::backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend};
 use foundry_zksync_compiler::DualCompiledContracts;
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, ResultAndState},
     DatabaseRef,
 };
+
+use crate::inspectors::InspectorStack;
 
 use super::Executor;
 
@@ -76,24 +75,25 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
     fn set_nonce(&self, executor: &mut Executor, address: Address, nonce: u64)
         -> BackendResult<()>;
 
-    fn set_inspect_context(&self, ctx: &mut dyn ExecutorStrategyContext, other_fields: OtherFields);
-
-    fn call_inspect(
+    /// Execute a transaction and *WITHOUT* applying state changes.
+    fn call(
         &self,
         ctx: &dyn ExecutorStrategyContext,
-        db: &mut dyn DatabaseExt,
+        backend: &mut CowBackend<'_>,
         env: &mut EnvWithHandlerCfg,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<ResultAndState>;
+        executor_env: &EnvWithHandlerCfg,
+        inspector: &mut InspectorStack,
+    ) -> Result<ResultAndState>;
 
-    fn transact_inspect(
+    /// Execute a transaction and apply state changes.
+    fn transact(
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
-        db: &mut dyn DatabaseExt,
+        backend: &mut Backend,
         env: &mut EnvWithHandlerCfg,
-        _executor_env: &EnvWithHandlerCfg,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<ResultAndState>;
+        executor_env: &EnvWithHandlerCfg,
+        inspector: &mut InspectorStack,
+    ) -> Result<ResultAndState>;
 
     fn new_backend_strategy(&self) -> BackendStrategy;
     fn new_cheatcode_inspector_strategy(
@@ -123,6 +123,19 @@ pub trait ExecutorStrategyExt {
     ) -> Result<()> {
         Ok(())
     }
+
+    /// Sets the transaction context for the next [ExecutorStrategyRunner::call] or
+    /// [ExecutorStrategyRunner::transact]. This selects whether to run the transaction on zkEVM
+    /// or the EVM.
+    /// This is based if the [OtherFields] contains
+    /// [foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY] with
+    /// [foundry_zksync_core::ZkTransactionMetadata].
+    fn zksync_set_transaction_context(
+        &self,
+        _ctx: &mut dyn ExecutorStrategyContext,
+        _other_fields: OtherFields,
+    ) {
+    }
 }
 
 /// Implements [ExecutorStrategyRunner] for EVM.
@@ -136,55 +149,6 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
 
     fn new_cloned(&self) -> Box<dyn ExecutorStrategyRunner> {
         Box::new(self.clone())
-    }
-
-    fn set_inspect_context(
-        &self,
-        _ctx: &mut dyn ExecutorStrategyContext,
-        _other_fields: OtherFields,
-    ) {
-    }
-
-    /// Executes the configured test call of the `env` without committing state changes.
-    ///
-    /// Note: in case there are any cheatcodes executed that modify the environment, this will
-    /// update the given `env` with the new values.
-    fn call_inspect(
-        &self,
-        _ctx: &dyn ExecutorStrategyContext,
-        db: &mut dyn DatabaseExt,
-        env: &mut EnvWithHandlerCfg,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<ResultAndState> {
-        let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
-
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
-
-        env.env = evm.context.evm.inner.env;
-
-        Ok(res)
-    }
-
-    /// Executes the configured test call of the `env` without committing state changes.
-    /// Modifications to the state are however allowed.
-    ///
-    /// Note: in case there are any cheatcodes executed that modify the environment, this will
-    /// update the given `env` with the new values.
-    fn transact_inspect(
-        &self,
-        _ctx: &mut dyn ExecutorStrategyContext,
-        db: &mut dyn DatabaseExt,
-        env: &mut EnvWithHandlerCfg,
-        _executor_env: &EnvWithHandlerCfg,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<ResultAndState> {
-        let mut evm = crate::utils::new_evm_with_inspector(db, env.clone(), inspector);
-
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
-
-        env.env = evm.context.evm.inner.env;
-
-        Ok(res)
     }
 
     fn set_balance(
@@ -212,6 +176,28 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         executor.backend_mut().insert_account_info(address, account);
 
         Ok(())
+    }
+
+    fn call(
+        &self,
+        _ctx: &dyn ExecutorStrategyContext,
+        backend: &mut CowBackend<'_>,
+        env: &mut EnvWithHandlerCfg,
+        _executor_env: &EnvWithHandlerCfg,
+        inspector: &mut InspectorStack,
+    ) -> Result<ResultAndState> {
+        backend.inspect(env, inspector, Box::new(()))
+    }
+
+    fn transact(
+        &self,
+        _ctx: &mut dyn ExecutorStrategyContext,
+        backend: &mut Backend,
+        env: &mut EnvWithHandlerCfg,
+        _executor_env: &EnvWithHandlerCfg,
+        inspector: &mut InspectorStack,
+    ) -> Result<ResultAndState> {
+        backend.inspect(env, inspector, Box::new(()))
     }
 
     fn new_backend_strategy(&self) -> BackendStrategy {

@@ -73,7 +73,7 @@ pub async fn send_transaction(
 ) -> Result<TxHash> {
     let zk_tx_meta =
         if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
-            foundry_strategy_zksync::get_zksync_transaction_metadata(&tx.other)
+            foundry_strategy_zksync::try_get_zksync_transaction_metadata(&tx.other)
         } else {
             None
         };

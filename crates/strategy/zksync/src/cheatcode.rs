@@ -34,7 +34,7 @@ use foundry_zksync_core::{
     vm::ZkEnv,
     PaymasterParams, ZkPaymasterData, ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS,
     CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, H256, KNOWN_CODES_STORAGE_ADDRESS,
-    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use itertools::Itertools;
 use revm::{
@@ -54,9 +54,6 @@ use zksync_types::{
     utils::{decompose_full_nonce, nonces_to_full_nonce},
     CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
 };
-
-/// Key used to set transaction metadata in other fields.
-pub const ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY: &str = "zksync";
 
 macro_rules! fmt_err {
     ($msg:literal $(,)?) => {

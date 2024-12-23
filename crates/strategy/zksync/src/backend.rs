@@ -1,8 +1,13 @@
 use std::{any::Any, collections::hash_map::Entry};
 
 use alloy_primitives::{map::HashMap, Address, U256};
-use foundry_evm::backend::strategy::{
-    BackendStrategy, BackendStrategyContext, BackendStrategyRunnerExt,
+use eyre::Result;
+use foundry_evm::{
+    backend::{
+        strategy::{BackendStrategy, BackendStrategyContext, BackendStrategyRunnerExt},
+        Backend,
+    },
+    InspectorExt,
 };
 use foundry_evm_core::backend::{
     strategy::{
@@ -12,18 +17,37 @@ use foundry_evm_core::backend::{
     BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
 };
 use foundry_zksync_core::{
-    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    convert::ConvertH160, vm::ZkEnv, PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS,
+    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
+    NONCE_HOLDER_ADDRESS,
 };
-use revm::{db::CacheDB, primitives::HashSet, DatabaseRef, JournaledState};
+use revm::{
+    db::CacheDB,
+    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
+    DatabaseRef, JournaledState,
+};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
+use zksync_types::H256;
+
+/// Represents additional data for ZK transactions.
+#[derive(Clone, Debug, Default)]
+pub struct ZksyncInspectContext {
+    /// Factory Deps for ZK transactions.
+    pub factory_deps: Vec<Vec<u8>>,
+    /// Paymaster data for ZK transactions.
+    pub paymaster_data: Option<PaymasterParams>,
+    /// Zksync environment.
+    pub zk_env: ZkEnv,
+}
 
 /// Context for [ZksyncBackendStrategyRunner].
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone)]
 pub struct ZksyncBackendStrategyContext {
     /// Store storage keys per contract address for immutable variables.
     persistent_immutable_keys: HashMap<Address, HashSet<U256>>,
+    /// Store persisted factory dependencies.
+    persisted_factory_deps: HashMap<H256, Vec<u8>>,
 }
 
 impl BackendStrategyContext for ZksyncBackendStrategyContext {
@@ -53,6 +77,36 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
 
     fn new_cloned(&self) -> Box<dyn BackendStrategyRunner> {
         Box::new(self.clone())
+    }
+
+    fn inspect(
+        &self,
+        backend: &mut Backend,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &mut dyn InspectorExt,
+        inspect_ctx: Box<dyn Any>,
+    ) -> Result<ResultAndState> {
+        if !is_zksync_inspect_context(inspect_ctx.as_ref()) {
+            return self.evm.inspect(backend, env, inspector, inspect_ctx);
+        }
+
+        let inspect_ctx = get_inspect_context(inspect_ctx);
+        let mut persisted_factory_deps =
+            get_context(backend.strategy.context.as_mut()).persisted_factory_deps.clone();
+
+        let result = foundry_zksync_core::vm::transact(
+            Some(&mut persisted_factory_deps),
+            Some(inspect_ctx.factory_deps),
+            inspect_ctx.paymaster_data,
+            env,
+            &inspect_ctx.zk_env,
+            backend,
+        );
+
+        let ctx = get_context(backend.strategy.context.as_mut());
+        ctx.persisted_factory_deps = persisted_factory_deps;
+
+        result
     }
 
     /// When creating or switching forks, we update the AccountInfo of the contract.
@@ -366,4 +420,12 @@ impl ZksyncBackendMerge {
 
 fn get_context(ctx: &mut dyn BackendStrategyContext) -> &mut ZksyncBackendStrategyContext {
     ctx.as_any_mut().downcast_mut().expect("expected ZksyncBackendStrategyContext")
+}
+
+fn get_inspect_context(ctx: Box<dyn Any>) -> Box<ZksyncInspectContext> {
+    ctx.downcast().expect("expected ZksyncInspectContext")
+}
+
+fn is_zksync_inspect_context(ctx: &dyn Any) -> bool {
+    ctx.downcast_ref::<ZksyncInspectContext>().is_some()
 }
