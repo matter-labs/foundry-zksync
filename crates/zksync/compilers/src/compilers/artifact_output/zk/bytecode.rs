@@ -7,9 +7,21 @@ use foundry_compilers_artifacts_solc::{
 };
 use serde::{Deserialize, Serialize};
 
+/// This will serialize the bytecode data without a `0x` prefix
+///
+/// Equivalent of solc artifact bytecode's
+/// [`serialize_bytecode_without_prefix`](foundry_compilers_artifacts::solc::bytecode::serialize_bytecode_without_prefix)
+pub fn serialize_bytes_without_prefix<S>(code: &Bytes, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    s.serialize_str(&alloy_primitives::hex::encode(code))
+}
+
 /// Bytecode compiled by zksolc
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ZkArtifactBytecode {
+    #[serde(serialize_with = "serialize_bytes_without_prefix")]
     object: Bytes,
     is_unlinked: bool,
 
@@ -34,7 +46,8 @@ impl ZkArtifactBytecode {
         Self { object, is_unlinked, missing_libraries }
     }
 
-    fn link_references(&self) -> BTreeMap<String, BTreeMap<String, Vec<Offsets>>> {
+    /// Get link references
+    pub fn link_references(&self) -> BTreeMap<String, BTreeMap<String, Vec<Offsets>>> {
         Contract::missing_libs_to_link_references(self.missing_libraries.as_slice())
     }
 
@@ -63,5 +76,26 @@ impl From<ZkArtifactBytecode> for CompactBytecode {
 impl From<ZkArtifactBytecode> for CompactDeployedBytecode {
     fn from(bcode: ZkArtifactBytecode) -> Self {
         Self { bytecode: Some(bcode.into()), immutable_references: BTreeMap::default() }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serialized_bytecode_is_not_prefixed() {
+        let object = Bytes::from(vec![0xDEu8, 0xAD, 0xBE, 0xEF]);
+        let sample = ZkArtifactBytecode { object, is_unlinked: false, missing_libraries: vec![] };
+
+        let json_str =
+            serde_json::to_string(&sample).expect("able to serialize artifact bytecode as json");
+
+        let deserialized: serde_json::Value =
+            serde_json::from_str(&json_str).expect("able to deserialize json");
+
+        let bytecode_str = deserialized["object"].as_str().expect(".object to be a string");
+
+        assert!(!bytecode_str.starts_with("0x"));
     }
 }

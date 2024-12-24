@@ -1,6 +1,6 @@
 //! zksolc artifacts to be used in `foundry-compilers`
 use foundry_compilers_artifacts_solc::{
-    BytecodeObject, CompactContractRef, FileToContractsMap, SourceFile, SourceFiles,
+    Bytecode, BytecodeObject, CompactContractRef, FileToContractsMap, SourceFile, SourceFiles,
 };
 
 use semver::Version;
@@ -54,6 +54,27 @@ impl CompilerOutput {
     pub fn split(self) -> (SourceFiles, OutputContracts) {
         (SourceFiles(self.sources), OutputContracts(self.contracts))
     }
+}
+
+/// Evm zksolc output field (deprecated)
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Evm {
+    /// The contract EraVM assembly code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assembly: Option<String>,
+    /// The contract EVM legacy assembly code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_assembly: Option<serde_json::Value>,
+    /// The contract bytecode.
+    /// Is reset by that of EraVM before yielding the compiled project artifacts.
+    pub bytecode: Option<Bytecode>,
+    /// The list of function hashes
+    #[serde(default, skip_serializing_if = "::std::collections::BTreeMap::is_empty")]
+    pub method_identifiers: BTreeMap<String, String>,
+    /// The extra EVMLA metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra_metadata: Option<ExtraMetadata>,
 }
 
 /// `zksolc` eravm output field

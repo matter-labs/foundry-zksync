@@ -126,6 +126,7 @@ impl ArtifactOutput for ZkArtifactOutput {
             devdoc,
             storage_layout,
             eravm,
+            evm,
             ir_optimized,
             hash,
             factory_dependencies,
@@ -134,6 +135,7 @@ impl ArtifactOutput for ZkArtifactOutput {
 
         let (bytecode, assembly) = eravm
             .map(|eravm| (eravm.bytecode(is_unlinked), eravm.assembly))
+            .or_else(|| evm.map(|evm| (evm.bytecode.map(|bc| bc.object), evm.assembly)))
             .unwrap_or_else(|| (None, None));
         let bytecode = bytecode
             .map(|object| ZkArtifactBytecode::with_object(object, is_unlinked, missing_libraries));
