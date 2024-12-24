@@ -4,7 +4,7 @@ use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
     executors::strategy::ExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
-    MultiContractRunnerBuilder, TestOptions, TestOptionsBuilder,
+    MultiContractRunnerBuilder,
 };
 use foundry_cli::utils;
 use foundry_compilers::{
