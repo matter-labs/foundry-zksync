@@ -239,13 +239,13 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             let call_contract = current.code_address.to_address();
             let call_value = U256::from(current.context_u128_value).to_ru256();
 
-            let mut had_mocks = false;
             if let Some(mocks) = self.mocked_calls.get_mut(&call_contract) {
-                had_mocks = true;
                 let ctx = MockCallDataContext {
                     calldata: Bytes::from(call_input.clone()),
                     value: Some(call_value),
                 };
+
+                // Try to find matching mock data
                 if let Some(return_data_queue) = match mocks.get_mut(&ctx) {
                     Some(queue) => Some(queue),
                     None => mocks
@@ -256,11 +256,10 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                         })
                         .map(|(_, v)| v),
                 } {
+                    // Handle mock return data...
                     if let Some(return_data) = if return_data_queue.len() == 1 {
-                        // If the mocked calls stack has a single element in it, don't empty it
                         return_data_queue.front().map(|x| x.to_owned())
                     } else {
-                        // Else, we pop the front element
                         return_data_queue.pop_front()
                     } {
                         let return_data = return_data.data.clone().to_vec();
@@ -278,16 +277,12 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             // if we get here there was no matching mock call,
             // so we check if there's no code at the mocked address
             if self.has_empty_code(storage, call_contract) {
-                // issue a more targeted
-                // error if we already had some mocks there
-                let had_mocks_message =
-                    if had_mocks { " - please ensure the current calldata is mocked" } else { "" };
-
+                let has_mocks = self.mocked_calls.contains_key(&call_contract);
                 tracing::error!(
                     target = ?call_contract,
                     calldata = hex::encode(&call_input),
                     "call may fail or behave unexpectedly due to empty code{}",
-                    had_mocks_message
+                    if has_mocks { " - please ensure the current calldata is mocked" } else { "" }
                 );
             }
         }
