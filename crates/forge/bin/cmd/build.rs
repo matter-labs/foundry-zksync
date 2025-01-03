@@ -66,6 +66,12 @@ pub struct BuildArgs {
     #[serde(skip)]
     pub ignore_eip_3860: bool,
 
+    /// Detect missing libraries, instead of erroring
+    ///
+    /// Currently unused
+    #[clap(long = "zk-detect-missing-libraries", group = "build")]
+    pub detect_missing_libraries: bool,
+
     #[command(flatten)]
     #[serde(flatten)]
     pub args: CoreBuildArgs,
