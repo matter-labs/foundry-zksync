@@ -245,7 +245,6 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                     value: Some(call_value),
                 };
 
-                // Try to find matching mock data
                 if let Some(return_data_queue) = match mocks.get_mut(&ctx) {
                     Some(queue) => Some(queue),
                     None => mocks
@@ -256,10 +255,11 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                         })
                         .map(|(_, v)| v),
                 } {
-                    // Handle mock return data...
                     if let Some(return_data) = if return_data_queue.len() == 1 {
+                        // If the mocked calls stack has a single element in it, don't empty it
                         return_data_queue.front().map(|x| x.to_owned())
                     } else {
+                        // Else, we pop the front element
                         return_data_queue.pop_front()
                     } {
                         let return_data = return_data.data.clone().to_vec();
@@ -282,6 +282,8 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                     target = ?call_contract,
                     calldata = hex::encode(&call_input),
                     "call may fail or behave unexpectedly due to empty code{}",
+                    // issue a more targeted
+                    // error if we already had some mocks there
                     if has_mocks { " - please ensure the current calldata is mocked" } else { "" }
                 );
             }
