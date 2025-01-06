@@ -15,7 +15,9 @@ impl Cheatcode for clearMockedCallsCall {
 impl Cheatcode for mockCall_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, returnData } = self;
-        ccx.state.strategy.runner.clone().cheatcode_mock_call(ccx, *callee, data, returnData)
+        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        mock_call(ccx.state, callee, data, None, returnData, InstructionResult::Return);
+        Ok(Default::default())
     }
 }
 
@@ -83,7 +85,10 @@ impl Cheatcode for mockCalls_1Call {
 impl Cheatcode for mockCallRevert_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, revertData } = self;
-        ccx.state.strategy.runner.clone().cheatcode_mock_call_revert(ccx, *callee, data, revertData)
+
+        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        mock_call(ccx.state, callee, data, None, revertData, InstructionResult::Revert);
+        Ok(Default::default())
     }
 }
 

@@ -2256,7 +2256,8 @@ fn apply_dispatch(
     }
 
     // Apply the cheatcode.
-    let mut result = cheat.dyn_apply(ccx, executor);
+    let runner = ccx.state.strategy.runner.new_cloned();
+    let mut result = runner.apply_full(cheat, ccx, executor);
 
     // Format the error message to include the cheatcode name.
     if let Err(e) = &mut result {
