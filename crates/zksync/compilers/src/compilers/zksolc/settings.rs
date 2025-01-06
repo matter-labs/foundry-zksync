@@ -112,7 +112,7 @@ pub struct ZkSettings {
     /// Switch to missing deployable libraries detection mode.
     /// Contracts are not compiled in this mode, and all compilation artifacts are not included.
     #[serde(default, rename = "detectMissingLibraries")]
-    pub detect_missing_libraries: bool,
+    pub zk_detect_missing_libraries: bool,
     // zksolc arguments
     /// A flag indicating whether to enable the system contract compilation mode.
     /// Whether to enable EraVM extensions.
@@ -204,7 +204,7 @@ impl Default for ZkSettings {
             via_ir: None,
             libraries: Default::default(),
             remappings: Default::default(),
-            detect_missing_libraries: false,
+            zk_detect_missing_libraries: false,
             enable_eravm_extensions: false,
             llvm_options: Default::default(),
             force_evmla: false,
@@ -244,7 +244,7 @@ impl CompilerSettings for ZkSolcSettings {
                     optimizer,
                     metadata,
                     libraries,
-                    detect_missing_libraries,
+                    zk_detect_missing_libraries,
                     enable_eravm_extensions,
                     llvm_options,
                     force_evmla,
@@ -262,7 +262,7 @@ impl CompilerSettings for ZkSolcSettings {
             *optimizer == other.settings.optimizer &&
             *metadata == other.settings.metadata &&
             *libraries == other.settings.libraries &&
-            *detect_missing_libraries == other.settings.detect_missing_libraries &&
+            *zk_detect_missing_libraries == other.settings.zk_detect_missing_libraries &&
             *enable_eravm_extensions == other.settings.enable_eravm_extensions &&
             *llvm_options == other.settings.llvm_options &&
             *force_evmla == other.settings.force_evmla &&
