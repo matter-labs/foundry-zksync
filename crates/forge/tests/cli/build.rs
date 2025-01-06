@@ -193,125 +193,24 @@ contract ValidContract {}
     cmd.args(["build"]).assert_success();
 });
 
-// tests build scenarios varying zk-detect-missing-libraries flag
-// TOML config file could be used to set the flag
-// also the flag should be set via command line argument
-// In any of these cases, it should not build (if the flag is set)
-// it should build (if the flag is not set in any of the above cases)
-// case 1: [BUILD] flag in both toml config file and command line argument
-forgetest_init!(test_zk_build_missing_libraries_config_and_flag, |prj, cmd| {
+forgetest_init!(test_zk_build_missing_libraries_as_arg, |prj, cmd| {
+    cmd.args(["build", "--zksync", "--zk-detect-missing-libraries"]).assert_success();
+});
+
+forgetest_init!(test_zk_build_missing_libraries_as_config, |prj, cmd| {
     let zk = ZkSyncConfig { detect_missing_libraries: true, ..Default::default() };
     prj.write_config(Config { zksync: zk, ..Default::default() });
-    cmd.args(["build", "--zksync", "--zk-detect-missing-libraries"])
-        .assert_success()
-        // .stderr_eq(str![r#"Ignoring the `detect_missing_libraries` flag; it should not be used in
-        // toml config file, but as an argument in the build command"#])
-        .stdout_eq(str![[r#"
+    cmd.args(["build", "--zksync", "--zk-detect-missing-libraries"]).assert_success();
+});
+
+forgetest_init!(test_zk_missing_libraries_param_only_on_build, |prj, cmd| {
+    cmd.args(["script", "--zksync", "--zk-detect-missing-libraries"]).assert_failure().stderr_eq(
+        str![
+            r#"
 ...
-Compiler run successful with warnings:
+error: unexpected argument '--zk-detect-missing-libraries' found
 ...
-"#]]);
-    // .stderr_eq(str![r#"Ignoring the `detect_missing_libraries` flag; it should not be used in
-    // toml config file, but as an argument in the build command"#]);
-});
-
-// scenario 2: [BUILD] flag set via command line argument only (NO WARNINGS; THE RIGHT WAY)
-forgetest_init!(test_zk_build_missing_libraries_only_flag, |prj, cmd| {
-    cmd.args(["build", "--zksync", "--zk-detect-missing-libraries"])
-        .assert_failure()
-        .stderr_eq(str![r#"Ignoring the `detect_missing_libraries` flag; it should not be used in toml config file, but as an argument in the build command"#]);
-});
-
-// scenario 3: [BUILD] flag set in toml config file only
-forgetest_init!(test_zk_build_missing_libraries_only_config, |prj, cmd| {
-    let zk = ZkSyncConfig { detect_missing_libraries: true, ..Default::default() };
-    prj.write_config(Config { zksync: zk, ..Default::default() });
-    cmd.args(["build", "--zksync"])
-        .assert_failure()
-        .stderr_eq(str![r#"Ignoring the `detect_missing_libraries` flag; it should not be used in toml config file, but as an argument in the build command"#]);
-});
-
-// scenario 4: [BUILD] flag not set in either toml config file or command line argument
-forgetest_init!(test_zk_build_missing_libraries_none, |prj, cmd| {
-    cmd.args(["build", "--zksync"]).assert_success();
-});
-
-// scenario 5: [TEST] flag not set in either toml config file or command line argument
-forgetest_init!(test_zk_script_missing_libraries_config_and_flag, |prj, cmd| {
-    let zk = ZkSyncConfig { detect_missing_libraries: true, ..Default::default() };
-    prj.write_config(Config { zksync: zk, ..Default::default() });
-    cmd.env("RUST_LOG", "warn");
-
-    //     cmd.args(["test", "--zksync", "--zk-detect-missing-libraries-deprecated"])
-    //         .assert_failure()
-    //         .stderr_eq(str![[r#"
-    // ...
-    // Ignoring the `detect_missing_libraries` flag; it should not be used in toml config file, but
-    // as an argument in the build command ...
-    // "#]]);
-
-    let output = cmd
-        .args(["test", "--zksync", "--zk-detect-missing-libraries-deprecated"])
-        .assert_failure()
-        .get_output()
-        .stdout_lossy();
-    assert!(output.contains("Ignoring the `detect_missing_libraries` flag; it should not be used in toml config file, but as an argument in the build command"), "{}", output);
-
-    // println!(
-    //     "{}",
-    //     cmd.args(["test", "--zksync", "--zk-detect-missing-libraries"])
-    //         .assert_success()
-    //         .get_output()
-    //         .stdout_lossy()
-    // );
-
-    // .stderr_eq(str![r#"Ignoring the `detect_missing_libraries` flag; it should not be used in
-    // toml config file, but as an argument in the build command"#])
-    //         .stdout_eq(str![[r#"
-    // ...
-    // Compiler run successful with warnings:
-    // ...
-    // "#]]);
-    // .stderr_eq(str![r#"Ignoring the `detect_missing_libraries` flag; it should not be used in
-    // toml config file, but as an argument in the build command"#]);
-});
-
-// scenario 6: [TEST] flag not set in either toml config file or command line argument
-forgetest_init!(test_zk_script_missing_libraries_config_and_flag, |prj, cmd| {
-    let zk = ZkSyncConfig { detect_missing_libraries: true, ..Default::default() };
-    prj.write_config(Config { zksync: zk, ..Default::default() });
-    cmd.env("RUST_LOG", "warn");
-
-    //     cmd.args(["test", "--zksync", "--zk-detect-missing-libraries-deprecated"])
-    //         .assert_failure()
-    //         .stderr_eq(str![[r#"
-    // ...
-    // Ignoring the `detect_missing_libraries` flag; it should not be used in toml config file, but
-    // as an argument in the build command ...
-    // "#]]);
-
-    let output = cmd
-        .args(["test", "--zksync", "--zk-detect-missing-libraries-deprecated"])
-        .assert_failure()
-        .get_output()
-        .stdout_lossy();
-    assert!(output.contains("Ignoring the `detect_missing_libraries` flag; it should not be used in toml config file, but as an argument in the build command"), "{}", output);
-
-    // println!(
-    //     "{}",
-    //     cmd.args(["test", "--zksync", "--zk-detect-missing-libraries"])
-    //         .assert_success()
-    //         .get_output()
-    //         .stdout_lossy()
-    // );
-
-    // .stderr_eq(str![r#"Ignoring the `detect_missing_libraries` flag; it should not be used in
-    // toml config file, but as an argument in the build command"#])
-    //         .stdout_eq(str![[r#"
-    // ...
-    // Compiler run successful with warnings:
-    // ...
-    // "#]]);
-    // .stderr_eq(str![r#"Ignoring the `detect_missing_libraries` flag; it should not be used in
-    // toml config file, but as an argument in the build command"#]);
+"#
+        ],
+    );
 });

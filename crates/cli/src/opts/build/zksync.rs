@@ -82,16 +82,6 @@ pub struct ZkSyncArgs {
     )]
     pub fallback_oz: Option<bool>,
 
-    /// Detect missing libraries, instead of erroring
-    ///
-    /// Currently unused
-    #[clap(
-        long = "zk-detect-missing-libraries-deprecated",
-        id = "zk-detect-missing-libraries-deprecated",
-        group = "depracated"
-    )]
-    pub detect_missing_libraries: bool,
-
     /// Set the LLVM optimization parameter `-O[0 | 1 | 2 | 3 | s | z]`.
     /// Use `3` for best performance and `z` for minimal size.
     #[clap(
@@ -168,16 +158,6 @@ impl ZkSyncArgs {
         set_if_some!(self.llvm_options.clone(), zksync.llvm_options);
         set_if_some!(self.force_evmla, zksync.force_evmla);
         set_if_some!(self.fallback_oz, zksync.fallback_oz);
-        set_if_some!(
-            self.detect_missing_libraries.then_some(true),
-            zksync.detect_missing_libraries
-        );
-
-        if zksync.detect_missing_libraries {
-            // warn saying that The `detect_missing_libraries` option should not be used in toml
-            // config, but as an argument in the build command
-            warn!("Ignoring the `detect_missing_libraries` flag; it should not be used in toml config file, but as an argument in the build command");
-        }
 
         set_if_some!(self.optimizer.then_some(true), zksync.optimizer);
         set_if_some!(

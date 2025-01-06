@@ -215,6 +215,10 @@ impl Provider for BuildArgs {
             dict.insert("ignore_eip_3860".to_string(), true.into());
         }
 
+        if self.detect_missing_libraries {
+            dict.insert("detect_missing_libraries".to_string(), true.into());
+        }
+
         Ok(Map::from([(Config::selected_profile(), dict)]))
     }
 }
