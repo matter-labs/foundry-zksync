@@ -1,8 +1,7 @@
 use crate::utils::generate_large_contract;
 use foundry_config::{Config, ZkSyncConfig};
-use foundry_test_utils::{forgetest, snapbox::IntoData, str, util::OutputExt};
+use foundry_test_utils::{forgetest, snapbox::IntoData, str};
 use globset::Glob;
-use regex::Regex;
 
 forgetest_init!(can_parse_build_filters, |prj, cmd| {
     prj.clear();
