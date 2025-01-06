@@ -90,6 +90,10 @@ impl BuildArgs {
             config = self.load_config();
         }
 
+        if self.zk_detect_missing_libraries {
+            config.zksync.zk_detect_missing_libraries = true;
+        }
+
         if !config.zksync.should_compile() {
             let project = config.project()?;
 
