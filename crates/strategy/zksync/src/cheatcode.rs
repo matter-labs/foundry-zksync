@@ -1,7 +1,7 @@
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{any::TypeId, fs, path::PathBuf, sync::Arc};
 
 use alloy_json_abi::ContractObject;
-use alloy_primitives::{keccak256, map::HashMap, Address, Bytes, FixedBytes, TxKind, B256, U256};
+use alloy_primitives::{keccak256, map::HashMap, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::{
     request::{TransactionInput, TransactionRequest},
     serde_helpers::WithOtherFields,
@@ -15,7 +15,13 @@ use foundry_cheatcodes::{
         EvmCheatcodeInspectorStrategyRunner,
     },
     Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, CommonCreateInput, DealRecord, Ecx, Error, InnerEcx, Result, Vm,
+    CheatsConfig, CheatsCtxt, CommonCreateInput, DealRecord, DynCheatcode, Ecx, Error, InnerEcx,
+    Result,
+    Vm::{
+        self, dealCall, etchCall, getCodeCall, getNonce_0Call, mockCallRevert_0Call,
+        mockCall_0Call, resetNonceCall, rollCall, setNonceCall, setNonceUnsafeCall, warpCall,
+        zkRegisterContractCall, zkUseFactoryDepCall, zkUsePaymasterCall, zkVmCall, zkVmSkipCall,
+    },
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_config::fs_permissions::FsAccessKind;
@@ -244,17 +250,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         Box::new(self.clone())
     }
 
-    fn get_nonce(&self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, address: Address) -> Result<u64> {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.get_nonce(ccx, address);
-        }
-
-        let nonce = foundry_zksync_core::nonce(address, ccx.ecx) as u64;
-        Ok(nonce)
-    }
-
     fn base_contract_deployed(&self, ctx: &mut dyn CheatcodeInspectorStrategyContext) {
         let ctx = get_context(ctx);
 
@@ -264,200 +259,199 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         ctx.zk_persist_nonce_update.persist_next();
     }
 
-    fn cheatcode_get_nonce(
+    fn apply_full(
         &self,
+        cheatcode: &dyn DynCheatcode,
         ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        address: Address,
-    ) -> foundry_cheatcodes::Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            let nonce = self.evm.get_nonce(ccx, address)?;
-            return Ok(nonce.abi_encode());
-        }
-
-        let nonce = foundry_zksync_core::cheatcodes::get_nonce(address, ccx.ecx);
-        Ok(nonce.abi_encode())
-    }
-
-    fn cheatcode_roll(&self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, new_height: U256) -> Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_roll(ccx, new_height);
-        }
-
-        ccx.ecx.env.block.number = new_height;
-        foundry_zksync_core::cheatcodes::roll(new_height, ccx.ecx);
-        Ok(Default::default())
-    }
-
-    fn cheatcode_warp(&self, ccx: &mut CheatsCtxt<'_, '_, '_, '_>, new_timestamp: U256) -> Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_warp(ccx, new_timestamp);
-        }
-
-        ccx.ecx.env.block.number = new_timestamp;
-        foundry_zksync_core::cheatcodes::warp(new_timestamp, ccx.ecx);
-        Ok(Default::default())
-    }
-
-    fn cheatcode_deal(
-        &self,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        address: Address,
-        new_balance: U256,
+        executor: &mut dyn CheatcodesExecutor,
     ) -> Result {
+        fn is<T: std::any::Any>(t: TypeId) -> bool {
+            TypeId::of::<T>() == t
+        }
+
         let ctx = get_context(ccx.state.strategy.context.as_mut());
 
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_deal(ccx, address, new_balance);
+        // Try to downcast the cheatcode to a type that requires special handling.
+        // Note that some cheatcodes are only handled in zkEVM context.
+        // If no handler fires, we use the default execution logic.
+        match cheatcode.as_any().type_id() {
+            t if ctx.using_zk_vm && is::<etchCall>(t) => {
+                let etchCall { target, newRuntimeBytecode } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+                foundry_zksync_core::cheatcodes::etch(*target, newRuntimeBytecode, ccx.ecx);
+                Ok(Default::default())
+            }
+            t if ctx.using_zk_vm && is::<rollCall>(t) => {
+                let &rollCall { newHeight } = cheatcode.as_any().downcast_ref().unwrap();
+                ccx.ecx.env.block.number = newHeight;
+                foundry_zksync_core::cheatcodes::roll(newHeight, ccx.ecx);
+                Ok(Default::default())
+            }
+            t if ctx.using_zk_vm && is::<warpCall>(t) => {
+                let &warpCall { newTimestamp } = cheatcode.as_any().downcast_ref().unwrap();
+                ccx.ecx.env.block.number = newTimestamp;
+                foundry_zksync_core::cheatcodes::warp(newTimestamp, ccx.ecx);
+                Ok(Default::default())
+            }
+            t if ctx.using_zk_vm && is::<dealCall>(t) => {
+                let &dealCall { account, newBalance } = cheatcode.as_any().downcast_ref().unwrap();
+
+                let old_balance =
+                    foundry_zksync_core::cheatcodes::deal(account, newBalance, ccx.ecx);
+                let record = DealRecord { address: account, old_balance, new_balance: newBalance };
+                ccx.state.eth_deals.push(record);
+                Ok(Default::default())
+            }
+            t if ctx.using_zk_vm && is::<resetNonceCall>(t) => {
+                let &resetNonceCall { account } = cheatcode.as_any().downcast_ref().unwrap();
+                foundry_zksync_core::cheatcodes::set_nonce(account, U256::ZERO, ccx.ecx);
+                Ok(Default::default())
+            }
+            t if ctx.using_zk_vm && is::<setNonceCall>(t) => {
+                let &setNonceCall { account, newNonce } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+
+                // nonce must increment only
+                let current = foundry_zksync_core::cheatcodes::get_nonce(account, ccx.ecx);
+                if U256::from(newNonce) < current {
+                    return Err(fmt_err!(
+                        "new nonce ({newNonce}) must be strictly equal to or higher than the \
+                    account's current nonce ({current})"
+                    ));
+                }
+
+                foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(newNonce), ccx.ecx);
+                Ok(Default::default())
+            }
+            t if ctx.using_zk_vm && is::<setNonceUnsafeCall>(t) => {
+                let &setNonceUnsafeCall { account, newNonce } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+                foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(newNonce), ccx.ecx);
+                Ok(Default::default())
+            }
+            t if ctx.using_zk_vm && is::<getNonce_0Call>(t) => {
+                let &getNonce_0Call { account } = cheatcode.as_any().downcast_ref().unwrap();
+
+                let nonce = foundry_zksync_core::cheatcodes::get_nonce(account, ccx.ecx);
+                Ok(nonce.abi_encode())
+            }
+            t if ctx.using_zk_vm && is::<mockCall_0Call>(t) => {
+                let mockCall_0Call { callee, data, returnData } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+
+                let _ = foundry_cheatcodes::make_acc_non_empty(callee, ccx.ecx)?;
+                foundry_zksync_core::cheatcodes::set_mocked_account(*callee, ccx.ecx, ccx.caller);
+                foundry_cheatcodes::mock_call(
+                    ccx.state,
+                    callee,
+                    data,
+                    None,
+                    returnData,
+                    InstructionResult::Return,
+                );
+                Ok(Default::default())
+            }
+            t if ctx.using_zk_vm && is::<mockCallRevert_0Call>(t) => {
+                let mockCallRevert_0Call { callee, data, revertData } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+
+                let _ = make_acc_non_empty(callee, ccx.ecx)?;
+                foundry_zksync_core::cheatcodes::set_mocked_account(*callee, ccx.ecx, ccx.caller);
+                // not calling
+                foundry_cheatcodes::mock_call(
+                    ccx.state,
+                    callee,
+                    data,
+                    None,
+                    revertData,
+                    InstructionResult::Revert,
+                );
+                Ok(Default::default())
+            }
+            t if is::<getCodeCall>(t) => {
+                // We don't need to check for `using_zk_vm` since we pass it to `get_artifact_code`.
+                let getCodeCall { artifactPath } = cheatcode.as_any().downcast_ref().unwrap();
+
+                Ok(get_artifact_code(
+                    &ctx.dual_compiled_contracts,
+                    ctx.using_zk_vm,
+                    &ccx.state.config,
+                    artifactPath,
+                    false,
+                )?
+                .abi_encode())
+            }
+            t if is::<zkVmCall>(t) => {
+                let zkVmCall { enable } = cheatcode.as_any().downcast_ref().unwrap();
+                if *enable {
+                    self.select_zk_vm(ctx, ccx.ecx, None)
+                } else {
+                    self.select_evm(ctx, ccx.ecx);
+                }
+                Ok(Default::default())
+            }
+            t if is::<zkVmSkipCall>(t) => {
+                let zkVmSkipCall { .. } = cheatcode.as_any().downcast_ref().unwrap();
+                let ctx = get_context(ctx);
+                ctx.skip_zk_vm = true;
+                Ok(Default::default())
+            }
+            t if is::<zkUsePaymasterCall>(t) => {
+                let zkUsePaymasterCall { paymaster_address, paymaster_input } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+                ctx.paymaster_params = Some(ZkPaymasterData {
+                    address: *paymaster_address,
+                    input: paymaster_input.clone(),
+                });
+                Ok(Default::default())
+            }
+            t if is::<zkUseFactoryDepCall>(t) => {
+                let zkUseFactoryDepCall { name } = cheatcode.as_any().downcast_ref().unwrap();
+                info!("Adding factory dependency: {:?}", name);
+                ctx.zk_use_factory_deps.push(name.clone());
+                Ok(Default::default())
+            }
+            t if is::<zkRegisterContractCall>(t) => {
+                let zkRegisterContractCall {
+                    name,
+                    evmBytecodeHash,
+                    evmDeployedBytecode,
+                    evmBytecode,
+                    zkBytecodeHash,
+                    zkDeployedBytecode,
+                } = cheatcode.as_any().downcast_ref().unwrap();
+
+                let zk_factory_deps = vec![]; //TODO: add argument to cheatcode
+                let new_contract = DualCompiledContract {
+                    name: name.clone(),
+                    zk_bytecode_hash: H256(zkBytecodeHash.0),
+                    zk_deployed_bytecode: zkDeployedBytecode.to_vec(),
+                    zk_factory_deps,
+                    evm_bytecode_hash: *evmBytecodeHash,
+                    evm_deployed_bytecode: evmDeployedBytecode.to_vec(),
+                    evm_bytecode: evmBytecode.to_vec(),
+                };
+
+                if let Some(existing) = ctx.dual_compiled_contracts.iter().find(|contract| {
+                    contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
+                        contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
+                }) {
+                    warn!(
+                        name = existing.name,
+                        "contract already exists with the given bytecode hashes"
+                    );
+                    return Ok(Default::default())
+                }
+
+                ctx.dual_compiled_contracts.push(new_contract);
+
+                Ok(Default::default())
+            }
+            _ => {
+                // Not custom, just invoke the default behavior
+                cheatcode.dyn_apply(ccx, executor)
+            }
         }
-
-        let old_balance = foundry_zksync_core::cheatcodes::deal(address, new_balance, ccx.ecx);
-        let record = DealRecord { address, old_balance, new_balance };
-        ccx.state.eth_deals.push(record);
-        Ok(Default::default())
-    }
-
-    fn cheatcode_etch(
-        &self,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        target: Address,
-        new_runtime_bytecode: &Bytes,
-    ) -> Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_etch(ccx, target, new_runtime_bytecode);
-        }
-
-        foundry_zksync_core::cheatcodes::etch(target, new_runtime_bytecode, ccx.ecx);
-        Ok(Default::default())
-    }
-
-    fn cheatcode_reset_nonce(
-        &self,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        account: Address,
-    ) -> Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_reset_nonce(ccx, account);
-        }
-
-        foundry_zksync_core::cheatcodes::set_nonce(account, U256::ZERO, ccx.ecx);
-        Ok(Default::default())
-    }
-
-    fn cheatcode_set_nonce(
-        &self,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        account: Address,
-        new_nonce: u64,
-    ) -> Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_set_nonce(ccx, account, new_nonce);
-        }
-
-        // nonce must increment only
-        let current = foundry_zksync_core::cheatcodes::get_nonce(account, ccx.ecx);
-        if U256::from(new_nonce) < current {
-            return Err(fmt_err!(
-                "new nonce ({new_nonce}) must be strictly equal to or higher than the \
-             account's current nonce ({current})"
-            ));
-        }
-
-        foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(new_nonce), ccx.ecx);
-        Ok(Default::default())
-    }
-
-    fn cheatcode_set_nonce_unsafe(
-        &self,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        account: Address,
-        new_nonce: u64,
-    ) -> Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_set_nonce_unsafe(ccx, account, new_nonce);
-        }
-
-        foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(new_nonce), ccx.ecx);
-        Ok(Default::default())
-    }
-
-    fn cheatcode_mock_call(
-        &self,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        callee: Address,
-        data: &Bytes,
-        return_data: &Bytes,
-    ) -> Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_mock_call(ccx, callee, data, return_data);
-        }
-
-        let _ = foundry_cheatcodes::make_acc_non_empty(&callee, ccx.ecx)?;
-        foundry_zksync_core::cheatcodes::set_mocked_account(callee, ccx.ecx, ccx.caller);
-        foundry_cheatcodes::mock_call(
-            ccx.state,
-            &callee,
-            data,
-            None,
-            return_data,
-            InstructionResult::Return,
-        );
-        Ok(Default::default())
-    }
-
-    fn cheatcode_mock_call_revert(
-        &self,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        callee: Address,
-        data: &Bytes,
-        revert_data: &Bytes,
-    ) -> Result {
-        let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-        if !ctx.using_zk_vm {
-            return self.evm.cheatcode_mock_call_revert(ccx, callee, data, revert_data);
-        }
-
-        let _ = make_acc_non_empty(&callee, ccx.ecx)?;
-        foundry_zksync_core::cheatcodes::set_mocked_account(callee, ccx.ecx, ccx.caller);
-        // not calling
-        foundry_cheatcodes::mock_call(
-            ccx.state,
-            &callee,
-            data,
-            None,
-            revert_data,
-            InstructionResult::Revert,
-        );
-        Ok(Default::default())
-    }
-
-    fn get_artifact_code(&self, state: &Cheatcodes, path: &str, deployed: bool) -> Result {
-        let ctx = get_context_ref(state.strategy.context.as_ref());
-
-        Ok(get_artifact_code(
-            &ctx.dual_compiled_contracts,
-            ctx.using_zk_vm,
-            &state.config,
-            path,
-            deployed,
-        )?
-        .abi_encode())
     }
 
     fn record_broadcastable_create_transactions(
@@ -742,77 +736,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 }
 
 impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
-    fn zksync_cheatcode_skip_zkvm(
-        &self,
-        ctx: &mut dyn CheatcodeInspectorStrategyContext,
-    ) -> Result {
-        let ctx = get_context(ctx);
-
-        ctx.skip_zk_vm = true;
-        Ok(Default::default())
-    }
-
-    fn zksync_cheatcode_set_paymaster(
-        &self,
-        ctx: &mut dyn CheatcodeInspectorStrategyContext,
-        paymaster_address: Address,
-        paymaster_input: &Bytes,
-    ) -> Result {
-        let ctx = get_context(ctx);
-
-        ctx.paymaster_params =
-            Some(ZkPaymasterData { address: paymaster_address, input: paymaster_input.clone() });
-        Ok(Default::default())
-    }
-
-    fn zksync_cheatcode_use_factory_deps(
-        &self,
-        ctx: &mut dyn CheatcodeInspectorStrategyContext,
-        name: String,
-    ) -> foundry_cheatcodes::Result {
-        let ctx = get_context(ctx);
-
-        info!("Adding factory dependency: {:?}", name);
-        ctx.zk_use_factory_deps.push(name);
-        Ok(Default::default())
-    }
-
-    fn zksync_cheatcode_register_contract(
-        &self,
-        ctx: &mut dyn CheatcodeInspectorStrategyContext,
-        name: String,
-        zk_bytecode_hash: FixedBytes<32>,
-        zk_deployed_bytecode: Vec<u8>,
-        zk_factory_deps: Vec<Vec<u8>>,
-        evm_bytecode_hash: FixedBytes<32>,
-        evm_deployed_bytecode: Vec<u8>,
-        evm_bytecode: Vec<u8>,
-    ) -> Result {
-        let ctx = get_context(ctx);
-
-        let new_contract = DualCompiledContract {
-            name,
-            zk_bytecode_hash: H256(zk_bytecode_hash.0),
-            zk_deployed_bytecode,
-            zk_factory_deps,
-            evm_bytecode_hash,
-            evm_deployed_bytecode,
-            evm_bytecode,
-        };
-
-        if let Some(existing) = ctx.dual_compiled_contracts.iter().find(|contract| {
-            contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
-                contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
-        }) {
-            warn!(name = existing.name, "contract already exists with the given bytecode hashes");
-            return Ok(Default::default())
-        }
-
-        ctx.dual_compiled_contracts.push(new_contract);
-
-        Ok(Default::default())
-    }
-
     fn zksync_record_create_address(
         &self,
         ctx: &mut dyn CheatcodeInspectorStrategyContext,
@@ -1269,20 +1192,6 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         let ctx = get_context(ctx);
         self.select_fork_vm(ctx, data, fork_id);
     }
-
-    fn zksync_cheatcode_select_zk_vm(
-        &self,
-        ctx: &mut dyn CheatcodeInspectorStrategyContext,
-        data: InnerEcx<'_, '_, '_>,
-        enable: bool,
-    ) {
-        let ctx = get_context(ctx);
-        if enable {
-            self.select_zk_vm(ctx, data, None)
-        } else {
-            self.select_evm(ctx, data);
-        }
-    }
 }
 
 impl ZksyncCheatcodeInspectorStrategyRunner {
@@ -1681,10 +1590,4 @@ fn get_context(
     ctx: &mut dyn CheatcodeInspectorStrategyContext,
 ) -> &mut ZksyncCheatcodeInspectorStrategyContext {
     ctx.as_any_mut().downcast_mut().expect("expected ZksyncCheatcodeInspectorStrategyContext")
-}
-
-fn get_context_ref(
-    ctx: &dyn CheatcodeInspectorStrategyContext,
-) -> &ZksyncCheatcodeInspectorStrategyContext {
-    ctx.as_any_ref().downcast_ref().expect("expected ZksyncCheatcodeInspectorStrategyContext")
 }

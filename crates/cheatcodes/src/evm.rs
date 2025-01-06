@@ -7,7 +7,7 @@ use crate::{
 };
 use alloy_consensus::TxEnvelope;
 use alloy_genesis::{Genesis, GenesisAccount};
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
 use foundry_common::fs::{read_json_file, write_json_file};
@@ -18,7 +18,7 @@ use foundry_evm_core::{
 };
 use foundry_evm_traces::StackSnapshotType;
 use rand::Rng;
-use revm::primitives::{Account, SpecId};
+use revm::primitives::{Account, Bytecode, SpecId, KECCAK_EMPTY};
 use std::{collections::BTreeMap, path::Path};
 mod record_debug_step;
 use record_debug_step::{convert_call_trace_to_debug_step, flatten_call_trace};
@@ -63,8 +63,7 @@ impl Cheatcode for addrCall {
 impl Cheatcode for getNonce_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
-
-        ccx.state.strategy.runner.clone().cheatcode_get_nonce(ccx, *account)
+        get_nonce(ccx, account)
     }
 }
 
@@ -350,7 +349,8 @@ impl Cheatcode for getBlobhashesCall {
 impl Cheatcode for rollCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newHeight } = self;
-        ccx.state.strategy.runner.clone().cheatcode_roll(ccx, *newHeight)
+        ccx.ecx.env.block.number = *newHeight;
+        Ok(Default::default())
     }
 }
 
@@ -372,7 +372,8 @@ impl Cheatcode for txGasPriceCall {
 impl Cheatcode for warpCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newTimestamp } = self;
-        ccx.state.strategy.runner.clone().cheatcode_warp(ccx, *newTimestamp)
+        ccx.ecx.env.block.timestamp = *newTimestamp;
+        Ok(Default::default())
     }
 }
 
@@ -407,7 +408,11 @@ impl Cheatcode for dealCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account: address, newBalance: new_balance } = *self;
 
-        ccx.state.strategy.runner.clone().cheatcode_deal(ccx, address, new_balance)
+        let account = journaled_account(ccx.ecx, address)?;
+        let old_balance = std::mem::replace(&mut account.info.balance, new_balance);
+        let record = DealRecord { address, old_balance, new_balance };
+        ccx.state.eth_deals.push(record);
+        Ok(Default::default())
     }
 }
 
@@ -415,14 +420,26 @@ impl Cheatcode for etchCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { target, newRuntimeBytecode } = self;
 
-        ccx.state.strategy.runner.clone().cheatcode_etch(ccx, *target, newRuntimeBytecode)
+        ensure_not_precompile!(&target, ccx);
+        ccx.ecx.load_account(*target)?;
+        let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(newRuntimeBytecode));
+        ccx.ecx.journaled_state.set_code(*target, bytecode);
+        Ok(Default::default())
     }
 }
 
 impl Cheatcode for resetNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
-        ccx.state.strategy.runner.clone().cheatcode_reset_nonce(ccx, *account)
+        let account = journaled_account(ccx.ecx, *account)?;
+        // Per EIP-161, EOA nonces start at 0, but contract nonces
+        // start at 1. Comparing by code_hash instead of code
+        // to avoid hitting the case where account's code is None.
+        let empty = account.info.code_hash == KECCAK_EMPTY;
+        let nonce = if empty { 0 } else { 1 };
+        account.info.nonce = nonce;
+        debug!(target: "cheatcodes", nonce, "reset");
+        Ok(Default::default())
     }
 }
 
@@ -430,7 +447,16 @@ impl Cheatcode for setNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
 
-        ccx.state.strategy.runner.clone().cheatcode_set_nonce(ccx, account, newNonce)
+        let account = journaled_account(ccx.ecx, account)?;
+        // nonce must increment only
+        let current = account.info.nonce;
+        ensure!(
+            newNonce >= current,
+            "new nonce ({newNonce}) must be strictly equal to or higher than the \
+             account's current nonce ({current})"
+        );
+        account.info.nonce = newNonce;
+        Ok(Default::default())
     }
 }
 
@@ -438,7 +464,9 @@ impl Cheatcode for setNonceUnsafeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
 
-        ccx.state.strategy.runner.clone().cheatcode_set_nonce_unsafe(ccx, account, newNonce)
+        let account = journaled_account(ccx.ecx, account)?;
+        account.info.nonce = newNonce;
+        Ok(Default::default())
     }
 }
 
