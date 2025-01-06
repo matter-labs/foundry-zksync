@@ -206,32 +206,6 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
     ) {
         self.farcall_handler.track_call_actions(&state, &data);
 
-        // Checks contract calls for expectCall cheatcode
-        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let current = state.vm_local_state.callstack.current;
-            if let Some(expected_calls_for_target) =
-                self.expected_calls.get_mut(&current.code_address.to_address())
-            {
-                let calldata = get_calldata(&state, memory);
-                // Match every partial/full calldata
-                for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
-                    // Increment actual times seen if...
-                    // The calldata is at most, as big as this call's input, and
-                    if expected_calldata.len() <= calldata.len() &&
-                    // Both calldata match, taking the length of the assumed smaller one (which will have at least the selector), and
-                    *expected_calldata == calldata[..expected_calldata.len()] &&
-                    // The value matches, if provided
-                    expected
-                        .value
-                        .map_or(true, |value|{
-                             value == rU256::from(current.context_u128_value)})
-                    {
-                        *actual_count += 1;
-                    }
-                }
-            }
-        }
-
         // Handle mocked calls
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
