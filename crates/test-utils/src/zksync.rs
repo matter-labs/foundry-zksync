@@ -142,15 +142,8 @@ impl ZkSyncNode {
         };
         let block_sealer = BlockSealer::new(sealing_mode);
 
-        let node: InMemoryNode = InMemoryNode::new(
-            None,
-            None,
-            &config,
-            time,
-            impersonation,
-            pool,
-            block_sealer,
-        );
+        let node: InMemoryNode =
+            InMemoryNode::new(None, None, &config, time, impersonation, pool, block_sealer);
 
         for wallet in LEGACY_RICH_WALLETS.iter() {
             let address = wallet.0;
@@ -181,7 +174,7 @@ impl ZkSyncNode {
                 let server = server_builder.build(SocketAddr::from(([0, 0, 0, 0], 0))).await;
 
                 // if no receiver was ready to receive the spawning thread died
-                _ = port_tx.send(0);
+                _ = port_tx.send(8011);
 
                 let handle = server.run();
 
