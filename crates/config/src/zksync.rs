@@ -46,9 +46,8 @@ pub struct ZkSyncConfig {
     pub force_evmla: bool,
 
     pub llvm_options: Vec<String>,
+    
     /// Detect missing libraries, instead of erroring
-    ///
-    /// Currently unused
     pub detect_missing_libraries: bool,
 
     /// Enable optimizer for zkSync
