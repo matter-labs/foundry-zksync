@@ -46,9 +46,9 @@ pub struct ZkSyncConfig {
     pub force_evmla: bool,
 
     pub llvm_options: Vec<String>,
-    
+
     /// Detect missing libraries, instead of erroring
-    pub detect_missing_libraries: bool,
+    pub zk_detect_missing_libraries: bool,
 
     /// Enable optimizer for zkSync
     pub optimizer: bool,
@@ -77,7 +77,7 @@ impl Default for ZkSyncConfig {
             fallback_oz: Default::default(),
             enable_eravm_extensions: Default::default(),
             force_evmla: Default::default(),
-            detect_missing_libraries: Default::default(),
+            zk_detect_missing_libraries: Default::default(),
             llvm_options: Default::default(),
             optimizer: true,
             optimizer_mode: '3',
@@ -123,7 +123,7 @@ impl ZkSyncConfig {
             via_ir: Some(via_ir),
             // Set in project paths.
             remappings: Vec::new(),
-            detect_missing_libraries: self.detect_missing_libraries,
+            zk_detect_missing_libraries: self.zk_detect_missing_libraries,
             enable_eravm_extensions: self.enable_eravm_extensions,
             force_evmla: self.force_evmla,
             llvm_options: self.llvm_options.clone(),

@@ -198,7 +198,7 @@ forgetest_init!(test_zk_build_missing_libraries_as_arg, |prj, cmd| {
 });
 
 forgetest_init!(test_zk_build_missing_libraries_as_config, |prj, cmd| {
-    let zk = ZkSyncConfig { detect_missing_libraries: true, ..Default::default() };
+    let zk = ZkSyncConfig { zk_detect_missing_libraries: true, ..Default::default() };
     prj.write_config(Config { zksync: zk, ..Default::default() });
     cmd.args(["build", "--zksync", "--zk-detect-missing-libraries"]).assert_success();
 });

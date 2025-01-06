@@ -68,7 +68,7 @@ pub struct BuildArgs {
 
     /// Detect missing libraries, instead of erroring
     #[clap(long = "zk-detect-missing-libraries", group = "build")]
-    pub detect_missing_libraries: bool,
+    pub zk_detect_missing_libraries: bool,
 
     #[command(flatten)]
     #[serde(flatten)]
@@ -213,8 +213,8 @@ impl Provider for BuildArgs {
             dict.insert("ignore_eip_3860".to_string(), true.into());
         }
 
-        if self.detect_missing_libraries {
-            dict.insert("detect_missing_libraries".to_string(), true.into());
+        if self.zk_detect_missing_libraries {
+            dict.insert("zk_detect_missing_libraries".to_string(), true.into());
         }
 
         Ok(Map::from([(Config::selected_profile(), dict)]))
