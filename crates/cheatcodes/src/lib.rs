@@ -96,12 +96,14 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
     }
 }
 
-pub(crate) trait DynCheatcode: 'static {
+pub trait DynCheatcode: 'static + std::any::Any {
     fn cheatcode(&self) -> &'static spec::Cheatcode<'static>;
 
     fn as_debug(&self) -> &dyn std::fmt::Debug;
 
     fn dyn_apply(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result;
+
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl<T: Cheatcode> DynCheatcode for T {
@@ -118,6 +120,11 @@ impl<T: Cheatcode> DynCheatcode for T {
     #[inline]
     fn dyn_apply(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         self.apply_full(ccx, executor)
+    }
+
+    #[inline]
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

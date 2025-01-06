@@ -12,67 +12,42 @@ pub(crate) mod assume;
 pub(crate) mod expect;
 
 impl Cheatcode for zkVmCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        let Self { enable } = *self;
-
-        ccx.state.strategy.runner.zksync_cheatcode_select_zk_vm(
-            ccx.state.strategy.context.as_mut(),
-            ccx.ecx,
-            enable,
-        );
-
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
         Ok(Default::default())
     }
 }
 
 impl Cheatcode for zkVmSkipCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        ccx.state.strategy.runner.zksync_cheatcode_skip_zkvm(ccx.state.strategy.context.as_mut())
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
     }
 }
 
 impl Cheatcode for zkUsePaymasterCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        let Self { paymaster_address, paymaster_input } = self;
-        ccx.state.strategy.runner.zksync_cheatcode_set_paymaster(
-            ccx.state.strategy.context.as_mut(),
-            *paymaster_address,
-            paymaster_input,
-        )
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
     }
 }
 
 impl Cheatcode for zkUseFactoryDepCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        let Self { name } = self;
-        ccx.state
-            .strategy
-            .runner
-            .zksync_cheatcode_use_factory_deps(ccx.state.strategy.context.as_mut(), name.clone())
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
     }
 }
 
 impl Cheatcode for zkRegisterContractCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        let Self {
-            name,
-            evmBytecodeHash,
-            evmDeployedBytecode,
-            evmBytecode,
-            zkBytecodeHash,
-            zkDeployedBytecode,
-        } = self;
-
-        ccx.state.strategy.runner.zksync_cheatcode_register_contract(
-            ccx.state.strategy.context.as_mut(),
-            name.clone(),
-            zkBytecodeHash.0.into(),
-            zkDeployedBytecode.to_vec(),
-            vec![], //TODO: add argument to cheatcode
-            *evmBytecodeHash,
-            evmDeployedBytecode.to_vec(),
-            evmBytecode.to_vec(),
-        )
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
     }
 }
 
