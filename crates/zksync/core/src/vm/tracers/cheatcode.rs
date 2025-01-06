@@ -117,6 +117,8 @@ pub struct CallContext {
     pub msg_sender: Address,
     /// Target contract's address.
     pub contract: Address,
+    /// Target contract's input (if CALL).
+    pub input: Option<Bytes>,
     /// Delegated contract's address. This is used
     /// to override `address(this)` for delegate calls.
     pub delegate_as: Option<Address>,
@@ -205,6 +207,46 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
         storage: StoragePtr<S>,
     ) {
         self.farcall_handler.track_call_actions(&state, &data);
+
+        // Checks contract calls for expectCall cheatcode
+        if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+            let current = state.vm_local_state.callstack.current;
+            if let Some(expected_calls_for_target) =
+                self.expected_calls.get_mut(&current.code_address.to_address())
+            {
+                let calldata = get_calldata(&state, memory);
+
+                // We skip recording the base call that initiated this transaction for `expectCall`,
+                // as it's already recorded in revm when the call was made.
+                let is_base_call = self
+                    .call_context
+                    .input
+                    .as_ref()
+                    .map(|input| input.0.to_vec() == calldata)
+                    .unwrap_or_default();
+
+                if !is_base_call {
+                    // Match every partial/full calldata
+                    for (expected_calldata, (expected, actual_count)) in expected_calls_for_target {
+                        // Increment actual times seen if...
+                        // The calldata is at most, as big as this call's input, and
+                        if expected_calldata.len() <= calldata.len() &&
+                        // Both calldata match, taking the length of the assumed smaller one (which will have at least the selector), and
+                        *expected_calldata == calldata[..expected_calldata.len()] &&
+                        // The value matches, if provided
+                        expected
+                            .value
+                            .map_or(true, |value|{
+                                value == rU256::from(current.context_u128_value)})
+                        {
+                            *actual_count += 1;
+                        }
+                    }
+                } else {
+                    trace!("skip recording base call in zkEVM for expectCall cheatcode");
+                }
+            }
+        }
 
         // Handle mocked calls
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
