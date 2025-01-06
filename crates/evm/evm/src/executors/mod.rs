@@ -15,7 +15,6 @@ use alloy_primitives::{
     map::{AddressHashMap, HashMap},
     Address, Bytes, Log, U256,
 };
-use alloy_serde::OtherFields;
 use alloy_sol_types::{sol, SolCall};
 use foundry_evm_core::{
     backend::{Backend, BackendError, BackendResult, CowBackend, DatabaseExt, GLOBAL_FAIL_SLOT},
@@ -25,6 +24,7 @@ use foundry_evm_core::{
     },
     decode::{RevertDecoder, SkipReason},
     utils::StateChangeset,
+    InspectorExt,
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
@@ -36,7 +36,10 @@ use revm::{
         ResultAndState, SignedAuthorization, SpecId, TxEnv, TxKind,
     },
 };
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    time::{Duration, Instant},
+};
 use strategy::ExecutorStrategy;
 
 mod builder;
@@ -86,14 +89,12 @@ pub struct Executor {
     pub env: EnvWithHandlerCfg,
     /// The Revm inspector stack.
     pub inspector: InspectorStack,
-    /// The gas limit for calls and deployments. This is different from the gas limit imposed by
-    /// the passed in environment, as those limits are used by the EVM for certain opcodes like
-    /// `gaslimit`.
+    /// The gas limit for calls and deployments.
     gas_limit: u64,
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
 
-    strategy: ExecutorStrategy,
+    pub strategy: ExecutorStrategy,
 }
 
 impl Clone for Executor {
@@ -189,6 +190,36 @@ impl Executor {
         self.env.spec_id()
     }
 
+    /// Sets the EVM spec ID.
+    pub fn set_spec_id(&mut self, spec_id: SpecId) {
+        self.env.handler_cfg.spec_id = spec_id;
+    }
+
+    /// Returns the gas limit for calls and deployments.
+    ///
+    /// This is different from the gas limit imposed by the passed in environment, as those limits
+    /// are used by the EVM for certain opcodes like `gaslimit`.
+    pub fn gas_limit(&self) -> u64 {
+        self.gas_limit
+    }
+
+    /// Sets the gas limit for calls and deployments.
+    pub fn set_gas_limit(&mut self, gas_limit: u64) {
+        self.gas_limit = gas_limit;
+    }
+
+    /// Returns whether `failed()` should be called on the test contract to determine if the test
+    /// failed.
+    pub fn legacy_assertions(&self) -> bool {
+        self.legacy_assertions
+    }
+
+    /// Sets whether `failed()` should be called on the test contract to determine if the test
+    /// failed.
+    pub fn set_legacy_assertions(&mut self, legacy_assertions: bool) {
+        self.legacy_assertions = legacy_assertions;
+    }
+
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
     pub fn deploy_create2_deployer(&mut self) -> eyre::Result<()> {
         trace!("deploying local create2 deployer");
@@ -198,7 +229,7 @@ impl Executor {
             .ok_or_else(|| BackendError::MissingAccount(DEFAULT_CREATE2_DEPLOYER))?;
 
         // If the deployer is not currently deployed, deploy the default one.
-        if create2_deployer_account.code.map_or(true, |code| code.is_empty()) {
+        if create2_deployer_account.code.is_none_or(|code| code.is_empty()) {
             let creator = DEFAULT_CREATE2_DEPLOYER_DEPLOYER;
 
             // Probably 0, but just in case.
@@ -253,14 +284,8 @@ impl Executor {
     }
 
     #[inline]
-    pub fn set_gas_limit(&mut self, gas_limit: u64) -> &mut Self {
-        self.gas_limit = gas_limit;
-        self
-    }
-
-    #[inline]
-    pub fn set_transaction_other_fields(&mut self, other_fields: OtherFields) {
-        self.strategy.runner.set_inspect_context(self.strategy.context.as_mut(), other_fields);
+    pub fn create2_deployer(&self) -> Address {
+        self.inspector().create2_deployer()
     }
 
     /// Deploys a contract and commits the new state to the underlying database.
@@ -438,15 +463,12 @@ impl Executor {
     pub fn call_with_env(&self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector().clone();
         let mut backend = CowBackend::new_borrowed(self.backend());
-        // this is a new call to inspect with a new env, so even if we've cloned the backend
-        // already, we reset the initialized state
-        backend.is_initialized = false;
-        backend.spec_id = env.spec_id();
 
-        let result = self.strategy.runner.call_inspect(
+        let result = self.strategy.runner.call(
             self.strategy.context.as_ref(),
             &mut backend,
             &mut env,
+            &self.env,
             &mut inspector,
         )?;
 
@@ -463,9 +485,8 @@ impl Executor {
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
-        backend.initialize(&env);
 
-        let result_and_state = self.strategy.runner.transact_inspect(
+        let result_and_state = self.strategy.runner.transact(
             self.strategy.context.as_mut(),
             backend,
             &mut env,
@@ -733,8 +754,12 @@ pub enum EvmError {
     #[error("{_0}")]
     Skip(SkipReason),
     /// Any other error.
-    #[error(transparent)]
-    Eyre(eyre::Error),
+    #[error("{}", foundry_common::errors::display_chain(.0))]
+    Eyre(
+        #[from]
+        #[source]
+        eyre::Report,
+    ),
 }
 
 impl From<ExecutionErr> for EvmError {
@@ -746,16 +771,6 @@ impl From<ExecutionErr> for EvmError {
 impl From<alloy_sol_types::Error> for EvmError {
     fn from(err: alloy_sol_types::Error) -> Self {
         Self::Abi(err.into())
-    }
-}
-
-impl From<eyre::Error> for EvmError {
-    fn from(err: eyre::Report) -> Self {
-        let mut chained_cause = String::new();
-        for cause in err.chain() {
-            chained_cause.push_str(format!("{cause}; ").as_str());
-        }
-        Self::Eyre(eyre::format_err!("{chained_cause}"))
     }
 }
 
@@ -1003,4 +1018,21 @@ fn convert_executed_result(
         out,
         chisel_state,
     })
+}
+
+/// Timer for a fuzz test.
+pub struct FuzzTestTimer {
+    /// Inner fuzz test timer - (test start time, test duration).
+    inner: Option<(Instant, Duration)>,
+}
+
+impl FuzzTestTimer {
+    pub fn new(timeout: Option<u32>) -> Self {
+        Self { inner: timeout.map(|timeout| (Instant::now(), Duration::from_secs(timeout.into()))) }
+    }
+
+    /// Whether the current fuzz test timed out and should be stopped.
+    pub fn is_timed_out(&self) -> bool {
+        self.inner.is_some_and(|(start, duration)| start.elapsed() > duration)
+    }
 }

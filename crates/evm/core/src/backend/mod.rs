@@ -7,7 +7,6 @@ use crate::{
     utils::{configure_tx_env, configure_tx_req_env, new_evm_with_inspector},
     InspectorExt,
 };
-use alloy_consensus::Transaction as TransactionTrait;
 use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
 use alloy_primitives::{keccak256, map::HashMap, uint, Address, B256, U256};
@@ -22,11 +21,12 @@ use revm::{
     precompile::{PrecompileSpecId, Precompiles},
     primitives::{
         Account, AccountInfo, BlobExcessGasAndPrice, Bytecode, Env, EnvWithHandlerCfg, EvmState,
-        EvmStorageSlot, HashMap as Map, Log, SpecId, KECCAK_EMPTY,
+        EvmStorageSlot, HashMap as Map, Log, ResultAndState, SpecId, KECCAK_EMPTY,
     },
     Database, DatabaseCommit, JournaledState,
 };
 use std::{
+    any::Any,
     collections::{BTreeMap, HashSet},
     time::Instant,
 };
@@ -773,9 +773,24 @@ impl Backend {
     /// Initializes settings we need to keep track of.
     ///
     /// We need to track these mainly to prevent issues when switching between different evms
-    pub fn initialize(&mut self, env: &EnvWithHandlerCfg) {
+    pub(crate) fn initialize(&mut self, env: &EnvWithHandlerCfg) {
         self.set_caller(env.tx.caller);
         self.set_spec_id(env.handler_cfg.spec_id);
+    }
+
+    /// Executes the configured test call of the `env` without committing state changes.
+    ///
+    /// Note: in case there are any cheatcodes executed that modify the environment, this will
+    /// update the given `env` with the new values.
+    #[instrument(name = "inspect", level = "debug", skip_all)]
+    pub fn inspect<I: InspectorExt>(
+        &mut self,
+        env: &mut EnvWithHandlerCfg,
+        inspector: &mut I,
+        inspect_ctx: Box<dyn Any>,
+    ) -> eyre::Result<ResultAndState> {
+        self.initialize(env);
+        self.strategy.runner.clone().inspect(self, env, inspector, inspect_ctx)
     }
 
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
@@ -1945,12 +1960,6 @@ fn commit_transaction(
     persistent_accounts: &HashSet<Address>,
     inspector: &mut dyn InspectorExt,
 ) -> eyre::Result<()> {
-    // TODO: Remove after https://github.com/foundry-rs/foundry/pull/9131
-    // if the tx has the blob_versioned_hashes field, we assume it's a Cancun block
-    if tx.blob_versioned_hashes().is_some() {
-        env.handler_cfg.spec_id = SpecId::CANCUN;
-    }
-
     configure_tx_env(&mut env.env, tx);
 
     let now = Instant::now();

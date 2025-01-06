@@ -15,7 +15,9 @@ impl Cheatcode for clearMockedCallsCall {
 impl Cheatcode for mockCall_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, returnData } = self;
-        ccx.state.strategy.runner.clone().cheatcode_mock_call(ccx, *callee, data, returnData)
+        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        mock_call(ccx.state, callee, data, None, returnData, InstructionResult::Return);
+        Ok(Default::default())
     }
 }
 
@@ -83,7 +85,10 @@ impl Cheatcode for mockCalls_1Call {
 impl Cheatcode for mockCallRevert_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, revertData } = self;
-        ccx.state.strategy.runner.clone().cheatcode_mock_call_revert(ccx, *callee, data, revertData)
+
+        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        mock_call(ccx.state, callee, data, None, revertData, InstructionResult::Revert);
+        Ok(Default::default())
     }
 }
 
@@ -173,7 +178,7 @@ fn mock_calls(
 pub fn make_acc_non_empty(callee: &Address, ecx: InnerEcx) -> Result {
     let acc = ecx.load_account(*callee)?;
 
-    let empty_bytecode = acc.info.code.as_ref().map_or(true, Bytecode::is_empty);
+    let empty_bytecode = acc.info.code.as_ref().is_none_or(Bytecode::is_empty);
     if empty_bytecode {
         let code = Bytecode::new_raw(Bytes::from_static(&foundry_zksync_core::EMPTY_CODE));
         ecx.journaled_state.set_code(*callee, code);
