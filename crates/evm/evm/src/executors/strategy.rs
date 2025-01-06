@@ -7,7 +7,7 @@ use foundry_cheatcodes::strategy::{
     CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategyRunner,
 };
 use foundry_evm_core::backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend};
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, ResultAndState},
     DatabaseRef,

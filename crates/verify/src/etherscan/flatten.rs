@@ -13,14 +13,11 @@ use foundry_compilers::{
         Compiler, CompilerInput,
     },
     solc::{CliSettings, Solc},
-    zksolc::{
-        input::{ZkSolcInput, ZkSolcVersionedInput},
-        ZkSolc, ZkSolcCompiler,
-    },
-    zksync::{
-        compile::output::AggregatedCompilerOutput as ZkAggregatedCompilerOutput, raw_build_info_new,
-    },
     AggregatedCompilerOutput,
+};
+use foundry_zksync_compilers::compilers::zksolc::{
+    input::{ZkSolcInput, ZkSolcVersionedInput},
+    ZkSolc, ZkSolcCompiler,
 };
 use semver::{BuildMetadata, Version};
 use std::path::Path;
@@ -74,7 +71,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
         let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
 
         eyre::ensure!(
-            bch == foundry_compilers::zksolc::settings::BytecodeHash::Keccak256,
+            bch == foundry_zksync_compilers::compilers::zksolc::settings::BytecodeHash::Keccak256,
             "When using flattened source with zksync, bytecodeHash must be set to keccak256 because Etherscan uses Keccak256 in its Compiler Settings when re-compiling your code. BytecodeHash is currently: {}. Hint: Set the bytecodeHash key in your foundry.toml :)",
             bch,
         );
@@ -203,12 +200,12 @@ Diagnostics: {diags}",
         };
 
         let zksolc_compiler = ZkSolcCompiler { zksolc: zksolc_path, solc: solc_compiler };
-        let zksolc = zksolc_compiler.zksolc(&input)?;
 
-        let out = zksolc.compile(&input.input)?;
-        if out.has_error() {
-            let mut o = ZkAggregatedCompilerOutput::default();
-            o.extend(solc_version, raw_build_info_new(&input, &out, false)?, "default", out);
+        let out = zksolc_compiler.compile(&input)?;
+        if out.errors.iter().any(|e| e.is_error()) {
+            let mut o: AggregatedCompilerOutput<ZkSolcCompiler> =
+                AggregatedCompilerOutput::default();
+            o.extend(solc_version, RawBuildInfo::new(&input, &out, false)?, "default", out);
             let diags = o.diagnostics(&[], &[], Default::default());
 
             eyre::bail!(

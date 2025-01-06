@@ -33,7 +33,9 @@ use foundry_evm_core::{
     backend::DatabaseExt,
     constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH},
 };
-use foundry_zksync_compiler::{ContractType, DualCompiledContract, DualCompiledContracts};
+use foundry_zksync_compilers::dual_compiled_contracts::{
+    ContractType, DualCompiledContract, DualCompiledContracts,
+};
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key,

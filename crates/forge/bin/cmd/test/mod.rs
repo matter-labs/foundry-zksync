@@ -12,9 +12,9 @@ use forge::{
         debug::{ContractSources, DebugTraceIdentifier},
         decode_trace_arena, folded_stack_trace,
         identifier::SignaturesIdentifier,
-        render_trace_arena, CallTraceDecoderBuilder, InternalTraceMode, TraceKind,
+        CallTraceDecoderBuilder, InternalTraceMode, TraceKind,
     },
-    MultiContractRunner, MultiContractRunnerBuilder, TestFilter, TestOptions, TestOptionsBuilder,
+    MultiContractRunner, MultiContractRunnerBuilder, TestFilter,
 };
 use foundry_cli::{
     opts::{CoreBuildArgs, GlobalOpts},
@@ -23,7 +23,10 @@ use foundry_cli::{
 use foundry_common::{compile::ProjectCompiler, evm::EvmArgs, fs, shell, TestFunctionExt};
 use foundry_compilers::{
     artifacts::output_selection::OutputSelection,
-    compilers::{multi::MultiCompilerLanguage, Language},
+    compilers::{
+        multi::{MultiCompiler, MultiCompilerLanguage},
+        Language,
+    },
     utils::source_files_iter,
     ProjectCompileOutput,
 };
@@ -34,11 +37,11 @@ use foundry_config::{
         Metadata, Profile, Provider,
     },
     filter::GlobMatcher,
-    get_available_profiles, Config,
+    Config,
 };
 use foundry_debugger::Debugger;
 use foundry_evm::traces::identifier::TraceIdentifiers;
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -51,16 +54,13 @@ use yansi::Paint;
 
 mod filter;
 mod summary;
-
-use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
-use summary::TestSummaryReporter;
-
-use crate::cmd::test::summary::print_invariant_metrics;
 pub use filter::FilterArgs;
-use forge::result::TestKind;
+use forge::{result::TestKind, traces::render_trace_arena_inner};
+use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
+use summary::{print_invariant_metrics, TestSummaryReport};
 
 // Loads project's figment and merges the build cli arguments into it
-foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_opts);
+foundry_config::merge_impl_figment_convert!(TestArgs, opts, evm_args);
 
 /// CLI arguments for `forge test`.
 #[derive(Clone, Debug, Parser)]
@@ -80,7 +80,7 @@ pub struct TestArgs {
     ///
     /// If the matching test is a fuzz test, then it will open the debugger on the first failure
     /// case. If the fuzz test does not fail, it will open the debugger on the last fuzz case.
-    #[arg(long, value_name = "DEPRECATED_TEST_FUNCTION_REGEX")]
+    #[arg(long, conflicts_with_all = ["flamegraph", "flamechart", "decode_internal", "rerun"], value_name = "DEPRECATED_TEST_FUNCTION_REGEX")]
     debug: Option<Option<Regex>>,
 
     /// Generate a flamegraph for a single test. Implies `--decode-internal`.
@@ -124,7 +124,7 @@ pub struct TestArgs {
     allow_failure: bool,
 
     /// Output test results as JUnit XML report.
-    #[arg(long, conflicts_with_all = ["quiet", "json", "gas_report"], help_heading = "Display options")]
+    #[arg(long, conflicts_with_all = ["quiet", "json", "gas_report", "summary", "list", "show_progress"], help_heading = "Display options")]
     pub junit: bool,
 
     /// Stop running tests after the first failure.
@@ -136,7 +136,7 @@ pub struct TestArgs {
     etherscan_api_key: Option<String>,
 
     /// List tests instead of running them.
-    #[arg(long, short, help_heading = "Display options")]
+    #[arg(long, short, conflicts_with_all = ["show_progress", "decode_internal", "summary"], help_heading = "Display options")]
     list: bool,
 
     /// Set seed used to generate randomness during your fuzz runs.
@@ -146,12 +146,16 @@ pub struct TestArgs {
     #[arg(long, env = "FOUNDRY_FUZZ_RUNS", value_name = "RUNS")]
     pub fuzz_runs: Option<u64>,
 
+    /// Timeout for each fuzz run in seconds.
+    #[arg(long, env = "FOUNDRY_FUZZ_TIMEOUT", value_name = "TIMEOUT")]
+    pub fuzz_timeout: Option<u64>,
+
     /// File to rerun fuzz failures from.
     #[arg(long)]
     pub fuzz_input_file: Option<String>,
 
     /// Show test execution progress.
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["quiet", "json"], help_heading = "Display options")]
     pub show_progress: bool,
 
     #[command(flatten)]
@@ -163,7 +167,7 @@ pub struct TestArgs {
     pub rerun: bool,
 
     #[command(flatten)]
-    evm_opts: EvmArgs,
+    evm_args: EvmArgs,
 
     #[command(flatten)]
     opts: CoreBuildArgs,
@@ -282,15 +286,14 @@ impl TestArgs {
             config.invariant.gas_report_samples = 0;
         }
 
-        // Set up the project.
-        let mut project = config.project()?;
-
         // Install missing dependencies.
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
             // need to re-configure here to also catch additional remappings
             config = self.load_config();
-            project = config.project()?;
         }
+
+        // Set up the project.
+        let project = config.project()?;
 
         let mut filter = self.filter(&config);
         trace!(target: "forge::test", ?filter, "using filter");
@@ -304,7 +307,7 @@ impl TestArgs {
 
         let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
             let zk_project =
-                foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
 
             let sources_to_compile = self.get_sources_to_compile(&config, &filter)?;
             let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
@@ -320,25 +323,17 @@ impl TestArgs {
 
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;
-        let toml = config.get_config_path();
-        let profiles = get_available_profiles(toml)?;
 
         // Remove the snapshots directory if it exists.
         // This is to ensure that we don't have any stale snapshots.
         // If `FORGE_SNAPSHOT_CHECK` is set, we don't remove the snapshots directory as it is
         // required for comparison.
-        if std::env::var("FORGE_SNAPSHOT_CHECK").is_err() {
+        if std::env::var_os("FORGE_SNAPSHOT_CHECK").is_none() {
             let snapshot_dir = project_root.join(&config.snapshots);
             if snapshot_dir.exists() {
                 let _ = fs::remove_dir_all(project_root.join(&config.snapshots));
             }
         }
-
-        let test_options: TestOptions = TestOptionsBuilder::default()
-            .fuzz(config.fuzz.clone())
-            .invariant(config.invariant.clone())
-            .profiles(profiles)
-            .build(&output, project_root)?;
 
         let should_debug = self.debug.is_some();
         let should_draw = self.flamegraph || self.flamechart;
@@ -380,10 +375,8 @@ impl TestArgs {
             .evm_spec(config.evm_spec_id())
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
-            .with_test_options(test_options.clone())
             .enable_isolation(evm_opts.isolate)
-            .alphanet(evm_opts.alphanet)
-            .build(project_root, output.clone(), zk_output, env, evm_opts, strategy)?;
+            .build::<MultiCompiler>(project_root, &output, zk_output, env, evm_opts, strategy)?;
 
         let mut maybe_override_mt = |flag, maybe_regex: Option<&Option<Regex>>| {
             if let Some(Some(regex)) = maybe_regex {
@@ -497,7 +490,7 @@ impl TestArgs {
         trace!(target: "forge::test", "running all tests");
 
         // If we need to render to a serialized format, we should not print anything else to stdout.
-        let silent = self.gas_report && shell::is_json();
+        let silent = self.gas_report && shell::is_json() || self.summary && shell::is_json();
 
         let num_filtered = runner.matching_test_functions(filter).count();
         if num_filtered != 1 && (self.debug.is_some() || self.flamegraph || self.flamechart) {
@@ -525,7 +518,7 @@ impl TestArgs {
         }
 
         // Run tests in a non-streaming fashion and collect results for serialization.
-        if !self.gas_report && shell::is_json() {
+        if !self.gas_report && !self.summary && shell::is_json() {
             let mut results = runner.test_collect(filter);
             results.values_mut().for_each(|suite_result| {
                 for test_result in suite_result.test_results.values_mut() {
@@ -585,7 +578,7 @@ impl TestArgs {
 
         if self.decode_internal.is_some() {
             let sources =
-                ContractSources::from_project_output(output, &config.root.0, Some(&libraries))?;
+                ContractSources::from_project_output(output, &config.root, Some(&libraries))?;
             builder = builder.with_debug_identifier(DebugTraceIdentifier::new(sources));
         }
         let mut decoder = builder.build();
@@ -635,9 +628,7 @@ impl TestArgs {
                     sh_println!("{}", result.short_result(name))?;
 
                     // Display invariant metrics if invariant kind.
-                    if let TestKind::Invariant { runs: _, calls: _, reverts: _, metrics } =
-                        &result.kind
-                    {
+                    if let TestKind::Invariant { metrics, .. } = &result.kind {
                         print_invariant_metrics(metrics);
                     }
 
@@ -676,7 +667,7 @@ impl TestArgs {
                     // - 0..3: nothing
                     // - 3: only display traces for failed tests
                     // - 4: also display the setup trace for failed tests
-                    // - 5..: display all traces for all tests
+                    // - 5..: display all traces for all tests, including storage changes
                     let should_include = match kind {
                         TraceKind::Execution => {
                             (verbosity == 3 && result.status.is_failure()) || verbosity >= 4
@@ -689,7 +680,7 @@ impl TestArgs {
 
                     if should_include {
                         decode_trace_arena(arena, &decoder).await?;
-                        decoded_traces.push(render_trace_arena(arena));
+                        decoded_traces.push(render_trace_arena_inner(arena, false, verbosity > 4));
                     }
                 }
 
@@ -823,14 +814,13 @@ impl TestArgs {
             outcome.gas_report = Some(finalized);
         }
 
-        if !silent && !outcome.results.is_empty() {
+        if !self.summary && !shell::is_json() {
             sh_println!("{}", outcome.summary(duration))?;
+        }
 
-            if self.summary {
-                let mut summary_table = TestSummaryReporter::new(self.detailed);
-                sh_println!("\n\nTest Summary:")?;
-                summary_table.print_summary(&outcome);
-            }
+        if self.summary && !outcome.results.is_empty() {
+            let summary_report = TestSummaryReport::new(self.detailed, outcome.clone());
+            sh_println!("{}", &summary_report)?;
         }
 
         // Reattach the task.
@@ -893,6 +883,9 @@ impl Provider for TestArgs {
         }
         if let Some(fuzz_runs) = self.fuzz_runs {
             fuzz_dict.insert("runs".to_string(), fuzz_runs.into());
+        }
+        if let Some(fuzz_timeout) = self.fuzz_timeout {
+            fuzz_dict.insert("timeout".to_string(), fuzz_timeout.into());
         }
         if let Some(fuzz_input_file) = self.fuzz_input_file.clone() {
             fuzz_dict.insert("failure_persist_file".to_string(), fuzz_input_file.into());
@@ -1031,7 +1024,7 @@ mod tests {
     fn extract_chain() {
         let test = |arg: &str, expected: Chain| {
             let args = TestArgs::parse_from(["foundry-cli", arg]);
-            assert_eq!(args.evm_opts.env.chain, Some(expected));
+            assert_eq!(args.evm_args.env.chain, Some(expected));
             let (config, evm_opts) = args.load_config_and_evm_opts().unwrap();
             assert_eq!(config.chain, Some(expected));
             assert_eq!(evm_opts.env.chain_id, Some(expected.id()));
@@ -1091,9 +1084,9 @@ contract FooBarTest is DSTest {
             &prj.root().to_string_lossy(),
         ]);
         let outcome = args.run().await.unwrap();
-        let gas_report = outcome.gas_report.unwrap();
+        let gas_report = outcome.gas_report.as_ref().unwrap();
 
-        assert_eq!(gas_report.contracts.len(), 3);
+        assert_eq!(gas_report.contracts.len(), 3, "{}", outcome.summary(Default::default()));
         let call_cnts = gas_report
             .contracts
             .values()

@@ -52,7 +52,7 @@ pub struct CowBackend<'a> {
 
 impl<'a> CowBackend<'a> {
     /// Creates a new `CowBackend` with the given `Backend`.
-    pub fn new(backend: &'a Backend) -> Self {
+    pub fn new_borrowed(backend: &'a Backend) -> Self {
         Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
     }
 
@@ -78,10 +78,6 @@ impl<'a> CowBackend<'a> {
             inspector,
             inspect_ctx,
         )
-    }
-
-    pub fn new_borrowed(backend: &'a Backend) -> Self {
-        Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::LATEST }
     }
 
     /// Returns whether there was a state snapshot failure in the backend.

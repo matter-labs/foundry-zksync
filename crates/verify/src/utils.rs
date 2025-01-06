@@ -16,6 +16,7 @@ use foundry_evm::{
     constants::DEFAULT_CREATE2_DEPLOYER,
     executors::{strategy::ExecutorStrategy, TracingExecutor},
     opts::EvmOpts,
+    traces::TraceMode,
 };
 use reqwest::Url;
 use revm_primitives::{
@@ -330,16 +331,17 @@ pub async fn get_tracing_executor(
     fork_config.fork_block_number = Some(fork_blk_num);
     fork_config.evm_version = evm_version;
 
-    let (env, fork, _chain, is_alphanet) =
+    let create2_deployer = evm_opts.create2_deployer;
+    let (env, fork, _chain, is_odyssey) =
         TracingExecutor::get_fork_material(fork_config, evm_opts).await?;
 
     let executor = TracingExecutor::new(
         env.clone(),
         fork,
         Some(fork_config.evm_version),
-        false,
-        false,
-        is_alphanet,
+        TraceMode::Call,
+        is_odyssey,
+        create2_deployer,
         strategy,
     );
 

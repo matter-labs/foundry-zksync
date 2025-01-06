@@ -1,16 +1,17 @@
 use alloy_primitives::hex;
 use clap::Parser;
-use comfy_table::Table;
+use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Table};
 use eyre::Result;
 use foundry_cli::{
     opts::{CompilerArgs, CoreBuildArgs, ProjectPathsArgs},
-    utils::FoundryPathExt,
+    utils::{cache_local_signatures, FoundryPathExt},
 };
 use foundry_common::{
     compile::{compile_target, ProjectCompiler},
     selectors::{import_selectors, SelectorImportData},
 };
 use foundry_compilers::{artifacts::output_selection::ContractOutputSelection, info::ContractInfo};
+use foundry_config::Config;
 use std::fs::canonicalize;
 
 /// CLI arguments for `forge selectors`.
@@ -67,11 +68,34 @@ pub enum SelectorsSubcommands {
         #[command(flatten)]
         project_paths: ProjectPathsArgs,
     },
+
+    /// Cache project selectors (enables trace with local contracts functions and events).
+    #[command(visible_alias = "c")]
+    Cache {
+        #[command(flatten)]
+        project_paths: ProjectPathsArgs,
+    },
 }
 
 impl SelectorsSubcommands {
     pub async fn run(self) -> Result<()> {
         match self {
+            Self::Cache { project_paths } => {
+                sh_println!("Caching selectors for contracts in the project...")?;
+                let build_args = CoreBuildArgs {
+                    project_paths,
+                    compiler: CompilerArgs {
+                        extra_output: vec![ContractOutputSelection::Abi],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+
+                // compile the project to get the artifacts/abis
+                let project = build_args.project()?;
+                let outcome = ProjectCompiler::new().quiet(true).compile(&project)?;
+                cache_local_signatures(&outcome, Config::foundry_cache_dir().unwrap())?
+            }
             Self::Upload { contract, all, project_paths } => {
                 let build_args = CoreBuildArgs {
                     project_paths: project_paths.clone(),
@@ -174,6 +198,7 @@ impl SelectorsSubcommands {
                     sh_println!("No colliding method selectors between the two contracts.")?;
                 } else {
                     let mut table = Table::new();
+                    table.apply_modifier(UTF8_ROUND_CORNERS);
                     table.set_header([
                         String::from("Selector"),
                         first_contract.name,
@@ -183,7 +208,7 @@ impl SelectorsSubcommands {
                         table.add_row([method.0, method.1, method.2]);
                     }
                     sh_println!("{} collisions found:", colliding_methods.len())?;
-                    sh_println!("{table}")?;
+                    sh_println!("\n{table}\n")?;
                 }
             }
             Self::List { contract, project_paths } => {
@@ -243,6 +268,7 @@ impl SelectorsSubcommands {
                     sh_println!("{contract}")?;
 
                     let mut table = Table::new();
+                    table.apply_modifier(UTF8_ROUND_CORNERS);
 
                     table.set_header(["Type", "Signature", "Selector"]);
 
@@ -264,7 +290,7 @@ impl SelectorsSubcommands {
                         table.add_row(["Error", &sig, &hex::encode_prefixed(selector)]);
                     }
 
-                    sh_println!("{table}")?;
+                    sh_println!("\n{table}\n")?;
 
                     if artifacts.peek().is_some() {
                         sh_println!()?
@@ -296,6 +322,7 @@ impl SelectorsSubcommands {
                     .collect::<Vec<_>>();
 
                 let mut table = Table::new();
+                table.apply_modifier(UTF8_ROUND_CORNERS);
 
                 table.set_header(["Type", "Signature", "Selector", "Contract"]);
 
@@ -341,7 +368,7 @@ impl SelectorsSubcommands {
 
                 if table.row_count() > 0 {
                     sh_println!("\nFound {} instance(s)...", table.row_count())?;
-                    sh_println!("{table}")?;
+                    sh_println!("\n{table}\n")?;
                 } else {
                     return Err(eyre::eyre!("\nSelector not found in the project."));
                 }
