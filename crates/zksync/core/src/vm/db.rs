@@ -78,8 +78,8 @@ where
 
     /// Create a new instance of [ZKEVMData] with system contracts.
     pub fn new_with_system_contracts(ecx: &'a mut EvmContext<DB>, chain_id: L2ChainId) -> Self {
-        let contracts = era_test_node::system_contracts::get_deployed_contracts(
-            &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
+        let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
+            &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
             false,
         );
         let system_context_init_log = get_system_context_init_logs(chain_id);

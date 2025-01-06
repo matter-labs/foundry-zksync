@@ -1,10 +1,9 @@
 use alloy_primitives::{hex, FixedBytes, Log};
-use era_test_node::{
-    config::node::ShowCalls,
-    formatter,
-    system_contracts::{Options, SystemContracts},
-    utils::bytecode_to_factory_dep,
+use anvil_zksync_config::types::SystemContractsOptions;
+use anvil_zksync_core::{
+    formatter, system_contracts::SystemContracts, utils::bytecode_to_factory_dep,
 };
+use anvil_zksync_types::ShowCalls;
 use itertools::Itertools;
 use revm::{
     db::states::StorageSlot,
@@ -19,7 +18,7 @@ use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
 use zksync_multivm::{
     interface::{
-        Call, CallType, ExecutionResult, Halt, InspectExecutionMode, VmEvent,
+        Call, CallType, ExecutionResult, Halt, InspectExecutionMode, TxExecutionMode, VmEvent,
         VmExecutionResultAndLogs, VmFactory, VmInterface, VmRevertReason,
     },
     tracers::CallTracer,
@@ -470,8 +469,12 @@ fn inspect_inner<S: ReadStorage>(
 ) -> InnerZkVmResult {
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
 
-    let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false);
-    let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);
+    let system_contracts =
+        SystemContracts::from_options(&SystemContractsOptions::BuiltInWithoutSecurity, false);
+    let system_env = create_system_env(
+        system_contracts.contracts(TxExecutionMode::VerifyExecute, false).clone(),
+        chain_id,
+    );
 
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env.clone(), system_env, storage.clone());
 
@@ -501,7 +504,7 @@ fn inspect_inner<S: ReadStorage>(
         )
         .into_tracer_pointer(),
     ];
-    let compressed_bytecodes = vm.push_transaction(tx).compressed_bytecodes.into_owned();
+    let compressed_bytecodes = vm.push_transaction(tx.clone()).compressed_bytecodes.into_owned();
     let mut tx_result = vm.inspect(&mut tracers.into(), InspectExecutionMode::OneTx);
 
     let mut call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
@@ -554,8 +557,8 @@ fn inspect_inner<S: ReadStorage>(
         refunded: bootloader_debug.refund_by_operator,
         bootloader_debug,
     };
-
-    formatter::print_vm_details(&tx_result);
+    let mut formatter = formatter::Formatter::new();
+    formatter.print_vm_details(&tx_result);
 
     info!("=== Console Logs: ");
     let log_parser = ConsoleLogParser::new();
@@ -572,13 +575,26 @@ fn inspect_inner<S: ReadStorage>(
     let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
     let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
     info!("=== Calls: ");
-    for call in call_traces.iter() {
-        formatter::print_call(call, 0, &ShowCalls::All, show_outputs, resolve_hashes);
+    let num_calls = call_traces.len();
+    for (i, call) in call_traces.iter().enumerate() {
+        let is_last_sibling = i == num_calls - 1;
+        formatter.print_call(
+            tx.initiator_account(),
+            tx.execute.contract_address,
+            call,
+            is_last_sibling,
+            &ShowCalls::All,
+            show_outputs,
+            resolve_hashes,
+        );
     }
 
     let mut deployed_bytecode_hashes = HashMap::<H160, H256>::default();
     info!("==== {}", format!("{} events", tx_result.logs.events.len()));
-    for event in &tx_result.logs.events {
+    let num_events = tx_result.logs.events.len();
+    for (i, event) in tx_result.logs.events.iter().enumerate() {
+        let is_last = i == num_events - 1;
+
         if event.address == CONTRACT_DEPLOYER_ADDRESS {
             deployed_bytecode_hashes.insert(
                 event.indexed_topics.get(3).cloned().unwrap_or_default().to_h160(),
@@ -586,7 +602,7 @@ fn inspect_inner<S: ReadStorage>(
             );
         }
 
-        formatter::print_event(event, resolve_hashes);
+        formatter.print_event(event, resolve_hashes, is_last);
     }
 
     let bytecodes = compressed_bytecodes

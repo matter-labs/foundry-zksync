@@ -246,7 +246,11 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-era_test_node = { git = "https://github.com/matter-labs/era-test-node.git", rev = "94503847b402f0161c3372d5f357a4cb16a2d66d" }
+anvil-zksync = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil-zksync" }
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil_zksync_core" }
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil_zksync_types" }
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil_zksync_config" }
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil_zksync_api_server" }
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
 zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
