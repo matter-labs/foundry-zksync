@@ -7,7 +7,6 @@ use crate::{
     utils::{configure_tx_env, configure_tx_req_env, new_evm_with_inspector},
     InspectorExt,
 };
-use alloy_consensus::Transaction as TransactionTrait;
 use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
 use alloy_primitives::{keccak256, map::HashMap, uint, Address, B256, U256};
@@ -1961,12 +1960,6 @@ fn commit_transaction(
     persistent_accounts: &HashSet<Address>,
     inspector: &mut dyn InspectorExt,
 ) -> eyre::Result<()> {
-    // TODO: Remove after https://github.com/foundry-rs/foundry/pull/9131
-    // if the tx has the blob_versioned_hashes field, we assume it's a Cancun block
-    if tx.blob_versioned_hashes().is_some() {
-        env.handler_cfg.spec_id = SpecId::CANCUN;
-    }
-
     configure_tx_env(&mut env.env, tx);
 
     let now = Instant::now();

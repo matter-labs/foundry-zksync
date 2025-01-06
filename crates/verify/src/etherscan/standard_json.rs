@@ -58,7 +58,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         _args: &VerifyArgs,
         context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)> {
-        let input = foundry_compilers::zksync::project_standard_json_input(
+        let input = foundry_zksync_compilers::compilers::project_standard_json_input(
             &context.project,
             &context.target_path,
         )
