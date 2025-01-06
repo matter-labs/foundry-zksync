@@ -145,7 +145,7 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
     ) -> Result<ResultAndState> {
         let mut evm = crate::utils::new_evm_with_inspector(backend, env.clone(), inspector);
 
-        let res = evm.transact().wrap_err("backend: failed while inspecting")?;
+        let res = evm.transact().wrap_err("EVM error")?;
 
         env.env = evm.context.evm.inner.env;
 

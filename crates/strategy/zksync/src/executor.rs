@@ -14,7 +14,7 @@ use foundry_evm::{
     },
     inspectors::InspectorStack,
 };
-use foundry_zksync_compiler::DualCompiledContracts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY};
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, ResultAndState},

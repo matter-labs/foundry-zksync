@@ -27,11 +27,12 @@ dirs-next = "2"
 dunce.workspace = true
 eyre.workspace = true
 figment = { workspace = true, features = ["toml", "env"] }
-globset = "0.4"
 glob = "0.3"
+globset = "0.4"
 Inflector = "0.11"
-number_prefix = "0.4"
+itertools.workspace = true
 mesc.workspace = true
+number_prefix = "0.4"
 regex.workspace = true
 reqwest.workspace = true
 semver = { workspace = true, features = ["serde"] }
@@ -44,6 +45,9 @@ toml_edit = "0.22"
 tracing.workspace = true
 walkdir.workspace = true
 yansi.workspace = true
+
+# zksync
+foundry-zksync-compilers.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 path-slash = "0.2"

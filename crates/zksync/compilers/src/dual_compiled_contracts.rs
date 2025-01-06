@@ -6,14 +6,15 @@ use std::{
 };
 
 use foundry_compilers::{
-    solc::SolcLanguage, zksync::compile::output::ProjectCompileOutput as ZkProjectCompileOutput,
-    Artifact, ArtifactId, ArtifactOutput, ConfigurableArtifacts, ProjectCompileOutput,
-    ProjectPathsConfig,
+    solc::SolcLanguage, Artifact, ArtifactId, ArtifactOutput, ConfigurableArtifacts,
+    ProjectCompileOutput, ProjectPathsConfig,
 };
 
 use alloy_primitives::{keccak256, B256};
 use tracing::debug;
 use zksync_types::H256;
+
+use crate::compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler};
 
 /// Represents the type of contract (ZK or EVM)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,7 +80,7 @@ impl DualCompiledContracts {
     /// Creates a collection of `[DualCompiledContract]`s from the provided solc and zksolc output.
     pub fn new(
         output: &ProjectCompileOutput,
-        zk_output: &ZkProjectCompileOutput,
+        zk_output: &ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
         layout: &ProjectPathsConfig,
         zk_layout: &ProjectPathsConfig<SolcLanguage>,
     ) -> Self {

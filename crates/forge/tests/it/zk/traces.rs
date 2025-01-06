@@ -63,10 +63,12 @@ fn get_zk_artifact_bytecode<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Vec<u8
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_traces_work_during_call() {
-    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    zk_config.verbosity = 5;
+    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
     let filter = Filter::new("testZkTraceOutputDuringCall", "ZkTraceTest", ".*");
 
-    let results = TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).test();
+    let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test();
     let traces =
         &results["zk/Trace.t.sol:ZkTraceTest"].test_results["testZkTraceOutputDuringCall()"].traces;
 
@@ -157,10 +159,12 @@ async fn test_zk_traces_work_during_call() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_traces_work_during_create() {
-    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    zk_config.verbosity = 5;
+    let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
     let filter = Filter::new("testZkTraceOutputDuringCreate", "ZkTraceTest", ".*");
 
-    let results = TestConfig::with_filter(runner, filter).evm_spec(SpecId::SHANGHAI).test();
+    let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test();
     let traces = results["zk/Trace.t.sol:ZkTraceTest"].test_results
         ["testZkTraceOutputDuringCreate()"]
         .traces
