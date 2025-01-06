@@ -10,6 +10,7 @@ use foundry_cheatcodes_common::{
     mock::{MockCallDataContext, MockCallReturnData},
     record::RecordAccess,
 };
+use tracing::trace;
 use zksync_multivm::{
     interface::tracer::TracerExecutionStatus,
     tracers::dynamic::vm_1_5_0::DynTracer,
