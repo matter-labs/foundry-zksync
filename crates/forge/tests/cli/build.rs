@@ -1,5 +1,5 @@
 use crate::utils::generate_large_contract;
-use foundry_config::{Config, ZkSyncConfig};
+use foundry_config::{zksync::ZkSyncConfig, Config};
 use foundry_test_utils::{forgetest, snapbox::IntoData, str};
 use globset::Glob;
 
