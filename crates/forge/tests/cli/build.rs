@@ -1,7 +1,8 @@
 use crate::utils::generate_large_contract;
 use foundry_config::{zksync::ZkSyncConfig, Config};
-use foundry_test_utils::{forgetest, snapbox::IntoData, str};
+use foundry_test_utils::{forgetest, snapbox::IntoData, str, util::OutputExt};
 use globset::Glob;
+use std::fs;
 
 forgetest_init!(can_parse_build_filters, |prj, cmd| {
     prj.clear();
@@ -209,14 +210,42 @@ contract ValidContract {}
     cmd.args(["build"]).assert_success();
 });
 
-forgetest_init!(test_zk_build_missing_libraries_as_arg, |prj, cmd| {
-    cmd.args(["build", "--zksync", "--zk-detect-missing-libraries"]).assert_success();
-});
+forgetest!(test_zk_build_with_missing_libraries_as_arg, |prj, cmd| {
+    prj.add_source(
+        "Foo",
+        r#"
+library Foo {
+    function get_something() external returns (uint256 c) {}
+}
+   "#,
+    )
+    .unwrap();
 
-forgetest_init!(test_zk_build_missing_libraries_as_config, |prj, cmd| {
-    let zk = ZkSyncConfig { zk_detect_missing_libraries: true, ..Default::default() };
-    prj.write_config(Config { zksync: zk, ..Default::default() });
-    cmd.args(["build", "--zksync", "--zk-detect-missing-libraries"]).assert_success();
+    prj.add_source(
+        "UsesFoo",
+        r#"
+import "./Foo.sol";
+contract UsesFoo {
+    uint256 something;
+
+    constructor() {
+        something = Foo.get_something();
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    // cmd.args(["build", "--zksync", "--zk-detect-missing-libraries", "--json"]).assert_success();
+    cmd.args(["build", "--zksync", "--zk-detect-missing-libraries", "--json", "--force"])
+        .assert_success()
+        .stdout_eq(str![[r#"
+...
+            "missingLibraries": [
+              "src/Foo.sol:Foo"
+            ]
+...
+"#]]);
 });
 
 forgetest_init!(test_zk_missing_libraries_param_only_on_build, |prj, cmd| {

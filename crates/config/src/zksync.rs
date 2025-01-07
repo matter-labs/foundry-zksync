@@ -136,7 +136,7 @@ impl ZkSyncConfig {
             via_ir: Some(via_ir),
             // Set in project paths.
             remappings: Vec::new(),
-            zk_detect_missing_libraries: self.zk_detect_missing_libraries,
+            detect_missing_libraries: self.zk_detect_missing_libraries,
             enable_eravm_extensions: self.enable_eravm_extensions,
             force_evmla: self.force_evmla,
             llvm_options: self.llvm_options.clone(),

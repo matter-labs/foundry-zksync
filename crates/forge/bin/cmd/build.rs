@@ -15,6 +15,7 @@ use foundry_config::{
         value::{Dict, Map, Value},
         Metadata, Profile, Provider,
     },
+    zksync::config_create_project,
     Config,
 };
 use serde::Serialize;
@@ -90,10 +91,6 @@ impl BuildArgs {
             config = self.load_config();
         }
 
-        if self.zk_detect_missing_libraries {
-            config.zksync.zk_detect_missing_libraries = true;
-        }
-
         if !config.zksync.should_compile() {
             let project = config.project()?;
 
@@ -130,8 +127,15 @@ impl BuildArgs {
             // no way to return a default from either branch. Ok(output)
             Ok(())
         } else {
-            let zk_project =
-                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
+            let mut zk_project = config_create_project(&config, config.cache, false)?;
+
+            // Note: This is to pass the zk_detect_missing_libraries flag to the zk compiler only
+            // while building.
+            zk_project.settings.settings.detect_missing_libraries =
+                self.zk_detect_missing_libraries;
+
+            // sh_print!("Compiling ZK contracts...")?;
+            // sh_println!("zk_project.settings.settings: {:?}", zk_project.settings.settings)?;
 
             // Collect sources to compile if build subdirectories specified.
             let mut files = vec![];
