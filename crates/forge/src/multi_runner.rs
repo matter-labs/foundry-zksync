@@ -447,9 +447,9 @@ impl MultiContractRunnerBuilder {
                 zk.zk_link_with_nonce_or_address(
                     Default::default(),
                     LIBRARY_DEPLOYER,
-                    // NOTE(zk): normally 0, this way we avoid overlaps with EVM libs
-                    // FIXME: needed or 0 is ok?
-                    libs_to_deploy.len() as u64,
+                    // NOTE(zk): match with EVM nonces as we will be doing a duplex deployment for
+                    // the libs
+                    0,
                     zk.contracts.keys(),
                 )
                 .map(|output|

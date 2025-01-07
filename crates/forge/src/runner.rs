@@ -102,6 +102,7 @@ impl ContractRunner<'_> {
                 U256::ZERO,
                 Some(self.revert_decoder),
             );
+            // TODO(zk): redo but entirely in zk
             let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
             result.extend(raw, TraceKind::Deployment);
             if reason.is_some() {
