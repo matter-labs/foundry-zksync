@@ -576,13 +576,13 @@ pub fn run_zk_script_test(
 
     let script_path_contract = format!("{script_path}:{contract_name}");
     let private_key =
-        ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
+        node.rich_wallets().first().cloned().map(|(_, pk)| pk).expect("No rich wallets available");
 
     let mut script_args = vec![
         "--zk-startup",
         &script_path_contract,
         "--private-key",
-        private_key,
+        &private_key,
         "--chain",
         "260",
         "--gas-estimate-multiplier",

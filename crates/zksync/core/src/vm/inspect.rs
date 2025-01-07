@@ -1,10 +1,9 @@
 use alloy_primitives::{hex, FixedBytes, Log};
-use era_test_node::{
-    config::node::ShowCalls,
-    formatter,
-    system_contracts::{Options, SystemContracts},
-    utils::bytecode_to_factory_dep,
+use anvil_zksync_config::types::SystemContractsOptions as Options;
+use anvil_zksync_core::{
+    formatter::Formatter, system_contracts::SystemContracts, utils::bytecode_to_factory_dep,
 };
+use anvil_zksync_types::ShowCalls;
 use itertools::Itertools;
 use revm::{
     db::states::StorageSlot,
@@ -25,12 +24,12 @@ use zksync_multivm::{
     tracers::CallTracer,
     vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
 };
-use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
-    get_nonce_key, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
-    Transaction, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS,
+    get_nonce_key, h256_to_address, h256_to_u256, l2::L2Tx, transaction_request::PaymasterParams,
+    u256_to_h256, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
-use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
+use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use std::{
     collections::HashMap,
@@ -39,6 +38,7 @@ use std::{
 };
 
 use crate::{
+    be_words_to_bytes,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     fix_l2_gas_limit, fix_l2_gas_price, is_system_address,
     vm::{
@@ -245,7 +245,7 @@ where
             info!("zk vm decoded result {}", hex::encode(&result));
 
             let address = if result.len() == 32 {
-                Some(h256_to_account_address(&H256::from_slice(&result)))
+                Some(h256_to_address(&H256::from_slice(&result)))
             } else {
                 None
             };
@@ -471,11 +471,14 @@ fn inspect_inner<S: ReadStorage>(
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
 
     let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false);
-    let system_env = create_system_env(system_contracts.baseline_contracts, chain_id);
+    let baseline_contracts =
+        system_contracts.contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false);
+    let system_env = create_system_env(baseline_contracts.clone(), chain_id);
 
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env.clone(), system_env, storage.clone());
 
     let tx: Transaction = l2_tx.clone().into();
+    let initiator = tx.initiator_account();
 
     let call_tracer_result = Arc::default();
     let cheatcode_tracer_result = Arc::default();
@@ -555,7 +558,9 @@ fn inspect_inner<S: ReadStorage>(
         bootloader_debug,
     };
 
-    formatter::print_vm_details(&tx_result);
+    let mut formatter = Formatter::new();
+
+    formatter.print_vm_details(&tx_result);
 
     info!("=== Console Logs: ");
     let log_parser = ConsoleLogParser::new();
@@ -572,13 +577,23 @@ fn inspect_inner<S: ReadStorage>(
     let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
     let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
     info!("=== Calls: ");
-    for call in call_traces.iter() {
-        formatter::print_call(call, 0, &ShowCalls::All, show_outputs, resolve_hashes);
+    for (i, call) in call_traces.iter().enumerate() {
+        let is_last = i == call_traces.len() - 1;
+        formatter.print_call(
+            initiator,
+            None,
+            call,
+            is_last,
+            &ShowCalls::All,
+            show_outputs,
+            resolve_hashes,
+        );
     }
 
     let mut deployed_bytecode_hashes = HashMap::<H160, H256>::default();
     info!("==== {}", format!("{} events", tx_result.logs.events.len()));
-    for event in &tx_result.logs.events {
+    for (i, event) in tx_result.logs.events.iter().enumerate() {
+        let is_last = i == tx_result.logs.events.len() - 1;
         if event.address == CONTRACT_DEPLOYER_ADDRESS {
             deployed_bytecode_hashes.insert(
                 event.indexed_topics.get(3).cloned().unwrap_or_default().to_h160(),
@@ -586,7 +601,7 @@ fn inspect_inner<S: ReadStorage>(
             );
         }
 
-        formatter::print_event(event, resolve_hashes);
+        formatter.print_event(event, resolve_hashes, is_last);
     }
 
     let bytecodes = compressed_bytecodes
@@ -615,7 +630,7 @@ fn inspect_inner<S: ReadStorage>(
                     .unwrap_or_default();
 
                 if result.len() == 32 {
-                    let address = h256_to_account_address(&H256::from_slice(&result));
+                    let address = h256_to_address(&H256::from_slice(&result));
                     deployed_bytecode_hashes.get(&address).cloned().and_then(|hash| {
                         bytecodes
                             .get(&h256_to_u256(hash))
@@ -812,7 +827,7 @@ pub fn batch_factory_dependencies(mut factory_deps: Vec<Vec<u8>>) -> Vec<Vec<Vec
 /// Transforms a given L2Tx into multiple txs if the factory deps need to be batched
 fn split_tx_by_factory_deps(mut tx: L2Tx) -> Vec<L2Tx> {
     if tx.execute.factory_deps.is_empty() {
-        return vec![tx]
+        return vec![tx];
     }
 
     let mut batched = batch_factory_dependencies(tx.execute.factory_deps);

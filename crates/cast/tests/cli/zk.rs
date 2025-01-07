@@ -8,10 +8,11 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
     let node = ZkSyncNode::start();
     let url = node.url();
 
-    let (addr, private_key) = ZkSyncNode::rich_wallets()
-        .next()
-        .map(|(addr, pk, _)| (addr, pk))
-        .expect("No rich wallets available");
+    // This test seems to require a specific private key, so we use the hard-coded one.
+    let (addr, private_key) = (
+        "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049".to_string(),
+        "0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110".to_string(),
+    );
 
     // Deploy paymaster
     cmd.args([
@@ -45,7 +46,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
             "--value",
             "0.1ether",
             "--private-key",
-            private_key,
+            &private_key,
             "--rpc-url",
             &url,
         ])
@@ -53,7 +54,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
 
     let balance_before = cmd
         .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
+        .args(["balance", &addr, "--rpc-url", &url])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -64,7 +65,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
         "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
         "increment()",
         "--private-key",
-        private_key,
+        &private_key,
         "--zk-paymaster-address",
         "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "--zk-paymaster-input",
@@ -76,7 +77,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
 
     let balance_after = cmd
         .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
+        .args(["balance", &addr, "--rpc-url", &url])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -88,10 +89,8 @@ casttest!(test_zk_cast_without_paymaster, async |_prj, cmd| {
     let node = ZkSyncNode::start();
     let url = node.url();
 
-    let (addr, private_key) = ZkSyncNode::rich_wallets()
-        .next()
-        .map(|(addr, pk, _)| (addr, pk))
-        .expect("No rich wallets available");
+    let (addr, private_key) =
+        node.rich_wallets().first().cloned().expect("No rich wallets available");
 
     // Deploy counter
     cmd.cast_fuse()
@@ -107,7 +106,7 @@ casttest!(test_zk_cast_without_paymaster, async |_prj, cmd| {
 
     let balance_before = cmd
         .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
+        .args(["balance", &addr, "--rpc-url", &url])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -118,7 +117,7 @@ casttest!(test_zk_cast_without_paymaster, async |_prj, cmd| {
             "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
             "increment()",
             "--private-key",
-            private_key,
+            &private_key,
             "--rpc-url",
             &url,
             "--gas-price",
@@ -128,7 +127,7 @@ casttest!(test_zk_cast_without_paymaster, async |_prj, cmd| {
 
     let balance_after = cmd
         .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
+        .args(["balance", &addr, "--rpc-url", &url])
         .assert_success()
         .get_output()
         .stdout_lossy();

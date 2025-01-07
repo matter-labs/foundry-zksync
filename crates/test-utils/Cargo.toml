@@ -31,14 +31,10 @@ tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rand.workspace = true
 snapbox = { version = "0.6", features = ["json", "regex"] }
-tokio.workspace = true
 tempfile.workspace = true
 
 # zk
-zksync_types.workspace = true
-era_test_node.workspace = true
-jsonrpc-core = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
-jsonrpc-http-server = { git = "https://github.com/matter-labs/jsonrpc.git", branch = "master" }
+alloy-zksync.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

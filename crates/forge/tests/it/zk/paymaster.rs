@@ -43,7 +43,7 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
     let url = node.url();
 
     let private_key =
-        ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
+        node.rich_wallets().first().cloned().map(|(_, pk)| pk).expect("No rich wallets available");
 
     // Install required dependencies
     cmd.args([
@@ -65,7 +65,7 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
             "--rpc-url",
             url.as_str(),
             "--private-key",
-            private_key,
+            &private_key,
             "--via-ir",
             "--value",
             "1000000000000000000",
@@ -91,7 +91,7 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
             "--rpc-url",
             url.as_str(),
             "--private-key",
-            private_key,
+            &private_key,
             "--zk-paymaster-address",
             paymaster_address,
             "--zk-paymaster-input",
@@ -114,7 +114,7 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
             "--rpc-url",
             url.as_str(),
             "--private-key",
-            private_key,
+            &private_key,
             "--zk-paymaster-address",
             paymaster_address,
             "--zk-paymaster-input",
