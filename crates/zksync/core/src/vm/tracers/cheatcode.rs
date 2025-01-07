@@ -10,7 +10,7 @@ use foundry_cheatcodes_common::{
     mock::{MockCallDataContext, MockCallReturnData},
     record::RecordAccess,
 };
-use tracing::trace;
+use tracing::debug;
 use zksync_multivm::{
     interface::tracer::TracerExecutionStatus,
     tracers::dynamic::vm_1_5_0::DynTracer,
@@ -217,14 +217,15 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             {
                 let calldata = get_calldata(&state, memory);
 
-                // We skip recording the base call that initiated this transaction for `expectCall`,
-                // as it's already recorded in revm when the call was made.
-                let is_base_call = self
-                    .call_context
-                    .input
-                    .as_ref()
-                    .map(|input| input.0.to_vec() == calldata)
-                    .unwrap_or_default();
+                // We skip recording the base call for `expectCall` cheatcode that initiated this
+                // transaction. The initial call is recorded in revm when it was
+                // made, and before being dispatched to zkEVM.
+                let is_base_call = current.code_address.to_address() == self.call_context.contract &&
+                    self.call_context
+                        .input
+                        .as_ref()
+                        .map(|input| input.0.to_vec() == calldata)
+                        .unwrap_or_default();
 
                 if !is_base_call {
                     // Match every partial/full calldata
@@ -244,7 +245,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                         }
                     }
                 } else {
-                    trace!("skip recording base call in zkEVM for expectCall cheatcode");
+                    debug!("skip recording base call in zkEVM for expectCall cheatcode");
                 }
             }
         }
