@@ -10,9 +10,12 @@ use crate::{
 use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
 use alloy_primitives::{keccak256, map::HashMap, uint, Address, B256, U256};
+use alloy_provider::Provider;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
 use eyre::Context;
-use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
+use foundry_common::{
+    is_known_system_sender, provider::try_get_zksync_http_provider, SYSTEM_TRANSACTION_TYPE,
+};
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
 use itertools::Itertools;
 use revm::{
@@ -28,6 +31,7 @@ use revm::{
 use std::{
     any::Any,
     collections::{BTreeMap, HashSet},
+    sync::Arc,
     time::Instant,
 };
 use strategy::{BackendStrategy, BackendStrategyForkInfo};
@@ -1612,6 +1616,26 @@ impl Database for Backend {
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
+        // Try obtaining code by hash via zks_getBytecodeByHash for zksync forks.
+        let maybe_zk_fork = self
+            .active_fork_id()
+            .and_then(|id| self.get_fork_info(id).ok())
+            .map(|info| info.fork_type.is_zk())
+            .and_then(|is_zk| if is_zk { self.active_fork_url() } else { None });
+        if let (Some(fork_url), Some(db)) = (maybe_zk_fork, self.active_fork_db_mut()) {
+            let provider = try_get_zksync_http_provider(fork_url)
+                .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)))?;
+            let result = db.db.do_any_request(async move {
+                let bytes: alloy_primitives::Bytes =
+                    provider.raw_request("zks_getBytecodeByHash".into(), vec![code_hash]).await?;
+                Ok(Bytecode::new_raw(bytes))
+            });
+
+            if let Ok(bytes) = result {
+                return Ok(bytes);
+            }
+        }
+
         if let Some(db) = self.active_fork_db_mut() {
             Ok(db.code_by_hash(code_hash)?)
         } else {
