@@ -9,6 +9,8 @@ use foundry_common::{
     shell,
 };
 use foundry_config::{Chain, Config};
+use foundry_evm::executors::strategy::ExecutorStrategy;
+use foundry_strategy_zksync::ZksyncExecutorStrategyBuilder;
 use serde::de::DeserializeOwned;
 use std::{
     ffi::OsStr,
@@ -91,6 +93,16 @@ pub fn get_provider(config: &Config) -> Result<RetryProvider> {
     get_provider_builder(config)?.build()
 }
 
+pub fn get_executor_strategy(config: &Config) -> ExecutorStrategy {
+    if config.zksync.should_compile() {
+        info!("using zksync strategy");
+        ExecutorStrategy::new_zksync()
+    } else {
+        info!("using evm strategy");
+        ExecutorStrategy::new_evm()
+    }
+}
+
 /// Returns a [RetryProvider] instantiated using [Config]'s
 /// RPC for ZKsync
 pub fn get_provider_zksync(config: &Config) -> Result<RetryProvider<Zksync>> {
@@ -115,6 +127,10 @@ pub fn get_provider_builder(config: &Config) -> Result<ProviderBuilder> {
 
     if let Some(rpc_timeout) = config.eth_rpc_timeout {
         builder = builder.timeout(Duration::from_secs(rpc_timeout));
+    }
+
+    if let Some(rpc_headers) = config.eth_rpc_headers.clone() {
+        builder = builder.headers(rpc_headers);
     }
 
     Ok(builder)
@@ -290,7 +306,7 @@ impl<'a> Git<'a> {
 
     #[inline]
     pub fn from_config(config: &'a Config) -> Self {
-        Self::new(config.root.0.as_path())
+        Self::new(config.root.as_path())
     }
 
     pub fn root_of(relative_to: &Path) -> Result<PathBuf> {
@@ -447,8 +463,8 @@ impl<'a> Git<'a> {
         self.cmd().args(["status", "--porcelain"]).exec().map(|out| out.stdout.is_empty())
     }
 
-    pub fn has_branch(self, branch: impl AsRef<OsStr>) -> Result<bool> {
-        self.cmd()
+    pub fn has_branch(self, branch: impl AsRef<OsStr>, at: &Path) -> Result<bool> {
+        self.cmd_at(at)
             .args(["branch", "--list", "--no-color"])
             .arg(branch)
             .get_stdout_lossy()
@@ -567,6 +583,12 @@ ignore them in the `.gitignore` file, or run this command again with the `--no-c
     pub fn cmd(self) -> Command {
         let mut cmd = Self::cmd_no_root();
         cmd.current_dir(self.root);
+        cmd
+    }
+
+    pub fn cmd_at(self, path: &Path) -> Command {
+        let mut cmd = Self::cmd_no_root();
+        cmd.current_dir(path);
         cmd
     }
 

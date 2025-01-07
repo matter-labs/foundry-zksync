@@ -19,9 +19,14 @@ use foundry_evm_core::{
 use foundry_evm_traces::StackSnapshotType;
 use rand::Rng;
 use revm::primitives::{Account, Bytecode, SpecId, KECCAK_EMPTY};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    fmt::Display,
+    path::Path,
+};
 mod record_debug_step;
 use record_debug_step::{convert_call_trace_to_debug_step, flatten_call_trace};
+use serde::Serialize;
 
 mod fork;
 pub(crate) mod mapping;
@@ -52,6 +57,70 @@ pub struct DealRecord {
     pub new_balance: U256,
 }
 
+/// Storage slot diff info.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct SlotStateDiff {
+    /// Initial storage value.
+    previous_value: B256,
+    /// Current storage value.
+    new_value: B256,
+}
+
+/// Balance diff info.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct BalanceDiff {
+    /// Initial storage value.
+    previous_value: U256,
+    /// Current storage value.
+    new_value: U256,
+}
+
+/// Account state diff info.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct AccountStateDiffs {
+    /// Address label, if any set.
+    label: Option<String>,
+    /// Account balance changes.
+    balance_diff: Option<BalanceDiff>,
+    /// State changes, per slot.
+    state_diff: BTreeMap<B256, SlotStateDiff>,
+}
+
+impl Display for AccountStateDiffs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> eyre::Result<(), std::fmt::Error> {
+        // Print changed account.
+        if let Some(label) = &self.label {
+            writeln!(f, "label: {label}")?;
+        }
+        // Print balance diff if changed.
+        if let Some(balance_diff) = &self.balance_diff {
+            if balance_diff.previous_value != balance_diff.new_value {
+                writeln!(
+                    f,
+                    "- balance diff: {} → {}",
+                    balance_diff.previous_value, balance_diff.new_value
+                )?;
+            }
+        }
+        // Print state diff if any.
+        if !&self.state_diff.is_empty() {
+            writeln!(f, "- state diff:")?;
+            for (slot, slot_changes) in &self.state_diff {
+                writeln!(
+                    f,
+                    "@ {slot}: {} → {}",
+                    slot_changes.previous_value, slot_changes.new_value
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl Cheatcode for addrCall {
     fn apply(&self, _state: &mut Cheatcodes) -> Result {
         let Self { privateKey } = self;
@@ -63,12 +132,6 @@ impl Cheatcode for addrCall {
 impl Cheatcode for getNonce_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
-
-        if ccx.state.use_zk_vm {
-            let nonce = foundry_zksync_core::cheatcodes::get_nonce(*account, ccx.ecx);
-            return Ok(nonce.abi_encode());
-        }
-
         get_nonce(ccx, account)
     }
 }
@@ -355,11 +418,6 @@ impl Cheatcode for getBlobhashesCall {
 impl Cheatcode for rollCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newHeight } = self;
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::roll(*newHeight, ccx.ecx);
-            return Ok(Default::default())
-        }
-
         ccx.ecx.env.block.number = *newHeight;
         Ok(Default::default())
     }
@@ -383,12 +441,7 @@ impl Cheatcode for txGasPriceCall {
 impl Cheatcode for warpCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newTimestamp } = self;
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::warp(*newTimestamp, ccx.ecx);
-            return Ok(Default::default())
-        }
         ccx.ecx.env.block.timestamp = *newTimestamp;
-
         Ok(Default::default())
     }
 }
@@ -423,12 +476,9 @@ impl Cheatcode for getBlobBaseFeeCall {
 impl Cheatcode for dealCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account: address, newBalance: new_balance } = *self;
-        let old_balance = if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::deal(address, new_balance, ccx.ecx)
-        } else {
-            let account = journaled_account(ccx.ecx, address)?;
-            std::mem::replace(&mut account.info.balance, new_balance)
-        };
+
+        let account = journaled_account(ccx.ecx, address)?;
+        let old_balance = std::mem::replace(&mut account.info.balance, new_balance);
         let record = DealRecord { address, old_balance, new_balance };
         ccx.state.eth_deals.push(record);
         Ok(Default::default())
@@ -438,13 +488,8 @@ impl Cheatcode for dealCall {
 impl Cheatcode for etchCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { target, newRuntimeBytecode } = self;
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::etch(*target, newRuntimeBytecode, ccx.ecx);
 
-            return Ok(Default::default());
-        }
-
-        ensure_not_precompile!(target, ccx);
+        ensure_not_precompile!(&target, ccx);
         ccx.ecx.load_account(*target)?;
         let bytecode = Bytecode::new_raw(Bytes::copy_from_slice(newRuntimeBytecode));
         ccx.ecx.journaled_state.set_code(*target, bytecode);
@@ -455,11 +500,6 @@ impl Cheatcode for etchCall {
 impl Cheatcode for resetNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account } = self;
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_nonce(*account, U256::ZERO, ccx.ecx);
-            return Ok(Default::default());
-        }
-
         let account = journaled_account(ccx.ecx, *account)?;
         // Per EIP-161, EOA nonces start at 0, but contract nonces
         // start at 1. Comparing by code_hash instead of code
@@ -475,11 +515,6 @@ impl Cheatcode for resetNonceCall {
 impl Cheatcode for setNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
-
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(newNonce), ccx.ecx);
-            return Ok(Default::default());
-        }
 
         let account = journaled_account(ccx.ecx, account)?;
         // nonce must increment only
@@ -497,11 +532,6 @@ impl Cheatcode for setNonceCall {
 impl Cheatcode for setNonceUnsafeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
-
-        if ccx.state.use_zk_vm {
-            foundry_zksync_core::cheatcodes::set_nonce(account, U256::from(newNonce), ccx.ecx);
-            return Ok(Default::default());
-        }
 
         let account = journaled_account(ccx.ecx, account)?;
         account.info.nonce = newNonce;
@@ -702,6 +732,25 @@ impl Cheatcode for stopAndReturnStateDiffCall {
     }
 }
 
+impl Cheatcode for getStateDiffCall {
+    fn apply(&self, state: &mut Cheatcodes) -> Result {
+        let mut diffs = String::new();
+        let state_diffs = get_recorded_state_diffs(state);
+        for (address, state_diffs) in state_diffs {
+            diffs.push_str(&format!("{address}\n"));
+            diffs.push_str(&format!("{state_diffs}\n"));
+        }
+        Ok(diffs.abi_encode())
+    }
+}
+
+impl Cheatcode for getStateDiffJsonCall {
+    fn apply(&self, state: &mut Cheatcodes) -> Result {
+        let state_diffs = get_recorded_state_diffs(state);
+        Ok(serde_json::to_string(&state_diffs)?.abi_encode())
+    }
+}
+
 impl Cheatcode for broadcastRawTransactionCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         let tx = TxEnvelope::decode(&mut self.data.as_ref())
@@ -718,7 +767,6 @@ impl Cheatcode for broadcastRawTransactionCall {
             ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
                 rpc: ccx.db.active_fork_url(),
                 transaction: tx.try_into()?,
-                zk_tx: None,
             });
         }
 
@@ -787,11 +835,12 @@ impl Cheatcode for stopAndReturnDebugTraceRecordingCall {
 
         let debug_steps: Vec<DebugStep> =
             steps.iter().map(|&step| convert_call_trace_to_debug_step(step)).collect();
-
         // Free up memory by clearing the steps if they are not recorded outside of cheatcode usage.
         if !record_info.original_tracer_config.record_steps {
             tracer.traces_mut().nodes_mut().iter_mut().for_each(|node| {
                 node.trace.steps = Vec::new();
+                node.logs = Vec::new();
+                node.ordering = Vec::new();
             });
         }
 
@@ -1021,10 +1070,7 @@ fn read_callers(state: &Cheatcodes, default_sender: &Address) -> Result {
 }
 
 /// Ensures the `Account` is loaded and touched.
-pub(super) fn journaled_account<'a>(
-    ecx: InnerEcx<'a, '_, '_>,
-    addr: Address,
-) -> Result<&'a mut Account> {
+pub fn journaled_account<'a>(ecx: InnerEcx<'a, '_, '_>, addr: Address) -> Result<&'a mut Account> {
     ecx.load_account(addr)?;
     ecx.journaled_state.touch(&addr);
     Ok(ecx.journaled_state.state.get_mut(&addr).expect("account is loaded"))
@@ -1063,4 +1109,57 @@ fn genesis_account(account: &Account) -> GenesisAccount {
         ),
         private_key: None,
     }
+}
+
+/// Helper function to returns state diffs recorded for each changed account.
+fn get_recorded_state_diffs(state: &mut Cheatcodes) -> BTreeMap<Address, AccountStateDiffs> {
+    let mut state_diffs: BTreeMap<Address, AccountStateDiffs> = BTreeMap::default();
+    if let Some(records) = &state.recorded_account_diffs_stack {
+        records
+            .iter()
+            .flatten()
+            .filter(|account_access| {
+                !account_access.storageAccesses.is_empty() ||
+                    account_access.oldBalance != account_access.newBalance
+            })
+            .for_each(|account_access| {
+                let account_diff =
+                    state_diffs.entry(account_access.account).or_insert(AccountStateDiffs {
+                        label: state.labels.get(&account_access.account).cloned(),
+                        ..Default::default()
+                    });
+
+                // Record account balance diffs.
+                if account_access.oldBalance != account_access.newBalance {
+                    // Update balance diff. Do not overwrite the initial balance if already set.
+                    if let Some(diff) = &mut account_diff.balance_diff {
+                        diff.new_value = account_access.newBalance;
+                    } else {
+                        account_diff.balance_diff = Some(BalanceDiff {
+                            previous_value: account_access.oldBalance,
+                            new_value: account_access.newBalance,
+                        });
+                    }
+                }
+
+                // Record account state diffs.
+                for storage_access in &account_access.storageAccesses {
+                    if storage_access.isWrite && !storage_access.reverted {
+                        // Update state diff. Do not overwrite the initial value if already set.
+                        match account_diff.state_diff.entry(storage_access.slot) {
+                            Entry::Vacant(slot_state_diff) => {
+                                slot_state_diff.insert(SlotStateDiff {
+                                    previous_value: storage_access.previousValue,
+                                    new_value: storage_access.newValue,
+                                });
+                            }
+                            Entry::Occupied(mut slot_state_diff) => {
+                                slot_state_diff.get_mut().new_value = storage_access.newValue;
+                            }
+                        }
+                    }
+                }
+            });
+    }
+    state_diffs
 }

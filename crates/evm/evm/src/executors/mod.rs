@@ -24,10 +24,10 @@ use foundry_evm_core::{
     },
     decode::{RevertDecoder, SkipReason},
     utils::StateChangeset,
+    InspectorExt,
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
-use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata};
 use revm::{
     db::{DatabaseCommit, DatabaseRef},
     interpreter::{return_ok, InstructionResult},
@@ -35,9 +35,12 @@ use revm::{
         AuthorizationList, BlockEnv, Bytecode, Env, EnvWithHandlerCfg, ExecutionResult, Output,
         ResultAndState, SignedAuthorization, SpecId, TxEnv, TxKind,
     },
-    Database,
 };
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    time::{Duration, Instant},
+};
+use strategy::ExecutorStrategy;
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -50,6 +53,8 @@ pub use invariant::InvariantExecutor;
 
 mod trace;
 pub use trace::TracingExecutor;
+
+pub mod strategy;
 
 sol! {
     interface ITest {
@@ -72,7 +77,7 @@ sol! {
 /// - `deploy`: a special case of `transact`, specialized for persisting the state of a contract
 ///   deployment
 /// - `setup`: a special case of `transact`, used to set up the environment for a test
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Executor {
     /// The underlying `revm::Database` that contains the EVM storage.
     // Note: We do not store an EVM here, since we are really
@@ -84,20 +89,25 @@ pub struct Executor {
     pub env: EnvWithHandlerCfg,
     /// The Revm inspector stack.
     pub inspector: InspectorStack,
-    /// The gas limit for calls and deployments. This is different from the gas limit imposed by
-    /// the passed in environment, as those limits are used by the EVM for certain opcodes like
-    /// `gaslimit`.
+    /// The gas limit for calls and deployments.
     gas_limit: u64,
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
 
-    /// Sets up the next transaction to be executed as a ZK transaction.
-    zk_tx: Option<ZkTransactionMetadata>,
-    // simulate persisted factory deps
-    zk_persisted_factory_deps: HashMap<foundry_zksync_core::H256, Vec<u8>>,
+    pub strategy: ExecutorStrategy,
+}
 
-    pub use_zk: bool,
-    pub zk_env: ZkEnv,
+impl Clone for Executor {
+    fn clone(&self) -> Self {
+        Self {
+            backend: self.backend.clone(),
+            env: self.env.clone(),
+            inspector: self.inspector.clone(),
+            gas_limit: self.gas_limit,
+            legacy_assertions: self.legacy_assertions,
+            strategy: self.strategy.clone(),
+        }
+    }
 }
 
 impl Executor {
@@ -115,6 +125,7 @@ impl Executor {
         inspector: InspectorStack,
         gas_limit: u64,
         legacy_assertions: bool,
+        strategy: ExecutorStrategy,
     ) -> Self {
         // Need to create a non-empty contract on the cheatcodes address so `extcodesize` checks
         // do not fail.
@@ -129,22 +140,19 @@ impl Executor {
             },
         );
 
-        Self {
-            backend,
-            env,
-            inspector,
-            gas_limit,
-            legacy_assertions,
-            zk_tx: None,
-            zk_persisted_factory_deps: Default::default(),
-            use_zk: false,
-            zk_env: Default::default(),
-        }
+        Self { backend, env, inspector, gas_limit, legacy_assertions, strategy }
     }
 
     fn clone_with_backend(&self, backend: Backend) -> Self {
         let env = EnvWithHandlerCfg::new_with_spec_id(Box::new(self.env().clone()), self.spec_id());
-        Self::new(backend, env, self.inspector().clone(), self.gas_limit, self.legacy_assertions)
+        Self::new(
+            backend,
+            env,
+            self.inspector().clone(),
+            self.gas_limit,
+            self.legacy_assertions,
+            self.strategy.clone(),
+        )
     }
 
     /// Returns a reference to the EVM backend.
@@ -182,6 +190,36 @@ impl Executor {
         self.env.spec_id()
     }
 
+    /// Sets the EVM spec ID.
+    pub fn set_spec_id(&mut self, spec_id: SpecId) {
+        self.env.handler_cfg.spec_id = spec_id;
+    }
+
+    /// Returns the gas limit for calls and deployments.
+    ///
+    /// This is different from the gas limit imposed by the passed in environment, as those limits
+    /// are used by the EVM for certain opcodes like `gaslimit`.
+    pub fn gas_limit(&self) -> u64 {
+        self.gas_limit
+    }
+
+    /// Sets the gas limit for calls and deployments.
+    pub fn set_gas_limit(&mut self, gas_limit: u64) {
+        self.gas_limit = gas_limit;
+    }
+
+    /// Returns whether `failed()` should be called on the test contract to determine if the test
+    /// failed.
+    pub fn legacy_assertions(&self) -> bool {
+        self.legacy_assertions
+    }
+
+    /// Sets whether `failed()` should be called on the test contract to determine if the test
+    /// failed.
+    pub fn set_legacy_assertions(&mut self, legacy_assertions: bool) {
+        self.legacy_assertions = legacy_assertions;
+    }
+
     /// Creates the default CREATE2 Contract Deployer for local tests and scripts.
     pub fn deploy_create2_deployer(&mut self) -> eyre::Result<()> {
         trace!("deploying local create2 deployer");
@@ -191,7 +229,7 @@ impl Executor {
             .ok_or_else(|| BackendError::MissingAccount(DEFAULT_CREATE2_DEPLOYER))?;
 
         // If the deployer is not currently deployed, deploy the default one.
-        if create2_deployer_account.code.map_or(true, |code| code.is_empty()) {
+        if create2_deployer_account.code.is_none_or(|code| code.is_empty()) {
             let creator = DEFAULT_CREATE2_DEPLOYER_DEPLOYER;
 
             // Probably 0, but just in case.
@@ -209,16 +247,8 @@ impl Executor {
 
     /// Set the balance of an account.
     pub fn set_balance(&mut self, address: Address, amount: U256) -> BackendResult<()> {
-        trace!(?address, ?amount, "setting account balance ZK={}", self.use_zk);
-        let mut account = self.backend().basic_ref(address)?.unwrap_or_default();
-        account.balance = amount;
-        self.backend_mut().insert_account_info(address, account);
-
-        if self.use_zk {
-            let (address, slot) = foundry_zksync_core::state::get_balance_storage(address);
-            self.backend.insert_account_storage(address, slot, amount)?;
-        }
-        Ok(())
+        trace!(?address, ?amount, "setting account balance");
+        self.strategy.runner.clone().set_balance(self, address, amount)
     }
 
     /// Gets the balance of an account
@@ -228,19 +258,7 @@ impl Executor {
 
     /// Set the nonce of an account.
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> BackendResult<()> {
-        let mut account = self.backend().basic_ref(address)?.unwrap_or_default();
-        account.nonce = nonce;
-        self.backend_mut().insert_account_info(address, account);
-        if self.use_zk {
-            let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
-            // fetch the full nonce to preserve account's deployment nonce
-            let full_nonce = self.backend.storage(address, slot)?;
-            let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
-            let new_full_nonce =
-                foundry_zksync_core::state::new_full_nonce(nonce, full_nonce.deploy_nonce);
-            self.backend.insert_account_storage(address, slot, new_full_nonce)?;
-        }
-        Ok(())
+        self.strategy.runner.clone().set_nonce(self, address, nonce)
     }
 
     /// Returns the nonce of an account.
@@ -266,9 +284,8 @@ impl Executor {
     }
 
     #[inline]
-    pub fn set_gas_limit(&mut self, gas_limit: u64) -> &mut Self {
-        self.gas_limit = gas_limit;
-        self
+    pub fn create2_deployer(&self) -> Address {
+        self.inspector().create2_deployer()
     }
 
     /// Deploys a contract and commits the new state to the underlying database.
@@ -446,23 +463,21 @@ impl Executor {
     pub fn call_with_env(&self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector().clone();
         let mut backend = CowBackend::new_borrowed(self.backend());
-        let result = match &self.zk_tx {
-            None => backend.inspect(&mut env, &mut inspector)?,
-            Some(zk_tx) => {
-                // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
-                env.block = self.env.block.clone();
-                env.tx.gas_price = self.env.tx.gas_price;
-                backend.inspect_ref_zk(
-                    &mut env,
-                    &self.zk_env,
-                    &mut self.zk_persisted_factory_deps.clone(),
-                    Some(zk_tx.factory_deps.clone()),
-                    zk_tx.paymaster_data.clone(),
-                )?
-            }
-        };
-        convert_executed_result(env, inspector, result, backend.has_state_snapshot_failure())
+
+        let result = self.strategy.runner.call(
+            self.strategy.context.as_ref(),
+            &mut backend,
+            &mut env,
+            &self.env,
+            &mut inspector,
+        )?;
+
+        convert_executed_result(
+            env.clone(),
+            inspector,
+            result,
+            backend.has_state_snapshot_failure(),
+        )
     }
 
     /// Execute the transaction configured in `env.tx`.
@@ -470,26 +485,17 @@ impl Executor {
     pub fn transact_with_env(&mut self, mut env: EnvWithHandlerCfg) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
         let backend = &mut self.backend;
-        let result_and_state = match self.zk_tx.take() {
-            None => backend.inspect(&mut env, &mut inspector)?,
-            Some(zk_tx) => {
-                // apply fork-related env instead of cheatcode handler
-                // since it won't be run inside zkvm
-                env.block = self.env.block.clone();
-                env.tx.gas_price = self.env.tx.gas_price;
-                backend.inspect_ref_zk(
-                    &mut env,
-                    &self.zk_env,
-                    // this will persist the added factory deps,
-                    // no need to commit them later
-                    &mut self.zk_persisted_factory_deps,
-                    Some(zk_tx.factory_deps),
-                    zk_tx.paymaster_data,
-                )?
-            }
-        };
+
+        let result_and_state = self.strategy.runner.transact(
+            self.strategy.context.as_mut(),
+            backend,
+            &mut env,
+            &self.env,
+            &mut inspector,
+        )?;
+
         let mut result = convert_executed_result(
-            env,
+            env.clone(),
             inspector,
             result_and_state,
             backend.has_state_snapshot_failure(),
@@ -662,10 +668,6 @@ impl Executor {
         }
     }
 
-    pub fn setup_zk_tx(&mut self, zk_tx: ZkTransactionMetadata) {
-        self.zk_tx = Some(zk_tx);
-    }
-
     /// Creates the environment to use when executing a transaction in a test context
     ///
     /// If using a backend with cheatcodes, `tx.gas_price` and `block.number` will be overwritten by
@@ -752,8 +754,12 @@ pub enum EvmError {
     #[error("{_0}")]
     Skip(SkipReason),
     /// Any other error.
-    #[error(transparent)]
-    Eyre(eyre::Error),
+    #[error("{}", foundry_common::errors::display_chain(.0))]
+    Eyre(
+        #[from]
+        #[source]
+        eyre::Report,
+    ),
 }
 
 impl From<ExecutionErr> for EvmError {
@@ -765,16 +771,6 @@ impl From<ExecutionErr> for EvmError {
 impl From<alloy_sol_types::Error> for EvmError {
     fn from(err: alloy_sol_types::Error) -> Self {
         Self::Abi(err.into())
-    }
-}
-
-impl From<eyre::Error> for EvmError {
-    fn from(err: eyre::Report) -> Self {
-        let mut chained_cause = String::new();
-        for cause in err.chain() {
-            chained_cause.push_str(format!("{cause}; ").as_str());
-        }
-        Self::Eyre(eyre::format_err!("{chained_cause}"))
     }
 }
 
@@ -1022,4 +1018,21 @@ fn convert_executed_result(
         out,
         chisel_state,
     })
+}
+
+/// Timer for a fuzz test.
+pub struct FuzzTestTimer {
+    /// Inner fuzz test timer - (test start time, test duration).
+    inner: Option<(Instant, Duration)>,
+}
+
+impl FuzzTestTimer {
+    pub fn new(timeout: Option<u32>) -> Self {
+        Self { inner: timeout.map(|timeout| (Instant::now(), Duration::from_secs(timeout.into()))) }
+    }
+
+    /// Whether the current fuzz test timed out and should be stopped.
+    pub fn is_timed_out(&self) -> bool {
+        self.inner.is_some_and(|(start, duration)| start.elapsed() > duration)
+    }
 }

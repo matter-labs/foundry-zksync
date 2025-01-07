@@ -3,17 +3,17 @@ use crate::build::ScriptPredeployLibraries;
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_rpc_types::TransactionRequest;
+use alloy_serde::OtherFields;
 use eyre::Result;
 use foundry_cheatcodes::BroadcastableTransaction;
 use foundry_config::Config;
 use foundry_evm::{
-    constants::{CALLER, DEFAULT_CREATE2_DEPLOYER},
+    constants::CALLER,
     executors::{DeployResult, EvmError, ExecutionErr, Executor, RawCallResult},
     opts::EvmOpts,
     revm::interpreter::{return_ok, InstructionResult},
     traces::{TraceKind, Traces},
 };
-use foundry_zksync_core::ZkTransactionMetadata;
 use std::collections::VecDeque;
 
 /// Drives script execution
@@ -81,13 +81,12 @@ impl ScriptRunner {
                         ..Default::default()
                     }
                     .into(),
-                    zk_tx: None,
                 })
             }),
             ScriptPredeployLibraries::Create2(libraries, salt) => {
+                let create2_deployer = self.executor.create2_deployer();
                 for library in libraries {
-                    let address =
-                        DEFAULT_CREATE2_DEPLOYER.create2_from_code(salt, library.as_ref());
+                    let address = create2_deployer.create2_from_code(salt, library.as_ref());
                     // Skip if already deployed
                     if !self.executor.is_empty_code(address)? {
                         continue;
@@ -97,7 +96,7 @@ impl ScriptRunner {
                         .executor
                         .transact_raw(
                             self.evm_opts.sender,
-                            DEFAULT_CREATE2_DEPLOYER,
+                            create2_deployer,
                             calldata.clone().into(),
                             U256::from(0),
                         )
@@ -113,11 +112,10 @@ impl ScriptRunner {
                             from: Some(self.evm_opts.sender),
                             input: calldata.into(),
                             nonce: Some(sender_nonce + library_transactions.len() as u64),
-                            to: Some(TxKind::Call(DEFAULT_CREATE2_DEPLOYER)),
+                            to: Some(TxKind::Call(create2_deployer)),
                             ..Default::default()
                         }
                         .into(),
-                        zk_tx: None,
                     });
                 }
 
@@ -175,12 +173,8 @@ impl ScriptRunner {
         // to simulate EVM behavior where only the tx that deploys the test contract increments the
         // nonce.
         if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
-            if let Some(zk_startup_migration) = &mut cheatcodes.zk_startup_migration {
-                debug!("script deployed, allowing startup storage migration");
-                zk_startup_migration.allow();
-            }
-            debug!("script deployed, allowing persisting next nonce update");
-            cheatcodes.zk_persist_nonce_update.persist_next();
+            debug!("script deployed");
+            cheatcodes.strategy.runner.base_contract_deployed(cheatcodes.strategy.context.as_mut());
         }
 
         // Optionally call the `setUp` function
@@ -260,11 +254,13 @@ impl ScriptRunner {
         calldata: Option<Bytes>,
         value: Option<U256>,
         authorization_list: Option<Vec<SignedAuthorization>>,
-        (use_zk, zk_tx): (bool, Option<ZkTransactionMetadata>),
+        other_fields: Option<OtherFields>,
     ) -> Result<ScriptResult> {
-        self.executor.use_zk = use_zk;
-        if let Some(zk_tx) = zk_tx {
-            self.executor.setup_zk_tx(zk_tx);
+        if let Some(other_fields) = other_fields {
+            self.executor.strategy.runner.zksync_set_transaction_context(
+                self.executor.strategy.context.as_mut(),
+                other_fields,
+            );
         }
 
         if let Some(to) = to {

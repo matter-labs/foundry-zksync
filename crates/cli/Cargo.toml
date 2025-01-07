@@ -19,6 +19,7 @@ foundry-config.workspace = true
 foundry-debugger.workspace = true
 foundry-evm.workspace = true
 foundry-wallets.workspace = true
+foundry-strategy-zksync.workspace = true
 
 foundry-compilers = { workspace = true, features = ["full"] }
 
@@ -50,6 +51,9 @@ tracing.workspace = true
 yansi.workspace = true
 
 tracing-tracy = { version = "0.11", optional = true }
+
+# zk
+foundry-zksync-compilers.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

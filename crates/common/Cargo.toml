@@ -14,6 +14,7 @@ workspace = true
 
 [dependencies]
 foundry-block-explorers = { workspace = true, features = ["foundry-compilers"] }
+foundry-zksync-compilers.workspace = true
 foundry-common-fmt.workspace = true
 foundry-compilers.workspace = true
 foundry-config.workspace = true
@@ -43,6 +44,8 @@ alloy-transport-ipc.workspace = true
 alloy-transport-ws.workspace = true
 alloy-transport.workspace = true
 alloy-consensus = { workspace = true, features = ["k256"] }
+alloy-network.workspace = true
+
 alloy-zksync.workspace = true
 
 tower.workspace = true

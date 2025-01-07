@@ -5,8 +5,6 @@ use alloy_primitives::Address;
 use alloy_sol_types::SolValue;
 use chrono::DateTime;
 use foundry_evm_core::constants::MAGIC_SKIP;
-use foundry_zksync_compiler::DualCompiledContract;
-use foundry_zksync_core::ZkPaymasterData;
 use std::env;
 
 pub(crate) mod assert;
@@ -14,77 +12,41 @@ pub(crate) mod assume;
 pub(crate) mod expect;
 
 impl Cheatcode for zkVmCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        let Self { enable } = *self;
-
-        if enable {
-            ccx.state.select_zk_vm(ccx.ecx, None);
-        } else {
-            ccx.state.select_evm(ccx.ecx);
-        }
-
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
         Ok(Default::default())
     }
 }
 
 impl Cheatcode for zkVmSkipCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        ccx.state.skip_zk_vm = ccx.state.use_zk_vm;
-
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
         Ok(Default::default())
     }
 }
 
 impl Cheatcode for zkUsePaymasterCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        let Self { paymaster_address, paymaster_input } = self;
-        ccx.state.paymaster_params =
-            Some(ZkPaymasterData { address: *paymaster_address, input: paymaster_input.clone() });
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
         Ok(Default::default())
     }
 }
 
 impl Cheatcode for zkUseFactoryDepCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        let Self { name } = self;
-        info!("Adding factory dependency: {:?}", name);
-        ccx.state.zk_use_factory_deps.push(name.clone());
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
         Ok(Default::default())
     }
 }
 
 impl Cheatcode for zkRegisterContractCall {
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
-        let Self {
-            name,
-            evmBytecodeHash,
-            evmDeployedBytecode,
-            evmBytecode,
-            zkBytecodeHash,
-            zkDeployedBytecode,
-        } = self;
-
-        let new_contract = DualCompiledContract {
-            name: name.clone(),
-            zk_bytecode_hash: zkBytecodeHash.0.into(),
-            zk_deployed_bytecode: zkDeployedBytecode.to_vec(),
-            //TODO: add argument to cheatcode
-            zk_factory_deps: vec![],
-            evm_bytecode_hash: *evmBytecodeHash,
-            evm_deployed_bytecode: evmDeployedBytecode.to_vec(),
-            evm_bytecode: evmBytecode.to_vec(),
-        };
-
-        if let Some(existing) = ccx.state.dual_compiled_contracts.iter().find(|contract| {
-            contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
-                contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
-        }) {
-            warn!(name = existing.name, "contract already exists with the given bytecode hashes");
-            return Ok(Default::default())
-        }
-
-        ccx.state.dual_compiled_contracts.push(new_contract);
-
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
         Ok(Default::default())
     }
 }

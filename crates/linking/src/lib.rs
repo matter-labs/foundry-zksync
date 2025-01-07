@@ -16,10 +16,12 @@ use foundry_compilers::{
         CompactDeployedBytecode, Libraries,
     },
     contracts::ArtifactContracts,
-    zksolc::{ZkSolc, ZkSolcCompiler},
     Artifact, ArtifactId,
 };
-use foundry_zksync_compiler::link::{self as zk_link, MissingLibrary};
+use foundry_zksync_compilers::{
+    compilers::zksolc::{ZkSolc, ZkSolcCompiler},
+    link::{self as zk_link, MissingLibrary},
+};
 use semver::Version;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},

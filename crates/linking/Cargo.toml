@@ -22,4 +22,4 @@ tracing.workspace = true
 
 # zk linking utils
 foundry-zksync-core.workspace = true
-foundry-zksync-compiler.workspace = true
+foundry-zksync-compilers.workspace = true

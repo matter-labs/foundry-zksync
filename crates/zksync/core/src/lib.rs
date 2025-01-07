@@ -84,8 +84,13 @@ pub struct ZkPaymasterData {
     pub input: Bytes,
 }
 
+/// Key used to set transaction metadata in other fields of [WithOtherFields<TransactionRequest>].
+/// This is used when broadcasting in a test, and when a script reads the broadcasted transactions.
+pub const ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY: &str = "zksync";
+
 /// Represents additional data for ZK transactions.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ZkTransactionMetadata {
     /// Factory Deps for ZK transactions.
     pub factory_deps: Vec<Vec<u8>>,

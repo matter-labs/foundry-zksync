@@ -19,7 +19,6 @@ use alloy_primitives::{
     Address, Bytes, Log, TxKind, U256,
 };
 use alloy_signer::Signer;
-use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use broadcast::next_nonce;
 use build::PreprocessedState;
 use clap::{Parser, ValueHint};
@@ -29,7 +28,7 @@ use forge_script_sequence::{AdditionalContract, NestedValue};
 use forge_verify::RetryArgs;
 use foundry_cli::{
     opts::{CoreBuildArgs, GlobalOpts},
-    utils::LoadConfig,
+    utils::{self, LoadConfig},
 };
 use foundry_common::{
     abi::{encode_function_args, get_func},
@@ -47,7 +46,6 @@ use foundry_config::{
 };
 use foundry_evm::{
     backend::Backend,
-    constants::DEFAULT_CREATE2_DEPLOYER,
     executors::ExecutorBuilder,
     inspectors::{
         cheatcodes::{BroadcastableTransactions, Wallets},
@@ -57,8 +55,7 @@ use foundry_evm::{
     traces::{TraceMode, Traces},
 };
 use foundry_wallets::MultiWalletOpts;
-use foundry_zksync_compiler::DualCompiledContracts;
-use foundry_zksync_core::vm::ZkEnv;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -76,7 +73,7 @@ mod transaction;
 mod verify;
 
 // Loads project's figment and merges the build cli arguments into it
-foundry_config::merge_impl_figment_convert!(ScriptArgs, opts, evm_opts);
+foundry_config::merge_impl_figment_convert!(ScriptArgs, opts, evm_args);
 
 /// CLI arguments for `forge script`.
 #[derive(Clone, Debug, Default, Parser)]
@@ -213,7 +210,7 @@ pub struct ScriptArgs {
     pub wallets: MultiWalletOpts,
 
     #[command(flatten)]
-    pub evm_opts: EvmArgs,
+    pub evm_args: EvmArgs,
 
     #[command(flatten)]
     pub verifier: forge_verify::VerifierArgs,
@@ -225,7 +222,7 @@ pub struct ScriptArgs {
 impl ScriptArgs {
     pub async fn preprocess(self) -> Result<PreprocessedState> {
         let script_wallets =
-            Wallets::new(self.wallets.get_multi_wallet().await?, self.evm_opts.sender);
+            Wallets::new(self.wallets.get_multi_wallet().await?, self.evm_args.sender);
 
         let (config, mut evm_opts) = self.load_config_and_evm_opts_emit_warnings()?;
 
@@ -242,7 +239,9 @@ impl ScriptArgs {
     pub async fn run_script(self) -> Result<()> {
         trace!(target: "script", "executing script command");
 
-        let compiled = self.preprocess().await?.compile()?;
+        let state = self.preprocess().await?;
+        let create2_deployer = state.script_config.evm_opts.create2_deployer;
+        let compiled = state.compile()?;
 
         // Move from `CompiledState` to `BundledState` either by resuming or executing and
         // simulating script.
@@ -280,20 +279,24 @@ impl ScriptArgs {
                 .execution_result
                 .transactions
                 .as_ref()
-                .map_or(true, |txs| txs.is_empty())
+                .is_none_or(|txs| txs.is_empty())
             {
                 return Ok(());
             }
 
             // Check if there are any missing RPCs and exit early to avoid hard error.
             if pre_simulation.execution_artifacts.rpc_data.missing_rpc {
-                sh_println!("\nIf you wish to simulate on-chain transactions pass a RPC URL.")?;
+                if !shell::is_json() {
+                    sh_println!("\nIf you wish to simulate on-chain transactions pass a RPC URL.")?;
+                }
+
                 return Ok(());
             }
 
             pre_simulation.args.check_contract_sizes(
                 &pre_simulation.execution_result,
                 &pre_simulation.build_data.known_contracts,
+                create2_deployer,
             )?;
 
             pre_simulation.fill_metadata().await?.bundle().await?
@@ -301,7 +304,9 @@ impl ScriptArgs {
 
         // Exit early in case user didn't provide any broadcast/verify related flags.
         if !bundled.args.should_broadcast() {
-            sh_println!("\nSIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.")?;
+            if !shell::is_json() {
+                sh_println!("\nSIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.")?;
+            }
             return Ok(());
         }
 
@@ -382,6 +387,7 @@ impl ScriptArgs {
         &self,
         result: &ScriptResult,
         known_contracts: &ContractsByArtifact,
+        create2_deployer: Address,
     ) -> Result<()> {
         //TODO: zk mode contract size check
 
@@ -411,7 +417,7 @@ impl ScriptArgs {
         }
 
         let mut prompt_user = false;
-        let max_size = match self.evm_opts.env.code_size_limit {
+        let max_size = match self.evm_args.env.code_size_limit {
             Some(size) => size,
             None => CONTRACT_MAX_SIZE,
         };
@@ -428,7 +434,7 @@ impl ScriptArgs {
 
             // Find if it's a CREATE or CREATE2. Otherwise, skip transaction.
             if let Some(TxKind::Call(to)) = to {
-                if to == DEFAULT_CREATE2_DEPLOYER {
+                if to == create2_deployer {
                     // Size of the salt prefix.
                     offset = 32;
                 } else {
@@ -553,6 +559,7 @@ impl ScriptConfig {
             // dapptools compatibility
             1
         };
+
         Ok(Self { config, evm_opts, sender_nonce, backends: HashMap::default() })
     }
 
@@ -593,13 +600,14 @@ impl ScriptConfig {
     ) -> Result<ScriptRunner> {
         trace!("preparing script runner");
         let env = self.evm_opts.evm_env().await?;
+        let mut strategy = utils::get_executor_strategy(&self.config);
 
         let db = if let Some(fork_url) = self.evm_opts.fork_url.as_ref() {
             match self.backends.get(fork_url) {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(fork);
+                    let backend = Backend::spawn(fork, strategy.runner.new_backend_strategy());
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -608,7 +616,7 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(None)
+            Backend::spawn(None, strategy.runner.new_backend_strategy())
         };
 
         // We need to enable tracing to decode contract names: local or external.
@@ -616,71 +624,46 @@ impl ScriptConfig {
             .inspectors(|stack| {
                 stack
                     .trace_mode(if debug { TraceMode::Debug } else { TraceMode::Call })
-                    .alphanet(self.evm_opts.alphanet)
+                    .odyssey(self.evm_opts.odyssey)
+                    .create2_deployer(self.evm_opts.create2_deployer)
             })
-            .spec(self.config.evm_spec_id())
+            .spec_id(self.config.evm_spec_id())
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions);
 
-        let use_zk = self.config.zksync.run_in_zk_mode();
-        let mut maybe_zk_env = None;
-        if use_zk {
-            if let Some(fork_url) = &self.evm_opts.fork_url {
-                let provider =
-                    zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
-                // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
-                let maybe_details =
-                    provider.get_block_details(env.block.number.try_into()?).await?;
-                if let Some(details) = maybe_details {
-                    let zk_env = ZkEnv {
-                        l1_gas_price: details
-                            .l1_gas_price
-                            .try_into()
-                            .expect("failed to convert l1_gas_price to u64"),
-                        fair_l2_gas_price: details
-                            .l2_fair_gas_price
-                            .try_into()
-                            .expect("failed to convert fair_l2_gas_price to u64"),
-                        fair_pubdata_price: details
-                            .fair_pubdata_price
-                            // TODO(zk): None as a value might mean L1Pegged model
-                            // we need to find out if it will ever be relevant to
-                            // us
-                            .unwrap_or_default()
-                            .try_into()
-                            .expect("failed to convert fair_pubdata_price to u64"),
-                    };
-                    builder = builder.zk_env(zk_env.clone());
-                    maybe_zk_env = Some(zk_env);
-                }
-            };
-        }
         if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
             cheats_data
         {
-            builder = builder
-                .inspectors(|stack| {
-                    stack
-                        .cheatcodes(
-                            CheatsConfig::new(
-                                &self.config,
-                                self.evm_opts.clone(),
-                                Some(known_contracts),
-                                Some(target.name),
-                                Some(target.version),
-                                dual_compiled_contracts,
-                                use_zk,
-                                maybe_zk_env,
-                            )
-                            .into(),
+            strategy.runner.zksync_set_dual_compiled_contracts(
+                strategy.context.as_mut(),
+                dual_compiled_contracts,
+            );
+
+            if let Some(fork_url) = &self.evm_opts.fork_url {
+                strategy.runner.zksync_set_fork_env(strategy.context.as_mut(), fork_url, &env)?;
+            }
+
+            builder = builder.inspectors(|stack| {
+                stack
+                    .cheatcodes(
+                        CheatsConfig::new(
+                            &self.config,
+                            self.evm_opts.clone(),
+                            Some(known_contracts),
+                            Some(target.name),
+                            Some(target.version),
+                            strategy
+                                .runner
+                                .new_cheatcode_inspector_strategy(strategy.context.as_ref()),
                         )
-                        .wallets(script_wallets)
-                        .enable_isolation(self.evm_opts.isolate)
-                })
-                .use_zk_vm(use_zk);
+                        .into(),
+                    )
+                    .wallets(script_wallets)
+                    .enable_isolation(self.evm_opts.isolate)
+            });
         }
 
-        let executor = builder.build(env, db);
+        let executor = builder.build(env, db, strategy);
         Ok(ScriptRunner::new(executor, self.evm_opts.clone()))
     }
 }
@@ -769,7 +752,7 @@ mod tests {
             "--code-size-limit",
             "50000",
         ]);
-        assert_eq!(args.evm_opts.env.code_size_limit, Some(50000));
+        assert_eq!(args.evm_args.env.code_size_limit, Some(50000));
     }
 
     #[test]

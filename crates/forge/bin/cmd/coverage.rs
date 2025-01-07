@@ -6,24 +6,27 @@ use forge::{
     coverage::{
         analysis::{SourceAnalysis, SourceAnalyzer, SourceFile, SourceFiles},
         anchors::find_anchors,
-        BytecodeReporter, ContractId, CoverageReport, CoverageReporter, DebugReporter, ItemAnchor,
-        LcovReporter, SummaryReporter,
+        BytecodeReporter, ContractId, CoverageReport, CoverageReporter, CoverageSummaryReporter,
+        DebugReporter, ItemAnchor, LcovReporter,
     },
     opts::EvmOpts,
     utils::IcPcMap,
-    MultiContractRunnerBuilder, TestOptions,
+    MultiContractRunnerBuilder,
 };
-use foundry_cli::utils::{LoadConfig, STATIC_FUZZ_SEED};
+use foundry_cli::utils::{self, LoadConfig, STATIC_FUZZ_SEED};
 use foundry_common::{compile::ProjectCompiler, fs};
 use foundry_compilers::{
-    artifacts::{sourcemap::SourceMap, CompactBytecode, CompactDeployedBytecode, SolcLanguage},
+    artifacts::{
+        sourcemap::SourceMap, CompactBytecode, CompactDeployedBytecode, SolcLanguage, Source,
+    },
+    compilers::multi::MultiCompiler,
     Artifact, ArtifactId, Project, ProjectCompileOutput,
 };
 use foundry_config::{Config, SolcReq};
-use foundry_zksync_compiler::DualCompiledContracts;
 use rayon::prelude::*;
-use semver::Version;
+use semver::{Version, VersionReq};
 use std::{
+    io,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -39,6 +42,17 @@ pub struct CoverageArgs {
     /// This flag can be used multiple times.
     #[arg(long, value_enum, default_value = "summary")]
     report: Vec<CoverageReportKind>,
+
+    /// The version of the LCOV "tracefile" format to use.
+    ///
+    /// Format: `MAJOR[.MINOR]`.
+    ///
+    /// Main differences:
+    /// - `1.x`: The original v1 format.
+    /// - `2.0`: Adds support for "line end" numbers for functions.
+    /// - `2.2`: Changes the format of functions.
+    #[arg(long, default_value = "1", value_parser = parse_lcov_version)]
+    lcov_version: Version,
 
     /// Enable viaIR with minimum optimization
     ///
@@ -154,7 +168,7 @@ impl CoverageArgs {
 
                 let source = SourceFile {
                     ast,
-                    source: fs::read_to_string(&file)
+                    source: Source::read(&file)
                         .wrap_err("Could not read source code for analysis")?,
                 };
                 versioned_sources
@@ -168,7 +182,7 @@ impl CoverageArgs {
         // Get source maps and bytecodes
         let artifacts: Vec<ArtifactData> = output
             .artifact_ids()
-            .par_bridge()
+            .par_bridge() // This parses source maps, so we want to run it in parallel.
             .filter_map(|(id, artifact)| {
                 let source_id = report.get_source_id(id.version.clone(), id.source.clone())?;
                 ArtifactData::new(&id, source_id, artifact)
@@ -223,6 +237,7 @@ impl CoverageArgs {
     ) -> Result<()> {
         let root = project.paths.root;
         let verbosity = evm_opts.verbosity;
+        let strategy = utils::get_executor_strategy(&config);
 
         // Build the contract runner
         let env = evm_opts.evm_env().await?;
@@ -231,13 +246,8 @@ impl CoverageArgs {
             .evm_spec(config.evm_spec_id())
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
-            .with_test_options(TestOptions {
-                fuzz: config.fuzz.clone(),
-                invariant: config.invariant.clone(),
-                ..Default::default()
-            })
             .set_coverage(true)
-            .build(&root, output.clone(), None, env, evm_opts, DualCompiledContracts::default())?;
+            .build::<MultiCompiler>(&root, output, None, env, evm_opts, strategy)?;
 
         let known_contracts = runner.known_contracts.clone();
 
@@ -253,10 +263,10 @@ impl CoverageArgs {
             for result in suite.test_results.values() {
                 let Some(hit_maps) = result.coverage.as_ref() else { continue };
                 for map in hit_maps.0.values() {
-                    if let Some((id, _)) = known_contracts.find_by_deployed_code(&map.bytecode) {
+                    if let Some((id, _)) = known_contracts.find_by_deployed_code(map.bytecode()) {
                         hits.push((id, map, true));
                     } else if let Some((id, _)) =
-                        known_contracts.find_by_creation_code(&map.bytecode)
+                        known_contracts.find_by_creation_code(map.bytecode())
                     {
                         hits.push((id, map, false));
                     }
@@ -285,7 +295,7 @@ impl CoverageArgs {
         let file_pattern = filter.args().coverage_pattern_inverse.as_ref();
         let file_root = &filter.paths().root;
         report.filter_out_ignored_sources(|path: &Path| {
-            file_pattern.map_or(true, |re| {
+            file_pattern.is_none_or(|re| {
                 !re.is_match(&path.strip_prefix(file_root).unwrap_or(path).to_string_lossy())
             })
         });
@@ -293,21 +303,17 @@ impl CoverageArgs {
         // Output final report
         for report_kind in self.report {
             match report_kind {
-                CoverageReportKind::Summary => SummaryReporter::default().report(&report),
+                CoverageReportKind::Summary => CoverageSummaryReporter::default().report(&report),
                 CoverageReportKind::Lcov => {
-                    if let Some(report_file) = self.report_file {
-                        return LcovReporter::new(&mut fs::create_file(root.join(report_file))?)
-                            .report(&report)
-                    } else {
-                        return LcovReporter::new(&mut fs::create_file(root.join("lcov.info"))?)
-                            .report(&report)
-                    }
+                    let path =
+                        root.join(self.report_file.as_deref().unwrap_or("lcov.info".as_ref()));
+                    let mut file = io::BufWriter::new(fs::create_file(path)?);
+                    LcovReporter::new(&mut file, self.lcov_version.clone()).report(&report)
                 }
                 CoverageReportKind::Bytecode => {
                     let destdir = root.join("bytecode-coverage");
                     fs::create_dir_all(&destdir)?;
-                    BytecodeReporter::new(root.clone(), destdir).report(&report)?;
-                    Ok(())
+                    BytecodeReporter::new(root.clone(), destdir).report(&report)
                 }
                 CoverageReportKind::Debug => DebugReporter.report(&report),
             }?;
@@ -316,9 +322,10 @@ impl CoverageArgs {
     }
 }
 
-// TODO: HTML
-#[derive(Clone, Debug, ValueEnum)]
+/// Coverage reports to generate.
+#[derive(Clone, Debug, Default, ValueEnum)]
 pub enum CoverageReportKind {
+    #[default]
     Summary,
     Lcov,
     Debug,
@@ -408,5 +415,33 @@ impl BytecodeData {
             &source_analysis.items,
             items_by_source_id,
         )
+    }
+}
+
+fn parse_lcov_version(s: &str) -> Result<Version, String> {
+    let vr = VersionReq::parse(&format!("={s}")).map_err(|e| e.to_string())?;
+    let [c] = &vr.comparators[..] else {
+        return Err("invalid version".to_string());
+    };
+    if c.op != semver::Op::Exact {
+        return Err("invalid version".to_string());
+    }
+    if !c.pre.is_empty() {
+        return Err("pre-releases are not supported".to_string());
+    }
+    Ok(Version::new(c.major, c.minor.unwrap_or(0), c.patch.unwrap_or(0)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lcov_version() {
+        assert_eq!(parse_lcov_version("0").unwrap(), Version::new(0, 0, 0));
+        assert_eq!(parse_lcov_version("1").unwrap(), Version::new(1, 0, 0));
+        assert_eq!(parse_lcov_version("1.0").unwrap(), Version::new(1, 0, 0));
+        assert_eq!(parse_lcov_version("1.1").unwrap(), Version::new(1, 1, 0));
+        assert_eq!(parse_lcov_version("1.11").unwrap(), Version::new(1, 11, 0));
     }
 }

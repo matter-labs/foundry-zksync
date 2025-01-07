@@ -21,6 +21,7 @@ use foundry_config::{figment, impl_figment_convert, impl_figment_convert_cast, C
 use itertools::Itertools;
 use reqwest::Url;
 use revm_primitives::HashSet;
+use semver::BuildMetadata;
 use std::path::PathBuf;
 
 /// Verification provider arguments
@@ -49,7 +50,7 @@ impl Default for VerifierArgs {
     }
 }
 
-/// CLI arguments for `forge verify`.
+/// CLI arguments for `forge verify-contract`.
 #[derive(Clone, Debug, Parser)]
 pub struct VerifyArgs {
     /// The address of the contract to verify.
@@ -227,6 +228,17 @@ impl VerifyArgs {
 
         let verifier_url = self.verifier.verifier_url.clone();
         sh_println!("Start verifying contract `{}` deployed on {chain}", self.address)?;
+        if let Some(version) = &self.compiler_version {
+            sh_println!("Compiler version: {version}")?;
+        }
+        if let Some(optimizations) = &self.num_of_optimizations {
+            sh_println!("Optimizations:    {optimizations}")?
+        }
+        if let Some(args) = &self.constructor_args {
+            if !args.is_empty() {
+                sh_println!("Constructor args: {args}")?
+            }
+        }
         self.verifier.verifier.client(&self.etherscan.key())?.verify(self, context).await.map_err(|err| {
             if let Some(verifier_url) = verifier_url {
                  match Url::parse(&verifier_url) {
@@ -270,8 +282,7 @@ impl VerifyArgs {
             };
 
             let cache = project.read_cache_file().ok();
-
-            let version = if let Some(ref version) = self.compiler_version {
+            let mut version = if let Some(ref version) = self.compiler_version {
                 version.trim_start_matches('v').parse()?
             } else if let Some(ref solc) = config.solc {
                 match solc {
@@ -301,7 +312,6 @@ impl VerifyArgs {
             } else {
                 eyre::bail!("If cache is disabled, compiler version must be either provided with `--compiler-version` option or set in foundry.toml")
             };
-
             let settings = if let Some(profile) = &self.compilation_profile {
                 if profile == "default" {
                     &project.settings
@@ -317,7 +327,21 @@ impl VerifyArgs {
                 let profiles = entry
                     .artifacts
                     .get(&contract.name)
-                    .and_then(|artifacts| artifacts.get(&version))
+                    .and_then(|artifacts| {
+                        let mut cached_artifacts = artifacts.get(&version);
+                        // If we try to verify with specific build version and no cached artifacts
+                        // found, then check if we have artifacts cached for same version but
+                        // without any build metadata.
+                        // This could happen when artifacts are built / cached
+                        // with a version like `0.8.20` but verify is using a compiler-version arg
+                        // as `0.8.20+commit.a1b79de6`.
+                        // See <https://github.com/foundry-rs/foundry/issues/9510>.
+                        if cached_artifacts.is_none() && version.build != BuildMetadata::EMPTY {
+                            version.build = BuildMetadata::EMPTY;
+                            cached_artifacts = artifacts.get(&version);
+                        }
+                        cached_artifacts
+                    })
                     .map(|artifacts| artifacts.keys().collect::<HashSet<_>>())
                     .unwrap_or_default();
 
@@ -384,7 +408,7 @@ impl VerifyArgs {
         let mut config = self.load_config_emit_warnings();
         config.libraries.extend(self.libraries.clone());
 
-        let project = foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+        let project = foundry_config::zksync::config_create_project(&config, config.cache, false)?;
 
         if let Some(ref contract) = self.contract {
             let contract_path = if let Some(ref path) = contract.path {

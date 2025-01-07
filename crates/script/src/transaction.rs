@@ -4,8 +4,7 @@ use alloy_primitives::{hex, Address, TxKind, B256};
 use eyre::Result;
 use forge_script_sequence::TransactionWithMetadata;
 use foundry_common::{fmt::format_token_raw, ContractData, TransactionMaybeSigned, SELECTOR_LEN};
-use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, traces::CallTraceDecoder};
-use foundry_zksync_core::ZkTransactionMetadata;
+use foundry_evm::traces::CallTraceDecoder;
 use itertools::Itertools;
 use revm_inspectors::tracing::types::CallKind;
 use std::collections::BTreeMap;
@@ -16,16 +15,11 @@ pub struct ScriptTransactionBuilder {
 }
 
 impl ScriptTransactionBuilder {
-    pub fn new(
-        transaction: TransactionMaybeSigned,
-        rpc: String,
-        zk: Option<ZkTransactionMetadata>,
-    ) -> Self {
+    pub fn new(transaction: TransactionMaybeSigned, rpc: String) -> Self {
         let mut transaction = TransactionWithMetadata::from_tx_request(transaction);
         transaction.rpc = rpc;
         // If tx.gas is already set that means it was specified in script
         transaction.is_fixed_gas_limit = transaction.tx().gas().is_some();
-        transaction.zk = zk;
 
         Self { transaction }
     }
@@ -35,16 +29,16 @@ impl ScriptTransactionBuilder {
         &mut self,
         local_contracts: &BTreeMap<Address, &ContractData>,
         decoder: &CallTraceDecoder,
+        create2_deployer: Address,
     ) -> Result<()> {
         if let Some(TxKind::Call(to)) = self.transaction.transaction.to() {
-            if to == DEFAULT_CREATE2_DEPLOYER {
+            if to == create2_deployer {
                 if let Some(input) = self.transaction.transaction.input() {
                     let (salt, init_code) = input.split_at(32);
 
                     self.set_create(
                         true,
-                        DEFAULT_CREATE2_DEPLOYER
-                            .create2_from_code(B256::from_slice(salt), init_code),
+                        create2_deployer.create2_from_code(B256::from_slice(salt), init_code),
                         local_contracts,
                     )?;
                 }

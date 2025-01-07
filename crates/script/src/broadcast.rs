@@ -26,10 +26,10 @@ use foundry_common::{
     provider::{
         get_http_provider, try_get_http_provider, try_get_zksync_http_provider, RetryProvider,
     },
-    TransactionMaybeSigned,
+    shell, TransactionMaybeSigned,
 };
 use foundry_config::Config;
-use foundry_zksync_core::{convert::ConvertH160, ZkTransactionMetadata};
+use foundry_zksync_core::convert::ConvertH160;
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{cmp::Ordering, sync::Arc};
@@ -66,12 +66,18 @@ pub async fn send_transaction(
     provider: Arc<RetryProvider>,
     zk_provider: Arc<RetryProvider<Zksync>>,
     mut kind: SendTransactionKind<'_>,
-    zk: Option<&ZkTransactionMetadata>,
     sequential_broadcast: bool,
     is_fixed_gas_limit: bool,
     estimate_via_rpc: bool,
     estimate_multiplier: u64,
 ) -> Result<TxHash> {
+    let zk_tx_meta =
+        if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
+            foundry_strategy_zksync::try_get_zksync_transaction_metadata(&tx.other)
+        } else {
+            None
+        };
+
     if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
         if sequential_broadcast {
             let from = tx.from.expect("no sender");
@@ -102,7 +108,7 @@ pub async fn send_transaction(
         // gas to be re-estimated right before broadcasting.
         if !is_fixed_gas_limit && estimate_via_rpc {
             // We skip estimating gas for zk transactions as the fee is estimated manually later.
-            if zk.is_none() {
+            if zk_tx_meta.is_none() {
                 estimate_gas(tx, &provider, estimate_multiplier).await?;
             }
         }
@@ -118,14 +124,16 @@ pub async fn send_transaction(
         SendTransactionKind::Raw(tx, signer) => {
             debug!("sending transaction: {:?}", tx);
 
-            if let Some(zk) = zk {
+            if let Some(zk_tx_meta) = zk_tx_meta {
                 let mut inner = tx.inner.clone();
                 inner.transaction_type = Some(TxType::Eip712 as u8);
                 let mut zk_tx: ZkTransactionRequest = inner.into();
-                if !zk.factory_deps.is_empty() {
-                    zk_tx.set_factory_deps(zk.factory_deps.iter().map(Bytes::from_iter).collect());
+                if !zk_tx_meta.factory_deps.is_empty() {
+                    zk_tx.set_factory_deps(
+                        zk_tx_meta.factory_deps.iter().map(Bytes::from_iter).collect(),
+                    );
                 }
-                if let Some(paymaster_data) = &zk.paymaster_data {
+                if let Some(paymaster_data) = &zk_tx_meta.paymaster_data {
                     zk_tx.set_paymaster_params(
                         alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
                             paymaster: paymaster_data.paymaster.to_address(),
@@ -248,7 +256,12 @@ impl BundledState {
             .sequence
             .sequences()
             .iter()
-            .flat_map(|sequence| sequence.transactions().map(|tx| tx.from().expect("missing from")))
+            .flat_map(|sequence| {
+                sequence
+                    .transactions()
+                    .filter(|tx| tx.is_unsigned())
+                    .map(|tx| tx.from().expect("missing from"))
+            })
             .collect::<AddressHashSet>();
 
         if required_addresses.contains(&Config::DEFAULT_SENDER) {
@@ -336,7 +349,6 @@ impl BundledState {
                     .skip(already_broadcasted)
                     .map(|tx_with_metadata| {
                         let is_fixed_gas_limit = tx_with_metadata.is_fixed_gas_limit;
-                        let zk = tx_with_metadata.zk.clone();
 
                         let kind = match tx_with_metadata.tx().clone() {
                             TransactionMaybeSigned::Signed { tx, .. } => {
@@ -367,7 +379,7 @@ impl BundledState {
                             }
                         };
 
-                        Ok((kind, zk, is_fixed_gas_limit))
+                        Ok((kind, is_fixed_gas_limit))
                     })
                     .collect::<Result<Vec<_>>>()?;
 
@@ -396,12 +408,11 @@ impl BundledState {
                         batch_number * batch_size,
                         batch_number * batch_size + std::cmp::min(batch_size, batch.len()) - 1
                     ));
-                    for (kind, zk, is_fixed_gas_limit) in batch {
+                    for (kind, is_fixed_gas_limit) in batch {
                         let fut = send_transaction(
                             provider.clone(),
                             zk_provider.clone(),
                             kind.clone(),
-                            zk.as_ref(),
                             sequential_broadcast,
                             *is_fixed_gas_limit,
                             estimate_via_rpc,
@@ -463,8 +474,10 @@ impl BundledState {
             seq_progress.inner.write().finish();
         }
 
-        sh_println!("\n\n==========================")?;
-        sh_println!("\nONCHAIN EXECUTION COMPLETE & SUCCESSFUL.")?;
+        if !shell::is_json() {
+            sh_println!("\n\n==========================")?;
+            sh_println!("\nONCHAIN EXECUTION COMPLETE & SUCCESSFUL.")?;
+        }
 
         Ok(BroadcastedState {
             args: self.args,

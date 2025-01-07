@@ -8,11 +8,13 @@ use foundry_compilers::{
     compilers::CompilerSettings,
     resolver::parse::SolData,
     solc::{Solc, SolcCompiler},
-    zksolc::{self, ZkSolc, ZkSolcCompiler},
-    zksync::artifact_output::zk::ZkArtifactOutput,
     Graph, Project,
 };
 use foundry_config::Config;
+use foundry_zksync_compilers::compilers::{
+    artifact_output::zk::ZkArtifactOutput,
+    zksolc::{self, ZkSolc, ZkSolcCompiler},
+};
 use semver::Version;
 use std::path::PathBuf;
 
@@ -41,7 +43,7 @@ impl ZkVerificationContext {
         config: Config,
     ) -> Result<Self> {
         let mut project =
-            foundry_zksync_compiler::config_create_project(&config, config.cache, false)?;
+            foundry_config::zksync::config_create_project(&config, config.cache, false)?;
         project.no_artifacts = true;
         let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
 

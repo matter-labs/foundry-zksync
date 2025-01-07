@@ -35,7 +35,7 @@ pub fn transact<'a, DB>(
     db: &'a mut DB,
 ) -> eyre::Result<ResultAndState>
 where
-    DB: Database,
+    DB: Database + ?Sized,
     <DB as Database>::Error: Debug,
 {
     info!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
@@ -77,6 +77,7 @@ where
         tx_caller: env.tx.caller,
         msg_sender: env.tx.caller,
         contract: transact_to.to_address(),
+        input: if is_create { None } else { Some(env.tx.data.clone()) },
         delegate_as: None,
         block_number: env.block.number,
         block_timestamp: env.block.timestamp,
@@ -192,6 +193,7 @@ where
         tx_caller: ecx.env.tx.caller,
         msg_sender,
         contract: CONTRACT_DEPLOYER_ADDRESS.to_address(),
+        input: None,
         delegate_as: None,
         block_number: ecx.env.block.number,
         block_timestamp: ecx.env.block.timestamp,
@@ -258,6 +260,7 @@ where
         tx_caller: ecx.env.tx.caller,
         msg_sender: call.caller,
         contract: call.bytecode_address,
+        input: Some(call.input.clone()),
         delegate_as: match call.scheme {
             CallScheme::DelegateCall => Some(call.target_address),
             _ => None,
