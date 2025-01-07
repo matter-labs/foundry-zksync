@@ -9,7 +9,7 @@ use crate::{
 };
 use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
-use alloy_primitives::{keccak256, map::HashMap, uint, Address, B256, U256};
+use alloy_primitives::{keccak256, map::HashMap, uint, Address, Bytes, B256, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
 use eyre::Context;
@@ -1626,8 +1626,9 @@ impl Database for Backend {
             let provider = try_get_zksync_http_provider(fork_url)
                 .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)))?;
             let result = db.db.do_any_request(async move {
-                let bytes: alloy_primitives::Bytes =
-                    provider.raw_request("zks_getBytecodeByHash".into(), vec![code_hash]).await?;
+                let bytes = provider
+                    .raw_request::<_, Bytes>("zks_getBytecodeByHash".into(), vec![code_hash])
+                    .await?;
                 Ok(Bytecode::new_raw(bytes))
             });
 
