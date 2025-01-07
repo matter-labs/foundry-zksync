@@ -2,7 +2,6 @@ use std::{any::Any, fmt::Debug, sync::Arc};
 
 use alloy_primitives::{Address, TxKind};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
-use foundry_evm_core::backend::LocalForkId;
 use revm::{
     interpreter::{CallInputs, CallOutcome, CreateOutcome, Interpreter},
     primitives::SignedAuthorization,
@@ -168,14 +167,6 @@ pub trait CheatcodeInspectorStrategyExt {
         _executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CallOutcome> {
         None
-    }
-
-    fn zksync_select_fork_vm(
-        &self,
-        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
-        _data: InnerEcx,
-        _fork_id: LocalForkId,
-    ) {
     }
 }
 
