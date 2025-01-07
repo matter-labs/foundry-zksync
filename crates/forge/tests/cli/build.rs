@@ -1,8 +1,7 @@
 use crate::utils::generate_large_contract;
-use foundry_config::{zksync::ZkSyncConfig, Config};
-use foundry_test_utils::{forgetest, snapbox::IntoData, str, util::OutputExt};
+use foundry_config::{Config};
+use foundry_test_utils::{forgetest, snapbox::IntoData, str};
 use globset::Glob;
-use std::fs;
 
 forgetest_init!(can_parse_build_filters, |prj, cmd| {
     prj.clear();
@@ -236,7 +235,6 @@ contract UsesFoo {
     )
     .unwrap();
 
-    // cmd.args(["build", "--zksync", "--zk-detect-missing-libraries", "--json"]).assert_success();
     cmd.args(["build", "--zksync", "--zk-detect-missing-libraries", "--json", "--force"])
         .assert_success()
         .stdout_eq(str![[r#"

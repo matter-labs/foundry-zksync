@@ -129,13 +129,11 @@ impl BuildArgs {
         } else {
             let mut zk_project = config_create_project(&config, config.cache, false)?;
 
-            // Note: This is to pass the zk_detect_missing_libraries flag to the zk compiler only
-            // while building.
+            // Note: Here we override the detect_missing_libraries flag to the compiler settings
+            // with the value from the CLI argument.
+            // Doing it here guarantees that this is only used while build is specified.
             zk_project.settings.settings.detect_missing_libraries =
                 self.zk_detect_missing_libraries;
-
-            // sh_print!("Compiling ZK contracts...")?;
-            // sh_println!("zk_project.settings.settings: {:?}", zk_project.settings.settings)?;
 
             // Collect sources to compile if build subdirectories specified.
             let mut files = vec![];
@@ -219,10 +217,6 @@ impl Provider for BuildArgs {
 
         if self.ignore_eip_3860 {
             dict.insert("ignore_eip_3860".to_string(), true.into());
-        }
-
-        if self.zk_detect_missing_libraries {
-            dict.insert("zk_detect_missing_libraries".to_string(), true.into());
         }
 
         Ok(Map::from([(Config::selected_profile(), dict)]))
