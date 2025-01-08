@@ -794,7 +794,7 @@ impl Backend {
         inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<ResultAndState> {
         self.initialize(env);
-        self.strategy.runner.clone().inspect(self, env, inspector, inspect_ctx)
+        self.strategy.runner.inspect(self, env, inspector, inspect_ctx)
     }
 
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.

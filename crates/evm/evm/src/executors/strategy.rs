@@ -43,28 +43,24 @@ impl ExecutorStrategyContext for () {
 #[derive(Debug)]
 pub struct ExecutorStrategy {
     /// Strategy runner.
-    pub runner: Box<dyn ExecutorStrategyRunner>,
+    pub runner: &'static dyn ExecutorStrategyRunner,
     /// Strategy context.
     pub context: Box<dyn ExecutorStrategyContext>,
 }
 
 impl ExecutorStrategy {
     pub fn new_evm() -> Self {
-        Self { runner: Box::new(EvmExecutorStrategyRunner::default()), context: Box::new(()) }
+        Self { runner: &EvmExecutorStrategyRunner, context: Box::new(()) }
     }
 }
 
 impl Clone for ExecutorStrategy {
     fn clone(&self) -> Self {
-        Self { runner: self.runner.new_cloned(), context: self.context.new_cloned() }
+        Self { runner: self.runner, context: self.context.new_cloned() }
     }
 }
 
 pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
-    fn name(&self) -> &'static str;
-
-    fn new_cloned(&self) -> Box<dyn ExecutorStrategyRunner>;
-
     fn set_balance(
         &self,
         executor: &mut Executor,
@@ -140,17 +136,9 @@ pub trait ExecutorStrategyExt {
 
 /// Implements [ExecutorStrategyRunner] for EVM.
 #[derive(Debug, Default, Clone)]
-pub struct EvmExecutorStrategyRunner {}
+pub struct EvmExecutorStrategyRunner;
 
 impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
-    fn name(&self) -> &'static str {
-        "evm"
-    }
-
-    fn new_cloned(&self) -> Box<dyn ExecutorStrategyRunner> {
-        Box::new(self.clone())
-    }
-
     fn set_balance(
         &self,
         executor: &mut Executor,
@@ -209,16 +197,10 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         _ctx: &dyn ExecutorStrategyContext,
     ) -> CheatcodeInspectorStrategy {
         CheatcodeInspectorStrategy {
-            runner: Box::new(EvmCheatcodeInspectorStrategyRunner::default()),
+            runner: &EvmCheatcodeInspectorStrategyRunner,
             context: Box::new(()),
         }
     }
 }
 
 impl ExecutorStrategyExt for EvmExecutorStrategyRunner {}
-
-impl Clone for Box<dyn ExecutorStrategyRunner> {
-    fn clone(&self) -> Self {
-        self.new_cloned()
-    }
-}
