@@ -174,7 +174,7 @@ impl ZkSyncNode {
                 let server = server_builder.build(SocketAddr::from(([0, 0, 0, 0], 0))).await;
 
                 // if no receiver was ready to receive the spawning thread died
-                _ = port_tx.send(8011);
+                _ = port_tx.send(config.port);
 
                 let handle = server.run();
 
