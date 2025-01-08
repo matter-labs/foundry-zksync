@@ -171,10 +171,9 @@ impl ZkSyncNode {
                 let allow_origin = AllowOrigin::any();
                 let server_builder = NodeServerBuilder::new(node.clone(), allow_origin);
 
-                let server = server_builder.build(SocketAddr::from(([0, 0, 0, 0], 0))).await;
-
+                let server = server_builder.build(SocketAddr::from(([0, 0, 0, 0], config.port))).await;
                 // if no receiver was ready to receive the spawning thread died
-                _ = port_tx.send(config.port);
+                 _ = port_tx.send(config.port);
 
                 let handle = server.run();
 
