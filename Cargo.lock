@@ -1263,14 +1263,45 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.6",
  "tokio-util",
- "tower-http",
+ "tower-http 0.5.2",
  "tracing",
+]
+
+[[package]]
+name = "anvil_zksync_api_decl"
+version = "0.2.1"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=b21c4898d44e3b775423b8d698d425fc43a85981#b21c4898d44e3b775423b8d698d425fc43a85981"
+dependencies = [
+ "anvil_zksync_types",
+ "jsonrpsee",
+ "zksync_types",
+ "zksync_web3_decl",
+]
+
+[[package]]
+name = "anvil_zksync_api_server"
+version = "0.2.1"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=b21c4898d44e3b775423b8d698d425fc43a85981#b21c4898d44e3b775423b8d698d425fc43a85981"
+dependencies = [
+ "anvil_zksync_api_decl",
+ "anvil_zksync_core",
+ "anvil_zksync_types",
+ "anyhow",
+ "hex",
+ "http 1.2.0",
+ "jsonrpsee",
+ "thiserror 1.0.69",
+ "tower 0.4.13",
+ "tower-http 0.6.2",
+ "tracing",
+ "zksync_types",
+ "zksync_web3_decl",
 ]
 
 [[package]]
 name = "anvil_zksync_config"
 version = "0.2.1"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=49b627d7c016cde705cec58d3e5d398a7f2143a8#49b627d7c016cde705cec58d3e5d398a7f2143a8"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=b21c4898d44e3b775423b8d698d425fc43a85981#b21c4898d44e3b775423b8d698d425fc43a85981"
 dependencies = [
  "alloy-signer 0.5.4",
  "alloy-signer-local 0.5.4",
@@ -1289,7 +1320,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_core"
 version = "0.2.1"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=49b627d7c016cde705cec58d3e5d398a7f2143a8#49b627d7c016cde705cec58d3e5d398a7f2143a8"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=b21c4898d44e3b775423b8d698d425fc43a85981#b21c4898d44e3b775423b8d698d425fc43a85981"
 dependencies = [
  "anvil_zksync_config",
  "anvil_zksync_types",
@@ -1323,7 +1354,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_types"
 version = "0.2.1"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=49b627d7c016cde705cec58d3e5d398a7f2143a8#49b627d7c016cde705cec58d3e5d398a7f2143a8"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=b21c4898d44e3b775423b8d698d425fc43a85981#b21c4898d44e3b775423b8d698d425fc43a85981"
 dependencies = [
  "clap",
  "serde",
@@ -4293,7 +4324,7 @@ dependencies = [
  "tokio",
  "toml 0.8.19",
  "toml_edit 0.22.22",
- "tower-http",
+ "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
  "vergen",
@@ -5066,7 +5097,9 @@ version = "0.0.2"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
- "alloy-zksync",
+ "anvil_zksync_api_server",
+ "anvil_zksync_config",
+ "anvil_zksync_core",
  "eyre",
  "fd-lock",
  "foundry-block-explorers",
@@ -5080,8 +5113,10 @@ dependencies = [
  "snapbox",
  "tempfile",
  "tokio",
+ "tower-http 0.6.2",
  "tracing",
  "tracing-subscriber",
+ "zksync_types",
 ]
 
 [[package]]
@@ -11523,6 +11558,20 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "403fa3b783d4b626a8ad51d766ab03cb6d2dbfc46b1c5d4448395e6628dc9697"
+dependencies = [
+ "bitflags 2.6.0",
+ "bytes",
+ "http 1.2.0",
+ "pin-project-lite",
+ "tower-layer",
+ "tower-service",
 ]
 
 [[package]]

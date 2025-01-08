@@ -31,10 +31,15 @@ tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rand.workspace = true
 snapbox = { version = "0.6", features = ["json", "regex"] }
+tokio.workspace = true
 tempfile.workspace = true
+tower-http = { version = "0.6.2", features = ["cors"] }
 
 # zk
-alloy-zksync.workspace = true
+zksync_types.workspace = true
+anvil_zksync_core.workspace = true
+anvil_zksync_api_server.workspace = true
+anvil_zksync_config.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

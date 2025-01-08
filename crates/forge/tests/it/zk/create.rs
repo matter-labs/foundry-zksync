@@ -14,10 +14,10 @@ forgetest_async!(forge_zk_can_deploy_erc20, |prj, cmd| {
     let url = node.url();
 
     let private_key =
-        node.rich_wallets().first().cloned().map(|(_, pk)| pk).expect("No rich wallets available");
+        ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
 
     let erc20_address =
-        deploy_zk_contract(&mut cmd, url.as_str(), &private_key, "./src/ERC20.sol:MyToken")
+        deploy_zk_contract(&mut cmd, url.as_str(), private_key, "./src/ERC20.sol:MyToken")
             .expect("Failed to deploy ERC20 contract");
 
     assert!(!erc20_address.is_empty(), "Deployed address should not be empty");
@@ -36,17 +36,17 @@ forgetest_async!(forge_zk_can_deploy_contracts_and_cast_a_transaction, |prj, cmd
     let url = node.url();
 
     let private_key =
-        node.rich_wallets().first().cloned().map(|(_, pk)| pk).expect("No rich wallets available");
+        ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
 
     let token_receiver_address = deploy_zk_contract(
         &mut cmd,
         url.as_str(),
-        &private_key,
+        private_key,
         "./src/TokenReceiver.sol:TokenReceiver",
     )
     .expect("Failed to deploy TokenReceiver contract");
     let erc_20_address =
-        deploy_zk_contract(&mut cmd, url.as_str(), &private_key, "./src/ERC20.sol:MyToken")
+        deploy_zk_contract(&mut cmd, url.as_str(), private_key, "./src/ERC20.sol:MyToken")
             .expect("Failed to deploy ERC20 contract");
 
     cmd.cast_fuse().args([
@@ -54,7 +54,7 @@ forgetest_async!(forge_zk_can_deploy_contracts_and_cast_a_transaction, |prj, cmd
         "--rpc-url",
         url.as_str(),
         "--private-key",
-        &private_key,
+        private_key,
         &erc_20_address,
         "transfer(address,uint256)",
         &token_receiver_address,
