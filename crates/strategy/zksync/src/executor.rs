@@ -50,9 +50,7 @@ impl ExecutorStrategyContext for ZksyncExecutorStrategyContext {
 
 /// Defines the [ExecutorStrategyRunner] strategy for ZKsync.
 #[derive(Debug, Default, Clone)]
-pub struct ZksyncExecutorStrategyRunner {
-    evm: EvmExecutorStrategyRunner,
-}
+pub struct ZksyncExecutorStrategyRunner;
 
 fn get_context_ref(ctx: &dyn ExecutorStrategyContext) -> &ZksyncExecutorStrategyContext {
     ctx.as_any_ref().downcast_ref().expect("expected ZksyncExecutorStrategyContext")
@@ -63,21 +61,13 @@ fn get_context(ctx: &mut dyn ExecutorStrategyContext) -> &mut ZksyncExecutorStra
 }
 
 impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
-    fn name(&self) -> &'static str {
-        "zk"
-    }
-
-    fn new_cloned(&self) -> Box<dyn ExecutorStrategyRunner> {
-        Box::new(self.clone())
-    }
-
     fn set_balance(
         &self,
         executor: &mut Executor,
         address: Address,
         amount: U256,
     ) -> BackendResult<()> {
-        self.evm.set_balance(executor, address, amount)?;
+        EvmExecutorStrategyRunner.set_balance(executor, address, amount)?;
 
         let (address, slot) = foundry_zksync_core::state::get_balance_storage(address);
         executor.backend.insert_account_storage(address, slot, amount)?;
@@ -91,7 +81,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         address: Address,
         nonce: u64,
     ) -> BackendResult<()> {
-        self.evm.set_nonce(executor, address, nonce)?;
+        EvmExecutorStrategyRunner.set_nonce(executor, address, nonce)?;
 
         let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
         // fetch the full nonce to preserve account's deployment nonce
@@ -130,7 +120,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let ctx = get_context_ref(ctx);
 
         match ctx.transaction_context.as_ref() {
-            None => self.evm.call(ctx, backend, env, executor_env, inspector),
+            None => EvmExecutorStrategyRunner.call(ctx, backend, env, executor_env, inspector),
             Some(zk_tx) => backend.inspect(
                 env,
                 inspector,
@@ -154,7 +144,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let ctx = get_context(ctx);
 
         match ctx.transaction_context.take() {
-            None => self.evm.transact(ctx, backend, env, executor_env, inspector),
+            None => EvmExecutorStrategyRunner.transact(ctx, backend, env, executor_env, inspector),
             Some(zk_tx) => {
                 // apply fork-related env instead of cheatcode handler
                 // since it won't be set by zkEVM
@@ -264,7 +254,7 @@ pub trait ZksyncExecutorStrategyBuilder {
 impl ZksyncExecutorStrategyBuilder for ExecutorStrategy {
     fn new_zksync() -> Self {
         Self {
-            runner: Box::new(ZksyncExecutorStrategyRunner::default()),
+            runner: &ZksyncExecutorStrategyRunner,
             context: Box::new(ZksyncExecutorStrategyContext::default()),
         }
     }
