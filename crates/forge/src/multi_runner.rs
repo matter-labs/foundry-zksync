@@ -541,46 +541,56 @@ impl MultiContractRunnerBuilder {
             .map(|(zk, libs)| zk.zk_get_linked_artifacts(zk.contracts.keys(), libs))
             .transpose()?;
 
-        let dual_compiled_contracts = strategy
-            .runner
-            .zksync_get_mut_dual_compiled_contracts(strategy.context.as_mut())
-            .expect("dual compiled contracts present");
-        let newly_linked_dual_compiled_contracts = zk_linked_contracts
-            .iter()
-            .flat_map(|arts| arts.iter())
-            .flat_map(|(needle, zk)| {
-                linked_contracts
-                    .iter()
-                    .find(|(id, _)| id.source == needle.source && id.name == needle.name)
-                    .map(|(_, evm)| (needle, zk, evm))
-            })
-            .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
-            .map(|(id, linked_zk, evm)| {
-                let (_, unlinked_zk_artifact) =
-                    zk_output.as_ref().unwrap().artifact_ids().find(|(id, _)| id == id).unwrap();
-                let zk_bytecode = linked_zk.get_bytecode_bytes().unwrap();
-                let zk_hash = hash_bytecode(&zk_bytecode);
-                let evm = evm.get_bytecode_bytes().unwrap();
-                let contract = DualCompiledContract {
-                    name: id.name.clone(),
-                    zk_bytecode_hash: zk_hash,
-                    zk_deployed_bytecode: zk_bytecode.to_vec(),
-                    // FIXME: retrieve unlinked factory deps (1.5.9)
-                    zk_factory_deps: vec![zk_bytecode.to_vec()],
-                    evm_bytecode_hash: B256::from_slice(&keccak256(evm.as_ref())[..]),
-                    evm_deployed_bytecode: evm.to_vec(), // FIXME: is this ok? not really used
-                    evm_bytecode: evm.to_vec(),
-                };
+        if let Some(dual_compiled_contracts) =
+            strategy.runner.zksync_get_mut_dual_compiled_contracts(strategy.context.as_mut())
+        {
+            let newly_linked_dual_compiled_contracts = zk_linked_contracts
+                .iter()
+                .flat_map(|arts| arts.iter())
+                .flat_map(|(needle, zk)| {
+                    linked_contracts
+                        .iter()
+                        .find(|(id, _)| id.source == needle.source && id.name == needle.name)
+                        .map(|(_, evm)| (needle, zk, evm))
+                })
+                .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
+                .map(|(id, linked_zk, evm)| {
+                    let (_, unlinked_zk_artifact) = zk_output
+                        .as_ref()
+                        .unwrap()
+                        .artifact_ids()
+                        .find(|(id, _)| id == id)
+                        .unwrap();
+                    let zk_bytecode = linked_zk.get_bytecode_bytes().unwrap();
+                    let zk_hash = hash_bytecode(&zk_bytecode);
+                    let evm = evm.get_bytecode_bytes().unwrap();
+                    let contract = DualCompiledContract {
+                        name: id.name.clone(),
+                        zk_bytecode_hash: zk_hash,
+                        zk_deployed_bytecode: zk_bytecode.to_vec(),
+                        // FIXME: retrieve unlinked factory deps (1.5.9)
+                        zk_factory_deps: vec![zk_bytecode.to_vec()],
+                        evm_bytecode_hash: B256::from_slice(&keccak256(evm.as_ref())[..]),
+                        evm_deployed_bytecode: evm.to_vec(), // FIXME: is this ok? not really used
+                        evm_bytecode: evm.to_vec(),
+                    };
 
-                // populate factory deps that were already linked
-                dual_compiled_contracts.extend_factory_deps_by_hash(
-                    contract,
-                    unlinked_zk_artifact.factory_dependencies.iter().flatten().map(|(_, hash)| {
-                        H256::from_slice(alloy_primitives::hex::decode(hash).unwrap().as_slice())
-                    }),
-                )
-            });
-        dual_compiled_contracts.extend(newly_linked_dual_compiled_contracts.collect::<Vec<_>>());
+                    // populate factory deps that were already linked
+                    dual_compiled_contracts.extend_factory_deps_by_hash(
+                        contract,
+                        unlinked_zk_artifact.factory_dependencies.iter().flatten().map(
+                            |(_, hash)| {
+                                H256::from_slice(
+                                    alloy_primitives::hex::decode(hash).unwrap().as_slice(),
+                                )
+                            },
+                        ),
+                    )
+                });
+
+            dual_compiled_contracts
+                .extend(newly_linked_dual_compiled_contracts.collect::<Vec<_>>());
+        }
 
         // FIXME: is this comment outdated? I don't see the library deployment code anywhere
         // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
