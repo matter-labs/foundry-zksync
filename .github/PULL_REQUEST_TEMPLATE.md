@@ -11,6 +11,12 @@
 # Evidence :camera:
 Include screenshots, screen recordings, or `console` output here demonstrating that your changes work as intended
 
+# Documentation :books:
+Please ensure the following before submitting your PR:
+
+- [ ] Check if these changes affect any documented features or workflows.
+- [ ] Update the [book](https://github.com/matter-labs/foundry-zksync-book) if these changes affect any documented features or workflows.
+
 <!-- All sections below are optional. You can uncomment any section applicable to your Pull Request. -->
 
 <!-- # Notes :memo:
