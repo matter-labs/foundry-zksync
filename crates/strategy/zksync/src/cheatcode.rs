@@ -490,7 +490,10 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
                 // Select fork
                 let select_fork_cheatcode = selectForkCall { forkId: fork_id };
-                select_fork_cheatcode.dyn_apply(ccx, executor)
+                select_fork_cheatcode.dyn_apply(ccx, executor)?;
+
+                // We need to return the fork ID.
+                Ok(encoded_fork_id)
             }
             t if is::<createSelectFork_1Call>(t) => {
                 let createSelectFork_1Call { urlOrAlias, blockNumber } =
@@ -513,7 +516,10 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
                 // Select fork
                 let select_fork_cheatcode = selectForkCall { forkId: fork_id };
-                select_fork_cheatcode.dyn_apply(ccx, executor)
+                select_fork_cheatcode.dyn_apply(ccx, executor)?;
+
+                // We need to return the fork ID.
+                Ok(encoded_fork_id)
             }
             t if is::<createSelectFork_2Call>(t) => {
                 let createSelectFork_2Call { urlOrAlias, txHash } =
@@ -536,7 +542,10 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
                 // Select fork
                 let select_fork_cheatcode = selectForkCall { forkId: fork_id };
-                select_fork_cheatcode.dyn_apply(ccx, executor)
+                select_fork_cheatcode.dyn_apply(ccx, executor)?;
+
+                // We need to return the fork ID.
+                Ok(encoded_fork_id)
             }
             _ => {
                 // Not custom, just invoke the default behavior
