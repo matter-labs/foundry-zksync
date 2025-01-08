@@ -246,7 +246,6 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-anvil-zksync = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil-zksync" }
 anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil_zksync_core" }
 anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil_zksync_types" }
 anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "070c569a332436a17836fb5a548e323ea1ef878c", package = "anvil_zksync_config" }
