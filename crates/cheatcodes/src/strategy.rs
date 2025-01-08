@@ -42,33 +42,26 @@ impl CheatcodeInspectorStrategyContext for () {
 #[derive(Debug)]
 pub struct CheatcodeInspectorStrategy {
     /// Strategy runner.
-    pub runner: Box<dyn CheatcodeInspectorStrategyRunner>,
+    pub runner: &'static dyn CheatcodeInspectorStrategyRunner,
     /// Strategy context.
     pub context: Box<dyn CheatcodeInspectorStrategyContext>,
 }
 
 impl CheatcodeInspectorStrategy {
     pub fn new_evm() -> Self {
-        Self {
-            runner: Box::new(EvmCheatcodeInspectorStrategyRunner::default()),
-            context: Box::new(()),
-        }
+        Self { runner: &EvmCheatcodeInspectorStrategyRunner, context: Box::new(()) }
     }
 }
 
 impl Clone for CheatcodeInspectorStrategy {
     fn clone(&self) -> Self {
-        Self { runner: self.runner.new_cloned(), context: self.context.new_cloned() }
+        Self { runner: self.runner, context: self.context.new_cloned() }
     }
 }
 
 pub trait CheatcodeInspectorStrategyRunner:
     Debug + Send + Sync + CheatcodeInspectorStrategyExt
 {
-    fn name(&self) -> &'static str;
-
-    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyRunner>;
-
     fn apply_full(
         &self,
         cheatcode: &dyn DynCheatcode,
@@ -171,17 +164,9 @@ pub trait CheatcodeInspectorStrategyExt {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct EvmCheatcodeInspectorStrategyRunner {}
+pub struct EvmCheatcodeInspectorStrategyRunner;
 
 impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
-    fn name(&self) -> &'static str {
-        "evm"
-    }
-
-    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyRunner> {
-        Box::new(self.clone())
-    }
-
     fn record_broadcastable_create_transactions(
         &self,
         _ctx: &mut dyn CheatcodeInspectorStrategyContext,
@@ -255,12 +240,6 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
 }
 
 impl CheatcodeInspectorStrategyExt for EvmCheatcodeInspectorStrategyRunner {}
-
-impl Clone for Box<dyn CheatcodeInspectorStrategyRunner> {
-    fn clone(&self) -> Self {
-        self.new_cloned()
-    }
-}
 
 struct _ObjectSafe0(dyn CheatcodeInspectorStrategyRunner);
 struct _ObjectSafe1(dyn CheatcodeInspectorStrategyExt);

@@ -91,9 +91,7 @@ macro_rules! bail {
 
 /// ZKsync implementation for [CheatcodeInspectorStrategyRunner].
 #[derive(Debug, Default, Clone)]
-pub struct ZksyncCheatcodeInspectorStrategyRunner {
-    evm: EvmCheatcodeInspectorStrategyRunner,
-}
+pub struct ZksyncCheatcodeInspectorStrategyRunner;
 
 /// Context for [ZksyncCheatcodeInspectorStrategyRunner].
 #[derive(Debug, Default, Clone)]
@@ -246,14 +244,6 @@ impl ZkPersistNonceUpdate {
 }
 
 impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner {
-    fn name(&self) -> &'static str {
-        "zk"
-    }
-
-    fn new_cloned(&self) -> Box<dyn CheatcodeInspectorStrategyRunner> {
-        Box::new(self.clone())
-    }
-
     fn base_contract_deployed(&self, ctx: &mut dyn CheatcodeInspectorStrategyContext) {
         let ctx = get_context(ctx);
 
@@ -565,7 +555,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
     ) {
         let ctx_zk = get_context(ctx);
         if !ctx_zk.using_zk_vm {
-            return self.evm.record_broadcastable_create_transactions(
+            return EvmCheatcodeInspectorStrategyRunner.record_broadcastable_create_transactions(
                 ctx,
                 config,
                 input,
@@ -692,7 +682,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         let ctx_zk = get_context(ctx);
 
         if !ctx_zk.using_zk_vm {
-            return self.evm.record_broadcastable_call_transactions(
+            return EvmCheatcodeInspectorStrategyRunner.record_broadcastable_call_transactions(
                 ctx,
                 config,
                 call,
@@ -1536,7 +1526,7 @@ pub trait ZksyncCheatcodeInspectorStrategyBuilder {
 impl ZksyncCheatcodeInspectorStrategyBuilder for CheatcodeInspectorStrategy {
     fn new_zksync(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv) -> Self {
         Self {
-            runner: Box::new(ZksyncCheatcodeInspectorStrategyRunner::default()),
+            runner: &ZksyncCheatcodeInspectorStrategyRunner,
             context: Box::new(ZksyncCheatcodeInspectorStrategyContext::new(
                 dual_compiled_contracts,
                 zk_env,

@@ -46,7 +46,7 @@ impl BackendStrategyContext for () {
 #[derive(Debug)]
 pub struct BackendStrategy {
     /// Strategy runner.
-    pub runner: Box<dyn BackendStrategyRunner>,
+    pub runner: &'static dyn BackendStrategyRunner,
     /// Strategy context.
     pub context: Box<dyn BackendStrategyContext>,
 }
@@ -54,21 +54,17 @@ pub struct BackendStrategy {
 impl BackendStrategy {
     /// Create a new instance of [BackendStrategy]
     pub fn new_evm() -> Self {
-        Self { runner: Box::new(EvmBackendStrategyRunner), context: Box::new(()) }
+        Self { runner: &EvmBackendStrategyRunner, context: Box::new(()) }
     }
 }
 
 impl Clone for BackendStrategy {
     fn clone(&self) -> Self {
-        Self { runner: self.runner.new_cloned(), context: self.context.new_cloned() }
+        Self { runner: self.runner, context: self.context.new_cloned() }
     }
 }
 
 pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt {
-    fn name(&self) -> &'static str;
-
-    fn new_cloned(&self) -> Box<dyn BackendStrategyRunner>;
-
     fn inspect(
         &self,
         backend: &mut Backend,
@@ -128,14 +124,6 @@ struct _ObjectSafe(dyn BackendStrategyRunner);
 pub struct EvmBackendStrategyRunner;
 
 impl BackendStrategyRunner for EvmBackendStrategyRunner {
-    fn name(&self) -> &'static str {
-        "evm"
-    }
-
-    fn new_cloned(&self) -> Box<dyn BackendStrategyRunner> {
-        Box::new(self.clone())
-    }
-
     fn inspect(
         &self,
         backend: &mut Backend,
@@ -296,11 +284,5 @@ impl EvmBackendMergeStrategy {
         }
 
         fork_db.accounts.insert(addr, acc);
-    }
-}
-
-impl Clone for Box<dyn BackendStrategyRunner> {
-    fn clone(&self) -> Self {
-        self.new_cloned()
     }
 }

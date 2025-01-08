@@ -801,9 +801,7 @@ impl Cheatcodes {
             }]);
         }
 
-        if let Some(result) =
-            self.strategy.runner.clone().zksync_try_create(self, ecx, &input, executor)
-        {
+        if let Some(result) = self.strategy.runner.zksync_try_create(self, ecx, &input, executor) {
             return Some(result);
         }
 
@@ -1222,9 +1220,7 @@ where {
             }]);
         }
 
-        if let Some(result) =
-            self.strategy.runner.clone().zksync_try_call(self, ecx, call, executor)
-        {
+        if let Some(result) = self.strategy.runner.zksync_try_call(self, ecx, call, executor) {
             return Some(result);
         }
 
@@ -2285,8 +2281,7 @@ fn apply_dispatch(
     }
 
     // Apply the cheatcode.
-    let runner = ccx.state.strategy.runner.new_cloned();
-    let mut result = runner.apply_full(cheat, ccx, executor);
+    let mut result = ccx.state.strategy.runner.apply_full(cheat, ccx, executor);
 
     // Format the error message to include the cheatcode name.
     if let Err(e) = &mut result {

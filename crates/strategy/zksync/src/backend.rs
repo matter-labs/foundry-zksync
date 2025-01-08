@@ -66,19 +66,9 @@ impl BackendStrategyContext for ZksyncBackendStrategyContext {
 
 /// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct ZksyncBackendStrategyRunner {
-    evm: EvmBackendStrategyRunner,
-}
+pub struct ZksyncBackendStrategyRunner;
 
 impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
-    fn name(&self) -> &'static str {
-        "zk"
-    }
-
-    fn new_cloned(&self) -> Box<dyn BackendStrategyRunner> {
-        Box::new(self.clone())
-    }
-
     fn inspect(
         &self,
         backend: &mut Backend,
@@ -87,7 +77,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         inspect_ctx: Box<dyn Any>,
     ) -> Result<ResultAndState> {
         if !is_zksync_inspect_context(inspect_ctx.as_ref()) {
-            return self.evm.inspect(backend, env, inspector, inspect_ctx);
+            return EvmBackendStrategyRunner.inspect(backend, env, inspector, inspect_ctx);
         }
 
         let inspect_ctx = get_inspect_context(inspect_ctx);
@@ -137,7 +127,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         active_journaled_state: &JournaledState,
         fork_journaled_state: &mut JournaledState,
     ) {
-        self.evm.merge_journaled_state_data(
+        EvmBackendStrategyRunner.merge_journaled_state_data(
             ctx,
             addr,
             active_journaled_state,
@@ -161,7 +151,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         active: &ForkDB,
         fork_db: &mut ForkDB,
     ) {
-        self.evm.merge_db_account_data(ctx, addr, active, fork_db);
+        EvmBackendStrategyRunner.merge_db_account_data(ctx, addr, active, fork_db);
         let ctx = get_context(ctx);
         let zk_state =
             &ZksyncMergeState { persistent_immutable_keys: &ctx.persistent_immutable_keys };
@@ -235,7 +225,7 @@ pub trait ZksyncBackendStrategyBuilder {
 impl ZksyncBackendStrategyBuilder for BackendStrategy {
     fn new_zksync() -> Self {
         Self {
-            runner: Box::new(ZksyncBackendStrategyRunner::default()),
+            runner: &ZksyncBackendStrategyRunner,
             context: Box::new(ZksyncBackendStrategyContext::default()),
         }
     }
