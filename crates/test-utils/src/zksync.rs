@@ -125,8 +125,8 @@ impl ZkSyncNode {
     ///
     /// The server is automatically stopped when the instance is dropped.
     pub fn start() -> Self {
-        let (stop_tx, _stop_rx) = tokio::sync::oneshot::channel::<()>();
-        let (port_tx, mut port_rx) = tokio::sync::oneshot::channel();
+        let (_guard, _guard_rx) = tokio::sync::oneshot::channel::<()>();
+        let (port_tx, port) = tokio::sync::oneshot::channel();
 
         let config = TestNodeConfig::default();
 
@@ -161,13 +161,13 @@ impl ZkSyncNode {
         }
 
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_multi_thread()
+            let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
-                .worker_threads(2)
+                .worker_threads(1)
                 .build()
                 .unwrap();
 
-            rt.block_on(async move {
+            runtime.block_on(async move {
                 let allow_origin = AllowOrigin::any();
                 let server_builder = NodeServerBuilder::new(node.clone(), allow_origin);
 
@@ -187,10 +187,11 @@ impl ZkSyncNode {
 
         // wait for server to start
         std::thread::sleep(Duration::from_millis(500));
+        let port =
+            tokio::task::block_in_place(move || tokio::runtime::Handle::current().block_on(port))
+                .expect("failed to start server");
 
-        let port = port_rx.try_recv().expect("Failed to receive server port on channel");
-
-        Self { port, _guard: stop_tx }
+        Self { port, _guard }
     }
 
     pub fn rich_wallets() -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {
