@@ -581,10 +581,10 @@ fn zksync_can_compile_yul_sample() {
         .find_map(|contracts| {
             contracts
                 .iter()
-                .find(|(name, _)| name.ends_with("SimpleStore.yul"))
+                .find(|(name, _)| name.ends_with("SimpleStore"))
                 .and_then(|(_, artifacts)| artifacts.first())
         })
-        .expect("SimpleStore.yul artifact not found")
+        .expect("SimpleStore artifact not found")
         .artifact
         .bytecode
         .clone()
@@ -592,5 +592,5 @@ fn zksync_can_compile_yul_sample() {
 
     let yul_bytecode = simple_store_artifact.object().into_bytes().unwrap();
 
-    assert!(!yul_bytecode.is_empty(), "SimpleStore.yul bytecode is empty");
+    assert!(!yul_bytecode.is_empty(), "SimpleStore bytecode is empty");
 }
