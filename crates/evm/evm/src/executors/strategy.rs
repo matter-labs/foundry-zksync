@@ -1,12 +1,15 @@
 use std::{any::Any, fmt::Debug};
 
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, Bytes, U256};
 use alloy_serde::OtherFields;
 use eyre::Result;
 use foundry_cheatcodes::strategy::{
     CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategyRunner,
 };
-use foundry_evm_core::backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend};
+use foundry_evm_core::{
+    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
+    decode::RevertDecoder,
+};
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, ResultAndState},
@@ -15,7 +18,7 @@ use revm::{
 
 use crate::inspectors::InspectorStack;
 
-use super::Executor;
+use super::{DeployResult, EvmError, Executor};
 
 pub trait ExecutorStrategyContext: Debug + Send + Sync + Any {
     /// Clone the strategy context.
@@ -68,8 +71,22 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         amount: U256,
     ) -> BackendResult<()>;
 
+    fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256>;
+
     fn set_nonce(&self, executor: &mut Executor, address: Address, nonce: u64)
         -> BackendResult<()>;
+
+    fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64>;
+
+    /// Deploys a library, applying state changes
+    fn deploy_library(
+        &self,
+        executor: &mut Executor,
+        from: Address,
+        code: Bytes,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<DeployResult, EvmError>;
 
     /// Execute a transaction and *WITHOUT* applying state changes.
     fn call(
@@ -160,6 +177,10 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         Ok(())
     }
 
+    fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256> {
+        executor.get_balance(address)
+    }
+
     fn set_nonce(
         &self,
         executor: &mut Executor,
@@ -171,6 +192,22 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         executor.backend_mut().insert_account_info(address, account);
 
         Ok(())
+    }
+
+    fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64> {
+        executor.get_nonce(address)
+    }
+
+    /// Deploys a library, applying state changes
+    fn deploy_library(
+        &self,
+        executor: &mut Executor,
+        from: Address,
+        code: Bytes,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<DeployResult, EvmError> {
+        executor.deploy(from, code, value, rd)
     }
 
     fn call(

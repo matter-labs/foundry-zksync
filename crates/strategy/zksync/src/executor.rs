@@ -1,23 +1,29 @@
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
-use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
+use alloy_zksync::{
+    contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS,
+    provider::{zksync_provider, ZksyncProvider},
+};
 use eyre::Result;
 
 use foundry_evm::{
-    backend::{Backend, BackendResult, CowBackend},
+    backend::{Backend, BackendResult, CowBackend, DatabaseExt},
+    decode::RevertDecoder,
     executors::{
         strategy::{
             EvmExecutorStrategyRunner, ExecutorStrategy, ExecutorStrategyContext,
             ExecutorStrategyExt, ExecutorStrategyRunner,
         },
-        Executor,
+        DeployResult, EvmError, Executor,
     },
     inspectors::InspectorStack,
 };
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
-use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY};
+use foundry_zksync_core::{
+    encode_create_params, vm::ZkEnv, ZkTransactionMetadata, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
+};
 use revm::{
-    primitives::{Env, EnvWithHandlerCfg, ResultAndState},
+    primitives::{CreateScheme, Env, EnvWithHandlerCfg, Output, ResultAndState},
     Database,
 };
 
@@ -52,6 +58,23 @@ impl ExecutorStrategyContext for ZksyncExecutorStrategyContext {
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncExecutorStrategyRunner;
 
+impl ZksyncExecutorStrategyRunner {
+    fn set_deployment_nonce(
+        executor: &mut Executor,
+        address: Address,
+        nonce: u64,
+    ) -> BackendResult<()> {
+        let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
+        // fetch the full nonce to preserve account's tx nonce
+        let full_nonce = executor.backend.storage(address, slot)?;
+        let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
+        let new_full_nonce = foundry_zksync_core::state::new_full_nonce(full_nonce.tx_nonce, nonce);
+        executor.backend.insert_account_storage(address, slot, new_full_nonce)?;
+
+        Ok(())
+    }
+}
+
 fn get_context_ref(ctx: &dyn ExecutorStrategyContext) -> &ZksyncExecutorStrategyContext {
     ctx.as_any_ref().downcast_ref().expect("expected ZksyncExecutorStrategyContext")
 }
@@ -75,6 +98,13 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         Ok(())
     }
 
+    fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256> {
+        let (address, slot) = foundry_zksync_core::state::get_balance_storage(address);
+        let balance = executor.backend.storage(address, slot)?;
+
+        Ok(balance)
+    }
+
     fn set_nonce(
         &self,
         executor: &mut Executor,
@@ -92,6 +122,76 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         executor.backend.insert_account_storage(address, slot, new_full_nonce)?;
 
         Ok(())
+    }
+
+    fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64> {
+        let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
+        let full_nonce = executor.backend.storage(address, slot)?;
+        let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
+
+        Ok(full_nonce.tx_nonce)
+    }
+
+    fn deploy_library(
+        &self,
+        executor: &mut Executor,
+        from: Address,
+        code: Bytes,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<DeployResult, EvmError> {
+        // sync deployer account info
+        let nonce = EvmExecutorStrategyRunner.get_nonce(executor, from).expect("deployer to exist");
+        let balance =
+            EvmExecutorStrategyRunner.get_balance(executor, from).expect("deployer to exist");
+
+        Self::set_deployment_nonce(executor, from, nonce).map_err(|err| eyre::eyre!(err))?;
+        self.set_balance(executor, from, balance).map_err(|err| eyre::eyre!(err))?;
+        tracing::debug!(?nonce, ?balance, sender = ?from, "deploying lib in EraVM");
+
+        // TODO(zk): determine how to return also relevant information for the EVM deployment
+        let evm_deployment = EvmExecutorStrategyRunner.deploy_library(
+            executor,
+            from,
+            code.clone(),
+            value,
+            rd.clone(),
+        )?;
+
+        let ctx = get_context(executor.strategy.context.as_mut());
+
+        // lookup dual compiled contract based on EVM bytecode
+        let Some(dual_contract) = ctx.dual_compiled_contracts.find_by_evm_bytecode(code.as_ref())
+        else {
+            // we don't know what the equivalent zk contract would be
+            return Ok(evm_deployment);
+        };
+
+        // no need for constructor args as it's a lib
+        let create_params =
+            encode_create_params(&CreateScheme::Create, dual_contract.zk_bytecode_hash, vec![]);
+
+        // populate ctx.transaction_context with factory deps
+        // we also populate the ctx so the deployment is executed
+        // entirely in EraVM
+        let factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(dual_contract);
+
+        // persist existing paymaster data (needed?)
+        let paymaster_data =
+            ctx.transaction_context.take().and_then(|metadata| metadata.paymaster_data);
+        ctx.transaction_context = Some(ZkTransactionMetadata { factory_deps, paymaster_data });
+
+        // eravm_env: call to ContractDeployer w/ properly encoded calldata
+        let env = executor.build_test_env(
+            from,
+            // foundry_zksync_core::vm::runner::transact takes care of using the ContractDeployer
+            // address
+            TxKind::Create,
+            create_params.into(),
+            value,
+        );
+
+        executor.deploy_with_env(env, rd)
     }
 
     fn new_backend_strategy(&self) -> foundry_evm_core::backend::strategy::BackendStrategy {

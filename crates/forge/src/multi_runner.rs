@@ -489,6 +489,8 @@ impl MultiContractRunnerBuilder {
         evm_opts: EvmOpts,
         mut strategy: ExecutorStrategy,
     ) -> Result<MultiContractRunner> {
+        // TODO(zk): move linking to executor strategy
+
         let contracts = output
             .artifact_ids()
             .map(|(id, v)| (id.with_stripped_file_prefixes(root), v))

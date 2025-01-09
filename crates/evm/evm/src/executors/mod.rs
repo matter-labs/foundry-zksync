@@ -303,6 +303,20 @@ impl Executor {
         self.deploy_with_env(env, rd)
     }
 
+    /// Deploys a library contract and commits the new state to the underlying database.
+    ///
+    /// Executes a CREATE transaction with the contract `code` and persistent database state
+    /// modifications.
+    pub fn deploy_library(
+        &mut self,
+        from: Address,
+        code: Bytes,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<DeployResult, EvmError> {
+        self.strategy.runner.deploy_library(self, from, code, value, rd)
+    }
+
     /// Deploys a contract using the given `env` and commits the new state to the underlying
     /// database.
     ///
@@ -672,7 +686,7 @@ impl Executor {
     ///
     /// If using a backend with cheatcodes, `tx.gas_price` and `block.number` will be overwritten by
     /// the cheatcode state in between calls.
-    fn build_test_env(
+    pub fn build_test_env(
         &self,
         caller: Address,
         transact_to: TxKind,

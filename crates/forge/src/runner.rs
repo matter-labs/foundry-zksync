@@ -124,13 +124,12 @@ impl<'a> ContractRunner<'a> {
 
         let mut result = TestSetup::default();
         for code in self.mcr.libs_to_deploy.iter() {
-            let deploy_result = self.executor.deploy(
+            let deploy_result = self.executor.deploy_library(
                 LIBRARY_DEPLOYER,
                 code.clone(),
                 U256::ZERO,
                 Some(&self.mcr.revert_decoder),
             );
-            // TODO(zk): redo but entirely in zk
 
             // Record deployed library address.
             if let Ok(deployed) = &deploy_result {
