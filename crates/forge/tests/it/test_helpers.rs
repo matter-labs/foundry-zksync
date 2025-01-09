@@ -518,15 +518,15 @@ pub fn manifest_root() -> &'static Path {
 /// the RPC endpoints used during tests
 pub fn rpc_endpoints() -> RpcEndpoints {
     RpcEndpoints::new([
-        ("mainnet", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Mainnet))),
-        ("mainnet2", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Mainnet))),
-        ("sepolia", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Sepolia))),
-        ("optimism", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Optimism))),
-        ("arbitrum", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Arbitrum))),
-        ("polygon", RpcEndpoint::Url(next_rpc_endpoint(NamedChain::Polygon))),
-        ("avaxTestnet", RpcEndpoint::Url("https://api.avax-test.network/ext/bc/C/rpc".into())),
-        ("moonbeam", RpcEndpoint::Url("https://moonbeam-rpc.publicnode.com".into())),
-        ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".into())),
+        ("mainnet", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Mainnet))),
+        ("mainnet2", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Mainnet))),
+        ("sepolia", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Sepolia))),
+        ("optimism", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Optimism))),
+        ("arbitrum", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Arbitrum))),
+        ("polygon", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Polygon))),
+        ("avaxTestnet", RpcEndpointUrl::Url("https://api.avax-test.network/ext/bc/C/rpc".into())),
+        ("moonbeam", RpcEndpointUrl::Url("https://moonbeam-rpc.publicnode.com".into())),
+        ("rpcEnvAlias", RpcEndpointUrl::Env("${RPC_ENV_ALIAS}".into())),
     ])
 }
 
