@@ -82,12 +82,6 @@ pub struct ZkSyncArgs {
     )]
     pub fallback_oz: Option<bool>,
 
-    /// Detect missing libraries, instead of erroring
-    ///
-    /// Currently unused
-    #[clap(long = "zk-detect-missing-libraries")]
-    pub detect_missing_libraries: bool,
-
     /// Set the LLVM optimization parameter `-O[0 | 1 | 2 | 3 | s | z]`.
     /// Use `3` for best performance and `z` for minimal size.
     #[clap(
@@ -164,10 +158,6 @@ impl ZkSyncArgs {
         set_if_some!(self.llvm_options.clone(), zksync.llvm_options);
         set_if_some!(self.force_evmla, zksync.force_evmla);
         set_if_some!(self.fallback_oz, zksync.fallback_oz);
-        set_if_some!(
-            self.detect_missing_libraries.then_some(true),
-            zksync.detect_missing_libraries
-        );
 
         set_if_some!(self.optimizer.then_some(true), zksync.optimizer);
         set_if_some!(

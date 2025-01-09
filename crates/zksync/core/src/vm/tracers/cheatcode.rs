@@ -167,10 +167,21 @@ impl CheatcodeTracer {
     }
 
     /// Check if the given address's code is empty
-    fn has_empty_code<S: ReadStorage>(&self, storage: StoragePtr<S>, target: Address) -> bool {
+    fn has_empty_code<S: ReadStorage>(
+        &self,
+        storage: StoragePtr<S>,
+        target: Address,
+        calldata: &[u8],
+        value: rU256,
+    ) -> bool {
         // The following addresses are expected to have empty bytecode
         let ignored_known_addresses =
             [foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS, self.call_context.tx_caller];
+
+        // Skip empty code check for empty calldata with non-zero value (Transfers)
+        if calldata.is_empty() && !value.is_zero() {
+            return false;
+        }
 
         let contract_code = storage.borrow_mut().read_value(&get_code_key(&target.to_h160()));
 
@@ -295,7 +306,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
 
             // if we get here there was no matching mock call,
             // so we check if there's no code at the mocked address
-            if self.has_empty_code(storage, call_contract) {
+            if self.has_empty_code(storage, call_contract, &call_input, call_value) {
                 // issue a more targeted
                 // error if we already had some mocks there
                 let had_mocks_message =
