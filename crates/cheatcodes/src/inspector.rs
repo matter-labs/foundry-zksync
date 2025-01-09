@@ -10,10 +10,7 @@ use crate::{
     strategy::CheatcodeInspectorStrategy,
     test::{
         assume::AssumeNoRevert,
-        expect::{
-            self, ExpectedCallData, ExpectedCallTracker, ExpectedCallType, ExpectedEmitTracker,
-            ExpectedRevert, ExpectedRevertKind,
-        },
+        expect::{self, ExpectedEmitTracker, ExpectedRevert, ExpectedRevertKind},
     },
     utils::IgnoredTraces,
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,

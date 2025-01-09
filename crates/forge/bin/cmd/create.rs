@@ -138,14 +138,14 @@ impl CreateArgs {
         // Find Project & Compile
         let project = config.project()?;
 
-        let zksync = self.opts.compiler.zk.enabled();
+        let zksync = self.build.compiler.zk.enabled();
         if zksync {
             let paymaster_params =
-                if let Some(paymaster_address) = self.opts.compiler.zk.paymaster_address {
+                if let Some(paymaster_address) = self.build.compiler.zk.paymaster_address {
                     Some(PaymasterParams {
                         paymaster: paymaster_address,
                         paymaster_input: self
-                            .opts
+                            .build
                             .compiler
                             .zk
                             .paymaster_input
@@ -161,7 +161,7 @@ impl CreateArgs {
                 project.find_contract_path(&self.contract.name)?
             };
 
-            let config = self.opts.try_load_config_emit_warnings()?;
+            let config = self.build.try_load_config_emit_warnings()?;
             let zk_project =
                 foundry_config::zksync::config_create_project(&config, config.cache, false)?;
             let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
@@ -439,7 +439,7 @@ impl CreateArgs {
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
             compilation_profile: Some(id.profile.to_string()),
-            zksync: self.opts.compiler.zk.enabled(),
+            zksync: self.build.compiler.zk.enabled(),
         };
 
         // Check config for Etherscan API Keys to avoid preflight check failing if no
@@ -624,7 +624,7 @@ impl CreateArgs {
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
             compilation_profile: Some(id.profile.to_string()),
-            zksync: self.opts.compiler.zk.enabled(),
+            zksync: self.build.compiler.zk.enabled(),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await
@@ -753,8 +753,8 @@ impl CreateArgs {
 
         sh_println!("Starting contract verification...")?;
 
-        let num_of_optimizations = if self.opts.compiler.optimize.unwrap_or_default() {
-            self.opts.compiler.optimizer_runs
+        let num_of_optimizations = if self.build.compiler.optimize.unwrap_or_default() {
+            self.build.compiler.optimizer_runs
         } else {
             None
         };
@@ -772,15 +772,15 @@ impl CreateArgs {
             skip_is_verified_check: true,
             watch: true,
             retry: self.retry,
-            libraries: self.opts.libraries.clone(),
+            libraries: self.build.libraries.clone(),
             root: None,
             verifier: self.verifier,
-            via_ir: self.opts.via_ir,
-            evm_version: self.opts.compiler.evm_version,
+            via_ir: self.build.via_ir,
+            evm_version: self.build.compiler.evm_version,
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
             compilation_profile: None, //TODO(zk): provide comp profile
-            zksync: self.opts.compiler.zk.enabled(),
+            zksync: self.build.compiler.zk.enabled(),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await
