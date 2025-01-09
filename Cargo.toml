@@ -232,7 +232,7 @@ syn-solidity = "0.8.14"
 
 alloy-chains = "0.1"
 alloy-rlp = "0.3"
-alloy-zksync = "0.8.0" 
+alloy-zksync = "0.8.0"
 
 alloy-trie = "0.7.0"
 
@@ -246,14 +246,16 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-era_test_node = { git = "https://github.com/matter-labs/era-test-node.git", rev = "94503847b402f0161c3372d5f357a4cb16a2d66d" }
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
-zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
-zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "b21c4898d44e3b775423b8d698d425fc43a85981" }   # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "b21c4898d44e3b775423b8d698d425fc43a85981" }  # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "b21c4898d44e3b775423b8d698d425fc43a85981" } # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "b21c4898d44e3b775423b8d698d425fc43a85981" } # https://github.com/matter-labs/anvil-zksync/pull/510
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
+zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
 
 # macros
 proc-macro2 = "1.0"

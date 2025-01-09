@@ -20,15 +20,15 @@ use zksync_multivm::{
         zkevm_opcode_defs::{FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER},
     },
 };
-use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     ethabi, get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256,
     IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, SYSTEM_CONTEXT_ADDRESS, U256,
 };
-use zksync_utils::bytecode::hash_bytecode;
+use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
+    hash_bytecode,
     vm::{
         farcall::{CallAction, CallDepth, FarCallHandler},
         ZkEnv,
@@ -335,7 +335,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                 if self.call_context.tx_caller == address {
                     tracing::debug!("overriding account version for caller {address:?}");
                     self.farcall_handler.set_immediate_return(rU256::from(1u32).to_be_bytes_vec());
-                    return
+                    return;
                 }
             }
         }
@@ -364,11 +364,11 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                 if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER) {
                     self.farcall_handler
                         .set_immediate_return(self.call_context.block_number.to_be_bytes_vec());
-                    return
+                    return;
                 } else if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP) {
                     self.farcall_handler
                         .set_immediate_return(self.call_context.block_timestamp.to_be_bytes_vec());
-                    return
+                    return;
                 }
             }
         }
@@ -385,7 +385,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             {
                 self.farcall_handler
                     .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
-                return
+                return;
             }
         }
 

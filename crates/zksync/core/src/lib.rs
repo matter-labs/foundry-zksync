@@ -30,6 +30,7 @@ use eyre::eyre;
 use revm::{Database, InnerEvmContext};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use zksync_types::bytecode::BytecodeHash;
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, encode_create_params, nonce};
@@ -45,7 +46,6 @@ use zksync_types::{
     utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
     U256,
 };
-pub use zksync_utils::bytecode::hash_bytecode;
 
 type Result<T> = std::result::Result<T, eyre::Report>;
 
@@ -73,6 +73,23 @@ pub fn get_account_code_key(address: Address) -> rU256 {
 /// Returns the account nonce key for a provided account address.
 pub fn get_nonce_key(address: Address) -> rU256 {
     zksync_types::get_nonce_key(&address.to_h160()).key().to_ru256()
+}
+
+/// Convenience wrapper for hashing EraVM bytecode.
+pub fn hash_bytecode(bytecode: &[u8]) -> H256 {
+    BytecodeHash::for_bytecode(bytecode).value()
+}
+
+// TODO: The approach towards bytecode has changed in core, so the same function was removed there.
+// There is a chance that this function is no longer needed.
+pub(crate) fn be_words_to_bytes(words: &[U256]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(words.len() * 32);
+    for word in words {
+        let mut payload = [0u8; 32];
+        word.to_big_endian(&mut payload);
+        bytes.extend_from_slice(&payload);
+    }
+    bytes
 }
 
 /// Represents additional data for ZK transactions that require a paymaster.

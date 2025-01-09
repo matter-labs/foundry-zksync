@@ -43,7 +43,7 @@ contract ZkLargeFactoryDependenciesScript is Script {
     )
     .unwrap();
 
-    let node = ZkSyncNode::start();
+    let node = ZkSyncNode::start().await;
 
     // foundry default gas-limit is not enough to pay for factory deps
     // with Anvil-zksync's environment

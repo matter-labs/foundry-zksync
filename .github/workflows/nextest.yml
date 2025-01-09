@@ -83,6 +83,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+
       - name: Setup Git config
         run: |
           git config --global user.name "GitHub Actions Bot"

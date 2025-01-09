@@ -4,13 +4,12 @@ use zksync_multivm::{
     interface::{L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode},
     vm_latest::{constants::BATCH_COMPUTATIONAL_GAS_LIMIT, utils::l2_blocks::load_last_l2_block},
 };
-use zksync_state::interface::{ReadStorage, StoragePtr};
 use zksync_types::{
     block::{unpack_block_info, L2BlockHasher},
     fee_model::PubdataIndependentBatchFeeModelInput,
-    StorageKey, SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
+    h256_to_u256, StorageKey, SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
 };
-use zksync_utils::h256_to_u256;
+use zksync_vm_interface::storage::{ReadStorage, StoragePtr};
 
 // https://github.com/matter-labs/era-contracts/blob/aafee035db892689df3f7afe4b89fd6467a39313/system-contracts/bootloader/bootloader.yul#L86
 const MAX_L2_GAS_PER_PUBDATA: u64 = 50000;
@@ -131,7 +130,7 @@ pub(crate) fn load_last_l1_batch<S: ReadStorage>(storage: StoragePtr<S>) -> Opti
     let block_number = batch_number as u32;
     if block_number == 0 {
         // The block does not exist yet
-        return None
+        return None;
     }
     Some((batch_number, batch_timestamp))
 }

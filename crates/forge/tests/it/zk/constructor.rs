@@ -25,7 +25,8 @@ forgetest_async!(test_zk_constructor_works_in_script, |prj, cmd| {
         None,
         3,
         Some(&["-vvvvv", "--broadcast"]),
-    );
+    )
+    .await;
 });
 
 fn setup_deploy_prj(prj: &mut TestProject) {
