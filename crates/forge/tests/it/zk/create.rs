@@ -10,7 +10,7 @@ forgetest_async!(forge_zk_can_deploy_erc20, |prj, cmd| {
     util::initialize(prj.root());
     prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol")).unwrap();
 
-    let node = ZkSyncNode::start();
+    let node = ZkSyncNode::start().await;
     let url = node.url();
 
     let private_key =
@@ -32,7 +32,7 @@ forgetest_async!(forge_zk_can_deploy_contracts_and_cast_a_transaction, |prj, cmd
     .unwrap();
     prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol")).unwrap();
 
-    let node = ZkSyncNode::start();
+    let node = ZkSyncNode::start().await;
     let url = node.url();
 
     let private_key =

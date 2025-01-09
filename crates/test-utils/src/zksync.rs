@@ -2,11 +2,14 @@
 use std::{net::SocketAddr, str::FromStr};
 
 use anvil_zksync_api_server::NodeServerBuilder;
-use anvil_zksync_config::TestNodeConfig;
-use anvil_zksync_core::node::{
-    BlockSealer, BlockSealerMode, ImpersonationManager, InMemoryNode, TimestampManager, TxPool,
+use anvil_zksync_config::{types::SystemContractsOptions, TestNodeConfig};
+use anvil_zksync_core::{
+    node::{
+        BlockProducer, BlockSealer, BlockSealerMode, ImpersonationManager, InMemoryNode,
+        TimestampManager, TxPool,
+    },
+    system_contracts::SystemContracts,
 };
-use std::time::Duration;
 use tower_http::cors::AllowOrigin;
 use zksync_types::{H160, U256};
 
@@ -124,73 +127,87 @@ impl ZkSyncNode {
     /// Start anvil-zksync in memory, binding a random available port
     ///
     /// The server is automatically stopped when the instance is dropped.
-    pub fn start() -> Self {
-        let (_guard, _guard_rx) = tokio::sync::oneshot::channel::<()>();
+    pub async fn start() -> Self {
+        let (_guard, guard_rx) = tokio::sync::oneshot::channel::<()>();
         let (port_tx, port) = tokio::sync::oneshot::channel();
+
+        std::thread::spawn(move || {
+            // We need to spawn a thread since `run_inner` future is not `Send`.
+            let runtime =
+                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            runtime.block_on(Self::run_inner(port_tx, guard_rx));
+        });
+
+        // wait for server to start
+        let port = port.await.expect("failed to start server");
+
+        Self { port, _guard }
+    }
+
+    async fn run_inner(
+        port_tx: tokio::sync::oneshot::Sender<u16>,
+        stop_guard: tokio::sync::oneshot::Receiver<()>,
+    ) {
+        const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
 
         let config = TestNodeConfig::default();
 
         let time = TimestampManager::default();
         let impersonation = ImpersonationManager::default();
         let pool = TxPool::new(impersonation.clone(), config.transaction_order);
-        let sealing_mode = if config.no_mining {
-            BlockSealerMode::noop()
-        } else if let Some(block_time) = config.block_time {
-            BlockSealerMode::fixed_time(config.max_transactions, block_time)
-        } else {
-            BlockSealerMode::immediate(config.max_transactions, pool.add_tx_listener())
-        };
+        let sealing_mode = BlockSealerMode::immediate(MAX_TRANSACTIONS, pool.add_tx_listener());
         let block_sealer = BlockSealer::new(sealing_mode);
 
-        let node: InMemoryNode =
-            InMemoryNode::new(None, None, &config, time, impersonation, pool, block_sealer);
+        let node: InMemoryNode = InMemoryNode::new(
+            None,
+            None,
+            &config,
+            time,
+            impersonation,
+            pool.clone(),
+            block_sealer.clone(),
+        );
 
         for wallet in LEGACY_RICH_WALLETS.iter() {
             let address = wallet.0;
             node.set_rich_account(
                 H160::from_str(address).unwrap(),
-                U256::from(100u128 * 10u128.pow(18)),
+                U256::from(1000u128 * 10u128.pow(18)),
             );
         }
         for wallet in RICH_WALLETS.iter() {
             let address = wallet.0;
             node.set_rich_account(
                 H160::from_str(address).unwrap(),
-                U256::from(100u128 * 10u128.pow(18)),
+                U256::from(1000u128 * 10u128.pow(18)),
             );
         }
 
-        std::thread::spawn(move || {
-            let runtime = tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .worker_threads(1)
-                .build()
-                .unwrap();
+        let system_contracts =
+            SystemContracts::from_options(&SystemContractsOptions::BuiltInWithoutSecurity, false);
 
-            runtime.block_on(async move {
-                let allow_origin = AllowOrigin::any();
-                let server_builder = NodeServerBuilder::new(node.clone(), allow_origin);
+        let allow_origin = AllowOrigin::any();
+        let server_builder = NodeServerBuilder::new(node.clone(), allow_origin);
 
-                let server = server_builder.build(SocketAddr::from(([0, 0, 0, 0], 0))).await;
-                // if no receiver was ready to receive the spawning thread died
-                _ = port_tx.send(server.local_addr().port());
+        let server = server_builder.build(SocketAddr::from(([0, 0, 0, 0], 0))).await;
+        // if no receiver was ready to receive the spawning thread died
+        port_tx.send(server.local_addr().port()).expect("failed to send port");
 
-                let handle = server.run();
+        let block_producer_handle = BlockProducer::new(node, pool, block_sealer, system_contracts);
 
-                tokio::select! {
-                    _ = handle.stopped() => {
-                    },
-                };
-            });
-        });
+        let handle = server.run();
 
-        // wait for server to start
-        std::thread::sleep(Duration::from_millis(500));
-        let port =
-            tokio::task::block_in_place(move || tokio::runtime::Handle::current().block_on(port))
-                .expect("failed to start server");
-
-        Self { port, _guard }
+        tokio::select! {
+            _ = handle.stopped() => {
+                tracing::error!("Server stopped");
+            },
+            _ = block_producer_handle => {
+                tracing::error!("Block producer stopped");
+            }
+            _ = stop_guard => {
+                tracing::info!("Server stopped by guard");
+            }
+        };
     }
 
     pub fn rich_wallets() -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {
