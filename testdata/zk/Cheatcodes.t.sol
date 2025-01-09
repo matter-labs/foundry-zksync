@@ -49,6 +49,32 @@ contract MyProxyCaller {
     }
 }
 
+contract Proxy {
+    InnerProxy innerProxy;
+
+    constructor(InnerProxy _innerProxy) {
+        innerProxy = _innerProxy;
+    }
+
+    function proxyCall(ICaller caller) public {
+        innerProxy.proxyCall(caller);
+    }
+}
+
+contract InnerProxy {
+    function proxyCall(ICaller caller) public {
+        caller.call(10);
+    }
+}
+
+interface ICaller {
+    function call(uint8 _value) external;
+}
+
+contract Caller is ICaller {
+    function call(uint8 _value) external {}
+}
+
 contract Emitter {
     event EventConstructor(string message);
     event EventFunction(string message);
@@ -267,6 +293,16 @@ contract ZkCheatcodesTest is DSTest {
         Vm.Log[] memory evmEntries = vm.getRecordedLogs();
 
         assertEq(zkvmEntries.length, evmEntries.length);
+    }
+
+    function testExpectCallCountsTopMostCallOnce() public {
+        InnerProxy innerProxy = new InnerProxy();
+        Proxy proxy = new Proxy(innerProxy);
+        Caller caller = new Caller();
+        vm.expectCall(address(proxy), abi.encodeCall(proxy.proxyCall, (caller)), 1);
+        vm.expectCall(address(innerProxy), abi.encodeCall(innerProxy.proxyCall, (caller)), 1);
+        vm.expectCall(address(caller), abi.encodeCall(caller.call, (10)), 1);
+        proxy.proxyCall(caller);
     }
 
     // Utility function

@@ -4,9 +4,9 @@ use super::string::parse;
 use crate::{Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, Result, Vm::*};
 use alloy_dyn_abi::DynSolType;
 use alloy_json_abi::ContractObject;
+use alloy_network::AnyTransactionReceipt;
 use alloy_primitives::{hex, map::Entry, Bytes, U256};
 use alloy_provider::network::ReceiptResponse;
-use alloy_rpc_types::AnyTransactionReceipt;
 use alloy_sol_types::SolValue;
 use dialoguer::{Input, Password};
 use forge_script_sequence::{BroadcastReader, TransactionWithMetadata};
@@ -283,7 +283,7 @@ impl Cheatcode for getArtifactPathByDeployedCodeCall {
 impl Cheatcode for getCodeCall {
     fn apply(&self, state: &mut Cheatcodes) -> Result {
         let Self { artifactPath: path } = self;
-        state.strategy.runner.get_artifact_code(state, path, false)
+        Ok(get_artifact_code(state, path, false)?.abi_encode())
     }
 }
 
