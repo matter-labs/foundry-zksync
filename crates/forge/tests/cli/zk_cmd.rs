@@ -123,8 +123,7 @@ contract CallEmptyCode is Test {
         .contains("call may fail or behave unexpectedly due to empty code");
 });
 
-// Sending ETH to an EOA doesn't trigger empty code warning
-forgetest_async!(test_zk_can_send_eth_to_eoa, |prj, cmd| {
+forgetest_async!(test_zk_can_send_eth_to_eoa_without_warnings, |prj, cmd| {
     foundry_test_utils::util::initialize(prj.root());
     prj.add_test(
         "SendEthToEOA.t.sol",
@@ -150,8 +149,7 @@ contract SendEthToEOA is Test {
     assert!(!output.contains("call may fail or behave unexpectedly due to empty code"));
 });
 
-//Calling an address with Zero value should trigger empty code warning
-forgetest_async!(test_zk_can_call_empty_code_with_zero_value, |prj, cmd| {
+forgetest_async!(test_zk_calling_empty_code_with_zero_value_issues_warning, |prj, cmd| {
     foundry_test_utils::util::initialize(prj.root());
     prj.add_test(
         "CallEmptyCodeWithZeroValue.t.sol",
