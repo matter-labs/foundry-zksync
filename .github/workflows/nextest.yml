@@ -83,19 +83,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      
-      # TODO: We don't actually need to run it, we just need to install it;
-      # it's just the quickest/simples way to do it.
-      # To be reimplemented properly.
-      - name: Run anvil-zksync
-        uses: dutterbutter/anvil-zksync-action@v1.1.0
-        with:
-          mode: fork
-          forkUrl: mainnet
-          log: info
-          logFilePath: anvil_zksync.log
-          target: x86_64-unknown-linux-gnu
-          releaseTag: v0.2.1
 
       - name: Setup Git config
         run: |
