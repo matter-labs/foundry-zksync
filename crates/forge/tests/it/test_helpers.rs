@@ -16,7 +16,7 @@ use foundry_compilers::{
 use foundry_config::{
     fs_permissions::PathPermission,
     zksync::{ZKSYNC_ARTIFACTS_DIR, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME},
-    Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig, InvariantConfig, RpcEndpoint,
+    Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig, InvariantConfig, RpcEndpointUrl,
     RpcEndpoints,
 };
 use foundry_evm::{constants::CALLER, opts::EvmOpts};
@@ -536,20 +536,20 @@ pub fn rpc_endpoints_zk() -> RpcEndpoints {
     let mainnet_url =
         std::env::var("TEST_MAINNET_URL").unwrap_or("https://mainnet.era.zksync.io".to_string()); // trufflehog:ignore
     RpcEndpoints::new([
-        ("mainnet", RpcEndpoint::Url(mainnet_url)),
+        ("mainnet", RpcEndpointUrl::Url(mainnet_url)),
         (
             "rpcAlias",
-            RpcEndpoint::Url(
+            RpcEndpointUrl::Url(
                 "https://eth-mainnet.alchemyapi.io/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf".to_string(), /* trufflehog:ignore */
             ),
         ),
         (
             "rpcAliasSepolia",
-            RpcEndpoint::Url(
+            RpcEndpointUrl::Url(
                 "https://eth-sepolia.g.alchemy.com/v2/Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf".to_string(), /* trufflehog:ignore */
             ),
         ),
-        ("rpcEnvAlias", RpcEndpoint::Env("${RPC_ENV_ALIAS}".to_string())),
+        ("rpcEnvAlias", RpcEndpointUrl::Env("${RPC_ENV_ALIAS}".to_string())),
     ])
 }
 
