@@ -365,7 +365,8 @@ impl ZkSolc {
         let mut compiler_output: ZkCompilerOutput = serde_json::from_str(output)?;
 
         // Sanitize contract names that are source file paths, using the file name without
-        // path or .yul extension. This happens in older zksolc versions and creates issues.
+        // path or .yul extension. This happens in zksolc versions older than 1.5.9 and
+        // creates issues.
         // See: https://github.com/matter-labs/era-compiler-solidity/issues/243
         if input.is_yul() {
             for contracts in compiler_output.contracts.values_mut() {
@@ -375,11 +376,10 @@ impl ZkSolc {
                         let sanitized_name = name
                             .split('/')
                             .last()
-                            .unwrap()
-                            .strip_suffix(".yul")
+                            .and_then(|name| name.strip_suffix(".yul"))
                             .expect("Error sanitizing path into name");
                         // Removing and inserting should be fine because there cannot be
-                        // two contracts named the same in a source file
+                        // two contracts named the same in a source file output
                         let contract = contracts.remove(&name).expect("Error replacing yul key");
                         contracts.insert(sanitized_name.into(), contract);
                     }
