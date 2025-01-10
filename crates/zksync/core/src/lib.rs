@@ -190,7 +190,7 @@ pub fn compute_create_address(sender: Address, nonce: u64) -> Address {
 
     let payload = [prefix.as_slice(), sender.0.as_slice(), nonce.0.as_slice()].concat();
     let hash = keccak256(payload);
-    let address = &hash[..20];
+    let address = &hash[12..];
 
     Address::from_slice(address)
 }
