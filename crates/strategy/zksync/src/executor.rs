@@ -1,13 +1,10 @@
 use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
-use alloy_zksync::{
-    contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS,
-    provider::{zksync_provider, ZksyncProvider},
-};
+use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
 
 use foundry_evm::{
-    backend::{Backend, BackendResult, CowBackend, DatabaseExt},
+    backend::{Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
     executors::{
         strategy::{
@@ -23,7 +20,7 @@ use foundry_zksync_core::{
     encode_create_params, vm::ZkEnv, ZkTransactionMetadata, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use revm::{
-    primitives::{CreateScheme, Env, EnvWithHandlerCfg, Output, ResultAndState},
+    primitives::{CreateScheme, Env, EnvWithHandlerCfg, ResultAndState},
     Database,
 };
 
