@@ -1,21 +1,44 @@
-use foundry_test_utils::{forgetest_async, util, TestProject};
+use forge::revm::primitives::SpecId;
+use foundry_test_utils::{forgetest_async, util, Filter, TestProject};
 
-use crate::test_helpers::{deploy_zk_contract, run_zk_script_test};
+use crate::{config::TestConfig, test_helpers::{deploy_zk_contract, run_zk_script_test, TEST_DATA_DEFAULT}};
 
-// TODO(zk): add test that actually does the deployment
-// of the unlinked contract via script, once recursive linking is supported
-// and once we also support doing deploy-time linking
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_deploy_time_linking() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new(".*", ".*", ".*WithLibraries.t.sol");
+
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
+}
 
 forgetest_async!(
     #[should_panic = "no bytecode for contract; is it abstract or unlinked?"]
-    script_using_unlinked_fails,
+    script_zk_fails_indirect_reference_to_unlinked,
     |prj, cmd| {
         setup_libs_prj(&mut prj);
         run_zk_script_test(
             prj.root(),
             &mut cmd,
             "./script/Libraries.s.sol",
-            "DeployUsesFoo",
+            "GetCodeUnlinked",
+            None,
+            1,
+            Some(&["-vvvvv"]),
+        );
+    }
+);
+
+// FIXME(zk): add deploy-time linking to scripting
+forgetest_async!(
+    #[should_panic = "has no bytecode hash, as it may require library linkage"]
+    script_zk_deploy_time_linking_fails,
+    |prj, cmd| {
+        setup_libs_prj(&mut prj);
+        run_zk_script_test(
+            prj.root(),
+            &mut cmd,
+            "./script/Libraries.s.sol",
+            "DeployTimeLinking",
             None,
             1,
             Some(&["-vvvvv"]),
@@ -25,7 +48,7 @@ forgetest_async!(
 
 forgetest_async!(
     #[should_panic = "Dynamic linking not supported"]
-    create_using_unlinked_fails,
+    create_zk_using_unlinked_fails,
     |prj, cmd| {
         setup_libs_prj(&mut prj);
 

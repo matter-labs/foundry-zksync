@@ -64,6 +64,8 @@ impl BuildData {
 
         let known_libraries = script_config.config.libraries_with_remappings()?;
 
+        // TODO(zk): linking updating self.dual_compiled_contracts
+
         let maybe_create2_link_output = can_use_create2
             .then(|| {
                 self.get_linker()
