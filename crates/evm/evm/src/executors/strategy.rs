@@ -1,16 +1,26 @@
-use std::{any::Any, fmt::Debug};
+use std::{any::Any, borrow::Borrow, collections::BTreeMap, fmt::Debug, path::Path};
 
+use alloy_json_abi::JsonAbi;
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_serde::OtherFields;
 use eyre::Result;
 use foundry_cheatcodes::strategy::{
     CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategyRunner,
 };
+use foundry_common::{ContractsByArtifact, TestFunctionExt};
+use foundry_compilers::{
+    artifacts::Libraries, contracts::ArtifactContracts, Artifact, ArtifactId, ProjectCompileOutput,
+};
 use foundry_evm_core::{
     backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
+    opts::EvmOpts,
 };
-use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
+use foundry_linking::{Linker, LinkerError};
+use foundry_zksync_compilers::{
+    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
+    dual_compiled_contracts::DualCompiledContracts,
+};
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, ResultAndState},
     DatabaseRef,
@@ -51,6 +61,15 @@ pub struct ExecutorStrategy {
     pub context: Box<dyn ExecutorStrategyContext>,
 }
 
+pub struct LinkOutput {
+    pub deployable_contracts: BTreeMap<ArtifactId, (JsonAbi, Bytes)>,
+    pub revert_decoder: RevertDecoder,
+    pub linked_contracts: ArtifactContracts,
+    pub known_contracts: ContractsByArtifact,
+    pub libs_to_deploy: Vec<Bytes>,
+    pub libraries: Libraries,
+}
+
 impl ExecutorStrategy {
     pub fn new_evm() -> Self {
         Self { runner: &EvmExecutorStrategyRunner, context: Box::new(()) }
@@ -77,6 +96,14 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         -> BackendResult<()>;
 
     fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64>;
+
+    fn link(
+        &self,
+        ctx: &mut dyn ExecutorStrategyContext,
+        root: &Path,
+        input: ProjectCompileOutput,
+        deployer: Address,
+    ) -> Result<LinkOutput, LinkerError>;
 
     /// Deploys a library, applying state changes
     fn deploy_library(
@@ -127,11 +154,11 @@ pub trait ExecutorStrategyExt {
     ) {
     }
 
-    fn zksync_get_mut_dual_compiled_contracts<'a>(
+    fn zksync_set_compilation_output(
         &self,
-        _ctx: &'a mut dyn ExecutorStrategyContext,
-    ) -> Option<&'a mut DualCompiledContracts> {
-        None
+        ctx: &mut dyn ExecutorStrategyContext,
+        output: ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
+    ) {
     }
 
     /// Set the fork environment on the context.
@@ -196,6 +223,60 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
 
     fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64> {
         executor.get_nonce(address)
+    }
+
+    fn link(
+        &self,
+        _: &mut dyn ExecutorStrategyContext,
+        root: &Path,
+        input: ProjectCompileOutput,
+        deployer: Address,
+    ) -> Result<LinkOutput, LinkerError> {
+        let contracts =
+            input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(root), v)).collect();
+        let linker = Linker::new(root, contracts);
+
+        // Build revert decoder from ABIs of all artifacts.
+        let abis = linker
+            .contracts
+            .iter()
+            .filter_map(|(_, contract)| contract.abi.as_ref().map(|abi| abi.borrow()));
+        let revert_decoder = RevertDecoder::new().with_abis(abis);
+
+        let foundry_linking::LinkOutput { libraries, libs_to_deploy } = linker
+            .link_with_nonce_or_address(Default::default(), deployer, 0, linker.contracts.keys())?;
+
+        let linked_contracts = linker.get_linked_artifacts(&libraries)?;
+
+        // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
+        let mut deployable_contracts = BTreeMap::default();
+        for (id, contract) in linked_contracts.iter() {
+            let Some(abi) = &contract.abi else { continue };
+
+            // if it's a test, link it and add to deployable contracts
+            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true) &&
+                abi.functions().any(|func| func.name.is_any_test())
+            {
+                let Some(bytecode) =
+                    contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
+                else {
+                    continue;
+                };
+
+                deployable_contracts.insert(id.clone(), (abi.clone(), bytecode));
+            }
+        }
+
+        let known_contracts = ContractsByArtifact::new(linked_contracts.clone());
+
+        Ok(LinkOutput {
+            deployable_contracts,
+            revert_decoder,
+            linked_contracts,
+            known_contracts,
+            libs_to_deploy,
+            libraries,
+        })
     }
 
     /// Deploys a library, applying state changes

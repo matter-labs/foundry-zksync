@@ -1,28 +1,38 @@
-use alloy_primitives::{Address, Bytes, TxKind, U256};
+use std::path::Path;
+
+use alloy_primitives::{keccak256, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
 
+use foundry_common::ContractsByArtifact;
+use foundry_compilers::{contracts::ArtifactContracts, Artifact, ProjectCompileOutput};
 use foundry_evm::{
     backend::{Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
     executors::{
         strategy::{
             EvmExecutorStrategyRunner, ExecutorStrategy, ExecutorStrategyContext,
-            ExecutorStrategyExt, ExecutorStrategyRunner,
+            ExecutorStrategyExt, ExecutorStrategyRunner, LinkOutput,
         },
         DeployResult, EvmError, Executor,
     },
     inspectors::InspectorStack,
 };
-use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
+use foundry_linking::{Linker, LinkerError, ZkLinkerError};
+use foundry_zksync_compilers::{
+    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
+    dual_compiled_contracts::{DualCompiledContract, DualCompiledContracts},
+};
 use foundry_zksync_core::{
-    encode_create_params, vm::ZkEnv, ZkTransactionMetadata, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
+    encode_create_params, hash_bytecode, vm::ZkEnv, ZkTransactionMetadata,
+    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use revm::{
     primitives::{CreateScheme, Env, EnvWithHandlerCfg, ResultAndState},
     Database,
 };
+use zksync_types::H256;
 
 use crate::{
     backend::{ZksyncBackendStrategyBuilder, ZksyncInspectContext},
@@ -33,6 +43,7 @@ use crate::{
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncExecutorStrategyContext {
     transaction_context: Option<ZkTransactionMetadata>,
+    compilation_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
     dual_compiled_contracts: DualCompiledContracts,
     zk_env: ZkEnv,
 }
@@ -127,6 +138,105 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
 
         Ok(full_nonce.tx_nonce)
+    }
+
+    fn link(
+        &self,
+        ctx: &mut dyn ExecutorStrategyContext,
+        root: &Path,
+        input: ProjectCompileOutput,
+        deployer: Address,
+    ) -> Result<LinkOutput, LinkerError> {
+        let evm_link = EvmExecutorStrategyRunner.link(ctx, root, input, deployer)?;
+
+        let ctx = get_context(ctx);
+        let Some(input) = ctx.compilation_output.as_ref() else {
+            return Err(LinkerError::MissingTargetArtifact)
+        };
+
+        let input = input.with_stripped_file_prefixes(root);
+        let linker = Linker::new(root, input.artifact_ids().collect());
+
+        let zk_linker_error_to_linker = |zk_error| match zk_error {
+            ZkLinkerError::Inner(err) => err,
+            // FIXME: better error value
+            ZkLinkerError::MissingLibraries(libs) => LinkerError::MissingLibraryArtifact {
+                file: "libraries".to_string(),
+                name: libs.len().to_string(),
+            },
+            ZkLinkerError::MissingFactoryDeps(libs) => LinkerError::MissingLibraryArtifact {
+                file: "factoryDeps".to_string(),
+                name: libs.len().to_string(),
+            },
+        };
+
+        let foundry_linking::LinkOutput { libraries, libs_to_deploy } = linker
+            .zk_link_with_nonce_or_address(
+                Default::default(),
+                deployer,
+                // NOTE(zk): match with EVM nonces as we will be doing a duplex deployment for
+                // the libs
+                0,
+                linker.contracts.keys(),
+            )
+            .map_err(zk_linker_error_to_linker)?;
+
+        let mut linked_contracts = linker
+            .zk_get_linked_artifacts(linker.contracts.keys(), &libraries)
+            .map_err(zk_linker_error_to_linker)?;
+
+        let newly_linked_dual_compiled_contracts = linked_contracts
+            .iter()
+            .flat_map(|(needle, zk)| {
+                evm_link
+                    .linked_contracts
+                    .iter()
+                    .find(|(id, _)| id.source == needle.source && id.name == needle.name)
+                    .map(|(_, evm)| (needle, zk, evm))
+            })
+            .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
+            .map(|(id, linked_zk, evm)| {
+                let (_, unlinked_zk_artifact) =
+                    input.artifact_ids().find(|(id, _)| id == id).unwrap();
+                let zk_bytecode = linked_zk.get_bytecode_bytes().unwrap();
+                let zk_hash = hash_bytecode(&zk_bytecode);
+                let evm = evm.get_bytecode_bytes().unwrap();
+                let contract = DualCompiledContract {
+                    name: id.name.clone(),
+                    zk_bytecode_hash: zk_hash,
+                    zk_deployed_bytecode: zk_bytecode.to_vec(),
+                    // FIXME: retrieve unlinked factory deps (1.5.9)
+                    zk_factory_deps: vec![zk_bytecode.to_vec()],
+                    evm_bytecode_hash: B256::from_slice(&keccak256(evm.as_ref())[..]),
+                    evm_deployed_bytecode: evm.to_vec(), // FIXME: is this ok? not really used
+                    evm_bytecode: evm.to_vec(),
+                };
+
+                // populate factory deps that were already linked
+                ctx.dual_compiled_contracts.extend_factory_deps_by_hash(
+                    contract,
+                    unlinked_zk_artifact.factory_dependencies.iter().flatten().map(|(_, hash)| {
+                        H256::from_slice(alloy_primitives::hex::decode(hash).unwrap().as_slice())
+                    }),
+                )
+            });
+
+        ctx.dual_compiled_contracts
+            .extend(newly_linked_dual_compiled_contracts.collect::<Vec<_>>());
+
+        // Extend zk contracts with solc contracts as well. This is required for traces to
+        // accurately detect contract names deployed in EVM mode, and when using
+        // `vm.zkVmSkip()` cheatcode.
+        linked_contracts.extend(evm_link.linked_contracts);
+
+        Ok(LinkOutput {
+            deployable_contracts: evm_link.deployable_contracts,
+            revert_decoder: evm_link.revert_decoder,
+            known_contracts: ContractsByArtifact::new(linked_contracts.clone()),
+            linked_contracts,
+            libs_to_deploy: evm_link.libs_to_deploy,
+            libraries: evm_link.libraries,
+        })
     }
 
     fn deploy_library(
@@ -274,12 +384,13 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
         ctx.dual_compiled_contracts = dual_compiled_contracts;
     }
 
-    fn zksync_get_mut_dual_compiled_contracts<'a>(
+    fn zksync_set_compilation_output(
         &self,
-        ctx: &'a mut dyn ExecutorStrategyContext,
-    ) -> Option<&'a mut DualCompiledContracts> {
+        ctx: &mut dyn ExecutorStrategyContext,
+        output: ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
+    ) {
         let ctx = get_context(ctx);
-        Some(&mut ctx.dual_compiled_contracts)
+        ctx.compilation_output.replace(output);
     }
 
     fn zksync_set_fork_env(
