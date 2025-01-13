@@ -144,7 +144,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         root: &Path,
-        input: ProjectCompileOutput,
+        input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
         let evm_link = EvmExecutorStrategyRunner.link(ctx, root, input, deployer)?;
@@ -154,8 +154,9 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             return Err(LinkerError::MissingTargetArtifact)
         };
 
-        let input = input.with_stripped_file_prefixes(root);
-        let linker = Linker::new(root, input.artifact_ids().collect());
+        let contracts =
+            input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(root), v)).collect();
+        let linker = Linker::new(root, contracts);
 
         let zk_linker_error_to_linker = |zk_error| match zk_error {
             ZkLinkerError::Inner(err) => err,
@@ -170,7 +171,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             },
         };
 
-        let foundry_linking::LinkOutput { libraries, libs_to_deploy } = linker
+        let foundry_linking::LinkOutput { libraries, libs_to_deploy: _ } = linker
             .zk_link_with_nonce_or_address(
                 Default::default(),
                 deployer,
@@ -196,8 +197,12 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             })
             .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
             .map(|(id, linked_zk, evm)| {
-                let (_, unlinked_zk_artifact) =
-                    input.artifact_ids().find(|(id, _)| id == id).unwrap();
+                let (_, unlinked_zk_artifact) = input
+                    .artifact_ids()
+                    .find(|(contract_id, _)| {
+                        contract_id.clone().with_stripped_file_prefixes(root) == id.clone()
+                    })
+                    .unwrap();
                 let zk_bytecode = linked_zk.get_bytecode_bytes().unwrap();
                 let zk_hash = hash_bytecode(&zk_bytecode);
                 let evm = evm.get_bytecode_bytes().unwrap();

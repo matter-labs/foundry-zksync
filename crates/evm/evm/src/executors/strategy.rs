@@ -101,7 +101,7 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         root: &Path,
-        input: ProjectCompileOutput,
+        input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError>;
 
@@ -156,8 +156,8 @@ pub trait ExecutorStrategyExt {
 
     fn zksync_set_compilation_output(
         &self,
-        ctx: &mut dyn ExecutorStrategyContext,
-        output: ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
+        _ctx: &mut dyn ExecutorStrategyContext,
+        _output: ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
     ) {
     }
 
@@ -229,7 +229,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         &self,
         _: &mut dyn ExecutorStrategyContext,
         root: &Path,
-        input: ProjectCompileOutput,
+        input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
         let contracts =

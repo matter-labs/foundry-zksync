@@ -492,7 +492,7 @@ impl MultiContractRunnerBuilder {
         mut strategy: ExecutorStrategy,
     ) -> Result<MultiContractRunner> {
         if let Some(zk) = zk_output {
-            strategy.runner.set_compilation_output(strategy.context.as_mut(), zk);
+            strategy.runner.zksync_set_compilation_output(strategy.context.as_mut(), zk);
         }
 
         let LinkOutput {
@@ -506,7 +506,7 @@ impl MultiContractRunnerBuilder {
 
         let contracts = deployable_contracts
             .into_iter()
-            .map(|id, (abi, bytecode)| (id, TestContract { abi, bytecode }))
+            .map(|(id, (abi, bytecode))| (id, TestContract { abi, bytecode }))
             .collect();
 
         Ok(MultiContractRunner {
