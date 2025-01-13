@@ -417,6 +417,19 @@ impl ZkSolc {
         }
     }
 
+    /// Get available zksolc versions
+    pub fn zksolc_available_versions() -> Vec<Version> {
+        let mut ret = vec![];
+        let min_max_patch_by_minor_versions = vec![(5, 6, 9)];
+        for (minor, min_patch, max_patch) in min_max_patch_by_minor_versions {
+            for i in min_patch..=max_patch {
+                ret.push(Version::new(1, minor, i));
+            }
+        }
+
+        ret
+    }
+
     /// Get available zksync solc versions
     pub fn solc_available_versions() -> Vec<Version> {
         let mut ret = vec![];

@@ -54,6 +54,41 @@ fn zksync_can_compile_dapp_sample() {
     assert_eq!(cache, updated_cache);
 }
 
+#[test]
+fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
+    for version in ZkSolc::zksolc_available_versions() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data/dapp-sample");
+        let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
+        let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::new(paths).unwrap();
+        let compiler = ZkSolcCompiler {
+            zksolc: ZkSolc::get_path_for_version(&version).unwrap(),
+            solc: Default::default(),
+        };
+        project.project_mut().compiler = compiler;
+
+        let compiled = project.compile().unwrap();
+        compiled.assert_success();
+        assert_eq!(
+            compiled.compiled_artifacts().len(),
+            3,
+            "zksolc {version} compilation yielded wrong number of artifacts"
+        );
+        for (n, c) in compiled.artifacts() {
+            assert!(
+                c.bytecode
+                    .as_ref()
+                    .unwrap_or_else(|| panic!(
+                        "zksolc {version} {n} artifact bytecode field should not be empty"
+                    ))
+                    .object()
+                    .bytes_len()
+                    > 0,
+                "zksolc {version} {n} artifact bytecode should yield more than 0 bytes",
+            );
+        }
+    }
+}
+
 fn test_zksync_can_compile_contract_with_suppressed_errors(compiler: ZkSolcCompiler) {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
