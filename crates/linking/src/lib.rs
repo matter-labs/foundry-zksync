@@ -361,9 +361,9 @@ impl<'a> Linker<'a> {
 
                 let bytes = match object {
                     BytecodeObject::Bytecode(bytes) => bytes,
-                    BytecodeObject::Unlinked(unlinked) => {
-                        alloy_primitives::hex::decode(unlinked).unwrap().into()
-                    }
+                    BytecodeObject::Unlinked(unlinked) => alloy_primitives::hex::decode(unlinked)
+                        .expect("malformed unlinked bytecode object")
+                        .into(),
                 };
 
                 Some((link_id, bytes))
@@ -423,7 +423,9 @@ impl<'a> Linker<'a> {
 
         let mut compact_bytecode = CompactBytecode::empty();
         compact_bytecode.object = BytecodeObject::Bytecode(
-            alloy_primitives::hex::decode(&linked.bytecode).unwrap().into(),
+            alloy_primitives::hex::decode(&linked.bytecode)
+                .expect("malformed unlinked bytecode object")
+                .into(),
         );
 
         let mut compact_deployed_bytecode = CompactDeployedBytecode::empty();

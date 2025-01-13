@@ -16,9 +16,9 @@ use crate::compilers::zksolc::ZkSolcCompiler;
 
 type LinkId = String;
 
+/// A library that zksolc will link against
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash)]
 #[serde(into = "String")]
-/// A library that zksolc will link against
 pub struct Library {
     /// Path to the library source
     pub filename: String,
@@ -43,8 +43,8 @@ pub struct LinkJsonInput {
     pub libraries: HashSet<Library>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
 /// Representation of a linked object given by zksolc
+#[derive(Debug, Clone, Deserialize)]
 pub struct LinkedObject {
     // FIXME: obtain factoryDeps from output
     // might come in handy to have the libraries used as well
@@ -54,8 +54,8 @@ pub struct LinkedObject {
     pub hash: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
 /// Representation of a linked object given by zksolc
+#[derive(Debug, Clone, Deserialize)]
 pub struct UnlinkedObject {
     /// List of unlinked libraries
     pub linker_symbols: HashSet<MissingLibrary>,
@@ -87,8 +87,8 @@ impl TryFrom<String> for MissingLibrary {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
 /// JSON Output for `zksolc link`
+#[derive(Debug, Clone, Deserialize)]
 pub struct LinkJsonOutput {
     /// Fully linked bytecodes resulting from given input
     #[serde(default)]

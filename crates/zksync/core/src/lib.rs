@@ -29,6 +29,8 @@ use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU25
 use eyre::eyre;
 use revm::{Database, InnerEvmContext};
 use serde::{Deserialize, Serialize};
+use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
+use zksync_types::Nonce;
 use std::fmt::Debug;
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
@@ -183,16 +185,7 @@ pub fn try_decode_create2(data: &[u8]) -> Result<(H256, H256, Vec<u8>)> {
 
 /// Compute a CREATE address according to zksync
 pub fn compute_create_address(sender: Address, nonce: u64) -> Address {
-    const CREATE_PREFIX: &'static [u8] = b"zksyncCreate";
-    let sender = sender.to_h256();
-    let nonce = H256::from_low_u64_be(nonce);
-    let prefix = keccak256(CREATE_PREFIX);
-
-    let payload = [prefix.as_slice(), sender.0.as_slice(), nonce.0.as_slice()].concat();
-    let hash = keccak256(payload);
-    let address = &hash[12..];
-
-    Address::from_slice(address)
+    get_create_zksync_address(sender.to_h160(), Nonce(nonce as u32)).to_address()
 }
 
 /// Try decoding the provided transaction data into create parameters.
