@@ -131,16 +131,23 @@ impl<'a> ContractRunner<'a> {
                 Some(&self.mcr.revert_decoder),
             );
 
-            // Record deployed library address.
-            if let Ok(deployed) = &deploy_result {
-                result.deployed_libs.push(deployed.address);
-            }
+            let deployments = match deploy_result {
+                Err(err) => vec![Err(err)],
+                Ok(deployments) => deployments.into_iter().map(|d| Ok(d)).collect(),
+            };
 
-            let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
-            result.extend(raw, TraceKind::Deployment);
-            if reason.is_some() {
-                result.reason = reason;
-                return Ok(result);
+            for deploy_result in deployments {
+                // Record deployed library address.
+                if let Ok(deployed) = &deploy_result {
+                    result.deployed_libs.push(deployed.address);
+                }
+
+                let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
+                result.extend(raw, TraceKind::Deployment);
+                if reason.is_some() {
+                    result.reason = reason;
+                    return Ok(result);
+                }
             }
         }
 

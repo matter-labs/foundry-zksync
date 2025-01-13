@@ -136,7 +136,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         code: Bytes,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<DeployResult, EvmError> {
+    ) -> Result<Vec<DeployResult>, EvmError> {
         // sync deployer account info
         let nonce = EvmExecutorStrategyRunner.get_nonce(executor, from).expect("deployer to exist");
         let balance =
@@ -146,8 +146,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         self.set_balance(executor, from, balance).map_err(|err| eyre::eyre!(err))?;
         tracing::debug!(?nonce, ?balance, sender = ?from, "deploying lib in EraVM");
 
-        // TODO(zk): determine how to return also relevant information for the EVM deployment
-        let evm_deployment = EvmExecutorStrategyRunner.deploy_library(
+        let mut evm_deployment = EvmExecutorStrategyRunner.deploy_library(
             executor,
             from,
             code.clone(),
@@ -188,7 +187,10 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             value,
         );
 
-        executor.deploy_with_env(env, rd)
+        executor.deploy_with_env(env, rd).map(move |dr| {
+            evm_deployment.push(dr);
+            evm_deployment
+        })
     }
 
     fn new_backend_strategy(&self) -> foundry_evm_core::backend::strategy::BackendStrategy {

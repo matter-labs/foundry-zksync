@@ -313,7 +313,7 @@ impl Executor {
         code: Bytes,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<DeployResult, EvmError> {
+    ) -> Result<Vec<DeployResult>, EvmError> {
         self.strategy.runner.deploy_library(self, from, code, value, rd)
     }
 

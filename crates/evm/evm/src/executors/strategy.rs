@@ -86,7 +86,7 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         code: Bytes,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<DeployResult, EvmError>;
+    ) -> Result<Vec<DeployResult>, EvmError>;
 
     /// Execute a transaction and *WITHOUT* applying state changes.
     fn call(
@@ -206,8 +206,8 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         code: Bytes,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<DeployResult, EvmError> {
-        executor.deploy(from, code, value, rd)
+    ) -> Result<Vec<DeployResult>, EvmError> {
+        executor.deploy(from, code, value, rd).map(|dr| vec![dr])
     }
 
     fn call(
