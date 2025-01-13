@@ -6,7 +6,7 @@ import {UsesFoo} from "../src/WithLibraries.sol";
 import "forge-std/Script.sol";
 
 contract GetCodeUnlinked is Script {
-   function run () external {
+   function run() external {
        // should fail because `UsesFoo` is unlinked
        bytes memory _code = vm.getCode("UsesFoo");
    }

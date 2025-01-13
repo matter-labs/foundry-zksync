@@ -7,14 +7,6 @@ import "../cheats/Vm.sol";
 
 import {UsesFoo} from "./WithLibraries.sol";
 
-contract GetCodeUnlinked is DSTest {
-    Vm constant vm = Vm(HEVM_ADDRESS);
-
-    function testGetCodeUnlinked() external {
-        bytes memory _code = vm.getCode("UsesFoo");
-    }
-}
-
 contract DeployTimeLinking is DSTest {
     function testUseUnlinkedContract() external {
         // we check that `UsesFoo` is fully linked

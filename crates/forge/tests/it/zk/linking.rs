@@ -1,12 +1,15 @@
 use forge::revm::primitives::SpecId;
 use foundry_test_utils::{forgetest_async, util, Filter, TestProject};
 
-use crate::{config::TestConfig, test_helpers::{deploy_zk_contract, run_zk_script_test, TEST_DATA_DEFAULT}};
+use crate::{
+    config::TestConfig,
+    test_helpers::{deploy_zk_contract, run_zk_script_test, TEST_DATA_DEFAULT},
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_deploy_time_linking() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
-    let filter = Filter::new(".*", ".*", ".*WithLibraries.t.sol");
+    let filter = Filter::new(".*", "DeployTimeLinking", ".*");
 
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }

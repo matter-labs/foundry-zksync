@@ -40,7 +40,7 @@ pub const ZKSOLC: &str = "zksolc";
 /// ZKsync solc release used for all ZKsync solc versions
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
 /// Default zksolc version
-pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 7);
+pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 8);
 
 #[cfg(test)]
 macro_rules! take_solc_installer_lock {
