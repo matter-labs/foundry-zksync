@@ -40,7 +40,7 @@ pub const ZKSOLC: &str = "zksolc";
 /// ZKsync solc release used for all ZKsync solc versions
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
 /// Default zksolc version
-pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 7);
+pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 9);
 
 #[cfg(test)]
 macro_rules! take_solc_installer_lock {
@@ -435,6 +435,12 @@ impl ZkSolc {
     #[instrument(name = "compile", level = "debug", skip_all)]
     pub fn compile_output(&self, input: &ZkSolcInput) -> Result<Vec<u8>> {
         let mut cmd = Command::new(&self.zksolc);
+
+        // Add the `--suppress-errors assemblycreate` flag for zksolc versions >= 1.5.9
+        // This prevents compile errors during foundry project compilation
+        if self.solc_version_info.zksync_version.as_ref() >= Some(&Version::new(1, 5, 9)) {
+            cmd.arg("--suppress-errors").arg("assemblycreate");
+        }
 
         if !self.allow_paths.is_empty() {
             cmd.arg("--allow-paths");

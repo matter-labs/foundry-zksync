@@ -117,7 +117,8 @@ pub struct ZkSyncArgs {
     /// Set the warnings to suppress for zksolc.
     #[clap(
         long = "zk-suppressed-warnings",
-        visible_alias = "suppressed-warnings",
+        alias =  "suppressed-warnings",
+        visible_alias = "suppress-warnings",
         value_delimiter = ',',
         help = "Set the warnings to suppress for zksolc, possible values: [txorigin]"
     )]
@@ -127,7 +128,8 @@ pub struct ZkSyncArgs {
     /// Set the errors to suppress for zksolc.
     #[clap(
         long = "zk-suppressed-errors",
-        visible_alias = "suppressed-errors",
+        alias = "suppressed-errors",
+        visible_alias = "suppress-errors",
         value_delimiter = ',',
         help = "Set the errors to suppress for zksolc, possible values: [sendtransfer, assemblycreate]"
     )]
