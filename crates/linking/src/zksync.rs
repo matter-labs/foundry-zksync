@@ -210,6 +210,7 @@ impl<'a> ZkLinker<'a> {
 
                     linked_artifacts.push((id.clone(), CompactContractBytecode::from(linked)));
                 }
+                // contract was ignored, no need to add it to the list of linked contracts
                 Err(ZkLinkerError::MissingFactoryDeps(fdeps)) => {
                     // attempt linking again if some factory dep remains unlinked
                     // this is just in the case where a previously unlinked factory dep

@@ -13,7 +13,10 @@ use semver::VersionReq;
 use zksync_types::H256;
 
 use foundry_common::ContractsByArtifact;
-use foundry_compilers::{Artifact, ProjectCompileOutput};
+use foundry_compilers::{
+    artifacts::CompactContractBytecodeCow, contracts::ArtifactContracts, Artifact,
+    ProjectCompileOutput,
+};
 use foundry_config::Config;
 use foundry_evm::{
     backend::{Backend, BackendResult, CowBackend},
@@ -132,7 +135,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             return Err(LinkerError::MissingTargetArtifact);
         };
 
-        let contracts =
+        let contracts: ArtifactContracts<CompactContractBytecodeCow<'_>> =
             input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(root), v)).collect();
 
         let Ok(zksolc) = foundry_config::zksync::config_zksolc_compiler(config) else {
@@ -152,7 +155,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             }
         })?;
 
-        let linker = ZkLinker::new(root, contracts, zksolc);
+        let linker = ZkLinker::new(root, contracts.clone(), zksolc);
 
         let zk_linker_error_to_linker = |zk_error| match zk_error {
             ZkLinkerError::Inner(err) => err,
@@ -178,8 +181,24 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             )
             .map_err(zk_linker_error_to_linker)?;
 
-        let mut linked_contracts = linker
-            .zk_get_linked_artifacts(linker.linker.contracts.keys(), &libraries)
+        let linked_contracts = linker
+            .zk_get_linked_artifacts(
+                linker
+                    .linker
+                    .contracts
+                    .iter()
+                    // we add this filter to avoid linking contracts that don't need linking
+                    .filter(|(_, art)| {
+                        // NOTE(zk): no need to check `deployed_bytecode`
+                        // as those `link_references` would be the same as `bytecode`
+                        art.bytecode
+                            .as_ref()
+                            .map(|bc| !bc.link_references.is_empty())
+                            .unwrap_or_default()
+                    })
+                    .map(|(id, _)| id),
+                &libraries,
+            )
             .map_err(zk_linker_error_to_linker)?;
 
         let newly_linked_dual_compiled_contracts = linked_contracts
@@ -193,15 +212,17 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             })
             .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
             .map(|(id, linked_zk, evm)| {
-                let (_, unlinked_zk_artifact) = input
+                let (unlinked_id, unlinked_zk_artifact) = input
                     .artifact_ids()
                     .find(|(contract_id, _)| {
                         contract_id.clone().with_stripped_file_prefixes(root) == id.clone()
                     })
-                    .unwrap();
-                let zk_bytecode = linked_zk.get_bytecode_bytes().unwrap();
+                    .expect("unable to find original (pre-linking) artifact");
+                dbg!(unlinked_id, &unlinked_zk_artifact);
+                let zk_bytecode =
+                    linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
                 let zk_hash = hash_bytecode(&zk_bytecode);
-                let evm = evm.get_bytecode_bytes().unwrap();
+                let evm = evm.get_bytecode_bytes().expect("no EVM bytecode (or unlinked)");
                 let contract = DualCompiledContract {
                     name: id.name.clone(),
                     zk_bytecode_hash: zk_hash,
@@ -218,8 +239,12 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                 // populate factory deps that were already linked
                 ctx.dual_compiled_contracts.extend_factory_deps_by_hash(
                     contract,
-                    unlinked_zk_artifact.factory_dependencies.iter().flatten().map(|(_, hash)| {
-                        H256::from_slice(alloy_primitives::hex::decode(hash).unwrap().as_slice())
+                    unlinked_zk_artifact.factory_dependencies.iter().flatten().map(|(hash, _)| {
+                        H256::from_slice(
+                            alloy_primitives::hex::decode(dbg!(hash))
+                                .expect("malformed factory dep hash")
+                                .as_slice(),
+                        )
                     }),
                 )
             });
@@ -227,10 +252,16 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         ctx.dual_compiled_contracts
             .extend(newly_linked_dual_compiled_contracts.collect::<Vec<_>>());
 
-        // Extend zk contracts with solc contracts as well. This is required for traces to
-        // accurately detect contract names deployed in EVM mode, and when using
-        // `vm.zkVmSkip()` cheatcode.
-        linked_contracts.extend(evm_link.linked_contracts);
+        let linked_contracts: ArtifactContracts = contracts
+            .into_iter()
+            .map(|(id, art)| (id, foundry_compilers::artifacts::CompactContractBytecode::from(art)))
+            // Extend original zk contracts with newly linked ones
+            .chain(linked_contracts)
+            // Extend zk contracts with solc contracts as well. This is required for traces to
+            // accurately detect contract names deployed in EVM mode, and when using
+            // `vm.zkVmSkip()` cheatcode.
+            .chain(evm_link.linked_contracts)
+            .collect();
 
         Ok(LinkOutput {
             deployable_contracts: evm_link.deployable_contracts,
