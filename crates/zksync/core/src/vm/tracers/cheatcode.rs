@@ -94,8 +94,6 @@ pub struct CheatcodeTracerContext<'a> {
     pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     /// Paymaster data
     pub paymaster_data: Option<ZkPaymasterData>,
-    /// Whether to persist nonce update for the tx caller, or not.
-    pub persist_nonce_update: bool,
     /// Era Vm environment
     pub zk_env: ZkEnv,
 }
@@ -169,8 +167,11 @@ impl CheatcodeTracer {
     /// Check if the given address's code is empty
     fn has_empty_code<S: ReadStorage>(&self, storage: StoragePtr<S>, target: Address) -> bool {
         // The following addresses are expected to have empty bytecode
-        let ignored_known_addresses =
-            [foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS, self.call_context.tx_caller];
+        let ignored_known_addresses = [
+            foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS,
+            self.call_context.tx_caller,
+            self.call_context.msg_sender,
+        ];
 
         let contract_code = storage.borrow_mut().read_value(&get_code_key(&target.to_h160()));
 
