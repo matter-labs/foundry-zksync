@@ -6,7 +6,6 @@
 pub mod artifacts;
 pub mod compilers;
 pub mod dual_compiled_contracts;
-pub mod libraries;
 pub mod link;
 
 // TODO: Used in integration tests.
