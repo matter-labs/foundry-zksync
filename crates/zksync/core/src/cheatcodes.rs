@@ -13,11 +13,10 @@ use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
     L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
-use zksync_utils::bytecode::hash_bytecode;
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    EMPTY_CODE,
+    hash_bytecode, EMPTY_CODE,
 };
 
 /// Sets `block.timestamp`.
@@ -183,7 +182,7 @@ where
             .expect("account 'KNOWN_CODES_STORAGE_ADDRESS' could not be loaded");
     }
 
-    let empty_code_hash = zksync_utils::bytecode::hash_bytecode(&EMPTY_CODE);
+    let empty_code_hash = hash_bytecode(&EMPTY_CODE);
 
     // update account code storage for empty code
     let account_key = address.to_h256().to_ru256();

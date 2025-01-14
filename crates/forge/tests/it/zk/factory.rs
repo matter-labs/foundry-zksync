@@ -49,7 +49,8 @@ forgetest_async!(script_zk_can_deploy_in_method, |prj, cmd| {
         None,
         2,
         Some(&["--broadcast"]),
-    );
+    )
+    .await;
     run_zk_script_test(
         prj.root(),
         &mut cmd,
@@ -58,7 +59,8 @@ forgetest_async!(script_zk_can_deploy_in_method, |prj, cmd| {
         None,
         2,
         Some(&["--broadcast"]),
-    );
+    )
+    .await;
 });
 
 forgetest_async!(script_zk_can_deploy_in_constructor, |prj, cmd| {
@@ -71,7 +73,8 @@ forgetest_async!(script_zk_can_deploy_in_constructor, |prj, cmd| {
         None,
         1,
         Some(&["--broadcast"]),
-    );
+    )
+    .await;
     run_zk_script_test(
         prj.root(),
         &mut cmd,
@@ -80,7 +83,8 @@ forgetest_async!(script_zk_can_deploy_in_constructor, |prj, cmd| {
         None,
         1,
         Some(&["--broadcast"]),
-    );
+    )
+    .await;
 });
 
 forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
@@ -93,7 +97,8 @@ forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
         None,
         3,
         Some(&["--broadcast"]),
-    );
+    )
+    .await;
     run_zk_script_test(
         prj.root(),
         &mut cmd,
@@ -102,7 +107,8 @@ forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
         None,
         2,
         Some(&["--broadcast"]),
-    );
+    )
+    .await;
 });
 
 fn setup_factory_prj(prj: &mut TestProject) {

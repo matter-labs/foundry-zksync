@@ -10,16 +10,17 @@ use alloy_primitives::{map::HashMap, Address, U256 as rU256};
 use foundry_cheatcodes_common::record::RecordAccess;
 use revm::{primitives::Account, Database, EvmContext, InnerEvmContext};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
-use zksync_state::interface::ReadStorage;
 use zksync_types::{
-    get_code_key, get_nonce_key, get_system_context_init_logs,
+    get_code_key, get_nonce_key, get_system_context_init_logs, h256_to_u256,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
     Nonce, StorageKey, StorageLog, StorageValue,
 };
+use zksync_vm_interface::storage::ReadStorage;
 
-use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
-
-use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
+use crate::{
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    hash_bytecode,
+};
 
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
@@ -33,7 +34,7 @@ pub struct ZKVMData<'a, DB: Database> {
     pub accesses: Option<&'a mut RecordAccess>,
 }
 
-impl<'a, DB> Debug for ZKVMData<'a, DB>
+impl<DB> Debug for ZKVMData<'_, DB>
 where
     DB: Database,
 {
@@ -78,8 +79,8 @@ where
 
     /// Create a new instance of [ZKEVMData] with system contracts.
     pub fn new_with_system_contracts(ecx: &'a mut EvmContext<DB>, chain_id: L2ChainId) -> Self {
-        let contracts = era_test_node::system_contracts::get_deployed_contracts(
-            &era_test_node::system_contracts::Options::BuiltInWithoutSecurity,
+        let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
+            &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
             false,
         );
         let system_context_init_log = get_system_context_init_logs(chain_id);
@@ -182,7 +183,7 @@ where
     }
 }
 
-impl<'a, DB> ReadStorage for &mut ZKVMData<'a, DB>
+impl<DB> ReadStorage for &mut ZKVMData<'_, DB>
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -207,7 +208,7 @@ where
                 .values()
                 .find_map(|account| {
                     if account.info.code_hash == hash_b256 {
-                        return Some(account.info.code.clone().map(|code| code.bytecode().to_vec()))
+                        return Some(account.info.code.clone().map(|code| code.bytecode().to_vec()));
                     }
                     None
                 })

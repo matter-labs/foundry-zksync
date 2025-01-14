@@ -2,8 +2,7 @@
 use revm::primitives::U256 as rU256;
 use revm::primitives::{Address, B256};
 
-use zksync_basic_types::{H160, H256, U256};
-use zksync_utils::{address_to_h256, h256_to_u256, u256_to_h256};
+use zksync_basic_types::{address_to_h256, h256_to_u256, u256_to_h256, H160, H256, U256};
 
 /// Conversions from [U256]
 pub trait ConvertU256 {

@@ -20,15 +20,15 @@ use zksync_multivm::{
         zkevm_opcode_defs::{FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER},
     },
 };
-use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     ethabi, get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256,
     IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, SYSTEM_CONTEXT_ADDRESS, U256,
 };
-use zksync_utils::bytecode::hash_bytecode;
+use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
+    hash_bytecode,
     vm::{
         farcall::{CallAction, CallDepth, FarCallHandler},
         ZkEnv,
@@ -165,13 +165,24 @@ impl CheatcodeTracer {
     }
 
     /// Check if the given address's code is empty
-    fn has_empty_code<S: ReadStorage>(&self, storage: StoragePtr<S>, target: Address) -> bool {
+    fn has_empty_code<S: ReadStorage>(
+        &self,
+        storage: StoragePtr<S>,
+        target: Address,
+        calldata: &[u8],
+        value: rU256,
+    ) -> bool {
         // The following addresses are expected to have empty bytecode
         let ignored_known_addresses = [
             foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS,
             self.call_context.tx_caller,
             self.call_context.msg_sender,
         ];
+
+        // Skip empty code check for empty calldata with non-zero value (Transfers)
+        if calldata.is_empty() && !value.is_zero() {
+            return false;
+        }
 
         let contract_code = storage.borrow_mut().read_value(&get_code_key(&target.to_h160()));
 
@@ -296,7 +307,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
 
             // if we get here there was no matching mock call,
             // so we check if there's no code at the mocked address
-            if self.has_empty_code(storage, call_contract) {
+            if self.has_empty_code(storage, call_contract, &call_input, call_value) {
                 // issue a more targeted
                 // error if we already had some mocks there
                 let had_mocks_message =
@@ -325,7 +336,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                 if self.call_context.tx_caller == address {
                     tracing::debug!("overriding account version for caller {address:?}");
                     self.farcall_handler.set_immediate_return(rU256::from(1u32).to_be_bytes_vec());
-                    return
+                    return;
                 }
             }
         }
@@ -354,11 +365,11 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                 if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_NUMBER) {
                     self.farcall_handler
                         .set_immediate_return(self.call_context.block_number.to_be_bytes_vec());
-                    return
+                    return;
                 } else if calldata.starts_with(&SELECTOR_SYSTEM_CONTEXT_BLOCK_TIMESTAMP) {
                     self.farcall_handler
                         .set_immediate_return(self.call_context.block_timestamp.to_be_bytes_vec());
-                    return
+                    return;
                 }
             }
         }
@@ -375,7 +386,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             {
                 self.farcall_handler
                     .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
-                return
+                return;
             }
         }
 

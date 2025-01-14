@@ -10,7 +10,7 @@ use foundry_zksync_compilers::dual_compiled_contracts::{
 use foundry_zksync_core::{vm::ZkEnv, ZkPaymasterData, H256};
 use revm::primitives::Bytecode;
 
-use super::types::{ZkPersistNonceUpdate, ZkStartupMigration};
+use super::types::ZkStartupMigration;
 
 /// Context for [ZksyncCheatcodeInspectorStrategyRunner].
 #[derive(Debug, Default, Clone)]

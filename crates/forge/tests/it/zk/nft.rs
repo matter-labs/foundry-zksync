@@ -12,7 +12,8 @@ forgetest_async!(script_zk_can_deploy_nft, |prj, cmd| {
         Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts"),
         1,
         Some(&["-vvvvv", "--broadcast"]),
-    );
+    )
+    .await;
 });
 
 fn setup_nft_prj(prj: &mut TestProject) {

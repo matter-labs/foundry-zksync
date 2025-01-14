@@ -166,7 +166,7 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
         Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts cyfrin/zksync-contracts"),
         2,
         Some(&["-vvvvv", "--via-ir", "--system-mode", "true", "--broadcast"]),
-    );
+    ).await;
 });
 
 fn setup_deploy_prj(prj: &mut TestProject) {

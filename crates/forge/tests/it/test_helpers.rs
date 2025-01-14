@@ -553,7 +553,7 @@ pub fn rpc_endpoints_zk() -> RpcEndpoints {
     ])
 }
 
-pub fn run_zk_script_test(
+pub async fn run_zk_script_test(
     root: impl AsRef<std::path::Path>,
     cmd: &mut TestCommand,
     script_path: &str,
@@ -562,7 +562,7 @@ pub fn run_zk_script_test(
     expected_broadcastable_txs: usize,
     extra_args: Option<&[&str]>,
 ) {
-    let node = ZkSyncNode::start();
+    let node = ZkSyncNode::start().await;
     let url = node.url();
 
     if let Some(deps) = dependencies {
@@ -582,7 +582,7 @@ pub fn run_zk_script_test(
         "--zk-startup",
         &script_path_contract,
         "--private-key",
-        private_key,
+        &private_key,
         "--chain",
         "260",
         "--gas-estimate-multiplier",

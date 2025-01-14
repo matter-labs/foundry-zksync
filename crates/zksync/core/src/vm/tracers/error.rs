@@ -6,7 +6,7 @@ use zksync_multivm::{
         vm_state::ErrorFlags,
     },
 };
-use zksync_state::interface::{ReadStorage, WriteStorage};
+use zksync_vm_interface::storage::{ReadStorage, WriteStorage};
 
 /// A tracer to allow logging low-level vm errors.
 #[derive(Debug, Default)]

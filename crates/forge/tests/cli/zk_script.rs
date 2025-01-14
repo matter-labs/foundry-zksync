@@ -22,7 +22,7 @@ forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
         zksync: ZkTransactionMetadata,
     }
 
-    let node = foundry_test_utils::ZkSyncNode::start();
+    let node = foundry_test_utils::ZkSyncNode::start().await;
 
     cmd.args(["init", "--force"]).arg(prj.root());
     cmd.assert_success();

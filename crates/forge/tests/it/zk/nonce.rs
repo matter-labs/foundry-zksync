@@ -15,7 +15,8 @@ forgetest_async!(setup_block_on_script_test, |prj, cmd| {
         None,
         4,
         Some(&["-vvvvv"]),
-    );
+    )
+    .await;
 });
 
 #[tokio::test(flavor = "multi_thread")]

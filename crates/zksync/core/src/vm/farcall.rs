@@ -21,8 +21,8 @@ use zksync_multivm::{
         },
     },
 };
-use zksync_state::interface::{StoragePtr, WriteStorage};
 use zksync_types::MSG_VALUE_SIMULATOR_ADDRESS;
+use zksync_vm_interface::storage::{StoragePtr, WriteStorage};
 
 use crate::convert::{ConvertAddress, ConvertH256, ConvertU256};
 
@@ -290,13 +290,13 @@ impl MockedCalls {
             if call.address == code_address {
                 let value_matches = call.value.map_or(true, |value| value == actual_value);
                 if !value_matches {
-                    continue
+                    continue;
                 }
 
                 if actual_calldata.starts_with(&call.calldata) {
                     // return early if exact match
                     if call.calldata.len() == actual_calldata.len() {
-                        return Some(call_return_data.clone())
+                        return Some(call_return_data.clone());
                     }
 
                     // else check for partial matches and pick the best
@@ -381,7 +381,7 @@ impl ParsedFarCall {
             ParsedFarCall::SimpleCall { calldata, .. } => calldata,
         }[4..];
         if params.is_empty() {
-            return Vec::new()
+            return Vec::new();
         }
 
         params
@@ -397,7 +397,7 @@ impl ParsedFarCall {
             ParsedFarCall::SimpleCall { calldata, .. } => calldata,
         }[4..];
         if params.is_empty() || params.len() < 32 * offset_words {
-            return Vec::new()
+            return Vec::new();
         }
 
         params[32 * offset_words..].to_vec()
