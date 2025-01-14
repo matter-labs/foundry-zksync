@@ -11,15 +11,12 @@ use foundry_test_utils::foundry_compilers::{
     CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig,
 };
 
+use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_zksync_compilers::{
     artifacts::{contract::Contract, error::Error},
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
-        zksolc::{
-            input::ZkSolcInput,
-            settings::{ZkSolcError, ZkSolcWarning},
-            ZkSolc, ZkSolcCompiler, ZkSolcSettings,
-        },
+        zksolc::{input::ZkSolcInput, ZkSolc, ZkSolcCompiler, ZkSolcSettings},
     },
 };
 
@@ -82,7 +79,7 @@ fn test_zksync_can_compile_contract_with_suppressed_errors(compiler: ZkSolcCompi
     assert!(compiled.has_compiler_errors());
 
     project.project_mut().settings.settings.suppressed_errors =
-        HashSet::from([ZkSolcError::SendTransfer]);
+        HashSet::from([ErrorType::SendTransfer]);
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();
@@ -139,7 +136,7 @@ fn test_zksync_can_compile_contract_with_suppressed_warnings(compiler: ZkSolcCom
     );
 
     project.project_mut().settings.settings.suppressed_warnings =
-        HashSet::from([ZkSolcWarning::TxOrigin]);
+        HashSet::from([WarningType::TxOrigin]);
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();
@@ -196,7 +193,7 @@ fn test_zksync_can_compile_contract_with_assembly_create_suppressed_errors(
     assert!(compiled.has_compiler_errors());
 
     project.project_mut().settings.settings.suppressed_errors =
-        HashSet::from([ZkSolcError::AssemblyCreate]);
+        HashSet::from([ErrorType::AssemblyCreate]);
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();
