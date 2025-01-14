@@ -102,7 +102,7 @@ fn lil_web3() {
 #[cfg_attr(windows, ignore = "Windows cannot find installed programs")]
 #[cfg(not(feature = "isolate-by-default"))]
 fn snekmate() {
-    ExtTester::new("pcaversaccio", "snekmate", "cb04f4bd70a5ce04cc12ceed9cd5a6c83029ff72")
+    ExtTester::new("pcaversaccio", "snekmate", "df226f4a45e86c8f8c3ff1f9fa3443d260002050")
         .install_command(&["pnpm", "install", "--prefer-offline"])
         // Try npm if pnpm fails / is not installed.
         .install_command(&["npm", "install", "--prefer-offline"])
