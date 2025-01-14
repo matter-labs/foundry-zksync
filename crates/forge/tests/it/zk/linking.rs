@@ -31,7 +31,7 @@ forgetest_async!(
     }
 );
 
-// FIXME(zk): add deploy-time linking to scripting
+// TODO(zk): add deploy-time linking to scripting
 forgetest_async!(
     #[should_panic = "has no bytecode hash, as it may require library linkage"]
     script_zk_deploy_time_linking_fails,

@@ -46,7 +46,7 @@ pub struct LinkJsonInput {
 /// Representation of a linked object given by zksolc
 #[derive(Debug, Clone, Deserialize)]
 pub struct LinkedObject {
-    // FIXME: obtain factoryDeps from output
+    // TODO(zk): obtain factoryDeps from output
     // might come in handy to have the libraries used as well
     /// Fully linked bytecode
     pub bytecode: String,
