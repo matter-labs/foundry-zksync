@@ -4,9 +4,15 @@ use alloy_primitives::{keccak256, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
+use revm::{
+    primitives::{CreateScheme, Env, EnvWithHandlerCfg, ResultAndState},
+    Database,
+};
+use semver::VersionReq;
+use zksync_types::H256;
 
 use foundry_common::ContractsByArtifact;
-use foundry_compilers::{contracts::ArtifactContracts, Artifact, ProjectCompileOutput};
+use foundry_compilers::{Artifact, ProjectCompileOutput};
 use foundry_config::Config;
 use foundry_evm::{
     backend::{Backend, BackendResult, CowBackend},
@@ -20,7 +26,7 @@ use foundry_evm::{
     },
     inspectors::InspectorStack,
 };
-use foundry_linking::{Linker, LinkerError, ZkLinker, ZkLinkerError};
+use foundry_linking::{LinkerError, ZkLinker, ZkLinkerError};
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::{DualCompiledContract, DualCompiledContracts},
@@ -29,11 +35,6 @@ use foundry_zksync_core::{
     encode_create_params, hash_bytecode, vm::ZkEnv, ZkTransactionMetadata,
     ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
-use revm::{
-    primitives::{CreateScheme, Env, EnvWithHandlerCfg, ResultAndState},
-    Database,
-};
-use zksync_types::H256;
 
 use crate::{
     backend::{ZksyncBackendStrategyBuilder, ZksyncInspectContext},
@@ -164,6 +165,17 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             // TODO(zk): better error
             return Err(LinkerError::CyclicDependency);
         };
+
+        // TODO(zk): better error
+        zksolc.version().map_err(|_| LinkerError::CyclicDependency).and_then(|version| {
+            let version_req = VersionReq::parse(">=1.5.8").unwrap();
+            if !version_req.matches(&version) {
+                tracing::error!(?version, "linking requires zksolc >= v1.5.8");
+                Err(LinkerError::CyclicDependency)
+            } else {
+                Ok(())
+            }
+        })?;
 
         let linker = ZkLinker::new(root, contracts, zksolc);
 
