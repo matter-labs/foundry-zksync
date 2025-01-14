@@ -259,13 +259,8 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         self.set_balance(executor, from, balance).map_err(|err| eyre::eyre!(err))?;
         tracing::debug!(?nonce, ?balance, sender = ?from, "deploying lib in EraVM");
 
-        let mut evm_deployment = EvmExecutorStrategyRunner.deploy_library(
-            executor,
-            from,
-            code.clone(),
-            value,
-            rd,
-        )?;
+        let mut evm_deployment =
+            EvmExecutorStrategyRunner.deploy_library(executor, from, code.clone(), value, rd)?;
 
         let ctx = get_context(executor.strategy.context.as_mut());
 
