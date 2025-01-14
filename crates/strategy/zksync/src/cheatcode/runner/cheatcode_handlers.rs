@@ -116,7 +116,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     cheatcode.as_any().downcast_ref().unwrap();
 
                 info!(?account, "cheatcode zkGetDeploymentNonce");
-                
+
                 let (_, deploy_nonce) =
                     foundry_zksync_core::cheatcodes::get_full_nonce(account, ccx.ecx);
                 Ok(deploy_nonce.abi_encode())
