@@ -68,7 +68,7 @@ impl BuildData {
                 .map(|(id, v)| (id.with_stripped_file_prefixes(self.project_root.as_ref()), v))
                 .collect(),
             zksolc,
-            input
+            input,
         ))
     }
 
@@ -178,13 +178,16 @@ impl BuildData {
             })
             .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
             .map(|(id, linked_zk, evm)| {
-                let (_, unlinked_zk_artifact) = input
-                    .artifact_ids()
-                    .find(|(contract_id, _)| {
-                        contract_id.clone().with_stripped_file_prefixes(self.project_root.as_ref())
-                            == id.clone()
-                    })
-                    .expect("unable to find original (pre-linking) artifact");
+                let (_, unlinked_zk_artifact) =
+                    input
+                        .artifact_ids()
+                        .find(|(contract_id, _)| {
+                            contract_id
+                                .clone()
+                                .with_stripped_file_prefixes(self.project_root.as_ref()) ==
+                                id.clone()
+                        })
+                        .expect("unable to find original (pre-linking) artifact");
                 let zk_bytecode =
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
                 let zk_hash = hash_bytecode(&zk_bytecode);
@@ -445,8 +448,8 @@ impl PreprocessedState {
                 if id.name != *name {
                     continue;
                 }
-            } else if contract.abi.as_ref().is_none_or(|abi| abi.is_empty())
-                || contract.bytecode.as_ref().is_none_or(|b| match &b.object {
+            } else if contract.abi.as_ref().is_none_or(|abi| abi.is_empty()) ||
+                contract.bytecode.as_ref().is_none_or(|b| match &b.object {
                     BytecodeObject::Bytecode(b) => b.is_empty(),
                     BytecodeObject::Unlinked(_) => false,
                 })

@@ -205,13 +205,25 @@ pub fn compute_create_address(sender: Address, nonce: u64) -> Address {
 }
 
 /// Compute a CREATE2 address according to zksync
-pub fn compute_create2_address(sender: Address, bytecode_hash: H256, salt: B256, constructor_input: &[u8]) -> Address {
+pub fn compute_create2_address(
+    sender: Address,
+    bytecode_hash: H256,
+    salt: B256,
+    constructor_input: &[u8],
+) -> Address {
     const CREATE2_PREFIX: &'static [u8] = b"zksyncCreate2";
     let prefix = keccak256(CREATE2_PREFIX);
     let sender = sender.to_h256();
     let constructor_input_hash = keccak256(constructor_input);
 
-    let payload = [prefix.as_slice(), sender.0.as_slice(), salt.0.as_slice(), bytecode_hash.0.as_slice(), constructor_input_hash.as_slice()].concat();
+    let payload = [
+        prefix.as_slice(),
+        sender.0.as_slice(),
+        salt.0.as_slice(),
+        bytecode_hash.0.as_slice(),
+        constructor_input_hash.as_slice(),
+    ]
+    .concat();
     let hash = keccak256(payload);
 
     let address = &hash[12..];
