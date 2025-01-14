@@ -20,7 +20,7 @@ use foundry_evm::{
     },
     inspectors::InspectorStack,
 };
-use foundry_linking::{Linker, LinkerError, ZkLinkerError};
+use foundry_linking::{Linker, LinkerError, ZkLinker, ZkLinkerError};
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::{DualCompiledContract, DualCompiledContracts},
@@ -158,11 +158,18 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
 
         let contracts =
             input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(root), v)).collect();
-        let linker = Linker::new(root, contracts);
+
+        let Ok(zksolc) = foundry_config::zksync::config_zksolc_compiler(config) else {
+            tracing::error!("unable to determine zksolc compiler to be used for linking");
+            // TODO(zk): better error
+            return Err(LinkerError::CyclicDependency);
+        };
+
+        let linker = ZkLinker::new(root, contracts, zksolc);
 
         let zk_linker_error_to_linker = |zk_error| match zk_error {
             ZkLinkerError::Inner(err) => err,
-            // FIXME: better error value
+            // TODO(zk): better error value
             ZkLinkerError::MissingLibraries(libs) => LinkerError::MissingLibraryArtifact {
                 file: "libraries".to_string(),
                 name: libs.len().to_string(),
@@ -180,12 +187,12 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                 // NOTE(zk): match with EVM nonces as we will be doing a duplex deployment for
                 // the libs
                 0,
-                linker.contracts.keys(),
+                linker.linker.contracts.keys(),
             )
             .map_err(zk_linker_error_to_linker)?;
 
         let mut linked_contracts = linker
-            .zk_get_linked_artifacts(linker.contracts.keys(), &libraries)
+            .zk_get_linked_artifacts(linker.linker.contracts.keys(), &libraries)
             .map_err(zk_linker_error_to_linker)?;
 
         let newly_linked_dual_compiled_contracts = linked_contracts
@@ -212,10 +219,12 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                     name: id.name.clone(),
                     zk_bytecode_hash: zk_hash,
                     zk_deployed_bytecode: zk_bytecode.to_vec(),
-                    // FIXME: retrieve unlinked factory deps (1.5.9)
+                    // TODO(zk): retrieve unlinked factory deps (1.5.9)
                     zk_factory_deps: vec![zk_bytecode.to_vec()],
                     evm_bytecode_hash: B256::from_slice(&keccak256(evm.as_ref())[..]),
-                    evm_deployed_bytecode: evm.to_vec(), // FIXME: is this ok? not really used
+                    // TODO(zk): determine if this is ok, as it's
+                    // not really used in dual compiled contracts
+                    evm_deployed_bytecode: evm.to_vec(),
                     evm_bytecode: evm.to_vec(),
                 };
 
@@ -289,7 +298,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         // entirely in EraVM
         let factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(dual_contract);
 
-        // persist existing paymaster data (needed?)
+        // persist existing paymaster data (TODO(zk): is this needed?)
         let paymaster_data =
             ctx.transaction_context.take().and_then(|metadata| metadata.paymaster_data);
         ctx.transaction_context = Some(ZkTransactionMetadata { factory_deps, paymaster_data });

@@ -172,6 +172,30 @@ pub fn config_zksolc_settings(config: &Config) -> Result<ZkSolcSettings, SolcErr
     Ok(config.zksync.settings(libraries, config.evm_version, config.via_ir))
 }
 
+/// Return the configured `zksolc` compiler
+///
+/// If not `offline`, will install the default version automatically
+/// Will fallback to `zksolc` present in the environment
+pub fn config_zksolc_compiler(config: &Config) -> Result<ZkSolcCompiler, SolcError> {
+    let zksolc = if let Some(zksolc) =
+        config_ensure_zksolc(config.zksync.zksolc.as_ref(), config.offline)?
+    {
+        zksolc
+    } else if !config.offline {
+        let default_version = semver::Version::new(1, 5, 8);
+        let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
+        if zksolc.is_none() {
+            ZkSolc::blocking_install(&default_version)?;
+            zksolc = ZkSolc::find_installed_version(&default_version)?;
+        }
+        zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"))
+    } else {
+        "zksolc".into()
+    };
+
+    Ok(ZkSolcCompiler { zksolc, solc: config_solc_compiler(config)? })
+}
+
 /// Create a new zkSync project
 pub fn config_create_project(
     config: &Config,
@@ -199,23 +223,7 @@ pub fn config_create_project(
         builder = builder.sparse_output(filter);
     }
 
-    let zksolc = if let Some(zksolc) =
-        config_ensure_zksolc(config.zksync.zksolc.as_ref(), config.offline)?
-    {
-        zksolc
-    } else if !config.offline {
-        let default_version = semver::Version::new(1, 5, 8);
-        let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
-        if zksolc.is_none() {
-            ZkSolc::blocking_install(&default_version)?;
-            zksolc = ZkSolc::find_installed_version(&default_version)?;
-        }
-        zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"))
-    } else {
-        "zksolc".into()
-    };
-
-    let zksolc_compiler = ZkSolcCompiler { zksolc, solc: config_solc_compiler(config)? };
+    let zksolc_compiler = config_zksolc_compiler(config)?;
 
     let project = builder.build(zksolc_compiler)?;
 
