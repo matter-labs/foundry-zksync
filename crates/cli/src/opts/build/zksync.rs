@@ -129,7 +129,7 @@ pub struct ZkSyncArgs {
         long = "zk-suppressed-errors",
         visible_alias = "suppressed-errors",
         value_delimiter = ',',
-        help = "Set the errors to suppress for zksolc, possible values: [sendtransfer]"
+        help = "Set the errors to suppress for zksolc, possible values: [sendtransfer, assemblycreate]"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suppressed_errors: Option<Vec<ZkSolcError>>,

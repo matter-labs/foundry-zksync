@@ -54,6 +54,9 @@ pub enum ZkSolcError {
     /// `sendtransfer` error: Using `send()` or `transfer()` methods on `address payable` instead
     /// of `call()`.
     SendTransfer,
+
+    /// `assemblycreate` error: Using `assembly { create }` instead of `new MyContract()`.
+    AssemblyCreate,
 }
 
 impl FromStr for ZkSolcError {
@@ -61,6 +64,7 @@ impl FromStr for ZkSolcError {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "sendtransfer" => Ok(Self::SendTransfer),
+            "assemblycreate" => Ok(Self::AssemblyCreate),
             s => Err(format!("Unknown zksolc error: {s}")),
         }
     }

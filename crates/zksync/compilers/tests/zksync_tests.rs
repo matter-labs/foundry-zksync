@@ -169,6 +169,49 @@ fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
     test_zksync_can_compile_contract_with_suppressed_warnings(compiler);
 }
 
+fn test_zksync_can_compile_contract_with_assembly_create_suppressed_errors(
+    compiler: ZkSolcCompiler,
+) {
+    let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+    project.project_mut().compiler = compiler;
+
+    project
+        .add_source(
+            "Erroneous",
+            r#"
+        // SPDX-License-Identifier: MIT OR Apache-2.0
+        pragma solidity ^0.8.10;
+        contract Erroneous {
+            function deployWithCreate(bytes memory bytecode) public returns (address addr) {
+                assembly {
+                    addr := create(0, add(bytecode, 0x20), mload(bytecode))
+                }
+            }
+        }
+        "#,
+        )
+        .unwrap();
+
+    let compiled = project.compile().unwrap();
+    assert!(compiled.has_compiler_errors());
+
+    project.project_mut().settings.settings.suppressed_errors =
+        HashSet::from([ZkSolcError::AssemblyCreate]);
+
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(compiled.find_first("Erroneous").is_some());
+}
+
+#[test]
+fn zksync_can_compile_contract_with_assembly_create_suppressed_errors() {
+    let compiler = ZkSolcCompiler {
+        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 9)).unwrap(),
+        solc: Default::default(),
+    };
+    test_zksync_can_compile_contract_with_assembly_create_suppressed_errors(compiler);
+}
+
 #[test]
 fn zksync_can_compile_dapp_detect_changes_in_libs() {
     // let _ = tracing_subscriber::fmt()
