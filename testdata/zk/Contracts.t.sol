@@ -84,7 +84,7 @@ contract CustomStorage {
     }
 }
 
-contract ZkContractsTest is DSTest, DSTestExt {
+contract ZkContractsTest is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
 
     Number number;
