@@ -333,8 +333,14 @@ impl ProjectCompiler {
         let files = self.files.clone();
 
         {
-            let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
-            Report::new(SpinnerReporter::spawn_with(format!("Using zksolc-{zksolc_version}")));
+            let zksolc_current_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
+            let zksolc_min_supported_version = ZkSolc::zksolc_minimum_supported_version();
+            if zksolc_current_version < zksolc_min_supported_version {
+                sh_warn!("Compiling with zksolc v{zksolc_current_version} which is not supported and may lead to unexpected errors. Minimum version supported is v{zksolc_min_supported_version}")?;
+            }
+            Report::new(SpinnerReporter::spawn_with(format!(
+                "Using zksolc-{zksolc_current_version}"
+            )));
         }
         self.zksync_compile_with(&project.paths.root, || {
             let files_to_compile =

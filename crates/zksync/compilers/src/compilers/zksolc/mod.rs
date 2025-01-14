@@ -430,6 +430,11 @@ impl ZkSolc {
         ret
     }
 
+    /// Get zksolc minimum supported version
+    pub fn zksolc_minimum_supported_version() -> Version {
+        ZkSolc::zksolc_available_versions().remove(0)
+    }
+
     /// Get available zksync solc versions
     pub fn solc_available_versions() -> Vec<Version> {
         let mut ret = vec![];

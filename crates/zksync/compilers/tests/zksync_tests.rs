@@ -81,8 +81,8 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
                         "zksolc {version} {n} artifact bytecode field should not be empty"
                     ))
                     .object()
-                    .bytes_len()
-                    > 0,
+                    .bytes_len() >
+                    0,
                 "zksolc {version} {n} artifact bytecode should yield more than 0 bytes",
             );
         }
