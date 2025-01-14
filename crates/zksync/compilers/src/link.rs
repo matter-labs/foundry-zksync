@@ -28,9 +28,9 @@ pub struct Library {
     pub address: Address,
 }
 
-impl Into<String> for Library {
-    fn into(self) -> String {
-        format!("{}:{}={}", self.filename, self.name, self.address)
+impl From<Library> for String {
+    fn from(val: Library) -> Self {
+        format!("{}:{}={}", val.filename, val.name, val.address)
     }
 }
 
@@ -101,7 +101,7 @@ pub struct LinkJsonOutput {
     pub ignored: HashMap<LinkId, LinkedObject>,
 }
 
-// taken fom compilers
+// taken from compilers
 fn map_io_err(zksolc_path: &Path) -> impl FnOnce(std::io::Error) -> SolcError + '_ {
     move |err| SolcError::io(err, zksolc_path)
 }
@@ -113,7 +113,7 @@ pub fn zksolc_link(
     input: LinkJsonInput,
 ) -> Result<LinkJsonOutput, SolcError> {
     let zksolc = &zksolc.zksolc;
-    let mut cmd = Command::new(&zksolc);
+    let mut cmd = Command::new(zksolc);
 
     cmd.arg("--standard-json")
         .arg("--link")
@@ -121,12 +121,12 @@ pub fn zksolc_link(
         .stderr(Stdio::piped())
         .stdout(Stdio::piped());
 
-    let mut child = cmd.spawn().map_err(map_io_err(&zksolc))?;
+    let mut child = cmd.spawn().map_err(map_io_err(zksolc))?;
 
     let stdin = child.stdin.as_mut().unwrap();
     let _ = serde_json::to_writer(stdin, &input);
 
-    let output = child.wait_with_output().map_err(map_io_err(&zksolc))?;
+    let output = child.wait_with_output().map_err(map_io_err(zksolc))?;
     tracing::trace!(?output);
 
     if output.status.success() {

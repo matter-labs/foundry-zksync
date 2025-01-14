@@ -133,7 +133,7 @@ impl<'a> ContractRunner<'a> {
 
             let deployments = match deploy_result {
                 Err(err) => vec![Err(err)],
-                Ok(deployments) => deployments.into_iter().map(|d| Ok(d)).collect(),
+                Ok(deployments) => deployments.into_iter().map(Ok).collect(),
             };
 
             for deploy_result in deployments {

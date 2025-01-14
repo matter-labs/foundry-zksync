@@ -308,7 +308,7 @@ impl DualCompiledContracts {
 
     /// Extend the inner set of contracts with the given iterator
     pub fn extend(&mut self, iter: impl IntoIterator<Item = DualCompiledContract>) {
-        self.contracts.extend(iter.into_iter());
+        self.contracts.extend(iter);
         self.contracts.sort_by(|a, b| a.name.cmp(&b.name));
         self.contracts.dedup_by(|a, b| a.name == b.name);
     }

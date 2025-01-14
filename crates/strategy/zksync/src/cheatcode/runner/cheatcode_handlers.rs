@@ -210,7 +210,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                         name = existing.name,
                         "contract already exists with the given bytecode hashes"
                     );
-                    return Ok(Default::default())
+                    return Ok(Default::default());
                 }
 
                 ctx.dual_compiled_contracts.push(new_contract);

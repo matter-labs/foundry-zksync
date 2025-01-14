@@ -264,7 +264,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             from,
             code.clone(),
             value,
-            rd.clone(),
+            rd,
         )?;
 
         let ctx = get_context(executor.strategy.context.as_mut());

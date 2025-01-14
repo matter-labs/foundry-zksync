@@ -237,12 +237,12 @@ pub fn config_create_project(
 fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
     if let Some(path) = &config.zksync.solc_path {
         if !path.is_file() {
-            return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())))
+            return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())));
         }
         let version = get_solc_version_info(path)?.version;
         let solc =
             Solc::new_with_version(path, Version::new(version.major, version.minor, version.patch));
-        return Ok(SolcCompiler::Specific(solc))
+        return Ok(SolcCompiler::Specific(solc));
     }
 
     if let Some(ref solc) = config.solc {
@@ -264,7 +264,7 @@ fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
             }
             SolcReq::Local(path) => {
                 if !path.is_file() {
-                    return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())))
+                    return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())));
                 }
                 let version = get_solc_version_info(path)?.version;
                 Solc::new_with_version(
@@ -315,7 +315,7 @@ pub fn config_ensure_zksolc(
                     if offline {
                         return Err(SolcError::msg(format!(
                             "can't install missing zksolc {version} in offline mode"
-                        )))
+                        )));
                     }
                     ZkSolc::blocking_install(version)?;
                     zksolc = ZkSolc::find_installed_version(version)?;
@@ -327,12 +327,12 @@ pub fn config_ensure_zksolc(
                     return Err(SolcError::msg(format!(
                         "`zksolc` {} does not exist",
                         zksolc.display()
-                    )))
+                    )));
                 }
                 Some(zksolc.clone())
             }
         };
-        return Ok(zksolc)
+        return Ok(zksolc);
     }
 
     Ok(None)

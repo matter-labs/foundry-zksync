@@ -203,7 +203,7 @@ impl<'a> ZkLinker<'a> {
         // TODO(zk): determine if this loop is still needed like this
         // explanation below
         while let Some(id) = targets.pop_front() {
-            match Self::zk_link(&contracts, &id, &libraries, &self.compiler) {
+            match Self::zk_link(&contracts, &id, libraries, &self.compiler) {
                 Ok(linked) => {
                     // persist linked contract for successive iterations
                     *contracts.entry(id.clone()).or_default() = linked.clone();
@@ -221,7 +221,7 @@ impl<'a> ZkLinker<'a> {
                         .flat_map(|fdep| {
                             contracts.iter().find(|(id, _)| {
                                 id.source.as_path() == Path::new(fdep.filename.as_str()) &&
-                                    &id.name == &fdep.library
+                                    id.name == fdep.library
                             })
                         })
                         .map(|(id, _)| id.clone())
@@ -230,7 +230,7 @@ impl<'a> ZkLinker<'a> {
                     // if we have no dep ids then we avoid
                     // queueing our own id to avoid infinite loop
                     // TODO(zk): find a better way to avoid issues later
-                    if let Some(_) = ids.peek() {
+                    if ids.peek().is_some() {
                         targets.extend(ids); // queue factory deps for linking
                         targets.push_back(id); // reque original target
                     }

@@ -436,7 +436,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             ctx.skip_zk_vm = false; // handled the skip, reset flag
             ctx.record_next_create_address = true;
             info!("running create in EVM, instead of zkEVM (skipped)");
-            return None
+            return None;
         }
 
         if let Some(CreateScheme::Create) = input.scheme() {
@@ -451,14 +451,14 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             let address = caller.create(nonce);
             if ecx.db.get_test_contract_address().map(|addr| address == addr).unwrap_or_default() {
                 info!("running create in EVM, instead of zkEVM (Test Contract) {:#?}", address);
-                return None
+                return None;
             }
         }
 
         let init_code = input.init_code();
         if init_code.0 == DEFAULT_CREATE2_DEPLOYER_CODE {
             info!("running create in EVM, instead of zkEVM (DEFAULT_CREATE2_DEPLOYER_CODE)");
-            return None
+            return None;
         }
 
         info!("running create in zkEVM");
@@ -679,7 +679,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 "running call in EVM, instead of zkEVM (Test Contract) {:#?}",
                 call.bytecode_address
             );
-            return None
+            return None;
         }
 
         info!("running call in zkEVM {:#?}", call);
@@ -833,7 +833,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
     ) {
         if !ctx.using_zk_vm {
             tracing::info!("already in EVM");
-            return
+            return;
         }
 
         tracing::info!("switching to EVM");
@@ -910,7 +910,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
     ) {
         if ctx.using_zk_vm {
             tracing::info!("already in ZK-VM");
-            return
+            return;
         }
 
         tracing::info!("switching to ZK-VM");

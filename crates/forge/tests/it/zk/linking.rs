@@ -27,7 +27,7 @@ forgetest_async!(
             None,
             1,
             Some(&["-vvvvv"]),
-        );
+        ).await;
     }
 );
 
