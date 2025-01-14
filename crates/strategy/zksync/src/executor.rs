@@ -7,6 +7,7 @@ use eyre::Result;
 
 use foundry_common::ContractsByArtifact;
 use foundry_compilers::{contracts::ArtifactContracts, Artifact, ProjectCompileOutput};
+use foundry_config::Config;
 use foundry_evm::{
     backend::{Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
@@ -143,11 +144,12 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
     fn link(
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
+        config: &Config,
         root: &Path,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
-        let evm_link = EvmExecutorStrategyRunner.link(ctx, root, input, deployer)?;
+        let evm_link = EvmExecutorStrategyRunner.link(ctx, config, root, input, deployer)?;
 
         let ctx = get_context(ctx);
         let Some(input) = ctx.compilation_output.as_ref() else {

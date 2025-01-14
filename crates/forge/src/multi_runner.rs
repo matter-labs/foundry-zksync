@@ -498,11 +498,17 @@ impl MultiContractRunnerBuilder {
         let LinkOutput {
             deployable_contracts,
             revert_decoder,
-            linked_contracts,
+            linked_contracts: _,
             known_contracts,
             libs_to_deploy,
             libraries,
-        } = strategy.runner.link(strategy.context.as_mut(), root, output, LIBRARY_DEPLOYER)?;
+        } = strategy.runner.link(
+            strategy.context.as_mut(),
+            &self.config,
+            root,
+            output,
+            LIBRARY_DEPLOYER,
+        )?;
 
         let contracts = deployable_contracts
             .into_iter()

@@ -11,6 +11,7 @@ use foundry_common::{ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
     artifacts::Libraries, contracts::ArtifactContracts, Artifact, ArtifactId, ProjectCompileOutput,
 };
+use foundry_config::Config;
 use foundry_evm_core::{
     backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
@@ -100,6 +101,7 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
     fn link(
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
+        config: &Config,
         root: &Path,
         input: &ProjectCompileOutput,
         deployer: Address,
@@ -228,6 +230,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
     fn link(
         &self,
         _: &mut dyn ExecutorStrategyContext,
+        _: &Config,
         root: &Path,
         input: &ProjectCompileOutput,
         deployer: Address,
