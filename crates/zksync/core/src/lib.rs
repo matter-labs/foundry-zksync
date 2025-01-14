@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
-pub use vm::{balance, encode_create_params, nonce};
+pub use vm::{balance, deploy_nonce, encode_create_params, nonce, tx_nonce};
 
 pub use vm::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use zksync_multivm::interface::{Call, CallType};
@@ -51,6 +51,11 @@ type Result<T> = std::result::Result<T, eyre::Report>;
 
 /// Represents an empty code
 pub const EMPTY_CODE: [u8; 32] = [0; 32];
+
+/// Represents ZKsync hash for [EMPTY_CODE]
+pub const EMPTY_CODE_HASH: H256 = H256(
+    alloy_primitives::b256!("01000001f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925").0,
+);
 
 /// The minimum possible address that is not reserved in the zkSync space.
 const MIN_VALID_ADDRESS: u32 = 2u32.pow(16);

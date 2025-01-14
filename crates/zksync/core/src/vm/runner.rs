@@ -89,7 +89,6 @@ where
 
     let mut ccx = CheatcodeTracerContext {
         persisted_factory_deps,
-        persist_nonce_update: true,
         zk_env: zk_env.clone(),
         ..Default::default()
     };
@@ -131,6 +130,24 @@ where
     ZKVMData::new(ecx).get_tx_nonce(address).0
 }
 
+/// Retrieves transaction nonce for a given address.
+pub fn tx_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u32
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    ZKVMData::new(ecx).get_tx_nonce(address).0
+}
+
+/// Retrieves deployment nonce for a given address.
+pub fn deploy_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u32
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    ZKVMData::new(ecx).get_deploy_nonce(address).0
+}
+
 /// EraVM equivalent of [`CreateInputs`]
 pub struct ZkCreateInputs {
     /// The current `msg.sender`
@@ -158,7 +175,7 @@ where
     let ZkCreateInputs { create_input, factory_deps, value, msg_sender } = inputs;
 
     info!("create tx {}", hex::encode(&create_input));
-    let caller = ecx.env.tx.caller;
+    let caller = inputs.msg_sender;
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
@@ -218,7 +235,7 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
-    let caller = ecx.env.tx.caller;
+    let caller = call.caller;
     let nonce: zksync_types::Nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {

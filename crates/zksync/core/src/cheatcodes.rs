@@ -107,6 +107,22 @@ where
     tx_nonce.to_ru256()
 }
 
+/// Gets the full nonce for a specific address.
+pub fn get_full_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> (rU256, rU256)
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
+    ecx.load_account(nonce_addr).expect("account could not be loaded");
+    let zk_address = address.to_h160();
+    let nonce_key = get_nonce_key(&zk_address).key().to_ru256();
+    let full_nonce = ecx.sload(nonce_addr, nonce_key).unwrap_or_default();
+
+    let (tx_nonce, deploy_nonce) = decompose_full_nonce(full_nonce.to_u256());
+    (tx_nonce.to_ru256(), deploy_nonce.to_ru256())
+}
+
 /// Sets code for a specific address.
 pub fn etch<DB>(address: Address, bytecode: &[u8], ecx: &mut InnerEvmContext<DB>)
 where

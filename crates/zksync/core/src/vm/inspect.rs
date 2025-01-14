@@ -28,7 +28,7 @@ use zksync_multivm::{
 use zksync_state::interface::{ReadStorage, StoragePtr, WriteStorage};
 use zksync_types::{
     get_nonce_key, l2::L2Tx, transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
-    Transaction, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS,
+    Transaction, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
 };
 use zksync_utils::{be_words_to_bytes, h256_to_account_address, h256_to_u256, u256_to_h256};
 
@@ -41,6 +41,7 @@ use std::{
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     fix_l2_gas_limit, fix_l2_gas_price, is_system_address,
+    state::{new_full_nonce, parse_full_nonce, FullNonce},
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
         env::{create_l1_batch_env, create_system_env},
@@ -187,8 +188,11 @@ where
     let is_create = call_ctx.is_create;
     info!(?call_ctx, "executing transaction in zk vm");
 
+    // We need to revert the tx nonce of the initiator as we intercept and dispatch
+    // CALLs and CREATEs to the zkEVM. The CREATEs always increment the deployment nonce
+    // which must be persisted, but the CALLs are not real transactions and hence must be reverted
+    let revert_tx_nonce_update = !call_ctx.is_create;
     let initiator_address = tx.common_data.initiator_address;
-    let persist_nonce_update = ccx.persist_nonce_update;
 
     if tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -329,23 +333,32 @@ where
 
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
-    // We skip nonce updates when should_update_nonce is false to avoid nonce mismatch
-    let filtered = modified_storage.iter().filter(|(k, _)| {
-        !(k.address() == &NONCE_HOLDER_ADDRESS &&
-            get_nonce_key(&initiator_address) == **k &&
-            !persist_nonce_update)
-    });
 
-    for (k, v) in filtered {
+    for (k, v) in modified_storage {
         let address = k.address().to_address();
         let index = k.key().to_ru256();
         era_db.load_account(address);
         let previous = era_db.sload(address, index);
         let entry = storage.entry(address).or_default();
+
+        let v = if revert_tx_nonce_update && get_nonce_key(&initiator_address) == k {
+            let FullNonce { tx_nonce, deploy_nonce } = parse_full_nonce(v.to_ru256());
+            let new_tx_nonce = tx_nonce.saturating_sub(1);
+            let v = new_full_nonce(new_tx_nonce, deploy_nonce).to_h256();
+            info!(
+                old = tx_nonce,
+                new = new_tx_nonce,
+                "reverting tx nonce for {initiator_address:?}"
+            );
+            v
+        } else {
+            v
+        };
+
         entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
 
         if k.address() == &ACCOUNT_CODE_STORAGE_ADDRESS {
-            if let Some(bytecode) = bytecodes.get(&h256_to_u256(*v)) {
+            if let Some(bytecode) = bytecodes.get(&h256_to_u256(v)) {
                 let bytecode =
                     bytecode.iter().flat_map(|x| u256_to_h256(*x).to_fixed_bytes()).collect_vec();
                 let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
@@ -354,14 +367,14 @@ where
             } else {
                 // We populate bytecodes for all non-system addresses
                 if !is_system_address(k.key().to_h160().to_address()) {
-                    if let Some(bytecode) = (&mut era_db).load_factory_dep(*v) {
+                    if let Some(bytecode) = (&mut era_db).load_factory_dep(v) {
                         let hash = B256::from_slice(v.as_bytes());
                         let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
                         codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
                     } else {
                         warn!(
                             "no bytecode was found for {:?}, requested by account {:?}",
-                            *v,
+                            v,
                             k.key().to_h160()
                         );
                     }

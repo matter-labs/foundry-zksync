@@ -105,6 +105,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let &zkGetTransactionNonceCall { account } =
                     cheatcode.as_any().downcast_ref().unwrap();
 
+                info!(?account, "cheatcode zkGetTransactionNonce");
+
                 let (tx_nonce, _) =
                     foundry_zksync_core::cheatcodes::get_full_nonce(account, ccx.ecx);
                 Ok(tx_nonce.abi_encode())
@@ -113,6 +115,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let &zkGetDeploymentNonceCall { account } =
                     cheatcode.as_any().downcast_ref().unwrap();
 
+                info!(?account, "cheatcode zkGetDeploymentNonce");
+                
                 let (_, deploy_nonce) =
                     foundry_zksync_core::cheatcodes::get_full_nonce(account, ccx.ecx);
                 Ok(deploy_nonce.abi_encode())
