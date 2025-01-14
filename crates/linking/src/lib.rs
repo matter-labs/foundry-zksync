@@ -185,9 +185,6 @@ impl<'a> Linker<'a> {
         Ok(LinkOutput { libraries, libs_to_deploy })
     }
 
-    // TODO(zk): zk_link_with_create2
-    // a bit more difficult due to the lack of bytecode
-    // until the contract is fully linked
     pub fn link_with_create2(
         &'a self,
         libraries: Libraries,

@@ -5163,7 +5163,6 @@ dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
  "dirs 5.0.1",
- "eyre",
  "fd-lock",
  "foundry-compilers",
  "foundry-compilers-artifacts-solc",

@@ -1,12 +1,12 @@
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     path::{Path, PathBuf},
 };
 
 use alloy_primitives::{
     hex::FromHex,
     map::{HashMap, HashSet},
-    Address,
+    Address, B256,
 };
 use foundry_compilers::{
     artifacts::{
@@ -14,12 +14,16 @@ use foundry_compilers::{
         CompactDeployedBytecode, Libraries,
     },
     contracts::ArtifactContracts,
-    Artifact, ArtifactId,
+    Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_zksync_compilers::{
-    compilers::zksolc::ZkSolcCompiler,
+    compilers::{
+        artifact_output::zk::{ZkArtifactOutput, ZkContractArtifact},
+        zksolc::ZkSolcCompiler,
+    },
     link::{self as zk_link, MissingLibrary},
 };
+use foundry_zksync_core::hash_bytecode;
 
 use crate::{LinkOutput, Linker, LinkerError};
 
@@ -38,6 +42,7 @@ pub enum ZkLinkerError {
 pub struct ZkLinker<'a> {
     pub linker: Linker<'a>,
     pub compiler: ZkSolcCompiler,
+    pub compiler_output: &'a ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
 }
 
 impl<'a> ZkLinker<'a> {
@@ -45,8 +50,50 @@ impl<'a> ZkLinker<'a> {
         root: impl Into<PathBuf>,
         contracts: ArtifactContracts<CompactContractBytecodeCow<'a>>,
         compiler: ZkSolcCompiler,
+        compiler_output: &'a ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
     ) -> Self {
-        Self { linker: Linker::new(root, contracts), compiler }
+        Self { linker: Linker::new(root, contracts), compiler, compiler_output }
+    }
+
+    /// Performs DFS on the graph of link references, and populates `deps` with all found libraries, including ones of factory deps.
+    fn zk_collect_dependencies(
+        &'a self,
+        target: &'a ArtifactId,
+        deps: &mut BTreeSet<&'a ArtifactId>,
+    ) -> Result<(), LinkerError> {
+        let (_, artifact) = self
+            .compiler_output
+            .artifact_ids()
+            .find(|(id, _)| {
+                let id = id.clone().with_stripped_file_prefixes(self.linker.root.as_ref());
+                id.source == target.source && id.name == target.name
+            })
+            .ok_or(LinkerError::MissingTargetArtifact)?;
+
+        let mut references = BTreeMap::new();
+        if let Some(bytecode) = &artifact.bytecode {
+            references.extend(bytecode.link_references());
+        }
+
+        // TODO(zk): should instead use unlinked factory dependencies
+        // zksolc 1.5.9
+
+        for (file, libs) in &references {
+            for contract in libs.keys() {
+                let id = self
+                    .linker
+                    .find_artifact_id_by_library_path(file, contract, Some(&target.version))
+                    .ok_or_else(|| LinkerError::MissingLibraryArtifact {
+                        file: file.to_string(),
+                        name: contract.to_string(),
+                    })?;
+                if deps.insert(id) {
+                    self.zk_collect_dependencies(id, deps)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Links given artifact with either given library addresses or address computed from sender and
@@ -71,7 +118,7 @@ impl<'a> ZkLinker<'a> {
 
         let mut needed_libraries = BTreeSet::new();
         for target in targets {
-            self.linker.collect_dependencies(target, &mut needed_libraries)?;
+            self.zk_collect_dependencies(target, &mut needed_libraries)?;
         }
 
         let mut libs_to_deploy = Vec::new();
@@ -96,6 +143,88 @@ impl<'a> ZkLinker<'a> {
             .into_iter()
             .map(|(_, linked)| linked.get_bytecode_bytes().unwrap().into_owned())
             .collect();
+
+        Ok(LinkOutput { libraries, libs_to_deploy })
+    }
+
+    pub fn zk_link_with_create2(
+        &'a self,
+        libraries: Libraries,
+        sender: Address,
+        salt: B256,
+        target: &'a ArtifactId,
+    ) -> Result<LinkOutput, LinkerError> {
+        // Library paths in `link_references` keys are always stripped, so we have to strip
+        // user-provided paths to be able to match them correctly.
+        let mut libraries = libraries.with_stripped_file_prefixes(self.linker.root.as_path());
+
+        let mut contracts = self.linker.contracts.clone();
+
+        let mut needed_libraries = BTreeSet::new();
+        self.zk_collect_dependencies(target, &mut needed_libraries)?;
+
+        let attempt_link = |contracts: &mut ArtifactContracts<CompactContractBytecodeCow<'a>>,
+                            id,
+                            libraries: &Libraries,
+                            zksolc| {
+            let original = contracts.get(id).expect("library present in list of contracts");
+            // Link library with provided libs and extract bytecode object (possibly unlinked).
+            match Self::zk_link(&contracts, id, libraries, zksolc) {
+                Ok(linked) => {
+                    // persist linked contract for successive iterations
+                    *contracts.entry(id.clone()).or_default() = linked.clone();
+                    linked.bytecode.expect("library should have bytecode")
+                }
+                // the library remains unlinked at this time
+                Err(_) => original.bytecode.as_ref().expect("library should have bytecode").clone(),
+            }
+        };
+
+        let mut needed_libraries = needed_libraries
+            .into_iter()
+            .filter(|id| {
+                // Filter out already provided libraries.
+                let (file, name) = self.linker.convert_artifact_id_to_lib_path(id);
+                !libraries.libs.contains_key(&file) || !libraries.libs[&file].contains_key(&name)
+            })
+            .map(|id| (id, attempt_link(&mut contracts, id, &libraries, &self.compiler)))
+            .collect::<Vec<_>>();
+
+        let mut libs_to_deploy = Vec::new();
+
+        // Iteratively compute addresses and link libraries until we have no unlinked libraries
+        // left.
+        while !needed_libraries.is_empty() {
+            // Find any library which is fully linked.
+            let deployable = needed_libraries
+                .iter()
+                .enumerate()
+                .find(|(_, (_, bytecode))| !bytecode.object.is_unlinked());
+
+            // If we haven't found any deployable library, it means we have a cyclic dependency.
+            let Some((index, &(id, _))) = deployable else {
+                return Err(LinkerError::CyclicDependency);
+            };
+            let (_, library_bytecode) = needed_libraries.swap_remove(index);
+
+            let code = library_bytecode.bytes().expect("fully linked bytecode");
+            let bytecode_hash = hash_bytecode(code);
+
+            let address =
+                foundry_zksync_core::compute_create2_address(sender, bytecode_hash, salt, &[]);
+
+            let (file, name) = self.linker.convert_artifact_id_to_lib_path(id);
+
+            // NOTE(zk): doesn't really matter since we use the EVM
+            // bytecode to determine what EraVM bytecode to deploy
+            dbg!(&file, &name, &address);
+            libs_to_deploy.push(code.clone());
+            libraries.libs.entry(file).or_default().insert(name, address.to_checksum(None));
+
+            for (id, bytecode) in &mut needed_libraries {
+                *bytecode = attempt_link(&mut contracts, id, &libraries, &self.compiler)
+            }
+        }
 
         Ok(LinkOutput { libraries, libs_to_deploy })
     }
@@ -221,8 +350,8 @@ impl<'a> ZkLinker<'a> {
                         .into_iter()
                         .flat_map(|fdep| {
                             contracts.iter().find(|(id, _)| {
-                                id.source.as_path() == Path::new(fdep.filename.as_str()) &&
-                                    id.name == fdep.library
+                                id.source.as_path() == Path::new(fdep.filename.as_str())
+                                    && id.name == fdep.library
                             })
                         })
                         .map(|(id, _)| id.clone())

@@ -155,7 +155,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             }
         })?;
 
-        let linker = ZkLinker::new(root, contracts.clone(), zksolc);
+        let linker = ZkLinker::new(root, contracts.clone(), zksolc, input);
 
         let zk_linker_error_to_linker = |zk_error| match zk_error {
             ZkLinkerError::Inner(err) => err,
@@ -212,13 +212,12 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             })
             .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
             .map(|(id, linked_zk, evm)| {
-                let (unlinked_id, unlinked_zk_artifact) = input
+                let (_, unlinked_zk_artifact) = input
                     .artifact_ids()
                     .find(|(contract_id, _)| {
                         contract_id.clone().with_stripped_file_prefixes(root) == id.clone()
                     })
                     .expect("unable to find original (pre-linking) artifact");
-                dbg!(unlinked_id, &unlinked_zk_artifact);
                 let zk_bytecode =
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
                 let zk_hash = hash_bytecode(&zk_bytecode);
