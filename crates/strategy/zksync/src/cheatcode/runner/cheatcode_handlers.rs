@@ -8,8 +8,9 @@ use foundry_cheatcodes::{
         createFork_0Call, createFork_1Call, createFork_2Call, createSelectFork_0Call,
         createSelectFork_1Call, createSelectFork_2Call, dealCall, etchCall, getCodeCall,
         getNonce_0Call, mockCallRevert_0Call, mockCall_0Call, resetNonceCall, rollCall,
-        selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall, zkRegisterContractCall,
-        zkUseFactoryDepCall, zkUsePaymasterCall, zkVmCall, zkVmSkipCall,
+        selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall, zkGetDeploymentNonceCall,
+        zkGetTransactionNonceCall, zkRegisterContractCall, zkUseFactoryDepCall, zkUsePaymasterCall,
+        zkVmCall, zkVmSkipCall,
     },
 };
 use foundry_evm::backend::LocalForkId;
@@ -99,6 +100,22 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
                 let nonce = foundry_zksync_core::cheatcodes::get_nonce(account, ccx.ecx);
                 Ok(nonce.abi_encode())
+            }
+            t if using_zk_vm && is::<zkGetTransactionNonceCall>(t) => {
+                let &zkGetTransactionNonceCall { account } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+
+                let (tx_nonce, _) =
+                    foundry_zksync_core::cheatcodes::get_full_nonce(account, ccx.ecx);
+                Ok(tx_nonce.abi_encode())
+            }
+            t if using_zk_vm && is::<zkGetDeploymentNonceCall>(t) => {
+                let &zkGetDeploymentNonceCall { account } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+
+                let (_, deploy_nonce) =
+                    foundry_zksync_core::cheatcodes::get_full_nonce(account, ccx.ecx);
+                Ok(deploy_nonce.abi_encode())
             }
             t if using_zk_vm && is::<mockCall_0Call>(t) => {
                 let mockCall_0Call { callee, data, returnData } =
