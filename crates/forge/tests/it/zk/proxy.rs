@@ -12,7 +12,8 @@ forgetest_async!(script_zk_can_deploy_proxy, |prj, cmd| {
         Some("OpenZeppelin/openzeppelin-contracts"),
         4,
         Some(&["--broadcast"]),
-    );
+    )
+    .await;
 });
 
 fn setup_proxy_prj(prj: &mut TestProject) {

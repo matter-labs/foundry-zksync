@@ -39,7 +39,7 @@ async fn test_zk_contract_paymaster() {
 // Tests the deployment of contracts using a paymaster for fee abstraction
 forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
     setup_deploy_prj(&mut prj);
-    let node = ZkSyncNode::start();
+    let node = ZkSyncNode::start().await;
     let url = node.url();
 
     let private_key =
@@ -136,7 +136,8 @@ forgetest_async!(paymaster_script_test, |prj, cmd| {
         Some("OpenZeppelin/openzeppelin-contracts cyfrin/zksync-contracts"),
         3,
         Some(&["-vvvvv", "--via-ir"]),
-    );
+    )
+    .await;
 });
 
 fn setup_deploy_prj(prj: &mut TestProject) {

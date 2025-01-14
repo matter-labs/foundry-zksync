@@ -1,19 +1,17 @@
-//! Contains in-memory implementation of era-test-node.
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    str::FromStr,
-};
+//! Contains in-memory implementation of anvil-zksync.
+use std::{net::SocketAddr, str::FromStr};
 
-use era_test_node::{
-    http_fork_source::HttpForkSource,
-    namespaces::{
-        ConfigurationApiNamespaceT, DebugNamespaceT, EthNamespaceT, EthTestNodeNamespaceT,
-        EvmNamespaceT, HardhatNamespaceT, NetNamespaceT, Web3NamespaceT, ZksNamespaceT,
+use anvil_zksync_api_server::NodeServerBuilder;
+use anvil_zksync_config::{types::SystemContractsOptions, TestNodeConfig};
+use anvil_zksync_core::{
+    node::{
+        BlockProducer, BlockSealer, BlockSealerMode, ImpersonationManager, InMemoryNode,
+        TimestampManager, TxPool,
     },
-    node::InMemoryNode,
+    system_contracts::SystemContracts,
 };
-use jsonrpc_core::IoHandler;
-use zksync_types::H160;
+use tower_http::cors::AllowOrigin;
+use zksync_types::{H160, U256};
 
 /// List of legacy wallets (address, private key) that we seed with tokens at start.
 const LEGACY_RICH_WALLETS: [(&str, &str); 10] = [
@@ -113,7 +111,7 @@ const RICH_WALLETS: [(&str, &str, &str); 10] = [
     ),
 ];
 
-/// In-memory era-test-node that is stopped when dropped.
+/// In-memory anvil-zksync that is stopped when dropped.
 pub struct ZkSyncNode {
     port: u16,
     _guard: tokio::sync::oneshot::Sender<()>,
@@ -126,69 +124,90 @@ impl ZkSyncNode {
         format!("http://127.0.0.1:{}", self.port)
     }
 
-    /// Start era-test-node in memory, binding a random available port
+    /// Start anvil-zksync in memory, binding a random available port
     ///
     /// The server is automatically stopped when the instance is dropped.
-    pub fn start() -> Self {
-        let (_guard, _guard_rx) = tokio::sync::oneshot::channel::<()>();
-
-        let io_handler = {
-            let node: InMemoryNode<HttpForkSource> =
-                InMemoryNode::new(None, None, Default::default(), None);
-
-            for wallet in LEGACY_RICH_WALLETS.iter() {
-                let address = wallet.0;
-                node.set_rich_account(H160::from_str(address).unwrap());
-            }
-            for wallet in RICH_WALLETS.iter() {
-                let address = wallet.0;
-                node.set_rich_account(H160::from_str(address).unwrap());
-            }
-
-            let mut io = IoHandler::default();
-
-            io.extend_with(NetNamespaceT::to_delegate(node.clone()));
-            io.extend_with(Web3NamespaceT::to_delegate(node.clone()));
-            io.extend_with(ConfigurationApiNamespaceT::to_delegate(node.clone()));
-            io.extend_with(DebugNamespaceT::to_delegate(node.clone()));
-            io.extend_with(EthNamespaceT::to_delegate(node.clone()));
-            io.extend_with(EthTestNodeNamespaceT::to_delegate(node.clone()));
-            io.extend_with(EvmNamespaceT::to_delegate(node.clone()));
-            io.extend_with(HardhatNamespaceT::to_delegate(node.clone()));
-            io.extend_with(ZksNamespaceT::to_delegate(node));
-            io
-        };
-        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+    pub async fn start() -> Self {
+        let (_guard, guard_rx) = tokio::sync::oneshot::channel::<()>();
         let (port_tx, port) = tokio::sync::oneshot::channel();
 
         std::thread::spawn(move || {
-            let runtime = tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .worker_threads(2)
-                .build()
-                .unwrap();
-
-            let server = jsonrpc_http_server::ServerBuilder::new(io_handler)
-                .threads(1)
-                .event_loop_executor(runtime.handle().clone())
-                .start_http(&addr)
-                .unwrap();
-
-            // if no receiver was ready to receive the spawning thread died
-            _ = port_tx.send(server.address().port());
-            // we only care that the channel is alive
-            _ = tokio::task::block_in_place(move || runtime.block_on(_guard_rx));
-
-            server.close();
+            // We need to spawn a thread since `run_inner` future is not `Send`.
+            let runtime =
+                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            runtime.block_on(Self::run_inner(port_tx, guard_rx));
         });
 
         // wait for server to start
-        std::thread::sleep(std::time::Duration::from_millis(600));
-        let port =
-            tokio::task::block_in_place(move || tokio::runtime::Handle::current().block_on(port))
-                .expect("failed to start server");
+        let port = port.await.expect("failed to start server");
 
-        Self { _guard, port }
+        Self { port, _guard }
+    }
+
+    async fn run_inner(
+        port_tx: tokio::sync::oneshot::Sender<u16>,
+        stop_guard: tokio::sync::oneshot::Receiver<()>,
+    ) {
+        const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
+
+        let config = TestNodeConfig::default();
+
+        let time = TimestampManager::default();
+        let impersonation = ImpersonationManager::default();
+        let pool = TxPool::new(impersonation.clone(), config.transaction_order);
+        let sealing_mode = BlockSealerMode::immediate(MAX_TRANSACTIONS, pool.add_tx_listener());
+        let block_sealer = BlockSealer::new(sealing_mode);
+
+        let node: InMemoryNode = InMemoryNode::new(
+            None,
+            None,
+            &config,
+            time,
+            impersonation,
+            pool.clone(),
+            block_sealer.clone(),
+        );
+
+        for wallet in LEGACY_RICH_WALLETS.iter() {
+            let address = wallet.0;
+            node.set_rich_account(
+                H160::from_str(address).unwrap(),
+                U256::from(1000u128 * 10u128.pow(18)),
+            );
+        }
+        for wallet in RICH_WALLETS.iter() {
+            let address = wallet.0;
+            node.set_rich_account(
+                H160::from_str(address).unwrap(),
+                U256::from(1000u128 * 10u128.pow(18)),
+            );
+        }
+
+        let system_contracts =
+            SystemContracts::from_options(&SystemContractsOptions::BuiltInWithoutSecurity, false);
+
+        let allow_origin = AllowOrigin::any();
+        let server_builder = NodeServerBuilder::new(node.clone(), allow_origin);
+
+        let server = server_builder.build(SocketAddr::from(([0, 0, 0, 0], 0))).await;
+        // if no receiver was ready to receive the spawning thread died
+        port_tx.send(server.local_addr().port()).expect("failed to send port");
+
+        let block_producer_handle = BlockProducer::new(node, pool, block_sealer, system_contracts);
+
+        let handle = server.run();
+
+        tokio::select! {
+            _ = handle.stopped() => {
+                tracing::error!("Server stopped");
+            },
+            _ = block_producer_handle => {
+                tracing::error!("Block producer stopped");
+            }
+            _ = stop_guard => {
+                tracing::info!("Server stopped by guard");
+            }
+        };
     }
 
     pub fn rich_wallets() -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {

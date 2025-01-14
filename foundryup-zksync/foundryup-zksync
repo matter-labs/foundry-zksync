@@ -192,6 +192,10 @@ EOF
         "Darwin")
             os="apple-darwin"
             arch=$(arch)
+            if [[ "$arch" == "i386" ]]; then
+              # Rosetta reports as i386, but we treat it as x86_64
+              arch="x86_64"
+            fi
             ;;
         *)
             err "anvil-zksync only supports Linux and MacOS! Detected OS: $uname_str"

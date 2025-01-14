@@ -122,3 +122,55 @@ contract CallEmptyCode is Test {
         .stdout_lossy()
         .contains("call may fail or behave unexpectedly due to empty code");
 });
+
+forgetest_async!(test_zk_can_send_eth_to_eoa_without_warnings, |prj, cmd| {
+    foundry_test_utils::util::initialize(prj.root());
+    prj.add_test(
+        "SendEthToEOA.t.sol",
+        r#"
+import "forge-std/Test.sol";
+
+contract SendEthToEOA is Test {
+    function testSendEthToEOA() external {
+        address eoa = makeAddr("Juan's Account");
+        vm.deal(address(this), 1 ether);
+        
+        (bool success,) = eoa.call{value: 1 ether}("");
+        assertTrue(success, "ETH transfer failed");
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    cmd.args(["test", "--zksync", "--match-test", "testSendEthToEOA"]);
+    let output = cmd.assert_success().get_output().stdout_lossy();
+
+    assert!(!output.contains("call may fail or behave unexpectedly due to empty code"));
+});
+
+forgetest_async!(test_zk_calling_empty_code_with_zero_value_issues_warning, |prj, cmd| {
+    foundry_test_utils::util::initialize(prj.root());
+    prj.add_test(
+        "CallEmptyCodeWithZeroValue.t.sol",
+        r#"
+import "forge-std/Test.sol";
+
+contract CallEmptyCodeWithZeroValue is Test {
+    function testCallEmptyCodeWithZeroValue() external {
+        address eoa = makeAddr("Juan's Account");
+        vm.deal(address(this), 1 ether);
+        
+        (bool success,) = eoa.call("");
+        assertTrue(success, "call failed");
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    cmd.args(["test", "--zksync", "--match-test", "testCallEmptyCodeWithZeroValue"]);
+    let output = cmd.assert_success().get_output().stdout_lossy();
+
+    assert!(output.contains("call may fail or behave unexpectedly due to empty code"));
+});

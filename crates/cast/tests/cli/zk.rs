@@ -5,13 +5,14 @@ const PAYMASTER_BYTECODE: &str = "0x00020000000000020003000000000002000000000301
 const COUNTER_BYTECODE: &str = "0x0000008003000039000000400030043f0000000100200190000000150000c13d000000000201001900000010002001980000002d0000613d000000000101043b000000e001100270000000110010009c000000200000613d000000120010009c0000002d0000c13d0000000001000416000000000001004b0000002d0000c13d000000000100041a000000ff0110018f000000800010043f0000001501000041000000370001042e0000000001000416000000000001004b0000002d0000c13d000000000200041a0000001601200197000000000010041b0000002001000039000001000010044300000120000004430000000f01000041000000370001042e0000000001000416000000000001004b0000002d0000c13d000000000100041a000000ff0210018f000000ff0020008c0000002f0000c13d0000001301000041000000000010043f0000001101000039000000040010043f000000140100004100000038000104300000000001000019000000380001043000000016021001970000000101100039000000ff0110018f000000000121019f000000000010041b0000000001000019000000370001042e0000003600000432000000370001042e0000003800010430000000000000000000000000000000000000000000000000000000020000000000000000000000000000004000000100000000000000000000000000000000000000000000000000fffffffc00000000000000000000000000000000000000000000000000000000000000000000000000000000d09de08a000000000000000000000000000000000000000000000000000000008381f58a4e487b710000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000240000000000000000000000000000000000000000000000000000000000000020000000800000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000027b95d8697efbdb44a7508247e8c640a64fb3ead050f40cb23deb1910c501315";
 
 casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
-    let node = ZkSyncNode::start();
+    let node = ZkSyncNode::start().await;
     let url = node.url();
 
-    let (addr, private_key) = ZkSyncNode::rich_wallets()
-        .next()
-        .map(|(addr, pk, _)| (addr, pk))
-        .expect("No rich wallets available");
+    // This test seems to require a specific private key, so we use the hard-coded one.
+    let (addr, private_key) = (
+        "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049".to_string(),
+        "0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110".to_string(),
+    );
 
     // Deploy paymaster
     cmd.args([
@@ -45,7 +46,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
             "--value",
             "0.1ether",
             "--private-key",
-            private_key,
+            &private_key,
             "--rpc-url",
             &url,
         ])
@@ -53,7 +54,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
 
     let balance_before = cmd
         .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
+        .args(["balance", &addr, "--rpc-url", &url])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -64,7 +65,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
         "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
         "increment()",
         "--private-key",
-        private_key,
+        &private_key,
         "--zk-paymaster-address",
         "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "--zk-paymaster-input",
@@ -76,7 +77,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
 
     let balance_after = cmd
         .cast_fuse()
-        .args(["balance", addr, "--rpc-url", &url])
+        .args(["balance", &addr, "--rpc-url", &url])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -85,7 +86,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
 });
 
 casttest!(test_zk_cast_without_paymaster, async |_prj, cmd| {
-    let node = ZkSyncNode::start();
+    let node = ZkSyncNode::start().await;
     let url = node.url();
 
     let (addr, private_key) = ZkSyncNode::rich_wallets()

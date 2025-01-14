@@ -4,6 +4,7 @@ use alloy_primitives::{keccak256, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
+use foundry_linking::{LinkerError, ZkLinker, ZkLinkerError};
 use revm::{
     primitives::{CreateScheme, Env, EnvWithHandlerCfg, ResultAndState},
     Database,
@@ -19,50 +20,24 @@ use foundry_evm::{
     decode::RevertDecoder,
     executors::{
         strategy::{
-            EvmExecutorStrategyRunner, ExecutorStrategy, ExecutorStrategyContext,
-            ExecutorStrategyExt, ExecutorStrategyRunner, LinkOutput,
+            EvmExecutorStrategyRunner, ExecutorStrategyContext, ExecutorStrategyExt,
+            ExecutorStrategyRunner, LinkOutput,
         },
         DeployResult, EvmError, Executor,
     },
     inspectors::InspectorStack,
 };
-use foundry_linking::{LinkerError, ZkLinker, ZkLinkerError};
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::{DualCompiledContract, DualCompiledContracts},
 };
-use foundry_zksync_core::{
-    encode_create_params, hash_bytecode, vm::ZkEnv, ZkTransactionMetadata,
-    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
-};
+use foundry_zksync_core::{encode_create_params, hash_bytecode, vm::ZkEnv, ZkTransactionMetadata};
 
 use crate::{
     backend::{ZksyncBackendStrategyBuilder, ZksyncInspectContext},
     cheatcode::ZksyncCheatcodeInspectorStrategyBuilder,
+    executor::{try_get_zksync_transaction_metadata, ZksyncExecutorStrategyContext},
 };
-
-/// Defines the context for [ZksyncExecutorStrategyRunner].
-#[derive(Debug, Default, Clone)]
-pub struct ZksyncExecutorStrategyContext {
-    transaction_context: Option<ZkTransactionMetadata>,
-    compilation_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
-    dual_compiled_contracts: DualCompiledContracts,
-    zk_env: ZkEnv,
-}
-
-impl ExecutorStrategyContext for ZksyncExecutorStrategyContext {
-    fn new_cloned(&self) -> Box<dyn ExecutorStrategyContext> {
-        Box::new(self.clone())
-    }
-
-    fn as_any_ref(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
 
 /// Defines the [ExecutorStrategyRunner] strategy for ZKsync.
 #[derive(Debug, Default, Clone)]
@@ -154,7 +129,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
 
         let ctx = get_context(ctx);
         let Some(input) = ctx.compilation_output.as_ref() else {
-            return Err(LinkerError::MissingTargetArtifact)
+            return Err(LinkerError::MissingTargetArtifact);
         };
 
         let contracts =
@@ -470,30 +445,5 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
         let ctx = get_context(ctx);
         let transaction_context = try_get_zksync_transaction_metadata(&other_fields);
         ctx.transaction_context = transaction_context;
-    }
-}
-
-pub fn try_get_zksync_transaction_metadata(
-    other_fields: &OtherFields,
-) -> Option<ZkTransactionMetadata> {
-    other_fields
-        .get_deserialized::<ZkTransactionMetadata>(ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY)
-        .transpose()
-        .ok()
-        .flatten()
-}
-
-/// Create ZKsync strategy for [ExecutorStrategy].
-pub trait ZksyncExecutorStrategyBuilder {
-    /// Create new zksync strategy.
-    fn new_zksync() -> Self;
-}
-
-impl ZksyncExecutorStrategyBuilder for ExecutorStrategy {
-    fn new_zksync() -> Self {
-        Self {
-            runner: &ZksyncExecutorStrategyRunner,
-            context: Box::new(ZksyncExecutorStrategyContext::default()),
-        }
     }
 }

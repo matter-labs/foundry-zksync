@@ -5,13 +5,13 @@ use crate::{
     TestFilter,
 };
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{get_contract_name, shell::verbosity, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
     artifacts::{Contract, Libraries},
     compilers::Compiler,
-    Artifact, ArtifactId, ProjectCompileOutput,
+    ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::{Config, InlineConfig};
 use foundry_evm::{
@@ -27,13 +27,10 @@ use foundry_evm::{
     revm,
     traces::{InternalTraceMode, TraceMode},
 };
-use foundry_zksync_core::hash_bytecode;
 use rayon::prelude::*;
 use revm::primitives::SpecId;
-use zksync_types::H256;
 
 use std::{
-    borrow::Borrow,
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
@@ -41,9 +38,8 @@ use std::{
     time::Instant,
 };
 
-use foundry_zksync_compilers::{
-    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
-    dual_compiled_contracts::DualCompiledContract,
+use foundry_zksync_compilers::compilers::{
+    artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
 };
 
 #[derive(Debug, Clone)]
@@ -544,8 +540,8 @@ impl MultiContractRunnerBuilder {
 }
 
 pub fn matches_contract(id: &ArtifactId, abi: &JsonAbi, filter: &dyn TestFilter) -> bool {
-    (filter.matches_path(&id.source) && filter.matches_contract(&id.name)) &&
-        abi.functions().any(|func| is_matching_test(func, filter))
+    (filter.matches_path(&id.source) && filter.matches_contract(&id.name))
+        && abi.functions().any(|func| is_matching_test(func, filter))
 }
 
 /// Returns `true` if the function is a test function that matches the given filter.

@@ -363,13 +363,34 @@ impl ZkSolc {
 
     /// Compiles with `--standard-json` and deserializes the output as [`CompilerOutput`].
     pub fn compile(&self, input: &ZkSolcInput) -> Result<ZkCompilerOutput> {
-        // If solc is zksync solc, override the returned version to put the complete zksolc one
         let output = self.compile_output(input)?;
         // Only run UTF-8 validation once.
         let output = std::str::from_utf8(&output).map_err(|_| SolcError::InvalidUtf8)?;
 
         let mut compiler_output: ZkCompilerOutput = serde_json::from_str(output)?;
 
+        // Sanitize contract names that are source file paths, using the file name without
+        // path or .yul extension. This happens in zksolc versions older than 1.5.9 and
+        // creates issues.
+        // See: https://github.com/matter-labs/era-compiler-solidity/issues/243
+        if input.is_yul() {
+            for contracts in compiler_output.contracts.values_mut() {
+                let contract_names = contracts.keys().cloned().collect::<Vec<String>>();
+                for name in contract_names {
+                    if name.ends_with(".yul") {
+                        let sanitized_name = name
+                            .split('/')
+                            .last()
+                            .and_then(|name| name.strip_suffix(".yul"))
+                            .expect("Error sanitizing path into name");
+                        // Removing and inserting should be fine because there cannot be
+                        // two contracts named the same in a source file output
+                        let contract = contracts.remove(&name).expect("Error replacing yul key");
+                        contracts.insert(sanitized_name.into(), contract);
+                    }
+                }
+            }
+        }
         // Add zksync version so that there's some way to identify if zksync solc was used
         // by looking at build info
         compiler_output.zksync_solc_version = self.solc_version_info.zksync_version.clone();
