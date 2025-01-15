@@ -62,16 +62,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
+    # in sync
+    permissions:
+      id-token: write
+      contents: write
+      attestations: write
     name: ${{ matrix.target }} (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
     needs: prepare
-    permissions:
-      # Required to post the release
-      contents: write
-      # For attestations
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -229,7 +228,7 @@ jobs:
           files: |
             ${{ steps.artifacts.outputs.file_name }}
             ${{ steps.man.outputs.foundry_man }}
-  
+
   retry-on-failure:
     if: failure() && fromJSON(github.run_attempt) < 3
     needs: [release]
