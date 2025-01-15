@@ -1,5 +1,7 @@
 use forge::revm::primitives::SpecId;
 use foundry_test_utils::{forgetest_async, util, Filter, TestProject};
+use foundry_zksync_compilers::compilers::zksolc::settings::ZkSolcError;
+use semver::Version;
 
 use crate::{
     config::TestConfig,
@@ -18,7 +20,7 @@ forgetest_async!(
     #[should_panic = "no bytecode for contract; is it abstract or unlinked?"]
     script_zk_fails_indirect_reference_to_unlinked,
     |prj, cmd| {
-        setup_libs_prj(&mut prj);
+        setup_libs_prj(&mut prj, Some(Version::new(1, 5, 9)));
         run_zk_script_test(
             prj.root(),
             &mut cmd,
@@ -32,12 +34,29 @@ forgetest_async!(
     }
 );
 
-// TODO(zk): add deploy-time linking to scripting
 forgetest_async!(
-    #[should_panic = "has no bytecode hash, as it may require library linkage"]
-    script_zk_deploy_time_linking_fails,
+    script_zk_deploy_time_linking,
     |prj, cmd| {
-        setup_libs_prj(&mut prj);
+        setup_libs_prj(&mut prj, Some(Version::new(1, 5, 9)));
+        run_zk_script_test(
+            prj.root(),
+            &mut cmd,
+            "./script/Libraries.s.sol",
+            "DeployTimeLinking",
+            None,
+            1,
+            Some(&["-vvvvv"]),
+        )
+        .await;
+    }
+);
+
+forgetest_async!(
+    #[ignore]
+    #[should_panic = "deploy-time linking not supported"]
+    script_zk_deploy_time_linking_fails_older_version,
+    |prj, cmd| {
+        setup_libs_prj(&mut prj, Some(Version::new(1, 5, 8)));
         run_zk_script_test(
             prj.root(),
             &mut cmd,
@@ -55,7 +74,7 @@ forgetest_async!(
     #[should_panic = "Dynamic linking not supported"]
     create_zk_using_unlinked_fails,
     |prj, cmd| {
-        setup_libs_prj(&mut prj);
+        setup_libs_prj(&mut prj, None);
 
         // we don't really connect to the rpc because
         // we expect to fail before that point
@@ -71,8 +90,18 @@ forgetest_async!(
     }
 );
 
-fn setup_libs_prj(prj: &mut TestProject) {
+fn setup_libs_prj(prj: &mut TestProject, zksolc: Option<Version>) {
     util::initialize(prj.root());
+
+    let zksolc = zksolc.unwrap_or_else(|| Version::new(1, 5, 9));
+    // force zksolc 1.5.9
+    let mut config = prj.config_from_output::<_, &str>([]);
+    if zksolc >= Version::new(1,5,9) {
+        config.zksync.suppressed_errors.insert(ZkSolcError::AssemblyCreate);
+    }
+    config.zksync.zksolc.replace(foundry_config::SolcReq::Version(zksolc));
+    prj.write_config(config);
+
     prj.add_script("Libraries.s.sol", include_str!("../../fixtures/zk/Libraries.s.sol")).unwrap();
     prj.add_source(
         "WithLibraries.sol",

@@ -4,12 +4,13 @@ use alloy_primitives::{keccak256, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
-use foundry_linking::{LinkerError, ZkLinker, ZkLinkerError};
+use foundry_linking::{
+    LinkerError, ZkLinker, ZkLinkerError, DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
+};
 use revm::{
     primitives::{CreateScheme, Env, EnvWithHandlerCfg, ResultAndState},
     Database,
 };
-use semver::VersionReq;
 use zksync_types::H256;
 
 use foundry_common::ContractsByArtifact;
@@ -146,9 +147,12 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
 
         // TODO(zk): better error
         zksolc.version().map_err(|_| LinkerError::CyclicDependency).and_then(|version| {
-            let version_req = VersionReq::parse(">=1.5.8").unwrap();
-            if !version_req.matches(&version) {
-                tracing::error!(?version, "linking requires zksolc >= v1.5.8");
+            if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
+                tracing::error!(
+                    %version,
+                    minimum_version = %DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
+                    "deploy-time linking not supported"
+                );
                 Err(LinkerError::CyclicDependency)
             } else {
                 Ok(())

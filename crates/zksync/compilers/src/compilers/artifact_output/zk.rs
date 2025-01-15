@@ -11,7 +11,11 @@ use foundry_compilers_artifacts_solc::{
     CompactDeployedBytecode,
 };
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::BTreeMap, path::Path};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashSet},
+    path::Path,
+};
 
 mod bytecode;
 pub use bytecode::ZkArtifactBytecode;
@@ -46,9 +50,16 @@ pub struct ZkContractArtifact {
     /// contract hash
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
-    /// contract factory dependencies
+    /// List of factory dependencies, encoded as <hash> => <path>:<name>
+    ///
+    /// Only contains fully linked factory dependencies
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factory_dependencies: Option<BTreeMap<String, String>>,
+    /// Complete list of factory dependencies, encoded as <path>:<name>
+    ///
+    /// Contains both linked and unlinked factory dependencies
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub factory_dependencies_unlinked: Option<HashSet<String>>,
     /// The identifier of the source file
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<u32>,
@@ -130,6 +141,7 @@ impl ArtifactOutput for ZkArtifactOutput {
             ir_optimized,
             hash,
             factory_dependencies,
+            factory_dependencies_unlinked,
             missing_libraries,
         } = contract;
 
@@ -144,6 +156,7 @@ impl ArtifactOutput for ZkArtifactOutput {
             abi,
             hash,
             factory_dependencies,
+            factory_dependencies_unlinked,
             storage_layout: Some(storage_layout),
             bytecode,
             assembly,

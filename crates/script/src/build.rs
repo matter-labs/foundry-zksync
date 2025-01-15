@@ -20,13 +20,12 @@ use foundry_compilers::{
     Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_evm::traces::debug::ContractSources;
-use foundry_linking::{Linker, ZkLinker};
+use foundry_linking::{Linker, ZkLinker, DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION};
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::{DualCompiledContract, DualCompiledContracts},
 };
 use foundry_zksync_core::{hash_bytecode, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, H256};
-use semver::VersionReq;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 /// Container for the compiled contracts.
@@ -52,9 +51,9 @@ impl BuildData {
         let zksolc = foundry_config::zksync::config_zksolc_compiler(&script_config.config)
             .context("retrieving zksolc compiler to be used for linking")?;
 
-        let version_req = VersionReq::parse(">=1.5.8").unwrap();
-        if !version_req.matches(&zksolc.version().context("trying to determine zksolc version")?) {
-            eyre::bail!("linking requires zksolc >= 1.5.8");
+        let version = zksolc.version().context("trying to determine zksolc version")?;
+        if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
+            eyre::bail!("deploy-time linking not supported. minimum: {}, given: {}", DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION, &version);
         }
 
         let Some(input) = self.zk_output.as_ref() else {

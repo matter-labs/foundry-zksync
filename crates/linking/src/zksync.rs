@@ -24,6 +24,7 @@ use foundry_zksync_compilers::{
     link::{self as zk_link, MissingLibrary},
 };
 use foundry_zksync_core::hash_bytecode;
+use semver::Version;
 
 use crate::{LinkOutput, Linker, LinkerError};
 
@@ -37,6 +38,8 @@ pub enum ZkLinkerError {
     #[error("unable to fully link due to unlinked factory dependencies")]
     MissingFactoryDeps(BTreeSet<MissingLibrary>),
 }
+
+pub const DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION: Version = Version::new(1, 5, 9);
 
 #[derive(Debug)]
 pub struct ZkLinker<'a> {
@@ -55,7 +58,29 @@ impl<'a> ZkLinker<'a> {
         Self { linker: Linker::new(root, contracts), compiler, compiler_output }
     }
 
-    /// Performs DFS on the graph of link references, and populates `deps` with all found libraries, including ones of factory deps.
+    fn zk_collect_factory_deps(&self, target: &ZkContractArtifact) -> Vec<ZkContractArtifact> {
+        let mut contracts =
+            self.compiler_output.clone().with_stripped_file_prefixes(self.linker.root.as_ref());
+
+        let parse_factory_dep = |dep: &str| {
+            let mut split = dep.split(':');
+            let path = split.next().expect("malformed factory dep path");
+            let name = split.next().expect("malformed factory dep name");
+
+            (path.to_string(), name.to_string())
+        };
+
+        target
+            .factory_dependencies_unlinked
+            .iter()
+            .flatten()
+            .map(|dep| parse_factory_dep(dep))
+            .filter_map(|(path, name)| contracts.remove(Path::new(&path), &name))
+            .collect()
+    }
+
+    /// Performs DFS on the graph of link references, and populates `deps` with all found libraries,
+    /// including ones of factory deps.
     fn zk_collect_dependencies(
         &'a self,
         target: &'a ArtifactId,
@@ -75,8 +100,12 @@ impl<'a> ZkLinker<'a> {
             references.extend(bytecode.link_references());
         }
 
-        // TODO(zk): should instead use unlinked factory dependencies
-        // zksolc 1.5.9
+        let factory_deps = self.zk_collect_factory_deps(artifact);
+        for fdep in factory_deps {
+            if let Some(bytecode) = &fdep.bytecode {
+                references.extend(bytecode.link_references());
+            }
+        }
 
         for (file, libs) in &references {
             for contract in libs.keys() {

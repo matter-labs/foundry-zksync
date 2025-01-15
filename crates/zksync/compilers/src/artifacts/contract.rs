@@ -6,7 +6,10 @@ use foundry_compilers_artifacts_solc::{
     CompactContractRef, CompactDeployedBytecode, DevDoc, Evm, Offsets, StorageLayout, UserDoc,
 };
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashSet},
+};
 
 /// Represents a compiled solidity contract
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -32,9 +35,17 @@ pub struct Contract {
     /// The contract EraVM bytecode hash.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
-    /// The contract factory dependencies.
+    /// Map of factory dependencies, encoded as <hash> => <path>:<name>
+    ///
+    /// Only contains fully linked factory dependencies, as
+    /// unlinked factory dependencies do not have a bytecode hash
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factory_dependencies: Option<BTreeMap<String, String>>,
+    /// Complete list of factory dependencies, encoded as <path>:<name>
+    ///
+    /// Contains both linked and unlinked factory dependencies
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub factory_dependencies_unlinked: Option<HashSet<String>>,
     /// EraVM-related outputs
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eravm: Option<EraVM>,
@@ -53,7 +64,16 @@ fn storage_layout_is_empty(storage_layout: &StorageLayout) -> bool {
 impl Contract {
     /// Returns true if contract is not linked
     pub fn is_unlinked(&self) -> bool {
-        self.hash.is_none() || !self.missing_libraries.is_empty()
+        self.hash.is_none()
+            || !self.missing_libraries.is_empty()
+            || self
+                .factory_dependencies_unlinked
+                .as_ref()
+                .and_then(|unlinked| {
+                    self.factory_dependencies.as_ref().map(|linked| unlinked.len() - linked.len())
+                })
+                .unwrap_or_default()
+                > 0
     }
 
     /// takes missing libraries output and transforms into link references
