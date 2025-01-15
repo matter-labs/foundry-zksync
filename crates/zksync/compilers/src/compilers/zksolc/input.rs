@@ -108,9 +108,16 @@ impl Default for ZkSolcInput {
 }
 
 impl ZkSolcInput {
-    fn new(language: SolcLanguage, sources: Sources, settings: ZkSettings) -> Self {
+    fn new(language: SolcLanguage, sources: Sources, mut settings: ZkSettings) -> Self {
+        // zksolc <= 1.5.6 has suppressed warnings/errors in at the root input level
         let suppressed_warnings = settings.suppressed_warnings.clone();
         let suppressed_errors = settings.suppressed_errors.clone();
+
+        // zksolc <= 1.5.6 uses "bytecode_hash" field for "hash_type"
+        if let Some(ref mut metadata) = settings.metadata {
+            metadata.bytecode_hash = metadata.hash_type;
+        };
+
         Self { language, sources, settings, suppressed_warnings, suppressed_errors }
     }
 

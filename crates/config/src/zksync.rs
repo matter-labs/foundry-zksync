@@ -46,8 +46,9 @@ pub struct ZkSyncConfig {
     /// solc path to use along the zksolc compiler
     pub solc_path: Option<PathBuf>,
 
-    /// Whether to include the metadata hash for zksolc compiled bytecode.
-    pub bytecode_hash: Option<BytecodeHash>,
+    /// Hash type for the the metadata hash appended by zksolc to the compiled bytecode.
+    #[serde(alias = "bytecode_hash")]
+    pub hash_type: Option<BytecodeHash>,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
     pub fallback_oz: bool,
@@ -83,7 +84,7 @@ impl Default for ZkSyncConfig {
             startup: false,
             zksolc: Default::default(),
             solc_path: Default::default(),
-            bytecode_hash: Default::default(),
+            hash_type: Default::default(),
             fallback_oz: Default::default(),
             enable_eravm_extensions: Default::default(),
             force_evmla: Default::default(),
@@ -128,7 +129,15 @@ impl ZkSyncConfig {
             libraries,
             optimizer,
             evm_version: Some(evm_version),
-            metadata: Some(SettingsMetadata { bytecode_hash: self.bytecode_hash }),
+            // NOTE: we set both `bytecode_hash` and `hash_type` fields to the same value abusing
+            // the fact that invalid json fields get ignored by zksolc. Only the correct field
+            // that the compiler version understands will be used while the other ignored.
+            // If this becomes a problem, we need to evaluate adding zksolc version aware
+            // sanitizing
+            metadata: Some(SettingsMetadata {
+                bytecode_hash: self.hash_type,
+                hash_type: self.hash_type,
+            }),
             via_ir: Some(via_ir),
             // Set in project paths.
             remappings: Vec::new(),
@@ -229,12 +238,12 @@ pub fn config_create_project(
 fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
     if let Some(path) = &config.zksync.solc_path {
         if !path.is_file() {
-            return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())))
+            return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())));
         }
         let version = get_solc_version_info(path)?.version;
         let solc =
             Solc::new_with_version(path, Version::new(version.major, version.minor, version.patch));
-        return Ok(SolcCompiler::Specific(solc))
+        return Ok(SolcCompiler::Specific(solc));
     }
 
     if let Some(ref solc) = config.solc {
@@ -256,7 +265,7 @@ fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
             }
             SolcReq::Local(path) => {
                 if !path.is_file() {
-                    return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())))
+                    return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())));
                 }
                 let version = get_solc_version_info(path)?.version;
                 Solc::new_with_version(
@@ -307,7 +316,7 @@ pub fn config_ensure_zksolc(
                     if offline {
                         return Err(SolcError::msg(format!(
                             "can't install missing zksolc {version} in offline mode"
-                        )))
+                        )));
                     }
                     ZkSolc::blocking_install(version)?;
                     zksolc = ZkSolc::find_installed_version(version)?;
@@ -319,12 +328,12 @@ pub fn config_ensure_zksolc(
                     return Err(SolcError::msg(format!(
                         "`zksolc` {} does not exist",
                         zksolc.display()
-                    )))
+                    )));
                 }
                 Some(zksolc.clone())
             }
         };
-        return Ok(zksolc)
+        return Ok(zksolc);
     }
 
     Ok(None)

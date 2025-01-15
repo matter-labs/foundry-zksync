@@ -17,7 +17,7 @@ use foundry_zksync_compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
             input::ZkSolcInput,
-            settings::{ZkSolcError, ZkSolcWarning},
+            settings::{SettingsMetadata, ZkSolcError, ZkSolcWarning},
             ZkSolc, ZkSolcCompiler, ZkSolcSettings,
         },
     },
@@ -68,24 +68,76 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
 
         let compiled = project.compile().unwrap();
         compiled.assert_success();
-        assert_eq!(
-            compiled.compiled_artifacts().len(),
-            3,
-            "zksolc {version} compilation yielded wrong number of artifacts"
-        );
+        assert_eq!(compiled.compiled_artifacts().len(), 3, "zksolc {version}");
         for (n, c) in compiled.artifacts() {
             assert!(
                 c.bytecode
                     .as_ref()
                     .unwrap_or_else(|| panic!(
-                        "zksolc {version} {n} artifact bytecode field should not be empty"
+                        "zksolc {version}: {n} artifact bytecode field should not be empty"
                     ))
                     .object()
                     .bytes_len() >
                     0,
-                "zksolc {version} {n} artifact bytecode should yield more than 0 bytes",
+                "zksolc {version}",
             );
         }
+    }
+}
+
+#[test]
+fn zksync_can_set_hash_type_with_supported_versions() {
+    for version in ZkSolc::zksolc_available_versions() {
+        let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+        let compiler = ZkSolcCompiler {
+            zksolc: ZkSolc::get_path_for_version(&version).unwrap(),
+            solc: Default::default(),
+        };
+        project.project_mut().compiler = compiler;
+        project.project_mut().settings.settings.metadata = Some(SettingsMetadata {
+            hash_type: Some(
+                foundry_zksync_compilers::compilers::zksolc::settings::BytecodeHash::None,
+            ),
+            bytecode_hash: None,
+        });
+
+        project
+            .add_source(
+                "Contract",
+                r#"
+            // SPDX-License-Identifier: MIT OR Apache-2.0
+            pragma solidity ^0.8.10;
+            contract Contract {
+                function call() public {}
+            }
+            "#,
+            )
+            .unwrap();
+
+        let compiled = project.compile().unwrap();
+        compiled.assert_success();
+        let contract_none = compiled.find_first("Contract").unwrap();
+        let bytecode_none =
+            contract_none.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
+
+        project.project_mut().settings.settings.metadata = Some(SettingsMetadata {
+            hash_type: Some(
+                foundry_zksync_compilers::compilers::zksolc::settings::BytecodeHash::Keccak256,
+            ),
+            bytecode_hash: None,
+        });
+
+        let compiled = project.compile().unwrap();
+        compiled.assert_success();
+        let contract_keccak = compiled.find_first("Contract").unwrap();
+        let bytecode_keccak =
+            contract_keccak.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
+        // NOTE: "none" value seems to pad 32 bytes of 0s at the end
+        assert_eq!(bytecode_none.len(), bytecode_keccak.len(), "zksolc {version}");
+        assert_ne!(bytecode_none, bytecode_keccak, "zksolc {version}");
+
+        let end = bytecode_keccak.len() - 32;
+        assert_eq!(bytecode_none.slice(..end), bytecode_keccak.slice(..end), "zksolc {version}");
     }
 }
 
