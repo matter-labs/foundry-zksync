@@ -73,17 +73,6 @@ jobs:
       - name: Install Vyper
         run: pip install vyper~=0.4.0
 
-      - name: Forge RPC cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.foundry/cache
-            ~/.config/.foundry/cache
-          key: rpc-cache-${{ hashFiles('crates/forge/tests/rpc-cache-keyfile') }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
       - name: Setup Git config
         run: |
           git config --global user.name "GitHub Actions Bot"
