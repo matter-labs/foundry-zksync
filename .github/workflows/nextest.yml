@@ -78,12 +78,9 @@ jobs:
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "<>"
           git config --global url."https://github.com/".insteadOf "git@github.com:"
-
-      - name: Test Group 1
-        run: cargo nextest run --test-threads=1 cmd::wallet::tests::can_parse_wallet_sign_hex_message cmd::wallet::vanity::tests::save_path dispatcher::tests::test_comment_regex
-
-      - name: Test Group 2
-        run: cargo nextest run --test-threads=1 cmd::wallet::vanity::tests::find_simple_vanity_start storage_layout_complex_json test_clear_cache
-
-      - name: Test Final Group
-        run: cargo nextest run --test-threads=1 test_invariant_roll_fork_handler
+      - name: Test
+        env:
+          SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
+          HTTP_ARCHIVE_URLS: ${{ secrets.HTTP_ARCHIVE_URLS }}
+          WS_ARCHIVE_URLS: ${{ secrets.WS_ARCHIVE_URLS }}
+        run: cargo nextest run --test-threads=1 ${{ matrix.flags }} --filter-expr 'not (test(~zk) or test(~test_zk_aave_di))'
