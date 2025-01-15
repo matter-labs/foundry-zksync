@@ -2,7 +2,7 @@ use foundry_test_utils::{forgetest_async, util, TestProject};
 
 use foundry_test_utils::{util::OutputExt, ZkSyncNode};
 
-forgetest_async!(script_execution_with_gas_price, |prj, cmd| {
+forgetest_async!(zk_script_execution_with_gas_price_specified_by_user, |prj, cmd| {
     setup_gas_prj(&mut prj);
 
     let node = ZkSyncNode::start().await;
@@ -23,8 +23,6 @@ forgetest_async!(script_execution_with_gas_price, |prj, cmd| {
         "--rpc-url",
         url.as_str(),
         "--slow",
-        "--evm-version",
-        "shanghai",
         "-vvvvv",
         "--broadcast",
         "--with-gas-price",
