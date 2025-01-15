@@ -141,7 +141,8 @@ pub async fn send_transaction(
                         },
                     );
                 }
-                foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;
+                foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider, estimate_multiplier)
+                    .await?;
 
                 let zk_signer = alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
                 let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
@@ -317,7 +318,15 @@ impl BundledState {
                     self.args.with_gas_price,
                     self.args.priority_gas_price,
                 ) {
-                    (true, Some(gas_price), _) => (Some(gas_price.to()), None),
+                    (true, Some(gas_price), priority_fee) => (
+                        Some(gas_price.to()),
+                        // NOTE(zk): Zksync is marked as legacy in alloy chains but it is compliant
+                        // with EIP-1559 so we need to pass down the user provided values
+                        priority_fee.map(|fee| Eip1559Estimation {
+                            max_fee_per_gas: gas_price.to(),
+                            max_priority_fee_per_gas: fee.to(),
+                        }),
+                    ),
                     (true, None, _) => (Some(provider.get_gas_price().await?), None),
                     (false, Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) => (
                         None,
@@ -367,6 +376,13 @@ impl BundledState {
 
                                 if let Some(gas_price) = gas_price {
                                     tx.set_gas_price(gas_price);
+                                    // NOTE(zk): Also set EIP-1559 fees for zk transactions
+                                    if let Some(eip1559_fees) = eip1559_fees {
+                                        tx.set_max_priority_fee_per_gas(
+                                            eip1559_fees.max_priority_fee_per_gas,
+                                        );
+                                        tx.set_max_fee_per_gas(eip1559_fees.max_fee_per_gas);
+                                    }
                                 } else {
                                     let eip1559_fees = eip1559_fees.expect("was set above");
                                     tx.set_max_priority_fee_per_gas(

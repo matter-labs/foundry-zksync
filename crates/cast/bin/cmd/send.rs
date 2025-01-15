@@ -286,7 +286,7 @@ async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Trans
         zk_tx.set_paymaster_params(paymaster_params);
     }
 
-    foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;
+    foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider, 130).await?;
 
     let cast = ZkCast::new(zk_provider, Cast::new(provider));
     let pending_tx = cast.send_zk(zk_tx).await?;

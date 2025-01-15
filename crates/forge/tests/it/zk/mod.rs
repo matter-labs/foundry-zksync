@@ -10,6 +10,7 @@ mod factory;
 mod factory_deps;
 mod fork;
 mod fuzz;
+mod gas;
 mod invariant;
 mod linking;
 mod logs;
