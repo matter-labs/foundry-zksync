@@ -26,14 +26,10 @@ contract ZkTxSenderTest is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
 
     function testZkTxSenderNoncesAreConsistent() public {
-        address thisAddr = address(this);
         address msgSender = msg.sender;
+        address thisAddr = address(this);
 
-        assertEq(
-            msgSender,
-            tx.origin,
-            "msg.sender and tx.origin must be same for top level"
-        );
+        assertEq(msgSender, tx.origin, "msg.sender and tx.origin must be same for top level");
 
         uint256 thisAddrTxNonce = vm.zkGetTransactionNonce(thisAddr);
         uint256 thisAddrDeployNonce = vm.zkGetDeploymentNonce(thisAddr);
@@ -41,33 +37,33 @@ contract ZkTxSenderTest is DSTest {
         uint256 msgSenderDeployNonce = vm.zkGetDeploymentNonce(msgSender);
 
         Counter counter = new Counter();
-        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(thisAddrDeployNonce, vm.zkGetDeploymentNonce(thisAddr));
-        assertEq(msgSenderTxNonce, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(msgSenderDeployNonce + 1, vm.zkGetDeploymentNonce(thisAddr));
+        assertEq(msgSenderTxNonce, vm.zkGetTransactionNonce(msgSender), "deployment#1: msg.sender tx nonce mismatch");
+        assertEq(
+            msgSenderDeployNonce, vm.zkGetDeploymentNonce(msgSender), "deployment#1: msg.sender deploy nonce mismatch"
+        );
+        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr), "deployment#1: self tx nonce mismatch");
+        assertEq(thisAddrDeployNonce + 1, vm.zkGetDeploymentNonce(thisAddr), "deployment#1: self deploy nonce mismatch");
 
         new Counter();
-        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(thisAddrDeployNonce, vm.zkGetDeploymentNonce(thisAddr));
-        assertEq(msgSenderTxNonce, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(msgSenderDeployNonce + 2, vm.zkGetDeploymentNonce(thisAddr));
+        assertEq(msgSenderTxNonce, vm.zkGetTransactionNonce(msgSender), "deployment#2: msg.sender tx nonce mismatch");
+        assertEq(
+            msgSenderDeployNonce, vm.zkGetDeploymentNonce(msgSender), "deployment#2: msg.sender deploy nonce mismatch"
+        );
+        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr), "deployment#2: self tx nonce mismatch");
+        assertEq(thisAddrDeployNonce + 2, vm.zkGetDeploymentNonce(thisAddr), "deployment#2: self deploy nonce mismatch");
 
         counter.setNumber(0);
-        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(thisAddrDeployNonce, vm.zkGetDeploymentNonce(thisAddr));
-        assertEq(msgSenderTxNonce + 1, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(msgSenderDeployNonce + 2, vm.zkGetDeploymentNonce(thisAddr));
+        assertEq(msgSenderTxNonce, vm.zkGetTransactionNonce(msgSender), "tx: msg.sender tx nonce mismatch");
+        assertEq(msgSenderDeployNonce, vm.zkGetDeploymentNonce(msgSender), "tx: msg.sender deploy nonce mismatch");
+        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr), "tx: self tx nonce mismatch");
+        assertEq(thisAddrDeployNonce + 2, vm.zkGetDeploymentNonce(thisAddr), "tx: self deploy nonce mismatch");
     }
 
     function testZkTxSenderNoncesAreConsistentInBroadcast() public {
-        address thisAddr = address(this);
         address msgSender = msg.sender;
+        address thisAddr = address(this);
 
-        assertEq(
-            msgSender,
-            tx.origin,
-            "msg.sender and tx.origin must be same for top level"
-        );
+        assertEq(msgSender, tx.origin, "msg.sender and tx.origin must be same for top level");
 
         // Start broadcasting on msg.sender
         vm.startBroadcast(msgSender);
@@ -78,22 +74,34 @@ contract ZkTxSenderTest is DSTest {
         uint256 msgSenderDeployNonce = vm.zkGetDeploymentNonce(msgSender);
 
         Counter counter = new Counter();
-        assertEq(thisAddrTxNonce + 1, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(thisAddrDeployNonce + 1, vm.zkGetDeploymentNonce(thisAddr));
-        assertEq(msgSenderTxNonce, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(msgSenderDeployNonce, vm.zkGetDeploymentNonce(thisAddr));
+        assertEq(
+            msgSenderTxNonce + 1, vm.zkGetTransactionNonce(msgSender), "deployment#1: msg.sender tx nonce mismatch"
+        );
+        assertEq(
+            msgSenderDeployNonce + 1,
+            vm.zkGetDeploymentNonce(msgSender),
+            "deployment#1: msg.sender deploy nonce mismatch"
+        );
+        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr), "deployment#1: self tx nonce mismatch");
+        assertEq(thisAddrDeployNonce, vm.zkGetDeploymentNonce(thisAddr), "deployment#1: self deploy nonce mismatch");
 
         new Counter();
-        assertEq(thisAddrTxNonce + 2, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(thisAddrDeployNonce + 2, vm.zkGetDeploymentNonce(thisAddr));
-        assertEq(msgSenderTxNonce, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(msgSenderDeployNonce, vm.zkGetDeploymentNonce(thisAddr));
+        assertEq(
+            msgSenderTxNonce + 2, vm.zkGetTransactionNonce(msgSender), "deployment#2: msg.sender tx nonce mismatch"
+        );
+        assertEq(
+            msgSenderDeployNonce + 2,
+            vm.zkGetDeploymentNonce(msgSender),
+            "deployment#2: msg.sender deploy nonce mismatch"
+        );
+        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr), "deployment#2: self tx nonce mismatch");
+        assertEq(thisAddrDeployNonce, vm.zkGetDeploymentNonce(thisAddr), "deployment#2: self deploy nonce mismatch");
 
         counter.setNumber(0);
-        assertEq(thisAddrTxNonce + 3, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(thisAddrDeployNonce + 2, vm.zkGetDeploymentNonce(thisAddr));
-        assertEq(msgSenderTxNonce, vm.zkGetTransactionNonce(thisAddr));
-        assertEq(msgSenderDeployNonce, vm.zkGetDeploymentNonce(thisAddr));
+        assertEq(msgSenderTxNonce + 3, vm.zkGetTransactionNonce(msgSender), "tx: msg.sender tx nonce mismatch");
+        assertEq(msgSenderDeployNonce + 2, vm.zkGetDeploymentNonce(msgSender), "tx: msg.sender deploy nonce mismatch");
+        assertEq(thisAddrTxNonce, vm.zkGetTransactionNonce(thisAddr), "tx: self tx nonce mismatch");
+        assertEq(thisAddrDeployNonce, vm.zkGetDeploymentNonce(thisAddr), "tx: self deploy nonce mismatch");
 
         vm.stopBroadcast();
     }
@@ -102,11 +110,7 @@ contract ZkTxSenderTest is DSTest {
         address thisAddr = address(this);
         address msgSender = msg.sender;
 
-        assertEq(
-            msgSender,
-            tx.origin,
-            "msg.sender and tx.origin must be same for top level"
-        );
+        assertEq(msgSender, tx.origin, "msg.sender and tx.origin must be same for top level");
 
         uint256 thisAddrBalance = thisAddr.balance;
         uint256 msgSenderBalance = msgSender.balance;

@@ -25,9 +25,13 @@ use zksync_multivm::{
     vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
 };
 use zksync_types::{
-    get_nonce_key, h256_to_address, h256_to_u256, l2::L2Tx, transaction_request::PaymasterParams,
-    u256_to_h256, utils::nonces_to_full_nonce, PackedEthSignature, StorageKey, Transaction,
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
+    get_nonce_key, h256_to_address, h256_to_u256,
+    l2::L2Tx,
+    transaction_request::PaymasterParams,
+    u256_to_h256,
+    utils::{decompose_full_nonce, nonces_to_full_nonce},
+    PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
@@ -41,7 +45,7 @@ use std::{
 use crate::{
     be_words_to_bytes,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    fix_l2_gas_limit, fix_l2_gas_price, is_system_address,
+    fix_l2_gas_limit, fix_l2_gas_price, increment_tx_nonce, is_system_address, set_tx_nonce,
     state::{new_full_nonce, parse_full_nonce, FullNonce},
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
@@ -104,6 +108,7 @@ where
         );
         tx.common_data.fee.gas_limit = new_gas_limit;
 
+        let initiator_address = tx.initiator_account();
         info!("executing batched tx ({}/{})", idx + 1, total_txns);
         let mut result = inspect(tx, ecx, ccx, call_ctx.clone())?;
 
@@ -150,6 +155,11 @@ where
                 *agg_output = output;
             }
             _ => unreachable!("aggregated result must only contain success"),
+        }
+
+        // Increment the nonce manually if there are multiple batches
+        if total_txns > 1 {
+            increment_tx_nonce(initiator_address.to_address(), ecx);
         }
     }
 
@@ -331,81 +341,15 @@ where
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
 
     let initiator_nonce_key = get_nonce_key(&initiator_address);
-    let caller_nonce_key = get_nonce_key(&call_ctx.msg_sender.to_h160());
 
     // NOTE(zk) We need to revert the tx nonce of the initiator as we intercept and dispatch
     // CALLs and CREATEs to the zkEVM. The CREATEs always increment the deployment nonce
-    // which must be persisted, but the CALLs are not real transactions and hence must
-    // be reverted.
-    if !call_ctx.is_create {
-        if let Some(initiator_nonce) = modified_storage.get_mut(&initiator_nonce_key) {
-            let FullNonce { tx_nonce, deploy_nonce } = parse_full_nonce(initiator_nonce.to_ru256());
-            let new_tx_nonce = tx_nonce.saturating_sub(1);
-            info!(address=?initiator_address, from=?tx_nonce, to=?new_tx_nonce, "reverting initiator tx nonce for CALL");
-            *initiator_nonce = new_full_nonce(new_tx_nonce, deploy_nonce).to_h256();
-        }
-    }
-
-    // NOTE(zk) We apply the nonce updates from the `tx_caller` to `msg_sender` if they differ.
-    // This is because zkEVM does not like being called from a non-EOA and it's simpler
-    // to call it with tx signer and adapt the nonce changes here. The nonce changes to `tx_caller`
-    // are thus reverted.
-    // We skip the balance changes as we override `msg.sender` in `executeTransaction` which takes
-    // care of it. The same cannot be done for `validateTransaction` due to the many safeguards
-    // around correct nonce update in the bootloader.
-    if initiator_address.to_address() != call_ctx.msg_sender {
-        if let (Some(initiator_nonce), Some(caller_nonce)) =
-            (modified_storage.get(&initiator_nonce_key), modified_storage.get(&caller_nonce_key))
-        {
-            let new_initiator_nonce = parse_full_nonce(initiator_nonce.to_ru256());
-            let new_caller_nonce = parse_full_nonce(caller_nonce.to_ru256());
-
-            let old_initiator_nonce = era_db.get_full_nonce(initiator_address.to_address());
-
-            let tx_nonce_inc =
-                new_initiator_nonce.tx_nonce.saturating_sub(old_initiator_nonce.tx_nonce);
-            let deploy_nonce_inc =
-                new_initiator_nonce.deploy_nonce.saturating_sub(old_initiator_nonce.deploy_nonce);
-
-            let corrected_initiator_nonce = FullNonce {
-                tx_nonce: old_initiator_nonce.tx_nonce,
-                deploy_nonce: old_initiator_nonce.deploy_nonce,
-            };
-            let corrected_caller_nonce = FullNonce {
-                tx_nonce: new_caller_nonce.tx_nonce.saturating_add(tx_nonce_inc),
-                deploy_nonce: new_caller_nonce.deploy_nonce.saturating_add(deploy_nonce_inc),
-            };
-
-            modified_storage.insert(
-                initiator_nonce_key,
-                nonces_to_full_nonce(
-                    old_initiator_nonce.tx_nonce.into(),
-                    old_initiator_nonce.deploy_nonce.into(),
-                )
-                .to_h256(),
-            );
-            modified_storage.insert(
-                caller_nonce_key,
-                nonces_to_full_nonce(
-                    corrected_caller_nonce.tx_nonce.into(),
-                    corrected_caller_nonce.deploy_nonce.into(),
-                )
-                .to_h256(),
-            );
-
-            info!(
-                address=?initiator_address,
-                from=?new_initiator_nonce,
-                to=?corrected_initiator_nonce,
-                "correcting initiator nonce",
-            );
-            info!(
-                address=?call_ctx.msg_sender,
-                from=?new_caller_nonce,
-                to=?corrected_caller_nonce,
-                "correcting caller nonce",
-            );
-        }
+    // which must be persisted, but the tx nonce increase must be reverted.
+    if let Some(initiator_nonce) = modified_storage.get_mut(&initiator_nonce_key) {
+        let FullNonce { tx_nonce, deploy_nonce } = parse_full_nonce(initiator_nonce.to_ru256());
+        let new_tx_nonce = tx_nonce.saturating_sub(1);
+        error!(address=?initiator_address, from=?tx_nonce, to=?new_tx_nonce, deploy_nonce, "reverting initiator tx nonce for CALL");
+        *initiator_nonce = new_full_nonce(new_tx_nonce, deploy_nonce).to_h256();
     }
 
     for (k, v) in modified_storage {

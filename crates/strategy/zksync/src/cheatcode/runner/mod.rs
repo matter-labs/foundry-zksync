@@ -194,6 +194,18 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             rpc,
             transaction: TransactionMaybeSigned::Unsigned(tx),
         });
+
+        // Explicitly increment tx nonce if calls are not isolated.
+        // This isn't needed in EVM, but required in zkEVM as the nonces are split.
+        if !config.evm_opts.isolate {
+            let tx_nonce = nonce;
+            foundry_zksync_core::set_tx_nonce(
+                broadcast.new_origin,
+                U256::from(tx_nonce.saturating_add(1)),
+                ecx_inner,
+            );
+            debug!(target: "cheatcodes", address=%broadcast.new_origin, new_tx_nonce=tx_nonce+1, tx_nonce, "incremented zksync tx nonce");
+        }
     }
 
     fn record_broadcastable_call_transactions(
@@ -292,15 +304,14 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         });
         debug!(target: "cheatcodes", tx=?broadcastable_transactions.back().unwrap(), "broadcastable call");
 
-        // Explicitly increment nonce if calls are not isolated.
+        // Explicitly increment tx nonce if calls are not isolated.
         if !config.evm_opts.isolate {
             foundry_zksync_core::set_tx_nonce(
                 broadcast.new_origin,
                 U256::from(tx_nonce.saturating_add(1)),
                 ecx_inner,
             );
-            debug!(target: "cheatcodes", address=%broadcast.new_origin, nonce=tx_nonce+1,
-        tx_nonce, "incremented zksync tx nonce");
+            debug!(target: "cheatcodes", address=%broadcast.new_origin, new_tx_nonce=tx_nonce+1, tx_nonce, "incremented zksync tx nonce");
         }
     }
 

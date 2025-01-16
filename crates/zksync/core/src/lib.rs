@@ -253,7 +253,7 @@ where
     DB: Database,
     DB::Error: Debug,
 {
-    //ensure nonce is _only_ tx nonce
+    // ensure nonce is _only_ tx nonce
     let (tx_nonce, _deploy_nonce) = decompose_full_nonce(nonce.to_u256());
 
     let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
@@ -266,6 +266,26 @@ where
         .map(|v| decompose_full_nonce(v.to_u256()).1)
         .unwrap_or_default();
     let updated_nonce = nonces_to_full_nonce(tx_nonce, old_deploy_nonce);
+    ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
+}
+
+/// Increment transaction nonce for a specific address.
+pub fn increment_tx_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>)
+where
+    DB: Database,
+    DB::Error: Debug,
+{
+    let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
+    ecx.load_account(nonce_addr).expect("account could not be loaded");
+    let nonce_key = get_nonce_key(address);
+    ecx.touch(&nonce_addr);
+
+    // We make sure to keep the old deployment nonce
+    let (tx_nonce, deploy_nonce) = ecx
+        .sload(nonce_addr, nonce_key)
+        .map(|v| decompose_full_nonce(v.to_u256()))
+        .unwrap_or_default();
+    let updated_nonce = nonces_to_full_nonce(tx_nonce.saturating_add(1u32.into()), deploy_nonce);
     ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
 }
 
