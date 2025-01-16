@@ -5,8 +5,9 @@ use std::{
     str::FromStr,
 };
 
+use foundry_compilers::ConfigurableArtifacts;
 use foundry_compilers::{
-    solc::SolcLanguage, Artifact, ArtifactId, ArtifactOutput, ConfigurableArtifacts,
+    info::ContractInfo, solc::SolcLanguage, Artifact, ArtifactId, ArtifactOutput,
     ProjectCompileOutput, ProjectPathsConfig,
 };
 
@@ -28,13 +29,11 @@ pub enum ContractType {
 /// Defines a contract that has been dual compiled with both zksolc and solc
 #[derive(Debug, Default, Clone)]
 pub struct DualCompiledContract {
-    /// Contract name
-    pub name: String,
     /// Deployed bytecode with zksolc
     pub zk_bytecode_hash: H256,
     /// Deployed bytecode hash with zksolc
     pub zk_deployed_bytecode: Vec<u8>,
-    /// Deployed bytecode factory deps
+    /// Bytecodes of the factory deps for zksolc's deployed bytecode
     pub zk_factory_deps: Vec<Vec<u8>>,
     /// Deployed bytecode hash with solc
     pub evm_bytecode_hash: B256,
@@ -47,11 +46,17 @@ pub struct DualCompiledContract {
 /// Couple contract type with contract and init code
 pub struct FindBytecodeResult<'a> {
     r#type: ContractType,
+    info: &'a ContractInfo,
     contract: &'a DualCompiledContract,
     init_code: &'a [u8],
 }
 
 impl<'a> FindBytecodeResult<'a> {
+    /// Retrieve the found contract's info
+    pub fn info(&self) -> &'a ContractInfo {
+        self.info
+    }
+
     /// Retrieve the found contract
     pub fn contract(self) -> &'a DualCompiledContract {
         self.contract
@@ -69,7 +74,7 @@ impl<'a> FindBytecodeResult<'a> {
 /// A collection of `[DualCompiledContract]`s
 #[derive(Debug, Default, Clone)]
 pub struct DualCompiledContracts {
-    contracts: Vec<DualCompiledContract>,
+    contracts: HashMap<ContractInfo, DualCompiledContract>,
     /// ZKvm artifacts path
     pub zk_artifact_path: PathBuf,
     /// EVM artifacts path
@@ -84,37 +89,29 @@ impl DualCompiledContracts {
         layout: &ProjectPathsConfig,
         zk_layout: &ProjectPathsConfig<SolcLanguage>,
     ) -> Self {
-        let mut dual_compiled_contracts = vec![];
+        let mut dual_compiled_contracts = HashMap::new();
         let mut solc_bytecodes = HashMap::new();
 
-        let output_artifacts = output
-            .cached_artifacts()
-            .artifact_files()
-            .chain(output.compiled_artifacts().artifact_files())
-            .filter_map(|artifact| {
-                ConfigurableArtifacts::contract_name(&artifact.file)
-                    .map(|name| (name, (&artifact.file, &artifact.artifact)))
-            });
-        let zk_output_artifacts = zk_output
-            .cached_artifacts()
-            .artifact_files()
-            .chain(zk_output.compiled_artifacts().artifact_files())
-            .filter_map(|artifact| {
-                ConfigurableArtifacts::contract_name(&artifact.file)
-                    .map(|name| (name, (&artifact.file, &artifact.artifact)))
-            });
+        let output_artifacts = output.artifact_ids().map(|(id, artifact)| {
+            (
+                ContractInfo {
+                    name: id.name,
+                    path: Some(id.source.to_string_lossy().into_owned()),
+                },
+                artifact,
+            )
+        });
+        let zk_output_artifacts = zk_output.artifact_ids().map(|(id, artifact)| {
+            (
+                ContractInfo {
+                    name: id.name,
+                    path: Some(id.source.to_string_lossy().into_owned()),
+                },
+                artifact,
+            )
+        });
 
-        for (_contract_name, (artifact_path, artifact)) in output_artifacts {
-            let contract_file = artifact_path
-                .strip_prefix(&layout.artifacts)
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "failed stripping solc artifact path '{:?}' from '{:?}'",
-                        layout.artifacts, artifact_path
-                    )
-                })
-                .to_path_buf();
-
+        for (contract_info, artifact) in output_artifacts {
             let deployed_bytecode = artifact.get_deployed_bytecode();
             let deployed_bytecode = deployed_bytecode
                 .as_ref()
@@ -122,7 +119,7 @@ impl DualCompiledContracts {
             let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
             if let Some(bytecode) = bytecode {
                 if let Some(deployed_bytecode) = deployed_bytecode {
-                    solc_bytecodes.insert(contract_file, (bytecode, deployed_bytecode.clone()));
+                    solc_bytecodes.insert(contract_info, (bytecode, deployed_bytecode.clone()));
                 }
             }
         }
@@ -140,17 +137,7 @@ impl DualCompiledContracts {
             }
         }
 
-        for (contract_name, (artifact_path, artifact)) in zk_output_artifacts {
-            let contract_file = artifact_path
-                .strip_prefix(&zk_layout.artifacts)
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "failed stripping zksolc artifact path '{:?}' from '{:?}'",
-                        zk_layout.artifacts, artifact_path
-                    )
-                })
-                .to_path_buf();
-
+        for (contract_info, artifact) in zk_output_artifacts {
             let maybe_bytecode = &artifact.bytecode;
             let maybe_hash = &artifact.hash;
             let maybe_factory_deps = &artifact.factory_dependencies;
@@ -159,7 +146,7 @@ impl DualCompiledContracts {
                 (maybe_bytecode, maybe_hash, maybe_factory_deps)
             {
                 if let Some((solc_bytecode, solc_deployed_bytecode)) =
-                    solc_bytecodes.get(&contract_file)
+                    solc_bytecodes.get(&contract_info)
                 {
                     // NOTE(zk): unlinked objects are _still_ encoded as valid hex
                     // but the hash wouldn't be present in the artifact
@@ -176,17 +163,19 @@ impl DualCompiledContracts {
 
                     factory_deps_vec.push(bytecode_vec.clone());
 
-                    dual_compiled_contracts.push(DualCompiledContract {
-                        name: contract_name,
-                        zk_bytecode_hash: H256::from_str(hash).unwrap(),
-                        zk_deployed_bytecode: bytecode_vec,
-                        zk_factory_deps: factory_deps_vec,
-                        evm_bytecode_hash: keccak256(solc_deployed_bytecode),
-                        evm_bytecode: solc_bytecode.to_vec(),
-                        evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
-                    });
+                    dual_compiled_contracts.insert(
+                        contract_info,
+                        DualCompiledContract {
+                            zk_bytecode_hash: H256::from_str(hash).unwrap(),
+                            zk_deployed_bytecode: bytecode_vec,
+                            zk_factory_deps: factory_deps_vec,
+                            evm_bytecode_hash: keccak256(solc_deployed_bytecode),
+                            evm_bytecode: solc_bytecode.to_vec(),
+                            evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
+                        },
+                    );
                 } else {
-                    tracing::error!("matching solc artifact not found for {contract_file:?}");
+                    tracing::error!("matching solc artifact not found for {contract_info:?}");
                 }
             }
         }
@@ -199,18 +188,29 @@ impl DualCompiledContracts {
     }
 
     /// Finds a contract matching the ZK deployed bytecode
-    pub fn find_by_zk_deployed_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
-        self.contracts.iter().find(|contract| bytecode.starts_with(&contract.zk_deployed_bytecode))
+    pub fn find_by_zk_deployed_bytecode(
+        &self,
+        bytecode: &[u8],
+    ) -> Option<(&ContractInfo, &DualCompiledContract)> {
+        self.contracts
+            .iter()
+            .find(|(_, contract)| bytecode.starts_with(&contract.zk_deployed_bytecode))
     }
 
     /// Finds a contract matching the EVM bytecode
-    pub fn find_by_evm_bytecode(&self, bytecode: &[u8]) -> Option<&DualCompiledContract> {
-        self.contracts.iter().find(|contract| bytecode.starts_with(&contract.evm_bytecode))
+    pub fn find_by_evm_bytecode(
+        &self,
+        bytecode: &[u8],
+    ) -> Option<(&ContractInfo, &DualCompiledContract)> {
+        self.contracts.iter().find(|(_, contract)| bytecode.starts_with(&contract.evm_bytecode))
     }
 
     /// Finds a contract matching the ZK bytecode hash
-    pub fn find_by_zk_bytecode_hash(&self, code_hash: H256) -> Option<&DualCompiledContract> {
-        self.contracts.iter().find(|contract| code_hash == contract.zk_bytecode_hash)
+    pub fn find_by_zk_bytecode_hash(
+        &self,
+        code_hash: H256,
+    ) -> Option<(&ContractInfo, &DualCompiledContract)> {
+        self.contracts.iter().find(|(_, contract)| code_hash == contract.zk_bytecode_hash)
     }
 
     /// Find a contract matching the given bytecode, whether it's EVM or ZK.
@@ -224,15 +224,26 @@ impl DualCompiledContracts {
         let zk = self.find_by_zk_deployed_bytecode(init_code).map(|evm| (ContractType::ZK, evm));
 
         match (&evm, &zk) {
-            (Some((_, evm)), Some((_, zk))) => {
+            (Some((_, (evm_info, evm))), Some((_, (zk_info, zk)))) => {
                 if zk.zk_deployed_bytecode.len() >= evm.evm_bytecode.len() {
-                    Some(FindBytecodeResult { r#type: ContractType::ZK, contract: zk, init_code })
+                    Some(FindBytecodeResult {
+                        r#type: ContractType::ZK,
+                        contract: zk,
+                        init_code,
+                        info: zk_info,
+                    })
                 } else {
-                    Some(FindBytecodeResult { r#type: ContractType::EVM, contract: zk, init_code })
+                    Some(FindBytecodeResult {
+                        r#type: ContractType::EVM,
+                        contract: zk,
+                        init_code,
+                        info: evm_info,
+                    })
                 }
             }
-            _ => evm.or(zk).map(|(r#type, contract)| FindBytecodeResult {
+            _ => evm.or(zk).map(|(r#type, (info, contract))| FindBytecodeResult {
                 r#type,
+                info,
                 contract,
                 init_code,
             }),
@@ -251,9 +262,9 @@ impl DualCompiledContracts {
         while let Some(dep) = queue.pop_front() {
             // try to insert in the list of visited, if it's already present, skip
             if visited.insert(dep) {
-                if let Some(contract) = self.find_by_zk_deployed_bytecode(dep) {
+                if let Some((info, contract)) = self.find_by_zk_deployed_bytecode(dep) {
                     debug!(
-                        name = contract.name,
+                        name = info.name,
                         deps = contract.zk_factory_deps.len(),
                         "new factory dependency"
                     );
@@ -287,13 +298,15 @@ impl DualCompiledContracts {
     }
 
     /// Returns an iterator over all `[DualCompiledContract]`s in the collection
-    pub fn iter(&self) -> impl Iterator<Item = &DualCompiledContract> {
+    pub fn iter(&self) -> impl Iterator<Item = (&ContractInfo, &DualCompiledContract)> {
         self.contracts.iter()
     }
 
     /// Adds a new `[DualCompiledContract]` to the collection
-    pub fn push(&mut self, contract: DualCompiledContract) {
-        self.contracts.push(contract);
+    ///
+    /// Will replace any contract with matching `info`
+    pub fn insert(&mut self, info: ContractInfo, contract: DualCompiledContract) {
+        self.contracts.insert(info, contract);
     }
 
     /// Retrieves the length of the collection.
@@ -307,10 +320,8 @@ impl DualCompiledContracts {
     }
 
     /// Extend the inner set of contracts with the given iterator
-    pub fn extend(&mut self, iter: impl IntoIterator<Item = DualCompiledContract>) {
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = (ContractInfo, DualCompiledContract)>) {
         self.contracts.extend(iter);
-        self.contracts.sort_by(|a, b| a.name.cmp(&b.name));
-        self.contracts.dedup_by(|a, b| a.name == b.name);
     }
 
     /// Populate the target's factory deps based on the new list
@@ -322,7 +333,7 @@ impl DualCompiledContracts {
         let deps_bytecodes = factory_deps
             .into_iter()
             .flat_map(|hash| self.find_by_zk_bytecode_hash(hash))
-            .map(|contract| contract.zk_deployed_bytecode.clone());
+            .map(|(_, contract)| contract.zk_deployed_bytecode.clone());
 
         target.zk_factory_deps.extend(deps_bytecodes);
         target

@@ -469,6 +469,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
 
         let constructor_args = find_contract.constructor_args();
+        let info = find_contract.info();
         let contract = find_contract.contract();
 
         let zk_create_input = foundry_zksync_core::encode_create_params(
@@ -502,7 +503,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
         // NOTE(zk): Clear injected factory deps so that they are not sent on further transactions
         ctx.zk_use_factory_deps.clear();
-        tracing::debug!(contract = contract.name, "using dual compiled contract");
+        tracing::debug!(contract = info.name, "using dual compiled contract");
 
         let zk_persist_nonce_update = ctx.zk_persist_nonce_update.check();
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
@@ -876,7 +877,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 .and_then(|zk_bytecode_hash| {
                     ctx.dual_compiled_contracts
                         .find_by_zk_bytecode_hash(zk_bytecode_hash.to_h256())
-                        .map(|contract| {
+                        .map(|(_, contract)| {
                             (
                                 contract.evm_bytecode_hash,
                                 Some(Bytecode::new_raw(Bytes::from(
@@ -952,7 +953,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 continue;
             }
 
-            if let Some(contract) = ctx.dual_compiled_contracts.iter().find(|contract| {
+            if let Some((_, contract)) = ctx.dual_compiled_contracts.iter().find(|(_, contract)| {
                 info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
             }) {
                 account_code_storage.insert(

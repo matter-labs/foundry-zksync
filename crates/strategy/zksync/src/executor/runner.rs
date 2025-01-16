@@ -15,8 +15,8 @@ use zksync_types::H256;
 
 use foundry_common::ContractsByArtifact;
 use foundry_compilers::{
-    artifacts::CompactContractBytecodeCow, contracts::ArtifactContracts, Artifact,
-    ProjectCompileOutput,
+    artifacts::CompactContractBytecodeCow, contracts::ArtifactContracts, info::ContractInfo,
+    Artifact, ProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm::{
@@ -226,8 +226,11 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
                 let zk_hash = hash_bytecode(&zk_bytecode);
                 let evm = evm.get_bytecode_bytes().expect("no EVM bytecode (or unlinked)");
-                let contract = DualCompiledContract {
+                let contract_info = ContractInfo {
                     name: id.name.clone(),
+                    path: Some(id.source.to_string_lossy().into_owned()),
+                };
+                let contract = DualCompiledContract {
                     zk_bytecode_hash: zk_hash,
                     zk_deployed_bytecode: zk_bytecode.to_vec(),
                     // TODO(zk): retrieve unlinked factory deps (1.5.9)
@@ -239,16 +242,21 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                     evm_bytecode: evm.to_vec(),
                 };
 
-                // populate factory deps that were already linked
-                ctx.dual_compiled_contracts.extend_factory_deps_by_hash(
-                    contract,
-                    unlinked_zk_artifact.factory_dependencies.iter().flatten().map(|(hash, _)| {
-                        H256::from_slice(
-                            alloy_primitives::hex::decode(dbg!(hash))
-                                .expect("malformed factory dep hash")
-                                .as_slice(),
-                        )
-                    }),
+                (
+                    contract_info,
+                    // populate factory deps that were already linked
+                    ctx.dual_compiled_contracts.extend_factory_deps_by_hash(
+                        contract,
+                        unlinked_zk_artifact.factory_dependencies.iter().flatten().map(
+                            |(hash, _)| {
+                                H256::from_slice(
+                                    alloy_primitives::hex::decode(dbg!(hash))
+                                        .expect("malformed factory dep hash")
+                                        .as_slice(),
+                                )
+                            },
+                        ),
+                    ),
                 )
             });
 
@@ -299,7 +307,8 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let ctx = get_context(executor.strategy.context.as_mut());
 
         // lookup dual compiled contract based on EVM bytecode
-        let Some(dual_contract) = ctx.dual_compiled_contracts.find_by_evm_bytecode(code.as_ref())
+        let Some((_, dual_contract)) =
+            ctx.dual_compiled_contracts.find_by_evm_bytecode(code.as_ref())
         else {
             // we don't know what the equivalent zk contract would be
             return Ok(evm_deployment);

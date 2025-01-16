@@ -64,16 +64,15 @@ fn storage_layout_is_empty(storage_layout: &StorageLayout) -> bool {
 impl Contract {
     /// Returns true if contract is not linked
     pub fn is_unlinked(&self) -> bool {
-        self.hash.is_none()
-            || !self.missing_libraries.is_empty()
-            || self
-                .factory_dependencies_unlinked
+        self.hash.is_none() ||
+            !self.missing_libraries.is_empty() ||
+            self.factory_dependencies_unlinked
                 .as_ref()
                 .and_then(|unlinked| {
                     self.factory_dependencies.as_ref().map(|linked| unlinked.len() - linked.len())
                 })
-                .unwrap_or_default()
-                > 0
+                .unwrap_or_default() >
+                0
     }
 
     /// takes missing libraries output and transforms into link references
