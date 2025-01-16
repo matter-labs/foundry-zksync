@@ -67,7 +67,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let full_nonce = executor.backend.storage(address, slot)?;
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
         let new_full_nonce =
-            foundry_zksync_core::state::new_full_nonce(nonce, full_nonce.deploy_nonce);
+            foundry_zksync_core::state::new_full_nonce(nonce as u128, full_nonce.deploy_nonce);
         executor.backend.insert_account_storage(address, slot, new_full_nonce)?;
 
         Ok(())

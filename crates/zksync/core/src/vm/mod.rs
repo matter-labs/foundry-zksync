@@ -12,7 +12,7 @@ pub use inspect::{
     batch_factory_dependencies, inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult,
 };
 pub use runner::{
-    balance, call, code_hash, create, deploy_nonce, encode_create_params, nonce, transact,
-    tx_nonce, ZkCreateInputs,
+    balance, call, code_hash, create, deploy_nonce, encode_create_params, transact, tx_nonce,
+    ZkCreateInputs,
 };
 pub use tracers::cheatcode::CheatcodeTracerContext;

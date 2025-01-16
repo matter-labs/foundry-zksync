@@ -99,7 +99,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         let init_code = input.init_code();
         let to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
-        let mut nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as u64;
+        let mut nonce = foundry_zksync_core::tx_nonce(broadcast.new_origin, ecx_inner) as u64;
         let find_contract = ctx
             .dual_compiled_contracts
             .find_bytecode(&init_code.0)
