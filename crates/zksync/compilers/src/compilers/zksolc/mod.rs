@@ -413,8 +413,8 @@ impl ZkSolc {
         }
     }
 
-    /// Get available zksolc versions
-    pub fn zksolc_available_versions() -> Vec<Version> {
+    /// Get supported zksolc versions
+    pub fn zksolc_supported_versions() -> Vec<Version> {
         let mut ret = vec![];
         let min_max_patch_by_minor_versions = vec![
             (5, 6, 7), // 1.5.x
@@ -430,12 +430,12 @@ impl ZkSolc {
 
     /// Get zksolc minimum supported version
     pub fn zksolc_minimum_supported_version() -> Version {
-        ZkSolc::zksolc_available_versions().remove(0)
+        ZkSolc::zksolc_supported_versions().remove(0)
     }
 
     /// Get zksolc minimum supported version
     pub fn zksolc_latest_supported_version() -> Version {
-        ZkSolc::zksolc_available_versions().pop().expect("No supported zksolc versions")
+        ZkSolc::zksolc_supported_versions().pop().expect("No supported zksolc versions")
     }
 
     /// Get available zksync solc versions

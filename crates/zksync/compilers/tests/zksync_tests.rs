@@ -56,7 +56,7 @@ fn zksync_can_compile_dapp_sample() {
 
 #[test]
 fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
-    for version in ZkSolc::zksolc_available_versions() {
+    for version in ZkSolc::zksolc_supported_versions() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data/dapp-sample");
         let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
         let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::new(paths).unwrap();
@@ -87,7 +87,7 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
 
 #[test]
 fn zksync_can_set_hash_type_with_supported_versions() {
-    for version in ZkSolc::zksolc_available_versions() {
+    for version in ZkSolc::zksolc_supported_versions() {
         let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
         let compiler = ZkSolcCompiler {
             zksolc: ZkSolc::get_path_for_version(&version).unwrap(),
@@ -124,7 +124,7 @@ fn zksync_can_set_hash_type_with_supported_versions() {
         let contract_keccak = compiled.find_first("Contract").unwrap();
         let bytecode_keccak =
             contract_keccak.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
-        // NOTE: "none" value seems to pad 32 bytes of 0s at the end
+        // NOTE: "none" value seems to pad 32 bytes of 0s at the end in this particular case
         assert_eq!(bytecode_none.len(), bytecode_keccak.len(), "zksolc {version}");
         assert_ne!(bytecode_none, bytecode_keccak, "zksolc {version}");
 
