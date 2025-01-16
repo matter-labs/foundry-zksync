@@ -149,7 +149,7 @@ impl BuildData {
             .zk_get_linked_artifacts(
                 input
                     .artifact_ids()
-                    .filter(|(_, artifact)| !artifact.is_unlinked())
+                    .filter(|(_, artifact)| artifact.is_unlinked())
                     // we can't use the `id` directly here
                     // becuase we expect an iterator of references
                     .map(|(id, _)| {
