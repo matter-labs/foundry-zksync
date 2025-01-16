@@ -341,7 +341,9 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             }
         }
 
-        // Override msg.sender for the transaction
+        // Override msg.sender for the execute transaction.
+        // The same cannot be done for `validateTransaction` due to the many safeguards around correct nonce update
+        // in the bootloader. So we handle it by modifying the storage post-execution.
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;

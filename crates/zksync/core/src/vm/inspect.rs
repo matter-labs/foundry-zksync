@@ -26,11 +26,12 @@ use zksync_multivm::{
 };
 use zksync_types::{
     get_nonce_key, h256_to_address, h256_to_u256, l2::L2Tx, transaction_request::PaymasterParams,
-    u256_to_h256, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
-    CONTRACT_DEPLOYER_ADDRESS,
+    u256_to_h256, utils::nonces_to_full_nonce, PackedEthSignature, StorageKey, Transaction,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
+use core::convert::Into;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -185,13 +186,8 @@ where
         .with_extra_factory_deps(persisted_factory_deps)
         .with_storage_accesses(ccx.accesses.take());
 
-    let is_create = call_ctx.is_create;
     info!(?call_ctx, "executing transaction in zk vm");
 
-    // We need to revert the tx nonce of the initiator as we intercept and dispatch
-    // CALLs and CREATEs to the zkEVM. The CREATEs always increment the deployment nonce
-    // which must be persisted, but the CALLs are not real transactions and hence must be reverted
-    let revert_tx_nonce_update = !call_ctx.is_create;
     let initiator_address = tx.common_data.initiator_address;
 
     if tx.common_data.signature.is_empty() {
@@ -207,12 +203,12 @@ where
     let InnerZkVmResult {
         tx_result,
         bytecodes,
-        modified_storage,
+        mut modified_storage,
         call_traces,
         recorded_immutables,
         create_outcome,
         gas_usage,
-    } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
+    } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx.clone());
 
     info!(
         reserved=?gas_usage.bootloader_debug.reserved_gas, limit=?gas_usage.limit, execution=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
@@ -255,7 +251,7 @@ where
             };
             // in zkEVM the output is the 0-padded address, we replace this with the deployed
             // bytecode so the traces can pick it up correctly
-            let output = if is_create {
+            let output = if call_ctx.is_create {
                 let create_result = match (address, create_outcome) {
                     (Some(address), Some(create_outcome)) => {
                         if address == create_outcome.address {
@@ -334,26 +330,90 @@ where
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
 
+    let initiator_nonce_key = get_nonce_key(&initiator_address);
+    let caller_nonce_key = get_nonce_key(&call_ctx.msg_sender.to_h160());
+
+    // NOTE(zk) We need to revert the tx nonce of the initiator as we intercept and dispatch
+    // CALLs and CREATEs to the zkEVM. The CREATEs always increment the deployment nonce
+    // which must be persisted, but the CALLs are not real transactions and hence must
+    // be reverted.
+    if !call_ctx.is_create {
+        if let Some(initiator_nonce) = modified_storage.get_mut(&initiator_nonce_key) {
+            let FullNonce { tx_nonce, deploy_nonce } = parse_full_nonce(initiator_nonce.to_ru256());
+            let new_tx_nonce = tx_nonce.saturating_sub(1);
+            info!(address=?initiator_address, from=?tx_nonce, to=?new_tx_nonce, "reverting initiator tx nonce for CALL");
+            *initiator_nonce = new_full_nonce(new_tx_nonce, deploy_nonce).to_h256();
+        }
+    }
+
+    // NOTE(zk) We apply the nonce updates from the `tx_caller` to `msg_sender` if they differ.
+    // This is because zkEVM does not like being called from a non-EOA and it's simpler
+    // to call it with tx signer and adapt the nonce changes here. The nonce changes to `tx_caller`
+    // are thus reverted.
+    // We skip the balance changes as we override `msg.sender` in `executeTransaction` which takes care of it.
+    // The same cannot be done for `validateTransaction` due to the many safeguards around correct nonce update
+    // in the bootloader.
+    if initiator_address.to_address() != call_ctx.msg_sender {
+        if let (Some(initiator_nonce), Some(caller_nonce)) =
+            (modified_storage.get(&initiator_nonce_key), modified_storage.get(&caller_nonce_key))
+        {
+            let new_initiator_nonce = parse_full_nonce(initiator_nonce.to_ru256());
+            let new_caller_nonce = parse_full_nonce(caller_nonce.to_ru256());
+
+            let old_initiator_nonce = era_db.get_full_nonce(initiator_address.to_address());
+
+            let tx_nonce_inc =
+                new_initiator_nonce.tx_nonce.saturating_sub(old_initiator_nonce.tx_nonce);
+            let deploy_nonce_inc =
+                new_initiator_nonce.deploy_nonce.saturating_sub(old_initiator_nonce.deploy_nonce);
+
+            let corrected_initiator_nonce = FullNonce {
+                tx_nonce: old_initiator_nonce.tx_nonce,
+                deploy_nonce: old_initiator_nonce.deploy_nonce,
+            };
+            let corrected_caller_nonce = FullNonce {
+                tx_nonce: new_caller_nonce.tx_nonce.saturating_add(tx_nonce_inc),
+                deploy_nonce: new_caller_nonce.deploy_nonce.saturating_add(deploy_nonce_inc),
+            };
+
+            modified_storage.insert(
+                initiator_nonce_key,
+                nonces_to_full_nonce(
+                    old_initiator_nonce.tx_nonce.into(),
+                    old_initiator_nonce.deploy_nonce.into(),
+                )
+                .to_h256(),
+            );
+            modified_storage.insert(
+                caller_nonce_key,
+                nonces_to_full_nonce(
+                    corrected_caller_nonce.tx_nonce.into(),
+                    corrected_caller_nonce.deploy_nonce.into(),
+                )
+                .to_h256(),
+            );
+
+            info!(
+                address=?initiator_address,
+                from=?new_initiator_nonce,
+                to=?corrected_initiator_nonce,
+                "correcting initiator nonce",
+            );
+            info!(
+                address=?call_ctx.msg_sender,
+                from=?new_caller_nonce,
+                to=?corrected_caller_nonce,
+                "correcting caller nonce",
+            );
+        }
+    }
+
     for (k, v) in modified_storage {
         let address = k.address().to_address();
         let index = k.key().to_ru256();
         era_db.load_account(address);
         let previous = era_db.sload(address, index);
         let entry = storage.entry(address).or_default();
-
-        let v = if revert_tx_nonce_update && get_nonce_key(&initiator_address) == k {
-            let FullNonce { tx_nonce, deploy_nonce } = parse_full_nonce(v.to_ru256());
-            let new_tx_nonce = tx_nonce.saturating_sub(1);
-            let v = new_full_nonce(new_tx_nonce, deploy_nonce).to_h256();
-            info!(
-                old = tx_nonce,
-                new = new_tx_nonce,
-                "reverting tx nonce for {initiator_address:?}"
-            );
-            v
-        } else {
-            v
-        };
 
         entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
 
