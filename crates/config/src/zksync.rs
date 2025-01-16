@@ -21,10 +21,7 @@ use foundry_zksync_compilers::{
 
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashSet},
-    path::PathBuf,
-};
+use std::{collections::HashSet, path::PathBuf};
 
 use crate::{Config, SkipBuildFilters, SolcReq};
 
