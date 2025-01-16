@@ -53,22 +53,18 @@ impl BuildData {
 
         let version = zksolc.version().context("trying to determine zksolc version")?;
         if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
-            eyre::bail!("deploy-time linking not supported. minimum: {}, given: {}", DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION, &version);
+            eyre::bail!(
+                "deploy-time linking not supported. minimum: {}, given: {}",
+                DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
+                &version
+            );
         }
 
         let Some(input) = self.zk_output.as_ref() else {
             eyre::bail!("unable to link zk artifacts if no zk compilation output is provided")
         };
 
-        Ok(ZkLinker::new(
-            self.project_root.clone(),
-            input
-                .artifact_ids()
-                .map(|(id, v)| (id.with_stripped_file_prefixes(self.project_root.as_ref()), v))
-                .collect(),
-            zksolc,
-            input,
-        ))
+        Ok(ZkLinker::new(self.project_root.clone(), input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(&self.project_root), v)).collect(), zksolc, input))
     }
 
     /// Will attempt linking via `zksolc`
@@ -85,15 +81,17 @@ impl BuildData {
         &mut self,
         script_config: &ScriptConfig,
         known_libraries: Libraries,
-        evm_linked_artifacts: ArtifactContracts,
+        evm_linked_contracts: ArtifactContracts,
     ) -> Result<ArtifactContracts> {
         if !script_config.config.zksync.should_compile() {
-            return Ok(evm_linked_artifacts);
+            return Ok(evm_linked_contracts);
         }
 
         let Some(input) = self.zk_output.as_ref() else {
             eyre::bail!("unable to link zk artifacts if no zk compilation output is provided");
         };
+        let input = input.clone().with_stripped_file_prefixes(&self.project_root);
+       
         let mut dual_compiled_contracts = self.dual_compiled_contracts.take().unwrap_or_default();
 
         let linker = self.get_zk_linker(script_config)?;
@@ -105,7 +103,7 @@ impl BuildData {
             .linker
             .contracts
             .keys()
-            .find(|id| id.source == target.source && id.name == target.name)
+            .find(|id|id.source == target.source && id.name == target.name)
         else {
             eyre::bail!("unable to find zk target artifact for linking");
         };
@@ -149,20 +147,14 @@ impl BuildData {
 
         let linked_contracts = linker
             .zk_get_linked_artifacts(
-                linker
-                    .linker
-                    .contracts
-                    .iter()
-                    // we add this filter to avoid linking contracts that don't need linking
-                    .filter(|(_, art)| {
-                        // NOTE(zk): no need to check `deployed_bytecode`
-                        // as those `link_references` would be the same as `bytecode`
-                        art.bytecode
-                            .as_ref()
-                            .map(|bc| !bc.link_references.is_empty())
-                            .unwrap_or_default()
-                    })
-                    .map(|(id, _)| id),
+                input
+                    .artifact_ids()
+                    .filter(|(_, artifact)| !artifact.is_unlinked())
+                    // we can't use the `id` directly here
+                    // becuase we expect an iterator of references
+                    .map(|(id, _)| {
+                        linker.linker.contracts.get_key_value(&id).expect("id to be present").0
+                    }),
                 &libraries,
             )
             .context("retrieving all fully linked contracts")?;
@@ -170,23 +162,17 @@ impl BuildData {
         let newly_linked_dual_compiled_contracts = linked_contracts
             .iter()
             .flat_map(|(needle, zk)| {
-                evm_linked_artifacts
+                evm_linked_contracts
                     .iter()
                     .find(|(id, _)| id.source == needle.source && id.name == needle.name)
                     .map(|(_, evm)| (needle, zk, evm))
             })
             .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
             .map(|(id, linked_zk, evm)| {
-                let (_, unlinked_zk_artifact) =
-                    input
-                        .artifact_ids()
-                        .find(|(contract_id, _)| {
-                            contract_id
-                                .clone()
-                                .with_stripped_file_prefixes(self.project_root.as_ref()) ==
-                                id.clone()
-                        })
-                        .expect("unable to find original (pre-linking) artifact");
+                let (_, unlinked_zk_artifact) = input
+                    .artifact_ids()
+                    .find(|(contract_id, _)| contract_id == id)
+                    .expect("unable to find original (pre-linking) artifact");
                 let zk_bytecode =
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
                 let zk_hash = hash_bytecode(&zk_bytecode);
@@ -233,12 +219,12 @@ impl BuildData {
             .artifact_ids()
             .map(|(id, v)| {
                 (
-                    id.with_stripped_file_prefixes(self.project_root.as_ref()),
+                    id,
                     CompactContractBytecode::from(CompactContractBytecodeCow::from(v)),
                 )
             })
             .chain(linked_contracts)
-            .chain(evm_linked_artifacts)
+            .chain(evm_linked_contracts)
             .collect();
 
         Ok(contracts)
@@ -436,10 +422,13 @@ impl PreprocessedState {
 
             let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
 
-            zk_output = Some(zk_compiler.zksync_compile(&zk_project)?);
+            zk_output = Some(
+                zk_compiler
+                    .zksync_compile(&zk_project)?
+            );
             Some(DualCompiledContracts::new(
                 &output,
-                &zk_output.clone().unwrap(),
+                zk_output.as_ref().unwrap(),
                 &project.paths,
                 &zk_project.paths,
             ))

@@ -135,9 +135,10 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let Some(input) = ctx.compilation_output.as_ref() else {
             return Err(LinkerError::MissingTargetArtifact);
         };
+        let input = input.clone().with_stripped_file_prefixes(root);
 
         let contracts: ArtifactContracts<CompactContractBytecodeCow<'_>> =
-            input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(root), v)).collect();
+            input.artifact_ids().collect();
 
         let Ok(zksolc) = foundry_config::zksync::config_zksolc_compiler(config) else {
             tracing::error!("unable to determine zksolc compiler to be used for linking");
@@ -159,7 +160,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             }
         })?;
 
-        let linker = ZkLinker::new(root, contracts.clone(), zksolc, input);
+        let linker = ZkLinker::new(root, contracts.clone(), zksolc, &input);
 
         let zk_linker_error_to_linker = |zk_error| match zk_error {
             ZkLinkerError::Inner(err) => err,
@@ -181,26 +182,20 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                 // NOTE(zk): match with EVM nonces as we will be doing a duplex deployment for
                 // the libs
                 0,
-                linker.linker.contracts.keys(),
+                linker.linker.contracts.keys(), // link everything
             )
             .map_err(zk_linker_error_to_linker)?;
 
         let linked_contracts = linker
             .zk_get_linked_artifacts(
-                linker
-                    .linker
-                    .contracts
-                    .iter()
-                    // we add this filter to avoid linking contracts that don't need linking
-                    .filter(|(_, art)| {
-                        // NOTE(zk): no need to check `deployed_bytecode`
-                        // as those `link_references` would be the same as `bytecode`
-                        art.bytecode
-                            .as_ref()
-                            .map(|bc| !bc.link_references.is_empty())
-                            .unwrap_or_default()
-                    })
-                    .map(|(id, _)| id),
+                input
+                    .artifact_ids()
+                    .filter(|(_, artifact)| !artifact.is_unlinked())
+                    // we can't use the `id` directly here
+                    // becuase we expect an iterator of references
+                    .map(|(id, _)| {
+                        linker.linker.contracts.get_key_value(&id).expect("id to be present").0
+                    }),
                 &libraries,
             )
             .map_err(zk_linker_error_to_linker)?;
@@ -218,9 +213,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             .map(|(id, linked_zk, evm)| {
                 let (_, unlinked_zk_artifact) = input
                     .artifact_ids()
-                    .find(|(contract_id, _)| {
-                        contract_id.clone().with_stripped_file_prefixes(root) == id.clone()
-                    })
+                    .find(|(contract_id, _)| contract_id == id)
                     .expect("unable to find original (pre-linking) artifact");
                 let zk_bytecode =
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");

@@ -66,6 +66,19 @@ pub struct ZkContractArtifact {
 }
 
 impl ZkContractArtifact {
+    /// Returns true if contract is not linked
+    pub fn is_unlinked(&self) -> bool {
+        self.hash.is_none() ||
+            !self.missing_libraries().map_or(true, Vec::is_empty) ||
+            self.factory_dependencies_unlinked
+                .as_ref()
+                .and_then(|unlinked| {
+                    self.factory_dependencies.as_ref().map(|linked| unlinked.len() - linked.len())
+                })
+                .unwrap_or_default() >
+                0
+    }
+
     /// Get contract missing libraries
     pub fn missing_libraries(&self) -> Option<&Vec<String>> {
         self.bytecode.as_ref().map(|bc| &bc.missing_libraries)

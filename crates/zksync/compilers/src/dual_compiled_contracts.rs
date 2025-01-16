@@ -5,10 +5,9 @@ use std::{
     str::FromStr,
 };
 
-use foundry_compilers::ConfigurableArtifacts;
 use foundry_compilers::{
     info::ContractInfo, solc::SolcLanguage, Artifact, ArtifactId, ArtifactOutput,
-    ProjectCompileOutput, ProjectPathsConfig,
+    ConfigurableArtifacts, ProjectCompileOutput, ProjectPathsConfig,
 };
 
 use alloy_primitives::{keccak256, B256};

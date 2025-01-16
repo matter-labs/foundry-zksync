@@ -49,34 +49,70 @@ pub struct ZkLinker<'a> {
 }
 
 impl<'a> ZkLinker<'a> {
+    fn zk_artifacts(&'a self) -> impl Iterator<Item = (ArtifactId, &'a ZkContractArtifact)> + 'a {
+        self.compiler_output
+            .artifact_ids()
+            .map(|(id, v)| (id.with_stripped_file_prefixes(&self.linker.root), v))
+    }
+
+    /// Construct a new `ZkLinker`
     pub fn new(
         root: impl Into<PathBuf>,
         contracts: ArtifactContracts<CompactContractBytecodeCow<'a>>,
         compiler: ZkSolcCompiler,
         compiler_output: &'a ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
     ) -> Self {
+        // TODO(zk): check prefix `root` is stripped from `compiler_output`
         Self { linker: Linker::new(root, contracts), compiler, compiler_output }
     }
 
-    fn zk_collect_factory_deps(&self, target: &ZkContractArtifact) -> Vec<ZkContractArtifact> {
-        let mut contracts =
-            self.compiler_output.clone().with_stripped_file_prefixes(self.linker.root.as_ref());
+    /// Collect the factory dependencies of the `target` artifact
+    ///
+    /// Will call itself recursively for nested dependencies
+    fn zk_collect_factory_deps(
+        &'a self,
+        target: &'a ArtifactId,
+        factory_deps: &mut BTreeSet<&'a ArtifactId>,
+    ) -> Result<(), LinkerError> {
+        let (_, artifact) = self
+            .zk_artifacts()
+            .find(|(id, _)| id.source == target.source && id.name == target.name)
+            .ok_or(LinkerError::MissingTargetArtifact)?;
 
-        let parse_factory_dep = |dep: &str| {
-            let mut split = dep.split(':');
-            let path = split.next().expect("malformed factory dep path");
-            let name = split.next().expect("malformed factory dep name");
+        let already_linked = artifact
+            .factory_dependencies
+            .as_ref()
+            .iter()
+            .map(|map| map.values().into_iter())
+            .flatten()
+            .collect::<Vec<_>>();
 
-            (path.to_string(), name.to_string())
-        };
-
-        target
+        let deps_of_target = artifact
             .factory_dependencies_unlinked
             .iter()
             .flatten()
-            .map(|dep| parse_factory_dep(dep))
-            .filter_map(|(path, name)| contracts.remove(Path::new(&path), &name))
-            .collect()
+            // remove already linked deps
+            .filter(|dep| !already_linked.contains(dep))
+            .map(|dep| {
+                let mut split = dep.split(':');
+                let path = split.next().expect("malformed factory dep path");
+                let name = split.next().expect("malformed factory dep name");
+
+                (path.to_string(), name.to_string())
+            });
+
+        for (file, name) in deps_of_target {
+            let id = self
+                .linker
+                .find_artifact_id_by_library_path(&file, &name, None)
+                .ok_or_else(|| LinkerError::MissingLibraryArtifact { file, name })?;
+
+            if factory_deps.insert(id) {
+                self.zk_collect_factory_deps(id, factory_deps)?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Performs DFS on the graph of link references, and populates `deps` with all found libraries,
@@ -87,12 +123,8 @@ impl<'a> ZkLinker<'a> {
         deps: &mut BTreeSet<&'a ArtifactId>,
     ) -> Result<(), LinkerError> {
         let (_, artifact) = self
-            .compiler_output
-            .artifact_ids()
-            .find(|(id, _)| {
-                let id = id.clone().with_stripped_file_prefixes(self.linker.root.as_ref());
-                id.source == target.source && id.name == target.name
-            })
+            .zk_artifacts()
+            .find(|(id, _)| id.source == target.source && id.name == target.name)
             .ok_or(LinkerError::MissingTargetArtifact)?;
 
         let mut references = BTreeMap::new();
@@ -100,8 +132,13 @@ impl<'a> ZkLinker<'a> {
             references.extend(bytecode.link_references());
         }
 
-        let factory_deps = self.zk_collect_factory_deps(artifact);
-        for fdep in factory_deps {
+        // find all nested factory deps's link references
+        let mut factory_deps = BTreeSet::new();
+        self.zk_collect_factory_deps(target, &mut factory_deps)?;
+
+        for (_, fdep) in factory_deps.into_iter().filter_map(|target| {
+            self.zk_artifacts().find(|(id, _)| id.source == target.source && id.name == target.name)
+        }) {
             if let Some(bytecode) = &fdep.bytecode {
                 references.extend(bytecode.link_references());
             }
@@ -246,7 +283,6 @@ impl<'a> ZkLinker<'a> {
 
             // NOTE(zk): doesn't really matter since we use the EVM
             // bytecode to determine what EraVM bytecode to deploy
-            dbg!(&file, &name, &address);
             libs_to_deploy.push(code.clone());
             libraries.libs.entry(file).or_default().insert(name, address.to_checksum(None));
 
