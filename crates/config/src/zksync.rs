@@ -47,7 +47,6 @@ pub struct ZkSyncConfig {
     pub solc_path: Option<PathBuf>,
 
     /// Hash type for the the metadata hash appended by zksolc to the compiled bytecode.
-    #[serde(alias = "bytecode_hash")]
     pub hash_type: Option<BytecodeHash>,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
@@ -129,15 +128,7 @@ impl ZkSyncConfig {
             libraries,
             optimizer,
             evm_version: Some(evm_version),
-            // NOTE: we set both `bytecode_hash` and `hash_type` fields to the same value abusing
-            // the fact that invalid json fields get ignored by zksolc. Only the correct field
-            // that the compiler version understands will be used while the other ignored.
-            // If this becomes a problem, we need to evaluate adding zksolc version aware
-            // sanitizing
-            metadata: Some(SettingsMetadata {
-                bytecode_hash: self.hash_type,
-                hash_type: self.hash_type,
-            }),
+            metadata: Some(SettingsMetadata::new(self.hash_type)),
             via_ir: Some(via_ir),
             // Set in project paths.
             remappings: Vec::new(),
@@ -207,7 +198,7 @@ pub fn config_create_project(
     {
         zksolc
     } else if !config.offline {
-        let default_version = semver::Version::new(1, 5, 7);
+        let default_version = ZkSolc::zksolc_latest_supported_version();
         let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
         if zksolc.is_none() {
             ZkSolc::blocking_install(&default_version)?;

@@ -68,7 +68,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
         context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)> {
         let metadata = context.project.settings.settings.metadata.as_ref();
-        let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
+        let bch = metadata.and_then(|m| m.hash_type).unwrap_or_default();
 
         eyre::ensure!(
             bch == foundry_zksync_compilers::compilers::zksolc::settings::BytecodeHash::Keccak256,

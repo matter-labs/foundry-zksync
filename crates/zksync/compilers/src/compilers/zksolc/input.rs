@@ -109,13 +109,20 @@ impl Default for ZkSolcInput {
 
 impl ZkSolcInput {
     fn new(language: SolcLanguage, sources: Sources, mut settings: ZkSettings) -> Self {
+        // TODO: Right now we abuse the fact that zksolc ignores invalid fields. Whenever
+        // there are fields that, for the same feature, are different accross compiler versions,
+        // we check and set them all to the same value. When compiling with a given version, the
+        // supported field is used and the other one is ignored.
+        // If this causes problems, we might need to make ZkSolcInput version aware and sanitize
+        // accordingly
+
         // zksolc <= 1.5.6 has suppressed warnings/errors in at the root input level
         let suppressed_warnings = settings.suppressed_warnings.clone();
         let suppressed_errors = settings.suppressed_errors.clone();
 
         // zksolc <= 1.5.6 uses "bytecode_hash" field for "hash_type"
         if let Some(ref mut metadata) = settings.metadata {
-            metadata.bytecode_hash = metadata.hash_type;
+            metadata.sanitize();
         };
 
         Self { language, sources, settings, suppressed_warnings, suppressed_errors }

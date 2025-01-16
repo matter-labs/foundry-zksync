@@ -35,12 +35,8 @@ pub mod input;
 pub mod settings;
 pub use settings::{ZkSettings, ZkSolcSettings};
 
-/// zksolc command
-pub const ZKSOLC: &str = "zksolc";
 /// ZKsync solc release used for all ZKsync solc versions
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
-/// Default zksolc version
-pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 7);
 
 #[cfg(test)]
 macro_rules! take_solc_installer_lock {
@@ -131,8 +127,8 @@ pub struct ZkSolcCompiler {
 
 impl Default for ZkSolcCompiler {
     fn default() -> Self {
-        let zksolc =
-            ZkSolc::get_path_for_version(&ZKSOLC_VERSION).expect("Could not install zksolc");
+        let zksolc = ZkSolc::get_path_for_version(&ZkSolc::zksolc_latest_supported_version())
+            .expect("Could not install zksolc");
         Self { zksolc, solc: Default::default() }
     }
 }
@@ -420,7 +416,9 @@ impl ZkSolc {
     /// Get available zksolc versions
     pub fn zksolc_available_versions() -> Vec<Version> {
         let mut ret = vec![];
-        let min_max_patch_by_minor_versions = vec![(5, 6, 9)];
+        let min_max_patch_by_minor_versions = vec![
+            (5, 6, 7), // 1.5.x
+        ];
         for (minor, min_patch, max_patch) in min_max_patch_by_minor_versions {
             for i in min_patch..=max_patch {
                 ret.push(Version::new(1, minor, i));
@@ -433,6 +431,11 @@ impl ZkSolc {
     /// Get zksolc minimum supported version
     pub fn zksolc_minimum_supported_version() -> Version {
         ZkSolc::zksolc_available_versions().remove(0)
+    }
+
+    /// Get zksolc minimum supported version
+    pub fn zksolc_latest_supported_version() -> Version {
+        ZkSolc::zksolc_available_versions().pop().expect("No supported zksolc versions")
     }
 
     /// Get available zksync solc versions
@@ -765,7 +768,8 @@ mod tests {
     use super::*;
 
     fn zksolc() -> ZkSolc {
-        let zksolc_path = ZkSolc::get_path_for_version(&ZKSOLC_VERSION).unwrap();
+        let zksolc_path =
+            ZkSolc::get_path_for_version(&ZkSolc::zksolc_latest_supported_version()).unwrap();
         let solc_version = "0.8.27";
 
         take_solc_installer_lock!(_lock);

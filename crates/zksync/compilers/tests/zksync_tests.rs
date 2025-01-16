@@ -17,7 +17,7 @@ use foundry_zksync_compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
             input::ZkSolcInput,
-            settings::{SettingsMetadata, ZkSolcError, ZkSolcWarning},
+            settings::{BytecodeHash, SettingsMetadata, ZkSolcError, ZkSolcWarning},
             ZkSolc, ZkSolcCompiler, ZkSolcSettings,
         },
     },
@@ -94,12 +94,8 @@ fn zksync_can_set_hash_type_with_supported_versions() {
             solc: Default::default(),
         };
         project.project_mut().compiler = compiler;
-        project.project_mut().settings.settings.metadata = Some(SettingsMetadata {
-            hash_type: Some(
-                foundry_zksync_compilers::compilers::zksolc::settings::BytecodeHash::None,
-            ),
-            bytecode_hash: None,
-        });
+        project.project_mut().settings.settings.metadata =
+            Some(SettingsMetadata::new(Some(BytecodeHash::None)));
 
         project
             .add_source(
@@ -120,12 +116,8 @@ fn zksync_can_set_hash_type_with_supported_versions() {
         let bytecode_none =
             contract_none.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
 
-        project.project_mut().settings.settings.metadata = Some(SettingsMetadata {
-            hash_type: Some(
-                foundry_zksync_compilers::compilers::zksolc::settings::BytecodeHash::Keccak256,
-            ),
-            bytecode_hash: None,
-        });
+        project.project_mut().settings.settings.metadata =
+            Some(SettingsMetadata::new(Some(BytecodeHash::Keccak256)));
 
         let compiled = project.compile().unwrap();
         compiled.assert_success();

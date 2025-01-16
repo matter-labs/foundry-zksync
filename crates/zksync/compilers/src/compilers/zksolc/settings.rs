@@ -402,7 +402,19 @@ pub struct SettingsMetadata {
         skip_serializing_if = "Option::is_none",
         with = "serde_helpers::display_from_str_opt"
     )]
-    pub bytecode_hash: Option<BytecodeHash>,
+    bytecode_hash: Option<BytecodeHash>,
+}
+
+impl SettingsMetadata {
+    /// Creates new SettingsMettadata
+    pub fn new(hash_type: Option<BytecodeHash>) -> Self {
+        Self { hash_type, bytecode_hash: None }
+    }
+
+    /// Makes SettingsMettadata version compatible
+    pub fn sanitize(&mut self) {
+        self.bytecode_hash = self.hash_type;
+    }
 }
 
 /// Determines the hash method for the metadata hash that is appended to the bytecode.

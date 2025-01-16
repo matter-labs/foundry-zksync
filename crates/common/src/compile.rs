@@ -335,8 +335,12 @@ impl ProjectCompiler {
         {
             let zksolc_current_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
             let zksolc_min_supported_version = ZkSolc::zksolc_minimum_supported_version();
+            let zksolc_latest_supported_version = ZkSolc::zksolc_latest_supported_version();
             if zksolc_current_version < zksolc_min_supported_version {
                 sh_warn!("Compiling with zksolc v{zksolc_current_version} which is not supported and may lead to unexpected errors. Minimum version supported is v{zksolc_min_supported_version}")?;
+            }
+            if zksolc_current_version > zksolc_latest_supported_version {
+                sh_warn!("Compiling with zksolc v{zksolc_current_version} which is still not supported and may lead to unexpected errors. Latest version supported is v{zksolc_latest_supported_version}")?;
             }
             Report::new(SpinnerReporter::spawn_with(format!(
                 "Using zksolc-{zksolc_current_version}"
