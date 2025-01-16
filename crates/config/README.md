@@ -228,7 +228,7 @@ The `zksync` settings must be prefixed with the profile they correspond to:
 compile = false 
 # Enable zkVM at startup, needs `compile = true` to have effect
 startup = true
-# By default the latest version is used
+# By default the latest supported version is used
 zksolc = "1.5.0" 
 # By default the corresponding solc patched version from matter-labs is used
 solc_path = "./solc-0.8.23-1.0.1"
