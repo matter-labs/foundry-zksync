@@ -20,4 +20,5 @@ mod paymaster;
 mod proxy;
 mod repros;
 mod script;
+mod sender;
 mod traces;
