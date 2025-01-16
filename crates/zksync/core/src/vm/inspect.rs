@@ -25,12 +25,8 @@ use zksync_multivm::{
     vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
 };
 use zksync_types::{
-    get_nonce_key, h256_to_address, h256_to_u256,
-    l2::L2Tx,
-    transaction_request::PaymasterParams,
-    u256_to_h256,
-    utils::{decompose_full_nonce, nonces_to_full_nonce},
-    PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
+    get_nonce_key, h256_to_address, h256_to_u256, l2::L2Tx, transaction_request::PaymasterParams,
+    u256_to_h256, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
     CONTRACT_DEPLOYER_ADDRESS,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
@@ -45,7 +41,7 @@ use std::{
 use crate::{
     be_words_to_bytes,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    fix_l2_gas_limit, fix_l2_gas_price, increment_tx_nonce, is_system_address, set_tx_nonce,
+    fix_l2_gas_limit, fix_l2_gas_price, increment_tx_nonce, is_system_address,
     state::{new_full_nonce, parse_full_nonce, FullNonce},
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
