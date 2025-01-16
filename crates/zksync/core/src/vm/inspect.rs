@@ -350,9 +350,9 @@ where
     // This is because zkEVM does not like being called from a non-EOA and it's simpler
     // to call it with tx signer and adapt the nonce changes here. The nonce changes to `tx_caller`
     // are thus reverted.
-    // We skip the balance changes as we override `msg.sender` in `executeTransaction` which takes care of it.
-    // The same cannot be done for `validateTransaction` due to the many safeguards around correct nonce update
-    // in the bootloader.
+    // We skip the balance changes as we override `msg.sender` in `executeTransaction` which takes
+    // care of it. The same cannot be done for `validateTransaction` due to the many safeguards
+    // around correct nonce update in the bootloader.
     if initiator_address.to_address() != call_ctx.msg_sender {
         if let (Some(initiator_nonce), Some(caller_nonce)) =
             (modified_storage.get(&initiator_nonce_key), modified_storage.get(&caller_nonce_key))

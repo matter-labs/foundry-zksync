@@ -175,8 +175,8 @@ where
     let ZkCreateInputs { create_input, factory_deps, value, msg_sender } = inputs;
 
     info!("create tx {}", hex::encode(&create_input));
-    // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using `msg.sender` as it's not EOA.
-    // The nonce and balance changes thus need to be adapted.
+    // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using
+    // `msg.sender` as it's not EOA. The nonce and balance changes thus need to be adapted.
     let caller = ecx.env.tx.caller;
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
@@ -237,8 +237,8 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
-    // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using `msg.sender` as it's not EOA.
-    // The nonce and balance changes thus need to be adapted.
+    // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using
+    // `msg.sender` as it's not EOA. The nonce and balance changes thus need to be adapted.
     let caller = ecx.env.tx.caller;
     let nonce: zksync_types::Nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
