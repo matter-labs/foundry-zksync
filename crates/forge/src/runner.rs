@@ -21,6 +21,7 @@ use foundry_evm::{
         invariant::{
             check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
         },
+        strategy::DeployLibKind,
         CallResult, EvmError, Executor, ITest, RawCallResult,
     },
     fuzz::{
@@ -126,7 +127,7 @@ impl<'a> ContractRunner<'a> {
         for code in self.mcr.libs_to_deploy.iter() {
             let deploy_result = self.executor.deploy_library(
                 LIBRARY_DEPLOYER,
-                code.clone(),
+                DeployLibKind::Create(code.clone()),
                 U256::ZERO,
                 Some(&self.mcr.revert_decoder),
             );
@@ -136,7 +137,9 @@ impl<'a> ContractRunner<'a> {
                 Ok(deployments) => deployments.into_iter().map(Ok).collect(),
             };
 
-            for deploy_result in deployments {
+            for deploy_result in
+                deployments.into_iter().map(|result| result.map(|(deployment, _)| deployment))
+            {
                 // Record deployed library address.
                 if let Ok(deployed) = &deploy_result {
                     result.deployed_libs.push(deployed.address);
@@ -314,7 +317,7 @@ impl<'a> ContractRunner<'a> {
                 [("setUp()".to_string(), TestResult::fail("multiple setUp functions".to_string()))]
                     .into(),
                 warnings,
-            )
+            );
         }
 
         // Check if `afterInvariant` function with valid signature declared.
@@ -330,7 +333,7 @@ impl<'a> ContractRunner<'a> {
                 )]
                 .into(),
                 warnings,
-            )
+            );
         }
         let call_after_invariant = after_invariant_fns.first().is_some_and(|after_invariant_fn| {
             let match_sig = after_invariant_fn.name == "afterInvariant";
@@ -364,7 +367,7 @@ impl<'a> ContractRunner<'a> {
                 start.elapsed(),
                 [("setUp()".to_string(), TestResult::setup_result(setup))].into(),
                 warnings,
-            )
+            );
         }
 
         // Filter out functions sequentially since it's very fast and there is no need to do it

@@ -26,7 +26,7 @@ use foundry_zksync_compilers::{
     dual_compiled_contracts::{DualCompiledContract, DualCompiledContracts},
 };
 use foundry_zksync_core::{hash_bytecode, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, H256};
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
 /// Container for the compiled contracts.
 #[derive(Debug)]
@@ -171,6 +171,7 @@ impl BuildData {
                     .artifact_ids()
                     .find(|(contract_id, _)| contract_id == id)
                     .expect("unable to find original (pre-linking) artifact");
+
                 let zk_bytecode =
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
                 let zk_hash = hash_bytecode(&zk_bytecode);
@@ -182,7 +183,7 @@ impl BuildData {
                 let contract = DualCompiledContract {
                     zk_bytecode_hash: zk_hash,
                     zk_deployed_bytecode: zk_bytecode.to_vec(),
-                    // TODO(zk): retrieve unlinked factory deps (1.5.9)
+                    // rest of factory deps is populated later
                     zk_factory_deps: vec![zk_bytecode.to_vec()],
                     evm_bytecode_hash: B256::from_slice(&keccak256(evm.as_ref())[..]),
                     // TODO(zk): determine if this is ok, as it's
@@ -192,24 +193,40 @@ impl BuildData {
                 };
 
                 (
-                    contract_info,
-                    // populate factory deps that were already linked
-                    dual_compiled_contracts.extend_factory_deps_by_hash(
-                        contract,
-                        unlinked_zk_artifact.factory_dependencies.iter().flatten().map(
-                            |(hash, _)| {
-                                H256::from_slice(
-                                    alloy_primitives::hex::decode(hash)
-                                        .expect("malformed factory dep hash")
-                                        .as_slice(),
-                                )
-                            },
-                        ),
+                    (contract_info.clone(), contract),
+                    (
+                        contract_info,
+                        unlinked_zk_artifact
+                            .factory_dependencies_unlinked
+                            .clone()
+                            .unwrap_or_default(),
                     ),
                 )
             });
 
-        dual_compiled_contracts.extend(newly_linked_dual_compiled_contracts.collect::<Vec<_>>());
+        let (new_contracts, new_contracts_deps): (Vec<_>, HashMap<_, _>) =
+            newly_linked_dual_compiled_contracts.unzip();
+        dual_compiled_contracts.extend(new_contracts);
+
+        // now that we have an updated list of DualCompiledContracts
+        // retrieve all the factory deps for a given contracts and store them
+        new_contracts_deps.into_iter().for_each(|(info, deps)| {
+            deps.into_iter().for_each(|dep| {
+                let mut split = dep.split(':');
+                let path = split.next().expect("malformed factory dep path");
+                let name = split.next().expect("malformed factory dep name");
+
+                let bytecode = dual_compiled_contracts
+                    .find(Some(path), Some(name))
+                    .next()
+                    .expect("unknown factory dep")
+                    .zk_deployed_bytecode
+                    .clone();
+
+                dual_compiled_contracts.insert_factory_deps(&info, Some(bytecode));
+            });
+        });
+
         self.dual_compiled_contracts.replace(dual_compiled_contracts);
 
         // base zksolc contracts + newly linked + evm contracts

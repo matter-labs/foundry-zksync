@@ -16,6 +16,7 @@ use alloy_primitives::{
     Address, Bytes, Log, U256,
 };
 use alloy_sol_types::{sol, SolCall};
+use foundry_common::TransactionMaybeSigned;
 use foundry_evm_core::{
     backend::{Backend, BackendError, BackendResult, CowBackend, DatabaseExt, GLOBAL_FAIL_SLOT},
     constants::{
@@ -40,7 +41,7 @@ use std::{
     borrow::Cow,
     time::{Duration, Instant},
 };
-use strategy::ExecutorStrategy;
+use strategy::{DeployLibKind, ExecutorStrategy};
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -305,16 +306,19 @@ impl Executor {
 
     /// Deploys a library contract and commits the new state to the underlying database.
     ///
-    /// Executes a CREATE transaction with the contract `code` and persistent database state
-    /// modifications.
+    /// Executes a `deploy_kind` transaction with the provided parameters
+    /// and persistent database state modifications.
+    ///
+    /// Will return a list of deployment results and transaction requests
+    /// Will also ensure nonce is increased for the sender
     pub fn deploy_library(
         &mut self,
         from: Address,
-        code: Bytes,
+        kind: DeployLibKind,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<Vec<DeployResult>, EvmError> {
-        self.strategy.runner.deploy_library(self, from, code, value, rd)
+    ) -> Result<Vec<(DeployResult, TransactionMaybeSigned)>, EvmError> {
+        self.strategy.runner.deploy_library(self, from, kind, value, rd)
     }
 
     /// Deploys a contract using the given `env` and commits the new state to the underlying
@@ -686,7 +690,7 @@ impl Executor {
     ///
     /// If using a backend with cheatcodes, `tx.gas_price` and `block.number` will be overwritten by
     /// the cheatcode state in between calls.
-    pub fn build_test_env(
+    fn build_test_env(
         &self,
         caller: Address,
         transact_to: TxKind,

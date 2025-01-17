@@ -1,30 +1,35 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use alloy_primitives::{keccak256, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
-use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
+use alloy_zksync::{
+    contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS,
+    provider::{zksync_provider, ZksyncProvider},
+};
 use eyre::Result;
 use foundry_linking::{
     LinkerError, ZkLinker, ZkLinkerError, DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
 };
 use revm::{
-    primitives::{CreateScheme, Env, EnvWithHandlerCfg, ResultAndState},
+    primitives::{CreateScheme, Env, EnvWithHandlerCfg, Output, ResultAndState},
     Database,
 };
+use tracing::debug;
 use zksync_types::H256;
 
-use foundry_common::ContractsByArtifact;
+use foundry_common::{ContractsByArtifact, TransactionMaybeSigned};
 use foundry_compilers::{
     artifacts::CompactContractBytecodeCow, contracts::ArtifactContracts, info::ContractInfo,
     Artifact, ProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm::{
-    backend::{Backend, BackendResult, CowBackend},
+    backend::{Backend, BackendResult, CowBackend, DatabaseExt},
+    constants::DEFAULT_CREATE2_DEPLOYER,
     decode::RevertDecoder,
     executors::{
         strategy::{
-            EvmExecutorStrategyRunner, ExecutorStrategyContext, ExecutorStrategyExt,
+            DeployLibKind, EvmExecutorStrategyRunner, ExecutorStrategyContext, ExecutorStrategyExt,
             ExecutorStrategyRunner, LinkOutput,
         },
         DeployResult, EvmError, Executor,
@@ -35,7 +40,10 @@ use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::{DualCompiledContract, DualCompiledContracts},
 };
-use foundry_zksync_core::{encode_create_params, hash_bytecode, vm::ZkEnv, ZkTransactionMetadata};
+use foundry_zksync_core::{
+    encode_create_params, hash_bytecode, vm::ZkEnv, ZkTransactionMetadata,
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+};
 
 use crate::{
     backend::{ZksyncBackendStrategyBuilder, ZksyncInspectContext},
@@ -225,7 +233,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                 let contract = DualCompiledContract {
                     zk_bytecode_hash: zk_hash,
                     zk_deployed_bytecode: zk_bytecode.to_vec(),
-                    // TODO(zk): retrieve unlinked factory deps (1.5.9)
+                    // rest of factory deps is populated later
                     zk_factory_deps: vec![zk_bytecode.to_vec()],
                     evm_bytecode_hash: B256::from_slice(&keccak256(evm.as_ref())[..]),
                     // TODO(zk): determine if this is ok, as it's
@@ -235,25 +243,40 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                 };
 
                 (
-                    contract_info,
-                    // populate factory deps that were already linked
-                    ctx.dual_compiled_contracts.extend_factory_deps_by_hash(
-                        contract,
-                        unlinked_zk_artifact.factory_dependencies.iter().flatten().map(
-                            |(hash, _)| {
-                                H256::from_slice(
-                                    alloy_primitives::hex::decode(hash)
-                                        .expect("malformed factory dep hash")
-                                        .as_slice(),
-                                )
-                            },
-                        ),
+                    (contract_info.clone(), contract),
+                    (
+                        contract_info,
+                        unlinked_zk_artifact
+                            .factory_dependencies_unlinked
+                            .clone()
+                            .unwrap_or_default(),
                     ),
                 )
             });
 
-        ctx.dual_compiled_contracts
-            .extend(newly_linked_dual_compiled_contracts.collect::<Vec<_>>());
+        let (new_contracts, new_contracts_deps): (Vec<_>, HashMap<_, _>) =
+            newly_linked_dual_compiled_contracts.unzip();
+        ctx.dual_compiled_contracts.extend(new_contracts);
+
+        // now that we have an updated list of DualCompiledContracts
+        // retrieve all the factory deps for a given contracts and store them
+        new_contracts_deps.into_iter().for_each(|(info, deps)| {
+            deps.into_iter().for_each(|dep| {
+                let mut split = dep.split(':');
+                let path = split.next().expect("malformed factory dep path");
+                let name = split.next().expect("malformed factory dep name");
+
+                let bytecode = ctx
+                    .dual_compiled_contracts
+                    .find(Some(path), Some(name))
+                    .next()
+                    .expect("unknown factory dep")
+                    .zk_deployed_bytecode
+                    .clone();
+
+                ctx.dual_compiled_contracts.insert_factory_deps(&info, Some(bytecode));
+            });
+        });
 
         let linked_contracts: ArtifactContracts = contracts
             .into_iter()
@@ -280,10 +303,10 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         &self,
         executor: &mut Executor,
         from: Address,
-        code: Bytes,
+        kind: DeployLibKind,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<Vec<DeployResult>, EvmError> {
+    ) -> Result<Vec<(DeployResult, TransactionMaybeSigned)>, EvmError> {
         // sync deployer account info
         let nonce = EvmExecutorStrategyRunner.get_nonce(executor, from).expect("deployer to exist");
         let balance =
@@ -294,12 +317,23 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         tracing::debug!(?nonce, ?balance, sender = ?from, "deploying lib in EraVM");
 
         let mut evm_deployment =
-            EvmExecutorStrategyRunner.deploy_library(executor, from, code.clone(), value, rd)?;
+            EvmExecutorStrategyRunner.deploy_library(executor, from, kind.clone(), value, rd)?;
 
         let ctx = get_context(executor.strategy.context.as_mut());
 
+        let (code, create_scheme, to) = match kind {
+            DeployLibKind::Create(bytes) => {
+                (bytes, CreateScheme::Create, CONTRACT_DEPLOYER_ADDRESS)
+            }
+            DeployLibKind::Create2(salt, bytes) => (
+                bytes,
+                CreateScheme::Create2 { salt: salt.into() },
+                DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+            ),
+        };
+
         // lookup dual compiled contract based on EVM bytecode
-        let Some((_, dual_contract)) =
+        let Some((dual_contract_info, dual_contract)) =
             ctx.dual_compiled_contracts.find_by_evm_bytecode(code.as_ref())
         else {
             // we don't know what the equivalent zk contract would be
@@ -307,33 +341,45 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         };
 
         // no need for constructor args as it's a lib
-        let create_params =
-            encode_create_params(&CreateScheme::Create, dual_contract.zk_bytecode_hash, vec![]);
+        let create_params: Bytes =
+            encode_create_params(&create_scheme, dual_contract.zk_bytecode_hash, vec![]).into();
 
         // populate ctx.transaction_context with factory deps
         // we also populate the ctx so the deployment is executed
         // entirely in EraVM
         let factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(dual_contract);
+        tracing::debug!(n_fdeps = factory_deps.len());
 
         // persist existing paymaster data (TODO(zk): is this needed?)
         let paymaster_data =
             ctx.transaction_context.take().and_then(|metadata| metadata.paymaster_data);
         ctx.transaction_context = Some(ZkTransactionMetadata { factory_deps, paymaster_data });
 
-        // eravm_env: call to ContractDeployer w/ properly encoded calldata
-        let env = executor.build_test_env(
-            from,
-            // foundry_zksync_core::vm::runner::transact takes care of using the ContractDeployer
-            // address
-            TxKind::Create,
-            create_params.into(),
-            value,
-        );
+        let result = executor.transact_raw(from, to, create_params.clone(), value)?;
+        let result = result.into_result(rd)?;
 
-        executor.deploy_with_env(env, rd).map(move |dr| {
-            evm_deployment.push(dr);
-            evm_deployment
-        })
+        let Some(Output::Create(_, Some(address))) = result.out else {
+            return Err(eyre::eyre!(
+                "Deployment succeeded, but no address was returned: {result:#?}"
+            )
+            .into());
+        };
+
+        // also mark this library as persistent, this will ensure that the state of the library is
+        // persistent across fork swaps in forking mode
+        executor.backend_mut().add_persistent_account(address);
+        debug!(%address, "deployed contract with create2");
+
+        let mut request = TransactionMaybeSigned::new(Default::default());
+        let unsigned = request.as_unsigned_mut().unwrap();
+        unsigned.from = Some(from);
+        unsigned.input = create_params.into();
+        unsigned.nonce = Some(nonce);
+        // we use the deployer here for consistency with linking
+        unsigned.to = Some(TxKind::Call(to));
+
+        evm_deployment.push((DeployResult { raw: result, address }, request));
+        Ok(evm_deployment)
     }
 
     fn new_backend_strategy(&self) -> foundry_evm_core::backend::strategy::BackendStrategy {

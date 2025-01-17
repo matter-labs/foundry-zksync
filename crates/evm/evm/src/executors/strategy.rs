@@ -1,19 +1,19 @@
 use std::{any::Any, borrow::Borrow, collections::BTreeMap, fmt::Debug, path::Path};
 
 use alloy_json_abi::JsonAbi;
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
 use alloy_serde::OtherFields;
-use eyre::Result;
+use eyre::{Context, Result};
 use foundry_cheatcodes::strategy::{
     CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategyRunner,
 };
-use foundry_common::{ContractsByArtifact, TestFunctionExt};
+use foundry_common::{ContractsByArtifact, TestFunctionExt, TransactionMaybeSigned};
 use foundry_compilers::{
     artifacts::Libraries, contracts::ArtifactContracts, Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm_core::{
-    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
+    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend, DatabaseExt},
     decode::RevertDecoder,
 };
 use foundry_linking::{Linker, LinkerError};
@@ -22,7 +22,7 @@ use foundry_zksync_compilers::{
     dual_compiled_contracts::DualCompiledContracts,
 };
 use revm::{
-    primitives::{Env, EnvWithHandlerCfg, ResultAndState},
+    primitives::{Env, EnvWithHandlerCfg, Output, ResultAndState},
     DatabaseRef,
 };
 
@@ -70,6 +70,16 @@ pub struct LinkOutput {
     pub libraries: Libraries,
 }
 
+/// Type of library deployment
+#[derive(Debug, Clone)]
+pub enum DeployLibKind {
+    /// CREATE(bytecode)
+    Create(Bytes),
+
+    /// CREATE2(salt, bytecode)
+    Create2(B256, Bytes),
+}
+
 impl ExecutorStrategy {
     pub fn new_evm() -> Self {
         Self { runner: &EvmExecutorStrategyRunner, context: Box::new(()) }
@@ -111,10 +121,10 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         &self,
         executor: &mut Executor,
         from: Address,
-        code: Bytes,
+        input: DeployLibKind,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<Vec<DeployResult>, EvmError>;
+    ) -> Result<Vec<(DeployResult, TransactionMaybeSigned)>, EvmError>;
 
     /// Execute a transaction and *WITHOUT* applying state changes.
     fn call(
@@ -256,8 +266,8 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
             let Some(abi) = &contract.abi else { continue };
 
             // if it's a test, link it and add to deployable contracts
-            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true) &&
-                abi.functions().any(|func| func.name.is_any_test())
+            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true)
+                && abi.functions().any(|func| func.name.is_any_test())
             {
                 let Some(bytecode) =
                     contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
@@ -286,11 +296,58 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         &self,
         executor: &mut Executor,
         from: Address,
-        code: Bytes,
+        kind: DeployLibKind,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<Vec<DeployResult>, EvmError> {
-        executor.deploy(from, code, value, rd).map(|dr| vec![dr])
+    ) -> Result<Vec<(DeployResult, TransactionMaybeSigned)>, EvmError> {
+        let nonce = self.get_nonce(executor, from).context("retrieving sender nonce")?;
+
+        match kind {
+            DeployLibKind::Create(code) => {
+                executor.deploy(from, code.clone(), value, rd).map(|dr| {
+                    let mut request = TransactionMaybeSigned::new(Default::default());
+                    let unsigned = request.as_unsigned_mut().unwrap();
+                    unsigned.from = Some(from);
+                    unsigned.input = code.into();
+                    unsigned.nonce = Some(nonce);
+
+                    vec![(dr, request)]
+                })
+            }
+            DeployLibKind::Create2(salt, code) => {
+                let create2_deployer = executor.create2_deployer();
+                let calldata: Bytes = [salt.as_ref(), code.as_ref()].concat().into();
+                let result =
+                    executor.transact_raw(from, create2_deployer, calldata.clone(), value)?;
+                let result = result.into_result(rd)?;
+
+                let Some(Output::Create(_, Some(address))) = result.out else {
+                    return Err(eyre::eyre!(
+                        "Deployment succeeded, but no address was returned: {result:#?}"
+                    )
+                    .into());
+                };
+
+                // also mark this library as persistent, this will ensure that the state of the
+                // library is persistent across fork swaps in forking mode
+                executor.backend_mut().add_persistent_account(address);
+                debug!(%address, "deployed contract with create2");
+
+                let mut request = TransactionMaybeSigned::new(Default::default());
+                let unsigned = request.as_unsigned_mut().unwrap();
+                unsigned.from = Some(from);
+                unsigned.input = calldata.into();
+                unsigned.nonce = Some(nonce);
+                unsigned.to = Some(TxKind::Call(create2_deployer));
+
+                // manually increase nonce when performing CALLs
+                executor
+                    .set_nonce(from, nonce + 1)
+                    .context("increasing nonce after CREATE2 deployment")?;
+
+                Ok(vec![(DeployResult { raw: result, address }, request)])
+            }
+        }
     }
 
     fn call(

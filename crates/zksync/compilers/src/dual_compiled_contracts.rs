@@ -6,8 +6,8 @@ use std::{
 };
 
 use foundry_compilers::{
-    info::ContractInfo, solc::SolcLanguage, Artifact, ArtifactId, ArtifactOutput,
-    ConfigurableArtifacts, ProjectCompileOutput, ProjectPathsConfig,
+    info::ContractInfo, solc::SolcLanguage, Artifact, ArtifactId, ProjectCompileOutput,
+    ProjectPathsConfig,
 };
 
 use alloy_primitives::{keccak256, B256};
@@ -308,6 +308,51 @@ impl DualCompiledContracts {
         self.contracts.insert(info, contract);
     }
 
+    /// Attempt reading an existing `[DualCompiledContract]`
+    pub fn get(&self, info: &ContractInfo) -> Option<&DualCompiledContract> {
+        self.contracts.get(info)
+    }
+
+    /// Search for matching contracts in the collection
+    ///
+    /// Contracts are ordered in descending best-fit order
+    pub fn find<'a: 'b, 'b>(
+        &'a self,
+        path: Option<&'b str>,
+        name: Option<&'b str>,
+    ) -> impl Iterator<Item = &'a DualCompiledContract> + 'b {
+        let full_matches = self.contracts.iter().filter(move |(info, _)| {
+            // if user provides a path we should check that it matches
+            // we check using `ends_with` to account for prefixes
+            path.map_or(true, |needle|
+                        info.path.as_ref()
+                        .map_or(true,
+                                |contract_path| contract_path.ends_with(needle)))
+                // if user provides a name we should check that it matches
+                && name.map_or(true, |name| name == info.name.as_str())
+        });
+
+        let path_matches = self.contracts.iter().filter(move |(info, _)| {
+            // if a path is provided, check that it matches
+            // if no path is provided, don't match it
+            path.map_or(false, |needle| {
+                info.path.as_ref().map_or(false, |contract_path| contract_path.ends_with(needle))
+            })
+        });
+
+        let name_matches = self.contracts.iter().filter(move |(info, _)| {
+            // if name is provided, check that it matches
+            // if no name is provided, don't match it
+            name.map(|name| name == info.name.as_str()).unwrap_or(false)
+        });
+
+        full_matches
+            .chain(path_matches)
+            .chain(name_matches)
+            .map(|(_, contract)| contract)
+            .into_iter()
+    }
+
     /// Retrieves the length of the collection.
     pub fn len(&self) -> usize {
         self.contracts.len()
@@ -336,5 +381,20 @@ impl DualCompiledContracts {
 
         target.zk_factory_deps.extend(deps_bytecodes);
         target
+    }
+
+    /// Populate the target's factory deps based on the new list
+    ///
+    /// Will return `None` if no matching `target` exists
+    /// Will not override existing factory deps
+    pub fn insert_factory_deps(
+        &mut self,
+        target: &ContractInfo,
+        factory_deps: impl IntoIterator<Item = Vec<u8>>,
+    ) -> Option<&DualCompiledContract> {
+        self.contracts.get_mut(target).map(|contract| {
+            contract.zk_factory_deps.extend(factory_deps);
+            &*contract
+        })
     }
 }
