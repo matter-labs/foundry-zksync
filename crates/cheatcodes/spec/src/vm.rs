@@ -912,7 +912,7 @@ interface Vm {
     #[cheatcode(group = Evm, safety = Safe)]
     function zkGetTransactionNonce(address account) external view returns (uint64 nonce);
 
-    /// Gets the deployment nonce of an zksync account.
+    /// Gets the deployment nonce of a zksync account.
     #[cheatcode(group = Evm, safety = Safe)]
     function zkGetDeploymentNonce(address account) external view returns (uint64 nonce);
 
