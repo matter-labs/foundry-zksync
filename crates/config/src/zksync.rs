@@ -74,6 +74,9 @@ pub struct ZkSyncConfig {
 
     // zksolc suppressed errors.
     pub suppressed_errors: HashSet<ZkSolcError>,
+
+    // Gas per pubdata
+    pub gas_per_pubdata: Option<u64>,
 }
 
 impl Default for ZkSyncConfig {
@@ -93,6 +96,7 @@ impl Default for ZkSyncConfig {
             optimizer_details: Default::default(),
             suppressed_errors: Default::default(),
             suppressed_warnings: Default::default(),
+            gas_per_pubdata: Default::default(),
         }
     }
 }

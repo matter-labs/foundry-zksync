@@ -23,13 +23,20 @@ pub struct ZkEnv {
     pub fair_l2_gas_price: u64,
     /// fair pubdata price
     pub fair_pubdata_price: u64,
+    /// gas per pubdata
+    pub gas_per_pubdata: Option<u64>,
 }
 
 impl Default for ZkEnv {
     fn default() -> Self {
         // TODO: fair pubdata price of 0 yields division by 0 error somewhere in
         // some cases. Should investigate this edge case further
-        Self { l1_gas_price: 0, fair_l2_gas_price: 0, fair_pubdata_price: 1000 }
+        Self {
+            l1_gas_price: 0,
+            fair_l2_gas_price: 0,
+            fair_pubdata_price: 1000,
+            gas_per_pubdata: None,
+        }
     }
 }
 

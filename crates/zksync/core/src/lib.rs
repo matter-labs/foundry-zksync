@@ -113,12 +113,18 @@ pub struct ZkTransactionMetadata {
     pub factory_deps: Vec<Vec<u8>>,
     /// Paymaster data for ZK transactions.
     pub paymaster_data: Option<PaymasterParams>,
+    /// Gas per pubdata for ZK transactions.
+    pub gas_per_pubdata: Option<u64>,
 }
 
 impl ZkTransactionMetadata {
     /// Create a new [`ZkTransactionMetadata`] with the given factory deps
-    pub fn new(factory_deps: Vec<Vec<u8>>, paymaster_data: Option<PaymasterParams>) -> Self {
-        Self { factory_deps, paymaster_data }
+    pub fn new(
+        factory_deps: Vec<Vec<u8>>,
+        paymaster_data: Option<PaymasterParams>,
+        gas_per_pubdata: Option<u64>,
+    ) -> Self {
+        Self { factory_deps, paymaster_data, gas_per_pubdata }
     }
 }
 /// Estimated gas from a ZK network.
@@ -143,7 +149,10 @@ pub async fn estimate_fee<P: ZksyncProvider<T>, T: Transport + Clone>(
     let max_priority_fee = tx.max_priority_fee_per_gas().unwrap_or(fee.max_priority_fee_per_gas);
     tx.set_max_fee_per_gas(max_fee);
     tx.set_max_priority_fee_per_gas(max_priority_fee);
-    tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit);
+    match tx.gas_per_pubdata() {
+        Some(v) if !v.is_zero() => (),
+        _ => tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit),
+    }
 
     Ok(())
 }

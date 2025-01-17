@@ -110,6 +110,13 @@ pub trait ExecutorStrategyExt {
     ) {
     }
 
+    fn zksync_set_gas_per_pubdata(
+        &self,
+        _ctx: &mut dyn ExecutorStrategyContext,
+        _gas_per_pubdata: u64,
+    ) {
+    }
+
     /// Set the fork environment on the context.
     fn zksync_set_fork_env(
         &self,

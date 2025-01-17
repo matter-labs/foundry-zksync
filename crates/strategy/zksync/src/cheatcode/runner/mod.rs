@@ -126,6 +126,8 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             paymaster_input: paymaster_data.input.to_vec(),
         });
 
+        let gas_per_pubdata = ctx.zk_env.gas_per_pubdata;
+
         let rpc = ecx_inner.db.active_fork_url();
 
         let injected_factory_deps = ctx
@@ -165,6 +167,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 serde_json::to_value(ZkTransactionMetadata::new(
                     factory_deps,
                     paymaster_params.clone(),
+                    gas_per_pubdata,
                 ))
                 .expect("failed encoding json"),
             );
@@ -189,8 +192,12 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         });
         tx.other.insert(
             ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-            serde_json::to_value(ZkTransactionMetadata::new(zk_tx_factory_deps, paymaster_params))
-                .expect("failed encoding json"),
+            serde_json::to_value(ZkTransactionMetadata::new(
+                zk_tx_factory_deps,
+                paymaster_params,
+                gas_per_pubdata,
+            ))
+            .expect("failed encoding json"),
         );
         broadcastable_transactions.push_back(BroadcastableTransaction {
             rpc,
@@ -256,6 +263,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             paymaster: paymaster_data.address.to_h160(),
             paymaster_input: paymaster_data.input.to_vec(),
         });
+        let gas_per_pubdata = ctx.zk_env.gas_per_pubdata;
         let factory_deps = if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
             // We shouldn't need factory_deps for CALLs
             factory_deps.clone()
@@ -263,8 +271,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             // For this case we use only the injected factory deps
             injected_factory_deps
         };
-        let zk_tx = ZkTransactionMetadata::new(factory_deps, paymaster_params);
-
+        let zk_tx = ZkTransactionMetadata::new(factory_deps, paymaster_params, gas_per_pubdata);
         let mut tx_req = TransactionRequest {
             from: Some(broadcast.new_origin),
             to: Some(TxKind::from(Some(call.target_address))),

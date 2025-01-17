@@ -141,6 +141,11 @@ pub async fn send_transaction(
                         },
                     );
                 }
+
+                if let Some(gas_per_pubdata) = zk_tx_meta.gas_per_pubdata {
+                    zk_tx.set_gas_per_pubdata(alloy_primitives::Uint::from(gas_per_pubdata));
+                }
+
                 foundry_zksync_core::estimate_fee(&mut zk_tx, &zk_provider, estimate_multiplier)
                     .await?;
 
