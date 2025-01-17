@@ -338,7 +338,7 @@ where
 
     let initiator_nonce_key = get_nonce_key(&initiator_address);
 
-    // NOTE(zk) We need to revert the tx nonce of the initiator as we intercept and dispatch
+    // NOTE(zk): We need to revert the tx nonce of the initiator as we intercept and dispatch
     // CALLs and CREATEs to the zkEVM. The CREATEs always increment the deployment nonce
     // which must be persisted, but the tx nonce increase must be reverted.
     if let Some(initiator_nonce) = modified_storage.get_mut(&initiator_nonce_key) {

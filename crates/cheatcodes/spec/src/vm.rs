@@ -908,11 +908,11 @@ interface Vm {
     #[cheatcode(group = Testing, safety = Safe)]
     function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;
 
-    /// Gets the transaction nonce of an zksync account.
+    /// Gets the transaction nonce of a zksync account.
     #[cheatcode(group = Evm, safety = Safe)]
     function zkGetTransactionNonce(address account) external view returns (uint64 nonce);
 
-    /// Gets the deployment nonce of an zksync account.
+    /// Gets the deployment nonce of a zksync account.
     #[cheatcode(group = Evm, safety = Safe)]
     function zkGetDeploymentNonce(address account) external view returns (uint64 nonce);
 
