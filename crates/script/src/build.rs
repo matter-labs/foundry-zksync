@@ -64,7 +64,7 @@ impl BuildData {
             eyre::bail!("unable to link zk artifacts if no zk compilation output is provided")
         };
 
-        Ok(ZkLinker::new(self.project_root.clone(), input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(&self.project_root), v)).collect(), zksolc, input))
+        Ok(ZkLinker::new(self.project_root.clone(), input.artifact_ids().collect(), zksolc, input))
     }
 
     /// Will attempt linking via `zksolc`
@@ -90,20 +90,18 @@ impl BuildData {
         let Some(input) = self.zk_output.as_ref() else {
             eyre::bail!("unable to link zk artifacts if no zk compilation output is provided");
         };
-        let input = input.clone().with_stripped_file_prefixes(&self.project_root);
-       
+
         let mut dual_compiled_contracts = self.dual_compiled_contracts.take().unwrap_or_default();
 
         let linker = self.get_zk_linker(script_config)?;
 
         // NOTE(zk): translate solc ArtifactId to zksolc otherwise
         // we won't be able to find it in the zksolc output
-        let target = self.target.clone().with_stripped_file_prefixes(self.project_root.as_ref());
         let Some(target) = linker
             .linker
             .contracts
             .keys()
-            .find(|id|id.source == target.source && id.name == target.name)
+            .find(|id| id.source == self.target.source && id.name == self.target.name)
         else {
             eyre::bail!("unable to find zk target artifact for linking");
         };
@@ -201,7 +199,7 @@ impl BuildData {
                         unlinked_zk_artifact.factory_dependencies.iter().flatten().map(
                             |(hash, _)| {
                                 H256::from_slice(
-                                    alloy_primitives::hex::decode(dbg!(hash))
+                                    alloy_primitives::hex::decode(hash)
                                         .expect("malformed factory dep hash")
                                         .as_slice(),
                                 )
@@ -217,12 +215,7 @@ impl BuildData {
         // base zksolc contracts + newly linked + evm contracts
         let contracts = input
             .artifact_ids()
-            .map(|(id, v)| {
-                (
-                    id,
-                    CompactContractBytecode::from(CompactContractBytecodeCow::from(v)),
-                )
-            })
+            .map(|(id, v)| (id, CompactContractBytecode::from(CompactContractBytecodeCow::from(v))))
             .chain(linked_contracts)
             .chain(evm_linked_contracts)
             .collect();
@@ -422,10 +415,7 @@ impl PreprocessedState {
 
             let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
 
-            zk_output = Some(
-                zk_compiler
-                    .zksync_compile(&zk_project)?
-            );
+            zk_output = Some(zk_compiler.zksync_compile(&zk_project)?);
             Some(DualCompiledContracts::new(
                 &output,
                 zk_output.as_ref().unwrap(),

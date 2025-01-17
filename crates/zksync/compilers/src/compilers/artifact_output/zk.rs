@@ -68,15 +68,15 @@ pub struct ZkContractArtifact {
 impl ZkContractArtifact {
     /// Returns true if contract is not linked
     pub fn is_unlinked(&self) -> bool {
-        self.hash.is_none() ||
-            !self.missing_libraries().map_or(true, Vec::is_empty) ||
-            self.factory_dependencies_unlinked
-                .as_ref()
-                .and_then(|unlinked| {
-                    self.factory_dependencies.as_ref().map(|linked| unlinked.len() - linked.len())
-                })
-                .unwrap_or_default() >
-                0
+        let unlinked_fdeps = self
+            .factory_dependencies_unlinked
+            .as_ref()
+            .map(|unlinked| unlinked.len())
+            .unwrap_or_default();
+        let linked_fdeps =
+            self.factory_dependencies.as_ref().map(|linked| linked.len()).unwrap_or_default();
+
+        !self.missing_libraries().map_or(true, Vec::is_empty) || unlinked_fdeps - linked_fdeps > 0
     }
 
     /// Get contract missing libraries

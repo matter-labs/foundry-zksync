@@ -50,9 +50,7 @@ pub struct ZkLinker<'a> {
 
 impl<'a> ZkLinker<'a> {
     fn zk_artifacts(&'a self) -> impl Iterator<Item = (ArtifactId, &'a ZkContractArtifact)> + 'a {
-        self.compiler_output
-            .artifact_ids()
-            .map(|(id, v)| (id.with_stripped_file_prefixes(&self.linker.root), v))
+        self.compiler_output.artifact_ids()
     }
 
     /// Construct a new `ZkLinker`
@@ -390,19 +388,39 @@ impl<'a> ZkLinker<'a> {
         targets: impl IntoIterator<Item = &'b ArtifactId>,
         libraries: &Libraries,
     ) -> Result<ArtifactContracts, ZkLinkerError> {
+        let mut contracts = self
+            .linker
+            .contracts
+            .clone()
+            .into_iter()
+            // we strip these here because the file references are also relative
+            // and the linker wouldn't be able to properly detect matching factory deps
+            // (libraries are given separately and alredy stripped)
+            .map(|(id, v)| (id.with_stripped_file_prefixes(&self.linker.root), v))
+            .collect();
         let mut targets = targets.into_iter().cloned().collect::<VecDeque<_>>();
-        let mut contracts = self.linker.contracts.clone();
         let mut linked_artifacts = vec![];
 
-        // TODO(zk): determine if this loop is still needed like this
         // explanation below
         while let Some(id) = targets.pop_front() {
-            match Self::zk_link(&contracts, &id, libraries, &self.compiler) {
+            if linked_artifacts.iter().any(|(linked, _)| linked == &id) {
+                // skip already linked
+                continue;
+            }
+
+            match Self::zk_link(
+                &contracts,
+                // we strip here _only_ so that the target matches what's in `contracts`
+                // but we want to return the full id in the `linked_artifacts`
+                &id.clone().with_stripped_file_prefixes(&self.linker.root),
+                libraries,
+                &self.compiler,
+            ) {
                 Ok(linked) => {
-                    // persist linked contract for successive iterations
                     *contracts.entry(id.clone()).or_default() = linked.clone();
 
-                    linked_artifacts.push((id.clone(), CompactContractBytecode::from(linked)));
+                    // persist linked contract for successive iterations
+                    linked_artifacts.push((id, CompactContractBytecode::from(linked)));
                 }
                 // contract was ignored, no need to add it to the list of linked contracts
                 Err(ZkLinkerError::MissingFactoryDeps(fdeps)) => {
@@ -412,20 +430,29 @@ impl<'a> ZkLinker<'a> {
                     // and instead `id` remains unlinked
                     // TODO(zk): might be unnecessary, observed when paths were wrong
                     let mut ids = fdeps
-                        .into_iter()
+                        .iter()
                         .flat_map(|fdep| {
                             contracts.iter().find(|(id, _)| {
-                                id.source.as_path() == Path::new(fdep.filename.as_str())
-                                    && id.name == fdep.library
+                                // strip here to match against the fdep which is stripped
+                                let id =
+                                    (*id).clone().with_stripped_file_prefixes(&self.linker.root);
+                                id.source.as_path() == Path::new(fdep.filename.as_str()) &&
+                                    id.name == fdep.library
                             })
                         })
+                        // we want to keep the non-stripped
                         .map(|(id, _)| id.clone())
                         .peekable();
 
                     // if we have no dep ids then we avoid
                     // queueing our own id to avoid infinite loop
                     // TODO(zk): find a better way to avoid issues later
-                    if ids.peek().is_some() {
+                    if let Some(sample_dep) = ids.peek() {
+                        // ensure that the sample_dep is in `contracts`
+                        if contracts.get(sample_dep).is_none() {
+                            return Err(ZkLinkerError::MissingFactoryDeps(fdeps));
+                        }
+
                         targets.extend(ids); // queue factory deps for linking
                         targets.push_back(id); // reque original target
                     }

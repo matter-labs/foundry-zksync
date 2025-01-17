@@ -135,7 +135,6 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let Some(input) = ctx.compilation_output.as_ref() else {
             return Err(LinkerError::MissingTargetArtifact);
         };
-        let input = input.clone().with_stripped_file_prefixes(root);
 
         let contracts: ArtifactContracts<CompactContractBytecodeCow<'_>> =
             input.artifact_ids().collect();
@@ -243,7 +242,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                         unlinked_zk_artifact.factory_dependencies.iter().flatten().map(
                             |(hash, _)| {
                                 H256::from_slice(
-                                    alloy_primitives::hex::decode(dbg!(hash))
+                                    alloy_primitives::hex::decode(hash)
                                         .expect("malformed factory dep hash")
                                         .as_slice(),
                                 )
