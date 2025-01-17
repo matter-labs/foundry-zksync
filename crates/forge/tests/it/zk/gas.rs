@@ -3,39 +3,25 @@ use foundry_test_utils::{forgetest_async, util, TestProject};
 use foundry_test_utils::{util::OutputExt, ZkSyncNode};
 
 forgetest_async!(zk_script_execution_with_gas_price_specified_by_user, |prj, cmd| {
+    // Setup
     setup_gas_prj(&mut prj);
-
     let node = ZkSyncNode::start().await;
     let url = node.url();
-
     cmd.forge_fuse();
+    let private_key = get_rich_wallet_key();
 
-    let private_key =
-        ZkSyncNode::rich_wallets().next().map(|(_, pk, _)| pk).expect("No rich wallets available");
+    // Create script args with gas price parameters
+    let script_args =
+        create_script_args(&private_key, url.as_str(), "--with-gas-price", "370000037");
+    let mut script_args = script_args.into_iter().collect::<Vec<_>>();
+    script_args.extend_from_slice(&["--priority-gas-price", "123123"]);
 
-    let script_args = vec![
-        "--zk-startup",
-        "./script/Gas.s.sol",
-        "--private-key",
-        &private_key,
-        "--chain",
-        "260",
-        "--rpc-url",
-        url.as_str(),
-        "--slow",
-        "-vvvvv",
-        "--broadcast",
-        "--with-gas-price",
-        "370000037",
-        "--priority-gas-price",
-        "123123",
-    ];
-
+    // Execute script and verify success
     cmd.arg("script").args(&script_args);
-
     let stdout = cmd.assert_success().get_output().stdout_lossy();
     assert!(stdout.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
 
+    // Verify transaction details from broadcast artifacts
     let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))
         .expect("No broadcast artifacts");
@@ -45,6 +31,7 @@ forgetest_async!(zk_script_execution_with_gas_price_specified_by_user, |prj, cmd
 
     assert_eq!(json["transactions"].as_array().expect("broadcastable txs").len(), 1);
 
+    // Verify gas prices in transaction
     let transaction_hash = json["receipts"][0]["transactionHash"].as_str().unwrap();
     let stdout = cmd
         .cast_fuse()
@@ -59,6 +46,62 @@ forgetest_async!(zk_script_execution_with_gas_price_specified_by_user, |prj, cmd
     assert!(stdout.contains("maxFeePerGas         370000037"));
     assert!(stdout.contains("maxPriorityFeePerGas 123123"));
 });
+
+forgetest_async!(zk_script_execution_with_gas_multiplier, |prj, cmd| {
+    // Setup
+    setup_gas_prj(&mut prj);
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+    cmd.forge_fuse();
+    let private_key = get_rich_wallet_key();
+
+    // Test with insufficient gas multiplier (should fail)
+    let insufficient_multiplier_args =
+        create_script_args(&private_key, &url, "--gas-estimate-multiplier", "1");
+    cmd.arg("script").args(&insufficient_multiplier_args);
+    cmd.assert_failure();
+    cmd.forge_fuse();
+
+    // Test with sufficient gas multiplier (should succeed)
+    let sufficient_multiplier_args =
+        create_script_args(&private_key, &url, "--gas-estimate-multiplier", "100");
+    cmd.arg("script").args(&sufficient_multiplier_args);
+    let stdout = cmd.assert_success().get_output().stdout_lossy();
+    assert!(stdout.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+});
+
+fn get_rich_wallet_key() -> String {
+    ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(_, pk, _)| pk)
+        .expect("No rich wallets available")
+        .to_owned()
+}
+
+fn create_script_args<'a>(
+    private_key: &'a str,
+    url: &'a str,
+    gas_param: &'a str,
+    gas_value: &'a str,
+) -> Vec<&'a str> {
+    vec![
+        "--zk-startup",
+        "./script/Gas.s.sol",
+        "--private-key",
+        private_key,
+        "--chain",
+        "260",
+        "--rpc-url",
+        url,
+        "--slow",
+        "-vvvvv",
+        "--broadcast",
+        "--timeout",
+        "3",
+        gas_param,
+        gas_value,
+    ]
+}
 
 fn setup_gas_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
