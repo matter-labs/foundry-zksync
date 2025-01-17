@@ -10402,7 +10402,7 @@
     {
       "func": {
         "id": "zkGetDeploymentNonce",
-        "description": "Gets the deployment nonce of an zksync account.",
+        "description": "Gets the deployment nonce of a zksync account.",
         "declaration": "function zkGetDeploymentNonce(address account) external view returns (uint64 nonce);",
         "visibility": "external",
         "mutability": "view",
@@ -10422,7 +10422,7 @@
     {
       "func": {
         "id": "zkGetTransactionNonce",
-        "description": "Gets the transaction nonce of an zksync account.",
+        "description": "Gets the transaction nonce of a zksync account.",
         "declaration": "function zkGetTransactionNonce(address account) external view returns (uint64 nonce);",
         "visibility": "external",
         "mutability": "view",
