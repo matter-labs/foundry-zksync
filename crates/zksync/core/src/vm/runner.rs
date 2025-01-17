@@ -9,7 +9,7 @@ use tracing::{debug, info};
 use zksync_basic_types::H256;
 use zksync_types::{
     ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, CONTRACT_DEPLOYER_ADDRESS,
-    U256,
+    CREATE2_FACTORY_ADDRESS, U256,
 };
 
 use std::{cmp::min, fmt::Debug};
@@ -51,7 +51,10 @@ where
     let caller = env.tx.caller;
     let nonce = ZKVMData::new(&mut ecx).get_tx_nonce(caller);
     let (transact_to, is_create) = match env.tx.transact_to {
-        TransactTo::Call(to) => (to.to_h160(), false),
+        TransactTo::Call(to) => {
+            let to = to.to_h160();
+            (to, to == CONTRACT_DEPLOYER_ADDRESS || to == CREATE2_FACTORY_ADDRESS)
+        }
         TransactTo::Create => (CONTRACT_DEPLOYER_ADDRESS, true),
     };
 
@@ -316,7 +319,7 @@ fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMa
         let (block_number, overflow) =
             ecx.env.block.number.overflowing_sub(alloy_primitives::U256::from(i));
         if overflow {
-            break
+            break;
         }
         match ecx.block_hash(block_number.to_u256().as_u64()) {
             Ok(block_hash) => {
