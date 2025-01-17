@@ -11,23 +11,10 @@ forgetest_async!(zk_script_execution_with_gas_price_specified_by_user, |prj, cmd
     let private_key = get_rich_wallet_key();
 
     // Create script args with gas price parameters
-    let script_args = vec![
-        "--zk-startup",
-        "./script/Gas.s.sol",
-        "--private-key",
-        &private_key,
-        "--chain",
-        "260",
-        "--rpc-url",
-        url.as_str(),
-        "--slow",
-        "-vvvvv",
-        "--broadcast",
-        "--with-gas-price",
-        "370000037",
-        "--priority-gas-price",
-        "123123",
-    ];
+    let script_args =
+        create_script_args(&private_key, url.as_str(), "--with-gas-price", "370000037");
+    let mut script_args = script_args.into_iter().collect::<Vec<_>>();
+    script_args.extend_from_slice(&["--priority-gas-price", "123123"]);
 
     // Execute script and verify success
     cmd.arg("script").args(&script_args);
@@ -105,7 +92,6 @@ forgetest_async!(zk_script_execution_with_gas_per_pubdata, |prj, cmd| {
     assert!(stdout.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
 });
 
-// Helper function to get rich wallet private key
 fn get_rich_wallet_key() -> String {
     ZkSyncNode::rich_wallets()
         .next()
@@ -114,7 +100,6 @@ fn get_rich_wallet_key() -> String {
         .to_owned()
 }
 
-// Helper function to create script arguments
 fn create_script_args<'a>(
     private_key: &'a str,
     url: &'a str,
