@@ -82,6 +82,7 @@ impl BuildData {
         script_config: &ScriptConfig,
         known_libraries: Libraries,
         evm_linked_contracts: ArtifactContracts,
+        use_create2: bool,
     ) -> Result<ArtifactContracts> {
         if !script_config.config.zksync.should_compile() {
             return Ok(evm_linked_contracts);
@@ -107,17 +108,7 @@ impl BuildData {
         };
 
         let create2_deployer = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
-        let can_use_create2 = if let Some(fork_url) = &script_config.evm_opts.fork_url {
-            let provider = try_get_http_provider(fork_url)?;
-            let deployer_code = provider.get_code_at(create2_deployer).await?;
-
-            !deployer_code.is_empty()
-        } else {
-            // If --fork-url is not provided, we are just simulating the script.
-            true
-        };
-
-        let maybe_create2_link_output = can_use_create2
+        let maybe_create2_link_output = use_create2
             .then(|| {
                 linker
                     .zk_link_with_create2(
@@ -271,13 +262,14 @@ impl BuildData {
             })
             .flatten();
 
-        let (libraries, predeploy_libs) = if let Some(output) = maybe_create2_link_output {
+        let (libraries, predeploy_libs, uses_create2) = if let Some(output) = maybe_create2_link_output {
             (
                 output.libraries,
                 ScriptPredeployLibraries::Create2(
                     output.libs_to_deploy,
                     script_config.config.create2_library_salt,
                 ),
+                true
             )
         } else {
             let output = self.get_linker().link_with_nonce_or_address(
@@ -287,14 +279,14 @@ impl BuildData {
                 [&self.target],
             )?;
 
-            (output.libraries, ScriptPredeployLibraries::Default(output.libs_to_deploy))
+            (output.libraries, ScriptPredeployLibraries::Default(output.libs_to_deploy), false)
         };
 
         let known_contracts = self
             .get_linker()
             .get_linked_artifacts(&libraries)
             .context("retrieving fully linked artifacts")?;
-        let known_contracts = self.zk_link(script_config, known_libraries, known_contracts).await?;
+        let known_contracts = self.zk_link(script_config, known_libraries, known_contracts, uses_create2).await?;
 
         LinkedBuildData::new(
             libraries,
@@ -313,7 +305,7 @@ impl BuildData {
     ) -> Result<LinkedBuildData> {
         let known_contracts = self.get_linker().get_linked_artifacts(&libraries)?;
         let known_contracts =
-            self.zk_link(script_config, libraries.clone(), known_contracts).await?;
+            self.zk_link(script_config, libraries.clone(), known_contracts, false).await?;
 
         LinkedBuildData::new(
             libraries,

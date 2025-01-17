@@ -333,7 +333,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         };
 
         // lookup dual compiled contract based on EVM bytecode
-        let Some((dual_contract_info, dual_contract)) =
+        let Some((_, dual_contract)) =
             ctx.dual_compiled_contracts.find_by_evm_bytecode(code.as_ref())
         else {
             // we don't know what the equivalent zk contract would be
