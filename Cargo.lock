@@ -3922,8 +3922,8 @@ dependencies = [
 
 [[package]]
 name = "era-solc"
-version = "1.5.9"
-source = "git+https://github.com/matter-labs/era-compiler-solidity.git?rev=b8265327d1530a2ba42473e37756aeebfb0fed75#b8265327d1530a2ba42473e37756aeebfb0fed75"
+version = "1.5.10"
+source = "git+https://github.com/matter-labs/era-compiler-solidity.git?tag=1.5.10#0c9df3b260c95e0881799bb3b2c85bd16a6dbf4d"
 dependencies = [
  "anyhow",
  "boolinator",

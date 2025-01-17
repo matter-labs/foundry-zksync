@@ -166,7 +166,7 @@ fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
     test_zksync_can_compile_contract_with_suppressed_warnings(compiler);
 }
 
-fn test_zksync_can_compile_contract_with_assembly_create_suppressed_errors(
+fn test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(
     compiler: ZkSolcCompiler,
 ) {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
@@ -174,11 +174,11 @@ fn test_zksync_can_compile_contract_with_assembly_create_suppressed_errors(
 
     project
         .add_source(
-            "Erroneous",
+            "Warning",
             r#"
         // SPDX-License-Identifier: MIT OR Apache-2.0
         pragma solidity ^0.8.10;
-        contract Erroneous {
+        contract Warning {
             function deployWithCreate(bytes memory bytecode) public returns (address addr) {
                 assembly {
                     addr := create(0, add(bytecode, 0x20), mload(bytecode))
@@ -189,24 +189,44 @@ fn test_zksync_can_compile_contract_with_assembly_create_suppressed_errors(
         )
         .unwrap();
 
+    // Compile the project and ensure it succeeds with warnings
     let compiled = project.compile().unwrap();
-    assert!(compiled.has_compiler_errors());
+    compiled.assert_success();
+    assert!(
+        compiled
+            .output()
+            .errors
+            .iter()
+            .any(|err| err.is_warning() && err.message.contains("create")),
+        "Expected assembly `create` warning, but none found: {:#?}",
+        compiled.output().errors
+    );
 
-    project.project_mut().settings.settings.suppressed_errors =
-        HashSet::from([ErrorType::AssemblyCreate]);
+    project.project_mut().settings.settings.suppressed_warnings =
+        HashSet::from([WarningType::AssemblyCreate]);
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();
-    assert!(compiled.find_first("Erroneous").is_some());
+    assert!(compiled.find_first("Warning").is_some());
+
+    assert!(
+        !compiled
+            .output()
+            .errors
+            .iter()
+            .any(|err| err.is_warning() && err.message.contains("create")),
+        "Assembly `create` warning was not suppressed: {:#?}",
+        compiled.output().errors
+    )
 }
 
 #[test]
-fn zksync_can_compile_contract_with_assembly_create_suppressed_errors() {
+fn zksync_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10() {
     let compiler = ZkSolcCompiler {
-        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 9)).unwrap(),
+        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 10)).unwrap(),
         solc: Default::default(),
     };
-    test_zksync_can_compile_contract_with_assembly_create_suppressed_errors(compiler);
+    test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(compiler);
 }
 
 #[test]
@@ -536,7 +556,7 @@ contract Util {}
     assert!(compiled.output().errors.iter().any(|error| error
         .formatted_message
         .as_ref()
-        .map_or(false, |msg| msg.contains("File outside of allowed directories"))));
+        .is_some_and(|msg| msg.contains("File outside of allowed directories"))));
 }
 
 #[test]
