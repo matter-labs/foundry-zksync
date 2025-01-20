@@ -220,7 +220,7 @@ pub struct ScriptArgs {
 
     /// Gas per pubdata
     #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
-    pub gas_per_pubdata: Option<u64>,
+    pub zk_gas_per_pubdata: Option<u64>,
 }
 
 impl ScriptArgs {
