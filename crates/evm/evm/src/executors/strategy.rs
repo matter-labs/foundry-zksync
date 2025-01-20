@@ -80,6 +80,15 @@ pub enum DeployLibKind {
     Create2(B256, Bytes),
 }
 
+/// Represents the result of a library deployment
+#[derive(Debug)]
+pub struct DeployLibResult {
+    /// Result of the deployment
+    pub result: DeployResult,
+    /// Equivalent transaction to deploy the given library
+    pub tx: Option<TransactionMaybeSigned>,
+}
+
 impl ExecutorStrategy {
     pub fn new_evm() -> Self {
         Self { runner: &EvmExecutorStrategyRunner, context: Box::new(()) }
@@ -124,7 +133,7 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         input: DeployLibKind,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<Vec<(DeployResult, TransactionMaybeSigned)>, EvmError>;
+    ) -> Result<Vec<DeployLibResult>, EvmError>;
 
     /// Execute a transaction and *WITHOUT* applying state changes.
     fn call(
@@ -299,7 +308,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         kind: DeployLibKind,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<Vec<(DeployResult, TransactionMaybeSigned)>, EvmError> {
+    ) -> Result<Vec<DeployLibResult>, EvmError> {
         let nonce = self.get_nonce(executor, from).context("retrieving sender nonce")?;
 
         match kind {
@@ -311,7 +320,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
                     unsigned.input = code.into();
                     unsigned.nonce = Some(nonce);
 
-                    vec![(dr, request)]
+                    vec![DeployLibResult { result: dr, tx: Some(request) }]
                 })
             }
             DeployLibKind::Create2(salt, code) => {
@@ -345,7 +354,10 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
                     .set_nonce(from, nonce + 1)
                     .context("increasing nonce after CREATE2 deployment")?;
 
-                Ok(vec![(DeployResult { raw: result, address }, request)])
+                Ok(vec![DeployLibResult {
+                    result: DeployResult { raw: result, address },
+                    tx: Some(request),
+                }])
             }
         }
     }

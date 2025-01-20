@@ -612,8 +612,12 @@ pub async fn run_zk_script_test(
     let content = foundry_common::fs::read_to_string(run_latest).unwrap();
 
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let txs =
+        json["transactions"].as_array().expect("broadcastable txs");
+    tracing::debug!(?txs, "executed script");
+
     assert_eq!(
-        json["transactions"].as_array().expect("broadcastable txs").len(),
+        txs.len(),
         expected_broadcastable_txs
     );
     cmd.forge_fuse();

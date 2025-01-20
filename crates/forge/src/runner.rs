@@ -21,7 +21,7 @@ use foundry_evm::{
         invariant::{
             check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
         },
-        strategy::DeployLibKind,
+        strategy::{DeployLibKind, DeployLibResult},
         CallResult, EvmError, Executor, ITest, RawCallResult,
     },
     fuzz::{
@@ -138,7 +138,7 @@ impl<'a> ContractRunner<'a> {
             };
 
             for deploy_result in
-                deployments.into_iter().map(|result| result.map(|(deployment, _)| deployment))
+                deployments.into_iter().map(|result| result.map(|deployment| deployment.result))
             {
                 // Record deployed library address.
                 if let Ok(deployed) = &deploy_result {

@@ -9,7 +9,8 @@ use foundry_config::Config;
 use foundry_evm::{
     constants::CALLER,
     executors::{
-        strategy::DeployLibKind, DeployResult, EvmError, ExecutionErr, Executor, RawCallResult,
+        strategy::{DeployLibKind, DeployLibResult},
+        DeployResult, EvmError, ExecutionErr, Executor, RawCallResult,
     },
     opts::EvmOpts,
     revm::interpreter::{return_ok, InstructionResult},
@@ -73,15 +74,17 @@ impl ScriptRunner {
                     )
                     .expect("couldn't deploy library");
 
-                for (result, transaction) in results {
+                for DeployLibResult { result, tx } in results {
                     if let Some(deploy_traces) = result.raw.traces {
                         traces.push((TraceKind::Deployment, deploy_traces));
                     }
 
-                    library_transactions.push_back(BroadcastableTransaction {
-                        rpc: self.evm_opts.fork_url.clone(),
-                        transaction,
-                    })
+                    if let Some(transaction) = tx {
+                        library_transactions.push_back(BroadcastableTransaction {
+                            rpc: self.evm_opts.fork_url.clone(),
+                            transaction,
+                        });
+                    }
                 }
             }),
             ScriptPredeployLibraries::Create2(libraries, salt) => {
@@ -103,15 +106,17 @@ impl ScriptRunner {
                         )
                         .expect("couldn't deploy library");
 
-                    for (result, transaction) in results {
+                    for DeployLibResult { result, tx } in results {
                         if let Some(deploy_traces) = result.raw.traces {
                             traces.push((TraceKind::Deployment, deploy_traces));
                         }
 
-                        library_transactions.push_back(BroadcastableTransaction {
-                            rpc: self.evm_opts.fork_url.clone(),
-                            transaction,
-                        });
+                        if let Some(transaction) = tx {
+                            library_transactions.push_back(BroadcastableTransaction {
+                                rpc: self.evm_opts.fork_url.clone(),
+                                transaction,
+                            });
+                        }
                     }
                 }
             }

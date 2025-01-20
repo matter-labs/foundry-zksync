@@ -29,8 +29,8 @@ use foundry_evm::{
     decode::RevertDecoder,
     executors::{
         strategy::{
-            DeployLibKind, EvmExecutorStrategyRunner, ExecutorStrategyContext, ExecutorStrategyExt,
-            ExecutorStrategyRunner, LinkOutput,
+            DeployLibKind, DeployLibResult, EvmExecutorStrategyRunner, ExecutorStrategyContext,
+            ExecutorStrategyExt, ExecutorStrategyRunner, LinkOutput,
         },
         DeployResult, EvmError, Executor,
     },
@@ -306,7 +306,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         kind: DeployLibKind,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<Vec<(DeployResult, TransactionMaybeSigned)>, EvmError> {
+    ) -> Result<Vec<DeployLibResult>, EvmError> {
         // sync deployer account info
         let nonce = EvmExecutorStrategyRunner.get_nonce(executor, from).expect("deployer to exist");
         let balance =
@@ -383,7 +383,14 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             serde_json::to_value(metadata).expect("failed encoding json"),
         );
 
-        evm_deployment.push((DeployResult { raw: result, address }, request));
+        // ignore all EVM broadcastables
+        evm_deployment.iter_mut().for_each(|result| {
+            result.tx.take();
+        });
+        evm_deployment.push(DeployLibResult {
+            result: DeployResult { raw: result, address },
+            tx: Some(request),
+        });
         Ok(evm_deployment)
     }
 

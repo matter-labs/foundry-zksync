@@ -41,7 +41,7 @@ use std::{
     borrow::Cow,
     time::{Duration, Instant},
 };
-use strategy::{DeployLibKind, ExecutorStrategy};
+use strategy::{DeployLibKind, DeployLibResult, ExecutorStrategy};
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -317,7 +317,7 @@ impl Executor {
         kind: DeployLibKind,
         value: U256,
         rd: Option<&RevertDecoder>,
-    ) -> Result<Vec<(DeployResult, TransactionMaybeSigned)>, EvmError> {
+    ) -> Result<Vec<DeployLibResult>, EvmError> {
         self.strategy.runner.deploy_library(self, from, kind, value, rd)
     }
 
