@@ -42,7 +42,7 @@ use foundry_zksync_compilers::{
 };
 use foundry_zksync_core::{
     encode_create_params, hash_bytecode, vm::ZkEnv, ZkTransactionMetadata,
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 
 use crate::{
@@ -353,7 +353,8 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         // persist existing paymaster data (TODO(zk): is this needed?)
         let paymaster_data =
             ctx.transaction_context.take().and_then(|metadata| metadata.paymaster_data);
-        ctx.transaction_context = Some(ZkTransactionMetadata { factory_deps, paymaster_data });
+        let metadata = ZkTransactionMetadata { factory_deps, paymaster_data };
+        ctx.transaction_context = Some(metadata.clone());
 
         let result = executor.transact_raw(from, to, create_params.clone(), value)?;
         let result = result.into_result(rd)?;
@@ -377,6 +378,10 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         unsigned.nonce = Some(nonce);
         // we use the deployer here for consistency with linking
         unsigned.to = Some(TxKind::Call(to));
+        unsigned.other.insert(
+            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+            serde_json::to_value(metadata).expect("failed encoding json"),
+        );
 
         evm_deployment.push((DeployResult { raw: result, address }, request));
         Ok(evm_deployment)
