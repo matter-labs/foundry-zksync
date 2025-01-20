@@ -242,16 +242,10 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                     evm_bytecode: evm.to_vec(),
                 };
 
-                (
-                    (contract_info.clone(), contract),
-                    (
-                        contract_info,
-                        unlinked_zk_artifact
-                            .factory_dependencies_unlinked
-                            .clone()
-                            .unwrap_or_default(),
-                    ),
-                )
+                let mut factory_deps = unlinked_zk_artifact.all_factory_deps().collect::<Vec<_>>();
+                factory_deps.dedup();
+
+                ((contract_info.clone(), contract), (contract_info, factory_deps))
             });
 
         let (new_contracts, new_contracts_deps): (Vec<_>, HashMap<_, _>) =

@@ -68,15 +68,27 @@ pub struct ZkContractArtifact {
 impl ZkContractArtifact {
     /// Returns true if contract is not linked
     pub fn is_unlinked(&self) -> bool {
+        let linked_fdeps =
+            self.factory_dependencies.as_ref().map(|linked| linked.len()).unwrap_or_default();
         let unlinked_fdeps = self
             .factory_dependencies_unlinked
             .as_ref()
             .map(|unlinked| unlinked.len())
-            .unwrap_or_default();
-        let linked_fdeps =
-            self.factory_dependencies.as_ref().map(|linked| linked.len()).unwrap_or_default();
+            // default to the same number as linked_deps if this one is missing
+            // since it would mean there are no deps that were unlinked
+            // so we want the check later to return false
+            .unwrap_or(linked_fdeps);
 
         !self.missing_libraries().map_or(true, Vec::is_empty) || unlinked_fdeps - linked_fdeps > 0
+    }
+
+    /// Returns a list of _all_ factory deps, by <path>:<name>
+    ///
+    /// Will return unlinked as well as linked factory deps (might contain duplicates)
+    pub fn all_factory_deps(&self) -> impl Iterator<Item = &String> {
+        let linked = self.factory_dependencies.iter().flatten().map(|(_, dep)| dep);
+        let unlinked = self.factory_dependencies_unlinked.iter().flatten();
+        linked.chain(unlinked)
     }
 
     /// Get contract missing libraries
