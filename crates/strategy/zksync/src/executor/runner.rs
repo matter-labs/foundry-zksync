@@ -144,6 +144,9 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             return Err(LinkerError::MissingTargetArtifact);
         };
 
+        // we don't strip here unlinke upstream due to
+        // `input` being used later during linking
+        // and that is unstripped
         let contracts: ArtifactContracts<CompactContractBytecodeCow<'_>> =
             input.artifact_ids().collect();
 
@@ -194,33 +197,25 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             .map_err(zk_linker_error_to_linker)?;
 
         let linked_contracts = linker
-            .zk_get_linked_artifacts(
-                input
-                    .artifact_ids()
-                    .filter(|(_, artifact)| artifact.is_unlinked())
-                    // we can't use the `id` directly here
-                    // becuase we expect an iterator of references
-                    .map(|(id, _)| {
-                        linker.linker.contracts.get_key_value(&id).expect("id to be present").0
-                    }),
-                &libraries,
-            )
+            .zk_get_linked_artifacts(linker.linker.contracts.keys(), &libraries)
             .map_err(zk_linker_error_to_linker)?;
 
         let newly_linked_dual_compiled_contracts = linked_contracts
             .iter()
             .flat_map(|(needle, zk)| {
+                // match EVM linking's prefix stripping
+                let stripped = needle.clone().with_stripped_file_prefixes(&root);
                 evm_link
                     .linked_contracts
                     .iter()
-                    .find(|(id, _)| id.source == needle.source && id.name == needle.name)
-                    .map(|(_, evm)| (needle, zk, evm))
+                    .find(|(id, _)| id.source == stripped.source && id.name == stripped.name)
+                    .map(|(_, evm)| (needle, stripped, zk, evm))
             })
-            .filter(|(_, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
-            .map(|(id, linked_zk, evm)| {
+            .filter(|(_, _, zk, evm)| zk.bytecode.is_some() && evm.bytecode.is_some())
+            .map(|(unstripped_id, id, linked_zk, evm)| {
                 let (_, unlinked_zk_artifact) = input
                     .artifact_ids()
-                    .find(|(contract_id, _)| contract_id == id)
+                    .find(|(contract_id, _)| contract_id == unstripped_id)
                     .expect("unable to find original (pre-linking) artifact");
                 let zk_bytecode =
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
@@ -363,7 +358,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         // also mark this library as persistent, this will ensure that the state of the library is
         // persistent across fork swaps in forking mode
         executor.backend_mut().add_persistent_account(address);
-        debug!(%address, "deployed contract with create2");
+        debug!(%address, "deployed contract");
 
         let mut request = TransactionMaybeSigned::new(Default::default());
         let unsigned = request.as_unsigned_mut().unwrap();

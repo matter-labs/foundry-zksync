@@ -134,16 +134,14 @@ impl BuildData {
             output.libraries
         };
 
+        let mut factory_deps = Default::default();
+        let mut libs = Default::default();
+        linker.zk_collect_dependencies(target, &mut libs, Some(&mut factory_deps)).expect("able to enumerate all factory deps");
+
         let linked_contracts = linker
             .zk_get_linked_artifacts(
-                input
-                    .artifact_ids()
-                    .filter(|(_, artifact)| artifact.is_unlinked())
-                    // we can't use the `id` directly here
-                    // becuase we expect an iterator of references
-                    .map(|(id, _)| {
-                        linker.linker.contracts.get_key_value(&id).expect("id to be present").0
-                    }),
+                // only retrieve target and its deps
+                factory_deps.into_iter().chain(libs.into_iter()).chain([target]),
                 &libraries,
             )
             .context("retrieving all fully linked contracts")?;

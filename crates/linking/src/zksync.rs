@@ -115,10 +115,11 @@ impl<'a> ZkLinker<'a> {
 
     /// Performs DFS on the graph of link references, and populates `deps` with all found libraries,
     /// including ones of factory deps.
-    fn zk_collect_dependencies(
+    pub fn zk_collect_dependencies(
         &'a self,
         target: &'a ArtifactId,
-        deps: &mut BTreeSet<&'a ArtifactId>,
+        libraries: &mut BTreeSet<&'a ArtifactId>,
+        factory_deps: Option<&mut BTreeSet<&'a ArtifactId>>,
     ) -> Result<(), LinkerError> {
         let (_, artifact) = self
             .zk_artifacts()
@@ -131,10 +132,11 @@ impl<'a> ZkLinker<'a> {
         }
 
         // find all nested factory deps's link references
-        let mut factory_deps = BTreeSet::new();
-        self.zk_collect_factory_deps(target, &mut factory_deps)?;
+        let mut fdeps_default = BTreeSet::new();
+        let factory_deps = factory_deps.unwrap_or(&mut fdeps_default);
+        self.zk_collect_factory_deps(target, factory_deps)?;
 
-        for (_, fdep) in factory_deps.into_iter().filter_map(|target| {
+        for (_, fdep) in factory_deps.iter().filter_map(|target| {
             self.zk_artifacts().find(|(id, _)| id.source == target.source && id.name == target.name)
         }) {
             if let Some(bytecode) = &fdep.bytecode {
@@ -151,8 +153,8 @@ impl<'a> ZkLinker<'a> {
                         file: file.to_string(),
                         name: contract.to_string(),
                     })?;
-                if deps.insert(id) {
-                    self.zk_collect_dependencies(id, deps)?;
+                if libraries.insert(id) {
+                    self.zk_collect_dependencies(id, libraries, Some(factory_deps))?;
                 }
             }
         }
@@ -182,7 +184,7 @@ impl<'a> ZkLinker<'a> {
 
         let mut needed_libraries = BTreeSet::new();
         for target in targets {
-            self.zk_collect_dependencies(target, &mut needed_libraries)?;
+            self.zk_collect_dependencies(target, &mut needed_libraries, None)?;
         }
 
         let mut libs_to_deploy = Vec::new();
@@ -225,7 +227,7 @@ impl<'a> ZkLinker<'a> {
         let mut contracts = self.linker.contracts.clone();
 
         let mut needed_libraries = BTreeSet::new();
-        self.zk_collect_dependencies(target, &mut needed_libraries)?;
+        self.zk_collect_dependencies(target, &mut needed_libraries, None)?;
 
         let attempt_link = |contracts: &mut ArtifactContracts<CompactContractBytecodeCow<'a>>,
                             id,

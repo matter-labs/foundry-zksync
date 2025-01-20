@@ -8,6 +8,8 @@ use crate::{
     test_helpers::{deploy_zk_contract, run_zk_script_test, TEST_DATA_DEFAULT},
 };
 
+const ZKSOLC_MIN_LINKING_VERSION: Version = Version::new(1, 5, 9);
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_deploy_time_linking() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
@@ -20,7 +22,7 @@ forgetest_async!(
     #[should_panic = "no bytecode for contract; is it abstract or unlinked?"]
     script_zk_fails_indirect_reference_to_unlinked,
     |prj, cmd| {
-        setup_libs_prj(&mut prj, &mut cmd, Some(Version::new(1, 5, 9)));
+        setup_libs_prj(&mut prj, &mut cmd, Some(ZKSOLC_MIN_LINKING_VERSION));
         run_zk_script_test(
             prj.root(),
             &mut cmd,
@@ -35,7 +37,7 @@ forgetest_async!(
 );
 
 forgetest_async!(script_zk_deploy_time_linking, |prj, cmd| {
-    setup_libs_prj(&mut prj, &mut cmd, Some(Version::new(1, 5, 9)));
+    setup_libs_prj(&mut prj, &mut cmd, Some(ZKSOLC_MIN_LINKING_VERSION));
     run_zk_script_test(
         prj.root(),
         &mut cmd,
@@ -54,7 +56,10 @@ forgetest_async!(
     #[should_panic = "deploy-time linking not supported"]
     script_zk_deploy_time_linking_fails_older_version,
     |prj, cmd| {
-        setup_libs_prj(&mut prj, &mut cmd, Some(Version::new(1, 5, 8)));
+        let mut version = ZKSOLC_MIN_LINKING_VERSION;
+        version.patch -= 1;
+
+        setup_libs_prj(&mut prj, &mut cmd, Some(version));
         run_zk_script_test(
             prj.root(),
             &mut cmd,
