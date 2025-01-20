@@ -12,7 +12,7 @@ env:
 
 jobs:
   zk-aave-test:
-    runs-on: ubuntu-22.04-github-hosted-16core
+    runs-on: ubuntu-24.04-github-hosted-16core
 
     steps:
       - name: Checkout code
