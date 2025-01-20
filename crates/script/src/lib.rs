@@ -217,6 +217,10 @@ pub struct ScriptArgs {
 
     #[command(flatten)]
     pub retry: RetryArgs,
+
+        /// Gas per pubdata
+        #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
+        pub gas_per_pubdata: Option<u64>,
 }
 
 impl ScriptArgs {
@@ -638,11 +642,6 @@ impl ScriptConfig {
                 strategy.context.as_mut(),
                 dual_compiled_contracts,
             );
-            if let Some(gas_per_pubdata) = self.config.zksync.gas_per_pubdata {
-                strategy
-                    .runner
-                    .zksync_set_gas_per_pubdata(strategy.context.as_mut(), gas_per_pubdata);
-            }
 
             if let Some(fork_url) = &self.evm_opts.fork_url {
                 strategy.runner.zksync_set_fork_env(strategy.context.as_mut(), fork_url, &env)?;

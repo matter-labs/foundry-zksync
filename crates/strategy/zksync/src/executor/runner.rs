@@ -154,15 +154,6 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
         ctx.dual_compiled_contracts = dual_compiled_contracts;
     }
 
-    fn zksync_set_gas_per_pubdata(
-        &self,
-        ctx: &mut dyn ExecutorStrategyContext,
-        gas_per_pubdata: u64,
-    ) {
-        let ctx = get_context(ctx);
-        ctx.zk_env.gas_per_pubdata = Some(gas_per_pubdata);
-    }
-
     fn zksync_set_fork_env(
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
@@ -182,7 +173,6 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
 
         if let Some(block_details) = maybe_block_details {
             ctx.zk_env = ZkEnv {
-                gas_per_pubdata: ctx.zk_env.gas_per_pubdata,
                 l1_gas_price: block_details
                     .l1_gas_price
                     .try_into()

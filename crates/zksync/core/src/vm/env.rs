@@ -23,8 +23,6 @@ pub struct ZkEnv {
     pub fair_l2_gas_price: u64,
     /// fair pubdata price
     pub fair_pubdata_price: u64,
-    /// gas per pubdata
-    pub gas_per_pubdata: Option<u64>,
 }
 
 impl Default for ZkEnv {
@@ -35,7 +33,6 @@ impl Default for ZkEnv {
             l1_gas_price: 0,
             fair_l2_gas_price: 0,
             fair_pubdata_price: 1000,
-            gas_per_pubdata: None,
         }
     }
 }

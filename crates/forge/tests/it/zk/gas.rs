@@ -68,7 +68,7 @@ forgetest_async!(zk_script_execution_with_gas_multiplier, |prj, cmd| {
     cmd.arg("script").args(&sufficient_multiplier_args);
     let stdout = cmd.assert_success().get_output().stdout_lossy();
     assert!(stdout.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
-});
+}); 
 
 forgetest_async!(zk_script_execution_with_gas_per_pubdata, |prj, cmd| {
     // Setup
