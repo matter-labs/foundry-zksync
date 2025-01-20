@@ -189,11 +189,8 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         });
         tx.other.insert(
             ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-            serde_json::to_value(ZkTransactionMetadata::new(
-                zk_tx_factory_deps,
-                paymaster_params,
-            ))
-            .expect("failed encoding json"),
+            serde_json::to_value(ZkTransactionMetadata::new(zk_tx_factory_deps, paymaster_params))
+                .expect("failed encoding json"),
         );
         broadcastable_transactions.push_back(BroadcastableTransaction {
             rpc,

@@ -218,9 +218,9 @@ pub struct ScriptArgs {
     #[command(flatten)]
     pub retry: RetryArgs,
 
-        /// Gas per pubdata
-        #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
-        pub gas_per_pubdata: Option<u64>,
+    /// Gas per pubdata
+    #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
+    pub gas_per_pubdata: Option<u64>,
 }
 
 impl ScriptArgs {

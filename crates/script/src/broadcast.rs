@@ -143,8 +143,13 @@ pub async fn send_transaction(
                     );
                 }
 
-                foundry_zksync_core::estimate_fee(&mut zk_tx, &zk_provider, estimate_multiplier, gas_per_pubdata)
-                    .await?;
+                foundry_zksync_core::estimate_fee(
+                    &mut zk_tx,
+                    &zk_provider,
+                    estimate_multiplier,
+                    gas_per_pubdata,
+                )
+                .await?;
 
                 let zk_signer = alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
                 let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
