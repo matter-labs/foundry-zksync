@@ -264,6 +264,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             injected_factory_deps
         };
         let zk_tx = ZkTransactionMetadata::new(factory_deps, paymaster_params);
+
         let mut tx_req = TransactionRequest {
             from: Some(broadcast.new_origin),
             to: Some(TxKind::from(Some(call.target_address))),
