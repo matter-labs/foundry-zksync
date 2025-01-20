@@ -70,6 +70,28 @@ forgetest_async!(zk_script_execution_with_gas_multiplier, |prj, cmd| {
     assert!(stdout.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
 });
 
+forgetest_async!(zk_script_execution_with_gas_per_pubdata, |prj, cmd| {
+    // Setup
+    setup_gas_prj(&mut prj);
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+    cmd.forge_fuse();
+    let private_key = get_rich_wallet_key();
+
+    // Test with unacceptable gas per pubdata (should fail)
+    let zero_pubdata_args = create_script_args(&private_key, &url, "--zk-gas-per-pubdata", "1");
+    cmd.arg("script").args(&zero_pubdata_args);
+    cmd.assert_failure();
+    cmd.forge_fuse();
+
+    // Test with sufficient gas per pubdata (should succeed)
+    let sufficient_pubdata_args =
+        create_script_args(&private_key, &url, "--zk-gas-per-pubdata", "3000");
+    cmd.arg("script").args(&sufficient_pubdata_args);
+    let stdout = cmd.assert_success().get_output().stdout_lossy();
+    assert!(stdout.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL"));
+});
+
 fn get_rich_wallet_key() -> String {
     ZkSyncNode::rich_wallets()
         .next()

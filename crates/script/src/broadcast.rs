@@ -70,6 +70,7 @@ pub async fn send_transaction(
     is_fixed_gas_limit: bool,
     estimate_via_rpc: bool,
     estimate_multiplier: u64,
+    gas_per_pubdata: Option<u64>,
 ) -> Result<TxHash> {
     let zk_tx_meta =
         if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
@@ -141,8 +142,14 @@ pub async fn send_transaction(
                         },
                     );
                 }
-                foundry_zksync_core::estimate_fee(&mut zk_tx, &zk_provider, estimate_multiplier)
-                    .await?;
+
+                foundry_zksync_core::estimate_fee(
+                    &mut zk_tx,
+                    &zk_provider,
+                    estimate_multiplier,
+                    gas_per_pubdata,
+                )
+                .await?;
 
                 let zk_signer = alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
                 let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
@@ -440,6 +447,7 @@ impl BundledState {
                             *is_fixed_gas_limit,
                             estimate_via_rpc,
                             self.args.gas_estimate_multiplier,
+                            self.args.gas_per_pubdata,
                         );
                         pending_transactions.push(fut);
                     }

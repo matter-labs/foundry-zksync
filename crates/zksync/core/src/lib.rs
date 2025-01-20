@@ -135,15 +135,20 @@ pub async fn estimate_fee<P: ZksyncProvider<T>, T: Transport + Clone>(
     tx: &mut ZkTransactionRequest,
     provider: P,
     estimate_multiplier: u64,
+    gas_per_pubdata: Option<u64>,
 ) -> Result<()> {
     let fee = provider.estimate_fee(tx.clone()).await?;
     tx.set_gas_limit(fee.gas_limit * estimate_multiplier / 100);
     // If user provided a gas price, use it for both maxFeePerGas
     let max_fee = tx.max_fee_per_gas().unwrap_or(fee.max_fee_per_gas);
     let max_priority_fee = tx.max_priority_fee_per_gas().unwrap_or(fee.max_priority_fee_per_gas);
+    let gas_per_pubdata = match gas_per_pubdata {
+        Some(value) => rU256::from(value),
+        None => fee.gas_per_pubdata_limit,
+    };
     tx.set_max_fee_per_gas(max_fee);
     tx.set_max_priority_fee_per_gas(max_priority_fee);
-    tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit);
+    tx.set_gas_per_pubdata(gas_per_pubdata);
 
     Ok(())
 }
