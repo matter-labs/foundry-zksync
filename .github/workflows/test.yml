@@ -88,7 +88,7 @@ jobs:
 
   crate-checks:
     # ubuntu-22.04 runs out of disk space
-    runs-on: ubuntu-22.04-github-hosted-16core
+    runs-on: ubuntu-24.04-github-hosted-16core
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +103,7 @@ jobs:
         run: cargo hack check
 
   zk-cargo-test:
-    runs-on: ubuntu-22.04-github-hosted-16core
+    runs-on: ubuntu-24.04-github-hosted-16core
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -165,12 +165,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install foundry-zksync
         run: |
           cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/
           cd /tmp
           ./install-foundry-zksync
-      
+
       - name: Verify anvil-zksync installation
         run: anvil-zksync --version
