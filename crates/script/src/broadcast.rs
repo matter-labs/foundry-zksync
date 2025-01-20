@@ -447,7 +447,7 @@ impl BundledState {
                             *is_fixed_gas_limit,
                             estimate_via_rpc,
                             self.args.gas_estimate_multiplier,
-                            self.args.gas_per_pubdata,
+                            self.args.zk_gas_per_pubdata,
                         );
                         pending_transactions.push(fut);
                     }
