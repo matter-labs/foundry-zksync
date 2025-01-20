@@ -134,7 +134,7 @@ pub struct ZkSyncArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suppressed_errors: Option<Vec<ZkSolcError>>,
 
-    /// Gas per pubdata
+    /// Gas per pubdata to be set on transactions when broadcasting on scripts
     #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
     pub gas_per_pubdata: Option<u64>,
 }
