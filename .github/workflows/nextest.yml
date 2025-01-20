@@ -40,6 +40,8 @@ jobs:
   test:
     name: test ${{ matrix.name }}
     runs-on: ${{ matrix.runner_label }}
+    container:
+      image: ubuntu:20.04
     timeout-minutes: 60
     needs: matrices
     strategy:
