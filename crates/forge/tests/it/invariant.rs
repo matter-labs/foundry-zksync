@@ -617,6 +617,8 @@ async fn test_invariant_roll_fork_handler() {
     });
     let results = runner.test_collect(&filter);
     error!("AAAAAAAAAAAAAH");
+    eprintln!("In Stderrr");
+    println!("In Stdout");
     assert_multiple(
         &results,
         BTreeMap::from([
