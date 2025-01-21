@@ -95,4 +95,4 @@ jobs:
           SVM_TARGET_PLATFORM: linux-amd64 
           HTTP_ARCHIVE_URLS: ${{ secrets.HTTP_ARCHIVE_URLS }}
           WS_ARCHIVE_URLS: ${{ secrets.WS_ARCHIVE_URLS }}
-        run: cargo nextest run -E 'kind(test) & !test(/issue|forge_std|ext_integration/)' --partition count:3/3 --filter-expr 'not (test(~zk) or test(~test_zk_aave_di))'
+        run: cargo nextest run -E 'kind(test) & !test(/issue|forge_std|ext_integration|zk|test_zk_aave_di/)' --partition count:3/3
