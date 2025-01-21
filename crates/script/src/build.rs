@@ -50,21 +50,31 @@ impl BuildData {
     fn get_zk_linker(&self, script_config: &ScriptConfig) -> Result<ZkLinker<'_>> {
         let zksolc = foundry_config::zksync::config_zksolc_compiler(&script_config.config)
             .context("retrieving zksolc compiler to be used for linking")?;
-
         let version = zksolc.version().context("trying to determine zksolc version")?;
-        if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
-            eyre::bail!(
-                "deploy-time linking not supported. minimum: {}, given: {}",
-                DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
-                &version
-            );
-        }
 
         let Some(input) = self.zk_output.as_ref() else {
             eyre::bail!("unable to link zk artifacts if no zk compilation output is provided")
         };
 
-        Ok(ZkLinker::new(self.project_root.clone(), input.artifact_ids().collect(), zksolc, input))
+        let linker =
+            ZkLinker::new(self.project_root.clone(), input.artifact_ids().collect(), zksolc, input);
+
+        let mut libs = Default::default();
+        linker.zk_collect_dependencies(&self.target, &mut libs, None)?;
+
+        // if there are no no libs, no linking will happen
+        // so we can skip version check
+        if libs.len() != 0 {
+            if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
+                eyre::bail!(
+                    "deploy-time linking not supported. minimum: {}, given: {}",
+                    DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
+                    &version
+                );
+            }
+        }
+
+        Ok(linker)
     }
 
     /// Will attempt linking via `zksolc`
@@ -94,18 +104,18 @@ impl BuildData {
 
         let mut dual_compiled_contracts = self.dual_compiled_contracts.take().unwrap_or_default();
 
-        let linker = self.get_zk_linker(script_config)?;
-
         // NOTE(zk): translate solc ArtifactId to zksolc otherwise
         // we won't be able to find it in the zksolc output
-        let Some(target) = linker
-            .linker
-            .contracts
-            .keys()
+        let Some(target) = input
+            .artifact_ids()
+            .map(|(id, _)| id)
             .find(|id| id.source == self.target.source && id.name == self.target.name)
         else {
             eyre::bail!("unable to find zk target artifact for linking");
         };
+        let target = &target;
+
+        let linker = self.get_zk_linker(script_config)?;
 
         let create2_deployer = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
         let maybe_create2_link_output = use_create2
@@ -138,7 +148,7 @@ impl BuildData {
         let mut libs = Default::default();
         linker
             .zk_collect_dependencies(target, &mut libs, Some(&mut factory_deps))
-            .expect("able to enumerate all factory deps");
+            .expect("able to enumerate all deps");
 
         let linked_contracts = linker
             .zk_get_linked_artifacts(
