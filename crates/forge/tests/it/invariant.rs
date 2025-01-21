@@ -5,8 +5,9 @@ use alloy_primitives::U256;
 use forge::fuzz::CounterExample;
 use foundry_common::{sh_eprintln, sh_println};
 use foundry_config::{Config, InvariantConfig};
-use foundry_test_utils::{forgetest_init, str, Filter};
+use foundry_test_utils::{forgetest_init, init_tracing, str, Filter};
 use std::collections::BTreeMap;
+use tracing::error;
 
 macro_rules! get_counterexample {
     ($runner:ident, $filter:expr) => {
@@ -609,13 +610,13 @@ async fn test_invariant_scrape_values() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_invariant_roll_fork_handler() {
+    init_tracing();
     let filter = Filter::new(".*", ".*", ".*fuzz/invariant/common/InvariantRollFork.t.sol");
     let mut runner = TEST_DATA_DEFAULT.runner_with(|config| {
         config.fuzz.seed = Some(U256::from(119u32));
     });
     let results = runner.test_collect(&filter);
-    sh_println!("Standard output bro").unwrap();
-    eprintln!("Printing something to stderr!!!!!");
+    error!("AAAAAAAAAAAAAH");
     assert_multiple(
         &results,
         BTreeMap::from([

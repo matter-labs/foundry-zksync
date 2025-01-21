@@ -285,8 +285,6 @@ impl<'a> ContractRunner<'a> {
     pub fn run_tests(mut self, filter: &dyn TestFilter) -> SuiteResult {
         let start = Instant::now();
         let mut warnings = Vec::new();
-        println!("Standard output inside the test");
-        eprintln!("Printing something to stderr inside the test!!!!!");
 
         // Check if `setUp` function with valid signature declared.
         let setup_fns: Vec<_> =
