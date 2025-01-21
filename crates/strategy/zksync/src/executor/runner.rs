@@ -191,7 +191,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                     minimum_version = %DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
                     "deploy-time linking not supported"
                 );
-                return Err(LinkerError::CyclicDependency.into());
+                return Err(LinkerError::CyclicDependency);
             }
         }
 

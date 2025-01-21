@@ -64,14 +64,12 @@ impl BuildData {
 
         // if there are no no libs, no linking will happen
         // so we can skip version check
-        if libs.len() != 0 {
-            if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
-                eyre::bail!(
-                    "deploy-time linking not supported. minimum: {}, given: {}",
-                    DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
-                    &version
-                );
-            }
+        if !libs.is_empty() && version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
+            eyre::bail!(
+                "deploy-time linking not supported. minimum: {}, given: {}",
+                DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
+                &version
+            );
         }
 
         Ok(linker)
