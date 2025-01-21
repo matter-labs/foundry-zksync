@@ -3,6 +3,7 @@
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::U256;
 use forge::fuzz::CounterExample;
+use foundry_common::{sh_eprintln, sh_println};
 use foundry_config::{Config, InvariantConfig};
 use foundry_test_utils::{forgetest_init, str, Filter};
 use std::collections::BTreeMap;
@@ -613,6 +614,8 @@ async fn test_invariant_roll_fork_handler() {
         config.fuzz.seed = Some(U256::from(119u32));
     });
     let results = runner.test_collect(&filter);
+    sh_println!("Standard output bro").unwrap();
+    sh_eprintln!("Printing something to stderr!!!!!").unwrap();
     assert_multiple(
         &results,
         BTreeMap::from([
