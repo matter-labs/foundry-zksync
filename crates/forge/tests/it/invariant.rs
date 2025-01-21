@@ -615,7 +615,7 @@ async fn test_invariant_roll_fork_handler() {
     });
     let results = runner.test_collect(&filter);
     sh_println!("Standard output bro").unwrap();
-    sh_eprintln!("Printing something to stderr!!!!!").unwrap();
+    eprintln!("Printing something to stderr!!!!!");
     assert_multiple(
         &results,
         BTreeMap::from([
