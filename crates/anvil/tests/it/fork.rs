@@ -1509,7 +1509,6 @@ async fn test_reset_updates_cache_path_when_rpc_url_not_provided() {
     assert_eq!(BLOCK_NUMBER - 1_000_000, get_block_from_cache_path(&mut api).await);
 }
 
-
 #[tokio::test(flavor = "multi_thread")]
 async fn test_fork_get_account() {
     let (_api, handle) = spawn(fork_config()).await;
