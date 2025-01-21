@@ -13,7 +13,7 @@ use foundry_compilers::{
 };
 use foundry_config::Config;
 use foundry_evm_core::{
-    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend, DatabaseExt},
+    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
 };
 use foundry_linking::{Linker, LinkerError};
@@ -22,7 +22,7 @@ use foundry_zksync_compilers::{
     dual_compiled_contracts::DualCompiledContracts,
 };
 use revm::{
-    primitives::{Env, EnvWithHandlerCfg, Output, ResultAndState},
+    primitives::{Env, EnvWithHandlerCfg, ResultAndState},
     DatabaseRef,
 };
 

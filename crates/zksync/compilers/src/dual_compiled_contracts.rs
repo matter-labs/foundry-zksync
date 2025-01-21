@@ -350,7 +350,6 @@ impl DualCompiledContracts {
             .chain(path_matches)
             .chain(name_matches)
             .map(|(_, contract)| contract)
-            .into_iter()
     }
 
     /// Retrieves the length of the collection.

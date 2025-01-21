@@ -100,7 +100,7 @@ impl ScriptRunner {
                         .executor
                         .deploy_library(
                             self.evm_opts.sender,
-                            DeployLibKind::Create2(salt.clone(), library.clone()),
+                            DeployLibKind::Create2(*salt, library.clone()),
                             U256::from(0),
                             None,
                         )

@@ -80,8 +80,7 @@ impl<'a> ZkLinker<'a> {
             .factory_dependencies
             .as_ref()
             .iter()
-            .map(|map| map.values().into_iter())
-            .flatten()
+            .flat_map(|map| map.values())
             .collect::<Vec<_>>();
 
         let unlinked_deps_of_target = artifact
@@ -102,7 +101,7 @@ impl<'a> ZkLinker<'a> {
             let id = self
                 .linker
                 .find_artifact_id_by_library_path(&file, &name, None)
-                .ok_or_else(|| LinkerError::MissingLibraryArtifact { file, name })?;
+                .ok_or(LinkerError::MissingLibraryArtifact { file, name })?;
 
             if factory_deps.insert(id) {
                 self.zk_collect_factory_deps(id, factory_deps)?;
@@ -234,7 +233,7 @@ impl<'a> ZkLinker<'a> {
                             zksolc| {
             let original = contracts.get(id).expect("library present in list of contracts");
             // Link library with provided libs and extract bytecode object (possibly unlinked).
-            match Self::zk_link(&contracts, id, libraries, zksolc) {
+            match Self::zk_link(contracts, id, libraries, zksolc) {
                 Ok(linked) => {
                     // persist linked contract for successive iterations
                     *contracts.entry(id.clone()).or_default() = linked.clone();

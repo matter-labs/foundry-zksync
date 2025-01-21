@@ -16,7 +16,6 @@ use alloy_primitives::{
     Address, Bytes, Log, U256,
 };
 use alloy_sol_types::{sol, SolCall};
-use foundry_common::TransactionMaybeSigned;
 use foundry_evm_core::{
     backend::{Backend, BackendError, BackendResult, CowBackend, DatabaseExt, GLOBAL_FAIL_SLOT},
     constants::{

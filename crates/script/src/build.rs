@@ -25,7 +25,7 @@ use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::{DualCompiledContract, DualCompiledContracts},
 };
-use foundry_zksync_core::{hash_bytecode, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, H256};
+use foundry_zksync_core::{hash_bytecode, DEFAULT_CREATE2_DEPLOYER_ZKSYNC};
 use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
 /// Container for the compiled contracts.

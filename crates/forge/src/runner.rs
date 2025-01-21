@@ -21,7 +21,7 @@ use foundry_evm::{
         invariant::{
             check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
         },
-        strategy::{DeployLibKind, DeployLibResult},
+        strategy::DeployLibKind,
         CallResult, EvmError, Executor, ITest, RawCallResult,
     },
     fuzz::{

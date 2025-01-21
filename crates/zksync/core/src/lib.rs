@@ -211,7 +211,7 @@ pub fn compute_create2_address(
     salt: B256,
     constructor_input: &[u8],
 ) -> Address {
-    const CREATE2_PREFIX: &'static [u8] = b"zksyncCreate2";
+    const CREATE2_PREFIX: &[u8] = b"zksyncCreate2";
     let prefix = keccak256(CREATE2_PREFIX);
     let sender = sender.to_h256();
     let constructor_input_hash = keccak256(constructor_input);

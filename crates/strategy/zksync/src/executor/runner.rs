@@ -15,7 +15,6 @@ use revm::{
     Database,
 };
 use tracing::debug;
-use zksync_types::H256;
 
 use foundry_common::{ContractsByArtifact, TransactionMaybeSigned};
 use foundry_compilers::{
@@ -25,7 +24,6 @@ use foundry_compilers::{
 use foundry_config::Config;
 use foundry_evm::{
     backend::{Backend, BackendResult, CowBackend, DatabaseExt},
-    constants::DEFAULT_CREATE2_DEPLOYER,
     decode::RevertDecoder,
     executors::{
         strategy::{
@@ -170,7 +168,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             }
         })?;
 
-        let linker = ZkLinker::new(root, contracts.clone(), zksolc, &input);
+        let linker = ZkLinker::new(root, contracts.clone(), zksolc, input);
 
         let zk_linker_error_to_linker = |zk_error| match zk_error {
             ZkLinkerError::Inner(err) => err,
@@ -204,7 +202,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             .iter()
             .flat_map(|(needle, zk)| {
                 // match EVM linking's prefix stripping
-                let stripped = needle.clone().with_stripped_file_prefixes(&root);
+                let stripped = needle.clone().with_stripped_file_prefixes(root);
                 evm_link
                     .linked_contracts
                     .iter()
