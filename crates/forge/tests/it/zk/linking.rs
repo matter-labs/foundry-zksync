@@ -18,6 +18,10 @@ async fn test_zk_deploy_time_linking() {
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
+// TODO(zk): add equivalent test for `GetCodeUnlinked`
+// would probably need to split in separate file (and skip other file)
+// as tests look for _all_ lib deps and deploy them for every test
+
 forgetest_async!(
     #[should_panic = "no bytecode for contract; is it abstract or unlinked?"]
     script_zk_fails_indirect_reference_to_unlinked,

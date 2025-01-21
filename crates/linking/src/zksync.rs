@@ -60,7 +60,6 @@ impl<'a> ZkLinker<'a> {
         compiler: ZkSolcCompiler,
         compiler_output: &'a ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
     ) -> Self {
-        // TODO(zk): check prefix `root` is stripped from `compiler_output`
         Self { linker: Linker::new(root, contracts), compiler, compiler_output }
     }
 
@@ -397,7 +396,7 @@ impl<'a> ZkLinker<'a> {
             .into_iter()
             // we strip these here because the file references are also relative
             // and the linker wouldn't be able to properly detect matching factory deps
-            // (libraries are given separately and alredy stripped)
+            // (libraries are given separately and already stripped)
             .map(|(id, v)| (id.with_stripped_file_prefixes(&self.linker.root), v))
             .collect();
         let mut targets = targets.into_iter().cloned().collect::<VecDeque<_>>();
@@ -456,7 +455,7 @@ impl<'a> ZkLinker<'a> {
                         }
 
                         targets.extend(ids); // queue factory deps for linking
-                        targets.push_back(id); // reque original target
+                        targets.push_back(id); // requeue original target
                     }
                 }
                 Err(err) => return Err(err),

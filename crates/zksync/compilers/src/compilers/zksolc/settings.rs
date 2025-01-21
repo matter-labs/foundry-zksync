@@ -54,6 +54,8 @@ pub enum ZkSolcError {
     /// `sendtransfer` error: Using `send()` or `transfer()` methods on `address payable` instead
     /// of `call()`.
     SendTransfer,
+    /// `assemblycreate` error: using 'create'/'create2' in an assembly block,
+    /// probably by providing bytecode and expecting an EVM-like behavior.
     AssemblyCreate,
 }
 
