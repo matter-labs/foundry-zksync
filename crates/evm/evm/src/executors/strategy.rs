@@ -325,21 +325,17 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
             }
             DeployLibKind::Create2(salt, code) => {
                 let create2_deployer = executor.create2_deployer();
+
                 let calldata: Bytes = [salt.as_ref(), code.as_ref()].concat().into();
                 let result =
                     executor.transact_raw(from, create2_deployer, calldata.clone(), value)?;
                 let result = result.into_result(rd)?;
 
-                let Some(Output::Create(_, Some(address))) = result.out else {
-                    return Err(eyre::eyre!(
-                        "Deployment succeeded, but no address was returned: {result:#?}"
-                    )
-                    .into());
-                };
-
-                // also mark this library as persistent, this will ensure that the state of the
-                // library is persistent across fork swaps in forking mode
-                executor.backend_mut().add_persistent_account(address);
+                let address = result
+                    .out
+                    .as_ref()
+                    .and_then(|out| out.address().cloned())
+                    .unwrap_or_else(|| create2_deployer.create2_from_code(salt, code.as_ref()));
                 debug!(%address, "deployed contract with create2");
 
                 let mut request = TransactionMaybeSigned::new(Default::default());
