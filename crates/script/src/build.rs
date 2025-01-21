@@ -136,7 +136,9 @@ impl BuildData {
 
         let mut factory_deps = Default::default();
         let mut libs = Default::default();
-        linker.zk_collect_dependencies(target, &mut libs, Some(&mut factory_deps)).expect("able to enumerate all factory deps");
+        linker
+            .zk_collect_dependencies(target, &mut libs, Some(&mut factory_deps))
+            .expect("able to enumerate all factory deps");
 
         let linked_contracts = linker
             .zk_get_linked_artifacts(
@@ -180,7 +182,6 @@ impl BuildData {
                     evm_deployed_bytecode: evm.to_vec(),
                     evm_bytecode: evm.to_vec(),
                 };
-
 
                 let mut factory_deps = unlinked_zk_artifact.all_factory_deps().collect::<Vec<_>>();
                 factory_deps.dedup();
@@ -255,31 +256,33 @@ impl BuildData {
             })
             .flatten();
 
-        let (libraries, predeploy_libs, uses_create2) = if let Some(output) = maybe_create2_link_output {
-            (
-                output.libraries,
-                ScriptPredeployLibraries::Create2(
-                    output.libs_to_deploy,
-                    script_config.config.create2_library_salt,
-                ),
-                true
-            )
-        } else {
-            let output = self.get_linker().link_with_nonce_or_address(
-                known_libraries.clone(),
-                script_config.evm_opts.sender,
-                script_config.sender_nonce,
-                [&self.target],
-            )?;
+        let (libraries, predeploy_libs, uses_create2) =
+            if let Some(output) = maybe_create2_link_output {
+                (
+                    output.libraries,
+                    ScriptPredeployLibraries::Create2(
+                        output.libs_to_deploy,
+                        script_config.config.create2_library_salt,
+                    ),
+                    true,
+                )
+            } else {
+                let output = self.get_linker().link_with_nonce_or_address(
+                    known_libraries.clone(),
+                    script_config.evm_opts.sender,
+                    script_config.sender_nonce,
+                    [&self.target],
+                )?;
 
-            (output.libraries, ScriptPredeployLibraries::Default(output.libs_to_deploy), false)
-        };
+                (output.libraries, ScriptPredeployLibraries::Default(output.libs_to_deploy), false)
+            };
 
         let known_contracts = self
             .get_linker()
             .get_linked_artifacts(&libraries)
             .context("retrieving fully linked artifacts")?;
-        let known_contracts = self.zk_link(script_config, known_libraries, known_contracts, uses_create2).await?;
+        let known_contracts =
+            self.zk_link(script_config, known_libraries, known_contracts, uses_create2).await?;
 
         LinkedBuildData::new(
             libraries,

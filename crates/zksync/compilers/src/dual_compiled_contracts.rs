@@ -346,10 +346,7 @@ impl DualCompiledContracts {
             name.map(|name| name == info.name.as_str()).unwrap_or(false)
         });
 
-        full_matches
-            .chain(path_matches)
-            .chain(name_matches)
-            .map(|(_, contract)| contract)
+        full_matches.chain(path_matches).chain(name_matches).map(|(_, contract)| contract)
     }
 
     /// Retrieves the length of the collection.

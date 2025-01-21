@@ -436,8 +436,8 @@ impl<'a> ZkLinker<'a> {
                                 // strip here to match against the fdep which is stripped
                                 let id =
                                     (*id).clone().with_stripped_file_prefixes(&self.linker.root);
-                                id.source.as_path() == Path::new(fdep.filename.as_str())
-                                    && id.name == fdep.library
+                                id.source.as_path() == Path::new(fdep.filename.as_str()) &&
+                                    id.name == fdep.library
                             })
                         })
                         // we want to keep the non-stripped
