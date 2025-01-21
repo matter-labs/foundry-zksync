@@ -153,20 +153,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             // TODO(zk): better error
             return Err(LinkerError::CyclicDependency);
         };
-
-        // TODO(zk): better error
-        zksolc.version().map_err(|_| LinkerError::CyclicDependency).and_then(|version| {
-            if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
-                tracing::error!(
-                    %version,
-                    minimum_version = %DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
-                    "deploy-time linking not supported"
-                );
-                Err(LinkerError::CyclicDependency)
-            } else {
-                Ok(())
-            }
-        })?;
+        let version = zksolc.version().map_err(|_| LinkerError::CyclicDependency)?;
 
         let linker = ZkLinker::new(root, contracts.clone(), zksolc, input);
 
@@ -193,6 +180,20 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                 linker.linker.contracts.keys(), // link everything
             )
             .map_err(zk_linker_error_to_linker)?;
+
+        // if we have no libraries then no linking will happen
+        // so we can skip the version check
+        if !libraries.is_empty() {
+            // TODO(zk): better error
+            if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
+                tracing::error!(
+                    %version,
+                    minimum_version = %DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
+                    "deploy-time linking not supported"
+                );
+                return Err(LinkerError::CyclicDependency.into());
+            }
+        }
 
         let linked_contracts = linker
             .zk_get_linked_artifacts(linker.linker.contracts.keys(), &libraries)
