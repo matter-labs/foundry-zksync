@@ -285,6 +285,8 @@ impl<'a> ContractRunner<'a> {
     pub fn run_tests(mut self, filter: &dyn TestFilter) -> SuiteResult {
         let start = Instant::now();
         let mut warnings = Vec::new();
+        println!("Standard output inside the test");
+        eprintln!("Printing something to stderr inside the test!!!!!");
 
         // Check if `setUp` function with valid signature declared.
         let setup_fns: Vec<_> =
@@ -307,7 +309,7 @@ impl<'a> ContractRunner<'a> {
                 [("setUp()".to_string(), TestResult::fail("multiple setUp functions".to_string()))]
                     .into(),
                 warnings,
-            )
+            );
         }
 
         // Check if `afterInvariant` function with valid signature declared.
@@ -323,7 +325,7 @@ impl<'a> ContractRunner<'a> {
                 )]
                 .into(),
                 warnings,
-            )
+            );
         }
         let call_after_invariant = after_invariant_fns.first().is_some_and(|after_invariant_fn| {
             let match_sig = after_invariant_fn.name == "afterInvariant";
@@ -357,7 +359,7 @@ impl<'a> ContractRunner<'a> {
                 start.elapsed(),
                 [("setUp()".to_string(), TestResult::setup_result(setup))].into(),
                 warnings,
-            )
+            );
         }
 
         // Filter out functions sequentially since it's very fast and there is no need to do it
@@ -669,8 +671,8 @@ impl<'a> FunctionRunner<'a> {
         match invariant_result.error {
             // If invariants were broken, replay the error to collect logs and traces
             Some(error) => match error {
-                InvariantFuzzError::BrokenInvariant(case_data) |
-                InvariantFuzzError::Revert(case_data) => {
+                InvariantFuzzError::BrokenInvariant(case_data)
+                | InvariantFuzzError::Revert(case_data) => {
                     // Replay error to create counterexample and to collect logs, traces and
                     // coverage.
                     match replay_error(
@@ -788,8 +790,8 @@ impl<'a> FunctionRunner<'a> {
         let address = self.setup.address;
 
         // Apply before test configured functions (if any).
-        if self.cr.contract.abi.functions().filter(|func| func.name.is_before_test_setup()).count() ==
-            1
+        if self.cr.contract.abi.functions().filter(|func| func.name.is_before_test_setup()).count()
+            == 1
         {
             for calldata in self
                 .executor
