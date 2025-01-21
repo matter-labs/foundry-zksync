@@ -102,7 +102,7 @@ pub struct Contract {
     /// Introduced in 1.5.8, beforehand we can assume the bytecode
     /// was always fully linked
     #[serde(default)]
-    pub object_format: ObjectFormat,
+    pub object_format: Option<ObjectFormat>,
 }
 
 fn storage_layout_is_empty(storage_layout: &StorageLayout) -> bool {
@@ -112,7 +112,7 @@ fn storage_layout_is_empty(storage_layout: &StorageLayout) -> bool {
 impl Contract {
     /// Returns true if contract is not linked
     pub fn is_unlinked(&self) -> bool {
-        self.object_format.is_unlinked()
+        self.object_format.as_ref().map(|format| format.is_unlinked()).unwrap_or_default()
     }
 
     /// takes missing libraries output and transforms into link references
