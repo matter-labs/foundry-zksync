@@ -40,6 +40,7 @@ jobs:
   test:
     name: test #${{ matrix.name }}
     runs-on: ubuntu-latest #${{ matrix.runner_label }}
+  #   runs-on: ubuntu-22.04-github-hosted-16core
     timeout-minutes: 60
     needs: matrices
     strategy:
@@ -91,7 +92,7 @@ jobs:
           git config --global url."https://github.com/".insteadOf "git@github.com:"
       - name: Test
         env:
-          SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
+          SVM_TARGET_PLATFORM: linux-amd64 
           HTTP_ARCHIVE_URLS: ${{ secrets.HTTP_ARCHIVE_URLS }}
           WS_ARCHIVE_URLS: ${{ secrets.WS_ARCHIVE_URLS }}
         run: cargo nextest run -E 'kind(test) & !test(/issue|forge_std|ext_integration/)' --partition count:3/3 --filter-expr 'not (test(~zk) or test(~test_zk_aave_di))'
