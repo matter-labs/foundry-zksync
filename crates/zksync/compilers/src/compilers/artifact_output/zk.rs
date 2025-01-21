@@ -68,18 +68,7 @@ pub struct ZkContractArtifact {
 impl ZkContractArtifact {
     /// Returns true if contract is not linked
     pub fn is_unlinked(&self) -> bool {
-        let linked_fdeps =
-            self.factory_dependencies.as_ref().map(|linked| linked.len()).unwrap_or_default();
-        let unlinked_fdeps = self
-            .factory_dependencies_unlinked
-            .as_ref()
-            .map(|unlinked| unlinked.len())
-            // default to the same number as linked_deps if this one is missing
-            // since it would mean there are no deps that were unlinked
-            // so we want the check later to return false
-            .unwrap_or(linked_fdeps);
-
-        !self.missing_libraries().map_or(true, Vec::is_empty) || unlinked_fdeps - linked_fdeps > 0
+        self.bytecode.as_ref().map(|bc| bc.is_unlinked()).unwrap_or(false)
     }
 
     /// Returns a list of _all_ factory deps, by <path>:<name>
@@ -154,7 +143,6 @@ impl ArtifactOutput for ZkArtifactOutput {
         contract: Self::CompilerContract,
         source_file: Option<&SourceFile>,
     ) -> Self::Artifact {
-        let is_unlinked = contract.is_unlinked();
         let Contract {
             abi,
             metadata,
@@ -168,14 +156,16 @@ impl ArtifactOutput for ZkArtifactOutput {
             factory_dependencies,
             factory_dependencies_unlinked,
             missing_libraries,
+            object_format,
         } = contract;
 
         let (bytecode, assembly) = eravm
-            .map(|eravm| (eravm.bytecode(is_unlinked), eravm.assembly))
+            .map(|eravm| (eravm.bytecode(object_format.is_unlinked()), eravm.assembly))
             .or_else(|| evm.map(|evm| (evm.bytecode.map(|bc| bc.object), evm.assembly)))
             .unwrap_or_else(|| (None, None));
-        let bytecode = bytecode
-            .map(|object| ZkArtifactBytecode::with_object(object, is_unlinked, missing_libraries));
+        let bytecode = bytecode.map(|object| {
+            ZkArtifactBytecode::with_object(object, object_format, missing_libraries)
+        });
 
         ZkContractArtifact {
             abi,
