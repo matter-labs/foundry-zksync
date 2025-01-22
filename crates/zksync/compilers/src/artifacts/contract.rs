@@ -41,6 +41,7 @@ impl TryFrom<String> for ObjectFormat {
 }
 
 impl ObjectFormat {
+    /// Returns `true` if the bytecode is unlinked
     pub fn is_unlinked(&self) -> bool {
         matches!(self, Self::Elf)
     }
