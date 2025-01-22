@@ -9,6 +9,12 @@ use foundry_evm::traces::TraceKind;
 use foundry_test_utils::Filter;
 use std::{collections::BTreeMap, env};
 
+fn test_xxx_a_naive_test() {
+    println!("just trying to print stdout");
+    eprintln!("just trying to print stderr");
+    panic!("oops I failed");
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_core() {
     let filter = Filter::new(".*", ".*", ".*core");
