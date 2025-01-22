@@ -145,7 +145,7 @@ jobs:
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
           echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
           echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
