@@ -174,7 +174,9 @@ impl BuildData {
                 let zk_bytecode =
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
                 let zk_hash = hash_bytecode(&zk_bytecode);
-                let evm_deployed = evm.get_deployed_bytecode_bytes().expect("no EVM deployed bytecode (or unlinked)");
+                let evm_deployed = evm
+                    .get_deployed_bytecode_bytes()
+                    .expect("no EVM deployed bytecode (or unlinked)");
                 let evm_bytecode = evm.get_bytecode_bytes().expect("no EVM bytecode (or unlinked)");
                 let contract_info = ContractInfo {
                     name: id.name.clone(),
