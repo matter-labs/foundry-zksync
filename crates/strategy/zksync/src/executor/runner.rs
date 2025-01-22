@@ -219,7 +219,9 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                 let zk_bytecode =
                     linked_zk.get_bytecode_bytes().expect("no EraVM bytecode (or unlinked)");
                 let zk_hash = hash_bytecode(&zk_bytecode);
-                let evm = evm.get_bytecode_bytes().expect("no EVM bytecode (or unlinked)");
+                let evm_deployed =
+                    evm.get_deployed_bytecode_bytes().expect("no EVM bytecode (or unlinked)");
+                let evm_bytecode = evm.get_bytecode_bytes().expect("no EVM bytecode (or unlinked)");
                 let contract_info = ContractInfo {
                     name: id.name.clone(),
                     path: Some(id.source.to_string_lossy().into_owned()),
@@ -229,11 +231,11 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                     zk_deployed_bytecode: zk_bytecode.to_vec(),
                     // rest of factory deps is populated later
                     zk_factory_deps: vec![zk_bytecode.to_vec()],
-                    evm_bytecode_hash: B256::from_slice(&keccak256(evm.as_ref())[..]),
+                    evm_bytecode_hash: B256::from_slice(&keccak256(evm_deployed.as_ref())[..]),
                     // TODO(zk): determine if this is ok, as it's
                     // not really used in dual compiled contracts
-                    evm_deployed_bytecode: evm.to_vec(),
-                    evm_bytecode: evm.to_vec(),
+                    evm_deployed_bytecode: evm_deployed.to_vec(),
+                    evm_bytecode: evm_bytecode.to_vec(),
                 };
 
                 let mut factory_deps = unlinked_zk_artifact.all_factory_deps().collect::<Vec<_>>();
