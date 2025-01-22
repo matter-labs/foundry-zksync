@@ -59,6 +59,11 @@ impl ZkContractArtifact {
     pub fn missing_libraries(&self) -> Option<&Vec<String>> {
         self.bytecode.as_ref().map(|bc| &bc.missing_libraries)
     }
+
+    /// Returns true if contract is not linked
+    pub fn is_unlinked(&self) -> bool {
+        self.bytecode.as_ref().map(|bc| bc.is_unlinked()).unwrap_or(false)
+    }
 }
 
 // CompactContract variants
@@ -118,7 +123,6 @@ impl ArtifactOutput for ZkArtifactOutput {
         contract: Self::CompilerContract,
         source_file: Option<&SourceFile>,
     ) -> Self::Artifact {
-        let is_unlinked = contract.is_unlinked();
         let Contract {
             abi,
             metadata,
@@ -131,14 +135,16 @@ impl ArtifactOutput for ZkArtifactOutput {
             hash,
             factory_dependencies,
             missing_libraries,
+            object_format,
         } = contract;
 
         let (bytecode, assembly) = eravm
-            .map(|eravm| (eravm.bytecode(is_unlinked), eravm.assembly))
+            .map(|eravm| (eravm.bytecode(object_format.is_unlinked()), eravm.assembly))
             .or_else(|| evm.map(|evm| (evm.bytecode.map(|bc| bc.object), evm.assembly)))
             .unwrap_or_else(|| (None, None));
-        let bytecode = bytecode
-            .map(|object| ZkArtifactBytecode::with_object(object, is_unlinked, missing_libraries));
+        let bytecode = bytecode.map(|object| {
+            ZkArtifactBytecode::with_object(object, object_format, missing_libraries)
+        });
 
         ZkContractArtifact {
             abi,

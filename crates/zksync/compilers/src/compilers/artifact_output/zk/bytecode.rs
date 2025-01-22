@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::artifacts::contract::Contract;
+use crate::artifacts::contract::{Contract, ObjectFormat};
 use alloy_primitives::Bytes;
 use foundry_compilers_artifacts_solc::{
     BytecodeObject, CompactBytecode, CompactDeployedBytecode, Offsets,
@@ -23,7 +23,7 @@ where
 pub struct ZkArtifactBytecode {
     #[serde(serialize_with = "serialize_bytes_without_prefix")]
     object: Bytes,
-    is_unlinked: bool,
+    object_format: ObjectFormat,
 
     /// Bytecode missing libraries
     #[serde(default)]
@@ -34,7 +34,7 @@ impl ZkArtifactBytecode {
     /// Get Bytecode from parts
     pub fn with_object(
         object: BytecodeObject,
-        is_unlinked: bool,
+        object_format: ObjectFormat,
         missing_libraries: Vec<String>,
     ) -> Self {
         let object = match object {
@@ -43,7 +43,12 @@ impl ZkArtifactBytecode {
                 alloy_primitives::hex::decode(s).expect("valid bytecode").into()
             }
         };
-        Self { object, is_unlinked, missing_libraries }
+        Self { object, object_format, missing_libraries }
+    }
+
+    /// Returns `true` if the bytecode is unlinked
+    pub fn is_unlinked(&self) -> bool {
+        self.object_format.is_unlinked()
     }
 
     /// Get link references
@@ -53,7 +58,7 @@ impl ZkArtifactBytecode {
 
     /// Get bytecode object
     pub fn object(&self) -> BytecodeObject {
-        if self.is_unlinked {
+         if self.object_format.is_unlinked() {
             // convert to unlinked
             let encoded = alloy_primitives::hex::encode(&self.object);
             BytecodeObject::Unlinked(encoded)
@@ -86,7 +91,11 @@ mod tests {
     #[test]
     fn serialized_bytecode_is_not_prefixed() {
         let object = Bytes::from(vec![0xDEu8, 0xAD, 0xBE, 0xEF]);
-        let sample = ZkArtifactBytecode { object, is_unlinked: false, missing_libraries: vec![] };
+        let sample = ZkArtifactBytecode {
+            object,
+            object_format: ObjectFormat::Raw,
+            missing_libraries: vec![],
+        };
 
         let json_str =
             serde_json::to_string(&sample).expect("able to serialize artifact bytecode as json");
