@@ -340,7 +340,7 @@ impl ProjectCompiler {
                 sh_warn!("Compiling with zksolc v{zksolc_current_version} which is not supported and may lead to unexpected errors. Minimum supported version is v{zksolc_min_supported_version}")?;
             }
             if zksolc_current_version > zksolc_latest_supported_version {
-                sh_warn!("Compiling with zksolc v{zksolc_current_version} which is still not supported and may lead to unexpected errors. Latest version supported is v{zksolc_latest_supported_version}")?;
+                sh_warn!("Compiling with zksolc v{zksolc_current_version} which is still not supported and may lead to unexpected errors. Latest supported version is v{zksolc_latest_supported_version}")?;
             }
             Report::new(SpinnerReporter::spawn_with(format!(
                 "Using zksolc-{zksolc_current_version}"
