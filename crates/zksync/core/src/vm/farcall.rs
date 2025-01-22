@@ -173,7 +173,7 @@ impl FarCallHandler {
                 PrimitiveValue { value: return_fat_ptr.to_u256(), is_pointer: false };
 
             // Just rewriting `code_page` is very error-prone, since the same memory page would be
-            // re-used for decommitments. We'll use a different approach:
+            // reused for decommitments. We'll use a different approach:
             // - Set `previous_code_word` to the value that we want
             // - Set `previous_code_memory_page` to the current code page + `previous_super_pc` to 0
             //   (as it corresponds
