@@ -416,12 +416,11 @@ impl ZkSolc {
     /// Get supported zksolc versions
     pub fn zksolc_supported_versions() -> Vec<Version> {
         let mut ret = vec![];
-        let min_max_patch_by_minor_versions = vec![
-            (5, 6, 7), // 1.5.x
-        ];
-        for (minor, min_patch, max_patch) in min_max_patch_by_minor_versions {
-            for i in min_patch..=max_patch {
-                ret.push(Version::new(1, minor, i));
+        let version_ranges = vec![(1, 5, 6..=7)];
+
+        for (major, minor, patch_range) in version_ranges {
+            for patch in patch_range {
+                ret.push(Version::new(major, minor, patch));
             }
         }
 
@@ -441,11 +440,11 @@ impl ZkSolc {
     /// Get available zksync solc versions
     pub fn solc_available_versions() -> Vec<Version> {
         let mut ret = vec![];
-        let min_max_patch_by_minor_versions =
-            vec![(4, 12, 26), (5, 0, 17), (6, 0, 12), (7, 0, 6), (8, 0, 28)];
-        for (minor, min_patch, max_patch) in min_max_patch_by_minor_versions {
-            for i in min_patch..=max_patch {
-                ret.push(Version::new(0, minor, i));
+        let version_ranges =
+            vec![(1, 4, 12..=26), (1, 5, 0..=17), (1, 6, 0..=12), (1, 7, 0..=6), (1, 8, 0..=28)];
+        for (major, minor, patch_range) in version_ranges {
+            for patch in patch_range {
+                ret.push(Version::new(major, minor, patch));
             }
         }
 
