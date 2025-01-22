@@ -137,6 +137,7 @@ impl ArtifactOutput for ZkArtifactOutput {
             missing_libraries,
             object_format,
         } = contract;
+        let object_format = object_format.unwrap_or_default();
 
         let (bytecode, assembly) = eravm
             .map(|eravm| (eravm.bytecode(object_format.is_unlinked()), eravm.assembly))
