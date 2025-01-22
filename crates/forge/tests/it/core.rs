@@ -9,6 +9,7 @@ use foundry_evm::traces::TraceKind;
 use foundry_test_utils::Filter;
 use std::{collections::BTreeMap, env};
 
+#[test]
 fn test_xxx_a_naive_test() {
     println!("just trying to print stdout");
     eprintln!("just trying to print stderr");
