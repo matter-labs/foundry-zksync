@@ -109,7 +109,7 @@ impl Default for ZkSolcInput {
 
 impl ZkSolcInput {
     fn new(language: SolcLanguage, sources: Sources, mut settings: ZkSettings) -> Self {
-        // TODO: Right now we abuse the fact that zksolc ignores invalid fields. Whenever
+        // TODO: Right now we make use of the fact that zksolc ignores invalid fields. Whenever
         // there are fields that, for the same feature, are different across compiler versions,
         // we check and set them all to the same value. When compiling with a given version, the
         // supported field is used and the other one is ignored.
