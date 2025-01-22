@@ -146,7 +146,7 @@ impl<'a> ZkLinker<'a> {
             for contract in libs.keys() {
                 let id = self
                     .linker
-                    .find_artifact_id_by_library_path(file, contract, Some(&target.version))
+                    .find_artifact_id_by_library_path(file, contract, None)
                     .ok_or_else(|| LinkerError::MissingLibraryArtifact {
                         file: file.to_string(),
                         name: contract.to_string(),
