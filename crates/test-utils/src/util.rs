@@ -228,6 +228,8 @@ impl ExtTester {
 #[allow(clippy::disallowed_macros)]
 pub fn initialize(target: &Path) {
     println!("initializing {}", target.display());
+    println!("Can I print to stdout from here?");
+    eprintln!("Can I print to stderr from here?");
 
     let tpath = TEMPLATE_PATH.as_path();
     pretty_err(tpath, fs::create_dir_all(tpath));
