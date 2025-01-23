@@ -71,8 +71,9 @@ if [ -z "$FORGE_VERSION_OUTPUT" ]; then
     exit 1
 fi
 
-if echo "$FORGE_VERSION_OUTPUT" | grep -q "foundry-zksync"; then
+if echo "$FORGE_VERSION_OUTPUT" | grep -E -q "[0-9]+\.[0-9]+\.[0-9]+"; then
     echo "Forge is successfully installed with version: $FORGE_VERSION_OUTPUT"
 else
-    echo "Forge is installed, but does not appear to be a tagged version (e.g.foundry-zksync-vx.x.x). Installed version: $FORGE_VERSION_OUTPUT"
+    echo "Forge is installed, but no semantic version (x.x.x) was detected."
+    echo "Installed version output: $FORGE_VERSION_OUTPUT"
 fi
