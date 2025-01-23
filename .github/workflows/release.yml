@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  pull_request:
+    branches:
+      - main
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
@@ -90,26 +93,26 @@ jobs:
           # `target`: Rust build target triple
           # `platform` and `arch`: Used in tarball names
           # `svm`: target platform to use for the Solc binary: https://github.com/roynalnaruto/svm-rs/blob/84cbe0ac705becabdc13168bae28a45ad2299749/svm-builds/build.rs#L4-L24
-          - runner: ubuntu-24.04-github-hosted-16core
-            target: x86_64-unknown-linux-gnu
-            svm_target_platform: linux-amd64
-            platform: linux
-            arch: amd64
+          # - runner: ubuntu-24.04-github-hosted-16core
+          #   target: x86_64-unknown-linux-gnu
+          #   svm_target_platform: linux-amd64
+          #   platform: linux
+          #   arch: amd64
           - runner: ubuntu-24.04-github-hosted-16core
             target: aarch64-unknown-linux-gnu
             svm_target_platform: linux-aarch64
             platform: linux
             arch: arm64
-          - runner: macos-latest
-            target: x86_64-apple-darwin
-            svm_target_platform: macosx-amd64
-            platform: darwin
-            arch: amd64
-          - runner: macos-latest
-            target: aarch64-apple-darwin
-            svm_target_platform: macosx-aarch64
-            platform: darwin
-            arch: arm64
+          # - runner: macos-latest
+          #   target: x86_64-apple-darwin
+          #   svm_target_platform: macosx-amd64
+          #   platform: darwin
+          #   arch: amd64
+          # - runner: macos-latest
+          #   target: aarch64-apple-darwin
+          #   svm_target_platform: macosx-aarch64
+          #   platform: darwin
+          #   arch: arm64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -121,34 +124,65 @@ jobs:
 
       - name: Install required Rust targets
         run: rustup target add ${{ matrix.target }}
+      
+      - name: Install cross v0.2.5 from source
+        run: cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5
 
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
           cache-on-failure: true
 
-      - name: Apple M1 setup
-        if: matrix.target == 'aarch64-apple-darwin'
-        run: |
-          brew install make
-          echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
-          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
+      # - name: Apple M1 setup
+      #   if: matrix.target == 'aarch64-apple-darwin'
+      #   run: |
+      #     brew install make
+      #     echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
+      #     echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+      #     echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
 
-      - name: Apple Darwin
-        if: matrix.target == 'x86_64-apple-darwin'
-        run: |
-          brew install make
-          echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
+      # - name: Apple Darwin
+      #   if: matrix.target == 'x86_64-apple-darwin'
+      #   run: |
+      #     brew install make
+      #     echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
 
-      - name: Linux ARM setup
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
-          echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
+      # - name: Linux ARM setup
+      #   if: matrix.target == 'aarch64-unknown-linux-gnu'
+      #   run: |
+      #     set -x
+      #     ls -l /etc/apt/sources.list
+      #     ls -l /etc/apt/sources.list.d
+      #     cat /etc/apt/sources.list.d/ubuntu.sources
+      #     ls -l /etc/apt/sources.list.d/ubuntu.sources
+          
+      #     echo 'updating'
+      #     sudo echo 'Types: deb
+      #     URIs: http://ports.ubuntu.com/ubuntu-ports/
+      #     Suites: noble noble-updates noble-backports
+      #     Architectures: arm64
+      #     Components: main restricted universe multiverse
+      #     Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+      #     Types: deb
+      #     URIs: http://ports.ubuntu.com/ubuntu-ports/
+      #     Suites: noble-security
+      #     Architectures: arm64
+      #     Components: main restricted universe multiverse
+      #     Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' | sudo dd of=/etc/apt/sources.list.d/ubuntu.sources
+
+      #     # deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main universe
+      #     # deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main universe
+
+
+      #     echo 'check'
+      #     cat /etc/apt/sources.list.d/ubuntu.sources
+      #     sudo dpkg --add-architecture arm64
+      #     sudo apt-get update -y
+      #     sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu pkg-config pkg-config:arm64 libssl-dev:arm64
+      #     echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+      #     echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
+      #     echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
 
       - name: Build binaries
         env:
@@ -165,7 +199,7 @@ jobs:
           #     flags+=(--features asm-keccak)
           # fi
 
-          RUSTFLAGS='-C target-feature=+crt-static' cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
+          RUSTFLAGS='-C target-feature=+crt-static' OPENSSL_STATIC=1 cross build --release --bin forge --bin cast --target "$target" "${flags[@]}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
