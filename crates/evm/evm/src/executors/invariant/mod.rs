@@ -352,7 +352,7 @@ impl<'a> InvariantExecutor<'a> {
             }
 
             while current_run.depth < self.config.depth {
-                println!("current_run: {current_run:?}");
+                println!("current_run: {}", current_run.depth);
                 // Check if the timeout has been reached.
                 if timer.is_timed_out() {
                     // Since we never record a revert here the test is still considered
