@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  pull_request:
+    branches:
+      - main
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
@@ -90,26 +93,26 @@ jobs:
           # `target`: Rust build target triple
           # `platform` and `arch`: Used in tarball names
           # `svm`: target platform to use for the Solc binary: https://github.com/roynalnaruto/svm-rs/blob/84cbe0ac705becabdc13168bae28a45ad2299749/svm-builds/build.rs#L4-L24
-          - runner: ubuntu-24.04-github-hosted-16core
-            target: x86_64-unknown-linux-gnu
-            svm_target_platform: linux-amd64
-            platform: linux
-            arch: amd64
+          # - runner: ubuntu-24.04-github-hosted-16core
+          #   target: x86_64-unknown-linux-gnu
+          #   svm_target_platform: linux-amd64
+          #   platform: linux
+          #   arch: amd64
           - runner: ubuntu-24.04-github-hosted-16core
             target: aarch64-unknown-linux-gnu
             svm_target_platform: linux-aarch64
             platform: linux
             arch: arm64
-          - runner: macos-latest
-            target: x86_64-apple-darwin
-            svm_target_platform: macosx-amd64
-            platform: darwin
-            arch: amd64
-          - runner: macos-latest
-            target: aarch64-apple-darwin
-            svm_target_platform: macosx-aarch64
-            platform: darwin
-            arch: arm64
+          # - runner: macos-latest
+          #   target: x86_64-apple-darwin
+          #   svm_target_platform: macosx-amd64
+          #   platform: darwin
+          #   arch: amd64
+          # - runner: macos-latest
+          #   target: aarch64-apple-darwin
+          #   svm_target_platform: macosx-aarch64
+          #   platform: darwin
+          #   arch: arm64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -144,8 +147,10 @@ jobs:
       - name: Linux ARM setup
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
+          echo $CROSS_DEB_ARCH
+          sudo dpkg --add-architecture $CROSS_DEB_ARCH
           sudo apt-get update -y
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:CROSS_DEB_ARCH
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
           echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
           echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
