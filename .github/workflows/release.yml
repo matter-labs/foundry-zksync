@@ -147,10 +147,10 @@ jobs:
       - name: Linux ARM setup
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
+          set -x
           ls -l /etc/apt/sources.list
           ls -l /etc/apt/sources.list.d
-          cat /etc/apt/sources.list
-          cat /etc/apt/sources.list.d/ubuntu.sources
+          echo 'updating'
           echo 'Types: deb
           URIs: http://ports.ubuntu.com/ubuntu-ports/
           Suites: noble noble-updates noble-backports
