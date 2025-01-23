@@ -225,25 +225,27 @@ contract ZkContractsTest is DSTest {
         (bool success,) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
         require(success, "zkVm() call failed");
         address sender = address(this);
-        uint64 startingNonce = vm.getNonce(sender);
+        uint64 startingTxNonce = vm.zkGetTransactionNonce(sender);
+        uint64 startingDeployNonce = vm.zkGetDeploymentNonce(sender);
 
         //this ensures calls & deployments increase the nonce
         vm.startBroadcast(sender);
 
         Greeter greeter = new Greeter();
-        assert(vm.getNonce(sender) == startingNonce + 1);
+        assert(vm.zkGetDeploymentNonce(sender) == startingDeployNonce + 1);
 
         greeter.setAge(42);
-        assert(vm.getNonce(sender) == startingNonce + 2);
+        assert(vm.zkGetTransactionNonce(sender) == startingTxNonce + 2);
 
         // static-call, nonce shouldn't change
         uint256 age = greeter.getAge();
         assert(age == 42);
-        assert(vm.getNonce(sender) == startingNonce + 2);
+        assert(vm.zkGetDeploymentNonce(sender) == startingDeployNonce + 1);
+        assert(vm.zkGetTransactionNonce(sender) == startingTxNonce + 2);
 
         uint256 num = greeter.greeting2("zksync", 2);
         assert(num == 4);
-        assert(vm.getNonce(sender) == startingNonce + 3);
+        assert(vm.zkGetTransactionNonce(sender) == startingTxNonce + 3);
         vm.stopBroadcast();
     }
 }
