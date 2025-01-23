@@ -147,8 +147,8 @@ jobs:
       - name: Linux ARM setup
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
-          ll /etc/apt/sources.list
-          ll /etc/apt/sources.list.d
+          ls -l /etc/apt/sources.list
+          ls -l /etc/apt/sources.list.d
           sudo dpkg --add-architecture arm64
           deb [arch=arm64] http://ports.ubuntu.com/ focal main multiverse universe
           sudo apt-get update -y
