@@ -147,6 +147,7 @@ jobs:
       - name: Linux ARM setup
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
+          sudo apt-get update -y
           sudo dpkg --add-architecture arm64
           sudo apt-get update -y
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64
