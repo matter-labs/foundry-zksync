@@ -157,12 +157,14 @@ jobs:
           sudo echo 'Types: deb
           URIs: http://ports.ubuntu.com/ubuntu-ports/
           Suites: noble noble-updates noble-backports
+          Architectures: arm64
           Components: main restricted universe multiverse
           Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
           Types: deb
           URIs: http://ports.ubuntu.com/ubuntu-ports/
           Suites: noble-security
+          Architectures: arm64
           Components: main restricted universe multiverse
           Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' | sudo dd of=/etc/apt/sources.list.d/ubuntu.sources
 
