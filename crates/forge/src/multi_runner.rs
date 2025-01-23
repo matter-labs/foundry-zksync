@@ -487,8 +487,8 @@ impl MultiContractRunnerBuilder {
         evm_opts: EvmOpts,
         mut strategy: ExecutorStrategy,
     ) -> Result<MultiContractRunner> {
-        if let Some(zk) = zk_output {
-            strategy.runner.zksync_set_compilation_output(strategy.context.as_mut(), zk);
+        if let Some(zk_output) = zk_output {
+            strategy.runner.zksync_set_compilation_output(strategy.context.as_mut(), zk_output);
         }
 
         let LinkOutput {
