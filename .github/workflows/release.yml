@@ -153,7 +153,18 @@ jobs:
           cat /etc/apt/sources.list.d/ubuntu.sources
           ls -l /etc/apt/sources.list.d/ubuntu.sources
           echo 'updating'
-          sudo echo '#foo-tmp' >> /tmp/ubuntu.sources-none
+          sudo echo 'Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports/
+          Suites: noble noble-updates noble-backports
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports/
+          Suites: noble-security
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' >> /tmp/ubuntu.sources-none
+          cat /tmp/ubuntu.sources-none
           sudo echo '#foo-sources.list' >> /etc/apt/sources.list
           sudo echo '#foo-sources.list.d' >> /etc/apt/sources.list.d/ubuntu.sources-none
           sudo echo '#foosources.list.d-ubuntu' >> /etc/apt/sources.list.d/ubuntu.sources
