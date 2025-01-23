@@ -161,7 +161,7 @@ jobs:
           URIs: http://ports.ubuntu.com/ubuntu-ports/
           Suites: noble-security
           Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' >> /etc/apt/sources.list
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' >> /etc/apt/sources.list.d/ubuntu.sources
 
           echo 'check'
           cat /etc/apt/sources.list.d/ubuntu.sources
