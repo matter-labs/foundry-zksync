@@ -151,8 +151,20 @@ jobs:
           ls -l /etc/apt/sources.list.d
           cat /etc/apt/sources.list
           cat /etc/apt/sources.list.d/ubuntu.sources
-          echo 'deb [arch=arm64] http://ports.ubuntu.com/ noble main multiverse universe' >> /etc/apt/sources.list
-          echo 'deb [arch=arm64] http://ports.ubuntu.com/ noble-security main multiverse universe' >> /etc/apt/sources.list
+          echo 'Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports/
+          Suites: noble noble-updates noble-backports
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports/
+          Suites: noble-security
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' >> /etc/apt/sources.list
+
+          echo 'check'
+          cat /etc/apt/sources.list.d/ubuntu.sources
           sudo dpkg --add-architecture arm64
           sudo apt-get update -y
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64
