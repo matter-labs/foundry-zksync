@@ -3,10 +3,10 @@
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::U256;
 use forge::fuzz::CounterExample;
-use foundry_common::{sh_eprintln, sh_println};
 use foundry_config::{Config, InvariantConfig};
 use foundry_test_utils::{forgetest_init, init_tracing, str, Filter};
 use std::collections::BTreeMap;
+use tokio::io::{self, AsyncWriteExt};
 use tracing::error;
 
 macro_rules! get_counterexample {
@@ -610,6 +610,8 @@ async fn test_invariant_scrape_values() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_invariant_roll_fork_handler() {
+    eprintln!("In Stderrr before the runner");
+    println!("In Stdout before the runner");
     init_tracing();
     let filter = Filter::new(".*", ".*", ".*fuzz/invariant/common/InvariantRollFork.t.sol");
     let mut runner = TEST_DATA_DEFAULT.runner_with(|config| {
@@ -619,6 +621,14 @@ async fn test_invariant_roll_fork_handler() {
     error!("AAAAAAAAAAAAAH");
     eprintln!("In Stderrr");
     println!("In Stdout");
+    let mut stdout = io::stdout();
+    stdout.write_all(b"To stdout via tokio handle").await.unwrap();
+    stdout.flush().await.unwrap();
+
+    let mut stderr = io::stderr();
+    stderr.write_all(b"To stderr via tokio handle").await.unwrap();
+    stderr.flush().await.unwrap();
+
     assert_multiple(
         &results,
         BTreeMap::from([
