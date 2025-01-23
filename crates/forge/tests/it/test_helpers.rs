@@ -232,6 +232,7 @@ impl ForgeTestData {
     ///
     /// Uses [get_compiled] to lazily compile the project.
     pub fn new(profile: ForgeTestProfile) -> Self {
+        println!("creating a new test profile");
         init_tracing();
 
         // NOTE(zk): We need to manually install the crypto provider as zksync-era uses `aws-lc-rs`
@@ -285,11 +286,13 @@ impl ForgeTestData {
     /// Builds a non-tracing runner
     pub fn runner_with(&self, modify: impl FnOnce(&mut Config)) -> MultiContractRunner {
         let mut config = (*self.config).clone();
+        println!("building the runner");
         modify(&mut config);
         self.runner_with_config(config)
     }
 
     fn runner_with_config(&self, mut config: Config) -> MultiContractRunner {
+        println!("runner with config");
         config.rpc_endpoints = rpc_endpoints();
         config.allow_paths.push(manifest_root().to_path_buf());
 
@@ -426,6 +429,7 @@ pub fn get_vyper() -> Vyper {
 }
 
 pub fn get_compiled(project: &mut Project) -> ProjectCompileOutput {
+    println!("getting compiled");
     let lock_file_path = project.sources_path().join(".lock");
     // Compile only once per test run.
     // We need to use a file lock because `cargo-nextest` runs tests in different processes.
