@@ -17,17 +17,3 @@ pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
     "apt-get update -q && apt-get install --assume-yes --no-install-recommends libssl-dev:$CROSS_DEB_ARCH pkg-config",
 ]
-
-[target.x86_64-apple-darwin]
-image = "macosx-amd64"
-pre-build = [
-    "brew install make",
-]
-
-[target.aarch64-apple-darwin]
-image = "aarch64-apple-darwin"
-pre-build = [
-    "export SDKROOT=$(xcrun -sdk macosx --show-sdk-path)",
-    "export MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)",
-    "brew install make",
-]
