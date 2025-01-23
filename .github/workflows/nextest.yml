@@ -96,4 +96,4 @@ jobs:
           HTTP_ARCHIVE_URLS: ${{ secrets.HTTP_ARCHIVE_URLS }}
           WS_ARCHIVE_URLS: ${{ secrets.WS_ARCHIVE_URLS }}
           RUST_BACKTRACE: full
-        run: cargo nextest run -E 'kind(test) & !test(/issue|forge_std|ext_integration|zk|test_zk_aave_di/) & test(xxx)' --no-capture
+        run: cargo nextest run -E 'kind(test) & !test(/issue|forge_std|ext_integration|zk|test_zk_aave_di/) & test(/xxx|test_invariant_roll_fork/)' --no-capture --no-fail-fast
