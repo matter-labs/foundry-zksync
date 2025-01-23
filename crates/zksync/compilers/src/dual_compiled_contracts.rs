@@ -42,6 +42,17 @@ pub struct DualCompiledContract {
     pub evm_bytecode: Vec<u8>,
 }
 
+/// Indicates the type of match from a `find` search
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FindMatchType {
+    /// The result matched both path and name
+    FullMatch,
+    /// The result only matched the path
+    Path,
+    /// The result only matched the name
+    Name,
+}
+
 /// Couple contract type with contract and init code
 pub struct FindBytecodeResult<'a> {
     r#type: ContractType,
@@ -320,33 +331,47 @@ impl DualCompiledContracts {
         &'a self,
         path: Option<&'b str>,
         name: Option<&'b str>,
-    ) -> impl Iterator<Item = &'a DualCompiledContract> + 'b {
-        let full_matches = self.contracts.iter().filter(move |(info, _)| {
-            // if user provides a path we should check that it matches
-            // we check using `ends_with` to account for prefixes
-            path.map_or(true, |needle|
+    ) -> impl Iterator<Item = (FindMatchType, &'a DualCompiledContract)> + 'b {
+        let full_matches = self
+            .contracts
+            .iter()
+            .filter(move |(info, _)| {
+                // if user provides a path we should check that it matches
+                // we check using `ends_with` to account for prefixes
+                path.map_or(false, |needle|
                         info.path.as_ref()
-                        .map_or(true,
+                        .map_or(false,
                                 |contract_path| contract_path.ends_with(needle)))
                 // if user provides a name we should check that it matches
-                && name.map_or(true, |name| name == info.name.as_str())
-        });
-
-        let path_matches = self.contracts.iter().filter(move |(info, _)| {
-            // if a path is provided, check that it matches
-            // if no path is provided, don't match it
-            path.map_or(false, |needle| {
-                info.path.as_ref().map_or(false, |contract_path| contract_path.ends_with(needle))
+                && name.map_or(false, |name| name == info.name.as_str())
             })
-        });
+            .map(|(_, contract)| (FindMatchType::FullMatch, contract));
 
-        let name_matches = self.contracts.iter().filter(move |(info, _)| {
-            // if name is provided, check that it matches
-            // if no name is provided, don't match it
-            name.map(|name| name == info.name.as_str()).unwrap_or(false)
-        });
+        let path_matches = self
+            .contracts
+            .iter()
+            .filter(move |(info, _)| {
+                // if a path is provided, check that it matches
+                // if no path is provided, don't match it
+                path.map_or(false, |needle| {
+                    info.path
+                        .as_ref()
+                        .map_or(false, |contract_path| contract_path.ends_with(needle))
+                })
+            })
+            .map(|(_, contract)| (FindMatchType::Path, contract));
 
-        full_matches.chain(path_matches).chain(name_matches).map(|(_, contract)| contract)
+        let name_matches = self
+            .contracts
+            .iter()
+            .filter(move |(info, _)| {
+                // if name is provided, check that it matches
+                // if no name is provided, don't match it
+                name.map(|name| name == info.name.as_str()).unwrap_or(false)
+            })
+            .map(|(_, contract)| (FindMatchType::Name, contract));
+
+        full_matches.chain(path_matches).chain(name_matches)
     }
 
     /// Retrieves the length of the collection.
@@ -392,5 +417,141 @@ impl DualCompiledContracts {
             contract.zk_factory_deps.extend(factory_deps);
             &*contract
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy_primitives::Bytes;
+    use zksync_types::bytecode::BytecodeHash;
+
+    use super::*;
+
+    fn find_sample() -> DualCompiledContracts {
+        let evm_empty_bytes = Bytes::from_static(&[0]).to_vec();
+        let zk_empty_bytes = vec![0u8; 32];
+
+        let zk_bytecode_hash = BytecodeHash::for_bytecode(&zk_empty_bytes).value();
+
+        let sample_contract = DualCompiledContract {
+            zk_bytecode_hash,
+            zk_deployed_bytecode: zk_empty_bytes,
+            zk_factory_deps: Default::default(),
+            evm_bytecode_hash: B256::from_slice(&keccak256(&evm_empty_bytes)[..]),
+            evm_deployed_bytecode: evm_empty_bytes.clone(),
+            evm_bytecode: evm_empty_bytes,
+        };
+
+        let infos = [
+            ContractInfo::new("src/Foo.sol:Foo"),
+            ContractInfo::new("src/Foo.sol:DoubleFoo"),
+            ContractInfo::new("test/Foo.t.sol:FooTest"),
+            ContractInfo::new("Bar"),
+            ContractInfo::new("BarScript"),
+            ContractInfo::new("script/Qux.sol:Foo"),
+            ContractInfo::new("script/Qux.sol:QuxScript"),
+        ];
+
+        let contracts = infos.into_iter().map(|info| (info, sample_contract.clone()));
+        DualCompiledContracts {
+            contracts: contracts.collect(),
+            zk_artifact_path: PathBuf::from("zkout"),
+            evm_artifact_path: PathBuf::from("out"),
+        }
+    }
+
+    #[track_caller]
+    fn assert_find_results<'a>(
+        results: impl Iterator<Item = (FindMatchType, &'a DualCompiledContract)>,
+        assertions: Vec<FindMatchType>,
+    ) {
+        let results = results.collect::<Vec<_>>();
+
+        let num_assertions = assertions.len();
+        let num_results = results.len();
+        assert!(
+            num_assertions == num_results,
+            "unexpected number of results! Expected: {num_assertions}, got: {num_results}"
+        );
+
+        for (i, (assertion, (result, _))) in assertions.into_iter().zip(results).enumerate() {
+            assert!(
+                assertion == result,
+                "assertion failed for match #{i}! Expected: {assertion:?}, got: {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn find_nothing() {
+        let collection = find_sample();
+
+        assert_find_results(collection.find(None, None), vec![]);
+    }
+
+    #[test]
+    fn find_by_full_match() {
+        let collection = find_sample();
+
+        let foo_find_asserts = vec![
+            FindMatchType::FullMatch,
+            FindMatchType::Path,
+            // DoubleFoo
+            FindMatchType::Path,
+            FindMatchType::Name,
+            // Qux.sol:Foo
+            FindMatchType::Name,
+        ];
+        assert_find_results(
+            collection.find(Some("src/Foo.sol"), Some("Foo")),
+            foo_find_asserts.clone(),
+        );
+        assert_find_results(collection.find(Some("Foo.sol"), Some("Foo")), foo_find_asserts);
+
+        let foo_test_find_asserts =
+            vec![FindMatchType::FullMatch, FindMatchType::Path, FindMatchType::Name];
+        assert_find_results(
+            collection.find(Some("test/Foo.t.sol"), Some("FooTest")),
+            foo_test_find_asserts.clone(),
+        );
+        assert_find_results(
+            collection.find(Some("Foo.t.sol"), Some("FooTest")),
+            foo_test_find_asserts,
+        );
+    }
+
+    #[test]
+    fn find_by_path() {
+        let collection = find_sample();
+
+        let foo_find_asserts = vec![FindMatchType::Path, FindMatchType::Path];
+        assert_find_results(collection.find(Some("src/Foo.sol"), None), foo_find_asserts.clone());
+        assert_find_results(collection.find(Some("Foo.sol"), None), foo_find_asserts);
+
+        assert_find_results(
+            collection.find(Some("test/Foo.t.sol"), None),
+            vec![FindMatchType::Path],
+        );
+        assert_find_results(
+            collection.find(Some("Foo.t.sol"), Some("FooTester")),
+            vec![FindMatchType::Path],
+        );
+    }
+
+    #[test]
+    fn find_by_name() {
+        let collection = find_sample();
+
+        assert_find_results(
+            collection.find(None, Some("Foo")),
+            vec![FindMatchType::Name, FindMatchType::Name],
+        );
+        assert_find_results(collection.find(None, Some("QuxScript")), vec![FindMatchType::Name]);
+
+        assert_find_results(collection.find(None, Some("BarScript")), vec![FindMatchType::Name]);
+        assert_find_results(
+            collection.find(Some("Bar.s.sol"), Some("BarScript")),
+            vec![FindMatchType::Name],
+        );
     }
 }

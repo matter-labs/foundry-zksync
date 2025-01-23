@@ -216,6 +216,7 @@ impl BuildData {
                     .find(Some(path), Some(name))
                     .next()
                     .expect("unknown factory dep")
+                    .1
                     .zk_deployed_bytecode
                     .clone();
 
