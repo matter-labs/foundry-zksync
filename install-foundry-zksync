@@ -62,9 +62,17 @@ echo "Cleanup completed."
 echo "Installation completed successfully!"
 
 echo "Verifying installation..."
-if "${FOUNDRY_BIN_DIR}/forge" --version | grep -q "0.0.2"; then
-    echo "Forge version 0.0.2 is successfully installed."
-else
-    echo "Installation verification failed. Forge is not properly installed."
+FORGE_VERSION_OUTPUT=$("${FOUNDRY_BIN_DIR}/forge" --version 2>/dev/null || true)
+
+echo $FORGE_VERSION_OUTPUT
+
+if [ -z "$FORGE_VERSION_OUTPUT" ]; then
+    echo "Installation verification failed. 'forge --version' returned empty or an error."
     exit 1
+fi
+
+if echo "$FORGE_VERSION_OUTPUT" | grep -q "foundry-zksync"; then
+    echo "Forge is successfully installed with version: $FORGE_VERSION_OUTPUT"
+else
+    echo "Forge is installed, but does not appear to be a tagged version (e.g.foundry-zksync-vx.x.x). Installed version: $FORGE_VERSION_OUTPUT"
 fi
