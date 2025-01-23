@@ -130,7 +130,6 @@ jobs:
       - name: Install cross v0.2.5 from source
         run: cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5
 
-
       # We diverge from upstream and build with cross as we're building static binaries
       - name: Build binaries
         env:
