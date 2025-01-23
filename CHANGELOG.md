@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.4](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.3...foundry-zksync-v0.0.4) (2025-01-23)
+
+
+### Bug Fixes
+
+* platform name in release ([#862](https://github.com/matter-labs/foundry-zksync/issues/862)) ([4e12292](https://github.com/matter-labs/foundry-zksync/commit/4e12292801b5b412fc59fc9ba20137f8cf03f8c7))
+
 ## [0.0.3](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.2...foundry-zksync-v0.0.3) (2025-01-23)
 
 
