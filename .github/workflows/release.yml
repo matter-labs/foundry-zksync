@@ -147,10 +147,12 @@ jobs:
       - name: Linux ARM setup
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
-          #sudo apt-get update -y
-          #sudo dpkg --add-architecture arm64
+          ll /etc/apt/sources.list
+          ll /etc/apt/sources.list.d
+          sudo dpkg --add-architecture arm64
+          deb [arch=arm64] http://ports.ubuntu.com/ focal main multiverse universe
           sudo apt-get update -y
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu pkg-config libssl-dev
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
           echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
           echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
