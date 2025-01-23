@@ -151,7 +151,7 @@ jobs:
           ls -l /etc/apt/sources.list
           ls -l /etc/apt/sources.list.d
           echo 'updating'
-          echo 'Types: deb
+          sudo echo 'Types: deb
           URIs: http://ports.ubuntu.com/ubuntu-ports/
           Suites: noble noble-updates noble-backports
           Components: main restricted universe multiverse
