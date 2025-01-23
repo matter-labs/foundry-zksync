@@ -147,8 +147,10 @@ jobs:
       - name: Linux ARM setup
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
+          echo $CROSS_DEB_ARCH
+          sudo dpkg --add-architecture $CROSS_DEB_ARCH
           sudo apt-get update -y
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:CROSS_DEB_ARCH
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
           echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
           echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
