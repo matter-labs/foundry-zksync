@@ -339,6 +339,7 @@ impl<'a> InvariantExecutor<'a> {
         let _ = self.runner.run(&invariant_strategy, |first_input| {
             // Create current invariant run data.
             println!("inside invariant");
+            println!("fuzz_state: {:?}", invariant_test.fuzz_state);
             let mut current_run = InvariantTestRun::new(
                 first_input,
                 // Before each run, we must reset the backend state.
