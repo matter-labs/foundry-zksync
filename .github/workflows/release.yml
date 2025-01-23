@@ -152,7 +152,8 @@ jobs:
           cat /etc/apt/sources.list
           cat /etc/apt/sources.list.d/ubuntu.sources
           sudo dpkg --add-architecture arm64
-          deb [arch=arm64] http://ports.ubuntu.com/ focal main multiverse universe
+          echo 'deb [arch=arm64] http://ports.ubuntu.com/ noble main multiverse universe' >> /etc/apt/sources.list
+          echo 'deb [arch=arm64] http://ports.ubuntu.com/ noble-security main multiverse universe' >> /etc/apt/sources.list
           sudo apt-get update -y
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
