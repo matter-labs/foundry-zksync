@@ -338,12 +338,12 @@ impl DualCompiledContracts {
             .filter(move |(info, _)| {
                 // if user provides a path we should check that it matches
                 // we check using `ends_with` to account for prefixes
-                path.map_or(false, |needle|
+                path.is_some_and(|needle|
                         info.path.as_ref()
-                        .map_or(false,
+                        .is_some_and(
                                 |contract_path| contract_path.ends_with(needle)))
                 // if user provides a name we should check that it matches
-                && name.map_or(false, |name| name == info.name.as_str())
+                && name.is_some_and(|name| name == info.name.as_str())
             })
             .map(|(_, contract)| (FindMatchType::FullMatch, contract));
 
@@ -353,10 +353,8 @@ impl DualCompiledContracts {
             .filter(move |(info, _)| {
                 // if a path is provided, check that it matches
                 // if no path is provided, don't match it
-                path.map_or(false, |needle| {
-                    info.path
-                        .as_ref()
-                        .map_or(false, |contract_path| contract_path.ends_with(needle))
+                path.is_some_and(|needle| {
+                    info.path.as_ref().is_some_and(|contract_path| contract_path.ends_with(needle))
                 })
             })
             .map(|(_, contract)| (FindMatchType::Path, contract));
