@@ -151,9 +151,6 @@ main() {
     RELEASE_URL="https://github.com/${FOUNDRYUP_REPO}/releases/download/${FOUNDRYUP_TAG}/"
     BIN_ARCHIVE_URL="${RELEASE_URL}foundry_nightly_${PLATFORM}_${ARCHITECTURE}.$EXT"
     
-    echo $BIN_ARCHIVE_URL
-    echo $RELEASE_URL
-    
     # Download and extract the binaries archive
     say "downloading latest forge, and cast"
     if [ "$PLATFORM" = "win32" ]; then
