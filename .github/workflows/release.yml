@@ -150,7 +150,11 @@ jobs:
           set -x
           ls -l /etc/apt/sources.list
           ls -l /etc/apt/sources.list.d
+          cat /etc/apt/sources.list.d/ubuntu.sources
+          ls -l /etc/apt/sources.list.d/ubuntu.sources
           echo 'updating'
+          sudo echo '#foo' >> /tmp/ubuntu.sources-none
+          sudo echo '#foo' >> /etc/apt/sources.list.d/ubuntu.sources-none
           sudo echo '#foo' >> /etc/apt/sources.list.d/ubuntu.sources
           echo 'updating2'
           sudo echo 'Types: deb
