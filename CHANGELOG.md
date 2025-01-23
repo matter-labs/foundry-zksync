@@ -231,7 +231,7 @@
 * fork reset ([#857](https://github.com/matter-labs/foundry-zksync/issues/857)) ([2179ac1](https://github.com/matter-labs/foundry-zksync/commit/2179ac163cef464666ea45243adcbc7d40431058))
 * **fork:** set block blob_excess_gas_and_price only if `excess_blob_gas header` is Some ([#9298](https://github.com/matter-labs/foundry-zksync/issues/9298)) ([4817280](https://github.com/matter-labs/foundry-zksync/commit/4817280d96e0e33a2e96cf169770da60514d1764))
 * **fork:** set block blob_excess_gas_and_price only if excess_blob_gas header is Some ([4817280](https://github.com/matter-labs/foundry-zksync/commit/4817280d96e0e33a2e96cf169770da60514d1764))
-* **fuzz:** exclude exernal libraries addresses from fuzz inputs ([#9527](https://github.com/matter-labs/foundry-zksync/issues/9527)) ([59f354c](https://github.com/matter-labs/foundry-zksync/commit/59f354c179f4e7f6d7292acb3d068815c79286d1))
+* **fuzz:** exclude external libraries addresses from fuzz inputs ([#9527](https://github.com/matter-labs/foundry-zksync/issues/9527)) ([59f354c](https://github.com/matter-labs/foundry-zksync/commit/59f354c179f4e7f6d7292acb3d068815c79286d1))
 * gas price estimation cast send zk ([#683](https://github.com/matter-labs/foundry-zksync/issues/683)) ([c129b59](https://github.com/matter-labs/foundry-zksync/commit/c129b5911e3d838904ca7b6776278bd9bdffeda9))
 * handle large years ([#9032](https://github.com/matter-labs/foundry-zksync/issues/9032)) ([eb04665](https://github.com/matter-labs/foundry-zksync/commit/eb046653de4047a27b181394338732e597965257))
 * identification of contracts in scripts ([#9346](https://github.com/matter-labs/foundry-zksync/issues/9346)) ([c13d42e](https://github.com/matter-labs/foundry-zksync/commit/c13d42e850da353c0856a8b0d4123e13cc40045d))
