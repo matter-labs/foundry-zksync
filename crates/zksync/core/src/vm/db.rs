@@ -13,13 +13,14 @@ use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_types::{
     get_code_key, get_nonce_key, get_system_context_init_logs, h256_to_u256,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
-    Nonce, StorageKey, StorageLog, StorageValue,
+    StorageKey, StorageLog, StorageValue,
 };
 use zksync_vm_interface::storage::ReadStorage;
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     hash_bytecode,
+    state::FullNonce,
 };
 
 /// Default chain id
@@ -138,22 +139,31 @@ where
         self.read_db(*code_key.address(), h256_to_u256(*code_key.key()))
     }
 
+    /// Returns the [FullNonce] for a given account from NonceHolder storage.
+    pub fn get_full_nonce(&mut self, address: Address) -> FullNonce {
+        let address = address.to_h160();
+        let nonce_key = get_nonce_key(&address);
+        let nonce_storage = self.read_db(*nonce_key.address(), h256_to_u256(*nonce_key.key()));
+        let (tx_nonce, deploy_nonce) = decompose_full_nonce(h256_to_u256(nonce_storage));
+        FullNonce { tx_nonce: tx_nonce.as_u128(), deploy_nonce: deploy_nonce.as_u128() }
+    }
+
     /// Returns the nonce for a given account from NonceHolder storage.
-    pub fn get_tx_nonce(&mut self, address: Address) -> Nonce {
+    pub fn get_tx_nonce(&mut self, address: Address) -> u128 {
         let address = address.to_h160();
         let nonce_key = get_nonce_key(&address);
         let nonce_storage = self.read_db(*nonce_key.address(), h256_to_u256(*nonce_key.key()));
         let (tx_nonce, _deploy_nonce) = decompose_full_nonce(h256_to_u256(nonce_storage));
-        Nonce(tx_nonce.as_u32())
+        tx_nonce.as_u128()
     }
 
     /// Returns the deployment nonce for a given account from NonceHolder storage.
-    pub fn get_deploy_nonce(&mut self, address: Address) -> Nonce {
+    pub fn get_deploy_nonce(&mut self, address: Address) -> u128 {
         let address = address.to_h160();
         let nonce_key = get_nonce_key(&address);
         let nonce_storage = self.read_db(*nonce_key.address(), h256_to_u256(*nonce_key.key()));
         let (_tx_nonce, deploy_nonce) = decompose_full_nonce(h256_to_u256(nonce_storage));
-        Nonce(deploy_nonce.as_u32())
+        deploy_nonce.as_u128()
     }
 
     /// Returns the nonce for a given account from NonceHolder storage.

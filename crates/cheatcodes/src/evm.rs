@@ -143,6 +143,20 @@ impl Cheatcode for getNonce_1Call {
     }
 }
 
+impl Cheatcode for zkGetTransactionNonceCall {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
+        let Self { account } = self;
+        get_nonce(ccx, account)
+    }
+}
+
+impl Cheatcode for zkGetDeploymentNonceCall {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
+        let Self { account } = self;
+        get_nonce(ccx, account)
+    }
+}
+
 impl Cheatcode for loadCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { target, slot } = *self;
