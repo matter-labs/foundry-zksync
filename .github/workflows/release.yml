@@ -152,6 +152,8 @@ jobs:
           ls -l /etc/apt/sources.list.d
           cat /etc/apt/sources.list.d/ubuntu.sources
           ls -l /etc/apt/sources.list.d/ubuntu.sources
+          whoami
+          sudo whoami
           echo 'updating'
           sudo echo 'Types: deb
           URIs: http://ports.ubuntu.com/ubuntu-ports/
@@ -180,6 +182,10 @@ jobs:
           Suites: noble-security
           Components: main restricted universe multiverse
           Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' >> /etc/apt/sources.list.d/ubuntu.sources
+
+          # deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main universe
+          # deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main universe
+
 
           echo 'check'
           cat /etc/apt/sources.list.d/ubuntu.sources
