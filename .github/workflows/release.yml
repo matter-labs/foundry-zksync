@@ -153,9 +153,10 @@ jobs:
           cat /etc/apt/sources.list.d/ubuntu.sources
           ls -l /etc/apt/sources.list.d/ubuntu.sources
           echo 'updating'
-          sudo echo '#foo' >> /tmp/ubuntu.sources-none
-          sudo echo '#foo' >> /etc/apt/sources.list.d/ubuntu.sources-none
-          sudo echo '#foo' >> /etc/apt/sources.list.d/ubuntu.sources
+          sudo echo '#foo-tmp' >> /tmp/ubuntu.sources-none
+          sudo echo '#foo-sources.list' >> /etc/apt/sources.list
+          sudo echo '#foo-sources.list.d' >> /etc/apt/sources.list.d/ubuntu.sources-none
+          sudo echo '#foosources.list.d-ubuntu' >> /etc/apt/sources.list.d/ubuntu.sources
           echo 'updating2'
           sudo echo 'Types: deb
           URIs: http://ports.ubuntu.com/ubuntu-ports/
