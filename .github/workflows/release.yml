@@ -151,6 +151,8 @@ jobs:
           ls -l /etc/apt/sources.list
           ls -l /etc/apt/sources.list.d
           echo 'updating'
+          sudo echo '#foo' >> /etc/apt/sources.list.d/ubuntu.sources
+          echo 'updating2'
           sudo echo 'Types: deb
           URIs: http://ports.ubuntu.com/ubuntu-ports/
           Suites: noble noble-updates noble-backports
