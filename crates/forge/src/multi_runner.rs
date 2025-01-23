@@ -160,6 +160,7 @@ impl MultiContractRunner {
         filter: &dyn TestFilter,
     ) -> impl Iterator<Item = (String, SuiteResult)> {
         let (tx, rx) = mpsc::channel();
+        println!("sending tests");
         self.test(filter, tx, false);
         rx.into_iter()
     }
@@ -193,6 +194,7 @@ impl MultiContractRunner {
         );
 
         if show_progress {
+            println!("show progress");
             let tests_progress = TestsProgress::new(contracts.len(), rayon::current_num_threads());
             // Collect test suite results to stream at the end of test run.
             let results: Vec<(String, SuiteResult)> = contracts
@@ -225,6 +227,7 @@ impl MultiContractRunner {
                 let _ = tx.send(result.to_owned());
             });
         } else {
+            println!("don't show progress");
             contracts.par_iter().for_each(|&(id, contract)| {
                 let _guard = tokio_handle.enter();
                 let result = self.run_test_suite(id, contract, &db, filter, &tokio_handle, None);
