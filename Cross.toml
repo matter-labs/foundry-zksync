@@ -18,7 +18,6 @@ pre-build = [
     "apt-get update -q && apt-get install --assume-yes --no-install-recommends libssl-dev:$CROSS_DEB_ARCH pkg-config",
 ]
 
-
 [target.x86_64-apple-darwin]
 image = "macosx-amd64"
 pre-build = [
