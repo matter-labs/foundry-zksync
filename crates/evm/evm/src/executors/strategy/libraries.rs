@@ -73,8 +73,8 @@ impl EvmExecutorStrategyRunner {
             let Some(abi) = &contract.abi else { continue };
 
             // if it's a test, link it and add to deployable contracts
-            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true)
-                && abi.functions().any(|func| func.name.is_any_test())
+            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true) &&
+                abi.functions().any(|func| func.name.is_any_test())
             {
                 let Some(bytecode) =
                     contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
