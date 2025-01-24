@@ -14,7 +14,7 @@ forgetest_init!(test_zk_build_sizes, |prj, cmd| {
 });
 
 // tests build output is as expected in zksync mode
-forgetest_init!(test_zk_cache, |prj, cmd| {
+forgetest_init!(test_zk_cache_ok, |prj, cmd| {
     let zk_toml = r#"[profile.default]
 src = 'src'
 out = 'out'
