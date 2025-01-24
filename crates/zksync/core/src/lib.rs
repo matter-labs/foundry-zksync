@@ -33,7 +33,7 @@ use std::fmt::Debug;
 use zksync_types::bytecode::BytecodeHash;
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
-pub use vm::{balance, encode_create_params, nonce};
+pub use vm::{balance, deploy_nonce, encode_create_params, tx_nonce};
 
 pub use vm::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use zksync_multivm::interface::{Call, CallType};
@@ -51,6 +51,11 @@ type Result<T> = std::result::Result<T, eyre::Report>;
 
 /// Represents an empty code
 pub const EMPTY_CODE: [u8; 32] = [0; 32];
+
+/// Represents ZKsync hash for [EMPTY_CODE]
+pub const EMPTY_CODE_HASH: H256 = H256(
+    alloy_primitives::b256!("01000001f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925").0,
+);
 
 /// The minimum possible address that is not reserved in the zkSync space.
 const MIN_VALID_ADDRESS: u32 = 2u32.pow(16);
@@ -131,15 +136,24 @@ pub struct EstimatedGas {
 
 /// Estimates the gas parameters for the provided transaction.
 /// This will call `estimateFee` method on the rpc and set the gas parameters on the transaction.
-pub async fn estimate_gas<P: ZksyncProvider<T>, T: Transport + Clone>(
+pub async fn estimate_fee<P: ZksyncProvider<T>, T: Transport + Clone>(
     tx: &mut ZkTransactionRequest,
     provider: P,
+    estimate_multiplier: u64,
+    gas_per_pubdata: Option<u64>,
 ) -> Result<()> {
     let fee = provider.estimate_fee(tx.clone()).await?;
-    tx.set_gas_limit(fee.gas_limit);
-    tx.set_max_fee_per_gas(fee.max_fee_per_gas);
-    tx.set_max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
-    tx.set_gas_per_pubdata(fee.gas_per_pubdata_limit);
+    tx.set_gas_limit(fee.gas_limit * estimate_multiplier / 100);
+    // If user provided a gas price, use it for both maxFeePerGas
+    let max_fee = tx.max_fee_per_gas().unwrap_or(fee.max_fee_per_gas);
+    let max_priority_fee = tx.max_priority_fee_per_gas().unwrap_or(fee.max_priority_fee_per_gas);
+    let gas_per_pubdata = match gas_per_pubdata {
+        Some(value) => rU256::from(value),
+        None => fee.gas_per_pubdata_limit,
+    };
+    tx.set_max_fee_per_gas(max_fee);
+    tx.set_max_priority_fee_per_gas(max_priority_fee);
+    tx.set_gas_per_pubdata(gas_per_pubdata);
 
     Ok(())
 }
@@ -248,7 +262,7 @@ where
     DB: Database,
     DB::Error: Debug,
 {
-    //ensure nonce is _only_ tx nonce
+    // ensure nonce is _only_ tx nonce
     let (tx_nonce, _deploy_nonce) = decompose_full_nonce(nonce.to_u256());
 
     let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
@@ -261,6 +275,26 @@ where
         .map(|v| decompose_full_nonce(v.to_u256()).1)
         .unwrap_or_default();
     let updated_nonce = nonces_to_full_nonce(tx_nonce, old_deploy_nonce);
+    ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
+}
+
+/// Increment transaction nonce for a specific address.
+pub fn increment_tx_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>)
+where
+    DB: Database,
+    DB::Error: Debug,
+{
+    let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
+    ecx.load_account(nonce_addr).expect("account could not be loaded");
+    let nonce_key = get_nonce_key(address);
+    ecx.touch(&nonce_addr);
+
+    // We make sure to keep the old deployment nonce
+    let (tx_nonce, deploy_nonce) = ecx
+        .sload(nonce_addr, nonce_key)
+        .map(|v| decompose_full_nonce(v.to_u256()))
+        .unwrap_or_default();
+    let updated_nonce = nonces_to_full_nonce(tx_nonce.saturating_add(1u32.into()), deploy_nonce);
     ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
 }
 

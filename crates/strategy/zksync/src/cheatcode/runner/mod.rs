@@ -60,8 +60,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         debug!("allowing startup storage migration");
         ctx.zk_startup_migration.allow();
-        debug!("allowing persisting next nonce update");
-        ctx.zk_persist_nonce_update.persist_next();
     }
 
     fn apply_full(
@@ -101,7 +99,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         let init_code = input.init_code();
         let to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
-        let mut nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as u64;
+        let mut nonce = foundry_zksync_core::tx_nonce(broadcast.new_origin, ecx_inner) as u64;
         let find_contract = ctx
             .dual_compiled_contracts
             .find_bytecode(&init_code.0)
@@ -196,6 +194,18 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             rpc,
             transaction: TransactionMaybeSigned::Unsigned(tx),
         });
+
+        // Explicitly increment tx nonce if calls are not isolated.
+        // This isn't needed in EVM, but required in zkEVM as the nonces are split.
+        if !config.evm_opts.isolate {
+            let tx_nonce = nonce;
+            foundry_zksync_core::set_tx_nonce(
+                broadcast.new_origin,
+                U256::from(tx_nonce.saturating_add(1)),
+                ecx_inner,
+            );
+            debug!(target: "cheatcodes", address=%broadcast.new_origin, new_tx_nonce=tx_nonce+1, tx_nonce, "incremented zksync tx nonce");
+        }
     }
 
     fn record_broadcastable_call_transactions(
@@ -227,7 +237,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         let is_fixed_gas_limit =
             foundry_cheatcodes::check_if_fixed_gas_limit(ecx_inner, call.gas_limit);
 
-        let nonce = foundry_zksync_core::nonce(broadcast.new_origin, ecx_inner) as u64;
+        let tx_nonce = foundry_zksync_core::tx_nonce(broadcast.new_origin, ecx_inner);
 
         let factory_deps = &mut ctx.set_deployer_call_input_factory_deps;
         let injected_factory_deps = ctx
@@ -270,7 +280,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             to: Some(TxKind::from(Some(call.target_address))),
             value: call.transfer_value(),
             input: TransactionInput::new(call.input.clone()),
-            nonce: Some(nonce),
+            nonce: Some(tx_nonce as u64),
             chain_id: Some(ecx_inner.env.cfg.chain_id),
             gas: if is_fixed_gas_limit { Some(call.gas_limit) } else { None },
             ..Default::default()
@@ -293,6 +303,16 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             transaction: TransactionMaybeSigned::Unsigned(tx),
         });
         debug!(target: "cheatcodes", tx=?broadcastable_transactions.back().unwrap(), "broadcastable call");
+
+        // Explicitly increment tx nonce if calls are not isolated.
+        if !config.evm_opts.isolate {
+            foundry_zksync_core::set_tx_nonce(
+                broadcast.new_origin,
+                U256::from(tx_nonce.saturating_add(1)),
+                ecx_inner,
+            );
+            debug!(target: "cheatcodes", address=%broadcast.new_origin, new_tx_nonce=tx_nonce+1, tx_nonce, "incremented zksync tx nonce");
+        }
     }
 
     fn post_initialize_interp(
@@ -504,14 +524,12 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         ctx.zk_use_factory_deps.clear();
         tracing::debug!(contract = contract.name, "using dual compiled contract");
 
-        let zk_persist_nonce_update = ctx.zk_persist_nonce_update.check();
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: state.mocked_calls.clone(),
             expected_calls: Some(&mut state.expected_calls),
             accesses: state.accesses.as_mut(),
             persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
             paymaster_data: ctx.paymaster_params.take(),
-            persist_nonce_update: state.broadcast.is_some() || zk_persist_nonce_update,
             zk_env: ctx.zk_env.clone(),
         };
 
@@ -683,7 +701,6 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         }
 
         info!("running call in zkEVM {:#?}", call);
-        let zk_persist_nonce_update = ctx.zk_persist_nonce_update.check();
 
         // NOTE(zk): Clear injected factory deps here even though it's actually used in broadcast.
         // To be consistent with where we clear factory deps in try_create_in_zk.
@@ -695,7 +712,6 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             accesses: state.accesses.as_mut(),
             persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
             paymaster_data: ctx.paymaster_params.take(),
-            persist_nonce_update: state.broadcast.is_some() || zk_persist_nonce_update,
             zk_env: ctx.zk_env.clone(),
         };
 

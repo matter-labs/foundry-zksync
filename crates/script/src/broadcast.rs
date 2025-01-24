@@ -70,6 +70,7 @@ pub async fn send_transaction(
     is_fixed_gas_limit: bool,
     estimate_via_rpc: bool,
     estimate_multiplier: u64,
+    gas_per_pubdata: Option<u64>,
 ) -> Result<TxHash> {
     let zk_tx_meta =
         if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
@@ -141,7 +142,14 @@ pub async fn send_transaction(
                         },
                     );
                 }
-                foundry_zksync_core::estimate_gas(&mut zk_tx, &zk_provider).await?;
+
+                foundry_zksync_core::estimate_fee(
+                    &mut zk_tx,
+                    &zk_provider,
+                    estimate_multiplier,
+                    gas_per_pubdata,
+                )
+                .await?;
 
                 let zk_signer = alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
                 let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
@@ -317,7 +325,20 @@ impl BundledState {
                     self.args.with_gas_price,
                     self.args.priority_gas_price,
                 ) {
-                    (true, Some(gas_price), _) => (Some(gas_price.to()), None),
+                    (true, Some(gas_price), priority_fee) => (
+                        Some(gas_price.to()),
+                        if self.script_config.config.zksync.run_in_zk_mode() {
+                            // NOTE(zk): Zksync is marked as legacy in alloy chains but it is
+                            // compliant with EIP-1559 so we need to
+                            // pass down the user provided values
+                            priority_fee.map(|fee| Eip1559Estimation {
+                                max_fee_per_gas: gas_price.to(),
+                                max_priority_fee_per_gas: fee.to(),
+                            })
+                        } else {
+                            None
+                        },
+                    ),
                     (true, None, _) => (Some(provider.get_gas_price().await?), None),
                     (false, Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) => (
                         None,
@@ -367,6 +388,15 @@ impl BundledState {
 
                                 if let Some(gas_price) = gas_price {
                                     tx.set_gas_price(gas_price);
+                                    if self.script_config.config.zksync.run_in_zk_mode() {
+                                        // NOTE(zk): Also set EIP-1559 fees for zk transactions
+                                        if let Some(eip1559_fees) = eip1559_fees {
+                                            tx.set_max_priority_fee_per_gas(
+                                                eip1559_fees.max_priority_fee_per_gas,
+                                            );
+                                            tx.set_max_fee_per_gas(eip1559_fees.max_fee_per_gas);
+                                        }
+                                    }
                                 } else {
                                     let eip1559_fees = eip1559_fees.expect("was set above");
                                     tx.set_max_priority_fee_per_gas(
@@ -417,6 +447,7 @@ impl BundledState {
                             *is_fixed_gas_limit,
                             estimate_via_rpc,
                             self.args.gas_estimate_multiplier,
+                            self.args.zk_gas_per_pubdata,
                         );
                         pending_transactions.push(fut);
                     }
