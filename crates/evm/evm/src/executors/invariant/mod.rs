@@ -401,9 +401,7 @@ impl<'a> InvariantExecutor<'a> {
                         invariant_test.set_error(InvariantFuzzError::MaxAssumeRejects(
                             self.config.max_assume_rejects,
                         ));
-                        return Err(TestCaseError::fail(
-                            "Max number of vm.assume rejects reached.",
-                        ));
+                        return Err(TestCaseError::fail("Max number of vm.assume rejects reached."));
                     }
                 } else {
                     // Commit executed call result.
@@ -460,6 +458,7 @@ impl<'a> InvariantExecutor<'a> {
 
                     invariant_test.set_last_call_results(result.call_result);
                     current_run.depth += 1;
+                    info!("iteration ended");
                 }
 
                 // Generates the next call from the run using the recently updated
@@ -471,6 +470,7 @@ impl<'a> InvariantExecutor<'a> {
                         .current(),
                 );
             }
+            info!("end of loop");
 
             // Call `afterInvariant` only if it is declared and test didn't fail already.
             if invariant_contract.call_after_invariant && !invariant_test.has_errors() {
@@ -483,6 +483,7 @@ impl<'a> InvariantExecutor<'a> {
                 .map_err(|_| TestCaseError::Fail("Failed to call afterInvariant".into()))?;
             }
 
+            info!("run about to end");
             // End current invariant test run.
             invariant_test.end_run(current_run, self.config.gas_report_samples as usize);
 
@@ -490,10 +491,12 @@ impl<'a> InvariantExecutor<'a> {
             if let Some(progress) = progress {
                 progress.inc(1);
             }
+            info!("run ended");
 
             Ok(())
         });
 
+        info!(?fuzz_fixtures);
         trace!(?fuzz_fixtures);
         invariant_test.fuzz_state.log_stats();
 
@@ -638,13 +641,13 @@ impl<'a> InvariantExecutor<'a> {
                 .filter(|func| {
                     !matches!(
                         func.state_mutability,
-                        alloy_json_abi::StateMutability::Pure
-                            | alloy_json_abi::StateMutability::View
+                        alloy_json_abi::StateMutability::Pure |
+                            alloy_json_abi::StateMutability::View
                     )
                 })
-                .count()
-                == 0
-                && !self.artifact_filters.excluded.contains(&artifact.identifier())
+                .count() ==
+                0 &&
+                !self.artifact_filters.excluded.contains(&artifact.identifier())
             {
                 self.artifact_filters.excluded.push(artifact.identifier());
             }
@@ -655,8 +658,8 @@ impl<'a> InvariantExecutor<'a> {
         for contract in selected.targetedArtifacts {
             let identifier = self.validate_selected_contract(contract, &[])?;
 
-            if !self.artifact_filters.targeted.contains_key(&identifier)
-                && !self.artifact_filters.excluded.contains(&identifier)
+            if !self.artifact_filters.targeted.contains_key(&identifier) &&
+                !self.artifact_filters.excluded.contains(&identifier)
             {
                 self.artifact_filters.targeted.insert(identifier, vec![]);
             }
@@ -725,12 +728,12 @@ impl<'a> InvariantExecutor<'a> {
             .setup_contracts
             .iter()
             .filter(|&(addr, (identifier, _))| {
-                *addr != to
-                    && *addr != CHEATCODE_ADDRESS
-                    && *addr != HARDHAT_CONSOLE_ADDRESS
-                    && (selected.is_empty() || selected.contains(addr))
-                    && (excluded.is_empty() || !excluded.contains(addr))
-                    && self.artifact_filters.matches(identifier)
+                *addr != to &&
+                    *addr != CHEATCODE_ADDRESS &&
+                    *addr != HARDHAT_CONSOLE_ADDRESS &&
+                    (selected.is_empty() || selected.contains(addr)) &&
+                    (excluded.is_empty() || !excluded.contains(addr)) &&
+                    self.artifact_filters.matches(identifier)
             })
             .map(|(addr, (identifier, abi))| {
                 (*addr, TargetedContract::new(identifier.clone(), abi.clone()))
