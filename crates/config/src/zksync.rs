@@ -1,5 +1,4 @@
 use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
-use core::iter;
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Severity},
     error::SolcError,
@@ -22,10 +21,7 @@ use foundry_zksync_compilers::{
 };
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashSet},
-    path::PathBuf,
-};
+use std::{collections::HashSet, path::PathBuf};
 
 use crate::{Config, SkipBuildFilters, SolcReq};
 
@@ -169,8 +165,11 @@ pub fn config_zksolc_settings(config: &Config) -> Result<ZkSolcSettings, SolcErr
         Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {e}"))),
     };
 
-    let x = <std::option::Option<SolcReq> as Clone>::clone(&config.zksync.zksolc).unwrap();
-    let version = x
+    let version = config
+        .zksync
+        .zksolc
+        .clone()
+        .ok_or_else(|| SolcError::msg("zksolc version is not set"))?
         .try_version()
         .map_err(|e| SolcError::msg(format!("Failed to parse zksolc version: {e}")))?;
 
@@ -185,18 +184,10 @@ pub fn config_create_project(
     cached: bool,
     no_artifacts: bool,
 ) -> Result<Project<ZkSolcCompiler, ZkArtifactOutput>, SolcError> {
-    let settings = config_zksolc_settings(config)?;
-
-    print!("settings: {:?}", settings);
-
     let mut builder = ProjectBuilder::<ZkSolcCompiler, ZkArtifactOutput>::default()
         .artifacts(ZkArtifactOutput {})
         .paths(config_project_paths(config))
-        .settings(settings.clone())
-        .additional_settings(BTreeMap::from_iter(iter::once((
-            "zksyn2c".to_string(),
-            settings.into(),
-        ))))
+        .settings(config_zksolc_settings(config)?)
         .ignore_error_codes(config.ignored_error_codes.iter().copied().map(Into::into))
         .ignore_paths(config.ignored_file_paths.clone())
         .set_compiler_severity_filter(if config.deny_warnings {
@@ -231,11 +222,6 @@ pub fn config_create_project(
     };
 
     let zksolc_compiler = ZkSolcCompiler { zksolc, solc: config_solc_compiler(config)? };
-
-    // builder.additional_settings(BTreeMap::from_iter(iter::once((
-    //     "zksync".to_string(),
-    //     settings.into(),
-    // ))));
 
     let project = builder.build(zksolc_compiler)?;
 
