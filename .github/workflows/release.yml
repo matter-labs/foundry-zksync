@@ -189,15 +189,15 @@ jobs:
         shell: bash
         run: |
           if [ "$PLATFORM_NAME" == "linux" ]; then
-              # tar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
-              # echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
-              echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz"
+              # tar -czvf "foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
+              # echo "file_name=foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+              echo "file_name=foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz"
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
               # We need to use gtar here otherwise the archive is corrupt.
               # See: https://github.com/actions/virtual-environments/issues/2619
-              # gtar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
-              # echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
-              echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz"
+              # gtar -czvf "foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
+              # echo "file_name=foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+              echo "file_name=foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz"
           fi
 
       # - name: Build man page
