@@ -40,6 +40,8 @@ jobs:
     needs: release-please
     uses: ./.github/workflows/release.yml
     with:
-      tag: ${{ needs.release-please.outputs.tag_name }}
-      version: ${{ (needs.release-please.outputs.tag_name && format('{0}.{1}.{2}', needs.release-please.outputs.major, needs.release-please.outputs.minor, needs.release-please.outputs.patch)) || ''}}
+      tag: foundry-zksync-v0.0.4
+      version: "0.0.4"
+      # tag: ${{ needs.release-please.outputs.tag_name }}
+      # version: ${{ (needs.release-please.outputs.tag_name && format('{0}.{1}.{2}', needs.release-please.outputs.major, needs.release-please.outputs.minor, needs.release-please.outputs.patch)) || ''}}
     secrets: inherit
