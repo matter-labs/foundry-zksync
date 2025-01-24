@@ -114,7 +114,6 @@ impl ZkSyncConfig {
         libraries: Libraries,
         evm_version: EvmVersion,
         via_ir: bool,
-        zksolc_version: Option<Version>,
     ) -> ZkSolcSettings {
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
@@ -145,7 +144,7 @@ impl ZkSyncConfig {
             codegen: if self.force_evmla { Codegen::EVMLA } else { Codegen::Yul },
             suppressed_warnings: self.suppressed_warnings.clone(),
             suppressed_errors: self.suppressed_errors.clone(),
-            zksolc_version,
+            zksolc_version: self.zksolc.as_ref().and_then(|req| req.try_version().ok()),
         };
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
@@ -165,15 +164,7 @@ pub fn config_zksolc_settings(config: &Config) -> Result<ZkSolcSettings, SolcErr
         Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {e}"))),
     };
 
-    let version = config
-        .zksync
-        .zksolc
-        .clone()
-        .ok_or_else(|| SolcError::msg("zksolc version is not set"))?
-        .try_version()
-        .map_err(|e| SolcError::msg(format!("Failed to parse zksolc version: {e}")))?;
-
-    Ok(config.zksync.settings(libraries, config.evm_version, config.via_ir, Some(version)))
+    Ok(config.zksync.settings(libraries, config.evm_version, config.via_ir))
 }
 
 /// Create a new ZKsync project
