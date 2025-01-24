@@ -52,7 +52,8 @@ impl ZksyncExecutorStrategyRunner {
         // fetch the full nonce to preserve account's tx nonce
         let full_nonce = executor.backend.storage(address, slot)?;
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
-        let new_full_nonce = foundry_zksync_core::state::new_full_nonce(full_nonce.tx_nonce, nonce);
+        let new_full_nonce =
+            foundry_zksync_core::state::new_full_nonce(full_nonce.tx_nonce, nonce as u128);
         executor.backend.insert_account_storage(address, slot, new_full_nonce)?;
 
         Ok(())
@@ -113,7 +114,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let full_nonce = executor.backend.storage(address, slot)?;
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
 
-        Ok(full_nonce.tx_nonce)
+        Ok(full_nonce.tx_nonce as u64)
     }
 
     fn link(
