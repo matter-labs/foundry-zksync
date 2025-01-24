@@ -210,7 +210,7 @@ impl VerifyBundle {
 
             let contract_bytecode_hash = foundry_zksync_core::hash_bytecode(bytecode);
             if bytecode_hash == contract_bytecode_hash {
-                if artifact.source.extension().map_or(false, |e| e.to_str() == Some("vy")) {
+                if artifact.source.extension().is_some_and(|e| e.to_str() == Some("vy")) {
                     warn!("Skipping verification of Vyper contract: {}", artifact.name);
                 }
 

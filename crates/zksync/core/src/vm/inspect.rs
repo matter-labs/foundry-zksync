@@ -27,10 +27,11 @@ use zksync_multivm::{
 use zksync_types::{
     get_nonce_key, h256_to_address, h256_to_u256, l2::L2Tx, transaction_request::PaymasterParams,
     u256_to_h256, PackedEthSignature, StorageKey, Transaction, ACCOUNT_CODE_STORAGE_ADDRESS,
-    CONTRACT_DEPLOYER_ADDRESS, NONCE_HOLDER_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
+use core::convert::Into;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -40,7 +41,8 @@ use std::{
 use crate::{
     be_words_to_bytes,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    fix_l2_gas_limit, fix_l2_gas_price, is_system_address,
+    fix_l2_gas_limit, fix_l2_gas_price, increment_tx_nonce, is_system_address,
+    state::{new_full_nonce, parse_full_nonce, FullNonce},
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
         env::{create_l1_batch_env, create_system_env},
@@ -102,6 +104,7 @@ where
         );
         tx.common_data.fee.gas_limit = new_gas_limit;
 
+        let initiator_address = tx.initiator_account();
         info!("executing batched tx ({}/{})", idx + 1, total_txns);
         let mut result = inspect(tx, ecx, ccx, call_ctx.clone())?;
 
@@ -149,6 +152,11 @@ where
             }
             _ => unreachable!("aggregated result must only contain success"),
         }
+
+        // Increment the nonce manually if there are multiple batches
+        if total_txns > 1 {
+            increment_tx_nonce(initiator_address.to_address(), ecx);
+        }
     }
 
     Ok(aggregated_result.expect("must have result"))
@@ -184,11 +192,9 @@ where
         .with_extra_factory_deps(persisted_factory_deps)
         .with_storage_accesses(ccx.accesses.take());
 
-    let is_create = call_ctx.is_create;
     info!(?call_ctx, "executing transaction in zk vm");
 
     let initiator_address = tx.common_data.initiator_address;
-    let persist_nonce_update = ccx.persist_nonce_update;
 
     if tx.common_data.signature.is_empty() {
         // FIXME: This is a hack to make sure that the signature is not empty.
@@ -203,12 +209,12 @@ where
     let InnerZkVmResult {
         tx_result,
         bytecodes,
-        modified_storage,
+        mut modified_storage,
         call_traces,
         recorded_immutables,
         create_outcome,
         gas_usage,
-    } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx);
+    } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx.clone());
 
     info!(
         reserved=?gas_usage.bootloader_debug.reserved_gas, limit=?gas_usage.limit, execution=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
@@ -251,7 +257,7 @@ where
             };
             // in zkEVM the output is the 0-padded address, we replace this with the deployed
             // bytecode so the traces can pick it up correctly
-            let output = if is_create {
+            let output = if call_ctx.is_create {
                 let create_result = match (address, create_outcome) {
                     (Some(address), Some(create_outcome)) => {
                         if address == create_outcome.address {
@@ -329,23 +335,30 @@ where
 
     let mut storage: rHashMap<Address, rHashMap<rU256, StorageSlot>> = Default::default();
     let mut codes: rHashMap<Address, (B256, Bytecode)> = Default::default();
-    // We skip nonce updates when should_update_nonce is false to avoid nonce mismatch
-    let filtered = modified_storage.iter().filter(|(k, _)| {
-        !(k.address() == &NONCE_HOLDER_ADDRESS &&
-            get_nonce_key(&initiator_address) == **k &&
-            !persist_nonce_update)
-    });
 
-    for (k, v) in filtered {
+    let initiator_nonce_key = get_nonce_key(&initiator_address);
+
+    // NOTE(zk): We need to revert the tx nonce of the initiator as we intercept and dispatch
+    // CALLs and CREATEs to the zkEVM. The CREATEs always increment the deployment nonce
+    // which must be persisted, but the tx nonce increase must be reverted.
+    if let Some(initiator_nonce) = modified_storage.get_mut(&initiator_nonce_key) {
+        let FullNonce { tx_nonce, deploy_nonce } = parse_full_nonce(initiator_nonce.to_ru256());
+        let new_tx_nonce = tx_nonce.saturating_sub(1);
+        error!(address=?initiator_address, from=?tx_nonce, to=?new_tx_nonce, deploy_nonce, "reverting initiator tx nonce for CALL");
+        *initiator_nonce = new_full_nonce(new_tx_nonce, deploy_nonce).to_h256();
+    }
+
+    for (k, v) in modified_storage {
         let address = k.address().to_address();
         let index = k.key().to_ru256();
         era_db.load_account(address);
         let previous = era_db.sload(address, index);
         let entry = storage.entry(address).or_default();
+
         entry.insert(index, StorageSlot::new_changed(previous, v.to_ru256()));
 
         if k.address() == &ACCOUNT_CODE_STORAGE_ADDRESS {
-            if let Some(bytecode) = bytecodes.get(&h256_to_u256(*v)) {
+            if let Some(bytecode) = bytecodes.get(&h256_to_u256(v)) {
                 let bytecode =
                     bytecode.iter().flat_map(|x| u256_to_h256(*x).to_fixed_bytes()).collect_vec();
                 let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
@@ -354,14 +367,14 @@ where
             } else {
                 // We populate bytecodes for all non-system addresses
                 if !is_system_address(k.key().to_h160().to_address()) {
-                    if let Some(bytecode) = (&mut era_db).load_factory_dep(*v) {
+                    if let Some(bytecode) = (&mut era_db).load_factory_dep(v) {
                         let hash = B256::from_slice(v.as_bytes());
                         let bytecode = Bytecode::new_raw(Bytes::from(bytecode));
                         codes.insert(k.key().to_h160().to_address(), (hash, bytecode));
                     } else {
                         warn!(
                             "no bytecode was found for {:?}, requested by account {:?}",
-                            *v,
+                            v,
                             k.key().to_h160()
                         );
                     }
