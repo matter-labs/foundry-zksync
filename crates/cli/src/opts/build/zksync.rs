@@ -2,8 +2,8 @@ use std::{collections::HashSet, path::PathBuf};
 
 use alloy_primitives::{hex, Address, Bytes};
 use clap::Parser;
+use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_config::zksync::ZkSyncConfig;
-use foundry_zksync_compilers::compilers::zksolc::settings::{ZkSolcError, ZkSolcWarning};
 use serde::Serialize;
 
 #[derive(Clone, Debug, Default, Serialize, Parser)]
@@ -117,22 +117,24 @@ pub struct ZkSyncArgs {
     /// Set the warnings to suppress for zksolc.
     #[clap(
         long = "zk-suppressed-warnings",
-        visible_alias = "suppressed-warnings",
+        alias = "suppressed-warnings",
+        visible_alias = "suppress-warnings",
         value_delimiter = ',',
-        help = "Set the warnings to suppress for zksolc, possible values: [txorigin]"
+        help = "Set the warnings to suppress for zksolc, possible values: [txorigin, assemblycreate]"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub suppressed_warnings: Option<Vec<ZkSolcWarning>>,
+    pub suppressed_warnings: Option<Vec<WarningType>>,
 
     /// Set the errors to suppress for zksolc.
     #[clap(
         long = "zk-suppressed-errors",
-        visible_alias = "suppressed-errors",
+        alias = "suppressed-errors",
+        visible_alias = "suppress-errors",
         value_delimiter = ',',
         help = "Set the errors to suppress for zksolc, possible values: [sendtransfer]"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub suppressed_errors: Option<Vec<ZkSolcError>>,
+    pub suppressed_errors: Option<Vec<ErrorType>>,
 }
 
 impl ZkSyncArgs {
