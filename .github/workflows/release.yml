@@ -57,11 +57,11 @@ jobs:
 
             echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
             echo "version_name=v${VERSION}" >> $GITHUB_OUTPUT
-            echo "release_name=foundry-zksync ${VERSION}" >> $GITHUB_OUTPUT
+            echo "release_name=foundry-zksync v${VERSION}" >> $GITHUB_OUTPUT
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
           
-      - name: Print outputs
+      - name: Print release info
         run: |
             echo tag_name: ${{ steps.release_info.outputs.tag_name }}
             echo version_name: ${{ steps.release_info.outputs.version_name }}
