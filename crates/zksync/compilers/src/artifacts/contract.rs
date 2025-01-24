@@ -50,6 +50,45 @@ impl ObjectFormat {
     }
 }
 
+/// zksolc: Binary object format.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "String", into = "String")]
+pub enum ObjectFormat {
+    /// Linked
+    #[default]
+    Raw,
+    /// Unlinked
+    Elf,
+}
+
+impl From<ObjectFormat> for String {
+    fn from(val: ObjectFormat) -> Self {
+        match val {
+            ObjectFormat::Raw => "raw",
+            ObjectFormat::Elf => "elf",
+        }
+        .to_string()
+    }
+}
+
+impl TryFrom<String> for ObjectFormat {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.as_str() {
+            "raw" => Ok(Self::Raw),
+            "elf" => Ok(Self::Elf),
+            s => Err(format!("Unknown zksolc object format: {s}")),
+        }
+    }
+}
+
+impl ObjectFormat {
+    /// Returns `true` if the bytecode is unlinked
+    pub fn is_unlinked(&self) -> bool {
+        matches!(self, Self::Elf)
+    }
+}
+
 /// Represents a compiled solidity contract
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -94,7 +133,6 @@ pub struct Contract {
     /// The contract's unlinked libraries
     #[serde(default)]
     pub missing_libraries: Vec<String>,
-
     /// zksolc's binary object format
     ///
     /// Tells whether the bytecode has been linked.

@@ -84,6 +84,11 @@ impl ZkContractArtifact {
     pub fn missing_libraries(&self) -> Option<&Vec<String>> {
         self.bytecode.as_ref().map(|bc| &bc.missing_libraries)
     }
+
+    /// Returns true if contract is not linked
+    pub fn is_unlinked(&self) -> bool {
+        self.bytecode.as_ref().map(|bc| bc.is_unlinked()).unwrap_or(false)
+    }
 }
 
 // CompactContract variants

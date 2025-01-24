@@ -30,6 +30,7 @@ path-slash = "0.2"
 
 # zk
 zksync_types.workspace = true
+era-solc.workspace = true
 
 [dev-dependencies]
 similar-asserts.workspace = true

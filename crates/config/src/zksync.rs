@@ -1,3 +1,4 @@
+use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Severity},
     error::SolcError,
@@ -11,14 +12,13 @@ use foundry_zksync_compilers::{
         zksolc::{
             get_solc_version_info,
             settings::{
-                BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcError,
-                ZkSolcSettings, ZkSolcWarning,
+                BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata,
+                ZkSolcSettings,
             },
             ZkSettings, ZkSolc, ZkSolcCompiler,
         },
     },
 };
-
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
@@ -70,10 +70,10 @@ pub struct ZkSyncConfig {
     pub optimizer_details: Option<OptimizerDetails>,
 
     // zksolc suppressed warnings.
-    pub suppressed_warnings: HashSet<ZkSolcWarning>,
+    pub suppressed_warnings: HashSet<WarningType>,
 
     // zksolc suppressed errors.
-    pub suppressed_errors: HashSet<ZkSolcError>,
+    pub suppressed_errors: HashSet<ErrorType>,
 }
 
 impl Default for ZkSyncConfig {
@@ -176,7 +176,7 @@ pub fn config_zksolc_compiler(config: &Config) -> Result<ZkSolcCompiler, SolcErr
     {
         zksolc
     } else if !config.offline {
-        let default_version = semver::Version::new(1, 5, 8);
+        let default_version = semver::Version::new(1, 5, 10);
         let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
         if zksolc.is_none() {
             ZkSolc::blocking_install(&default_version)?;
@@ -264,7 +264,10 @@ fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
             }
             SolcReq::Local(path) => {
                 if !path.is_file() {
-                    return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())));
+                    return Err(SolcError::msg(format!(
+                        "`solc` {} does not exist",
+                        path.display()
+                    )));
                 }
                 let version = get_solc_version_info(path)?.version;
                 Solc::new_with_version(
