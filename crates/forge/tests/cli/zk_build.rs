@@ -13,7 +13,7 @@ forgetest_init!(test_zk_build_sizes, |prj, cmd| {
     assert!(pattern.is_match(&stdout), "Unexpected size output:\n{stdout}");
 });
 
-// tests build output is as expected in zksync mode
+// tests cache works as expected in zksync mode
 forgetest_init!(test_zk_cache_ok, |prj, cmd| {
     let zk_toml = r#"[profile.default]
 src = 'src'
@@ -38,7 +38,7 @@ zksolc = '1.5.6'
     assert!(pattern_2.is_match(&stdout_2));
 });
 
-// tests build output is as expected in zksync mode
+// tests cache is invalidated when zksolc version changes
 forgetest_init!(test_zk_cache_invalid_on_version_changed, |prj, cmd| {
     let template_toml = r#"[profile.default]
 src = 'src'
