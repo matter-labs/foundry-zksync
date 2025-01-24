@@ -11,7 +11,7 @@ use foundry_zksync_compilers::dual_compiled_contracts::{
 use foundry_zksync_core::{vm::ZkEnv, ZkPaymasterData, H256};
 use revm::primitives::Bytecode;
 
-use super::types::{ZkPersistNonceUpdate, ZkStartupMigration};
+use super::types::ZkStartupMigration;
 
 /// Context for [ZksyncCheatcodeInspectorStrategyRunner].
 #[derive(Debug, Default, Clone)]
@@ -48,9 +48,6 @@ pub struct ZksyncCheatcodeInspectorStrategyContext {
     /// This can be done as each test runs with its own [Cheatcodes] instance, thereby
     /// providing the necessary level of isolation.
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
-
-    /// Nonce update persistence behavior in zkEVM for the tx caller.
-    pub zk_persist_nonce_update: ZkPersistNonceUpdate,
 
     /// Stores the factory deps that were detected as part of CREATE2 deployer call.
     /// Must be cleared every call.
@@ -115,7 +112,6 @@ impl ZksyncCheatcodeInspectorStrategyContext {
             zk_startup_migration: ZkStartupMigration::Defer,
             zk_use_factory_deps: Default::default(),
             persisted_factory_deps: Default::default(),
-            zk_persist_nonce_update: Default::default(),
             set_deployer_call_input_factory_deps: Default::default(),
             zk_env,
         }

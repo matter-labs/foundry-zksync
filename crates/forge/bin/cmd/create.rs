@@ -692,7 +692,7 @@ impl CreateArgs {
         deployer.tx.set_gas_price(gas_price);
 
         // estimate fee
-        foundry_zksync_core::estimate_gas(&mut deployer.tx, &provider).await?;
+        foundry_zksync_core::estimate_fee(&mut deployer.tx, &provider, 130, None).await?;
 
         if !is_legacy {
             let estimate = provider.estimate_eip1559_fees(None).await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;

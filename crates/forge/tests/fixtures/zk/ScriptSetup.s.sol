@@ -4,26 +4,42 @@ pragma solidity ^0.8.13;
 import {Script} from "forge-std/Script.sol";
 import {Greeter} from "../src/Greeter.sol";
 
+interface VmExt {
+    function zkGetTransactionNonce(
+        address account
+    ) external view returns (uint64 nonce);
+    function zkGetDeploymentNonce(
+        address account
+    ) external view returns (uint64 nonce);
+}
+
 contract ScriptSetupNonce is Script {
+    VmExt internal constant vmExt = VmExt(VM_ADDRESS);
+
     function setUp() public {
-        uint256 initial_nonce = checkNonce(address(tx.origin));
+        uint256 initialNonceTx = checkTxNonce(address(tx.origin));
+        uint256 initialNonceDeploy = checkDeployNonce(address(tx.origin));
         // Perform transactions and deploy contracts in setup to increment nonce and verify broadcast nonce matches onchain
         new Greeter();
         new Greeter();
         new Greeter();
         new Greeter();
-        assert(checkNonce(address(tx.origin)) == initial_nonce);
+        assert(checkTxNonce(address(tx.origin)) == initialNonceTx);
+        assert(checkDeployNonce(address(tx.origin)) == initialNonceDeploy);
     }
 
     function run() public {
         // Get initial nonce
-        uint256 initial_nonce = checkNonce(address(tx.origin));
-        assert(initial_nonce == vm.getNonce(address(tx.origin)));
+        uint256 initialNonceTx = checkTxNonce(tx.origin);
+        uint256 initialNonceDeploy = checkDeployNonce(tx.origin);
+        assert(initialNonceTx == vmExt.zkGetTransactionNonce(tx.origin));
+        assert(initialNonceDeploy == vmExt.zkGetDeploymentNonce(tx.origin));
 
         // Create and interact with non-broadcasted contract to verify nonce is not incremented
         Greeter notBroadcastGreeter = new Greeter();
         notBroadcastGreeter.greeting("john");
-        assert(checkNonce(address(tx.origin)) == initial_nonce);
+        assert(checkTxNonce(tx.origin) == initialNonceTx);
+        assert(checkDeployNonce(tx.origin) == initialNonceDeploy);
 
         // Start broadcasting transactions
         vm.startBroadcast();
@@ -33,28 +49,51 @@ contract ScriptSetupNonce is Script {
 
         // Deploy checker and verify nonce
         NonceChecker checker = new NonceChecker();
+
+        vm.stopBroadcast();
+
         // We expect the nonce to be incremented by 1 because the check is done in an external
         // call
-        checker.assertNonce(vm.getNonce(address(tx.origin)) + 1);
-        vm.stopBroadcast();
+        checker.assertTxNonce(
+            vmExt.zkGetTransactionNonce(address(tx.origin)) + 1
+        );
+        checker.assertDeployNonce(
+            vmExt.zkGetDeploymentNonce(address(tx.origin))
+        );
     }
 
-    function checkNonce(address addr) public returns (uint256) {
+    function checkTxNonce(address addr) public returns (uint256) {
         // We prank here to avoid accidentally "polluting" the nonce of `addr` during the call
         // for example when `addr` is `tx.origin`
         vm.prank(address(this), address(this));
-        return NonceLib.getNonce(addr);
+        return NonceLib.getTxNonce(addr);
+    }
+
+    function checkDeployNonce(address addr) public returns (uint256) {
+        // We prank here to avoid accidentally "polluting" the nonce of `addr` during the call
+        // for example when `addr` is `tx.origin`
+        vm.prank(address(this), address(this));
+        return NonceLib.getDeployNonce(addr);
     }
 }
 
 contract NonceChecker {
-    function checkNonce() public returns (uint256) {
-        return NonceLib.getNonce(address(tx.origin));
+    function checkTxNonce() public returns (uint256) {
+        return NonceLib.getTxNonce(address(tx.origin));
     }
 
-    function assertNonce(uint256 expected) public {
-        uint256 real_nonce = checkNonce();
-        require(real_nonce == expected, "Nonce mismatch");
+    function checkDeployNonce() public returns (uint256) {
+        return NonceLib.getDeployNonce(address(tx.origin));
+    }
+
+    function assertTxNonce(uint256 expected) public {
+        uint256 real_nonce = checkTxNonce();
+        require(real_nonce == expected, "tx nonce mismatch");
+    }
+
+    function assertDeployNonce(uint256 expected) public {
+        uint256 real_nonce = checkDeployNonce();
+        require(real_nonce == expected, "deploy nonce mismatch");
     }
 }
 
@@ -62,8 +101,19 @@ library NonceLib {
     address constant NONCE_HOLDER = address(0x8003);
 
     /// Retrieve tx nonce for `addr` from the NONCE_HOLDER system contract
-    function getNonce(address addr) internal returns (uint256) {
-        (bool success, bytes memory data) = NONCE_HOLDER.call(abi.encodeWithSignature("getMinNonce(address)", addr));
+    function getTxNonce(address addr) internal returns (uint256) {
+        (bool success, bytes memory data) = NONCE_HOLDER.call(
+            abi.encodeWithSignature("getMinNonce(address)", addr)
+        );
+        require(success, "Failed to get nonce");
+        return abi.decode(data, (uint256));
+    }
+
+    /// Retrieve tx nonce for `addr` from the NONCE_HOLDER system contract
+    function getDeployNonce(address addr) internal returns (uint256) {
+        (bool success, bytes memory data) = NONCE_HOLDER.call(
+            abi.encodeWithSignature("getDeploymentNonce(address)", addr)
+        );
         require(success, "Failed to get nonce");
         return abi.decode(data, (uint256));
     }
