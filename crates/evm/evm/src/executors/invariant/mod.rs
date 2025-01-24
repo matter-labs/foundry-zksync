@@ -35,6 +35,7 @@ use std::{
     collections::{btree_map::Entry, HashMap as Map},
     sync::Arc,
 };
+use tracing::Level;
 
 mod error;
 pub use error::{InvariantFailures, InvariantFuzzError};
@@ -324,11 +325,15 @@ impl<'a> InvariantExecutor<'a> {
         deployed_libs: &[Address],
         progress: Option<&ProgressBar>,
     ) -> Result<InvariantFuzzTestResult> {
-        println!("invariant fuzz");
+        let func_name = invariant_contract.invariant_function.name.clone();
+        let span = span!(Level::INFO, "invariant fuzz", name = func_name);
+        let _guard = span.enter();
+        event!(Level::INFO, "invariant fuzz");
         // Throw an error to abort test run if the invariant function accepts input params
         if !invariant_contract.invariant_function.inputs.is_empty() {
             return Err(eyre!("Invariant test function should have no inputs"));
         }
+        let _guard = span.enter();
 
         let (invariant_test, invariant_strategy) =
             self.prepare_test(&invariant_contract, fuzz_fixtures, deployed_libs)?;
@@ -338,8 +343,7 @@ impl<'a> InvariantExecutor<'a> {
 
         let _ = self.runner.run(&invariant_strategy, |first_input| {
             // Create current invariant run data.
-            println!("inside invariant");
-            println!("fuzz_state: {:?}", invariant_test.fuzz_state);
+            event!(Level::INFO, fuzz_state = ?invariant_test.fuzz_state);
             let mut current_run = InvariantTestRun::new(
                 first_input,
                 // Before each run, we must reset the backend state.
@@ -353,7 +357,8 @@ impl<'a> InvariantExecutor<'a> {
             }
 
             while current_run.depth < self.config.depth {
-                println!("current_run: {}", current_run.depth);
+                event!(Level::INFO, current_run = ?current_run.depth);
+                event!(Level::INFO, inputs = ?current_run.inputs);
                 // Check if the timeout has been reached.
                 if timer.is_timed_out() {
                     // Since we never record a revert here the test is still considered
@@ -396,7 +401,9 @@ impl<'a> InvariantExecutor<'a> {
                         invariant_test.set_error(InvariantFuzzError::MaxAssumeRejects(
                             self.config.max_assume_rejects,
                         ));
-                        return Err(TestCaseError::fail("Max number of vm.assume rejects reached."));
+                        return Err(TestCaseError::fail(
+                            "Max number of vm.assume rejects reached.",
+                        ));
                     }
                 } else {
                     // Commit executed call result.
@@ -631,13 +638,13 @@ impl<'a> InvariantExecutor<'a> {
                 .filter(|func| {
                     !matches!(
                         func.state_mutability,
-                        alloy_json_abi::StateMutability::Pure |
-                            alloy_json_abi::StateMutability::View
+                        alloy_json_abi::StateMutability::Pure
+                            | alloy_json_abi::StateMutability::View
                     )
                 })
-                .count() ==
-                0 &&
-                !self.artifact_filters.excluded.contains(&artifact.identifier())
+                .count()
+                == 0
+                && !self.artifact_filters.excluded.contains(&artifact.identifier())
             {
                 self.artifact_filters.excluded.push(artifact.identifier());
             }
@@ -648,8 +655,8 @@ impl<'a> InvariantExecutor<'a> {
         for contract in selected.targetedArtifacts {
             let identifier = self.validate_selected_contract(contract, &[])?;
 
-            if !self.artifact_filters.targeted.contains_key(&identifier) &&
-                !self.artifact_filters.excluded.contains(&identifier)
+            if !self.artifact_filters.targeted.contains_key(&identifier)
+                && !self.artifact_filters.excluded.contains(&identifier)
             {
                 self.artifact_filters.targeted.insert(identifier, vec![]);
             }
@@ -718,12 +725,12 @@ impl<'a> InvariantExecutor<'a> {
             .setup_contracts
             .iter()
             .filter(|&(addr, (identifier, _))| {
-                *addr != to &&
-                    *addr != CHEATCODE_ADDRESS &&
-                    *addr != HARDHAT_CONSOLE_ADDRESS &&
-                    (selected.is_empty() || selected.contains(addr)) &&
-                    (excluded.is_empty() || !excluded.contains(addr)) &&
-                    self.artifact_filters.matches(identifier)
+                *addr != to
+                    && *addr != CHEATCODE_ADDRESS
+                    && *addr != HARDHAT_CONSOLE_ADDRESS
+                    && (selected.is_empty() || selected.contains(addr))
+                    && (excluded.is_empty() || !excluded.contains(addr))
+                    && self.artifact_filters.matches(identifier)
             })
             .map(|(addr, (identifier, abi))| {
                 (*addr, TargetedContract::new(identifier.clone(), abi.clone()))

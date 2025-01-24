@@ -610,18 +610,11 @@ async fn test_invariant_scrape_values() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_invariant_roll_fork_handler() {
-    eprintln!("In Stderrr before the runner");
-    println!("In Stdout before the runner");
-    init_tracing();
     let filter = Filter::new(".*", ".*", ".*fuzz/invariant/common/InvariantRollFork.t.sol");
     let mut runner = TEST_DATA_DEFAULT.runner_with(|config| {
         config.fuzz.seed = Some(U256::from(119u32));
     });
-    println!("before results");
     let results = runner.test_collect(&filter);
-    error!("AAAAAAAAAAAAAH");
-    eprintln!("In Stderrr");
-    println!("In Stdout");
 
     assert_multiple(
         &results,

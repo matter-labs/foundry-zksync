@@ -95,5 +95,5 @@ jobs:
           SVM_TARGET_PLATFORM: linux-amd64 
           HTTP_ARCHIVE_URLS: ${{ secrets.HTTP_ARCHIVE_URLS }}
           WS_ARCHIVE_URLS: ${{ secrets.WS_ARCHIVE_URLS }}
-          RUST_BACKTRACE: full
+          RUST_LOG: info
         run: cargo nextest run -E 'kind(test) & !test(/issue|forge_std|ext_integration|zk|test_zk_aave_di/) & test(/invariant_roll_fork/)' --no-capture
