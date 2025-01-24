@@ -349,8 +349,9 @@ impl BundledState {
                     ),
                     (false, _, _) => {
                         if self.script_config.config.zksync.run_in_zk_mode() {
-                            // NOTE(zk): We need to avoid estimating eip1559 fees for zk transactions
-                            // as the fee is estimated later. This branch is for non legacy chains (zkchains).
+                            // NOTE(zk): We need to avoid estimating eip1559 fees for zk
+                            // transactions as the fee is estimated
+                            // later. This branch is for non legacy chains (zkchains).
                             (Some(provider.get_gas_price().await?), None)
                         } else {
                             let mut fees = provider
