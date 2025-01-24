@@ -1,3 +1,4 @@
+use core::{assert_eq, assert_ne};
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -5,6 +6,7 @@ use std::{
     str::FromStr,
 };
 
+use foundry_compilers::solc::Solc;
 use foundry_compilers_artifacts_solc::Remapping;
 use foundry_test_utils::foundry_compilers::{
     buildinfo::BuildInfo, cache::CompilerCache, project_util::*, resolver::parse::SolData,
@@ -653,4 +655,60 @@ fn zksync_can_compile_yul_sample() {
     let yul_bytecode = simple_store_artifact.object().into_bytes().unwrap();
 
     assert!(!yul_bytecode.is_empty(), "SimpleStore bytecode is empty");
+}
+
+// Test that checks that you have to recompile the project if the zksolc version changes (the
+// cache is invalidated)
+#[test]
+fn zksync_detects_change_on_cache_if_zksolc_version_changes() {
+    let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+    let solc =
+        Solc::find_or_install(&semver::Version::new(0, 8, 19)).expect("could not install solc");
+
+    project.project_mut().build_info = true;
+    project
+        .add_source(
+            "A",
+            r#"
+pragma solidity ^0.8.10;
+import "./B.sol";
+contract A { }
+"#,
+        )
+        .unwrap();
+
+    project
+        .add_source(
+            "B",
+            r"
+pragma solidity ^0.8.10;
+contract B { }
+",
+        )
+        .unwrap();
+
+    let config_1_5_6 = ZkSolcCompiler {
+        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 0)).unwrap(),
+        solc: foundry_compilers::solc::SolcCompiler::Specific(solc),
+    };
+    project.project_mut().compiler = config_1_5_6;
+
+    let compiled_1 = project.compile().unwrap();
+    compiled_1.assert_success();
+
+    let cache = CompilerCache::<ZkSolcSettings>::read(project.cache_path()).unwrap();
+
+    let config_1_5_7 = ZkSolcCompiler {
+        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 10)).unwrap(),
+        solc: Default::default(),
+    };
+    project.project_mut().compiler = config_1_5_7;
+
+    let compiled_2 = project.compile().unwrap();
+
+    assert!(!compiled_2.is_unchanged());
+
+    let latest_cache = CompilerCache::<ZkSolcSettings>::read(project.cache_path()).unwrap();
+
+    assert_ne!(cache, latest_cache);
 }
