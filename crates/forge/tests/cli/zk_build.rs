@@ -50,17 +50,15 @@ solc = '0.8.26'
 "#;
 
     let toml_156 = format!(
-        r#"{}
+        r#"{template_toml}
 zksolc = '1.5.6'
-"#,
-        template_toml
+"#
     );
 
     let toml_157 = format!(
-        r#"{}
+        r#"{template_toml}
 zksolc = '1.5.7'
-"#,
-        template_toml
+"#
     );
 
     fs::write(prj.root().join("foundry.toml"), toml_156).unwrap();
