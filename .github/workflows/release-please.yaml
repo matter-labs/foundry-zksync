@@ -36,10 +36,12 @@ jobs:
 
   # Trigger workflow to generate artifacts
   release:
-    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    # if: ${{ needs.release-please.outputs.releases_created == 'true' }}
     needs: release-please
     uses: ./.github/workflows/release.yml
     with:
-      tag: ${{ needs.release-please.outputs.tag_name }}
-      version: "${{ needs.release-please.outputs.major }}.${{ needs.release-please.outputs.minor }}.${{ needs.release-please.outputs.patch }}"
+      # tag: ${{ needs.release-please.outputs.tag_name }}
+      # version: "${{ needs.release-please.outputs.major }}.${{ needs.release-please.outputs.minor }}.${{ needs.release-please.outputs.patch }}"
+      tag: foundry-zksync-v0.0.4
+      version: "0.0.4"
     secrets: inherit
