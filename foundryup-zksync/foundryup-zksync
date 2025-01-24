@@ -86,19 +86,34 @@ main() {
 
   # Install by downloading binaries
   if [[ "$FOUNDRYUP_REPO" == "matter-labs/foundry-zksync" && -z "$FOUNDRYUP_BRANCH" && -z "$FOUNDRYUP_COMMIT" ]]; then
-    FOUNDRYUP_VERSION=${FOUNDRYUP_VERSION:-nightly}
-    FOUNDRYUP_TAG=$FOUNDRYUP_VERSION
+    # If --version not specified, fetch the latest release tag from GitHub
+   if [ -z "$FOUNDRYUP_VERSION" ]; then
+    # No --version passed -> Use the "latest" semantic-release tag
+    LATEST_TAG=$(curl -s https://api.github.com/repos/${FOUNDRYUP_REPO}/releases/latest | \
+                 sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p')
+    if [ -z "$LATEST_TAG" ]; then
+      err "could not fetch the latest release tag for $FOUNDRYUP_REPO!"
+    fi
+    FOUNDRYUP_TAG="$LATEST_TAG"
 
-    # Normalize versions (handle channels, versions without v prefix
-    if [[ "$FOUNDRYUP_VERSION" =~ ^nightly ]]; then
-      FOUNDRYUP_VERSION="nightly"
-    elif [[ "$FOUNDRYUP_VERSION" == [[:digit:]]* ]]; then
-      # Add v prefix
-      FOUNDRYUP_VERSION="v${FOUNDRYUP_VERSION}"
-      FOUNDRYUP_TAG="${FOUNDRYUP_VERSION}"
+  else
+    # --version was specified; check if it's nightly or a numeric version, etc.
+    if [[ "$FOUNDRYUP_VERSION" == "nightly" ]]; then
+      say "Installing the nightly build"
+      FOUNDRYUP_TAG="nightly"
+    elif [[ "$FOUNDRYUP_VERSION" =~ ^foundry-zksync-v ]]; then
+      # user passed full "foundry-zksync-v0.0.4"
+      FOUNDRYUP_TAG="$FOUNDRYUP_VERSION"
+    elif [[ "$FOUNDRYUP_VERSION" =~ ^v ]]; then
+      # user passed "v0.0.4"
+      FOUNDRYUP_TAG="foundry-zksync-$FOUNDRYUP_VERSION"
+    else
+      # user passed "0.0.4"
+      FOUNDRYUP_TAG="foundry-zksync-v$FOUNDRYUP_VERSION"
     fi
 
-    say "installing foundry (version ${FOUNDRYUP_VERSION}, tag ${FOUNDRYUP_TAG})"
+    say "installing foundry-zksync ($FOUNDRYUP_TAG)"
+  fi
 
     uname_s=$(uname -s)
     PLATFORM=$(tolower "${FOUNDRYUP_PLATFORM:-$uname_s}")
@@ -134,9 +149,8 @@ main() {
 
     # Compute the URL of the release tarball in the Foundry repository.
     RELEASE_URL="https://github.com/${FOUNDRYUP_REPO}/releases/download/${FOUNDRYUP_TAG}/"
-    BIN_ARCHIVE_URL="${RELEASE_URL}foundry_${FOUNDRYUP_VERSION}_${PLATFORM}_${ARCHITECTURE}.$EXT"
-    MAN_TARBALL_URL="${RELEASE_URL}foundry_man_${FOUNDRYUP_VERSION}.tar.gz"
-
+    BIN_ARCHIVE_URL="${RELEASE_URL}foundry_nightly_${PLATFORM}_${ARCHITECTURE}.$EXT"
+    
     # Download and extract the binaries archive
     say "downloading latest forge, and cast"
     if [ "$PLATFORM" = "win32" ]; then
@@ -150,9 +164,23 @@ main() {
 
     # Optionally download the manuals
     if check_cmd tar; then
-      say "downloading manpages"
+      say "attempting to download manpages from release assets"
       mkdir -p "$FOUNDRY_MAN_DIR"
-      download "$MAN_TARBALL_URL" | tar -xzC "$FOUNDRY_MAN_DIR"
+
+      ASSET_DATA=$(curl -s "https://api.github.com/repos/${FOUNDRYUP_REPO}/releases/tags/${FOUNDRYUP_TAG}")
+
+      # Parse out the man asset name:
+      # e.g. "foundry_man_nightly-ae913af65381734ad46c044a9495b67310bc77c4.tar.gz"
+      MAN_ASSET_NAME=$(echo "$ASSET_DATA" | grep -oE '"name":\s*"foundry_man_nightly[^"]+' \
+                                      | sed 's/"name": "//')
+
+      if [ -n "$MAN_ASSET_NAME" ]; then
+        MAN_TARBALL_URL="${RELEASE_URL}${MAN_ASSET_NAME}"
+        say "Found manpage tarball: $MAN_TARBALL_URL"
+        download "$MAN_TARBALL_URL" | tar -xzC "$FOUNDRY_MAN_DIR"
+      else
+        say "No manpage tarball found for this release."
+      fi
     else
       say 'skipping manpage download: missing "tar"'
     fi
