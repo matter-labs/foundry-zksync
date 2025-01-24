@@ -10,6 +10,9 @@ permissions:
 
 # Run the workflow on push to the main branch and manually
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -33,9 +36,10 @@ jobs:
 
   # Trigger workflow to generate artifacts
   release:
-    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    # if: ${{ needs.release-please.outputs.releases_created == 'true' }}
     needs: release-please
     uses: ./.github/workflows/release.yml
     with:
       tag: ${{ needs.release-please.outputs.tag_name }}
+      version: "${{ needs.release-please.outputs.major }}.${{ needs.release-please.outputs.minor }}.${{ needs.release-please.outputs.patch }}"
     secrets: inherit
