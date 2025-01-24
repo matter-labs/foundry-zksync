@@ -41,14 +41,11 @@ jobs:
       - name: Compute release name and tag
         id: release_info
         run: |
-          echo "nightly? $IS_NIGHTLY"
-          if [[ $IS_NIGHTLY ]]; then
-            echo nightly
+          if [[ $IS_NIGHTLY == "true" ]]; then
             echo "tag_name=nightly-${GITHUB_SHA}" >> $GITHUB_OUTPUT
             echo "release_name=foundry-zksync Nightly ($(date '+%Y-%m-%d'))" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
           else
-            echo "${{inputs.version}}"
             echo "tag_name=${{ inputs.version }}" >> $GITHUB_OUTPUT
             echo "release_name=${{ inputs.tag }}" >> $GITHUB_OUTPUT
             echo "prerelease=false" >> $GITHUB_OUTPUT
