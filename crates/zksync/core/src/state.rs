@@ -24,21 +24,22 @@ pub fn get_nonce_storage(address: rAddress) -> (rAddress, rU256) {
 }
 
 /// Returns full nonce value
-pub fn new_full_nonce(tx_nonce: u64, deploy_nonce: u64) -> rU256 {
+pub fn new_full_nonce(tx_nonce: u128, deploy_nonce: u128) -> rU256 {
     nonces_to_full_nonce(tx_nonce.into(), deploy_nonce.into()).to_ru256()
 }
 
 /// Represents a ZKSync account nonce with two 64-bit transaction and deployment nonces.
+/// Note that the nonces have a theoretical size of 128-bits but the server only accepts 32-bits.
 #[derive(Default, Debug, Clone, Copy)]
 pub struct FullNonce {
     /// Transaction nonce.
-    pub tx_nonce: u64,
+    pub tx_nonce: u128,
     /// Deployment nonce.
-    pub deploy_nonce: u64,
+    pub deploy_nonce: u128,
 }
 
 /// Decomposes a full nonce into transaction and deploy nonces.
 pub fn parse_full_nonce(full_nonce: rU256) -> FullNonce {
     let (tx, deploy) = decompose_full_nonce(full_nonce.to_u256());
-    FullNonce { tx_nonce: tx.as_u64(), deploy_nonce: deploy.as_u64() }
+    FullNonce { tx_nonce: tx.as_u128(), deploy_nonce: deploy.as_u128() }
 }

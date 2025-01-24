@@ -575,7 +575,7 @@ contract Util {}
     assert!(compiled.output().errors.iter().any(|error| error
         .formatted_message
         .as_ref()
-        .map_or(false, |msg| msg.contains("File outside of allowed directories"))));
+        .is_some_and(|msg| msg.contains("File outside of allowed directories"))));
 }
 
 #[test]
