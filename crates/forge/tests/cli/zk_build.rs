@@ -36,8 +36,6 @@ zksolc = '1.5.6'
 
     assert!(pattern_1.is_match(&stdout_1));
     assert!(pattern_2.is_match(&stdout_2));
-
-    // assert!(pattern.is_match(&stdout), "Unexpected size output:\n{stdout}");
 });
 
 // tests build output is as expected in zksync mode
@@ -79,6 +77,4 @@ zksolc = '1.5.7'
 
     assert!(pattern_1.is_match(&stdout_1));
     assert!(pattern_2.is_match(&stdout_2));
-
-    // assert!(pattern.is_match(&stdout), "Unexpected size output:\n{stdout}");
 });

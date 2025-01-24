@@ -173,12 +173,10 @@ pub fn config_zksolc_settings(config: &Config) -> Result<ZkSolcSettings, SolcErr
         .try_version()
         .map_err(|e| SolcError::msg(format!("Failed to parse zksolc version: {e}")))?;
 
-    print!("version: {:?}", version);
-
     Ok(config.zksync.settings(libraries, config.evm_version, config.via_ir, Some(version)))
 }
 
-/// Create a new zkSync project
+/// Create a new ZKsync project
 pub fn config_create_project(
     config: &Config,
     cached: bool,
@@ -346,6 +344,8 @@ pub fn config_ensure_zksolc(
 mod tests {
     use foundry_compilers::solc::SolcCompiler;
     use semver::Version;
+
+    use crate::Config;
 
     use super::*;
 
