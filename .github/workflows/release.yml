@@ -38,7 +38,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.tag || '' }}
-        
+
       - name: Compute release name and tag
         id: release_info
         run: |
@@ -50,7 +50,7 @@ jobs:
             echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
             echo "version_name=${VERSION}" >> $GITHUB_OUTPUT
             echo "release_name=foundry-zksync Nightly ($(date '+%Y-%m-%d'))" >> $GITHUB_OUTPUT
-            echo "prerelease=true" >> $GITHUB_OUTPUT  
+            echo "prerelease=true" >> $GITHUB_OUTPUT
           else
             TAG="${{ inputs.tag || format('stable-{0}', github.sha) }}"
             VERSION="${{ inputs.version || 'stable' }}"
@@ -63,10 +63,10 @@ jobs:
           
       - name: Print release info
         run: |
-            echo tag_name: "${{ steps.release_info.outputs.tag_name }}"
-            echo version_name: "${{ steps.release_info.outputs.version_name }}"
-            echo release_name: "${{ steps.release_info.outputs.release_name }}"
-            echo prerelease: "${{ steps.release_info.outputs.prerelease }}"
+          echo tag_name: "${{ steps.release_info.outputs.tag_name }}"
+          echo version_name: "${{ steps.release_info.outputs.version_name }}"
+          echo release_name: "${{ steps.release_info.outputs.release_name }}"
+          echo prerelease: "${{ steps.release_info.outputs.prerelease }}"
 
       # Creates a `nightly-SHA` tag for this specific nightly
       # This tag is used for this specific nightly version's release
