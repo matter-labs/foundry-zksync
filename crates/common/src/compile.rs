@@ -25,6 +25,7 @@ use foundry_zksync_compilers::compilers::{
 };
 
 use num_format::{Locale, ToFormattedString};
+
 use std::{
     collections::BTreeMap,
     fmt::Display,
@@ -192,7 +193,7 @@ impl ProjectCompiler {
         let quiet = self.quiet.unwrap_or(false);
         let bail = self.bail.unwrap_or(true);
 
-        let output = with_compilation_reporter(self.quiet.unwrap_or(false), || {
+        let output = with_compilation_reporter(quiet, || {
             tracing::debug!("compiling project");
 
             let timer = Instant::now();

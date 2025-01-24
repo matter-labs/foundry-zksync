@@ -1,4 +1,5 @@
 use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
+use core::iter;
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Severity},
     error::SolcError,
@@ -21,7 +22,10 @@ use foundry_zksync_compilers::{
 };
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+};
 
 use crate::{Config, SkipBuildFilters, SolcReq};
 
@@ -114,6 +118,7 @@ impl ZkSyncConfig {
         libraries: Libraries,
         evm_version: EvmVersion,
         via_ir: bool,
+        zksolc_version: Option<Version>,
     ) -> ZkSolcSettings {
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
@@ -144,6 +149,7 @@ impl ZkSyncConfig {
             codegen: if self.force_evmla { Codegen::EVMLA } else { Codegen::Yul },
             suppressed_warnings: self.suppressed_warnings.clone(),
             suppressed_errors: self.suppressed_errors.clone(),
+            zksolc_version,
         };
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
@@ -163,7 +169,14 @@ pub fn config_zksolc_settings(config: &Config) -> Result<ZkSolcSettings, SolcErr
         Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {e}"))),
     };
 
-    Ok(config.zksync.settings(libraries, config.evm_version, config.via_ir))
+    let x = <std::option::Option<SolcReq> as Clone>::clone(&config.zksync.zksolc).unwrap();
+    let version = x
+        .try_version()
+        .map_err(|e| SolcError::msg(format!("Failed to parse zksolc version: {e}")))?;
+
+    print!("version: {:?}", version);
+
+    Ok(config.zksync.settings(libraries, config.evm_version, config.via_ir, Some(version)))
 }
 
 /// Create a new zkSync project
@@ -172,10 +185,18 @@ pub fn config_create_project(
     cached: bool,
     no_artifacts: bool,
 ) -> Result<Project<ZkSolcCompiler, ZkArtifactOutput>, SolcError> {
+    let settings = config_zksolc_settings(config)?;
+
+    print!("settings: {:?}", settings);
+
     let mut builder = ProjectBuilder::<ZkSolcCompiler, ZkArtifactOutput>::default()
         .artifacts(ZkArtifactOutput {})
         .paths(config_project_paths(config))
-        .settings(config_zksolc_settings(config)?)
+        .settings(settings.clone())
+        .additional_settings(BTreeMap::from_iter(iter::once((
+            "zksyn2c".to_string(),
+            settings.into(),
+        ))))
         .ignore_error_codes(config.ignored_error_codes.iter().copied().map(Into::into))
         .ignore_paths(config.ignored_file_paths.clone())
         .set_compiler_severity_filter(if config.deny_warnings {
@@ -210,6 +231,11 @@ pub fn config_create_project(
     };
 
     let zksolc_compiler = ZkSolcCompiler { zksolc, solc: config_solc_compiler(config)? };
+
+    // builder.additional_settings(BTreeMap::from_iter(iter::once((
+    //     "zksync".to_string(),
+    //     settings.into(),
+    // ))));
 
     let project = builder.build(zksolc_compiler)?;
 
