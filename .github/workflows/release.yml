@@ -60,6 +60,11 @@ jobs:
             echo "release_name=foundry-zksync ${VERSION}" >> $GITHUB_OUTPUT
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
+          
+          echo tag_name: ${tag_name}
+          echo version_name: ${version_name}
+          echo release_name: ${release_name}
+          echo prerelease: ${prerelease}
 
       # Creates a `nightly-SHA` tag for this specific nightly
       # This tag is used for this specific nightly version's release
