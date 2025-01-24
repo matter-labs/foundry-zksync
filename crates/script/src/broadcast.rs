@@ -348,17 +348,26 @@ impl BundledState {
                         }),
                     ),
                     (false, _, _) => {
-                        let mut fees = provider.estimate_eip1559_fees(None).await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
+                        if self.script_config.config.zksync.run_in_zk_mode() {
+                            // NOTE(zk): We need to avoid estimating eip1559 fees for zk transactions
+                            // as the fee is estimated later. This branch is for non legacy chains (zkchains).
+                            (Some(provider.get_gas_price().await?), None)
+                        } else {
+                            let mut fees = provider
+                                .estimate_eip1559_fees(None)
+                                .await
+                                .wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
 
-                        if let Some(gas_price) = self.args.with_gas_price {
-                            fees.max_fee_per_gas = gas_price.to();
+                            if let Some(gas_price) = self.args.with_gas_price {
+                                fees.max_fee_per_gas = gas_price.to();
+                            }
+
+                            if let Some(priority_gas_price) = self.args.priority_gas_price {
+                                fees.max_priority_fee_per_gas = priority_gas_price.to();
+                            }
+
+                            (None, Some(fees))
                         }
-
-                        if let Some(priority_gas_price) = self.args.priority_gas_price {
-                            fees.max_priority_fee_per_gas = priority_gas_price.to();
-                        }
-
-                        (None, Some(fees))
                     }
                 };
 
