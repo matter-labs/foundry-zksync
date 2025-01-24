@@ -171,7 +171,7 @@ jobs:
           PLATFORM_NAME: ${{ matrix.platform }}
           TARGET: ${{ matrix.target }}
           ARCH: ${{ matrix.arch }}
-          VERSION_NAME: ${{ (env.IS_NIGHTLY && 'nightly') || needs.prepare.outputs.tag_name }}
+          VERSION_NAME: ${{ (env.IS_NIGHTLY == true && 'nightly') || needs.prepare.outputs.tag_name }}
         shell: bash
         run: |
           if [ "$PLATFORM_NAME" == "linux" ]; then
