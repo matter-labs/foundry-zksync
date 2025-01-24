@@ -46,7 +46,7 @@ jobs:
           if [ $IS_NIGHTLY == "true" ]; then
             TAG="${{ inputs.tag || format('nightly-{0}', github.sha) }}"
             VERSION="${{ inputs.version || 'nightly' }}"
-
+            
             echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
             echo "version_name=${VERSION}" >> $GITHUB_OUTPUT
             echo "release_name=foundry-zksync Nightly ($(date '+%Y-%m-%d'))" >> $GITHUB_OUTPUT
@@ -61,35 +61,37 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
           
-          echo tag_name: ${tag_name}
-          echo version_name: ${version_name}
-          echo release_name: ${release_name}
-          echo prerelease: ${prerelease}
+      - name: Print outputs
+        run: |
+            echo tag_name: ${{ steps.release_info.outputs.tag_name }}
+            echo version_name: ${{ steps.release_info.outputs.version_name }}
+            echo release_name: ${{ steps.release_info.outputs.release_name }}
+            echo prerelease: ${{ steps.release_info.outputs.prerelease }}
 
       # Creates a `nightly-SHA` tag for this specific nightly
       # This tag is used for this specific nightly version's release
       # which allows users to roll back. It is also used to build
       # the changelog.
-      - name: Create build-specific tag (nightly)
-        if: ${{ env.IS_NIGHTLY == 'true' }}
-        uses: actions/github-script@v7
-        env:
-          TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
-        with:
-          script: |
-            const createTag = require('./.github/scripts/create-tag.js')
-            await createTag({ github, context }, process.env.TAG_NAME)
+      # - name: Create build-specific tag (nightly)
+      #   if: ${{ env.IS_NIGHTLY == 'true' }}
+      #   uses: actions/github-script@v7
+      #   env:
+      #     TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
+      #   with:
+      #     script: |
+      #       const createTag = require('./.github/scripts/create-tag.js')
+      #       await createTag({ github, context }, process.env.TAG_NAME)
 
-      - name: Build changelog (nightly)
-        if: ${{ env.IS_NIGHTLY == 'true' }}
-        id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@v4
-        with:
-          configuration: "./.github/changelog.json"
-          fromTag: 'nightly'
-          toTag: ${{ steps.release_info.outputs.tag_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Build changelog (nightly)
+      #   if: ${{ env.IS_NIGHTLY == 'true' }}
+      #   id: build_changelog
+      #   uses: mikepenz/release-changelog-builder-action@v4
+      #   with:
+      #     configuration: "./.github/changelog.json"
+      #     fromTag: 'nightly'
+      #     toTag: ${{ steps.release_info.outputs.tag_name }}
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
     name: ${{ matrix.target }} (${{ matrix.runner }})
