@@ -63,10 +63,10 @@ jobs:
           
       - name: Print release info
         run: |
-            echo tag_name: ${{ steps.release_info.outputs.tag_name }}
-            echo version_name: ${{ steps.release_info.outputs.version_name }}
-            echo release_name: ${{ steps.release_info.outputs.release_name }}
-            echo prerelease: ${{ steps.release_info.outputs.prerelease }}
+            echo tag_name: "${{ steps.release_info.outputs.tag_name }}"
+            echo version_name: "${{ steps.release_info.outputs.version_name }}"
+            echo release_name: "${{ steps.release_info.outputs.release_name }}"
+            echo prerelease: "${{ steps.release_info.outputs.prerelease }}"
 
       # Creates a `nightly-SHA` tag for this specific nightly
       # This tag is used for this specific nightly version's release
