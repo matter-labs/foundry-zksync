@@ -9,7 +9,7 @@ library Foo {
 }
 
 contract UsesFoo {
-    uint256 number;
+    uint256 public number;
 
     constructor() {
         number = Foo.add(42, 0);

@@ -244,6 +244,11 @@ impl ZkSolcCompiler {
 
         Ok(zksolc)
     }
+
+    /// Retrieve the version of the specified `zksolc`
+    pub fn version(&self) -> Result<Version> {
+        ZkSolc::get_version_for_path(self.zksolc.as_ref())
+    }
 }
 
 /// Version metadata. Will include `zksync_version` if compiler is zksync solc.
