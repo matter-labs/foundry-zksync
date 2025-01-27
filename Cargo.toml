@@ -254,6 +254,7 @@ zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", r
 zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
 zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
 zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
+era-solc = { git = "https://github.com/matter-labs/era-compiler-solidity.git", tag = "1.5.10", package = "era-solc" }
 
 # macros
 proc-macro2 = "1.0"
@@ -301,7 +302,7 @@ regex = { version = "1", default-features = false }
 reqwest = { version = "0.12", default-features = false }
 semver = "1"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+serde_json = { version = "=1.0.128", features = ["arbitrary_precision"] }
 similar-asserts = "1.6"
 soldeer-commands = "=0.5.2"
 strum = "0.26"

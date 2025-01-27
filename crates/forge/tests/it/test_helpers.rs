@@ -201,7 +201,7 @@ impl ForgeTestProfile {
         zk_config.zksync.startup = true;
         zk_config.zksync.fallback_oz = true;
         zk_config.zksync.optimizer_mode = '3';
-        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 7)));
+        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 10)));
         zk_config.fuzz.no_zksync_reserved_addresses = true;
         zk_config.invariant.depth = 15;
 
@@ -624,6 +624,7 @@ pub fn deploy_zk_contract(
     url: &str,
     private_key: &str,
     contract_path: &str,
+    extra_args: Option<&[&str]>,
 ) -> Result<String, String> {
     cmd.forge_fuse().args([
         "create",
@@ -634,6 +635,10 @@ pub fn deploy_zk_contract(
         "--private-key",
         private_key,
     ]);
+
+    if let Some(args) = extra_args {
+        cmd.args(args);
+    }
 
     let output = cmd.assert_success();
     let output = output.get_output();

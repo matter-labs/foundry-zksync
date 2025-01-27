@@ -37,6 +37,7 @@ forgetest_async!(
             "127.0.0.1:1234",
             "0x0000000000000000000000000000000000000000000000000000000000000000",
             "./src/WithLibraries.sol:UsesFoo",
+            None,
         )
         .expect("Failed to deploy UsesFoo contract");
 
