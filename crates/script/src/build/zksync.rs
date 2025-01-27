@@ -1,9 +1,14 @@
 use std::collections::HashMap;
 
 use alloy_primitives::{keccak256, B256};
-use foundry_compilers::{artifacts::{CompactContractBytecode, CompactContractBytecodeCow, Libraries}, contracts::ArtifactContracts, info::ContractInfo, Artifact};
-use foundry_linking::{ZkLinker, DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION};
 use eyre::{Context, Result};
+use foundry_compilers::{
+    artifacts::{CompactContractBytecode, CompactContractBytecodeCow, Libraries},
+    contracts::ArtifactContracts,
+    info::ContractInfo,
+    Artifact,
+};
+use foundry_linking::{ZkLinker, DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION};
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{hash_bytecode, DEFAULT_CREATE2_DEPLOYER_ZKSYNC};
 

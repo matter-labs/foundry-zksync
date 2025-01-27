@@ -15,7 +15,8 @@ use foundry_compilers::{
     compilers::{multi::MultiCompilerLanguage, Language},
     info::ContractInfo,
     solc::SolcLanguage,
-    utils::source_files_iter, ArtifactId, ProjectCompileOutput,
+    utils::source_files_iter,
+    ArtifactId, ProjectCompileOutput,
 };
 use foundry_evm::traces::debug::ContractSources;
 use foundry_linking::Linker;
