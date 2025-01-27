@@ -1,6 +1,5 @@
 use forge::revm::primitives::SpecId;
 use foundry_test_utils::{forgetest_async, util, Filter, TestCommand, TestProject};
-use foundry_zksync_compilers::compilers::zksolc::settings::ZkSolcError;
 use semver::Version;
 
 use crate::{
@@ -103,7 +102,7 @@ fn setup_libs_prj(prj: &mut TestProject, cmd: &mut TestCommand, zksolc: Option<V
 
     let mut config = cmd.config();
     if let Some(zksolc) = zksolc {
-        config.zksync.zksolc.replace(foundry_config::SolcReq::Version(zksolc))
+        config.zksync.zksolc.replace(foundry_config::SolcReq::Version(zksolc));
     }
     prj.write_config(config);
 
