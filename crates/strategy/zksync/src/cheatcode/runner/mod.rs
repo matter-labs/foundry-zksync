@@ -456,7 +456,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             ctx.skip_zk_vm = false; // handled the skip, reset flag
             ctx.record_next_create_address = true;
             info!("running create in EVM, instead of zkEVM (skipped)");
-            return None
+            return None;
         }
 
         if let Some(CreateScheme::Create) = input.scheme() {
@@ -471,14 +471,14 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             let address = caller.create(nonce);
             if ecx.db.get_test_contract_address().map(|addr| address == addr).unwrap_or_default() {
                 info!("running create in EVM, instead of zkEVM (Test Contract) {:#?}", address);
-                return None
+                return None;
             }
         }
 
         let init_code = input.init_code();
         if init_code.0 == DEFAULT_CREATE2_DEPLOYER_CODE {
             info!("running create in EVM, instead of zkEVM (DEFAULT_CREATE2_DEPLOYER_CODE)");
-            return None
+            return None;
         }
 
         info!("running create in zkEVM");
@@ -489,6 +489,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
 
         let constructor_args = find_contract.constructor_args();
+        let info = find_contract.info();
         let contract = find_contract.contract();
 
         let zk_create_input = foundry_zksync_core::encode_create_params(
@@ -522,7 +523,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
         // NOTE(zk): Clear injected factory deps so that they are not sent on further transactions
         ctx.zk_use_factory_deps.clear();
-        tracing::debug!(contract = contract.name, "using dual compiled contract");
+        tracing::debug!(contract = info.name, "using dual compiled contract");
 
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: state.mocked_calls.clone(),
@@ -697,7 +698,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 "running call in EVM, instead of zkEVM (Test Contract) {:#?}",
                 call.bytecode_address
             );
-            return None
+            return None;
         }
 
         info!("running call in zkEVM {:#?}", call);
@@ -849,7 +850,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
     ) {
         if !ctx.using_zk_vm {
             tracing::info!("already in EVM");
-            return
+            return;
         }
 
         tracing::info!("switching to EVM");
@@ -892,7 +893,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 .and_then(|zk_bytecode_hash| {
                     ctx.dual_compiled_contracts
                         .find_by_zk_bytecode_hash(zk_bytecode_hash.to_h256())
-                        .map(|contract| {
+                        .map(|(_, contract)| {
                             (
                                 contract.evm_bytecode_hash,
                                 Some(Bytecode::new_raw(Bytes::from(
@@ -926,7 +927,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
     ) {
         if ctx.using_zk_vm {
             tracing::info!("already in ZK-VM");
-            return
+            return;
         }
 
         tracing::info!("switching to ZK-VM");
@@ -968,7 +969,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 continue;
             }
 
-            if let Some(contract) = ctx.dual_compiled_contracts.iter().find(|contract| {
+            if let Some((_, contract)) = ctx.dual_compiled_contracts.iter().find(|(_, contract)| {
                 info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
             }) {
                 account_code_storage.insert(

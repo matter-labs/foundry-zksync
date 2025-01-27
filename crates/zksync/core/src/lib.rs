@@ -19,7 +19,7 @@ pub mod vm;
 pub mod state;
 
 use alloy_network::TransactionBuilder;
-use alloy_primitives::{address, hex, keccak256, Address, Bytes, U256 as rU256};
+use alloy_primitives::{address, hex, keccak256, Address, Bytes, B256, U256 as rU256};
 use alloy_transport::Transport;
 use alloy_zksync::{
     network::transaction_request::TransactionRequest as ZkTransactionRequest,
@@ -30,7 +30,8 @@ use eyre::eyre;
 use revm::{Database, InnerEvmContext};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use zksync_types::bytecode::BytecodeHash;
+use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
+use zksync_types::{bytecode::BytecodeHash, Nonce};
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, deploy_nonce, encode_create_params, tx_nonce};
@@ -210,6 +211,38 @@ pub fn try_decode_create2(data: &[u8]) -> Result<(H256, H256, Vec<u8>)> {
     };
 
     Ok((H256(salt.0), H256(bytecode_hash.0), constructor_args.to_vec()))
+}
+
+/// Compute a CREATE address according to zksync
+pub fn compute_create_address(sender: Address, nonce: u64) -> Address {
+    get_create_zksync_address(sender.to_h160(), Nonce(nonce as u32)).to_address()
+}
+
+/// Compute a CREATE2 address according to zksync
+pub fn compute_create2_address(
+    sender: Address,
+    bytecode_hash: H256,
+    salt: B256,
+    constructor_input: &[u8],
+) -> Address {
+    const CREATE2_PREFIX: &[u8] = b"zksyncCreate2";
+    let prefix = keccak256(CREATE2_PREFIX);
+    let sender = sender.to_h256();
+    let constructor_input_hash = keccak256(constructor_input);
+
+    let payload = [
+        prefix.as_slice(),
+        sender.0.as_slice(),
+        salt.0.as_slice(),
+        bytecode_hash.0.as_slice(),
+        constructor_input_hash.as_slice(),
+    ]
+    .concat();
+    let hash = keccak256(payload);
+
+    let address = &hash[12..];
+
+    Address::from_slice(address)
 }
 
 /// Try decoding the provided transaction data into create parameters.

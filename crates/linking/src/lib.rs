@@ -18,6 +18,9 @@ use std::{
     str::FromStr,
 };
 
+mod zksync;
+pub use zksync::*;
+
 /// Errors that can occur during linking.
 #[derive(Debug, thiserror::Error)]
 pub enum LinkerError {
@@ -31,6 +34,7 @@ pub enum LinkerError {
     CyclicDependency,
 }
 
+#[derive(Debug)]
 pub struct Linker<'a> {
     /// Root of the project, used to determine whether artifact/library path can be stripped.
     pub root: PathBuf,

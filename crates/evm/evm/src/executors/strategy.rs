@@ -1,4 +1,4 @@
-use std::{any::Any, fmt::Debug};
+use std::{any::Any, fmt::Debug, path::Path};
 
 use alloy_primitives::{Address, U256};
 use alloy_serde::OtherFields;
@@ -6,8 +6,17 @@ use eyre::Result;
 use foundry_cheatcodes::strategy::{
     CheatcodeInspectorStrategy, EvmCheatcodeInspectorStrategyRunner,
 };
-use foundry_evm_core::backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend};
-use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
+use foundry_compilers::ProjectCompileOutput;
+use foundry_config::Config;
+use foundry_evm_core::{
+    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
+    decode::RevertDecoder,
+};
+use foundry_linking::LinkerError;
+use foundry_zksync_compilers::{
+    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
+    dual_compiled_contracts::DualCompiledContracts,
+};
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, ResultAndState},
     DatabaseRef,
@@ -15,7 +24,10 @@ use revm::{
 
 use crate::inspectors::InspectorStack;
 
-use super::Executor;
+use super::{EvmError, Executor};
+
+mod libraries;
+pub use libraries::*;
 
 pub trait ExecutorStrategyContext: Debug + Send + Sync + Any {
     /// Clone the strategy context.
@@ -68,8 +80,31 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         amount: U256,
     ) -> BackendResult<()>;
 
+    fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256>;
+
     fn set_nonce(&self, executor: &mut Executor, address: Address, nonce: u64)
         -> BackendResult<()>;
+
+    fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64>;
+
+    fn link(
+        &self,
+        ctx: &mut dyn ExecutorStrategyContext,
+        config: &Config,
+        root: &Path,
+        input: &ProjectCompileOutput,
+        deployer: Address,
+    ) -> Result<LinkOutput, LinkerError>;
+
+    /// Deploys a library, applying state changes
+    fn deploy_library(
+        &self,
+        executor: &mut Executor,
+        from: Address,
+        input: DeployLibKind,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<Vec<DeployLibResult>, EvmError>;
 
     /// Execute a transaction and *WITHOUT* applying state changes.
     fn call(
@@ -107,6 +142,13 @@ pub trait ExecutorStrategyExt {
         &self,
         _ctx: &mut dyn ExecutorStrategyContext,
         _dual_compiled_contracts: DualCompiledContracts,
+    ) {
+    }
+
+    fn zksync_set_compilation_output(
+        &self,
+        _ctx: &mut dyn ExecutorStrategyContext,
+        _output: ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
     ) {
     }
 
@@ -153,6 +195,10 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         Ok(())
     }
 
+    fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256> {
+        executor.get_balance(address)
+    }
+
     fn set_nonce(
         &self,
         executor: &mut Executor,
@@ -164,6 +210,33 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         executor.backend_mut().insert_account_info(address, account);
 
         Ok(())
+    }
+
+    fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64> {
+        executor.get_nonce(address)
+    }
+
+    fn link(
+        &self,
+        _: &mut dyn ExecutorStrategyContext,
+        _: &Config,
+        root: &Path,
+        input: &ProjectCompileOutput,
+        deployer: Address,
+    ) -> Result<LinkOutput, LinkerError> {
+        self.link_impl(root, input, deployer)
+    }
+
+    /// Deploys a library, applying state changes
+    fn deploy_library(
+        &self,
+        executor: &mut Executor,
+        from: Address,
+        kind: DeployLibKind,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<Vec<DeployLibResult>, EvmError> {
+        self.deploy_library_impl(executor, from, kind, value, rd)
     }
 
     fn call(

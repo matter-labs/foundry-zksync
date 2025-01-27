@@ -13,6 +13,7 @@ use foundry_cheatcodes::{
         zkVmCall, zkVmSkipCall,
     },
 };
+use foundry_compilers::info::ContractInfo;
 use foundry_evm::backend::LocalForkId;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{ZkPaymasterData, H256};
@@ -213,8 +214,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let ctx = get_context(ccx.state.strategy.context.as_mut());
 
                 let zk_factory_deps = vec![]; //TODO: add argument to cheatcode
+                let new_contract_info = ContractInfo::new(name);
                 let new_contract = DualCompiledContract {
-                    name: name.clone(),
                     zk_bytecode_hash: H256(zkBytecodeHash.0),
                     zk_deployed_bytecode: zkDeployedBytecode.to_vec(),
                     zk_factory_deps,
@@ -223,18 +224,20 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     evm_bytecode: evmBytecode.to_vec(),
                 };
 
-                if let Some(existing) = ctx.dual_compiled_contracts.iter().find(|contract| {
-                    contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
-                        contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
-                }) {
+                if let Some((existing, _)) =
+                    ctx.dual_compiled_contracts.iter().find(|(_, contract)| {
+                        contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
+                            contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
+                    })
+                {
                     warn!(
                         name = existing.name,
                         "contract already exists with the given bytecode hashes"
                     );
-                    return Ok(Default::default())
+                    return Ok(Default::default());
                 }
 
-                ctx.dual_compiled_contracts.push(new_contract);
+                ctx.dual_compiled_contracts.insert(new_contract_info, new_contract);
 
                 Ok(Default::default())
             }

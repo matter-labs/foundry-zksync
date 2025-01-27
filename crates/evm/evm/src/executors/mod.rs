@@ -40,7 +40,7 @@ use std::{
     borrow::Cow,
     time::{Duration, Instant},
 };
-use strategy::ExecutorStrategy;
+use strategy::{DeployLibKind, DeployLibResult, ExecutorStrategy};
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -301,6 +301,23 @@ impl Executor {
     ) -> Result<DeployResult, EvmError> {
         let env = self.build_test_env(from, TxKind::Create, code, value);
         self.deploy_with_env(env, rd)
+    }
+
+    /// Deploys a library contract and commits the new state to the underlying database.
+    ///
+    /// Executes a `deploy_kind` transaction with the provided parameters
+    /// and persistent database state modifications.
+    ///
+    /// Will return a list of deployment results and transaction requests
+    /// Will also ensure nonce is increased for the sender
+    pub fn deploy_library(
+        &mut self,
+        from: Address,
+        kind: DeployLibKind,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<Vec<DeployLibResult>, EvmError> {
+        self.strategy.runner.deploy_library(self, from, kind, value, rd)
     }
 
     /// Deploys a contract using the given `env` and commits the new state to the underlying
