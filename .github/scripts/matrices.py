@@ -116,7 +116,8 @@ def main():
                     os_str = f" ({target.target})"
 
                 name = case.name
-                flags = f"-E '{case.filter}'"
+                # NOTE(zk): filter out zk tests from upstream ci runs
+                flags = f"-E '{case.filter} & not (test(~zk) or test(~test_zk_aave_di) or package(~zksync))'"
                 if case.n_partitions > 1:
                     s = f"{partition}/{case.n_partitions}"
                     name += f" ({s})"
