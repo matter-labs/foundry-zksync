@@ -61,6 +61,11 @@ impl ScriptRunner {
         let mut library_transactions = VecDeque::new();
         let mut traces = Traces::default();
 
+        // NOTE(zk): below we moved the logic into the strategy
+        // so we can override it in the zksync strategy
+        // Additionally, we have a list of results to register
+        // both the EVM and EraVM deployment
+
         // Deploy libraries
         match libraries {
             ScriptPredeployLibraries::Default(libraries) => libraries.iter().for_each(|code| {

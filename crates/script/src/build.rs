@@ -577,6 +577,9 @@ impl CompiledState {
             ScriptSequenceKind::Multi(_) => Libraries::default(),
         };
 
+        // NOTE(zk): we added `script_config` to be able
+        // to retrieve the appropriate `zksolc` compiler version
+        // from the config to be used during linking
         let linked_build_data = build_data.link_with_libraries(&script_config, libraries).await?;
 
         Ok(BundledState {
