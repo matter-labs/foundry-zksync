@@ -176,7 +176,7 @@ pub fn config_zksolc_compiler(config: &Config) -> Result<ZkSolcCompiler, SolcErr
     {
         zksolc
     } else if !config.offline {
-        let default_version = semver::Version::new(1, 5, 10);
+        let default_version = semver::Version::new(1, 5, 11);
         let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
         if zksolc.is_none() {
             ZkSolc::blocking_install(&default_version)?;
