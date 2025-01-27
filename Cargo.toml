@@ -295,7 +295,7 @@ k256 = "0.13"
 mesc = "0.3"
 num-format = "0.4"
 parking_lot = "0.12"
-proptest = "1.6.0"
+proptest = "1"
 rand = "0.8"
 rayon = "1"
 regex = { version = "1", default-features = false }
@@ -319,7 +319,7 @@ vergen = { version = "8", default-features = false }
 yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
 
 [patch.crates-io]
-proptest = { git = "https://github.com/nbaztec/proptest", branch = "v1.6.0-foundry-zksync" }
+proptest = { git = "https://github.com/nbaztec/proptest", branch = "v1.5.0-foundry-zksync" }
 
 ## alloy-core
 # alloy-dyn-abi = { path = "../../alloy-rs/core/crates/dyn-abi" }

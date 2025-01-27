@@ -2210,16 +2210,7 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0700ddab506f33b20a03b13996eccd309a48e5ff77d0d95926aa0210fb4e95f1"
 dependencies = [
- "bit-vec 0.6.3",
-]
-
-[[package]]
-name = "bit-set"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3"
-dependencies = [
- "bit-vec 0.8.0",
+ "bit-vec",
 ]
 
 [[package]]
@@ -2230,12 +2221,6 @@ checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 dependencies = [
  "serde",
 ]
-
-[[package]]
-name = "bit-vec"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
 name = "bitflags"
@@ -7021,7 +7006,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55cb077ad656299f160924eb2912aa147d7339ea7d69e1b5517326fdcec3c1ca"
 dependencies = [
  "ascii-canvas",
- "bit-set 0.5.3",
+ "bit-set",
  "ena",
  "itertools 0.11.0",
  "lalrpop-util",
@@ -7749,6 +7734,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
@@ -8721,11 +8707,11 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "1.6.0"
-source = "git+https://github.com/nbaztec/proptest?branch=v1.6.0-foundry-zksync#564f5ec8cf833446042f08a0b05bf15501fe50ef"
+version = "1.5.0"
+source = "git+https://github.com/nbaztec/proptest?branch=v1.5.0-foundry-zksync#bb936381bf0486435a9f7f03a96d7933fb19ed17"
 dependencies = [
- "bit-set 0.8.0",
- "bit-vec 0.8.0",
+ "bit-set",
+ "bit-vec",
  "bitflags 2.6.0",
  "lazy_static",
  "num-traits",
@@ -13172,7 +13158,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b7c0061db44757522f2d82cad02f45dc98267210ac362071234ed08e30fd4d6"
 dependencies = [
  "arrayvec 0.7.6",
- "bit-vec 0.6.3",
+ "bit-vec",
  "blake2s_simd",
  "byteorder",
  "cfg-if",
@@ -13350,7 +13336,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8986ad796f8e00d8999fee72effba1a21bce40f5f877d681ac9cd89a94834d8"
 dependencies = [
  "anyhow",
- "bit-vec 0.6.3",
+ "bit-vec",
  "once_cell",
  "prost 0.12.6",
  "prost-reflect",
