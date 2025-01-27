@@ -625,6 +625,7 @@ pub fn deploy_zk_contract(
     url: &str,
     private_key: &str,
     contract_path: &str,
+    extra_args: Option<&[&str]>,
 ) -> Result<String, String> {
     cmd.forge_fuse().args([
         "create",
@@ -635,6 +636,10 @@ pub fn deploy_zk_contract(
         "--private-key",
         private_key,
     ]);
+
+    if let Some(args) = extra_args {
+        cmd.args(args);
+    }
 
     let output = cmd.assert_success();
     let output = output.get_output();
