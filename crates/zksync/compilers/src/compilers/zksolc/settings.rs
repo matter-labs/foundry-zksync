@@ -15,6 +15,8 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+
+use super::{ZkSolc, ZkSolcCompiler};
 ///
 /// The Solidity compiler codegen.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -90,7 +92,7 @@ pub struct ZkSettings {
 }
 
 /// Analogous to SolcSettings for zksolc compiler
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ZkSolcSettings {
     /// JSON settings expected by Solc
@@ -100,8 +102,18 @@ pub struct ZkSolcSettings {
     #[serde(flatten)]
     pub cli_settings: solc::CliSettings,
     /// The version of the zksolc compiler to use.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub zksolc_version: Option<Version>,
+    pub zksolc_version: Version,
+}
+
+impl Default for ZkSolcSettings {
+    fn default() -> Self {
+        Self {
+            settings: Default::default(),
+            cli_settings: Default::default(),
+            zksolc_version: ZkSolc::get_version_for_path(ZkSolcCompiler::default().zksolc.as_ref())
+                .expect("Failed to get zksolc version"),
+        }
+    }
 }
 
 impl ZkSettings {
