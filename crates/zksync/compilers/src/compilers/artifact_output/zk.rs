@@ -66,11 +66,6 @@ pub struct ZkContractArtifact {
 }
 
 impl ZkContractArtifact {
-    /// Returns true if contract is not linked
-    pub fn is_unlinked(&self) -> bool {
-        self.bytecode.as_ref().map(|bc| bc.is_unlinked()).unwrap_or(false)
-    }
-
     /// Returns a list of _all_ factory deps, by <path>:<name>
     ///
     /// Will return unlinked as well as linked factory deps (might contain duplicates)
