@@ -4893,6 +4893,7 @@ dependencies = [
  "foundry-evm-coverage",
  "foundry-evm-fuzz",
  "foundry-evm-traces",
+ "foundry-linking",
  "foundry-zksync-compilers",
  "foundry-zksync-core",
  "foundry-zksync-inspectors",
@@ -5056,8 +5057,11 @@ version = "0.0.4"
 dependencies = [
  "alloy-primitives",
  "foundry-compilers",
+ "foundry-zksync-compilers",
+ "foundry-zksync-core",
  "semver 1.0.23",
  "thiserror 2.0.11",
+ "tracing",
 ]
 
 [[package]]
@@ -5082,9 +5086,11 @@ dependencies = [
  "eyre",
  "foundry-cheatcodes",
  "foundry-common",
+ "foundry-compilers",
  "foundry-config",
  "foundry-evm",
  "foundry-evm-core",
+ "foundry-linking",
  "foundry-zksync-compilers",
  "foundry-zksync-core",
  "itertools 0.13.0",
@@ -5164,7 +5170,6 @@ dependencies = [
  "alloy-primitives",
  "dirs 5.0.1",
  "era-solc",
- "eyre",
  "fd-lock",
  "foundry-compilers",
  "foundry-compilers-artifacts-solc",

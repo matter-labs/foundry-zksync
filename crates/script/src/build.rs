@@ -4,17 +4,14 @@ use crate::{
 };
 use alloy_primitives::{Bytes, B256};
 use alloy_provider::Provider;
-use eyre::{OptionExt, Result};
+use eyre::{Context, OptionExt, Result};
 use forge_script_sequence::ScriptSequence;
 use foundry_cheatcodes::Wallets;
 use foundry_common::{
     compile::ProjectCompiler, provider::try_get_http_provider, ContractData, ContractsByArtifact,
 };
 use foundry_compilers::{
-    artifacts::{
-        BytecodeObject, CompactBytecode, CompactContractBytecode, CompactDeployedBytecode,
-        Libraries,
-    },
+    artifacts::{BytecodeObject, Libraries},
     compilers::{multi::MultiCompilerLanguage, Language},
     info::ContractInfo,
     solc::SolcLanguage,
@@ -27,7 +24,9 @@ use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::DualCompiledContracts,
 };
-use std::{collections::BTreeMap, path::PathBuf, str::FromStr, sync::Arc};
+use std::{path::PathBuf, str::FromStr, sync::Arc};
+
+mod zksync;
 
 /// Container for the compiled contracts.
 #[derive(Debug)]
@@ -50,7 +49,7 @@ impl BuildData {
 
     /// Links contracts. Uses CREATE2 linking when possible, otherwise falls back to
     /// default linking with sender nonce and address.
-    pub async fn link(self, script_config: &ScriptConfig) -> Result<LinkedBuildData> {
+    pub async fn link(mut self, script_config: &ScriptConfig) -> Result<LinkedBuildData> {
         let create2_deployer = script_config.evm_opts.create2_deployer;
         let can_use_create2 = if let Some(fork_url) = &script_config.evm_opts.fork_url {
             let provider = try_get_http_provider(fork_url)?;
@@ -63,6 +62,8 @@ impl BuildData {
         };
 
         let known_libraries = script_config.config.libraries_with_remappings()?;
+
+        // TODO(zk): evaluate using strategies here as well
 
         let maybe_create2_link_output = can_use_create2
             .then(|| {
@@ -77,32 +78,59 @@ impl BuildData {
             })
             .flatten();
 
-        let (libraries, predeploy_libs) = if let Some(output) = maybe_create2_link_output {
-            (
-                output.libraries,
-                ScriptPredeployLibraries::Create2(
-                    output.libs_to_deploy,
-                    script_config.config.create2_library_salt,
-                ),
-            )
-        } else {
-            let output = self.get_linker().link_with_nonce_or_address(
-                known_libraries,
-                script_config.evm_opts.sender,
-                script_config.sender_nonce,
-                [&self.target],
-            )?;
+        let (libraries, predeploy_libs, uses_create2) =
+            if let Some(output) = maybe_create2_link_output {
+                (
+                    output.libraries,
+                    ScriptPredeployLibraries::Create2(
+                        output.libs_to_deploy,
+                        script_config.config.create2_library_salt,
+                    ),
+                    true,
+                )
+            } else {
+                let output = self.get_linker().link_with_nonce_or_address(
+                    known_libraries.clone(),
+                    script_config.evm_opts.sender,
+                    script_config.sender_nonce,
+                    [&self.target],
+                )?;
 
-            (output.libraries, ScriptPredeployLibraries::Default(output.libs_to_deploy))
-        };
+                (output.libraries, ScriptPredeployLibraries::Default(output.libs_to_deploy), false)
+            };
 
-        LinkedBuildData::new(libraries, predeploy_libs, self)
+        let known_contracts = self
+            .get_linker()
+            .get_linked_artifacts(&libraries)
+            .context("retrieving fully linked artifacts")?;
+        let known_contracts =
+            self.zk_link(script_config, known_libraries, known_contracts, uses_create2).await?;
+
+        LinkedBuildData::new(
+            libraries,
+            predeploy_libs,
+            ContractsByArtifact::new(known_contracts),
+            self,
+        )
     }
 
     /// Links the build data with the given libraries. Expects supplied libraries set being enough
     /// to fully link target contract.
-    pub fn link_with_libraries(self, libraries: Libraries) -> Result<LinkedBuildData> {
-        LinkedBuildData::new(libraries, ScriptPredeployLibraries::Default(Vec::new()), self)
+    pub async fn link_with_libraries(
+        mut self,
+        script_config: &ScriptConfig,
+        libraries: Libraries,
+    ) -> Result<LinkedBuildData> {
+        let known_contracts = self.get_linker().get_linked_artifacts(&libraries)?;
+        let known_contracts =
+            self.zk_link(script_config, libraries.clone(), known_contracts, false).await?;
+
+        LinkedBuildData::new(
+            libraries,
+            ScriptPredeployLibraries::Default(Vec::new()),
+            ContractsByArtifact::new(known_contracts),
+            self,
+        )
     }
 }
 
@@ -140,47 +168,14 @@ impl LinkedBuildData {
     pub fn new(
         libraries: Libraries,
         predeploy_libraries: ScriptPredeployLibraries,
-        mut build_data: BuildData,
+        known_contracts: ContractsByArtifact,
+        build_data: BuildData,
     ) -> Result<Self> {
         let sources = ContractSources::from_project_output(
             &build_data.output,
             &build_data.project_root,
             Some(&libraries),
         )?;
-
-        let mut known_artifacts = build_data.get_linker().get_linked_artifacts(&libraries)?;
-        // Extend known_artifacts with zk artifacts if available
-        if let Some(zk_output) = build_data.zk_output.take() {
-            let zk_contracts =
-                zk_output.with_stripped_file_prefixes(&build_data.project_root).into_artifacts();
-
-            for (id, contract) in zk_contracts {
-                if let Some(abi) = contract.abi {
-                    let bytecode = contract.bytecode.as_ref();
-                    // TODO(zk): retrieve link_references
-                    if let Some(bytecode_object) = bytecode.map(|b| b.object()) {
-                        let compact_bytecode = CompactBytecode {
-                            object: bytecode_object.clone(),
-                            source_map: None,
-                            link_references: BTreeMap::new(),
-                        };
-                        let compact_contract = CompactContractBytecode {
-                            abi: Some(abi),
-                            bytecode: Some(compact_bytecode.clone()),
-                            deployed_bytecode: Some(CompactDeployedBytecode {
-                                bytecode: Some(compact_bytecode),
-                                immutable_references: BTreeMap::new(),
-                            }),
-                        };
-                        known_artifacts.insert(id.clone(), compact_contract);
-                    }
-                } else {
-                    warn!("Abi not found for contract {}", id.identifier());
-                }
-            }
-        }
-
-        let known_contracts = ContractsByArtifact::new(known_artifacts);
 
         Ok(Self { build_data, known_contracts, libraries, predeploy_libraries, sources })
     }
@@ -250,7 +245,7 @@ impl PreprocessedState {
             zk_output = Some(zk_compiler.zksync_compile(&zk_project)?);
             Some(DualCompiledContracts::new(
                 &output,
-                &zk_output.clone().unwrap(),
+                zk_output.as_ref().unwrap(),
                 &project.paths,
                 &zk_project.paths,
             ))
@@ -392,7 +387,10 @@ impl CompiledState {
             ScriptSequenceKind::Multi(_) => Libraries::default(),
         };
 
-        let linked_build_data = build_data.link_with_libraries(libraries)?;
+        // NOTE(zk): we added `script_config` to be able
+        // to retrieve the appropriate `zksolc` compiler version
+        // from the config to be used during linking
+        let linked_build_data = build_data.link_with_libraries(&script_config, libraries).await?;
 
         Ok(BundledState {
             args,

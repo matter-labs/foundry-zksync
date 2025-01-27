@@ -6,7 +6,7 @@
 pub mod artifacts;
 pub mod compilers;
 pub mod dual_compiled_contracts;
-pub mod libraries;
+pub mod link;
 
 // TODO: Used in integration tests.
 // find out why cargo complains about unused dev_dependency for these cases

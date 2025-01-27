@@ -9,29 +9,28 @@ use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{get_contract_name, shell::verbosity, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    artifacts::{
-        CompactBytecode, CompactContractBytecode, CompactDeployedBytecode, Contract, Libraries,
-    },
+    artifacts::{Contract, Libraries},
     compilers::Compiler,
-    Artifact, ArtifactId, ProjectCompileOutput,
+    ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::{Config, InlineConfig};
 use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
-    executors::{strategy::ExecutorStrategy, Executor, ExecutorBuilder},
+    executors::{
+        strategy::{ExecutorStrategy, LinkOutput},
+        Executor, ExecutorBuilder,
+    },
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
     revm,
     traces::{InternalTraceMode, TraceMode},
 };
-use foundry_linking::{LinkOutput, Linker};
 use rayon::prelude::*;
 use revm::primitives::SpecId;
 
 use std::{
-    borrow::Borrow,
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
@@ -486,94 +485,34 @@ impl MultiContractRunnerBuilder {
         zk_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
         env: revm::primitives::Env,
         evm_opts: EvmOpts,
-        strategy: ExecutorStrategy,
+        mut strategy: ExecutorStrategy,
     ) -> Result<MultiContractRunner> {
-        let contracts = output
-            .artifact_ids()
-            .map(|(id, v)| (id.with_stripped_file_prefixes(root), v))
-            .collect();
-        let linker = Linker::new(root, contracts);
+        if let Some(zk_output) = zk_output {
+            strategy.runner.zksync_set_compilation_output(strategy.context.as_mut(), zk_output);
+        }
 
-        // Build revert decoder from ABIs of all artifacts.
-        let abis = linker
-            .contracts
-            .iter()
-            .filter_map(|(_, contract)| contract.abi.as_ref().map(|abi| abi.borrow()));
-        let revert_decoder = RevertDecoder::new().with_abis(abis);
-
-        let LinkOutput { libraries, libs_to_deploy } = linker.link_with_nonce_or_address(
-            Default::default(),
+        let LinkOutput {
+            deployable_contracts,
+            revert_decoder,
+            linked_contracts: _,
+            known_contracts,
+            libs_to_deploy,
+            libraries,
+        } = strategy.runner.link(
+            strategy.context.as_mut(),
+            &self.config,
+            root,
+            output,
             LIBRARY_DEPLOYER,
-            0,
-            linker.contracts.keys(),
         )?;
 
-        let linked_contracts = linker.get_linked_artifacts(&libraries)?;
-
-        // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
-        let mut deployable_contracts = DeployableContracts::default();
-
-        for (id, contract) in linked_contracts.iter() {
-            let Some(abi) = &contract.abi else { continue };
-
-            // if it's a test, link it and add to deployable contracts
-            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true) &&
-                abi.functions().any(|func| func.name.is_any_test())
-            {
-                let Some(bytecode) =
-                    contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
-                else {
-                    continue;
-                };
-
-                deployable_contracts
-                    .insert(id.clone(), TestContract { abi: abi.clone(), bytecode });
-            }
-        }
-
-        let mut known_contracts = ContractsByArtifact::default();
-        if zk_output.is_none() {
-            known_contracts = ContractsByArtifact::new(linked_contracts);
-        } else if let Some(zk_output) = zk_output {
-            let zk_contracts = zk_output.with_stripped_file_prefixes(root).into_artifacts();
-            let mut zk_contracts_map = BTreeMap::new();
-
-            for (id, contract) in zk_contracts {
-                if let Some(abi) = contract.abi {
-                    let bytecode = contract.bytecode.as_ref();
-
-                    // TODO(zk): retrieve link_references
-                    if let Some(bytecode_object) = bytecode.map(|b| b.object()) {
-                        let compact_bytecode = CompactBytecode {
-                            object: bytecode_object.clone(),
-                            source_map: None,
-                            link_references: BTreeMap::new(),
-                        };
-                        let compact_contract = CompactContractBytecode {
-                            abi: Some(abi),
-                            bytecode: Some(compact_bytecode.clone()),
-                            deployed_bytecode: Some(CompactDeployedBytecode {
-                                bytecode: Some(compact_bytecode),
-                                immutable_references: BTreeMap::new(),
-                            }),
-                        };
-                        zk_contracts_map.insert(id.clone(), compact_contract);
-                    }
-                } else {
-                    warn!("Abi not found for contract {}", id.identifier());
-                }
-            }
-
-            // Extend zk contracts with solc contracts as well. This is required for traces to
-            // accurately detect contract names deployed in EVM mode, and when using
-            // `vm.zkVmSkip()` cheatcode.
-            zk_contracts_map.extend(linked_contracts);
-
-            known_contracts = ContractsByArtifact::new(zk_contracts_map);
-        }
+        let contracts = deployable_contracts
+            .into_iter()
+            .map(|(id, (abi, bytecode))| (id, TestContract { abi, bytecode }))
+            .collect();
 
         Ok(MultiContractRunner {
-            contracts: deployable_contracts,
+            contracts,
             revert_decoder,
             known_contracts,
             libs_to_deploy,
