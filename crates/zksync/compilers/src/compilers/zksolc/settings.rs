@@ -87,9 +87,6 @@ pub struct ZkSettings {
     /// Suppressed `zksolc` errors.
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     pub suppressed_errors: HashSet<ErrorType>,
-    /// The version of the zksolc compiler to use.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub zksolc_version: Option<Version>,
 }
 
 /// Analogous to SolcSettings for zksolc compiler
@@ -102,6 +99,9 @@ pub struct ZkSolcSettings {
     /// Additional CLI args configuration
     #[serde(flatten)]
     pub cli_settings: solc::CliSettings,
+    /// The version of the zksolc compiler to use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zksolc_version: Option<Version>,
 }
 
 impl ZkSettings {
@@ -170,7 +170,6 @@ impl Default for ZkSettings {
             codegen: Default::default(),
             suppressed_errors: Default::default(),
             suppressed_warnings: Default::default(),
-            zksolc_version: None,
         }
     }
 }
@@ -210,7 +209,6 @@ impl CompilerSettings for ZkSolcSettings {
                     codegen,
                     suppressed_warnings,
                     suppressed_errors,
-                    zksolc_version,
                 },
             ..
         } = self;
@@ -228,7 +226,7 @@ impl CompilerSettings for ZkSolcSettings {
             *codegen == other.settings.codegen &&
             *suppressed_warnings == other.settings.suppressed_warnings &&
             *suppressed_errors == other.settings.suppressed_errors &&
-            *zksolc_version == other.settings.zksolc_version
+            self.zksolc_version == other.zksolc_version
     }
 
     fn with_remappings(mut self, remappings: &[Remapping]) -> Self {

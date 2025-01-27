@@ -193,7 +193,7 @@ impl ProjectCompiler {
         let quiet = self.quiet.unwrap_or(false);
         let bail = self.bail.unwrap_or(true);
 
-        let output = with_compilation_reporter(quiet, || {
+        let output = with_compilation_reporter(self.quiet.unwrap_or(false), || {
             tracing::debug!("compiling project");
 
             let timer = Instant::now();

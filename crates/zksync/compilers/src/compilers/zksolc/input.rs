@@ -40,7 +40,7 @@ impl CompilerInput for ZkSolcVersionedInput {
         language: Self::Language,
         version: Version,
     ) -> Self {
-        let ZkSolcSettings { settings, cli_settings } = settings;
+        let ZkSolcSettings { settings, cli_settings, .. } = settings;
         let input = ZkSolcInput::new(language, sources, settings).sanitized(&version);
 
         Self { solc_version: version, input, cli_settings }

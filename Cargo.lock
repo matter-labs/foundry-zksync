@@ -5262,6 +5262,7 @@ dependencies = [
  "fs4 0.8.4",
  "itertools 0.13.0",
  "path-slash",
+ "regex",
  "reqwest 0.12.9",
  "semver 1.0.23",
  "serde",

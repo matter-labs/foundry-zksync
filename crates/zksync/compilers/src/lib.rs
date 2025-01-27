@@ -13,4 +13,6 @@ pub mod libraries;
 #[cfg(test)]
 use foundry_test_utils as _;
 #[cfg(test)]
+use regex as _;
+#[cfg(test)]
 use tempfile as _;

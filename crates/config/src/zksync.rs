@@ -144,11 +144,14 @@ impl ZkSyncConfig {
             codegen: if self.force_evmla { Codegen::EVMLA } else { Codegen::Yul },
             suppressed_warnings: self.suppressed_warnings.clone(),
             suppressed_errors: self.suppressed_errors.clone(),
-            zksolc_version: self.zksolc.as_ref().and_then(|req| req.try_version().ok()),
         };
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
-        ZkSolcSettings { settings: zk_settings, cli_settings: CliSettings::default() }
+        ZkSolcSettings {
+            settings: zk_settings,
+            cli_settings: CliSettings::default(),
+            zksolc_version: None,
+        }
     }
 }
 
