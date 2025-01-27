@@ -40,7 +40,7 @@ pub const ZKSOLC: &str = "zksolc";
 /// ZKsync solc release used for all ZKsync solc versions
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
 /// Default zksolc version
-pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 10);
+pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 9);
 
 #[cfg(test)]
 macro_rules! take_solc_installer_lock {
@@ -151,7 +151,11 @@ impl Compiler for ZkSolcCompiler {
     ) -> Result<CompilerOutput<Self::CompilationError, Self::CompilerContract>> {
         let zksolc = self.zksolc(input)?;
 
+        println!("paso por aca 1");
+
         let mut zk_output = zksolc.compile(&input.input)?;
+        println!("zk_output {:?}", zk_output);
+
         let mut metadata = BTreeMap::new();
         if let Some(solc_version) = zk_output.version.take() {
             metadata.insert("solcVersion".to_string(), solc_version.into());

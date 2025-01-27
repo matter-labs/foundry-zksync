@@ -225,6 +225,8 @@ impl CompilerSettings for ZkSolcSettings {
             ..
         } = self;
 
+        println!("ybue: zksolc_version: {:?}", self.zksolc_version);
+
         *via_ir == other.settings.via_ir &&
             *remappings == other.settings.remappings &&
             *evm_version == other.settings.evm_version &&
