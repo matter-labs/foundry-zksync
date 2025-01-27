@@ -344,7 +344,7 @@ where
     if let Some(initiator_nonce) = modified_storage.get_mut(&initiator_nonce_key) {
         let FullNonce { tx_nonce, deploy_nonce } = parse_full_nonce(initiator_nonce.to_ru256());
         let new_tx_nonce = tx_nonce.saturating_sub(1);
-        error!(address=?initiator_address, from=?tx_nonce, to=?new_tx_nonce, deploy_nonce, "reverting initiator tx nonce for CALL");
+        trace!(address=?initiator_address, from=?tx_nonce, to=?new_tx_nonce, deploy_nonce, "reverting initiator tx nonce for CALL");
         *initiator_nonce = new_full_nonce(new_tx_nonce, deploy_nonce).to_h256();
     }
 
