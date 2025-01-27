@@ -26,7 +26,7 @@ forgetest_async!(
     #[should_panic = "no bytecode for contract; is it abstract or unlinked?"]
     script_zk_fails_indirect_reference_to_unlinked,
     |prj, cmd| {
-        setup_libs_prj(&mut prj, &mut cmd, Some(ZKSOLC_MIN_LINKING_VERSION));
+        setup_libs_prj(&mut prj, &mut cmd, None);
         run_zk_script_test(
             prj.root(),
             &mut cmd,
@@ -41,7 +41,7 @@ forgetest_async!(
 );
 
 forgetest_async!(script_zk_deploy_time_linking, |prj, cmd| {
-    setup_libs_prj(&mut prj, &mut cmd, Some(ZKSOLC_MIN_LINKING_VERSION));
+    setup_libs_prj(&mut prj, &mut cmd, None);
     run_zk_script_test(
         prj.root(),
         &mut cmd,
@@ -101,13 +101,10 @@ forgetest_async!(
 fn setup_libs_prj(prj: &mut TestProject, cmd: &mut TestCommand, zksolc: Option<Version>) {
     util::initialize(prj.root());
 
-    let zksolc = zksolc.unwrap_or_else(|| Version::new(1, 5, 9));
-    // force zksolc 1.5.9
     let mut config = cmd.config();
-    if zksolc >= Version::new(1, 5, 9) {
-        config.zksync.suppressed_errors.insert(ZkSolcError::AssemblyCreate);
+    if let Some(zksolc) = zksolc {
+        config.zksync.zksolc.replace(foundry_config::SolcReq::Version(zksolc))
     }
-    config.zksync.zksolc.replace(foundry_config::SolcReq::Version(zksolc));
     prj.write_config(config);
 
     prj.add_script("Libraries.s.sol", include_str!("../../fixtures/zk/Libraries.s.sol")).unwrap();

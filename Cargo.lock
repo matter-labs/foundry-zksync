@@ -5260,7 +5260,6 @@ dependencies = [
  "alloy-primitives",
  "dirs 5.0.1",
  "era-solc",
- "eyre",
  "fd-lock",
  "foundry-compilers",
  "foundry-compilers-artifacts-solc",
