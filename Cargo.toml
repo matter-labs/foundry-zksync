@@ -319,6 +319,8 @@ vergen = { version = "8", default-features = false }
 yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
 
 [patch.crates-io]
+proptest = { git = "https://github.com/nbaztec/proptest", branch = "v1.6.0-foundry-zksync" }
+
 ## alloy-core
 # alloy-dyn-abi = { path = "../../alloy-rs/core/crates/dyn-abi" }
 # alloy-json-abi = { path = "../../alloy-rs/core/crates/json-abi" }

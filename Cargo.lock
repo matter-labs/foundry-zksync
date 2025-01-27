@@ -8722,8 +8722,7 @@ dependencies = [
 [[package]]
 name = "proptest"
 version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14cae93065090804185d3b75f0bf93b8eeda30c7a9b4a33d3bdb3988d6229e50"
+source = "git+https://github.com/nbaztec/proptest?branch=v1.6.0-foundry-zksync#564f5ec8cf833446042f08a0b05bf15501fe50ef"
 dependencies = [
  "bit-set 0.8.0",
  "bit-vec 0.8.0",
