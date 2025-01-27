@@ -322,9 +322,17 @@ contract UsesCheatcodes {
         return vm.getNonce(target);
     }
 
+    function getZkTransactionNonce(Vm vm, address target) public view returns (uint64) {
+        return vm.zkGetTransactionNonce(target);
+    }
+
+    function getZkDeploymentNonce(Vm vm, address target) public view returns (uint64) {
+        return vm.zkGetDeploymentNonce(target);
+    }
+
     function getZkBalance(Vm vm, address target) public view returns (uint256) {
         vm.zkVm(true);
-        getNonce(vm, target);
+        getZkTransactionNonce(vm, target);
         return target.balance;
     }
 }
@@ -346,12 +354,12 @@ contract ZkCheatcodesInZkVmTest is DSTest {
         address target = address(this);
 
         vm.expectRevert();
-        helper.getNonce(vm, target);
+        helper.getZkTransactionNonce(vm, target);
     }
 
     function testCallVmAfterDisableZkVm() external {
         address target = address(this);
-        uint64 expected = vm.getNonce(target);
+        uint64 expected = vm.zkGetTransactionNonce(target);
 
         vm.zkVm(false);
         uint64 got = helper.getNonce(vm, target);

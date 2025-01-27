@@ -9,9 +9,10 @@ use tracing::{debug, info};
 use zksync_basic_types::H256;
 use zksync_types::{
     ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, CONTRACT_DEPLOYER_ADDRESS,
-    U256,
+    CREATE2_FACTORY_ADDRESS, U256,
 };
 
+use core::convert::Into;
 use std::{cmp::min, fmt::Debug};
 
 use crate::{
@@ -51,7 +52,10 @@ where
     let caller = env.tx.caller;
     let nonce = ZKVMData::new(&mut ecx).get_tx_nonce(caller);
     let (transact_to, is_create) = match env.tx.transact_to {
-        TransactTo::Call(to) => (to.to_h160(), false),
+        TransactTo::Call(to) => {
+            let to = to.to_h160();
+            (to, to == CONTRACT_DEPLOYER_ADDRESS || to == CREATE2_FACTORY_ADDRESS)
+        }
         TransactTo::Create => (CONTRACT_DEPLOYER_ADDRESS, true),
     };
 
@@ -60,7 +64,7 @@ where
     let tx = L2Tx::new(
         Some(transact_to),
         env.tx.data.to_vec(),
-        nonce,
+        (nonce as u32).into(),
         Fee {
             gas_limit,
             max_fee_per_gas,
@@ -89,7 +93,6 @@ where
 
     let mut ccx = CheatcodeTracerContext {
         persisted_factory_deps,
-        persist_nonce_update: true,
         zk_env: zk_env.clone(),
         ..Default::default()
     };
@@ -122,13 +125,22 @@ where
     B256::from(ZKVMData::new(ecx).get_code_hash(address).0)
 }
 
-/// Retrieves nonce for a given address.
-pub fn nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u32
+/// Retrieves transaction nonce for a given address.
+pub fn tx_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u128
 where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    ZKVMData::new(ecx).get_tx_nonce(address).0
+    ZKVMData::new(ecx).get_tx_nonce(address)
+}
+
+/// Retrieves deployment nonce for a given address.
+pub fn deploy_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u128
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    ZKVMData::new(ecx).get_deploy_nonce(address)
 }
 
 /// EraVM equivalent of [`CreateInputs`]
@@ -158,6 +170,8 @@ where
     let ZkCreateInputs { create_input, factory_deps, value, msg_sender } = inputs;
 
     info!("create tx {}", hex::encode(&create_input));
+    // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using
+    // `msg.sender` as it's not EOA. The nonce and balance changes thus need to be adapted.
     let caller = ecx.env.tx.caller;
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
@@ -176,7 +190,7 @@ where
     let tx = L2Tx::new(
         Some(CONTRACT_DEPLOYER_ADDRESS),
         create_input,
-        nonce,
+        (nonce as u32).into(),
         Fee {
             gas_limit,
             max_fee_per_gas,
@@ -218,8 +232,10 @@ where
     <DB as Database>::Error: Debug,
 {
     info!(?call, "call tx {}", hex::encode(&call.input));
+    // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using
+    // `msg.sender` as it's not EOA. The nonce and balance changes thus need to be adapted.
     let caller = ecx.env.tx.caller;
-    let nonce: zksync_types::Nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
+    let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
         PaymasterParams {
@@ -236,7 +252,7 @@ where
     let tx = L2Tx::new(
         Some(call.bytecode_address.to_h160()),
         call.input.to_vec(),
-        nonce,
+        (nonce as u32).into(),
         Fee {
             gas_limit,
             max_fee_per_gas,
@@ -316,7 +332,7 @@ fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMa
         let (block_number, overflow) =
             ecx.env.block.number.overflowing_sub(alloy_primitives::U256::from(i));
         if overflow {
-            break
+            break;
         }
         match ecx.block_hash(block_number.to_u256().as_u64()) {
             Ok(block_hash) => {

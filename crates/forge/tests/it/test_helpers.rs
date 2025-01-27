@@ -201,7 +201,7 @@ impl ForgeTestProfile {
         zk_config.zksync.startup = true;
         zk_config.zksync.fallback_oz = true;
         zk_config.zksync.optimizer_mode = '3';
-        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 7)));
+        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 10)));
         zk_config.fuzz.no_zksync_reserved_addresses = true;
         zk_config.invariant.depth = 15;
 
@@ -612,6 +612,7 @@ pub async fn run_zk_script_test(
     let content = foundry_common::fs::read_to_string(run_latest).unwrap();
 
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+
     assert_eq!(
         json["transactions"].as_array().expect("broadcastable txs").len(),
         expected_broadcastable_txs
@@ -624,6 +625,7 @@ pub fn deploy_zk_contract(
     url: &str,
     private_key: &str,
     contract_path: &str,
+    extra_args: Option<&[&str]>,
 ) -> Result<String, String> {
     cmd.forge_fuse().args([
         "create",
@@ -634,6 +636,10 @@ pub fn deploy_zk_contract(
         "--private-key",
         private_key,
     ]);
+
+    if let Some(args) = extra_args {
+        cmd.args(args);
+    }
 
     let output = cmd.assert_success();
     let output = output.get_output();

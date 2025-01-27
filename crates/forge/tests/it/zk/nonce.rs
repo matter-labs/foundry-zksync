@@ -13,7 +13,7 @@ forgetest_async!(setup_block_on_script_test, |prj, cmd| {
         "./script/ScriptSetup.s.sol",
         "ScriptSetupNonce",
         None,
-        4,
+        3,
         Some(&["-vvvvv"]),
     )
     .await;

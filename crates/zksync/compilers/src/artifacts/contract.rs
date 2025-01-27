@@ -6,7 +6,49 @@ use foundry_compilers_artifacts_solc::{
     CompactContractRef, CompactDeployedBytecode, DevDoc, Evm, Offsets, StorageLayout, UserDoc,
 };
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashSet},
+};
+
+/// zksolc: Binary object format.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "String", into = "String")]
+pub enum ObjectFormat {
+    /// Linked
+    #[default]
+    Raw,
+    /// Unlinked
+    Elf,
+}
+
+impl From<ObjectFormat> for String {
+    fn from(val: ObjectFormat) -> Self {
+        match val {
+            ObjectFormat::Raw => "raw",
+            ObjectFormat::Elf => "elf",
+        }
+        .to_string()
+    }
+}
+
+impl TryFrom<String> for ObjectFormat {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.as_str() {
+            "raw" => Ok(Self::Raw),
+            "elf" => Ok(Self::Elf),
+            s => Err(format!("Unknown zksolc object format: {s}")),
+        }
+    }
+}
+
+impl ObjectFormat {
+    /// Returns true if the object format is considered `unlinked`
+    pub fn is_unlinked(&self) -> bool {
+        matches!(self, Self::Elf)
+    }
+}
 
 /// Represents a compiled solidity contract
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -32,9 +74,17 @@ pub struct Contract {
     /// The contract EraVM bytecode hash.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
-    /// The contract factory dependencies.
+    /// Map of factory dependencies, encoded as <hash> => <path>:<name>
+    ///
+    /// Only contains fully linked factory dependencies, as
+    /// unlinked factory dependencies do not have a bytecode hash
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factory_dependencies: Option<BTreeMap<String, String>>,
+    /// Complete list of factory dependencies, encoded as <path>:<name>
+    ///
+    /// Contains both linked and unlinked factory dependencies
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub factory_dependencies_unlinked: Option<HashSet<String>>,
     /// EraVM-related outputs
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eravm: Option<EraVM>,
@@ -44,6 +94,14 @@ pub struct Contract {
     /// The contract's unlinked libraries
     #[serde(default)]
     pub missing_libraries: Vec<String>,
+    /// zksolc's binary object format
+    ///
+    /// Tells whether the bytecode has been linked.
+    ///
+    /// Introduced in 1.5.8, beforehand we can assume the bytecode
+    /// was always fully linked
+    #[serde(default)]
+    pub object_format: Option<ObjectFormat>,
 }
 
 fn storage_layout_is_empty(storage_layout: &StorageLayout) -> bool {
@@ -53,7 +111,7 @@ fn storage_layout_is_empty(storage_layout: &StorageLayout) -> bool {
 impl Contract {
     /// Returns true if contract is not linked
     pub fn is_unlinked(&self) -> bool {
-        self.hash.is_none() || !self.missing_libraries.is_empty()
+        self.object_format.as_ref().map(|format| format.is_unlinked()).unwrap_or_default()
     }
 
     /// takes missing libraries output and transforms into link references

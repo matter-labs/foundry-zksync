@@ -40,7 +40,7 @@ pub const ZKSOLC: &str = "zksolc";
 /// ZKsync solc release used for all ZKsync solc versions
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
 /// Default zksolc version
-pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 7);
+pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 10);
 
 #[cfg(test)]
 macro_rules! take_solc_installer_lock {
@@ -243,6 +243,11 @@ impl ZkSolcCompiler {
         zksolc.include_paths.clone_from(&input.cli_settings.include_paths);
 
         Ok(zksolc)
+    }
+
+    /// Retrieve the version of the specified `zksolc`
+    pub fn version(&self) -> Result<Version> {
+        ZkSolc::get_version_for_path(self.zksolc.as_ref())
     }
 }
 

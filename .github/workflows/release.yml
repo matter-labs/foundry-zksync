@@ -1,16 +1,26 @@
-name: release
+name: Release
 
 on:
-  push:
-    tags:
-      - "*-zksync.*"
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
+  # Workflow call trigger for stable releases generation
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to use for the release (<component>-v<version>)."
+        type: string
+        required: true
+        default: ""
+      version:
+        description: "Version for the release."
+        type: string
+        required: true
+        default: ""
 
 env:
   CARGO_TERM_COLOR: always
-  IS_NIGHTLY: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+  IS_NIGHTLY: ${{ github.event_name == 'schedule' || inputs.tag == '' }}
 
 jobs:
   prepare:
@@ -19,29 +29,50 @@ jobs:
     timeout-minutes: 30
     outputs:
       tag_name: ${{ steps.release_info.outputs.tag_name }}
+      version_name: ${{ steps.release_info.outputs.version_name }}
       release_name: ${{ steps.release_info.outputs.release_name }}
-      changelog: ${{ steps.build_changelog.outputs.changelog }}
+      prerelease: ${{ steps.release_info.outputs.prerelease }}
+      changelog: ${{ steps.build_changelog.outputs.changelog || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.tag || '' }}
 
       - name: Compute release name and tag
         id: release_info
         run: |
-          if [[ ${IS_NIGHTLY} == 'true' ]]; then
-            echo "tag_name=nightly-${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "nightly: $IS_NIGHTLY"
+          if [ $IS_NIGHTLY == "true" ]; then
+            TAG="${{ inputs.tag || format('nightly-{0}', github.sha) }}"
+            VERSION="${{ inputs.version || 'nightly' }}"
+            
+            echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
+            echo "version_name=${VERSION}" >> $GITHUB_OUTPUT
             echo "release_name=foundry-zksync Nightly ($(date '+%Y-%m-%d'))" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
           else
-            echo "tag_name=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
-            echo "release_name=foundry-zksync@${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            TAG="${{ inputs.tag || format('stable-{0}', github.sha) }}"
+            VERSION="${{ inputs.version || 'stable' }}"
+
+            echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
+            echo "version_name=v${VERSION}" >> $GITHUB_OUTPUT
+            echo "release_name=foundry-zksync v${VERSION}" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
+          
+      - name: Print release info
+        run: |
+          echo tag_name: "${{ steps.release_info.outputs.tag_name }}"
+          echo version_name: "${{ steps.release_info.outputs.version_name }}"
+          echo release_name: "${{ steps.release_info.outputs.release_name }}"
+          echo prerelease: "${{ steps.release_info.outputs.prerelease }}"
 
       # Creates a `nightly-SHA` tag for this specific nightly
       # This tag is used for this specific nightly version's release
       # which allows users to roll back. It is also used to build
       # the changelog.
-      - name: Create build-specific nightly tag
+      - name: Create build-specific tag (nightly)
         if: ${{ env.IS_NIGHTLY == 'true' }}
         uses: actions/github-script@v7
         env:
@@ -51,12 +82,14 @@ jobs:
             const createTag = require('./.github/scripts/create-tag.js')
             await createTag({ github, context }, process.env.TAG_NAME)
 
-      - name: Build changelog
+      - name: Build changelog (nightly)
+        if: ${{ env.IS_NIGHTLY == 'true' }}
         id: build_changelog
         uses: mikepenz/release-changelog-builder-action@v4
         with:
           configuration: "./.github/changelog.json"
           fromTag: ${{ env.IS_NIGHTLY == 'true' && 'nightly' || '' }}
+          fromTag: 'nightly'
           toTag: ${{ steps.release_info.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -70,12 +103,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
     needs: prepare
-    permissions:
-      # Required to post the release
-      contents: write
-      # For attestations
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -84,12 +111,12 @@ jobs:
           # `target`: Rust build target triple
           # `platform` and `arch`: Used in tarball names
           # `svm`: target platform to use for the Solc binary: https://github.com/roynalnaruto/svm-rs/blob/84cbe0ac705becabdc13168bae28a45ad2299749/svm-builds/build.rs#L4-L24
-          - runner: ubuntu-22.04-github-hosted-16core
+          - runner: ubuntu-24.04-github-hosted-16core
             target: x86_64-unknown-linux-gnu
             svm_target_platform: linux-amd64
             platform: linux
             arch: amd64
-          - runner: ubuntu-22.04-github-hosted-16core
+          - runner: ubuntu-24.04-github-hosted-16core
             target: aarch64-unknown-linux-gnu
             svm_target_platform: linux-aarch64
             platform: linux
@@ -106,39 +133,25 @@ jobs:
             arch: arm64
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
-      - name: Install required Rust targets
-        run: rustup target add ${{ matrix.target }}
+          ref: ${{ inputs.tag || '' }}
 
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
           cache-on-failure: true
 
-      - name: Apple M1 setup
-        if: matrix.target == 'aarch64-apple-darwin'
-        run: |
-          brew install make
-          echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
-          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
-      - name: Apple Darwin
-        if: matrix.target == 'x86_64-apple-darwin'
-        run: |
-          brew install make
-          echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
+      - name: Install required Rust targets
+        run: rustup target add ${{ matrix.target }}
 
-      - name: Linux ARM setup
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
-          echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Install cross v0.2.5 from source
+        run: cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5
 
+      # We diverge from upstream and build with cross as we're building static binaries
       - name: Build binaries
         env:
           SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
@@ -154,7 +167,7 @@ jobs:
           #     flags+=(--features asm-keccak)
           # fi
 
-          cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
+          RUSTFLAGS='-C target-feature=+crt-static' OPENSSL_STATIC=1 cross build --release --bin forge --bin cast --target "$target" "${flags[@]}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
@@ -171,17 +184,17 @@ jobs:
           PLATFORM_NAME: ${{ matrix.platform }}
           TARGET: ${{ matrix.target }}
           ARCH: ${{ matrix.arch }}
-          VERSION_NAME: ${{ (env.IS_NIGHTLY && 'nightly') || needs.prepare.outputs.tag_name }}
+          VERSION_NAME: ${{ needs.prepare.outputs.version_name }}
         shell: bash
         run: |
           if [ "$PLATFORM_NAME" == "linux" ]; then
-              tar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
-              echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+              tar -czvf "foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
+              echo "file_name=foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
               # We need to use gtar here otherwise the archive is corrupt.
               # See: https://github.com/actions/virtual-environments/issues/2619
-              gtar -czvf "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
-              echo "file_name=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+              gtar -czvf "foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" -C ./target/${TARGET}/release forge cast
+              echo "file_name=foundry_zksync_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
           fi
 
       - name: Build man page
@@ -190,7 +203,7 @@ jobs:
         env:
           PLATFORM_NAME: ${{ matrix.platform }}
           TARGET: ${{ matrix.target }}
-          VERSION_NAME: ${{ (env.IS_NIGHTLY && 'nightly') || needs.prepare.outputs.tag_name }}
+          VERSION_NAME: ${{ needs.prepare.outputs.version_name }}
         shell: bash
         run: |
           sudo apt-get -y install help2man
@@ -203,12 +216,22 @@ jobs:
 
       # Creates the release for this specific version
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        if: ${{ inputs.tag == '' }}
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ needs.prepare.outputs.release_name }}
           tag_name: ${{ needs.prepare.outputs.tag_name }}
-          prerelease: true
+          prerelease: ${{ needs.prepare.outputs.prerelease }}
           body: ${{ needs.prepare.outputs.changelog }}
+          files: |
+            ${{ steps.artifacts.outputs.file_name }}
+            ${{ steps.man.outputs.foundry_man }}
+
+      - name: Update release-please release artifacts
+        if: ${{ inputs.tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
           files: |
             ${{ steps.artifacts.outputs.file_name }}
             ${{ steps.man.outputs.foundry_man }}
@@ -223,8 +246,8 @@ jobs:
       # If this is a nightly release, it also updates the release
       # tagged `nightly` for compatibility with `foundryup`
       - name: Update nightly release
-        if: ${{ env.IS_NIGHTLY }}
-        uses: softprops/action-gh-release@v1
+        if: ${{ env.IS_NIGHTLY == 'true' }}
+        uses: softprops/action-gh-release@v2
         with:
           name: "Nightly foundry-zksync"
           tag_name: "nightly"
@@ -233,7 +256,7 @@ jobs:
           files: |
             ${{ steps.artifacts.outputs.file_name }}
             ${{ steps.man.outputs.foundry_man }}
-  
+
   retry-on-failure:
     if: failure() && fromJSON(github.run_attempt) < 3
     needs: [release]
