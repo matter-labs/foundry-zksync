@@ -528,8 +528,6 @@ impl Backend {
                 .ok_or(BlockchainError::BlockNotFound)?;
             // update all settings related to the forked block
             {
-                let maybe_rpc_url = { self.node_config.read().await.eth_rpc_url.clone() };
-
                 if let Some(fork_url) = forking.json_rpc_url.or(maybe_rpc_url) {
                     // Set the fork block number
                     let mut node_config = self.node_config.write().await;
@@ -544,7 +542,8 @@ impl Backend {
                     *self.fork.write() = Some(fork);
                     *self.env.write() = env;
                 } else {
-                    // Set cache path on correct block
+                    // If rpc url is unspecified, then update the fork with the new block number and
+                    // existing rpc url, this updates the cache path
                     {
                         let maybe_fork_url = { self.node_config.read().await.eth_rpc_url.clone() };
                         if let Some(fork_url) = maybe_fork_url {
