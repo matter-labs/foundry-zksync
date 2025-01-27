@@ -21,7 +21,6 @@ serde_json.workspace = true
 serde.workspace = true
 semver.workspace = true
 itertools.workspace = true
-eyre.workspace = true
 walkdir.workspace = true
 reqwest.workspace = true
 yansi.workspace = true
