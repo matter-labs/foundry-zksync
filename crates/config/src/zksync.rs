@@ -146,11 +146,17 @@ impl ZkSyncConfig {
             suppressed_errors: self.suppressed_errors.clone(),
         };
 
+        let zksolc_version = self.zksolc.as_ref().map(|req| match req {
+            SolcReq::Version(version) => version.clone(),
+            SolcReq::Local(path) => ZkSolc::get_version_for_path(path)
+                .unwrap_or_else(|_| panic!("Could not find zksolc version for this path")),
+        });
+
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
         ZkSolcSettings {
             settings: zk_settings,
             cli_settings: CliSettings::default(),
-            zksolc_version: None,
+            zksolc_version,
         }
     }
 }
