@@ -1031,7 +1031,8 @@ dependencies = [
 [[package]]
 name = "alloy-zksync"
 version = "0.9.0"
-source = "git+https://github.com/popzxc/alloy-zksync/?rev=92768d367bc2a1671ca1da5cb36e1471bbb7c79e#92768d367bc2a1671ca1da5cb36e1471bbb7c79e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e9432f4705b656b59f2a84001a57b946510b3c1a01d38f2940fa1c4123b0b9a"
 dependencies = [
  "alloy",
  "alloy-consensus-any",
@@ -10760,7 +10761,7 @@ dependencies = [
  "solar-config",
  "solar-data-structures",
  "solar-macros",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tracing",
  "unicode-width 0.2.0",
 ]
