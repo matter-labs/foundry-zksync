@@ -11,13 +11,14 @@ use foundry_test_utils::foundry_compilers::{
     CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig,
 };
 
+use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_zksync_compilers::{
     artifacts::{contract::Contract, error::Error},
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
             input::ZkSolcInput,
-            settings::{BytecodeHash, SettingsMetadata, ZkSolcError, ZkSolcWarning},
+            settings::{BytecodeHash, SettingsMetadata},
             ZkSolc, ZkSolcCompiler, ZkSolcSettings,
         },
     },
@@ -161,7 +162,7 @@ fn test_zksync_can_compile_contract_with_suppressed_errors(compiler: ZkSolcCompi
     assert!(compiled.has_compiler_errors());
 
     project.project_mut().settings.settings.suppressed_errors =
-        HashSet::from([ZkSolcError::SendTransfer]);
+        HashSet::from([ErrorType::SendTransfer]);
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();
@@ -218,7 +219,7 @@ fn test_zksync_can_compile_contract_with_suppressed_warnings(compiler: ZkSolcCom
     );
 
     project.project_mut().settings.settings.suppressed_warnings =
-        HashSet::from([ZkSolcWarning::TxOrigin]);
+        HashSet::from([WarningType::TxOrigin]);
 
     let compiled = project.compile().unwrap();
     compiled.assert_success();
@@ -246,6 +247,69 @@ fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
         solc: Default::default(),
     };
     test_zksync_can_compile_contract_with_suppressed_warnings(compiler);
+}
+
+fn test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(
+    compiler: ZkSolcCompiler,
+) {
+    let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+    project.project_mut().compiler = compiler;
+
+    project
+        .add_source(
+            "Warning",
+            r#"
+        // SPDX-License-Identifier: MIT OR Apache-2.0
+        pragma solidity ^0.8.10;
+        contract Warning {
+            function deployWithCreate(bytes memory bytecode) public returns (address addr) {
+                assembly {
+                    addr := create(0, add(bytecode, 0x20), mload(bytecode))
+                }
+            }
+        }
+        "#,
+        )
+        .unwrap();
+
+    // Compile the project and ensure it succeeds with warnings
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(
+        compiled
+            .output()
+            .errors
+            .iter()
+            .any(|err| err.is_warning() && err.message.contains("create")),
+        "Expected assembly `create` warning, but none found: {:#?}",
+        compiled.output().errors
+    );
+
+    project.project_mut().settings.settings.suppressed_warnings =
+        HashSet::from([WarningType::AssemblyCreate]);
+
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+    assert!(compiled.find_first("Warning").is_some());
+
+    assert!(
+        !compiled
+            .output()
+            .errors
+            .iter()
+            .any(|err| err.is_warning() && err.message.contains("create")),
+        "Assembly `create` warning was not suppressed: {:#?}",
+        compiled.output().errors
+    )
+}
+
+#[test]
+fn zksync_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10() {
+    let compiler = ZkSolcCompiler {
+        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 10)).unwrap(),
+        solc: Default::default(),
+    };
+    test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(compiler);
 }
 
 #[test]
@@ -575,7 +639,7 @@ contract Util {}
     assert!(compiled.output().errors.iter().any(|error| error
         .formatted_message
         .as_ref()
-        .map_or(false, |msg| msg.contains("File outside of allowed directories"))));
+        .is_some_and(|msg| msg.contains("File outside of allowed directories"))));
 }
 
 #[test]

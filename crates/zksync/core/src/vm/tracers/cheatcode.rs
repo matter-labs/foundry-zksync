@@ -94,8 +94,6 @@ pub struct CheatcodeTracerContext<'a> {
     pub persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     /// Paymaster data
     pub paymaster_data: Option<ZkPaymasterData>,
-    /// Whether to persist nonce update for the tx caller, or not.
-    pub persist_nonce_update: bool,
     /// Era Vm environment
     pub zk_env: ZkEnv,
 }
@@ -175,8 +173,11 @@ impl CheatcodeTracer {
         value: rU256,
     ) -> bool {
         // The following addresses are expected to have empty bytecode
-        let ignored_known_addresses =
-            [foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS, self.call_context.tx_caller];
+        let ignored_known_addresses = [
+            foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS,
+            self.call_context.tx_caller,
+            self.call_context.msg_sender,
+        ];
 
         // Skip empty code check for empty calldata with non-zero value (Transfers)
         if calldata.is_empty() && !value.is_zero() {
@@ -340,7 +341,10 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
             }
         }
 
-        // Override msg.sender for the transaction
+        // Override msg.sender for the execute transaction.
+        // The same cannot be done for `validateTransaction` due to the many safeguards around
+        // correct nonce update in the bootloader. So we handle it by modifying the storage
+        // post-execution.
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;

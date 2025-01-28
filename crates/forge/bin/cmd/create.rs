@@ -113,6 +113,10 @@ pub struct CreateArgs {
 
     #[command(flatten)]
     retry: RetryArgs,
+
+    /// Gas per pubdata
+    #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
+    pub zk_gas_per_pubdata: Option<u64>,
 }
 
 #[derive(Debug, Default)]
@@ -128,7 +132,7 @@ impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> Result<()> {
         let mut config = self.try_load_config_emit_warnings()?;
-
+        let timeout = config.transaction_timeout;
         // Install missing dependencies.
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
             // need to re-configure here to also catch additional remappings
@@ -170,10 +174,10 @@ impl CreateArgs {
             let (artifact, id) =
                 remove_zk_contract(&mut zk_output, &target_path, &self.contract.name)?;
 
-            let ZkContractArtifact { bytecode, factory_dependencies, abi, .. } = artifact;
+            let ZkContractArtifact { bytecode, abi, factory_dependencies, .. } = &artifact;
 
-            let abi = abi.expect("Abi not found");
-            let bin = bytecode.expect("Bytecode not found");
+            let abi = abi.clone().expect("Abi not found");
+            let bin = bytecode.as_ref().expect("Bytecode not found");
 
             let bytecode = match bin.object() {
                 BytecodeObject::Bytecode(bytes) => bytes.to_vec(),
@@ -220,7 +224,7 @@ impl CreateArgs {
 
             let factory_deps: Vec<Vec<u8>> = {
                 let factory_dependencies_map =
-                    factory_dependencies.expect("factory deps not found");
+                    factory_dependencies.as_ref().expect("factory deps not found");
                 let mut visited_paths = HashSet::new();
                 let mut visited_bytecodes = HashSet::new();
                 let mut queue = VecDeque::new();
@@ -248,12 +252,12 @@ impl CreateArgs {
                                 )
                             });
                         let fdep_fdeps_map =
-                            fdep_art.factory_dependencies.clone().expect("factory deps not found");
+                            fdep_art.factory_dependencies.as_ref().expect("factory deps not found");
                         for dep in fdep_fdeps_map.values() {
                             queue.push_back(dep.clone())
                         }
 
-                        // TODO(zk): ensure factory deps are also linked
+                        // NOTE(zk): unlinked factory deps don't show up in `factory_dependencies`
                         let fdep_bytecode = fdep_art
                             .bytecode
                             .clone()
@@ -301,7 +305,7 @@ impl CreateArgs {
                     provider,
                     chain_id,
                     deployer,
-                    config.transaction_timeout,
+                    timeout,
                     id,
                     zk_data,
                 )
@@ -659,7 +663,6 @@ impl CreateArgs {
                     e
                 }
             })?;
-        let is_legacy = self.tx.legacy || Chain::from(chain).is_legacy();
 
         deployer.tx = deployer.tx.with_factory_deps(
             zk_data.factory_deps.clone().into_iter().map(|dep| dep.into()).collect(),
@@ -692,24 +695,13 @@ impl CreateArgs {
         deployer.tx.set_gas_price(gas_price);
 
         // estimate fee
-        foundry_zksync_core::estimate_gas(&mut deployer.tx, &provider).await?;
-
-        if !is_legacy {
-            let estimate = provider.estimate_eip1559_fees(None).await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
-            let priority_fee = if let Some(priority_fee) = self.tx.priority_gas_price {
-                priority_fee.to()
-            } else {
-                estimate.max_priority_fee_per_gas
-            };
-            let max_fee = if let Some(max_fee) = self.tx.gas_price {
-                max_fee.to()
-            } else {
-                estimate.max_fee_per_gas
-            };
-
-            deployer.tx.set_max_fee_per_gas(max_fee);
-            deployer.tx.set_max_priority_fee_per_gas(priority_fee);
-        }
+        foundry_zksync_core::estimate_fee(
+            &mut deployer.tx,
+            &provider,
+            130,
+            self.zk_gas_per_pubdata,
+        )
+        .await?;
 
         if let Some(gas_limit) = self.tx.gas_limit {
             deployer.tx.set_gas_limit(gas_limit.to::<u64>());
@@ -989,6 +981,7 @@ where
             .send_transaction(self.tx)
             .await?
             .with_required_confirmations(self.confs as u64)
+            .with_timeout(Some(std::time::Duration::from_secs(self.timeout)))
             .get_receipt()
             .await?;
 

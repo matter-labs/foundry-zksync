@@ -22,6 +22,7 @@ foundry-evm-core.workspace = true
 foundry-evm-coverage.workspace = true
 foundry-evm-fuzz.workspace = true
 foundry-evm-traces.workspace = true
+foundry-linking.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compilers.workspace = true
 foundry-zksync-inspectors.workspace = true

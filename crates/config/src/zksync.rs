@@ -1,3 +1,4 @@
+use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Severity},
     error::SolcError,
@@ -11,14 +12,13 @@ use foundry_zksync_compilers::{
         zksolc::{
             get_solc_version_info,
             settings::{
-                BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcError,
-                ZkSolcSettings, ZkSolcWarning,
+                BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata,
+                ZkSolcSettings,
             },
             ZkSettings, ZkSolc, ZkSolcCompiler,
         },
     },
 };
-
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
@@ -74,10 +74,10 @@ pub struct ZkSyncConfig {
     pub optimizer_details: Option<OptimizerDetails>,
 
     // zksolc suppressed warnings.
-    pub suppressed_warnings: HashSet<ZkSolcWarning>,
+    pub suppressed_warnings: HashSet<WarningType>,
 
     // zksolc suppressed errors.
-    pub suppressed_errors: HashSet<ZkSolcError>,
+    pub suppressed_errors: HashSet<ErrorType>,
 }
 
 impl Default for ZkSyncConfig {
@@ -171,6 +171,30 @@ pub fn config_zksolc_settings(config: &Config) -> Result<ZkSolcSettings, SolcErr
     Ok(config.zksync.settings(libraries, config.evm_version, config.via_ir))
 }
 
+/// Return the configured `zksolc` compiler
+///
+/// If not `offline`, will install the default version automatically
+/// Will fallback to `zksolc` present in the environment
+pub fn config_zksolc_compiler(config: &Config) -> Result<ZkSolcCompiler, SolcError> {
+    let zksolc = if let Some(zksolc) =
+        config_ensure_zksolc(config.zksync.zksolc.as_ref(), config.offline)?
+    {
+        zksolc
+    } else if !config.offline {
+        let default_version = ZkSolc::zksolc_latest_supported_version();
+        let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
+        if zksolc.is_none() {
+            ZkSolc::blocking_install(&default_version)?;
+            zksolc = ZkSolc::find_installed_version(&default_version)?;
+        }
+        zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"))
+    } else {
+        "zksolc".into()
+    };
+
+    Ok(ZkSolcCompiler { zksolc, solc: config_solc_compiler(config)? })
+}
+
 /// Create a new zkSync project
 pub fn config_create_project(
     config: &Config,
@@ -198,23 +222,7 @@ pub fn config_create_project(
         builder = builder.sparse_output(filter);
     }
 
-    let zksolc = if let Some(zksolc) =
-        config_ensure_zksolc(config.zksync.zksolc.as_ref(), config.offline)?
-    {
-        zksolc
-    } else if !config.offline {
-        let default_version = ZkSolc::zksolc_latest_supported_version();
-        let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
-        if zksolc.is_none() {
-            ZkSolc::blocking_install(&default_version)?;
-            zksolc = ZkSolc::find_installed_version(&default_version)?;
-        }
-        zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"))
-    } else {
-        "zksolc".into()
-    };
-
-    let zksolc_compiler = ZkSolcCompiler { zksolc, solc: config_solc_compiler(config)? };
+    let zksolc_compiler = config_zksolc_compiler(config)?;
 
     let project = builder.build(zksolc_compiler)?;
 

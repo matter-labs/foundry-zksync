@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use alloy_primitives::{keccak256, map::HashMap, Address, Bytes, B256};
 use alloy_sol_types::SolValue;
 use foundry_cheatcodes::strategy::CheatcodeInspectorStrategyContext;
+use foundry_compilers::info::ContractInfo;
 use foundry_evm_core::constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH};
 use foundry_zksync_compilers::dual_compiled_contracts::{
     DualCompiledContract, DualCompiledContracts,
@@ -10,7 +11,7 @@ use foundry_zksync_compilers::dual_compiled_contracts::{
 use foundry_zksync_core::{vm::ZkEnv, ZkPaymasterData, H256};
 use revm::primitives::Bytecode;
 
-use super::types::{ZkPersistNonceUpdate, ZkStartupMigration};
+use super::types::ZkStartupMigration;
 
 /// Context for [ZksyncCheatcodeInspectorStrategyRunner].
 #[derive(Debug, Default, Clone)]
@@ -48,9 +49,6 @@ pub struct ZksyncCheatcodeInspectorStrategyContext {
     /// providing the necessary level of isolation.
     pub persisted_factory_deps: HashMap<H256, Vec<u8>>,
 
-    /// Nonce update persistence behavior in zkEVM for the tx caller.
-    pub zk_persist_nonce_update: ZkPersistNonceUpdate,
-
     /// Stores the factory deps that were detected as part of CREATE2 deployer call.
     /// Must be cleared every call.
     pub set_deployer_call_input_factory_deps: Vec<Vec<u8>>,
@@ -68,32 +66,38 @@ impl ZksyncCheatcodeInspectorStrategyContext {
         let zk_deployed_bytecode = foundry_zksync_core::EMPTY_CODE.to_vec();
 
         let mut dual_compiled_contracts = dual_compiled_contracts;
-        dual_compiled_contracts.push(DualCompiledContract {
-            name: String::from("EmptyEVMBytecode"),
-            zk_bytecode_hash,
-            zk_deployed_bytecode: zk_deployed_bytecode.clone(),
-            zk_factory_deps: Default::default(),
-            evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
-            evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
-            evm_bytecode: Bytecode::new_raw(empty_bytes).bytecode().to_vec(),
-        });
+        dual_compiled_contracts.insert(
+            ContractInfo::new("EmptyEVMBytecode"),
+            DualCompiledContract {
+                zk_bytecode_hash,
+                zk_deployed_bytecode: zk_deployed_bytecode.clone(),
+                zk_factory_deps: Default::default(),
+                evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
+                evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
+                evm_bytecode: Bytecode::new_raw(empty_bytes).bytecode().to_vec(),
+            },
+        );
 
         let cheatcodes_bytecode = {
             let mut bytecode = CHEATCODE_ADDRESS.abi_encode_packed();
             bytecode.append(&mut [0; 12].to_vec());
             Bytes::from(bytecode)
         };
-        dual_compiled_contracts.push(DualCompiledContract {
-            name: String::from("CheatcodeBytecode"),
-            // we put a different bytecode hash here so when importing back to EVM
-            // we avoid collision with EmptyEVMBytecode for the cheatcodes
-            zk_bytecode_hash: foundry_zksync_core::hash_bytecode(CHEATCODE_CONTRACT_HASH.as_ref()),
-            zk_deployed_bytecode: cheatcodes_bytecode.to_vec(),
-            zk_factory_deps: Default::default(),
-            evm_bytecode_hash: CHEATCODE_CONTRACT_HASH,
-            evm_deployed_bytecode: cheatcodes_bytecode.to_vec(),
-            evm_bytecode: cheatcodes_bytecode.to_vec(),
-        });
+        dual_compiled_contracts.insert(
+            ContractInfo::new("CheatcodeBytecode"),
+            DualCompiledContract {
+                // we put a different bytecode hash here so when importing back to EVM
+                // we avoid collision with EmptyEVMBytecode for the cheatcodes
+                zk_bytecode_hash: foundry_zksync_core::hash_bytecode(
+                    CHEATCODE_CONTRACT_HASH.as_ref(),
+                ),
+                zk_deployed_bytecode: cheatcodes_bytecode.to_vec(),
+                zk_factory_deps: Default::default(),
+                evm_bytecode_hash: CHEATCODE_CONTRACT_HASH,
+                evm_deployed_bytecode: cheatcodes_bytecode.to_vec(),
+                evm_bytecode: cheatcodes_bytecode.to_vec(),
+            },
+        );
 
         let mut persisted_factory_deps = HashMap::new();
         persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
@@ -108,7 +112,6 @@ impl ZksyncCheatcodeInspectorStrategyContext {
             zk_startup_migration: ZkStartupMigration::Defer,
             zk_use_factory_deps: Default::default(),
             persisted_factory_deps: Default::default(),
-            zk_persist_nonce_update: Default::default(),
             set_deployer_call_input_factory_deps: Default::default(),
             zk_env,
         }

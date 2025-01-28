@@ -240,6 +240,11 @@ impl ZkSolcCompiler {
 
         Ok(zksolc)
     }
+
+    /// Retrieve the version of the specified `zksolc`
+    pub fn version(&self) -> Result<Version> {
+        ZkSolc::get_version_for_path(self.zksolc.as_ref())
+    }
 }
 
 /// Version metadata. Will include `zksync_version` if compiler is zksync solc.
@@ -416,7 +421,7 @@ impl ZkSolc {
     /// Get supported zksolc versions
     pub fn zksolc_supported_versions() -> Vec<Version> {
         let mut ret = vec![];
-        let version_ranges = vec![(1, 5, 6..=7)];
+        let version_ranges = vec![(1, 5, 6..=11)];
 
         for (major, minor, patch_range) in version_ranges {
             for patch in patch_range {

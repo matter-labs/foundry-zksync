@@ -8,10 +8,12 @@ use foundry_cheatcodes::{
         createFork_0Call, createFork_1Call, createFork_2Call, createSelectFork_0Call,
         createSelectFork_1Call, createSelectFork_2Call, dealCall, etchCall, getCodeCall,
         getNonce_0Call, mockCallRevert_0Call, mockCall_0Call, resetNonceCall, rollCall,
-        selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall, zkRegisterContractCall,
-        zkUseFactoryDepCall, zkUsePaymasterCall, zkVmCall, zkVmSkipCall,
+        selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall, zkGetDeploymentNonceCall,
+        zkGetTransactionNonceCall, zkRegisterContractCall, zkUseFactoryDepCall, zkUsePaymasterCall,
+        zkVmCall, zkVmSkipCall,
     },
 };
+use foundry_compilers::info::ContractInfo;
 use foundry_evm::backend::LocalForkId;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{ZkPaymasterData, H256};
@@ -99,6 +101,26 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
                 let nonce = foundry_zksync_core::cheatcodes::get_nonce(account, ccx.ecx);
                 Ok(nonce.abi_encode())
+            }
+            t if using_zk_vm && is::<zkGetTransactionNonceCall>(t) => {
+                let &zkGetTransactionNonceCall { account } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+
+                info!(?account, "cheatcode zkGetTransactionNonce");
+
+                let (tx_nonce, _) =
+                    foundry_zksync_core::cheatcodes::get_full_nonce(account, ccx.ecx);
+                Ok(tx_nonce.abi_encode())
+            }
+            t if using_zk_vm && is::<zkGetDeploymentNonceCall>(t) => {
+                let &zkGetDeploymentNonceCall { account } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+
+                info!(?account, "cheatcode zkGetDeploymentNonce");
+
+                let (_, deploy_nonce) =
+                    foundry_zksync_core::cheatcodes::get_full_nonce(account, ccx.ecx);
+                Ok(deploy_nonce.abi_encode())
             }
             t if using_zk_vm && is::<mockCall_0Call>(t) => {
                 let mockCall_0Call { callee, data, returnData } =
@@ -192,8 +214,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let ctx = get_context(ccx.state.strategy.context.as_mut());
 
                 let zk_factory_deps = vec![]; //TODO: add argument to cheatcode
+                let new_contract_info = ContractInfo::new(name);
                 let new_contract = DualCompiledContract {
-                    name: name.clone(),
                     zk_bytecode_hash: H256(zkBytecodeHash.0),
                     zk_deployed_bytecode: zkDeployedBytecode.to_vec(),
                     zk_factory_deps,
@@ -202,18 +224,20 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     evm_bytecode: evmBytecode.to_vec(),
                 };
 
-                if let Some(existing) = ctx.dual_compiled_contracts.iter().find(|contract| {
-                    contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
-                        contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
-                }) {
+                if let Some((existing, _)) =
+                    ctx.dual_compiled_contracts.iter().find(|(_, contract)| {
+                        contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
+                            contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
+                    })
+                {
                     warn!(
                         name = existing.name,
                         "contract already exists with the given bytecode hashes"
                     );
-                    return Ok(Default::default())
+                    return Ok(Default::default());
                 }
 
-                ctx.dual_compiled_contracts.push(new_contract);
+                ctx.dual_compiled_contracts.insert(new_contract_info, new_contract);
 
                 Ok(Default::default())
             }

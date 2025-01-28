@@ -1,25 +1,34 @@
+use std::path::Path;
+
 use alloy_primitives::{Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
-
-use foundry_evm::{
-    backend::{Backend, BackendResult, CowBackend},
-    executors::{
-        strategy::{
-            EvmExecutorStrategyRunner, ExecutorStrategyContext, ExecutorStrategyExt,
-            ExecutorStrategyRunner,
-        },
-        Executor,
-    },
-    inspectors::InspectorStack,
-};
-use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
-use foundry_zksync_core::vm::ZkEnv;
+use foundry_linking::LinkerError;
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, ResultAndState},
     Database,
 };
+
+use foundry_compilers::ProjectCompileOutput;
+use foundry_config::Config;
+use foundry_evm::{
+    backend::{Backend, BackendResult, CowBackend},
+    decode::RevertDecoder,
+    executors::{
+        strategy::{
+            DeployLibKind, DeployLibResult, EvmExecutorStrategyRunner, ExecutorStrategyContext,
+            ExecutorStrategyExt, ExecutorStrategyRunner, LinkOutput,
+        },
+        EvmError, Executor,
+    },
+    inspectors::InspectorStack,
+};
+use foundry_zksync_compilers::{
+    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
+    dual_compiled_contracts::DualCompiledContracts,
+};
+use foundry_zksync_core::vm::ZkEnv;
 
 use crate::{
     backend::{ZksyncBackendStrategyBuilder, ZksyncInspectContext},
@@ -27,9 +36,29 @@ use crate::{
     executor::{try_get_zksync_transaction_metadata, ZksyncExecutorStrategyContext},
 };
 
+mod libraries;
+
 /// Defines the [ExecutorStrategyRunner] strategy for ZKsync.
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncExecutorStrategyRunner;
+
+impl ZksyncExecutorStrategyRunner {
+    fn set_deployment_nonce(
+        executor: &mut Executor,
+        address: Address,
+        nonce: u64,
+    ) -> BackendResult<()> {
+        let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
+        // fetch the full nonce to preserve account's tx nonce
+        let full_nonce = executor.backend.storage(address, slot)?;
+        let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
+        let new_full_nonce =
+            foundry_zksync_core::state::new_full_nonce(full_nonce.tx_nonce, nonce as u128);
+        executor.backend.insert_account_storage(address, slot, new_full_nonce)?;
+
+        Ok(())
+    }
+}
 
 fn get_context_ref(ctx: &dyn ExecutorStrategyContext) -> &ZksyncExecutorStrategyContext {
     ctx.as_any_ref().downcast_ref().expect("expected ZksyncExecutorStrategyContext")
@@ -54,6 +83,13 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         Ok(())
     }
 
+    fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256> {
+        let (address, slot) = foundry_zksync_core::state::get_balance_storage(address);
+        let balance = executor.backend.storage(address, slot)?;
+
+        Ok(balance)
+    }
+
     fn set_nonce(
         &self,
         executor: &mut Executor,
@@ -67,10 +103,40 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         let full_nonce = executor.backend.storage(address, slot)?;
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
         let new_full_nonce =
-            foundry_zksync_core::state::new_full_nonce(nonce, full_nonce.deploy_nonce);
+            foundry_zksync_core::state::new_full_nonce(nonce as u128, full_nonce.deploy_nonce);
         executor.backend.insert_account_storage(address, slot, new_full_nonce)?;
 
         Ok(())
+    }
+
+    fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64> {
+        let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
+        let full_nonce = executor.backend.storage(address, slot)?;
+        let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
+
+        Ok(full_nonce.tx_nonce as u64)
+    }
+
+    fn link(
+        &self,
+        ctx: &mut dyn ExecutorStrategyContext,
+        config: &Config,
+        root: &Path,
+        input: &ProjectCompileOutput,
+        deployer: Address,
+    ) -> Result<LinkOutput, LinkerError> {
+        self.link_impl(ctx, config, root, input, deployer)
+    }
+
+    fn deploy_library(
+        &self,
+        executor: &mut Executor,
+        from: Address,
+        kind: DeployLibKind,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<Vec<DeployLibResult>, EvmError> {
+        self.deploy_library_impl(executor, from, kind, value, rd)
     }
 
     fn new_backend_strategy(&self) -> foundry_evm_core::backend::strategy::BackendStrategy {
@@ -152,6 +218,15 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
     ) {
         let ctx = get_context(ctx);
         ctx.dual_compiled_contracts = dual_compiled_contracts;
+    }
+
+    fn zksync_set_compilation_output(
+        &self,
+        ctx: &mut dyn ExecutorStrategyContext,
+        output: ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
+    ) {
+        let ctx = get_context(ctx);
+        ctx.compilation_output.replace(output);
     }
 
     fn zksync_set_fork_env(
