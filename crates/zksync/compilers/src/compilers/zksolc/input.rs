@@ -43,8 +43,10 @@ impl CompilerInput for ZkSolcVersionedInput {
         version: Version,
     ) -> Self {
         let zksolc_path = settings.zksolc_path();
+        let zksolc_version = settings.zksolc_version_ref().clone();
         let ZkSolcSettings { settings, cli_settings, .. } = settings;
-        let input = ZkSolcInput::new(language, sources, settings).sanitized(&version);
+        let input =
+            ZkSolcInput::new(language, sources, settings, &zksolc_version).sanitized(&version);
 
         Self { solc_version: version, input, cli_settings, zksolc_path }
     }
@@ -109,21 +111,22 @@ impl Default for ZkSolcInput {
 }
 
 impl ZkSolcInput {
-    fn new(language: SolcLanguage, sources: Sources, mut settings: ZkSettings) -> Self {
-        // TODO: Right now we make use of the fact that zksolc ignores invalid fields. Whenever
-        // there are fields that, for the same feature, are different across compiler versions,
-        // we check and set them all to the same value. When compiling with a given version, the
-        // supported field is used and the other one is ignored.
-        // If this causes problems, we might need to make ZkSolcInput version aware and sanitize
-        // accordingly
-
+    fn new(
+        language: SolcLanguage,
+        sources: Sources,
+        mut settings: ZkSettings,
+        zksolc_version: &Version,
+    ) -> Self {
+        let mut suppressed_warnings = HashSet::default();
+        let mut suppressed_errors = HashSet::default();
         // zksolc <= 1.5.6 has suppressed warnings/errors in at the root input level
-        let suppressed_warnings = settings.suppressed_warnings.clone();
-        let suppressed_errors = settings.suppressed_errors.clone();
+        if zksolc_version <= &Version::new(1, 5, 6) {
+            suppressed_warnings = std::mem::take(&mut settings.suppressed_warnings);
+            suppressed_errors = std::mem::take(&mut settings.suppressed_errors);
+        }
 
-        // zksolc <= 1.5.6 uses "bytecode_hash" field for "hash_type"
         if let Some(ref mut metadata) = settings.metadata {
-            metadata.sanitize();
+            metadata.sanitize(zksolc_version);
         };
 
         Self { language, sources, settings, suppressed_warnings, suppressed_errors }

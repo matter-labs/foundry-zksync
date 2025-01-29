@@ -425,8 +425,11 @@ impl SettingsMetadata {
     }
 
     /// Makes SettingsMettadata version compatible
-    pub fn sanitize(&mut self) {
-        self.bytecode_hash = self.hash_type;
+    pub fn sanitize(&mut self, zksolc_version: &Version) {
+        // zksolc <= 1.5.6 uses "bytecode_hash" field for "hash_type"
+        if zksolc_version <= &Version::new(1, 5, 6) {
+            self.bytecode_hash = self.hash_type.take();
+        }
     }
 }
 
