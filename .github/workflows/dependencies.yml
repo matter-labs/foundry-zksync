@@ -9,22 +9,9 @@ on:
   workflow_dispatch:
     # Needed so we can run it manually
 
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  BRANCH: cargo-update
-  TITLE: "chore(deps): weekly `cargo update`"
-  BODY: |
-    Automation to keep dependencies in `Cargo.lock` current.
-
-    <details><summary><strong>cargo update log</strong></summary>
-    <p>
-
-    ```log
-    $cargo_update_log
-    ```
-
-    </p>
-    </details>
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
     update:

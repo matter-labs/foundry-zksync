@@ -103,7 +103,7 @@ impl RunArgs {
     pub async fn run(self) -> Result<()> {
         let figment = Into::<Figment>::into(&self.rpc).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
-        let mut config = Config::try_from(figment)?.sanitized();
+        let mut config = Config::from_provider(figment)?.sanitized();
         let strategy = utils::get_executor_strategy(&config);
 
         let compute_units_per_second =
