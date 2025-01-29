@@ -17,7 +17,7 @@ use std::{
     str::FromStr,
 };
 
-use super::{ZkSolc, ZKSOLC_VERSION};
+use super::ZkSolc;
 ///
 /// The Solidity compiler codegen.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -108,12 +108,13 @@ pub struct ZkSolcSettings {
 
 impl Default for ZkSolcSettings {
     fn default() -> Self {
-        let zksolc_path = ZkSolc::get_path_for_version(&ZKSOLC_VERSION)
+        let version = ZkSolc::zksolc_latest_supported_version();
+        let zksolc_path = ZkSolc::get_path_for_version(&version)
             .expect("failed getting default zksolc version path");
         Self {
             settings: Default::default(),
             cli_settings: Default::default(),
-            zksolc_version: ZKSOLC_VERSION,
+            zksolc_version: version,
             zksolc_path,
         }
     }

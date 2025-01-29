@@ -62,7 +62,7 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data/dapp-sample");
         let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
         let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::new(paths).unwrap();
-        project.project_mut().settings.set_zksolc_version(version);
+        project.project_mut().settings.set_zksolc_version(version.clone()).unwrap();
 
         let compiled = project.compile().unwrap();
         compiled.assert_success();
@@ -75,8 +75,8 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
                         "zksolc {version}: {n} artifact bytecode field should not be empty"
                     ))
                     .object()
-                    .bytes_len()
-                    > 0,
+                    .bytes_len() >
+                    0,
                 "zksolc {version}",
             );
         }
@@ -87,7 +87,7 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
 fn zksync_can_set_hash_type_with_supported_versions() {
     for version in ZkSolc::zksolc_supported_versions() {
         let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
-        project.project_mut().settings.set_zksolc_version(version).unwrap();
+        project.project_mut().settings.set_zksolc_version(version.clone()).unwrap();
         project.project_mut().settings.settings.metadata =
             Some(SettingsMetadata::new(Some(BytecodeHash::None)));
 
@@ -167,7 +167,9 @@ fn test_zksync_can_compile_contract_with_suppressed_errors(zksolc_version: Versi
 
 #[test]
 fn zksync_can_compile_contract_with_suppressed_errors() {
-    test_zksync_can_compile_contract_with_suppressed_errors(ZKSOLC_VERSION);
+    test_zksync_can_compile_contract_with_suppressed_errors(
+        ZkSolc::zksolc_latest_supported_version(),
+    );
 }
 
 #[test]
@@ -229,7 +231,9 @@ fn test_zksync_can_compile_contract_with_suppressed_warnings(zksolc_version: Ver
 
 #[test]
 fn zksync_can_compile_contract_with_suppressed_warnings() {
-    test_zksync_can_compile_contract_with_suppressed_warnings(ZKSOLC_VERSION);
+    test_zksync_can_compile_contract_with_suppressed_warnings(
+        ZkSolc::zksolc_latest_supported_version(),
+    );
 }
 
 #[test]
