@@ -263,7 +263,7 @@ impl VerifyBytecodeArgs {
 
             // configure_tx_rq_env(&mut env, &gen_tx);
 
-            configure_tx_req_env(&mut env, &gen_tx_req)
+            configure_tx_req_env(&mut env, &gen_tx_req, None)
                 .wrap_err("Failed to configure tx request env")?;
 
             // Seed deployer account with funds
@@ -481,7 +481,7 @@ impl VerifyBytecodeArgs {
             }
 
             // configure_req__env(&mut env, &transaction.inner);
-            configure_tx_req_env(&mut env, &transaction)
+            configure_tx_req_env(&mut env, &transaction, None)
                 .wrap_err("Failed to configure tx request env")?;
 
             let fork_address = crate::utils::deploy_contract(
