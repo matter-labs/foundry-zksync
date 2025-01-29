@@ -4,6 +4,7 @@ use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_ty
 use foundry_compilers::{
     artifacts::{serde_helpers, EvmVersion, Libraries},
     compilers::CompilerSettings,
+    error::Result,
     solc, CompilerSettingsRestrictions,
 };
 use foundry_compilers_artifacts_solc::{output_selection::OutputSelection, remappings::Remapping};
@@ -15,6 +16,8 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+
+use super::{ZkSolc, ZKSOLC_VERSION};
 ///
 /// The Solidity compiler codegen.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -90,7 +93,7 @@ pub struct ZkSettings {
 }
 
 /// Analogous to SolcSettings for zksolc compiler
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ZkSolcSettings {
     /// JSON settings expected by Solc
@@ -99,6 +102,53 @@ pub struct ZkSolcSettings {
     /// Additional CLI args configuration
     #[serde(flatten)]
     pub cli_settings: solc::CliSettings,
+    /// The version of the zksolc compiler to use. Retrieved from `zksolc_path`
+    zksolc_version: Version,
+    /// zksolc path
+    zksolc_path: PathBuf,
+}
+
+impl Default for ZkSolcSettings {
+    fn default() -> Self {
+        let zksolc_path = ZkSolc::get_path_for_version(&ZKSOLC_VERSION)
+            .expect("failed getting default zksolc version path");
+        Self {
+            settings: Default::default(),
+            cli_settings: Default::default(),
+            zksolc_version: ZKSOLC_VERSION,
+            zksolc_path,
+        }
+    }
+}
+
+impl ZkSolcSettings {
+    /// Initialize settings for a given zksolc path
+    pub fn new_from_path(
+        settings: ZkSettings,
+        cli_settings: solc::CliSettings,
+        zksolc_path: PathBuf,
+    ) -> Result<Self> {
+        let zksolc_version = ZkSolc::get_version_for_path(&zksolc_path)?;
+        Ok(Self { settings, cli_settings, zksolc_path, zksolc_version })
+    }
+
+    /// Get zksolc path
+    pub fn zksolc_path(&self) -> PathBuf {
+        self.zksolc_path.clone()
+    }
+
+    /// Get zksolc version
+    pub fn zksolc_version_ref(&self) -> &Version {
+        &self.zksolc_version
+    }
+
+    /// Set a specific zksolc version
+    pub fn set_zksolc_version(&mut self, zksolc_version: Version) -> Result<()> {
+        let zksolc_path = ZkSolc::get_path_for_version(&zksolc_version)?;
+        self.zksolc_version = zksolc_version;
+        self.zksolc_path = zksolc_path;
+        Ok(())
+    }
 }
 
 impl ZkSettings {
@@ -222,7 +272,8 @@ impl CompilerSettings for ZkSolcSettings {
             *force_evmla == other.settings.force_evmla &&
             *codegen == other.settings.codegen &&
             *suppressed_warnings == other.settings.suppressed_warnings &&
-            *suppressed_errors == other.settings.suppressed_errors
+            *suppressed_errors == other.settings.suppressed_errors &&
+            self.zksolc_version == other.zksolc_version
     }
 
     fn with_remappings(mut self, remappings: &[Remapping]) -> Self {

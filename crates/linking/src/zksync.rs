@@ -44,7 +44,7 @@ pub const DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION: Version = Version::new(1, 5, 9
 #[derive(Debug)]
 pub struct ZkLinker<'a> {
     pub linker: Linker<'a>,
-    pub compiler: ZkSolcCompiler,
+    pub compiler: PathBuf,
     pub compiler_output: &'a ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
 }
 
@@ -57,7 +57,7 @@ impl<'a> ZkLinker<'a> {
     pub fn new(
         root: impl Into<PathBuf>,
         contracts: ArtifactContracts<CompactContractBytecodeCow<'a>>,
-        compiler: ZkSolcCompiler,
+        compiler: PathBuf,
         compiler_output: &'a ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
     ) -> Self {
         Self { linker: Linker::new(root, contracts), compiler, compiler_output }
@@ -299,7 +299,7 @@ impl<'a> ZkLinker<'a> {
         contracts: &ArtifactContracts<CompactContractBytecodeCow<'a>>,
         target: &ArtifactId,
         libraries: &Libraries,
-        zksolc: &ZkSolcCompiler,
+        zksolc_path: &Path,
     ) -> Result<CompactContractBytecodeCow<'a>, ZkLinkerError> {
         let artifact_to_link_id = |id: &ArtifactId| format!("{}:{}", id.source.display(), id.name);
 
@@ -336,7 +336,7 @@ impl<'a> ZkLinker<'a> {
             .collect::<HashSet<_>>();
 
         let mut link_output =
-            zk_link::zksolc_link(zksolc, zk_link::LinkJsonInput { bytecodes, libraries })
+            zk_link::zksolc_link(zksolc_path, zk_link::LinkJsonInput { bytecodes, libraries })
                 .expect("able to call zksolc --link"); // TODO(zk): proper error check
 
         let link_id = &artifact_to_link_id(target);

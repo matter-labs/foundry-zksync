@@ -20,11 +20,11 @@ use foundry_compilers::{
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
 use foundry_zksync_compilers::compilers::{
-    artifact_output::zk::ZkArtifactOutput,
-    zksolc::{ZkSolc, ZkSolcCompiler},
+    artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
 };
 
 use num_format::{Locale, ToFormattedString};
+
 use std::{
     collections::BTreeMap,
     fmt::Display,
@@ -330,7 +330,7 @@ impl ProjectCompiler {
         let files = self.files.clone();
 
         {
-            let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
+            let zksolc_version = project.settings.zksolc_version_ref();
             Report::new(SpinnerReporter::spawn_with(format!("Using zksolc-{zksolc_version}")));
         }
         self.zksync_compile_with(|| {
