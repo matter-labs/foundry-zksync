@@ -56,14 +56,14 @@ impl ZksyncExecutorStrategyRunner {
         let contracts: ArtifactContracts<CompactContractBytecodeCow<'_>> =
             input.artifact_ids().collect();
 
-        let Ok(zksolc) = foundry_config::zksync::config_zksolc_compiler(config) else {
+        let Ok(zksolc_settings) = foundry_config::zksync::config_zksolc_settings(config) else {
             tracing::error!("unable to determine zksolc compiler to be used for linking");
             // TODO(zk): better error
             return Err(LinkerError::CyclicDependency);
         };
-        let version = zksolc.version().map_err(|_| LinkerError::CyclicDependency)?;
+        let version = zksolc_settings.zksolc_version_ref();
 
-        let linker = ZkLinker::new(root, contracts.clone(), zksolc, input);
+        let linker = ZkLinker::new(root, contracts.clone(), zksolc_settings.zksolc_path(), input);
 
         let zk_linker_error_to_linker = |zk_error| match zk_error {
             ZkLinkerError::Inner(err) => err,
@@ -93,7 +93,7 @@ impl ZksyncExecutorStrategyRunner {
         // so we can skip the version check
         if !libraries.is_empty() {
             // TODO(zk): better error
-            if version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
+            if version < &DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
                 tracing::error!(
                     %version,
                     minimum_version = %DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,

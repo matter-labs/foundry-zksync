@@ -20,11 +20,11 @@ use foundry_compilers::{
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
 use foundry_zksync_compilers::compilers::{
-    artifact_output::zk::ZkArtifactOutput,
-    zksolc::{ZkSolc, ZkSolcCompiler},
+    artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
 };
 
 use num_format::{Locale, ToFormattedString};
+
 use std::{
     collections::BTreeMap,
     fmt::Display,
@@ -283,9 +283,9 @@ impl ProjectCompiler {
                 let dev_functions =
                     artifact.abi.as_ref().map(|abi| abi.functions()).into_iter().flatten().filter(
                         |func| {
-                            func.name.is_any_test() ||
-                                func.name.eq("IS_TEST") ||
-                                func.name.eq("IS_SCRIPT")
+                            func.name.is_any_test()
+                                || func.name.eq("IS_TEST")
+                                || func.name.eq("IS_SCRIPT")
                         },
                     );
 
@@ -330,7 +330,7 @@ impl ProjectCompiler {
         let files = self.files.clone();
 
         {
-            let zksolc_current_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
+            let zksolc_current_version = project.settings.zksolc_version_ref();
             let zksolc_min_supported_version = ZkSolc::zksolc_minimum_supported_version();
             let zksolc_latest_supported_version = ZkSolc::zksolc_latest_supported_version();
             if zksolc_current_version < zksolc_min_supported_version {
@@ -463,8 +463,8 @@ impl ProjectCompiler {
                     .as_ref()
                     .map(|abi| {
                         abi.functions().any(|f| {
-                            f.test_function_kind().is_known() ||
-                                matches!(f.name.as_str(), "IS_TEST" | "IS_SCRIPT")
+                            f.test_function_kind().is_known()
+                                || matches!(f.name.as_str(), "IS_TEST" | "IS_SCRIPT")
                         })
                     })
                     .unwrap_or(false);

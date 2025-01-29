@@ -23,6 +23,7 @@ use foundry_zksync_compilers::{
         },
     },
 };
+use semver::Version;
 
 #[test]
 fn zksync_can_compile_dapp_sample() {
@@ -61,11 +62,7 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data/dapp-sample");
         let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
         let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::new(paths).unwrap();
-        let compiler = ZkSolcCompiler {
-            zksolc: ZkSolc::get_path_for_version(&version).unwrap(),
-            solc: Default::default(),
-        };
-        project.project_mut().compiler = compiler;
+        project.project_mut().settings.set_zksolc_version(version);
 
         let compiled = project.compile().unwrap();
         compiled.assert_success();
@@ -78,8 +75,8 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
                         "zksolc {version}: {n} artifact bytecode field should not be empty"
                     ))
                     .object()
-                    .bytes_len() >
-                    0,
+                    .bytes_len()
+                    > 0,
                 "zksolc {version}",
             );
         }
@@ -90,11 +87,7 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
 fn zksync_can_set_hash_type_with_supported_versions() {
     for version in ZkSolc::zksolc_supported_versions() {
         let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
-        let compiler = ZkSolcCompiler {
-            zksolc: ZkSolc::get_path_for_version(&version).unwrap(),
-            solc: Default::default(),
-        };
-        project.project_mut().compiler = compiler;
+        project.project_mut().settings.set_zksolc_version(version).unwrap();
         project.project_mut().settings.settings.metadata =
             Some(SettingsMetadata::new(Some(BytecodeHash::None)));
 
@@ -134,13 +127,14 @@ fn zksync_can_set_hash_type_with_supported_versions() {
     }
 }
 
-fn test_zksync_can_compile_contract_with_suppressed_errors(compiler: ZkSolcCompiler) {
+fn test_zksync_can_compile_contract_with_suppressed_errors(zksolc_version: Version) {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
     //     .try_init()
     //     .ok();
+
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
-    project.project_mut().compiler = compiler;
+    project.project_mut().settings.set_zksolc_version(zksolc_version).unwrap();
 
     project
         .add_source(
@@ -159,37 +153,35 @@ fn test_zksync_can_compile_contract_with_suppressed_errors(compiler: ZkSolcCompi
         .unwrap();
 
     let compiled = project.compile().unwrap();
+
     assert!(compiled.has_compiler_errors());
 
     project.project_mut().settings.settings.suppressed_errors =
         HashSet::from([ErrorType::SendTransfer]);
 
     let compiled = project.compile().unwrap();
+
     compiled.assert_success();
     assert!(compiled.find_first("Erroneous").is_some());
 }
 
 #[test]
 fn zksync_can_compile_contract_with_suppressed_errors() {
-    test_zksync_can_compile_contract_with_suppressed_errors(ZkSolcCompiler::default());
+    test_zksync_can_compile_contract_with_suppressed_errors(ZKSOLC_VERSION);
 }
 
 #[test]
 fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_errors() {
-    let compiler = ZkSolcCompiler {
-        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 6)).unwrap(),
-        solc: Default::default(),
-    };
-    test_zksync_can_compile_contract_with_suppressed_errors(compiler);
+    test_zksync_can_compile_contract_with_suppressed_errors(Version::new(1, 5, 6));
 }
 
-fn test_zksync_can_compile_contract_with_suppressed_warnings(compiler: ZkSolcCompiler) {
+fn test_zksync_can_compile_contract_with_suppressed_warnings(zksolc_version: Version) {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
     //     .try_init()
     //     .ok();
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
-    project.project_mut().compiler = compiler;
+    project.project_mut().settings.set_zksolc_version(zksolc_version).unwrap();
 
     project
         .add_source(
@@ -237,23 +229,19 @@ fn test_zksync_can_compile_contract_with_suppressed_warnings(compiler: ZkSolcCom
 
 #[test]
 fn zksync_can_compile_contract_with_suppressed_warnings() {
-    test_zksync_can_compile_contract_with_suppressed_warnings(ZkSolcCompiler::default());
+    test_zksync_can_compile_contract_with_suppressed_warnings(ZKSOLC_VERSION);
 }
 
 #[test]
 fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
-    let compiler = ZkSolcCompiler {
-        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 6)).unwrap(),
-        solc: Default::default(),
-    };
-    test_zksync_can_compile_contract_with_suppressed_warnings(compiler);
+    test_zksync_can_compile_contract_with_suppressed_warnings(Version::new(1, 5, 6));
 }
 
 fn test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(
-    compiler: ZkSolcCompiler,
+    zksolc_version: Version,
 ) {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
-    project.project_mut().compiler = compiler;
+    project.project_mut().settings.set_zksolc_version(zksolc_version).unwrap();
 
     project
         .add_source(
@@ -305,11 +293,9 @@ fn test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(
 
 #[test]
 fn zksync_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10() {
-    let compiler = ZkSolcCompiler {
-        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 10)).unwrap(),
-        solc: Default::default(),
-    };
-    test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(compiler);
+    test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(Version::new(
+        1, 5, 10,
+    ));
 }
 
 #[test]
@@ -736,4 +722,58 @@ fn zksync_can_compile_yul_sample() {
     let yul_bytecode = simple_store_artifact.object().into_bytes().unwrap();
 
     assert!(!yul_bytecode.is_empty(), "SimpleStore bytecode is empty");
+}
+
+#[test]
+fn zksync_detects_change_on_cache_if_zksolc_version_changes() {
+    let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+
+    project.project_mut().build_info = true;
+
+    project
+        .add_source(
+            "A",
+            r#"
+pragma solidity ^0.8.10;
+import "./B.sol";
+contract A { }
+"#,
+        )
+        .unwrap();
+
+    project
+        .add_source(
+            "B",
+            r"
+pragma solidity ^0.8.10;
+contract B { }
+",
+        )
+        .unwrap();
+
+    project.project_mut().settings.set_zksolc_version(Version::new(1, 5, 6)).unwrap();
+
+    let compiled_1 = project.compile().unwrap();
+    compiled_1.assert_success();
+
+    for bi in compiled_1.output().build_infos.iter() {
+        let zksolc_version =
+            bi.build_info.get("output").unwrap()["metadata"]["zksolcVersion"].to_string();
+        assert_eq!(zksolc_version, "\"1.5.6\"");
+    }
+
+    let compiled_2 = project.compile().unwrap();
+    assert!(compiled_2.is_unchanged());
+
+    project.project_mut().settings.set_zksolc_version(Version::new(1, 5, 7)).unwrap();
+
+    let compiled_3 = project.compile().unwrap();
+    compiled_3.assert_success();
+    assert!(!compiled_3.is_unchanged());
+
+    for bi in compiled_3.output().build_infos.iter() {
+        let zksolc_version =
+            bi.build_info.get("output").unwrap()["metadata"]["zksolcVersion"].to_string();
+        assert_eq!(zksolc_version, "\"1.5.7\"");
+    }
 }

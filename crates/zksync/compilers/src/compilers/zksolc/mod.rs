@@ -117,20 +117,10 @@ impl ZkSolcOS {
 }
 
 /// ZkSolc compiler
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ZkSolcCompiler {
-    /// zksolc path
-    pub zksolc: PathBuf,
     /// solc compiler to use along zksolc
     pub solc: SolcCompiler,
-}
-
-impl Default for ZkSolcCompiler {
-    fn default() -> Self {
-        let zksolc = ZkSolc::get_path_for_version(&ZkSolc::zksolc_latest_supported_version())
-            .expect("Could not install zksolc");
-        Self { zksolc, solc: Default::default() }
-    }
 }
 
 impl Compiler for ZkSolcCompiler {
@@ -148,6 +138,7 @@ impl Compiler for ZkSolcCompiler {
         let zksolc = self.zksolc(input)?;
 
         let mut zk_output = zksolc.compile(&input.input)?;
+
         let mut metadata = BTreeMap::new();
         if let Some(solc_version) = zk_output.version.take() {
             metadata.insert("solcVersion".to_string(), solc_version.into());
@@ -232,18 +223,13 @@ impl ZkSolcCompiler {
             }
         };
 
-        let mut zksolc = ZkSolc::new(self.zksolc.clone(), solc)?;
+        let mut zksolc = ZkSolc::new(input.zksolc_path.clone(), solc)?;
 
         zksolc.base_path.clone_from(&input.cli_settings.base_path);
         zksolc.allow_paths.clone_from(&input.cli_settings.allow_paths);
         zksolc.include_paths.clone_from(&input.cli_settings.include_paths);
 
         Ok(zksolc)
-    }
-
-    /// Retrieve the version of the specified `zksolc`
-    pub fn version(&self) -> Result<Version> {
-        ZkSolc::get_version_for_path(self.zksolc.as_ref())
     }
 }
 

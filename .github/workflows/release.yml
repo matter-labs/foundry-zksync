@@ -94,16 +94,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
+    permissions:
+      id-token: write
+      contents: write
+      attestations: write
     name: ${{ matrix.target }} (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
     needs: prepare
-    permissions:
-      # Required to post the release
-      contents: write
-      # For attestations
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:

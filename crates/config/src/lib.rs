@@ -58,7 +58,9 @@ pub mod utils;
 pub use utils::*;
 
 mod endpoints;
-pub use endpoints::{ResolvedRpcEndpoints, RpcEndpoint, RpcEndpoints};
+pub use endpoints::{
+    ResolvedRpcEndpoint, ResolvedRpcEndpoints, RpcEndpoint, RpcEndpointUrl, RpcEndpoints,
+};
 
 mod etherscan;
 use etherscan::{
@@ -955,6 +957,7 @@ impl Config {
     }
 
     /// Resolves globs and builds a mapping from individual source files to their restrictions
+    #[expect(clippy::disallowed_macros)]
     fn restrictions(
         &self,
         paths: &ProjectPathsConfig,
@@ -983,7 +986,20 @@ impl Config {
                 if !map.contains_key(source) {
                     map.insert(source.clone(), res);
                 } else {
-                    map.get_mut(source.as_path()).unwrap().merge(res);
+                    let value = map.remove(source.as_path()).unwrap();
+                    if let Some(merged) = value.clone().merge(res) {
+                        map.insert(source.clone(), merged);
+                    } else {
+                        // `sh_warn!` is a circular dependency, preventing us from using it here.
+                        eprintln!(
+                            "{}",
+                            yansi::Paint::yellow(&format!(
+                                "Failed to merge compilation restrictions for {}",
+                                source.display()
+                            ))
+                        );
+                        map.insert(source.clone(), value);
+                    }
                 }
             }
         }
@@ -1301,7 +1317,7 @@ impl Config {
     ) -> Option<Result<Cow<'_, str>, UnresolvedEnvVarError>> {
         let mut endpoints = self.rpc_endpoints.clone().resolved();
         if let Some(endpoint) = endpoints.remove(maybe_alias) {
-            return Some(endpoint.map(Cow::Owned));
+            return Some(endpoint.url().map(Cow::Owned));
         }
 
         if let Ok(Some(endpoint)) = mesc::get_endpoint_by_query(maybe_alias, Some("foundry")) {
@@ -2557,10 +2573,10 @@ mod tests {
     use super::*;
     use crate::{
         cache::{CachedChains, CachedEndpoints},
-        endpoints::{RpcEndpointConfig, RpcEndpointType},
+        endpoints::{RpcEndpoint, RpcEndpointType},
         etherscan::ResolvedEtherscanConfigs,
     };
-    use endpoints::RpcAuth;
+    use endpoints::{RpcAuth, RpcEndpointConfig};
     use figment::error::Kind::InvalidType;
     use foundry_compilers::artifacts::{
         vyper::VyperOptimizationMode, ModelCheckerEngine, YulDetails,
@@ -3230,17 +3246,19 @@ mod tests {
                 RpcEndpoints::new([
                     (
                         "optimism",
-                        RpcEndpointType::String(RpcEndpoint::Url(
+                        RpcEndpointType::String(RpcEndpointUrl::Url(
                             "https://example.com/".to_string()
                         ))
                     ),
                     (
                         "mainnet",
-                        RpcEndpointType::Config(RpcEndpointConfig {
-                            endpoint: RpcEndpoint::Env("${_CONFIG_MAINNET}".to_string()),
-                            retries: Some(3),
-                            retry_backoff: Some(1000),
-                            compute_units_per_second: Some(1000),
+                        RpcEndpointType::Config(RpcEndpoint {
+                            endpoint: RpcEndpointUrl::Env("${_CONFIG_MAINNET}".to_string()),
+                            config: RpcEndpointConfig {
+                                retries: Some(3),
+                                retry_backoff: Some(1000),
+                                compute_units_per_second: Some(1000),
+                            },
                             auth: None,
                         })
                     ),
@@ -3251,10 +3269,23 @@ mod tests {
             let resolved = config.rpc_endpoints.resolved();
             assert_eq!(
                 RpcEndpoints::new([
-                    ("optimism", RpcEndpoint::Url("https://example.com/".to_string())),
+                    (
+                        "optimism",
+                        RpcEndpointType::String(RpcEndpointUrl::Url(
+                            "https://example.com/".to_string()
+                        ))
+                    ),
                     (
                         "mainnet",
-                        RpcEndpoint::Url("https://eth-mainnet.alchemyapi.io/v2/123455".to_string())
+                        RpcEndpointType::Config(RpcEndpoint {
+                            endpoint: RpcEndpointUrl::Env("${_CONFIG_MAINNET}".to_string()),
+                            config: RpcEndpointConfig {
+                                retries: Some(3),
+                                retry_backoff: Some(1000),
+                                compute_units_per_second: Some(1000),
+                            },
+                            auth: None,
+                        })
                     ),
                 ])
                 .resolved(),
@@ -3287,17 +3318,19 @@ mod tests {
                 RpcEndpoints::new([
                     (
                         "optimism",
-                        RpcEndpointType::String(RpcEndpoint::Url(
+                        RpcEndpointType::String(RpcEndpointUrl::Url(
                             "https://example.com/".to_string()
                         ))
                     ),
                     (
                         "mainnet",
-                        RpcEndpointType::Config(RpcEndpointConfig {
-                            endpoint: RpcEndpoint::Env("${_CONFIG_MAINNET}".to_string()),
-                            retries: Some(3),
-                            retry_backoff: Some(1000),
-                            compute_units_per_second: Some(1000),
+                        RpcEndpointType::Config(RpcEndpoint {
+                            endpoint: RpcEndpointUrl::Env("${_CONFIG_MAINNET}".to_string()),
+                            config: RpcEndpointConfig {
+                                retries: Some(3),
+                                retry_backoff: Some(1000),
+                                compute_units_per_second: Some(1000)
+                            },
                             auth: Some(RpcAuth::Env("Bearer ${_CONFIG_AUTH}".to_string())),
                         })
                     ),
@@ -3309,19 +3342,21 @@ mod tests {
                 RpcEndpoints::new([
                     (
                         "optimism",
-                        RpcEndpointType::String(RpcEndpoint::Url(
+                        RpcEndpointType::String(RpcEndpointUrl::Url(
                             "https://example.com/".to_string()
                         ))
                     ),
                     (
                         "mainnet",
-                        RpcEndpointType::Config(RpcEndpointConfig {
-                            endpoint: RpcEndpoint::Url(
+                        RpcEndpointType::Config(RpcEndpoint {
+                            endpoint: RpcEndpointUrl::Url(
                                 "https://eth-mainnet.alchemyapi.io/v2/123455".to_string()
                             ),
-                            retries: Some(3),
-                            retry_backoff: Some(1000),
-                            compute_units_per_second: Some(1000),
+                            config: RpcEndpointConfig {
+                                retries: Some(3),
+                                retry_backoff: Some(1000),
+                                compute_units_per_second: Some(1000)
+                            },
                             auth: Some(RpcAuth::Raw("Bearer 123456".to_string())),
                         })
                     ),
@@ -3367,18 +3402,22 @@ mod tests {
             assert_eq!(
                 endpoints,
                 RpcEndpoints::new([
-                    ("optimism", RpcEndpoint::Url("https://example.com/".to_string())),
+                    ("optimism", RpcEndpointUrl::Url("https://example.com/".to_string())),
                     (
                         "mainnet",
-                        RpcEndpoint::Url("https://eth-mainnet.alchemyapi.io/v2/123455".to_string())
+                        RpcEndpointUrl::Url(
+                            "https://eth-mainnet.alchemyapi.io/v2/123455".to_string()
+                        )
                     ),
                     (
                         "mainnet_2",
-                        RpcEndpoint::Url("https://eth-mainnet.alchemyapi.io/v2/123456".to_string())
+                        RpcEndpointUrl::Url(
+                            "https://eth-mainnet.alchemyapi.io/v2/123456".to_string()
+                        )
                     ),
                     (
                         "mainnet_3",
-                        RpcEndpoint::Url(
+                        RpcEndpointUrl::Url(
                             "https://eth-mainnet.alchemyapi.io/v2/123456/98765".to_string()
                         )
                     ),
@@ -3554,17 +3593,17 @@ mod tests {
                     revert_strings: Some(RevertStrings::Strip),
                     allow_paths: vec![PathBuf::from("allow"), PathBuf::from("paths")],
                     rpc_endpoints: RpcEndpoints::new([
-                        ("optimism", RpcEndpoint::Url("https://example.com/".to_string())),
-                        ("mainnet", RpcEndpoint::Env("${RPC_MAINNET}".to_string())),
+                        ("optimism", RpcEndpointUrl::Url("https://example.com/".to_string())),
+                        ("mainnet", RpcEndpointUrl::Env("${RPC_MAINNET}".to_string())),
                         (
                             "mainnet_2",
-                            RpcEndpoint::Env(
+                            RpcEndpointUrl::Env(
                                 "https://eth-mainnet.alchemyapi.io/v2/${API_KEY}".to_string()
                             )
                         ),
                         (
                             "mainnet_3",
-                            RpcEndpoint::Env(
+                            RpcEndpointUrl::Env(
                                 "https://eth-mainnet.alchemyapi.io/v2/${API_KEY}/${ANOTHER_KEY}"
                                     .to_string()
                             )
@@ -3688,11 +3727,11 @@ mod tests {
             assert_eq!(
                 config.rpc_endpoints,
                 RpcEndpoints::new([
-                    ("optimism", RpcEndpoint::Url("https://example.com/".to_string())),
-                    ("mainnet", RpcEndpoint::Env("${RPC_MAINNET}".to_string())),
+                    ("optimism", RpcEndpointUrl::Url("https://example.com/".to_string())),
+                    ("mainnet", RpcEndpointUrl::Env("${RPC_MAINNET}".to_string())),
                     (
                         "mainnet_2",
-                        RpcEndpoint::Env(
+                        RpcEndpointUrl::Env(
                             "https://eth-mainnet.alchemyapi.io/v2/${API_KEY}".to_string()
                         )
                     ),
