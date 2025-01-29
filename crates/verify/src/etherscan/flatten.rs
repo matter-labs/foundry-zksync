@@ -188,6 +188,7 @@ Diagnostics: {diags}",
             },
             solc_version: solc_version.clone(),
             cli_settings: CliSettings::default(),
+            zksolc_path: zksolc_path.clone(),
         };
 
         let solc_compiler = if compiler_version.is_zksync_solc {
@@ -199,7 +200,7 @@ Diagnostics: {diags}",
             SolcCompiler::Specific(solc)
         };
 
-        let zksolc_compiler = ZkSolcCompiler { zksolc: zksolc_path, solc: solc_compiler };
+        let zksolc_compiler = ZkSolcCompiler { solc: solc_compiler };
 
         let out = zksolc_compiler.compile(&input)?;
         if out.errors.iter().any(|e| e.is_error()) {

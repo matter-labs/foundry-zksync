@@ -25,6 +25,8 @@ pub struct ZkSolcVersionedInput {
     pub solc_version: Version,
     /// zksolc cli settings
     pub cli_settings: solc::CliSettings,
+    /// zksolc binary path
+    pub zksolc_path: PathBuf,
 }
 
 impl CompilerInput for ZkSolcVersionedInput {
@@ -40,10 +42,11 @@ impl CompilerInput for ZkSolcVersionedInput {
         language: Self::Language,
         version: Version,
     ) -> Self {
+        let zksolc_path = settings.zksolc_path();
         let ZkSolcSettings { settings, cli_settings, .. } = settings;
         let input = ZkSolcInput::new(language, sources, settings).sanitized(&version);
 
-        Self { solc_version: version, input, cli_settings }
+        Self { solc_version: version, input, cli_settings, zksolc_path }
     }
 
     fn language(&self) -> Self::Language {

@@ -45,7 +45,7 @@ impl ZkVerificationContext {
         let mut project =
             foundry_config::zksync::config_create_project(&config, config.cache, false)?;
         project.no_artifacts = true;
-        let zksolc_version = ZkSolc::get_version_for_path(&project.compiler.zksolc)?;
+        let zksolc_version = project.settings.zksolc_version_ref();
 
         let (solc_version, is_zksync_solc) = if let Some(solc) = &config.zksync.solc_path {
             let solc_type_and_version = zksolc::get_solc_version_info(solc)?;
@@ -68,7 +68,7 @@ impl ZkVerificationContext {
         };
 
         let compiler_version =
-            ZkVersion { zksolc: zksolc_version, solc: solc_version, is_zksync_solc };
+            ZkVersion { zksolc: zksolc_version.clone(), solc: solc_version, is_zksync_solc };
 
         Ok(Self { config, project, target_name, target_path, compiler_version })
     }

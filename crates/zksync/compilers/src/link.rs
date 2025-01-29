@@ -12,8 +12,6 @@ use alloy_primitives::{
 use foundry_compilers::error::SolcError;
 use serde::{Deserialize, Serialize};
 
-use crate::compilers::zksolc::ZkSolcCompiler;
-
 type LinkId = String;
 
 /// A library that zksolc will link against
@@ -108,12 +106,8 @@ fn map_io_err(zksolc_path: &Path) -> impl FnOnce(std::io::Error) -> SolcError + 
 
 /// Invoke `zksolc link` given the `zksolc` binary and json input to use
 #[tracing::instrument(level = tracing::Level::TRACE, ret)]
-pub fn zksolc_link(
-    zksolc: &ZkSolcCompiler,
-    input: LinkJsonInput,
-) -> Result<LinkJsonOutput, SolcError> {
-    let zksolc = &zksolc.zksolc;
-    let mut cmd = Command::new(zksolc);
+pub fn zksolc_link(zksolc_path: &Path, input: LinkJsonInput) -> Result<LinkJsonOutput, SolcError> {
+    let mut cmd = Command::new(zksolc_path);
 
     cmd.arg("--standard-json")
         .arg("--link")
@@ -121,12 +115,12 @@ pub fn zksolc_link(
         .stderr(Stdio::piped())
         .stdout(Stdio::piped());
 
-    let mut child = cmd.spawn().map_err(map_io_err(zksolc))?;
+    let mut child = cmd.spawn().map_err(map_io_err(zksolc_path))?;
 
     let stdin = child.stdin.as_mut().unwrap();
     let _ = serde_json::to_writer(stdin, &input);
 
-    let output = child.wait_with_output().map_err(map_io_err(zksolc))?;
+    let output = child.wait_with_output().map_err(map_io_err(zksolc_path))?;
     tracing::trace!(?output);
 
     if output.status.success() {

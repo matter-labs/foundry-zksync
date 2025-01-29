@@ -115,7 +115,7 @@ impl ZkSyncConfig {
         evm_version: EvmVersion,
         via_ir: bool,
         offline: bool,
-    ) -> ZkSolcSettings {
+    ) -> Result<ZkSolcSettings, SolcError> {
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
             mode: Some(self.optimizer_mode),
@@ -125,7 +125,7 @@ impl ZkSyncConfig {
             jump_table_density_threshold: None,
         };
 
-        let zk_settings = ZkSettings {
+        let settings = ZkSettings {
             libraries,
             optimizer,
             evm_version: Some(evm_version),
@@ -147,16 +147,22 @@ impl ZkSyncConfig {
             suppressed_errors: self.suppressed_errors.clone(),
         };
 
-        let zksolc_path = get_zksolc_compiler(self.zksolc.as_ref(), offline)
-            .unwrap_or_else(|e| panic!("Could not find zksolc compiler: {e}"));
+        let zksolc_path = if let Some(path) = config_ensure_zksolc(self.zksolc.as_ref(), offline)? {
+            path
+        } else if !offline {
+            let default_version = semver::Version::new(1, 5, 11);
+            let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
+            if zksolc.is_none() {
+                ZkSolc::blocking_install(&default_version)?;
+                zksolc = ZkSolc::find_installed_version(&default_version)?;
+            }
+            zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"))
+        } else {
+            "zksolc".into()
+        };
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
-        ZkSolcSettings {
-            settings: zk_settings,
-            cli_settings: CliSettings::default(),
-            zksolc_version: ZkSolc::get_version_for_path(zksolc_path.as_ref())
-                .unwrap_or_else(|_| panic!("Could not find zksolc version for this path")),
-        }
+        ZkSolcSettings::new_from_path(settings, CliSettings::default(), zksolc_path)
     }
 }
 
@@ -172,26 +178,7 @@ pub fn config_zksolc_settings(config: &Config) -> Result<ZkSolcSettings, SolcErr
         Err(e) => return Err(SolcError::msg(format!("Failed to parse libraries: {e}"))),
     };
 
-    Ok(config.zksync.settings(libraries, config.evm_version, config.via_ir, config.offline))
-}
-
-/// get the configured `zksolc` compiler
-pub fn get_zksolc_compiler(zksolc: Option<&SolcReq>, offline: bool) -> Result<PathBuf, SolcError> {
-    let zksolc = if let Some(zksolc) = config_ensure_zksolc(zksolc, offline)? {
-        zksolc
-    } else if !offline {
-        let default_version = semver::Version::new(1, 5, 11);
-        let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
-        if zksolc.is_none() {
-            ZkSolc::blocking_install(&default_version)?;
-            zksolc = ZkSolc::find_installed_version(&default_version)?;
-        }
-        zksolc.unwrap_or_else(|| panic!("Could not install zksolc v{default_version}"))
-    } else {
-        "zksolc".into()
-    };
-
-    Ok(zksolc)
+    config.zksync.settings(libraries, config.evm_version, config.via_ir, config.offline)
 }
 
 /// Return the configured `zksolc` compiler
@@ -199,10 +186,7 @@ pub fn get_zksolc_compiler(zksolc: Option<&SolcReq>, offline: bool) -> Result<Pa
 /// If not `offline`, will install the default version automatically
 /// Will fallback to `zksolc` present in the environment
 pub fn config_zksolc_compiler(config: &Config) -> Result<ZkSolcCompiler, SolcError> {
-    Ok(ZkSolcCompiler {
-        zksolc: get_zksolc_compiler(config.zksync.zksolc.as_ref(), config.offline)?,
-        solc: config_solc_compiler(config)?,
-    })
+    Ok(ZkSolcCompiler { solc: config_solc_compiler(config)? })
 }
 
 /// Create a new ZKsync project

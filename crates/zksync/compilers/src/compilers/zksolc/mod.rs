@@ -123,17 +123,13 @@ impl ZkSolcOS {
 /// ZkSolc compiler
 #[derive(Debug, Clone)]
 pub struct ZkSolcCompiler {
-    /// zksolc path
-    pub zksolc: PathBuf,
     /// solc compiler to use along zksolc
     pub solc: SolcCompiler,
 }
 
 impl Default for ZkSolcCompiler {
     fn default() -> Self {
-        let zksolc =
-            ZkSolc::get_path_for_version(&ZKSOLC_VERSION).expect("Could not install zksolc");
-        Self { zksolc, solc: Default::default() }
+        Self { solc: Default::default() }
     }
 }
 
@@ -237,18 +233,13 @@ impl ZkSolcCompiler {
             }
         };
 
-        let mut zksolc = ZkSolc::new(self.zksolc.clone(), solc)?;
+        let mut zksolc = ZkSolc::new(input.zksolc_path.clone(), solc)?;
 
         zksolc.base_path.clone_from(&input.cli_settings.base_path);
         zksolc.allow_paths.clone_from(&input.cli_settings.allow_paths);
         zksolc.include_paths.clone_from(&input.cli_settings.include_paths);
 
         Ok(zksolc)
-    }
-
-    /// Retrieve the version of the specified `zksolc`
-    pub fn version(&self) -> Result<Version> {
-        ZkSolc::get_version_for_path(self.zksolc.as_ref())
     }
 }
 
