@@ -16,7 +16,7 @@ ignore = [
     "RUSTSEC-2024-0388",
     # Used by era-test-node
     # net2 is unmaintained
-    "RUSTSEC-2020-0016"
+    "RUSTSEC-2020-0016",
 ]
 
 # This section is considered when running `cargo deny check bans`.
@@ -111,6 +111,8 @@ allow-git = [
     "https://github.com/paradigmxyz/revm-inspectors",
     "https://github.com/bluealloy/revm",
     "https://github.com/RustCrypto/hashes",
+    "https://github.com/popzxc/alloy-zksync",
+    "https://github.com/nbaztec/proptest",
 ]
 
 [sources.allow-org]

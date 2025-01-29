@@ -2,6 +2,8 @@
 
 Update or revert to a specific Foundry-zksync branch with ease.
 
+`foundryup` supports installing and managing multiple versions.
+
 ## Installing
 
 <!-- TODO: update to reference curl link once available -->
@@ -18,7 +20,7 @@ To install the **nightly** version:
 foundryup-zksync
 ```
 
-To install a specific **version** (in this case the `nightly` version):
+To **install** a specific **version** (in this case the `nightly` version):
 
 ```sh
 foundryup-zksync --version nightly
@@ -64,6 +66,6 @@ foundryup-zksync --path ./git/foundry
 
 ---
 
-**Tip**: All flags have a single character shorthand equivalent! You can use `-v` instead of `--version`, etc.
+**Tip**: All flags have a single character shorthand equivalent! You can use `-i` instead of `--install`, etc.
 
 ---
