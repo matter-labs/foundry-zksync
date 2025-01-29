@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.5](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.4...foundry-zksync-v0.0.5) (2025-01-29)
+
+
+### Features
+
+* add assemblycreate for warning suppression for zksolc 1.5.10 ([#840](https://github.com/matter-labs/foundry-zksync/issues/840)) ([62af6f9](https://github.com/matter-labs/foundry-zksync/commit/62af6f93260e470ae77501cfdcab27e94e9424de))
+* Cache invalidation on zksolc version change ([#871](https://github.com/matter-labs/foundry-zksync/issues/871)) ([60a8f35](https://github.com/matter-labs/foundry-zksync/commit/60a8f35202d23064e589b3334be331fc42e31993))
+* Upstream 5e72c69 ([#876](https://github.com/matter-labs/foundry-zksync/issues/876)) ([7b50143](https://github.com/matter-labs/foundry-zksync/commit/7b5014354a71a58e5a8e1326abe375ad0be988b4))
+* **zk:** zksolc linking ([#800](https://github.com/matter-labs/foundry-zksync/issues/800)) ([b69695a](https://github.com/matter-labs/foundry-zksync/commit/b69695a020ba4d2850e069e7a0d53a03c5d92ac2))
+
+
+### Bug Fixes
+
+* add proper filter sets for ci test runs ([#875](https://github.com/matter-labs/foundry-zksync/issues/875)) ([886ff8b](https://github.com/matter-labs/foundry-zksync/commit/886ff8b4e4e3b466665f0236f30fb32bc6af1c2b))
+* release artifact names and tags ([#866](https://github.com/matter-labs/foundry-zksync/issues/866)) ([b993907](https://github.com/matter-labs/foundry-zksync/commit/b993907c8c4873bdc720d7a942e0ae70466ed1be))
+* Remove wrong estimation in create for zksync transactions ([#864](https://github.com/matter-labs/foundry-zksync/issues/864)) ([cf0a88d](https://github.com/matter-labs/foundry-zksync/commit/cf0a88d18218471dcf13d62afa4f8fe5335d9740))
+* set log level for nonce revert to trace ([#873](https://github.com/matter-labs/foundry-zksync/issues/873)) ([a9289fb](https://github.com/matter-labs/foundry-zksync/commit/a9289fbb04b528a30d42d3daac5e62f250b04dc7))
+
 ## [0.0.4](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.3...foundry-zksync-v0.0.4) (2025-01-23)
 
 
