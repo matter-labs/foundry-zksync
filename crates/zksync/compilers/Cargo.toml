@@ -37,5 +37,4 @@ similar-asserts.workspace = true
 fd-lock = "4.0.2"
 tempfile.workspace = true
 foundry-test-utils.workspace = true
-regex = { workspace = true, default-features = false }
 
