@@ -121,16 +121,10 @@ impl ZkSolcOS {
 }
 
 /// ZkSolc compiler
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ZkSolcCompiler {
     /// solc compiler to use along zksolc
     pub solc: SolcCompiler,
-}
-
-impl Default for ZkSolcCompiler {
-    fn default() -> Self {
-        Self { solc: Default::default() }
-    }
 }
 
 impl Compiler for ZkSolcCompiler {

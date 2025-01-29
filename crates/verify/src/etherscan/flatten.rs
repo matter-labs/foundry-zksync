@@ -188,7 +188,7 @@ Diagnostics: {diags}",
             },
             solc_version: solc_version.clone(),
             cli_settings: CliSettings::default(),
-            zksolc_path: zksolc_path.clone(),
+            zksolc_path,
         };
 
         let solc_compiler = if compiler_version.is_zksync_solc {
