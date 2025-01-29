@@ -181,14 +181,6 @@ pub fn config_zksolc_settings(config: &Config) -> Result<ZkSolcSettings, SolcErr
     config.zksync.settings(libraries, config.evm_version, config.via_ir, config.offline)
 }
 
-/// Return the configured `zksolc` compiler
-///
-/// If not `offline`, will install the default version automatically
-/// Will fallback to `zksolc` present in the environment
-pub fn config_zksolc_compiler(config: &Config) -> Result<ZkSolcCompiler, SolcError> {
-    Ok(ZkSolcCompiler { solc: config_solc_compiler(config)? })
-}
-
 /// Create a new ZKsync project
 pub fn config_create_project(
     config: &Config,
@@ -216,7 +208,7 @@ pub fn config_create_project(
         builder = builder.sparse_output(filter);
     }
 
-    let zksolc_compiler = config_zksolc_compiler(config)?;
+    let zksolc_compiler = ZkSolcCompiler { solc: config_solc_compiler(config)? };
 
     let project = builder.build(zksolc_compiler)?;
 

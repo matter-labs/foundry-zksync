@@ -132,16 +132,6 @@ impl ZkSolcSettings {
         Ok(Self { settings, cli_settings, zksolc_path, zksolc_version })
     }
 
-    /// Initialize settings for a given zksolc version
-    pub fn new_from_version(
-        settings: ZkSettings,
-        cli_settings: solc::CliSettings,
-        zksolc_version: Version,
-    ) -> Result<Self> {
-        let zksolc_path = ZkSolc::get_path_for_version(&zksolc_version)?;
-        Ok(Self { settings, cli_settings, zksolc_path, zksolc_version })
-    }
-
     /// Get zksolc path
     pub fn zksolc_path(&self) -> PathBuf {
         self.zksolc_path.clone()
