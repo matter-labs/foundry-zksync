@@ -157,11 +157,9 @@ pub fn fuzz_param_from_state(
                     let mut fuzzed_addr = Address::from_word(value);
                     if !deployed_libs.contains(&fuzzed_addr) {
                         if no_zksync_reserved_addresses {
-                            Some(DynSolValue::Address(foundry_zksync_core::to_safe_address(
-                                fuzzed_addr,
-                            )))
+                            DynSolValue::Address(foundry_zksync_core::to_safe_address(fuzzed_addr))
                         } else {
-                            Some(DynSolValue::Address(fuzzed_addr))
+                            DynSolValue::Address(fuzzed_addr)
                         }
                     } else {
                         let mut rng = StdRng::seed_from_u64(0x1337); // use deterministic rng

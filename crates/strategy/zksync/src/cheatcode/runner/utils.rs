@@ -98,8 +98,8 @@ pub(super) fn get_artifact_code(
                         .or_else(|| {
                             // If we know the current script/test contract solc version, try to
                             // filter by it
-                            config.running_version.as_ref().and_then(|version| {
-                                filtered.iter().find(|(id, _)| id.version == *version)
+                            config.running_artifact.as_ref().and_then(|artifact| {
+                                filtered.iter().find(|(id, _)| id.version == artifact.version)
                             })
                         })
                         .ok_or_else(|| Error::display("multiple matching artifacts found"))

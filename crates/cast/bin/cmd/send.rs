@@ -23,7 +23,6 @@ use foundry_cli::{
     utils::LoadConfig,
 };
 use foundry_common::ens::NameOrAddress;
-use foundry_config::Config;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 /// ZkSync-specific paymaster parameters for transactions
@@ -148,7 +147,7 @@ impl SendTxArgs {
         let mut config = eth.load_config()?;
         config.zksync.startup = zksync_params.zksync;
         config.zksync.compile = zksync_params.zksync;
-        
+
         let provider = utils::get_provider(&config)?;
         let zk_provider = utils::get_provider_zksync(&config)?;
 

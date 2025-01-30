@@ -131,7 +131,7 @@ pub struct ZkSyncData {
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> Result<()> {
-        let mut config = self.try_load_config_emit_warnings()?;
+        let mut config = self.load_config()?;
         let timeout = config.transaction_timeout;
         // Install missing dependencies.
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
@@ -165,7 +165,7 @@ impl CreateArgs {
                 project.find_contract_path(&self.contract.name)?
             };
 
-            let config = self.build.try_load_config_emit_warnings()?;
+            let config = self.load_config()?;
             let zk_project =
                 foundry_config::zksync::config_create_project(&config, config.cache, false)?;
             let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
@@ -200,7 +200,7 @@ impl CreateArgs {
             };
 
             // Add arguments to constructor
-            let config = self.eth.try_load_config_emit_warnings()?;
+            let config = self.eth.load_config()?;
             let provider = utils::get_provider_zksync(&config)?;
             let params = match abi.constructor {
                 Some(ref v) => {

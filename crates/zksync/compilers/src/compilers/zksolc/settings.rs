@@ -2,11 +2,12 @@
 use crate::artifacts::output_selection::OutputSelection as ZkOutputSelection;
 use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_compilers::{
-    artifacts::{serde_helpers, EvmVersion, Libraries},
+    artifacts::{
+        output_selection::OutputSelection, serde_helpers, EvmVersion, Libraries, Remapping,
+    },
     compilers::CompilerSettings,
     solc, CompilerSettingsRestrictions,
 };
-use foundry_compilers_artifacts_solc::{output_selection::OutputSelection, remappings::Remapping};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{

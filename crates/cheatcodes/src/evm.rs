@@ -12,9 +12,8 @@ use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
 use foundry_common::fs::{read_json_file, write_json_file};
 use foundry_evm_core::{
-    abi::HARDHAT_CONSOLE_ADDRESS,
     backend::{DatabaseExt, RevertStateSnapshotAction},
-    constants::{CALLER, CHEATCODE_ADDRESS, TEST_CONTRACT_ADDRESS},
+    constants::{CALLER, CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, TEST_CONTRACT_ADDRESS},
 };
 use foundry_evm_traces::StackSnapshotType;
 use rand::Rng;
