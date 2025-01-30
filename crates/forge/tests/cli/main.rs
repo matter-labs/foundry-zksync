@@ -26,6 +26,7 @@ mod svm;
 mod test_cmd;
 mod verify;
 mod verify_bytecode;
+mod version;
 
 mod ext_integration;
 mod zk_build;

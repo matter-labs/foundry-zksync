@@ -28,16 +28,6 @@ foundry_config::merge_impl_figment_convert!(BuildArgs, build);
 /// In order to override them in the foundry `Config` they need to be merged into an existing
 /// `figment::Provider`, like `foundry_config::Config` is.
 ///
-/// # Example
-///
-/// ```
-/// use foundry_cli::cmd::forge::build::BuildArgs;
-/// use foundry_config::Config;
-/// # fn t(args: BuildArgs) {
-/// let config = Config::from(&args);
-/// # }
-/// ```
-///
 /// `BuildArgs` implements `figment::Provider` in which all config related fields are serialized and
 /// then merged into an existing `Config`, effectively overwriting them.
 ///
@@ -83,7 +73,7 @@ impl BuildArgs {
 
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
             // need to re-configure here to also catch additional remappings
-            config = self.load_config();
+            config = self.load_config()?;
         }
 
         if !config.zksync.should_compile() {
@@ -179,9 +169,9 @@ impl BuildArgs {
         // Use the path arguments or if none where provided the `src`, `test` and `script`
         // directories as well as the `foundry.toml` configuration file.
         self.watch.watchexec_config(|| {
-            let config = Config::from(self);
+            let config = self.load_config()?;
             let foundry_toml: PathBuf = config.root.join(Config::FILE_NAME);
-            [config.src, config.test, config.script, foundry_toml]
+            Ok([config.src, config.test, config.script, foundry_toml])
         })
     }
 }

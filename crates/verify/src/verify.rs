@@ -28,7 +28,7 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, Parser)]
 pub struct VerifierArgs {
     /// The contract verification provider to use.
-    #[arg(long, help_heading = "Verifier options", default_value = "etherscan", value_enum)]
+    #[arg(long, help_heading = "Verifier options", default_value = "sourcify", value_enum)]
     pub verifier: VerificationProviderType,
 
     /// The verifier API KEY, if using a custom provider.
@@ -43,7 +43,7 @@ pub struct VerifierArgs {
 impl Default for VerifierArgs {
     fn default() -> Self {
         Self {
-            verifier: VerificationProviderType::Etherscan,
+            verifier: VerificationProviderType::Sourcify,
             verifier_api_key: None,
             verifier_url: None,
         }
@@ -190,7 +190,7 @@ impl figment::Provider for VerifyArgs {
 impl VerifyArgs {
     /// Run the verify command to submit the contract's source code for verification on etherscan
     pub async fn run(mut self) -> Result<()> {
-        let config = self.load_config_emit_warnings();
+        let config = self.load_config()?;
 
         if self.guess_constructor_args && config.get_rpc_url().is_none() {
             eyre::bail!(
@@ -269,7 +269,7 @@ impl VerifyArgs {
     /// Resolves [VerificationContext] object either from entered contract name or by trying to
     /// match bytecode located at given address.
     pub async fn resolve_context(&self) -> Result<VerificationContext> {
-        let mut config = self.load_config_emit_warnings();
+        let mut config = self.load_config()?;
         config.libraries.extend(self.libraries.clone());
 
         let project = config.project()?;

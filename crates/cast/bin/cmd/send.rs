@@ -20,6 +20,7 @@ use eyre::Result;
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
     utils,
+    utils::LoadConfig,
 };
 use foundry_common::ens::NameOrAddress;
 use foundry_config::Config;
@@ -144,10 +145,10 @@ impl SendTxArgs {
             None
         };
 
-        let mut config = Config::from(&eth);
+        let mut config = eth.load_config()?;
         config.zksync.startup = zksync_params.zksync;
         config.zksync.compile = zksync_params.zksync;
-
+        
         let provider = utils::get_provider(&config)?;
         let zk_provider = utils::get_provider_zksync(&config)?;
 

@@ -121,7 +121,7 @@ impl VerifyBytecodeArgs {
     /// bytecode.
     pub async fn run(mut self) -> Result<()> {
         // Setup
-        let config = self.load_config_emit_warnings();
+        let config = self.load_config()?;
         let provider = utils::get_provider(&config)?;
         let strategy = utils::get_executor_strategy(&config);
 

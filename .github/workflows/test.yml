@@ -17,6 +17,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   TARGET_RUST_VERSION: "stable"
+  RUST_BACKTRACE: full
 
 jobs:
   nextest:

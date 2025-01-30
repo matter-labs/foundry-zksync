@@ -358,8 +358,7 @@ impl TestRunnerConfig {
             &self.config,
             self.evm_opts.clone(),
             Some(known_contracts),
-            Some(artifact_id.name.clone()),
-            Some(artifact_id.version.clone()),
+            Some(artifact_id.clone()),
             strategy.runner.new_cheatcode_inspector_strategy(strategy.context.as_ref()),
         ));
 
