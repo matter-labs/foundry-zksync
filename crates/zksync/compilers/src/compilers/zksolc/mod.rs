@@ -438,7 +438,7 @@ impl ZkSolc {
     pub fn solc_available_versions() -> Vec<Version> {
         let mut ret = vec![];
         let version_ranges =
-            vec![(1, 4, 12..=26), (1, 5, 0..=17), (1, 6, 0..=12), (1, 7, 0..=6), (1, 8, 0..=28)];
+            vec![(0, 4, 12..=26), (0, 5, 0..=17), (0, 6, 0..=12), (0, 7, 0..=6), (0, 8, 0..=28)];
         for (major, minor, patch_range) in version_ranges {
             for patch in patch_range {
                 ret.push(Version::new(major, minor, patch));
