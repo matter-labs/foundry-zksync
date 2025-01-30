@@ -38,6 +38,9 @@ pub use settings::{ZkSettings, ZkSolcSettings};
 /// ZKsync solc release used for all ZKsync solc versions
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
 
+/// Get zksolc versions that are specifically not supported
+pub const ZKSOLC_UNSUPPORTED_VERSIONS: [Version; 1] = [Version::new(1, 5, 9)];
+
 #[cfg(test)]
 macro_rules! take_solc_installer_lock {
     ($lock:ident) => {
@@ -411,7 +414,10 @@ impl ZkSolc {
 
         for (major, minor, patch_range) in version_ranges {
             for patch in patch_range {
-                ret.push(Version::new(major, minor, patch));
+                let v = Version::new(major, minor, patch);
+                if !ZKSOLC_UNSUPPORTED_VERSIONS.contains(&v) {
+                    ret.push(v);
+                }
             }
         }
 
@@ -573,18 +579,6 @@ impl ZkSolc {
 
     /// Get path for installed zksolc version. Returns `Ok(None)` if not installed
     pub fn find_installed_version(version: &Version) -> Result<Option<PathBuf>> {
-        let min_supported_version = Self::zksolc_minimum_supported_version();
-        let latest_supported_version = Self::zksolc_latest_supported_version();
-        if *version < min_supported_version {
-            return Err(SolcError::msg(format!(
-                "Specifying zksolc v{version} not supported. Minimum version supported is v{min_supported_version}"
-            )));
-        }
-        if *version > latest_supported_version {
-            return Err(SolcError::msg(format!(
-                "Specifying zksolc v{version} not supported. Latest version supported is v{latest_supported_version}"
-            )));
-        }
         let zksolc = Self::compiler_path(version)?;
 
         if !zksolc.is_file() {
