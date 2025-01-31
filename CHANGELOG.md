@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.7](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.6...foundry-zksync-v0.0.7) (2025-01-31)
+
+
+### Bug Fixes
+
+* fix installation script for v0.0.6 ([#887](https://github.com/matter-labs/foundry-zksync/issues/887)) ([296c8f3](https://github.com/matter-labs/foundry-zksync/commit/296c8f3b14d7fe28ef6ed64592568cfed005e422))
+* foundry man artifact name ([#886](https://github.com/matter-labs/foundry-zksync/issues/886)) ([62d5ff6](https://github.com/matter-labs/foundry-zksync/commit/62d5ff66cae2af74f4fad8524337a33394ae8437))
+
 ## [0.0.6](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.5...foundry-zksync-v0.0.6) (2025-01-31)
 
 
