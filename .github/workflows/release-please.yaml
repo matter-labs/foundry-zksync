@@ -37,6 +37,5 @@ jobs:
     needs: release-please
     uses: ./.github/workflows/release.yml
     with:
-      tag: "foundry-zksync-v0.0.5"
-      # tag: ${{ needs.release-please.outputs.tag_name }}
+      tag: ${{ needs.release-please.outputs.tag_name }}
     secrets: inherit
