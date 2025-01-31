@@ -237,6 +237,8 @@ alloy-trie = "0.7.0"
 
 ## op-alloy
 op-alloy-rpc-types = "0.9.0"
+## Note(zk): Foundry upstream change to maili-consensus but we need to keep
+## it for zksync for now until era-solc updates the pinned version of serde
 op-alloy-consensus = "0.9.0"
 
 ## cli
