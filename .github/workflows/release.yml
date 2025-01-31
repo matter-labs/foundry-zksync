@@ -12,11 +12,6 @@ on:
         type: string
         required: true
         default: ""
-      version:
-        description: "Version for the release."
-        type: string
-        required: true
-        default: ""
 
 env:
   CARGO_TERM_COLOR: always
@@ -43,21 +38,31 @@ jobs:
         id: release_info
         run: |
           echo "nightly: $IS_NIGHTLY"
-          if [ $IS_NIGHTLY == "true" ]; then
-            TAG="${{ inputs.tag || format('nightly-{0}', github.sha) }}"
-            VERSION="${{ inputs.version || 'nightly' }}"
+          if [ $IS_NIGHTLY == "true" ]; then 
+            if [ "${{inputs.tag}}" ]; then
+              TAG="${{ inputs.tag }}"
+              VERSION="${TAG#foundry-zksync-}"
+            else
+              TAG="${{ format('nightly-{0}', github.sha) }}"
+              VERSION=nightly
+            fi
             
             echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
             echo "version_name=${VERSION}" >> $GITHUB_OUTPUT
             echo "release_name=foundry-zksync Nightly ($(date '+%Y-%m-%d'))" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
           else
-            TAG="${{ inputs.tag || format('stable-{0}', github.sha) }}"
-            VERSION="${{ inputs.version || 'stable' }}"
+            if [ "${{inputs.tag}}" ]; then
+              TAG="${{ inputs.tag }}"
+              VERSION="${TAG#foundry-zksync-}"
+            else
+              TAG="${{ format('stable-{0}', github.sha) }}"
+              VERSION=stable
+            fi
 
             echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
-            echo "version_name=v${VERSION}" >> $GITHUB_OUTPUT
-            echo "release_name=foundry-zksync v${VERSION}" >> $GITHUB_OUTPUT
+            echo "version_name=${VERSION}" >> $GITHUB_OUTPUT
+            echo "release_name=foundry-zksync ${VERSION}" >> $GITHUB_OUTPUT
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
           
@@ -210,8 +215,8 @@ jobs:
           help2man -N ./target/${TARGET}/release/cast > cast.1
           gzip forge.1
           gzip cast.1
-          tar -czvf "foundry_man_${VERSION_NAME}.tar.gz" forge.1.gz cast.1.gz
-          echo "foundry_man=foundry_man_${VERSION_NAME}.tar.gz" >> $GITHUB_OUTPUT
+          tar -czvf "foundry_zksync_man_${VERSION_NAME}.tar.gz" forge.1.gz cast.1.gz
+          echo "foundry_man=foundry_zksync_man_${VERSION_NAME}.tar.gz" >> $GITHUB_OUTPUT
 
       # Creates the release for this specific version
       - name: Create release

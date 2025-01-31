@@ -157,7 +157,7 @@ no_storage_caching = false
 # Whether to store the referenced sources in the metadata as literal data.
 use_literal_content = false
 # use ipfs method to generate the metadata hash, solc's default.
-# To not include the metadata hash, to allow for deterministic code: https://docs.soliditylang.org/en/latest/metadata.html, use "none"
+# To not include the metadata hash, to allow for deterministic code: https://docs.soliditylang.org/en/latest/metadata.html, use "none" (evm compilation only, field will be ignored for zksync)
 bytecode_hash = "ipfs"
 # Whether to append the CBOR-encoded metadata file.
 cbor_metadata = true
@@ -228,11 +228,12 @@ The `zksync` settings must be prefixed with the profile they correspond to:
 compile = false 
 # Enable zkVM at startup, needs `compile = true` to have effect
 startup = true
-# By default the latest version is used
+# By default the latest supported version is used
 zksolc = "1.5.0" 
 # By default the corresponding solc patched version from matter-labs is used
 solc_path = "./solc-0.8.23-1.0.1"
-bytecode_hash = "none" 
+# By default, no value is passed and the default for the compiler (keccak256) will be used
+hash_type = "none"
 # Allow compiler to use mode 'z' if contracts won't fit in the EraVM bytecode 
 # size limitations
 fallback_oz = false 

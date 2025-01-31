@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.0.7](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.6...foundry-zksync-v0.0.7) (2025-01-31)
+
+
+### Bug Fixes
+
+* fix installation script for v0.0.6 ([#887](https://github.com/matter-labs/foundry-zksync/issues/887)) ([296c8f3](https://github.com/matter-labs/foundry-zksync/commit/296c8f3b14d7fe28ef6ed64592568cfed005e422))
+* foundry man artifact name ([#886](https://github.com/matter-labs/foundry-zksync/issues/886)) ([62d5ff6](https://github.com/matter-labs/foundry-zksync/commit/62d5ff66cae2af74f4fad8524337a33394ae8437))
+
+## [0.0.6](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.5...foundry-zksync-v0.0.6) (2025-01-31)
+
+
+### Features
+
+* implement compiler backwards compatibility policy ([#843](https://github.com/matter-labs/foundry-zksync/issues/843)) ([469b770](https://github.com/matter-labs/foundry-zksync/commit/469b7700404178060e6ee135ab967d723851bfa2))
+
+
+### Bug Fixes
+
+* trim tag name to obtain version ([#885](https://github.com/matter-labs/foundry-zksync/issues/885)) ([113501c](https://github.com/matter-labs/foundry-zksync/commit/113501c28a53e95393e20f1ab37df8848b472b95))
+
+## [0.0.5](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.4...foundry-zksync-v0.0.5) (2025-01-29)
+
+
+### Features
+
+* add assemblycreate for warning suppression for zksolc 1.5.10 ([#840](https://github.com/matter-labs/foundry-zksync/issues/840)) ([62af6f9](https://github.com/matter-labs/foundry-zksync/commit/62af6f93260e470ae77501cfdcab27e94e9424de))
+* Cache invalidation on zksolc version change ([#871](https://github.com/matter-labs/foundry-zksync/issues/871)) ([60a8f35](https://github.com/matter-labs/foundry-zksync/commit/60a8f35202d23064e589b3334be331fc42e31993))
+* Upstream 5e72c69 ([#876](https://github.com/matter-labs/foundry-zksync/issues/876)) ([7b50143](https://github.com/matter-labs/foundry-zksync/commit/7b5014354a71a58e5a8e1326abe375ad0be988b4))
+* **zk:** zksolc linking ([#800](https://github.com/matter-labs/foundry-zksync/issues/800)) ([b69695a](https://github.com/matter-labs/foundry-zksync/commit/b69695a020ba4d2850e069e7a0d53a03c5d92ac2))
+
+
+### Bug Fixes
+
+* add proper filter sets for ci test runs ([#875](https://github.com/matter-labs/foundry-zksync/issues/875)) ([886ff8b](https://github.com/matter-labs/foundry-zksync/commit/886ff8b4e4e3b466665f0236f30fb32bc6af1c2b))
+* release artifact names and tags ([#866](https://github.com/matter-labs/foundry-zksync/issues/866)) ([b993907](https://github.com/matter-labs/foundry-zksync/commit/b993907c8c4873bdc720d7a942e0ae70466ed1be))
+* Remove wrong estimation in create for zksync transactions ([#864](https://github.com/matter-labs/foundry-zksync/issues/864)) ([cf0a88d](https://github.com/matter-labs/foundry-zksync/commit/cf0a88d18218471dcf13d62afa4f8fe5335d9740))
+* set log level for nonce revert to trace ([#873](https://github.com/matter-labs/foundry-zksync/issues/873)) ([a9289fb](https://github.com/matter-labs/foundry-zksync/commit/a9289fbb04b528a30d42d3daac5e62f250b04dc7))
+
 ## [0.0.4](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.3...foundry-zksync-v0.0.4) (2025-01-23)
 
 

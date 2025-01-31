@@ -19,7 +19,6 @@ use foundry_compilers::{
     solc::SolcSettings,
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
-
 use num_format::{Locale, ToFormattedString};
 
 use std::{
