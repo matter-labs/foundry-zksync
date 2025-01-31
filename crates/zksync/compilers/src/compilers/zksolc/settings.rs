@@ -17,7 +17,7 @@ use std::{
     str::FromStr,
 };
 
-use super::{ZkSolc, ZKSOLC_VERSION};
+use super::ZkSolc;
 ///
 /// The Solidity compiler codegen.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -43,8 +43,6 @@ pub struct ZkSettings {
     /// The Solidity codegen.
     #[serde(default)]
     pub codegen: Codegen,
-    // TODO: era-compiler-solidity uses a BTreeSet of strings. In theory the serialization
-    // should be the same but maybe we should double check
     /// Solidity remappings
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remappings: Vec<Remapping>,
@@ -110,12 +108,13 @@ pub struct ZkSolcSettings {
 
 impl Default for ZkSolcSettings {
     fn default() -> Self {
-        let zksolc_path = ZkSolc::get_path_for_version(&ZKSOLC_VERSION)
+        let version = ZkSolc::zksolc_latest_supported_version();
+        let zksolc_path = ZkSolc::get_path_for_version(&version)
             .expect("failed getting default zksolc version path");
         Self {
             settings: Default::default(),
             cli_settings: Default::default(),
-            zksolc_version: ZKSOLC_VERSION,
+            zksolc_version: version,
             zksolc_path,
         }
     }
@@ -400,29 +399,37 @@ impl OptimizerDetails {
 
 /// Settings metadata
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SettingsMetadata {
     /// Use the given hash method for the metadata hash that is appended to the bytecode.
     /// The metadata hash can be removed from the bytecode via option "none".
-    /// `zksolc` only supports keccak256
     #[serde(
         default,
-        rename = "bytecodeHash",
         skip_serializing_if = "Option::is_none",
         with = "serde_helpers::display_from_str_opt"
     )]
-    pub bytecode_hash: Option<BytecodeHash>,
+    pub hash_type: Option<BytecodeHash>,
+    /// hash_type field name for zksolc v1.5.6 and older
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "serde_helpers::display_from_str_opt"
+    )]
+    bytecode_hash: Option<BytecodeHash>,
 }
 
 impl SettingsMetadata {
-    /// New SettingsMetadata
-    pub fn new(hash: BytecodeHash) -> Self {
-        Self { bytecode_hash: Some(hash) }
+    /// Creates new SettingsMettadata
+    pub fn new(hash_type: Option<BytecodeHash>) -> Self {
+        Self { hash_type, bytecode_hash: None }
     }
-}
 
-impl From<BytecodeHash> for SettingsMetadata {
-    fn from(hash: BytecodeHash) -> Self {
-        Self { bytecode_hash: Some(hash) }
+    /// Makes SettingsMettadata version compatible
+    pub fn sanitize(&mut self, zksolc_version: &Version) {
+        // zksolc <= 1.5.6 uses "bytecode_hash" field for "hash_type"
+        if zksolc_version <= &Version::new(1, 5, 6) {
+            self.bytecode_hash = self.hash_type.take();
+        }
     }
 }
 
@@ -437,6 +444,9 @@ pub enum BytecodeHash {
     /// The default keccak256 hash.
     #[serde(rename = "keccak256")]
     Keccak256,
+    /// The `ipfs` hash.
+    #[serde(rename = "ipfs")]
+    Ipfs,
 }
 
 impl FromStr for BytecodeHash {
@@ -445,6 +455,7 @@ impl FromStr for BytecodeHash {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "none" => Ok(Self::None),
+            "ipfs" => Ok(Self::Ipfs),
             "keccak256" => Ok(Self::Keccak256),
             s => Err(format!("Unknown bytecode hash: {s}")),
         }
@@ -455,6 +466,7 @@ impl fmt::Display for BytecodeHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             Self::Keccak256 => "keccak256",
+            Self::Ipfs => "ipfs",
             Self::None => "none",
         };
         f.write_str(s)

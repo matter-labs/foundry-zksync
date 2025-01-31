@@ -46,7 +46,11 @@ pub struct ZkSyncConfig {
     /// solc path to use along the zksolc compiler
     pub solc_path: Option<PathBuf>,
 
-    /// Whether to include the metadata hash for zksolc compiled bytecode.
+    /// Hash type for the the metadata hash appended by zksolc to the compiled bytecode.
+    pub hash_type: Option<BytecodeHash>,
+
+    /// Hash type for the the metadata hash appended by zksolc to the compiled bytecode.
+    /// Deprecated in favor of `hash_type`
     pub bytecode_hash: Option<BytecodeHash>,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
@@ -83,6 +87,7 @@ impl Default for ZkSyncConfig {
             startup: false,
             zksolc: Default::default(),
             solc_path: Default::default(),
+            hash_type: Default::default(),
             bytecode_hash: Default::default(),
             fallback_oz: Default::default(),
             enable_eravm_extensions: Default::default(),
@@ -129,7 +134,7 @@ impl ZkSyncConfig {
             libraries,
             optimizer,
             evm_version: Some(evm_version),
-            metadata: Some(SettingsMetadata { bytecode_hash: self.bytecode_hash }),
+            metadata: Some(SettingsMetadata::new(self.hash_type.or(self.bytecode_hash))),
             via_ir: Some(via_ir),
             // Set in project paths.
             remappings: Vec::new(),

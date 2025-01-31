@@ -16,7 +16,11 @@ use foundry_zksync_compilers::{
     artifacts::{contract::Contract, error::Error},
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
-        zksolc::{input::ZkSolcInput, ZkSolcCompiler, ZkSolcSettings, ZKSOLC_VERSION},
+        zksolc::{
+            input::ZkSolcInput,
+            settings::{BytecodeHash, SettingsMetadata},
+            ZkSolc, ZkSolcCompiler, ZkSolcSettings,
+        },
     },
 };
 use semver::Version;
@@ -50,6 +54,77 @@ fn zksync_can_compile_dapp_sample() {
 
     let updated_cache = CompilerCache::<ZkSolcSettings>::read(project.cache_path()).unwrap();
     assert_eq!(cache, updated_cache);
+}
+
+#[test]
+fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
+    for version in ZkSolc::zksolc_supported_versions() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data/dapp-sample");
+        let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
+        let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::new(paths).unwrap();
+        project.project_mut().settings.set_zksolc_version(version.clone()).unwrap();
+
+        let compiled = project.compile().unwrap();
+        compiled.assert_success();
+        assert_eq!(compiled.compiled_artifacts().len(), 3, "zksolc {version}");
+        for (n, c) in compiled.artifacts() {
+            assert!(
+                c.bytecode
+                    .as_ref()
+                    .unwrap_or_else(|| panic!(
+                        "zksolc {version}: {n} artifact bytecode field should not be empty"
+                    ))
+                    .object()
+                    .bytes_len() >
+                    0,
+                "zksolc {version}",
+            );
+        }
+    }
+}
+
+#[test]
+fn zksync_can_set_hash_type_with_supported_versions() {
+    for version in ZkSolc::zksolc_supported_versions() {
+        let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+        project.project_mut().settings.set_zksolc_version(version.clone()).unwrap();
+        project.project_mut().settings.settings.metadata =
+            Some(SettingsMetadata::new(Some(BytecodeHash::None)));
+
+        project
+            .add_source(
+                "Contract",
+                r#"
+            // SPDX-License-Identifier: MIT OR Apache-2.0
+            pragma solidity ^0.8.10;
+            contract Contract {
+                function call() public {}
+            }
+            "#,
+            )
+            .unwrap();
+
+        let compiled = project.compile().unwrap();
+        compiled.assert_success();
+        let contract_none = compiled.find_first("Contract").unwrap();
+        let bytecode_none =
+            contract_none.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
+
+        project.project_mut().settings.settings.metadata =
+            Some(SettingsMetadata::new(Some(BytecodeHash::Keccak256)));
+
+        let compiled = project.compile().unwrap();
+        compiled.assert_success();
+        let contract_keccak = compiled.find_first("Contract").unwrap();
+        let bytecode_keccak =
+            contract_keccak.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
+        // NOTE: "none" value seems to pad 32 bytes of 0s at the end in this particular case
+        assert_eq!(bytecode_none.len(), bytecode_keccak.len(), "zksolc {version}");
+        assert_ne!(bytecode_none, bytecode_keccak, "zksolc {version}");
+
+        let end = bytecode_keccak.len() - 32;
+        assert_eq!(bytecode_none.slice(..end), bytecode_keccak.slice(..end), "zksolc {version}");
+    }
 }
 
 fn test_zksync_can_compile_contract_with_suppressed_errors(zksolc_version: Version) {
@@ -92,7 +167,9 @@ fn test_zksync_can_compile_contract_with_suppressed_errors(zksolc_version: Versi
 
 #[test]
 fn zksync_can_compile_contract_with_suppressed_errors() {
-    test_zksync_can_compile_contract_with_suppressed_errors(ZKSOLC_VERSION);
+    test_zksync_can_compile_contract_with_suppressed_errors(
+        ZkSolc::zksolc_latest_supported_version(),
+    );
 }
 
 #[test]
@@ -154,7 +231,9 @@ fn test_zksync_can_compile_contract_with_suppressed_warnings(zksolc_version: Ver
 
 #[test]
 fn zksync_can_compile_contract_with_suppressed_warnings() {
-    test_zksync_can_compile_contract_with_suppressed_warnings(ZKSOLC_VERSION);
+    test_zksync_can_compile_contract_with_suppressed_warnings(
+        ZkSolc::zksolc_latest_supported_version(),
+    );
 }
 
 #[test]
