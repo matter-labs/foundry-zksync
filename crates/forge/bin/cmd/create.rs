@@ -35,12 +35,7 @@ use foundry_config::{
     merge_impl_figment_convert, Config,
 };
 use serde_json::json;
-use std::{
-    borrow::Borrow,
-    marker::PhantomData,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
 
 mod zksync;
 
@@ -736,7 +731,6 @@ impl From<PendingTransactionError> for ContractDeploymentError {
 mod tests {
     use super::*;
     use alloy_primitives::I256;
-    
 
     #[test]
     fn can_parse_create() {
