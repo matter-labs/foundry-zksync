@@ -3,7 +3,7 @@ use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
 use alloy_network::{
-    AnyNetwork, AnyTransactionReceipt, EthereumWallet, ReceiptResponse, TransactionBuilder,
+    AnyNetwork, AnyTransactionReceipt, EthereumWallet, TransactionBuilder,
 };
 use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
