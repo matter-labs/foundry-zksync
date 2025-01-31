@@ -151,8 +151,11 @@ main() {
     fi
 
     # Compute the URL of the release tarball in the Foundry repository.
+    ARCHIVE_TAG=$(echo "$FOUNDRYUP_TAG" | tr '-' '_')
     RELEASE_URL="https://github.com/${FOUNDRYUP_REPO}/releases/download/${FOUNDRYUP_TAG}/"
-    BIN_ARCHIVE_URL="${RELEASE_URL}foundry_nightly_${PLATFORM}_${ARCHITECTURE}.$EXT"
+    BIN_ARCHIVE_URL="${RELEASE_URL}${ARCHIVE_TAG}_${PLATFORM}_${ARCHITECTURE}.$EXT"
+    MAN_TAG=$(echo "$FOUNDRYUP_TAG" | sed 's/^foundry-zksync-//')
+    MAN_TARBALL_URL="${RELEASE_URL}foundry_man_${MAN_TAG}.tar.gz"
     
     # Download and extract the binaries archive
     say "downloading latest forge, and cast"
@@ -162,41 +165,22 @@ main() {
       ensure unzip "$tmp" -d "$FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG"
       rm -f "$tmp"
     else
-      tmp="$(mktemp -d 2>/dev/null || echo ".")/foundry.tar.gz"
-      ensure download "$BIN_ARCHIVE_URL" "$tmp"
-      # Make sure it's a valid tar archive.
-      ensure tar tf $tmp 1> /dev/null
-      ensure mkdir -p $FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG
-      ensure tar -C "$FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG" -xvf $tmp
-      rm -f "$tmp"
+      ensure mkdir -p "$FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG"
+      ensure download "$BIN_ARCHIVE_URL" | ensure tar -xzC "$FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG"
     fi
 
     # Optionally download the manuals
     if check_cmd tar; then
-      say "attempting to download manpages from release assets"
+      say "downloading manpages"
       mkdir -p "$FOUNDRY_MAN_DIR"
-
-      ASSET_DATA=$(curl -s "https://api.github.com/repos/${FOUNDRYUP_REPO}/releases/tags/${FOUNDRYUP_TAG}")
-
-      # Parse out the man asset name:
-      # e.g. "foundry_man_nightly-ae913af65381734ad46c044a9495b67310bc77c4.tar.gz"
-      MAN_ASSET_NAME=$(echo "$ASSET_DATA" | grep -oE '"name":\s*"foundry_man_nightly[^"]+' \
-                                      | sed 's/"name": "//')
-
-      if [ -n "$MAN_ASSET_NAME" ]; then
-        MAN_TARBALL_URL="${RELEASE_URL}${MAN_ASSET_NAME}"
-        say "Found manpage tarball: $MAN_TARBALL_URL"
-        download "$MAN_TARBALL_URL" | tar -xzC "$FOUNDRY_MAN_DIR"
-      else
-        say "No manpage tarball found for this release."
-      fi
+      download "$MAN_TARBALL_URL" | tar -xzC "$FOUNDRY_MAN_DIR"
     else
       say 'skipping manpage download: missing "tar"'
     fi
 
     for bin in "${BINS[@]}"; do
       bin_path="$FOUNDRY_BIN_DIR/$bin"
-      cp $FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG/$bin $bin_path
+      cp $FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG/$bin $bin_path
 
       # Print installed msg
       say "installed - $(ensure "$bin_path" --version)"
