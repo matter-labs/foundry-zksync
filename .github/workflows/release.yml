@@ -48,7 +48,7 @@ jobs:
             fi
             
             echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
-            echo "version_name=${VERSION}" >> $GITHUB_OUTPUT
+            echo "version_name=v${VERSION}" >> $GITHUB_OUTPUT
             echo "release_name=foundry-zksync Nightly ($(date '+%Y-%m-%d'))" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
           else
