@@ -165,7 +165,8 @@ main() {
       ensure unzip "$tmp" -d "$FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG"
       rm -f "$tmp"
     else
-       ensure download "$BIN_ARCHIVE_URL" | ensure tar -xzC "$FOUNDRY_BIN_DIR"
+      ensure mkdir -p "$FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG"
+      ensure download "$BIN_ARCHIVE_URL" | ensure tar -xzC "$FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG"
     fi
 
     # Optionally download the manuals
@@ -179,7 +180,7 @@ main() {
 
     for bin in "${BINS[@]}"; do
       bin_path="$FOUNDRY_BIN_DIR/$bin"
-      cp $FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG/$bin $bin_path
+      cp $FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG/$bin $bin_path
 
       # Print installed msg
       say "installed - $(ensure "$bin_path" --version)"
