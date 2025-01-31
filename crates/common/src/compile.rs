@@ -19,9 +19,6 @@ use foundry_compilers::{
     solc::SolcSettings,
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
-use foundry_zksync_compilers::compilers::{
-    artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
-};
 
 use num_format::{Locale, ToFormattedString};
 
@@ -346,7 +343,7 @@ impl SizeReport {
     /// Returns true if any contract exceeds the runtime size limit, excluding dev contracts.
     pub fn exceeds_runtime_size_limit(&self) -> bool {
         if self.zksync {
-            self.max_runtime_size() > ZKSYNC_CONTRACT_SIZE_LIMIT
+            self.max_runtime_size() > zksync::ZKSYNC_CONTRACT_SIZE_LIMIT
         } else {
             self.max_runtime_size() > CONTRACT_RUNTIME_SIZE_LIMIT
         }
@@ -355,7 +352,7 @@ impl SizeReport {
     /// Returns true if any contract exceeds the initcode size limit, excluding dev contracts.
     pub fn exceeds_initcode_size_limit(&self) -> bool {
         if self.zksync {
-            self.max_init_size() > ZKSYNC_CONTRACT_SIZE_LIMIT
+            self.max_init_size() > zksync::ZKSYNC_CONTRACT_SIZE_LIMIT
         } else {
             self.max_init_size() > CONTRACT_INITCODE_SIZE_LIMIT
         }
@@ -418,7 +415,7 @@ impl SizeReport {
             .filter(|(_, c)| !c.is_dev_contract && (c.runtime_size > 0 || c.init_size > 0));
         for (name, contract) in contracts {
             let ((runtime_margin, runtime_color), (init_margin, init_color)) = if self.zksync {
-                Self::zk_limits_table_format(&contract)
+                Self::zk_limits_table_format(contract)
             } else {
                 let runtime_margin =
                     CONTRACT_RUNTIME_SIZE_LIMIT as isize - contract.runtime_size as isize;

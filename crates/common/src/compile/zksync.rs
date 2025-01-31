@@ -1,9 +1,19 @@
-use foundry_compilers::ProjectCompileOutput;
+use std::{collections::BTreeMap, io::IsTerminal};
+
+use comfy_table::Color;
+use eyre::Result;
+use foundry_compilers::{
+    artifacts::Source,
+    report::{BasicStdoutReporter, NoReporter, Report},
+    Project, ProjectCompileOutput,
+};
 use foundry_zksync_compilers::compilers::{
     artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
 };
 
-use super::{ProjectCompiler, SizeReport};
+use crate::{reports::report_kind, shell, term::SpinnerReporter, TestFunctionExt};
+
+use super::{contract_size, ContractInfo, ProjectCompiler, SizeReport};
 
 // https://docs.zksync.io/build/developer-reference/ethereum-differences/contract-deployment#contract-size-limit-and-format-of-bytecode-hash
 pub(super) const ZKSYNC_CONTRACT_SIZE_LIMIT: usize = 450999;
@@ -159,8 +169,8 @@ impl ProjectCompiler {
                     .as_ref()
                     .map(|abi| {
                         abi.functions().any(|f| {
-                            f.test_function_kind().is_known()
-                                || matches!(f.name.as_str(), "IS_TEST" | "IS_SCRIPT")
+                            f.test_function_kind().is_known() ||
+                                matches!(f.name.as_str(), "IS_TEST" | "IS_SCRIPT")
                         })
                     })
                     .unwrap_or(false);
@@ -189,7 +199,7 @@ impl ProjectCompiler {
 impl SizeReport {
     pub(super) fn zk_limits_table_format(
         contract: &ContractInfo,
-    ) -> ((Color, Color), (isize, isize)) {
+    ) -> ((isize, Color), (isize, Color)) {
         let runtime_margin = ZKSYNC_CONTRACT_SIZE_LIMIT as isize - contract.runtime_size as isize;
         let init_margin = ZKSYNC_CONTRACT_SIZE_LIMIT as isize - contract.init_size as isize;
 
