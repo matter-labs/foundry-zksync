@@ -41,7 +41,7 @@ jobs:
           if [ $IS_NIGHTLY == "true" ]; then 
             if [ "${{inputs.tag}}" ]; then
               TAG="${{ inputs.tag }}"
-              VERSION="${TAG#foundry-zksync-}"
+              VERSION="${TAG#foundry-zksync-v}"
             else
               TAG="${{ format('nightly-{0}', github.sha) }}"
               VERSION=nightly
@@ -54,14 +54,14 @@ jobs:
           else
             if [ "${{inputs.tag}}" ]; then
               TAG="${{ inputs.tag }}"
-              VERSION="${TAG#foundry-zksync-}"
+              VERSION="${TAG#foundry-zksync-v}"
             else
               TAG="${{ format('stable-{0}', github.sha) }}"
               VERSION=stable
             fi
 
             echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
-            echo "version_name=${VERSION}" >> $GITHUB_OUTPUT
+            echo "version_name=v${VERSION}" >> $GITHUB_OUTPUT
             echo "release_name=foundry-zksync v${VERSION}" >> $GITHUB_OUTPUT
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
