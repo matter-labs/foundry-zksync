@@ -10,9 +10,6 @@ permissions:
 
 # Run the workflow on push to the main branch and manually
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
