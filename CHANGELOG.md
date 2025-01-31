@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.6](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.5...foundry-zksync-v0.0.6) (2025-01-31)
+
+
+### Features
+
+* implement compiler backwards compatibility policy ([#843](https://github.com/matter-labs/foundry-zksync/issues/843)) ([469b770](https://github.com/matter-labs/foundry-zksync/commit/469b7700404178060e6ee135ab967d723851bfa2))
+
+
+### Bug Fixes
+
+* trim tag name to obtain version ([#885](https://github.com/matter-labs/foundry-zksync/issues/885)) ([113501c](https://github.com/matter-labs/foundry-zksync/commit/113501c28a53e95393e20f1ab37df8848b472b95))
+
 ## [0.0.5](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.4...foundry-zksync-v0.0.5) (2025-01-29)
 
 
