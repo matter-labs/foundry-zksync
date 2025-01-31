@@ -155,7 +155,7 @@ main() {
     RELEASE_URL="https://github.com/${FOUNDRYUP_REPO}/releases/download/${FOUNDRYUP_TAG}/"
     BIN_ARCHIVE_URL="${RELEASE_URL}${ARCHIVE_TAG}_${PLATFORM}_${ARCHITECTURE}.$EXT"
     MAN_TAG=$(echo "$FOUNDRYUP_TAG" | sed 's/^foundry-zksync-//')
-    MAN_TARBALL_URL="${RELEASE_URL}foundry_man_${MAN_TAG}.tar.gz"
+    MAN_TARBALL_URL="${RELEASE_URL}foundry_zksync_man_${MAN_TAG}.tar.gz"
     
     # Download and extract the binaries archive
     say "downloading latest forge, and cast"
