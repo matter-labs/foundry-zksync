@@ -17,7 +17,7 @@ use foundry_common::{
 };
 use foundry_config::zksync::ZKSYNC_ARTIFACTS_DIR;
 use foundry_evm_core::{
-    abi::{console, Vm},
+    abi::console,
     constants::{
         CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS,
         TEST_CONTRACT_ADDRESS,

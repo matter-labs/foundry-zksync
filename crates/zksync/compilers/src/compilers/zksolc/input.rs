@@ -2,10 +2,11 @@
 use super::{settings::ZkSolcSettings, ZkSettings};
 use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_compilers::{
+    artifacts::{Remapping, Source, Sources},
     compilers::{solc::SolcLanguage, CompilerInput},
     solc,
 };
-use foundry_compilers_artifacts_solc::{remappings::Remapping, serde_helpers, Source, Sources};
+use foundry_compilers_artifacts_solc::serde_helpers::tuple_vec_map;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -158,7 +159,7 @@ pub struct StandardJsonCompilerInput {
     /// compiler language
     pub language: SolcLanguage,
     /// sources to compile
-    #[serde(with = "serde_helpers::tuple_vec_map")]
+    #[serde(with = "tuple_vec_map")]
     pub sources: Vec<(PathBuf, Source)>,
     /// compiler settings
     pub settings: ZkSettings,

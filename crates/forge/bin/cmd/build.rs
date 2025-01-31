@@ -69,7 +69,7 @@ impl BuildArgs {
     // TODO(zk): We cannot return `ProjectCompileOutput` as there's currently no way to return
     // a common type from solc and zksolc branches.
     pub fn run(self) -> Result<()> {
-        let mut config = self.try_load_config_emit_warnings()?;
+        let mut config = self.load_config()?;
 
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
             // need to re-configure here to also catch additional remappings

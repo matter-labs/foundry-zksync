@@ -359,10 +359,10 @@ impl EtherscanVerificationProvider {
         if code_format == CodeFormat::SingleFile {
             verify_args = if let Some(optimizations) = args.num_of_optimizations {
                 verify_args.optimized().runs(optimizations as u32)
-            } else if context.config.optimizer == Some(true) {
+            } else if context.config().optimizer == Some(true) {
                 verify_args
                     .optimized()
-                    .runs(context.config.optimizer_runs.unwrap_or(200).try_into()?)
+                    .runs(context.config().optimizer_runs.unwrap_or(200).try_into()?)
             } else {
                 verify_args.not_optimized()
             };

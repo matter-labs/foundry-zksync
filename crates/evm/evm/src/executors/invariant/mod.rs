@@ -8,8 +8,10 @@ use eyre::{eyre, ContextCompat, Result};
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use foundry_config::InvariantConfig;
 use foundry_evm_core::{
-    abi::HARDHAT_CONSOLE_ADDRESS,
-    constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, MAGIC_ASSUME, TEST_TIMEOUT},
+    constants::{
+        CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME,
+        TEST_TIMEOUT,
+    },
     precompiles::PRECOMPILES,
 };
 use foundry_evm_fuzz::{

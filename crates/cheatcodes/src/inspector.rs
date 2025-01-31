@@ -10,10 +10,7 @@ use crate::{
     strategy::CheatcodeInspectorStrategy,
     test::{
         assume::AssumeNoRevert,
-        expect::{
-            self, ExpectedCallData, ExpectedCallTracker, ExpectedCallType, ExpectedEmitTracker,
-            ExpectedRevert, ExpectedRevertKind,
-        },
+        expect::{self, ExpectedEmitTracker, ExpectedRevert, ExpectedRevertKind},
         revert_handlers,
     },
     utils::IgnoredTraces,
@@ -33,9 +30,9 @@ use foundry_cheatcodes_common::{
 };
 use foundry_common::{evm::Breakpoints, TransactionMaybeSigned, SELECTOR_LEN};
 use foundry_evm_core::{
-    abi::{Vm::stopExpectSafeMemoryCall, HARDHAT_CONSOLE_ADDRESS},
+    abi::Vm::stopExpectSafeMemoryCall,
     backend::{DatabaseError, DatabaseExt, RevertDiagnostic},
-    constants::{CHEATCODE_ADDRESS, MAGIC_ASSUME},
+    constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME},
     utils::new_evm_with_existing_context,
     InspectorExt,
 };
