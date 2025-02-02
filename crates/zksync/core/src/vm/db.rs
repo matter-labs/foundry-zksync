@@ -2,7 +2,7 @@
 /// as a read-only fork source.
 /// This way, we can run transaction on top of the chain that is persisted
 /// in the Database object.
-/// This code doesn't do any mutatios to Database: after each transaction run, the Revm
+/// This code doesn't do any mutations to Database: after each transaction run, the Revm
 /// is usually collecting all the diffs - and applies them to database itself.
 use std::{collections::HashMap as sHashMap, fmt::Debug};
 
