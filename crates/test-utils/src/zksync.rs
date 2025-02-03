@@ -125,12 +125,12 @@ pub struct Fork {
 impl Fork {
     /// Create a fork config with the provided url and the latest block.
     pub fn new(url: String) -> Self {
-        Fork { url, ..Default::default() }
+        Self { url, ..Default::default() }
     }
 
     /// Create a fork config with the provided url and block.
     pub fn new_with_block(url: String, block: u64) -> Self {
-        Fork { url, block: Some(block) }
+        Self { url, block: Some(block) }
     }
 }
 
