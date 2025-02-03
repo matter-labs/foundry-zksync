@@ -954,7 +954,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
         for address in data.db.persistent_accounts().into_iter().chain([data.env.tx.caller]) {
             info!(?address, "importing to zk state");
 
-            // Re-use the deployment nonce from storage if present.
+            // Reuse the deployment nonce from storage if present.
             let deployment_nonce = {
                 let nonce_key = get_nonce_key(address);
                 let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
