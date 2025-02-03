@@ -6,6 +6,7 @@ use foundry_compilers::{
         output_selection::OutputSelection, serde_helpers, EvmVersion, Libraries, Remapping,
     },
     compilers::CompilerSettings,
+    error::Result,
     solc, CompilerSettingsRestrictions,
 };
 use semver::Version;
@@ -16,6 +17,8 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+
+use super::ZkSolc;
 ///
 /// The Solidity compiler codegen.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -41,8 +44,6 @@ pub struct ZkSettings {
     /// The Solidity codegen.
     #[serde(default)]
     pub codegen: Codegen,
-    // TODO: era-compiler-solidity uses a BTreeSet of strings. In theory the serialization
-    // should be the same but maybe we should double check
     /// Solidity remappings
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remappings: Vec<Remapping>,
@@ -91,7 +92,7 @@ pub struct ZkSettings {
 }
 
 /// Analogous to SolcSettings for zksolc compiler
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ZkSolcSettings {
     /// JSON settings expected by Solc
@@ -100,6 +101,54 @@ pub struct ZkSolcSettings {
     /// Additional CLI args configuration
     #[serde(flatten)]
     pub cli_settings: solc::CliSettings,
+    /// The version of the zksolc compiler to use. Retrieved from `zksolc_path`
+    zksolc_version: Version,
+    /// zksolc path
+    zksolc_path: PathBuf,
+}
+
+impl Default for ZkSolcSettings {
+    fn default() -> Self {
+        let version = ZkSolc::zksolc_latest_supported_version();
+        let zksolc_path = ZkSolc::get_path_for_version(&version)
+            .expect("failed getting default zksolc version path");
+        Self {
+            settings: Default::default(),
+            cli_settings: Default::default(),
+            zksolc_version: version,
+            zksolc_path,
+        }
+    }
+}
+
+impl ZkSolcSettings {
+    /// Initialize settings for a given zksolc path
+    pub fn new_from_path(
+        settings: ZkSettings,
+        cli_settings: solc::CliSettings,
+        zksolc_path: PathBuf,
+    ) -> Result<Self> {
+        let zksolc_version = ZkSolc::get_version_for_path(&zksolc_path)?;
+        Ok(Self { settings, cli_settings, zksolc_path, zksolc_version })
+    }
+
+    /// Get zksolc path
+    pub fn zksolc_path(&self) -> PathBuf {
+        self.zksolc_path.clone()
+    }
+
+    /// Get zksolc version
+    pub fn zksolc_version_ref(&self) -> &Version {
+        &self.zksolc_version
+    }
+
+    /// Set a specific zksolc version
+    pub fn set_zksolc_version(&mut self, zksolc_version: Version) -> Result<()> {
+        let zksolc_path = ZkSolc::get_path_for_version(&zksolc_version)?;
+        self.zksolc_version = zksolc_version;
+        self.zksolc_path = zksolc_path;
+        Ok(())
+    }
 }
 
 impl ZkSettings {
@@ -223,7 +272,8 @@ impl CompilerSettings for ZkSolcSettings {
             *force_evmla == other.settings.force_evmla &&
             *codegen == other.settings.codegen &&
             *suppressed_warnings == other.settings.suppressed_warnings &&
-            *suppressed_errors == other.settings.suppressed_errors
+            *suppressed_errors == other.settings.suppressed_errors &&
+            self.zksolc_version == other.zksolc_version
     }
 
     fn with_remappings(mut self, remappings: &[Remapping]) -> Self {
@@ -350,29 +400,37 @@ impl OptimizerDetails {
 
 /// Settings metadata
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SettingsMetadata {
     /// Use the given hash method for the metadata hash that is appended to the bytecode.
     /// The metadata hash can be removed from the bytecode via option "none".
-    /// `zksolc` only supports keccak256
     #[serde(
         default,
-        rename = "bytecodeHash",
         skip_serializing_if = "Option::is_none",
         with = "serde_helpers::display_from_str_opt"
     )]
-    pub bytecode_hash: Option<BytecodeHash>,
+    pub hash_type: Option<BytecodeHash>,
+    /// hash_type field name for zksolc v1.5.6 and older
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "serde_helpers::display_from_str_opt"
+    )]
+    bytecode_hash: Option<BytecodeHash>,
 }
 
 impl SettingsMetadata {
-    /// New SettingsMetadata
-    pub fn new(hash: BytecodeHash) -> Self {
-        Self { bytecode_hash: Some(hash) }
+    /// Creates new SettingsMettadata
+    pub fn new(hash_type: Option<BytecodeHash>) -> Self {
+        Self { hash_type, bytecode_hash: None }
     }
-}
 
-impl From<BytecodeHash> for SettingsMetadata {
-    fn from(hash: BytecodeHash) -> Self {
-        Self { bytecode_hash: Some(hash) }
+    /// Makes SettingsMettadata version compatible
+    pub fn sanitize(&mut self, zksolc_version: &Version) {
+        // zksolc <= 1.5.6 uses "bytecode_hash" field for "hash_type"
+        if zksolc_version <= &Version::new(1, 5, 6) {
+            self.bytecode_hash = self.hash_type.take();
+        }
     }
 }
 
@@ -387,6 +445,9 @@ pub enum BytecodeHash {
     /// The default keccak256 hash.
     #[serde(rename = "keccak256")]
     Keccak256,
+    /// The `ipfs` hash.
+    #[serde(rename = "ipfs")]
+    Ipfs,
 }
 
 impl FromStr for BytecodeHash {
@@ -395,6 +456,7 @@ impl FromStr for BytecodeHash {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "none" => Ok(Self::None),
+            "ipfs" => Ok(Self::Ipfs),
             "keccak256" => Ok(Self::Keccak256),
             s => Err(format!("Unknown bytecode hash: {s}")),
         }
@@ -405,6 +467,7 @@ impl fmt::Display for BytecodeHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             Self::Keccak256 => "keccak256",
+            Self::Ipfs => "ipfs",
             Self::None => "none",
         };
         f.write_str(s)
