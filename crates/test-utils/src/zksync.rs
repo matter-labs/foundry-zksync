@@ -2,8 +2,12 @@
 use std::{net::SocketAddr, str::FromStr};
 
 use anvil_zksync_api_server::NodeServerBuilder;
-use anvil_zksync_config::{types::SystemContractsOptions, TestNodeConfig};
+use anvil_zksync_config::{
+    types::{CacheConfig, SystemContractsOptions},
+    TestNodeConfig,
+};
 use anvil_zksync_core::{
+    fork::ForkDetails,
     node::{
         BlockProducer, BlockSealer, BlockSealerMode, ImpersonationManager, InMemoryNode,
         TimestampManager, TxPool,
@@ -111,6 +115,25 @@ const RICH_WALLETS: [(&str, &str, &str); 10] = [
     ),
 ];
 
+/// Represents fork config for [ZkSyncNode].
+#[derive(Debug, Default)]
+pub struct Fork {
+    url: String,
+    block: Option<u64>,
+}
+
+impl Fork {
+    /// Create a fork config with the provided url and the latest block.
+    pub fn new(url: String) -> Self {
+        Fork { url, ..Default::default() }
+    }
+
+    /// Create a fork config with the provided url and block.
+    pub fn new_with_block(url: String, block: u64) -> Self {
+        Fork { url, block: Some(block) }
+    }
+}
+
 /// In-memory anvil-zksync that is stopped when dropped.
 pub struct ZkSyncNode {
     port: u16,
@@ -118,7 +141,9 @@ pub struct ZkSyncNode {
 }
 
 impl ZkSyncNode {
-    /// Returns the server url.
+    /// Start anvil-zksync in memory, binding a random available port
+    ///
+    /// The server is automatically stopped when the instance is dropped.
     #[inline]
     pub fn url(&self) -> String {
         format!("http://127.0.0.1:{}", self.port)
@@ -128,14 +153,30 @@ impl ZkSyncNode {
     ///
     /// The server is automatically stopped when the instance is dropped.
     pub async fn start() -> Self {
+        Self::start_inner(None).await
+    }
+
+    /// Start anvil-zksync in memory, binding a random available port and with the provided fork url
+    /// and block.
+    ///
+    /// The server is automatically stopped when the instance is dropped.
+    pub async fn start_with_fork(fork: Fork) -> Self {
+        Self::start_inner(Some(fork)).await
+    }
+
+    async fn start_inner(fork: Option<Fork>) -> Self {
         let (_guard, guard_rx) = tokio::sync::oneshot::channel::<()>();
         let (port_tx, port) = tokio::sync::oneshot::channel();
 
+        let fork = fork.map(|fork| {
+            ForkDetails::from_url(fork.url, fork.block, CacheConfig::Memory)
+                .expect("failed building ForkDetails")
+        });
         std::thread::spawn(move || {
             // We need to spawn a thread since `run_inner` future is not `Send`.
             let runtime =
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-            runtime.block_on(Self::run_inner(port_tx, guard_rx));
+            runtime.block_on(Self::run_inner(port_tx, guard_rx, fork));
         });
 
         // wait for server to start
@@ -147,6 +188,7 @@ impl ZkSyncNode {
     async fn run_inner(
         port_tx: tokio::sync::oneshot::Sender<u16>,
         stop_guard: tokio::sync::oneshot::Receiver<()>,
+        fork: Option<ForkDetails>,
     ) {
         const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
 
@@ -159,7 +201,7 @@ impl ZkSyncNode {
         let block_sealer = BlockSealer::new(sealing_mode);
 
         let node: InMemoryNode = InMemoryNode::new(
-            None,
+            fork,
             None,
             &config,
             time,
