@@ -31,8 +31,8 @@ const VALUE_TEN: Bytes = Bytes::from_static(
     hex!("000000000000000000000000000000000000000000000000000000000000000a").as_slice(),
 );
 const VALUE_LOG_UINT_TEN: Bytes = Bytes::from_static(
-    hex!("f5b1bba9000000000000000000000000000000000000000000000000000000000000000a").as_slice(),
-); // selector: log(uint)
+    hex!("f82c50f1000000000000000000000000000000000000000000000000000000000000000a").as_slice(),
+); // selector: log(uint256)
 
 static BYTECODE_ADDER: LazyLock<Vec<u8>> =
     LazyLock::new(|| get_zk_artifact_bytecode("Trace.t.sol/Adder.json"));

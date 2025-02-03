@@ -140,7 +140,10 @@ async fn test_zk_record_logs() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheatcodes_in_zkvm() {
-    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let mut runner = TEST_DATA_DEFAULT.runner_zksync();
+    let mut config = runner.config.as_ref().clone();
+    config.allow_internal_expect_revert = true;
+    runner.config = std::sync::Arc::new(config);
     let filter = Filter::new(".*", "ZkCheatcodesInZkVmTest", ".*");
 
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
@@ -165,7 +168,7 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
         "DeployCounterWithBytecodeHash",
         Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts cyfrin/zksync-contracts"),
         2,
-        Some(&["-vvvvv", "--via-ir", "--system-mode", "true", "--broadcast"]),
+        Some(&["-vvvvv", "--via-ir", "--system-mode", "true", "--broadcast", "--optimize", "true"]),
     ).await;
 });
 

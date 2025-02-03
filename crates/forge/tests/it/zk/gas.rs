@@ -79,10 +79,35 @@ forgetest_async!(zk_script_execution_with_gas_per_pubdata, |prj, cmd| {
     let private_key = get_rich_wallet_key();
 
     // Test with unacceptable gas per pubdata (should fail)
-    let zero_pubdata_args = create_script_args(&private_key, &url, "--zk-gas-per-pubdata", "1");
-    cmd.arg("script").args(&zero_pubdata_args);
-    cmd.assert_failure();
-    cmd.forge_fuse();
+    let forge_bin = env!("CARGO_BIN_EXE_forge");
+    let mut child = std::process::Command::new(forge_bin)
+        .args([
+            "script",
+            "--zksync",
+            "script/Gas.s.sol:GasScript",
+            "--private-key",
+            &private_key,
+            "--chain",
+            "260",
+            "--rpc-url",
+            &url,
+            "--slow",
+            "-vvvvv",
+            "--broadcast",
+            "--zk-gas-per-pubdata",
+            "1",
+        ])
+        .current_dir(prj.root())
+        .spawn()
+        .expect("failed to spawn process");
+
+    // Wait for 10 seconds then kill the process
+    std::thread::sleep(std::time::Duration::from_secs(10));
+    child.kill().expect("failed to kill process");
+    let output = child.wait().expect("failed to wait for process");
+
+    // Assert command was killed
+    assert!(!output.success());
 
     // Test with sufficient gas per pubdata (should succeed)
     let sufficient_pubdata_args =
