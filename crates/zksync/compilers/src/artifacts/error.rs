@@ -57,11 +57,12 @@ impl fmt::Display for Error {
         // Skip the first line if it contains the same message as severity,
         // unless it includes a source location (denoted by 3+ colons) something like:
         // path/to/file:line:column: ErrorType: message
-        if lines.peek().map_or(false, |l| {
-            l.contains(self.severity.to_string().as_str()) &&
+        if let Some(l) = lines.peek() {
+            if l.contains(self.severity.to_string().as_str()) &&
                 l.bytes().filter(|b| *b == b':').count() < 3
-        }) {
-            lines.next();
+            {
+                lines.next();
+            }
         }
 
         // Format the main source location
