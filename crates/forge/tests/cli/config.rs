@@ -537,7 +537,7 @@ forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
     // create a new lib directly in the `lib` folder with a remapping
     let mut config = config;
     config.remappings = vec![Remapping::from_str("nested/=lib/nested").unwrap().into()];
-    let nested = prj.paths().libraries[0].join("dep1");
+    let nested = prj.paths().libraries[0].join("nested-lib");
     pretty_err(&nested, fs::create_dir_all(&nested));
     let toml_file = nested.join("foundry.toml");
     pretty_err(&toml_file, fs::write(&toml_file, config.to_string_pretty().unwrap()));
@@ -550,9 +550,9 @@ forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
             // default
             "forge-std/=lib/forge-std/src/".parse().unwrap(),
             // remapping is local to the lib
-            "dep1/=lib/dep1/src/".parse().unwrap(),
+            "nested-lib/=lib/nested-lib/src/".parse().unwrap(),
             // global
-            "nested/=lib/dep1/lib/nested/".parse().unwrap(),
+            "nested/=lib/nested-lib/lib/nested/".parse().unwrap(),
         ]
     );
 
@@ -571,13 +571,13 @@ forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
         remappings,
         vec![
             // local to the lib
-            "another-lib/=lib/dep1/lib/another-lib/src/".parse().unwrap(),
+            "another-lib/=lib/nested-lib/lib/another-lib/src/".parse().unwrap(),
             // global
             "forge-std/=lib/forge-std/src/".parse().unwrap(),
-            "dep1/=lib/dep1/src/".parse().unwrap(),
+            "nested-lib/=lib/nested-lib/src/".parse().unwrap(),
             // remappings local to the lib
-            "nested-twice/=lib/dep1/lib/another-lib/lib/nested-twice/".parse().unwrap(),
-            "nested/=lib/dep1/lib/nested/".parse().unwrap(),
+            "nested-twice/=lib/nested-lib/lib/another-lib/lib/nested-twice/".parse().unwrap(),
+            "nested/=lib/nested-lib/lib/nested/".parse().unwrap(),
         ]
     );
 
@@ -589,13 +589,13 @@ forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
         remappings,
         vec![
             // local to the lib
-            "another-lib/=lib/dep1/lib/another-lib/custom-source-dir/".parse().unwrap(),
+            "another-lib/=lib/nested-lib/lib/another-lib/custom-source-dir/".parse().unwrap(),
             // global
             "forge-std/=lib/forge-std/src/".parse().unwrap(),
-            "dep1/=lib/dep1/src/".parse().unwrap(),
+            "nested-lib/=lib/nested-lib/src/".parse().unwrap(),
             // remappings local to the lib
-            "nested-twice/=lib/dep1/lib/another-lib/lib/nested-twice/".parse().unwrap(),
-            "nested/=lib/dep1/lib/nested/".parse().unwrap(),
+            "nested-twice/=lib/nested-lib/lib/another-lib/lib/nested-twice/".parse().unwrap(),
+            "nested/=lib/nested-lib/lib/nested/".parse().unwrap(),
         ]
     );
 
@@ -608,13 +608,13 @@ forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
         remappings,
         vec![
             // local to the lib
-            "another-lib/=lib/dep1/lib/another-lib/custom-source-dir/".parse().unwrap(),
+            "another-lib/=lib/nested-lib/lib/another-lib/custom-source-dir/".parse().unwrap(),
             // global
             "forge-std/=lib/forge-std/src/".parse().unwrap(),
-            "dep1/=lib/dep1/src/".parse().unwrap(),
+            "nested-lib/=lib/nested-lib/src/".parse().unwrap(),
             // remappings local to the lib
-            "nested-twice/=lib/dep1/lib/another-lib/lib/nested-twice/".parse().unwrap(),
-            "nested/=lib/dep1/lib/nested/".parse().unwrap(),
+            "nested-twice/=lib/nested-lib/lib/another-lib/lib/nested-twice/".parse().unwrap(),
+            "nested/=lib/nested-lib/lib/nested/".parse().unwrap(),
         ]
     );
 });
