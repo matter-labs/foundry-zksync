@@ -142,6 +142,8 @@ async fn test_zk_record_logs() {
 async fn test_zk_cheatcodes_in_zkvm() {
     let mut runner = TEST_DATA_DEFAULT.runner_zksync();
     let mut config = runner.config.as_ref().clone();
+    // This is now false by default so in order to expect a revert from an internal call, we need to
+    // set it to true https://github.com/foundry-rs/foundry/pull/9537
     config.allow_internal_expect_revert = true;
     runner.config = std::sync::Arc::new(config);
     let filter = Filter::new(".*", "ZkCheatcodesInZkVmTest", ".*");
@@ -161,6 +163,7 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
     setup_deploy_prj(&mut prj);
 
     cmd.forge_fuse();
+    // We added the optimizer flag which is now false by default so we need to set it to true
     run_zk_script_test(
         prj.root(),
         &mut cmd,

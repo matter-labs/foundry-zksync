@@ -136,6 +136,7 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
 forgetest_async!(paymaster_script_test, |prj, cmd| {
     setup_deploy_prj(&mut prj);
     cmd.forge_fuse();
+    // We added the optimizer flag which is now false by default so we need to set it to true
     run_zk_script_test(
         prj.root(),
         &mut cmd,
