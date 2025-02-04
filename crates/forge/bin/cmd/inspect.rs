@@ -3,7 +3,10 @@ use clap::Parser;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Table};
 use eyre::{Context, Result};
 use forge::revm::primitives::Eof;
-use foundry_cli::opts::{BuildOpts, CompilerOpts};
+use foundry_cli::{
+    opts::{BuildOpts, CompilerOpts},
+    utils::LoadConfig,
+};
 use foundry_common::{compile::ProjectCompiler, fmt::pretty_eof, shell};
 use foundry_compilers::{
     artifacts::{
@@ -14,9 +17,17 @@ use foundry_compilers::{
         CompactBytecode, StorageLayout,
     },
     info::ContractInfo,
+    multi::MultiCompiler,
     utils::canonicalize,
+    ConfigurableArtifacts, Project,
+};
+use foundry_config::{zksync::config_create_project, Config, SolcReq};
+use foundry_zksync_compilers::compilers::{
+    artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
 };
 use regex::Regex;
+use semver::Version;
+use solar_parse::interface::config;
 use std::{fmt, sync::LazyLock};
 
 /// CLI arguments for `forge inspect`.
@@ -63,20 +74,58 @@ impl InspectArgs {
             ..build
         };
 
+        println!(
+            "Inspecting contract `{contract}` field `{field}`",
+            contract = contract,
+            field = field
+        );
+
         // Build the project
         let project = modified_build_args.project()?;
-        let compiler = ProjectCompiler::new().quiet(true);
+
+        let mut compiler = ProjectCompiler::new().quiet(true);
+        // compiler.zksync_compile(project)
         let target_path = if let Some(path) = &contract.path {
             canonicalize(project.root().join(path))?
         } else {
             project.find_contract_path(&contract.name)?
         };
+
+        println!("Compiling contract `{contract}`", contract = contract);
+        println!("Target path: `{target_path}`", target_path = target_path.display());
+
+        // let x: &Project<MultiCompiler, ConfigurableArtifacts> = &project;
+        // let config = x.
+        // let c: ZkSolcCompiler = project.compiler.pipe_as_ref();
+        // let a: &Project<ZkSolcCompiler, ZkArtifactOutput> = project.compiler.as_ref();
+
+        let config =
+            Config { solc: Some(SolcReq::Version(Version::new(0, 8, 26))), ..Default::default() };
+        let project2 = config_create_project(&config, false, true).unwrap();
+
+        let mut output2 = compiler.files([target_path.clone()]).zksync_compile(&project2)?;
+        compiler = ProjectCompiler::new().quiet(true);
         let mut output = compiler.files([target_path.clone()]).compile(&project)?;
 
+        println!(
+            "Inspecting contract `{contract}` field `{field}`",
+            contract = contract,
+            field = field
+        );
+        println!("output: {output}");
+        println!("output2: {output2}");
+
         // Find the artifact
-        let artifact = output.remove(&target_path, &contract.name).ok_or_else(|| {
+        let artifact1 = output.remove(&target_path, &contract.name).ok_or_else(|| {
             eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
         })?;
+
+        let artifact = output2.remove(&target_path, &contract.name).ok_or_else(|| {
+            eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
+        })?;
+
+        println!("Artifat: {:?}", artifact);
+        println!("Artifact2: {:?}", artifact2);
 
         // Match on ContractArtifactFields and pretty-print
         match field {
@@ -93,7 +142,7 @@ impl InspectArgs {
                 }
             }
             ContractArtifactField::Bytecode => {
-                print_json_str(&artifact.bytecode, Some("object"))?;
+                print_json_str(&artifact2.bytecode, Some("object"))?;
             }
             ContractArtifactField::DeployedBytecode => {
                 print_json_str(&artifact.deployed_bytecode, Some("object"))?;
