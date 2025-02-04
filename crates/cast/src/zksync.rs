@@ -1,11 +1,14 @@
 //! Contains zksync specific logic for foundry's `cast` functionality
 
 use alloy_network::AnyNetwork;
+use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_transport::Transport;
 use alloy_zksync::network::{
-    transaction_request::TransactionRequest as ZkTransactionRequest, Zksync,
+    transaction_request::TransactionRequest as ZkTransactionRequest,
+    unsigned_tx::eip712::PaymasterParams, Zksync,
 };
+use clap::Parser;
 use eyre::Result;
 
 use crate::Cast;
@@ -61,5 +64,61 @@ where
         let res = self.provider.send_transaction(tx).await?;
 
         Ok(res)
+    }
+}
+
+#[derive(Clone, Debug, Parser)]
+#[command(next_help_heading = "Transaction options")]
+pub struct ZkTransactionOpts {
+    // /// Use ZKSync
+    // #[arg(long, default_value_ifs([("paymaster_address", ArgPredicate::IsPresent,
+    // "true"),("paymaster_input", ArgPredicate::IsPresent, "true")]))] pub zksync: bool,
+    /// Paymaster address for the ZKSync transaction
+    #[arg(long = "zk-paymaster-address", requires = "paymaster_input")]
+    pub paymaster_address: Option<Address>,
+
+    /// Paymaster input for the ZKSync transaction
+    #[arg(long = "zk-paymaster-input", requires = "paymaster_address")]
+    pub paymaster_input: Option<Bytes>,
+
+    /// Factory dependencies for the ZKSync transaction
+    #[arg(long = "zk-factory-deps")]
+    pub factory_deps: Vec<Bytes>,
+
+    /// Custom signature for the ZKSync transaction
+    #[arg(long = "zk-custom-signature")]
+    pub custom_signature: Option<Bytes>,
+
+    /// Gas per pubdata for the ZKSync transaction
+    #[arg(long = "zk-gas-per-pubdata")]
+    pub gas_per_pubdata: Option<U256>,
+}
+
+impl ZkTransactionOpts {
+    pub fn has_zksync_args(&self) -> bool {
+        self.paymaster_address.is_some() ||
+            !self.factory_deps.is_empty() ||
+            self.custom_signature.is_some() ||
+            self.gas_per_pubdata.is_some()
+    }
+
+    pub fn apply_to_tx(&self, tx: &mut ZkTransactionRequest) {
+        if let Some(gas_per_pubdata) = self.gas_per_pubdata {
+            tx.set_gas_per_pubdata(gas_per_pubdata)
+        }
+
+        if !self.factory_deps.is_empty() {
+            tx.set_factory_deps(self.factory_deps.clone());
+        }
+
+        if let Some(custom_signature) = &self.custom_signature {
+            tx.set_custom_signature(custom_signature.clone());
+        }
+
+        if let (Some(paymaster), Some(paymaster_input)) =
+            (self.paymaster_address, self.paymaster_input.clone())
+        {
+            tx.set_paymaster_params(PaymasterParams { paymaster, paymaster_input });
+        }
     }
 }

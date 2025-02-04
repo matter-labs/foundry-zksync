@@ -2,6 +2,8 @@ use crate::tx::{CastTxBuilder, SenderKind};
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockId;
+use alloy_zksync::network::transaction_request::TransactionRequest as ZkTransactionRequest;
+use cast::ZkTransactionOpts;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -39,6 +41,10 @@ pub struct EstimateArgs {
 
     #[command(flatten)]
     eth: EthereumOpts,
+
+    /// Zksync Transaction
+    #[command(flatten)]
+    zksync: ZkTransactionOpts,
 }
 
 #[derive(Debug, Parser)]
@@ -67,10 +73,11 @@ pub enum EstimateSubcommands {
 
 impl EstimateArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, mut tx, block, eth, command } = self;
+        let Self { to, mut sig, mut args, mut tx, block, eth, command, zksync } = self;
 
         let config = Config::from(&eth);
         let provider = utils::get_provider(&config)?;
+        //let provider = utils::get_provider_zksync(&config)?;
         let sender = SenderKind::from_wallet_opts(eth.wallet).await?;
 
         let code = if let Some(EstimateSubcommands::Create {
@@ -99,7 +106,15 @@ impl EstimateArgs {
             .build_raw(sender)
             .await?;
 
-        let gas = provider.estimate_gas(&tx).block(block.unwrap_or_default()).await?;
+        let gas = if zksync.has_zksync_args() {
+            let zk_provider = utils::get_provider_zksync(&config)?;
+            let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
+            zksync.apply_to_tx(&mut zk_tx);
+            zk_provider.estimate_gas(&zk_tx).await?
+        } else {
+            provider.estimate_gas(&tx).block(block.unwrap_or_default()).await?
+        };
+
         sh_println!("{gas}")?;
         Ok(())
     }
