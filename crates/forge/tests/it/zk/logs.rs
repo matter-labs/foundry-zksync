@@ -51,7 +51,7 @@ async fn test_zk_logs_work_in_create() {
                 Some(vec![
                     "print".into(),
                     "outer print".into(),
-                    "0xF9E9ba9Ed9B96AB918c74B21dD0f1D5f2ac38a30".into(),
+                    "0xB5c1DF089600415B21FB76bf89900Adb575947c8".into(),
                     "print".into(),
                     "0xff".into(),
                     "print".into(),
