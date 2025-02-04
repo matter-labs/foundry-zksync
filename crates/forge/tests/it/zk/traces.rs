@@ -14,10 +14,10 @@ use itertools::Itertools;
 use serde::Deserialize;
 
 const ADDRESS_ZK_TRACE_TEST: Address = address!("7fa9385be102ac3eac297483dd6233d62b3e1496");
-const ADDRESS_ADDER: Address = address!("f9e9ba9ed9b96ab918c74b21dd0f1d5f2ac38a30");
-const ADDRESS_NUMBER: Address = address!("f232f12e115391c535fd519b00efadf042fc8be5");
-const ADDRESS_FIRST_INNER_NUMBER: Address = address!("ed570f3f91621894e001df0fb70bfbd123d3c8ad");
-const ADDRESS_SECOND_INNER_NUMBER: Address = address!("abceaeac3d3a2ac3dcffd7a60ca00a3fac9490ca");
+const ADDRESS_ADDER: Address = address!("b5c1df089600415b21fb76bf89900adb575947c8");
+const ADDRESS_NUMBER: Address = address!("d6a7a38ee698efae2f48f3a62dc7a71c3c0930a1");
+const ADDRESS_FIRST_INNER_NUMBER: Address = address!("89c74b24fb24dda42a8465ee0f9ede2c1308deeb");
+const ADDRESS_SECOND_INNER_NUMBER: Address = address!("9359008843d2c083a14e9c17cde01893938047fa");
 const ADDRESS_CONSOLE: Address = address!("000000000000000000636f6e736f6c652e6c6f67");
 const SELECTOR_TEST_CALL: Bytes = Bytes::from_static(hex!("0d3282c4").as_slice());
 const SELECTOR_TEST_CREATE: Bytes = Bytes::from_static(hex!("61bdc916").as_slice());
