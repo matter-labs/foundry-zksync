@@ -22,10 +22,11 @@ use foundry_evm::{
 use foundry_evm_core::backend::DatabaseExt;
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, PaymasterParams, ZkTransactionMetadata,
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
+    get_account_code_key, get_balance_key, get_nonce_key,
+    state::parse_full_nonce,
+    PaymasterParams, ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, KNOWN_CODES_STORAGE_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use itertools::Itertools;
 use revm::{
@@ -960,10 +961,13 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
                 let account = journaled_account(data, nonce_addr).expect("failed to load account");
                 if let Some(value) = account.storage.get(&nonce_key) {
-                    let full_nonce = value.original_value.to_u256();
-                    let (_tx_nonce, deployment_nonce) = decompose_full_nonce(full_nonce);
-                    debug!(?address, ?deployment_nonce, "reuse existing deployment nonce");
-                    deployment_nonce
+                    let full_nonce = parse_full_nonce(value.original_value);
+                    debug!(
+                        ?address,
+                        deployment_nonce = full_nonce.deploy_nonce,
+                        "reuse existing deployment nonce"
+                    );
+                    full_nonce.deploy_nonce.into()
                 } else {
                     zksync_types::U256::zero()
                 }

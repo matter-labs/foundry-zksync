@@ -141,15 +141,13 @@ pub struct ZkSyncNode {
 }
 
 impl ZkSyncNode {
-    /// Start anvil-zksync in memory, binding a random available port
-    ///
-    /// The server is automatically stopped when the instance is dropped.
+    /// Returns the server url.
     #[inline]
     pub fn url(&self) -> String {
         format!("http://127.0.0.1:{}", self.port)
     }
 
-    /// Start anvil-zksync in memory, binding a random available port
+    /// Start anvil-zksync in memory, binding a random available port.
     ///
     /// The server is automatically stopped when the instance is dropped.
     pub async fn start() -> Self {
