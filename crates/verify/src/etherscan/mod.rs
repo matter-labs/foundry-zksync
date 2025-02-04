@@ -648,7 +648,7 @@ Compiler run successful!
 
         let mut etherscan = EtherscanVerificationProvider::default();
         etherscan
-            .preflight_verify_check(args, CompilerVerificationContext::Solc(context))
+            .preflight_verify_check(args, context)
             .await
             .unwrap();
     });
