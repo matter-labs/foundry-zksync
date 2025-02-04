@@ -22,10 +22,11 @@ use foundry_evm::{
 use foundry_evm_core::backend::DatabaseExt;
 use foundry_zksync_core::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    get_account_code_key, get_balance_key, get_nonce_key, PaymasterParams, ZkTransactionMetadata,
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
-    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
+    get_account_code_key, get_balance_key, get_nonce_key,
+    state::parse_full_nonce,
+    PaymasterParams, ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, KNOWN_CODES_STORAGE_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use itertools::Itertools;
 use revm::{
@@ -38,7 +39,7 @@ use revm::{
         SignedAuthorization, KECCAK_EMPTY,
     },
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace, warn};
 use zksync_types::{
     block::{pack_block_info, unpack_block_info},
     utils::{decompose_full_nonce, nonces_to_full_nonce},
@@ -883,7 +884,10 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
             let balance = data.sload(balance_account, balance_key).unwrap_or_default().data;
             let full_nonce = data.sload(nonce_account, nonce_key).unwrap_or_default();
-            let (tx_nonce, _deployment_nonce) = decompose_full_nonce(full_nonce.to_u256());
+            let (tx_nonce, deployment_nonce) = decompose_full_nonce(full_nonce.to_u256());
+            if !deployment_nonce.is_zero() {
+                warn!(?address, ?deployment_nonce, "discarding ZKsync deployment nonce for EVM context, might cause inconsistencies");
+            }
             let nonce = tx_nonce.as_u64();
 
             let account_code_key = get_account_code_key(address);
@@ -909,7 +913,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
             let _ = std::mem::replace(&mut account.info.nonce, nonce);
 
             if test_contract.map(|addr| addr == address).unwrap_or_default() {
-                tracing::trace!(?address, "ignoring code translation for test contract");
+                trace!(?address, "ignoring code translation for test contract");
             } else {
                 account.info.code_hash = code_hash;
                 account.info.code.clone_from(&code);
@@ -951,21 +955,39 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
         for address in data.db.persistent_accounts().into_iter().chain([data.env.tx.caller]) {
             info!(?address, "importing to zk state");
 
+            // Reuse the deployment nonce from storage if present.
+            let deployment_nonce = {
+                let nonce_key = get_nonce_key(address);
+                let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
+                let account = journaled_account(data, nonce_addr).expect("failed to load account");
+                if let Some(value) = account.storage.get(&nonce_key) {
+                    let full_nonce = parse_full_nonce(value.original_value);
+                    debug!(
+                        ?address,
+                        deployment_nonce = full_nonce.deploy_nonce,
+                        "reuse existing deployment nonce"
+                    );
+                    full_nonce.deploy_nonce.into()
+                } else {
+                    zksync_types::U256::zero()
+                }
+            };
+
             let account = journaled_account(data, address).expect("failed to load account");
             let info = &account.info;
 
             let balance_key = get_balance_key(address);
             l2_eth_storage.insert(balance_key, EvmStorageSlot::new(info.balance));
 
-            // TODO we need to find a proper way to handle deploy nonces instead of replicating
-            let full_nonce = nonces_to_full_nonce(info.nonce.into(), info.nonce.into());
+            debug!(?address, ?deployment_nonce, transaction_nonce=?info.nonce, "attempting to fit EVM nonce to ZKsync nonces, might cause inconsistencies");
+            let full_nonce = nonces_to_full_nonce(info.nonce.into(), deployment_nonce);
 
             let nonce_key = get_nonce_key(address);
             nonce_storage.insert(nonce_key, EvmStorageSlot::new(full_nonce.to_ru256()));
 
             if test_contract.map(|test_address| address == test_address).unwrap_or_default() {
                 // avoid migrating test contract code
-                tracing::trace!(?address, "ignoring code translation for test contract");
+                trace!(?address, "ignoring code translation for test contract");
                 continue;
             }
 
