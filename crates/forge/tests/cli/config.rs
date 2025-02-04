@@ -964,7 +964,7 @@ contract CounterTest {
     cmd.forge_fuse().args(["build"]).assert_success();
 });
 
-// NOTE: This test output differs from the original due to zksync integration:
+// NOTE(zk): This test output differs from the original due to zksync integration:
 // 1. Additional zksync-specific configuration items are present
 // 2. Some existing configuration items appear in a different order
 #[cfg(not(feature = "isolate-by-default"))]
