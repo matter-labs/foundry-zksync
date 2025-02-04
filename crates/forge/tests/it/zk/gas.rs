@@ -79,12 +79,12 @@ forgetest_async!(zk_script_execution_with_gas_per_pubdata, |prj, cmd| {
     let private_key = get_rich_wallet_key();
 
     // Test with unacceptable gas per pubdata (should fail)
-    let forge_bin = env!("CARGO_BIN_EXE_forge");
+    let mut forge_bin = prj.forge_bin();
     // We had to change the approach of testing an invalid gas per pubdata value because there were
     // changes upstream for the timeout and retries mechanism Now we execute the command
     // directly and check the output with a manual timeout. The previous approach was to use the
     // `forge script` command with a timeout but now it's not timeouting anymore for this error.
-    let mut child = std::process::Command::new(forge_bin)
+    let mut child = forge_bin
         .args([
             "script",
             "--zksync",
