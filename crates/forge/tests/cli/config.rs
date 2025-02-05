@@ -964,6 +964,9 @@ contract CounterTest {
     cmd.forge_fuse().args(["build"]).assert_success();
 });
 
+// NOTE(zk): This test output differs from the original due to zksync integration:
+// 1. Additional zksync-specific configuration items are present
+// 2. Some existing configuration items appear in a different order
 #[cfg(not(feature = "isolate-by-default"))]
 forgetest_init!(test_default_config, |prj, cmd| {
     cmd.forge_fuse().args(["config"]).assert_success().stdout_eq(str![[r#"
@@ -1003,8 +1006,8 @@ ignored_warnings_from = []
 deny_warnings = false
 test_failures_file = "cache/test-failures"
 show_progress = false
+additional_compiler_profiles = []
 eof = false
-transaction_timeout = 120
 ffi = false
 allow_internal_expect_revert = false
 always_use_create_2_factory = false
@@ -1034,15 +1037,15 @@ cbor_metadata = true
 sparse_mode = false
 build_info = false
 compilation_restrictions = []
-additional_compiler_profiles = []
-assertions_revert = true
+legacy_assertions = false
 isolate = false
 disable_block_gas_limit = false
-odyssey = false
+transaction_timeout = 120
 unchecked_cheatcode_artifacts = false
 create2_library_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
 create2_deployer = "0x4e59b44847b379578588920ca78fbf26c0b4956c"
-legacy_assertions = false
+odyssey = false
+assertions_revert = true
 
 [[profile.default.fs_permissions]]
 access = "read"
@@ -1051,6 +1054,18 @@ path = "out"
 [profile.default.rpc_storage_caching]
 chains = "all"
 endpoints = "all"
+
+[profile.default.zksync]
+compile = false
+startup = false
+fallback_oz = false
+enable_eravm_extensions = false
+force_evmla = false
+llvm_options = []
+optimizer = true
+optimizer_mode = "3"
+suppressed_warnings = []
+suppressed_errors = []
 
 [fmt]
 line_length = 120
@@ -1086,6 +1101,7 @@ max_fuzz_dictionary_values = 6553600
 gas_report_samples = 256
 failure_persist_dir = "cache/fuzz"
 failure_persist_file = "failures"
+no_zksync_reserved_addresses = false
 show_logs = false
 
 [invariant]
@@ -1103,6 +1119,7 @@ max_assume_rejects = 65536
 gas_report_samples = 256
 failure_persist_dir = "cache/invariant"
 show_metrics = false
+no_zksync_reserved_addresses = false
 
 [labels]
 
@@ -1187,6 +1204,7 @@ exclude = []
     "gas_report_samples": 256,
     "failure_persist_dir": "cache/fuzz",
     "failure_persist_file": "failures",
+    "no_zksync_reserved_addresses": false,
     "show_logs": false,
     "timeout": null
   },
@@ -1205,7 +1223,8 @@ exclude = []
     "gas_report_samples": 256,
     "failure_persist_dir": "cache/invariant",
     "show_metrics": false,
-    "timeout": null
+    "timeout": null,
+    "no_zksync_reserved_addresses": false
   },
   "ffi": false,
   "allow_internal_expect_revert": false,
@@ -1295,7 +1314,24 @@ exclude = []
   "transaction_timeout": 120,
   "eof": false,
   "additional_compiler_profiles": [],
-  "compilation_restrictions": []
+  "compilation_restrictions": [],
+  "zksync": {
+    "compile": false,
+    "startup": false,
+    "zksolc": null,
+    "solc_path": null,
+    "hash_type": null,
+    "bytecode_hash": null,
+    "fallback_oz": false,
+    "enable_eravm_extensions": false,
+    "force_evmla": false,
+    "llvm_options": [],
+    "optimizer": true,
+    "optimizer_mode": "3",
+    "optimizer_details": null,
+    "suppressed_warnings": [],
+    "suppressed_errors": []
+  }
 }
 
 "#]]);

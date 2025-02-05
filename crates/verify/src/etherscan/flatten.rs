@@ -68,7 +68,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
         context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)> {
         let metadata = context.project.settings.settings.metadata.as_ref();
-        let bch = metadata.and_then(|m| m.bytecode_hash).unwrap_or_default();
+        let bch = metadata.and_then(|m| m.hash_type).unwrap_or_default();
 
         eyre::ensure!(
             bch == foundry_zksync_compilers::compilers::zksolc::settings::BytecodeHash::Keccak256,
@@ -188,6 +188,7 @@ Diagnostics: {diags}",
             },
             solc_version: solc_version.clone(),
             cli_settings: CliSettings::default(),
+            zksolc_path,
         };
 
         let solc_compiler = if compiler_version.is_zksync_solc {
@@ -199,7 +200,7 @@ Diagnostics: {diags}",
             SolcCompiler::Specific(solc)
         };
 
-        let zksolc_compiler = ZkSolcCompiler { zksolc: zksolc_path, solc: solc_compiler };
+        let zksolc_compiler = ZkSolcCompiler { solc: solc_compiler };
 
         let out = zksolc_compiler.compile(&input)?;
         if out.errors.iter().any(|e| e.is_error()) {

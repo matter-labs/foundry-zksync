@@ -18,23 +18,27 @@ use super::BuildData;
 
 impl BuildData {
     fn get_zk_linker(&self, script_config: &ScriptConfig) -> Result<ZkLinker<'_>> {
-        let zksolc = foundry_config::zksync::config_zksolc_compiler(&script_config.config)
+        let zksolc_settings = foundry_config::zksync::config_zksolc_settings(&script_config.config)
             .context("retrieving zksolc compiler to be used for linking")?;
-        let version = zksolc.version().context("trying to determine zksolc version")?;
+        let version = zksolc_settings.zksolc_version_ref();
 
         let Some(input) = self.zk_output.as_ref() else {
             eyre::bail!("unable to link zk artifacts if no zk compilation output is provided")
         };
 
-        let linker =
-            ZkLinker::new(self.project_root.clone(), input.artifact_ids().collect(), zksolc, input);
+        let linker = ZkLinker::new(
+            self.project_root.clone(),
+            input.artifact_ids().collect(),
+            zksolc_settings.zksolc_path(),
+            input,
+        );
 
         let mut libs = Default::default();
         linker.zk_collect_dependencies(&self.target, &mut libs, None)?;
 
         // if there are no no libs, no linking will happen
         // so we can skip version check
-        if !libs.is_empty() && version < DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
+        if !libs.is_empty() && version < &DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION {
             eyre::bail!(
                 "deploy-time linking not supported. minimum: {}, given: {}",
                 DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,

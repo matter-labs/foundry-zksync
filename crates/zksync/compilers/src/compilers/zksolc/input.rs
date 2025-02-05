@@ -26,6 +26,8 @@ pub struct ZkSolcVersionedInput {
     pub solc_version: Version,
     /// zksolc cli settings
     pub cli_settings: solc::CliSettings,
+    /// zksolc binary path
+    pub zksolc_path: PathBuf,
 }
 
 impl CompilerInput for ZkSolcVersionedInput {
@@ -41,10 +43,13 @@ impl CompilerInput for ZkSolcVersionedInput {
         language: Self::Language,
         version: Version,
     ) -> Self {
-        let ZkSolcSettings { settings, cli_settings } = settings;
-        let input = ZkSolcInput::new(language, sources, settings).sanitized(&version);
+        let zksolc_path = settings.zksolc_path();
+        let zksolc_version = settings.zksolc_version_ref().clone();
+        let ZkSolcSettings { settings, cli_settings, .. } = settings;
+        let input =
+            ZkSolcInput::new(language, sources, settings, &zksolc_version).sanitized(&version);
 
-        Self { solc_version: version, input, cli_settings }
+        Self { solc_version: version, input, cli_settings, zksolc_path }
     }
 
     fn language(&self) -> Self::Language {
@@ -107,9 +112,24 @@ impl Default for ZkSolcInput {
 }
 
 impl ZkSolcInput {
-    fn new(language: SolcLanguage, sources: Sources, settings: ZkSettings) -> Self {
-        let suppressed_warnings = settings.suppressed_warnings.clone();
-        let suppressed_errors = settings.suppressed_errors.clone();
+    fn new(
+        language: SolcLanguage,
+        sources: Sources,
+        mut settings: ZkSettings,
+        zksolc_version: &Version,
+    ) -> Self {
+        let mut suppressed_warnings = HashSet::default();
+        let mut suppressed_errors = HashSet::default();
+        // zksolc <= 1.5.6 has suppressed warnings/errors in at the root input level
+        if zksolc_version <= &Version::new(1, 5, 6) {
+            suppressed_warnings = std::mem::take(&mut settings.suppressed_warnings);
+            suppressed_errors = std::mem::take(&mut settings.suppressed_errors);
+        }
+
+        if let Some(ref mut metadata) = settings.metadata {
+            metadata.sanitize(zksolc_version);
+        };
+
         Self { language, sources, settings, suppressed_warnings, suppressed_errors }
     }
 
