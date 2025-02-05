@@ -24,7 +24,7 @@ use semver::{BuildMetadata, Version};
 use std::{fmt::Debug, sync::LazyLock};
 
 mod zksync;
- use zksync::EtherscanZksyncSourceProvider;
+use zksync::EtherscanZksyncSourceProvider;
 
 mod flatten;
 
