@@ -1,8 +1,8 @@
 //! zksolc artifacts to be used in `foundry-compilers`
-use foundry_compilers_artifacts_solc::{
+
+use foundry_compilers::artifacts::{
     Bytecode, BytecodeObject, CompactContractRef, FileToContractsMap, SourceFile, SourceFiles,
 };
-
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
