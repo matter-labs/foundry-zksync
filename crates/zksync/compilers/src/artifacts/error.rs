@@ -1,6 +1,7 @@
 //! zksolc error from std json output
 use foundry_compilers_artifacts_solc::error::{Severity, SourceLocation};
 
+use core::iter::Peekable;
 use foundry_compilers_artifacts_solc::serde_helpers;
 use serde::{Deserialize, Serialize};
 use std::{fmt, ops::Range};
@@ -43,58 +44,41 @@ impl Error {
         self.severity.is_info()
     }
 }
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: Adding short msg for zksolc results in duplicate error messages.
-        // Check if this is always the case or if it would be useful to
-        // add it sometimes.
-        //let mut short_msg = self.message.trim();
         let fmtd_msg = self.formatted_message.as_deref().unwrap_or("");
 
-        /*
-        if short_msg.is_empty() {
-            // if the message is empty, try to extract the first line from the formatted message
-            if let Some(first_line) = fmtd_msg.lines().next() {
-                // this is something like `ParserError: <short_message>`
-                if let Some((_, s)) = first_line.split_once(':') {
-                    short_msg = s.trim_start();
-                } else {
-                    short_msg = first_line;
-                }
+        // Format the severity level
+        styled(f, self.severity.color().bold(), |f| self.fmt_severity(f))?;
+
+        let mut lines = fmtd_msg.lines().peekable();
+
+        // Skip the first line if it contains the same message as severity,
+        // unless it includes a source location (denoted by 3+ colons) something like:
+        // path/to/file:line:column: ErrorType: message
+        if let Some(l) = lines.peek() {
+            if l.contains(self.severity.to_string().as_str()) &&
+                l.bytes().filter(|b| *b == b':').count() < 3
+            {
+                lines.next();
             }
         }
-        */
 
-        // Error (XXXX): Error Message
-        styled(f, self.severity.color().bold(), |f| self.fmt_severity(f))?;
-        //fmt_msg(f, short_msg)?;
-
-        let mut lines = fmtd_msg.lines();
-
-        /*
-        // skip the first line if it contains the same message as the one we just formatted,
-        // unless it also contains a source location, in which case the entire error message is an
-        // old style error message, like:
-        //     path/to/file:line:column: ErrorType: message
-        if lines.clone().next().map_or(false, |l| {
-            l.contains(short_msg) && l.bytes().filter(|b| *b == b':').count() < 3
-        }) {
-            let _ = lines.next();
-        }
-        */
-
-        // format the main source location
+        // Format the main source location
         fmt_source_location(f, &mut lines)?;
 
-        // format remaining lines as secondary locations
+        // Process additional message lines
         while let Some(line) = lines.next() {
-            f.write_str("\n")?;
+            // Use carriage return instead of newline to refresh the same line
+            f.write_str("\r")?;
 
-            if let Some((note, msg)) = line.split_once(':') {
-                styled(f, Self::secondary_style(), |f| f.write_str(note))?;
-                fmt_msg(f, msg)?;
-            } else {
-                f.write_str(line)?;
+            match line.split_once(':') {
+                Some((note, msg)) => {
+                    styled(f, Self::secondary_style(), |f| f.write_str(note))?;
+                    fmt_msg(f, msg)?;
+                }
+                None => f.write_str(line)?,
             }
 
             fmt_source_location(f, &mut lines)?;
@@ -157,7 +141,10 @@ fn fmt_msg(f: &mut fmt::Formatter<'_>, msg: &str) -> fmt::Result {
     })
 }
 
-fn fmt_source_location(f: &mut fmt::Formatter<'_>, lines: &mut std::str::Lines<'_>) -> fmt::Result {
+fn fmt_source_location(
+    f: &mut fmt::Formatter<'_>,
+    lines: &mut Peekable<std::str::Lines<'_>>,
+) -> fmt::Result {
     // --> source
     if let Some(line) = lines.next() {
         f.write_str("\n")?;
