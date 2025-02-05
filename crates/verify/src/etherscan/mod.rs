@@ -2,7 +2,7 @@ use crate::{
     provider::{VerificationContext, VerificationProvider},
     retry::RETRY_CHECK_ON_VERIFY,
     verify::{VerifyArgs, VerifyCheckArgs},
-    zk_provider::{CompilerVerificationContext, ZkVerificationContext},
+    zk_provider::CompilerVerificationContext,
 };
 use alloy_json_abi::Function;
 use alloy_primitives::hex;
@@ -24,6 +24,9 @@ use regex::Regex;
 use semver::{BuildMetadata, Version};
 use std::{fmt::Debug, sync::LazyLock};
 
+mod zksync;
+pub(self) use zksync::EtherscanZksyncSourceProvider;
+
 mod flatten;
 
 mod standard_json;
@@ -38,17 +41,11 @@ pub struct EtherscanVerificationProvider;
 /// The contract source provider for [EtherscanVerificationProvider]
 ///
 /// Returns source, contract_name and the source [CodeFormat]
-trait EtherscanSourceProvider: Send + Sync + Debug {
+trait EtherscanSourceProvider: Send + Sync + Debug + EtherscanZksyncSourceProvider {
     fn source(
         &self,
         args: &VerifyArgs,
         context: &VerificationContext,
-    ) -> Result<(String, String, CodeFormat)>;
-
-    fn zk_source(
-        &self,
-        args: &VerifyArgs,
-        context: &ZkVerificationContext,
     ) -> Result<(String, String, CodeFormat)>;
 }
 
@@ -308,36 +305,12 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<VerifyContract> {
-        let (source, contract_name, code_format) = match context {
-            CompilerVerificationContext::Solc(context) => {
-                self.source_provider(args).source(args, context)?
-            }
-            CompilerVerificationContext::ZkSolc(context) => {
-                self.source_provider(args).zk_source(args, context)?
-            }
-        };
+        let (source, contract_name, code_format) = self.dispatch_source_provider(args, context)?;
 
         let mut compiler_version = context.compiler_version().clone();
         compiler_version.build = match RE_BUILD_COMMIT.captures(compiler_version.build.as_str()) {
             Some(cap) => BuildMetadata::new(cap.name("commit").unwrap().as_str())?,
             _ => BuildMetadata::EMPTY,
-        };
-
-        let zk_args = match context {
-            CompilerVerificationContext::ZkSolc(zk_context) => {
-                let compiler_mode =
-                    if zk_context.compiler_version.is_zksync_solc { "zksync" } else { "solc" }
-                        .to_string();
-
-                vec![
-                    ("compilermode".to_string(), compiler_mode),
-                    (
-                        "zksolcVersion".to_string(),
-                        format!("v{}", zk_context.compiler_version.zksolc),
-                    ),
-                ]
-            }
-            _ => vec![],
         };
 
         let compiler_version =
@@ -347,7 +320,7 @@ impl EtherscanVerificationProvider {
             VerifyContract::new(args.address, contract_name, source, compiler_version)
                 .constructor_arguments(constructor_args)
                 .code_format(code_format);
-        verify_args.other.extend(zk_args.into_iter());
+        self.populate_context_verify_args(context, &mut verify_args);
 
         if args.via_ir {
             // we explicitly set this __undocumented__ argument to true if provided by the user,
@@ -421,7 +394,7 @@ impl EtherscanVerificationProvider {
             context.config(),
         )?;
 
-        //TODO: zk support
+        //TODO(zk): EraVM support
         let creation_data = client.contract_creation_data(args.address).await?;
         let transaction = provider
             .get_transaction_by_hash(creation_data.transaction_hash)
@@ -440,23 +413,8 @@ impl EtherscanVerificationProvider {
             eyre::bail!("Fetching of constructor arguments is not supported for contracts created by contracts")
         };
 
-        match context {
-            CompilerVerificationContext::Solc(context) => {
-                let output = context.project.compile_file(&context.target_path)?;
-                let artifact = output
-                    .find(&context.target_path, &context.target_name)
-                    .ok_or_eyre("Contract artifact wasn't found locally")?;
-                let bytecode = artifact
-                    .get_bytecode_object()
-                    .ok_or_eyre("Contract artifact does not contain bytecode")?;
-                let bytecode = match bytecode.as_ref() {
-                    BytecodeObject::Bytecode(bytes) => Ok(bytes),
-                    BytecodeObject::Unlinked(_) => Err(eyre!(
-                        "You have to provide correct libraries to use --guess-constructor-args"
-                    )),
-                }?;
-
-                if maybe_creation_code.starts_with(bytecode) {
+        let bytecode = context.get_target_bytecode()?;
+        if maybe_creation_code.starts_with(bytecode.as_ref()) {
                     let constructor_args = &maybe_creation_code[bytecode.len()..];
                     let constructor_args = hex::encode(constructor_args);
                     sh_println!("Identified constructor arguments: {constructor_args}")?;
@@ -464,33 +422,7 @@ impl EtherscanVerificationProvider {
                 } else {
                     eyre::bail!("Local bytecode doesn't match on-chain bytecode")
                 }
-            }
-            CompilerVerificationContext::ZkSolc(context) => {
-                let output = context.project.compile_file(&context.target_path)?;
-                let artifact = output
-                    .find(&context.target_path, &context.target_name)
-                    .ok_or_eyre("Contract artifact wasn't found locally")?;
 
-                let bytecode = artifact
-                    .get_bytecode_object()
-                    .ok_or_eyre("Contract artifact does not contain bytecode")?;
-                let bytecode = match bytecode.as_ref() {
-                    BytecodeObject::Bytecode(bytes) => Ok(bytes),
-                    BytecodeObject::Unlinked(_) => Err(eyre!(
-                        "You have to provide correct libraries to use --guess-constructor-args"
-                    )),
-                }?;
-
-                if maybe_creation_code.starts_with(bytecode) {
-                    let constructor_args = &maybe_creation_code[bytecode.len()..];
-                    let constructor_args = hex::encode(constructor_args);
-                    sh_println!("Identified constructor arguments: {constructor_args}")?;
-                    Ok(constructor_args)
-                } else {
-                    eyre::bail!("Local bytecode doesn't match on-chain bytecode")
-                }
-            }
-        }
     }
 }
 

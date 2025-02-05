@@ -1,8 +1,8 @@
 use std::{collections::HashSet, path::PathBuf};
 
 use alloy_provider::Provider;
-use foundry_cli::utils::{self, LoadConfig};
 use eyre::Result;
+use foundry_cli::utils::{self, LoadConfig};
 use foundry_common::{compile::ProjectCompiler, ContractsByArtifact};
 use foundry_compilers::solc::Solc;
 use foundry_config::SolcReq;
