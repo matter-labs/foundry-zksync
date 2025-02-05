@@ -1,8 +1,5 @@
-use super::{zksync::EtherscanZksyncSourceProvider, EtherscanSourceProvider, VerifyArgs};
-use crate::{
-    provider::VerificationContext,
-    zk_provider::{ZkVerificationContext, ZkVersion},
-};
+use super::{EtherscanSourceProvider, VerifyArgs};
+use crate::provider::VerificationContext;
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
 use foundry_compilers::{
@@ -12,12 +9,8 @@ use foundry_compilers::{
         solc::{SolcCompiler, SolcLanguage, SolcVersionedInput},
         Compiler, CompilerInput,
     },
-    solc::{CliSettings, Solc},
+    solc::Solc,
     AggregatedCompilerOutput,
-};
-use foundry_zksync_compilers::compilers::zksolc::{
-    input::{ZkSolcInput, ZkSolcVersionedInput},
-    ZkSolc, ZkSolcCompiler,
 };
 use semver::{BuildMetadata, Version};
 use std::path::Path;

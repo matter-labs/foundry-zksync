@@ -17,7 +17,6 @@ use foundry_block_explorers::{
 };
 use foundry_cli::utils::{get_provider, read_constructor_args_file, LoadConfig};
 use foundry_common::{abi::encode_function_args, retry::RetryError};
-use foundry_compilers::{artifacts::BytecodeObject, Artifact};
 use foundry_config::{Chain, Config};
 use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
 use regex::Regex;
@@ -25,7 +24,7 @@ use semver::{BuildMetadata, Version};
 use std::{fmt::Debug, sync::LazyLock};
 
 mod zksync;
-pub(self) use zksync::EtherscanZksyncSourceProvider;
+ use zksync::EtherscanZksyncSourceProvider;
 
 mod flatten;
 
