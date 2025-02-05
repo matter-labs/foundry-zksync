@@ -5,12 +5,12 @@ use alloy_dyn_abi::{DecodedEvent, DynSolValue, EventExt};
 use alloy_json_abi::Event;
 use alloy_primitives::{address, b256, Address, U256};
 use forge::{
+    constants::HARDHAT_CONSOLE_ADDRESS,
     decode::decode_console_logs,
     result::{TestKind, TestStatus},
 };
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_evm::traces::{CallKind, CallTraceDecoder, DecodedCallData, TraceKind};
-use foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS;
 use foundry_test_utils::Filter;
 use std::sync::Arc;
 
@@ -391,3 +391,9 @@ test_repro!(8639);
 
 // https://github.com/foundry-rs/foundry/issues/8566
 test_repro!(8566);
+
+// https://github.com/foundry-rs/foundry/issues/9643
+test_repro!(9643);
+
+// https://github.com/foundry-rs/foundry/issues/7238
+test_repro!(7238);

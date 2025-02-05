@@ -9,7 +9,7 @@ use cast::{Cast, SimpleCast};
 use clap::{CommandFactory, Parser};
 use clap_complete::generate;
 use eyre::Result;
-use foundry_cli::{handler, utils};
+use foundry_cli::{handler, utils, utils::LoadConfig};
 use foundry_common::{
     abi::{get_error, get_event},
     ens::{namehash, ProviderEnsExt},
@@ -292,7 +292,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
         // Blockchain & RPC queries
         CastSubcommand::AccessList(cmd) => cmd.run().await?,
         CastSubcommand::Age { block, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             sh_println!(
                 "{}",
@@ -300,7 +300,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
             )?
         }
         CastSubcommand::Balance { block, who, ether, rpc, erc20 } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let account_addr = who.resolve(&provider).await?;
 
@@ -321,7 +321,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
             }
         }
         CastSubcommand::BaseFee { block, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             sh_println!(
                 "{}",
@@ -329,7 +329,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
             )?
         }
         CastSubcommand::Block { block, full, field, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             sh_println!(
                 "{}",
@@ -339,7 +339,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
             )?
         }
         CastSubcommand::BlockNumber { rpc, block } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let number = match block {
                 Some(id) => {
@@ -355,34 +355,34 @@ async fn main_args(args: CastArgs) -> Result<()> {
             sh_println!("{number}")?
         }
         CastSubcommand::Chain { rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             sh_println!("{}", Cast::new(provider).chain().await?)?
         }
         CastSubcommand::ChainId { rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             sh_println!("{}", Cast::new(provider).chain_id().await?)?
         }
         CastSubcommand::Client { rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             sh_println!("{}", provider.get_client_version().await?)?
         }
         CastSubcommand::Code { block, who, disassemble, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let who = who.resolve(&provider).await?;
             sh_println!("{}", Cast::new(provider).code(who, block, disassemble).await?)?
         }
         CastSubcommand::Codesize { block, who, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let who = who.resolve(&provider).await?;
             sh_println!("{}", Cast::new(provider).codesize(who, block).await?)?
         }
         CastSubcommand::ComputeAddress { address, nonce, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
 
             let address = stdin::unwrap_line(address)?;
@@ -418,7 +418,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
         }
         CastSubcommand::FindBlock(cmd) => cmd.run().await?,
         CastSubcommand::GasPrice { rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             sh_println!("{}", Cast::new(provider).gas_price().await?)?;
         }
@@ -431,37 +431,37 @@ async fn main_args(args: CastArgs) -> Result<()> {
             sh_println!("{}", foundry_common::erc7201(&id))?;
         }
         CastSubcommand::Implementation { block, beacon, who, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let who = who.resolve(&provider).await?;
             sh_println!("{}", Cast::new(provider).implementation(who, beacon, block).await?)?;
         }
         CastSubcommand::Admin { block, who, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let who = who.resolve(&provider).await?;
             sh_println!("{}", Cast::new(provider).admin(who, block).await?)?;
         }
         CastSubcommand::Nonce { block, who, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let who = who.resolve(&provider).await?;
             sh_println!("{}", Cast::new(provider).nonce(who, block).await?)?;
         }
         CastSubcommand::Codehash { block, who, slots, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let who = who.resolve(&provider).await?;
             sh_println!("{}", Cast::new(provider).codehash(who, slots, block).await?)?;
         }
         CastSubcommand::StorageRoot { block, who, slots, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let who = who.resolve(&provider).await?;
             sh_println!("{}", Cast::new(provider).storage_root(who, slots, block).await?)?;
         }
         CastSubcommand::Proof { address, slots, rpc, block } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let address = address.resolve(&provider).await?;
             let value = provider
@@ -478,7 +478,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
         CastSubcommand::Estimate(cmd) => cmd.run().await?,
         CastSubcommand::MakeTx(cmd) => cmd.run().await?,
         CastSubcommand::PublishTx { raw_tx, cast_async, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             let cast = Cast::new(&provider);
             let pending_tx = cast.publish(raw_tx).await?;
@@ -492,7 +492,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
             }
         }
         CastSubcommand::Receipt { tx_hash, field, cast_async, confirmations, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
             sh_println!(
                 "{}",
@@ -504,7 +504,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
         CastSubcommand::Run(cmd) => cmd.run().await?,
         CastSubcommand::SendTx(cmd) => cmd.run().await?,
         CastSubcommand::Tx { tx_hash, field, raw, rpc } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
 
             // Can use either --raw or specify raw as a field
@@ -570,7 +570,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
             sh_println!("{}", namehash(&name))?
         }
         CastSubcommand::LookupAddress { who, rpc, verify } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
 
             let who = stdin::unwrap_line(who)?;
@@ -585,7 +585,7 @@ async fn main_args(args: CastArgs) -> Result<()> {
             sh_println!("{name}")?
         }
         CastSubcommand::ResolveName { who, rpc, verify } => {
-            let config = Config::from(&rpc);
+            let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
 
             let who = stdin::unwrap_line(who)?;
@@ -635,20 +635,50 @@ async fn main_args(args: CastArgs) -> Result<()> {
             "{}",
             SimpleCast::right_shift(&value, &bits, base_in.as_deref(), &base_out)?
         )?,
-        CastSubcommand::EtherscanSource { address, directory, etherscan, flatten } => {
-            let config = Config::from(&etherscan);
+        CastSubcommand::Source {
+            address,
+            directory,
+            explorer_api_url,
+            explorer_url,
+            etherscan,
+            flatten,
+        } => {
+            let config = etherscan.load_config()?;
             let chain = config.chain.unwrap_or_default();
-            let api_key = config.get_etherscan_api_key(Some(chain)).unwrap_or_default();
+            let api_key = config.get_etherscan_api_key(Some(chain));
             match (directory, flatten) {
                 (Some(dir), false) => {
-                    SimpleCast::expand_etherscan_source_to_directory(chain, address, api_key, dir)
-                        .await?
+                    SimpleCast::expand_etherscan_source_to_directory(
+                        chain,
+                        address,
+                        api_key,
+                        dir,
+                        explorer_api_url,
+                        explorer_url,
+                    )
+                    .await?
                 }
-                (None, false) => {
-                    sh_println!("{}", SimpleCast::etherscan_source(chain, address, api_key).await?)?
-                }
+                (None, false) => sh_println!(
+                    "{}",
+                    SimpleCast::etherscan_source(
+                        chain,
+                        address,
+                        api_key,
+                        explorer_api_url,
+                        explorer_url
+                    )
+                    .await?
+                )?,
                 (dir, true) => {
-                    SimpleCast::etherscan_source_flatten(chain, address, api_key, dir).await?;
+                    SimpleCast::etherscan_source_flatten(
+                        chain,
+                        address,
+                        api_key,
+                        dir,
+                        explorer_api_url,
+                        explorer_url,
+                    )
+                    .await?;
                 }
             }
         }

@@ -18,7 +18,7 @@ impl VerifyArgs {
     ///
     /// Will assume configured compiler is zksolc
     pub(super) async fn zk_resolve_context(&self) -> Result<ZkVerificationContext> {
-        let mut config = self.load_config_emit_warnings();
+        let mut config = self.load_config()?;
         config.libraries.extend(self.libraries.clone());
 
         let project = foundry_config::zksync::config_create_project(&config, config.cache, false)?;

@@ -155,7 +155,7 @@ impl VerificationProvider for EtherscanVerificationProvider {
 
     /// Executes the command to check verification status on Etherscan
     async fn check(&self, args: VerifyCheckArgs) -> Result<()> {
-        let config = args.try_load_config_emit_warnings()?;
+        let config = args.load_config()?;
         let etherscan = self.client(
             args.etherscan.chain.unwrap_or_default(),
             args.verifier.verifier_url.as_deref(),
@@ -223,8 +223,7 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<(Client, VerifyContract)> {
-        let config = args.try_load_config_emit_warnings()?;
-
+        let config = args.load_config()?;
         let etherscan = self.client(
             args.etherscan.chain.unwrap_or_default(),
             args.verifier.verifier_url.as_deref(),
@@ -333,8 +332,10 @@ impl EtherscanVerificationProvider {
         if code_format == CodeFormat::SingleFile {
             verify_args = if let Some(optimizations) = args.num_of_optimizations {
                 verify_args.optimized().runs(optimizations as u32)
-            } else if context.config().optimizer {
-                verify_args.optimized().runs(context.config().optimizer_runs.try_into()?)
+            } else if context.config().optimizer == Some(true) {
+                verify_args
+                    .optimized()
+                    .runs(context.config().optimizer_runs.unwrap_or(200).try_into()?)
             } else {
                 verify_args.not_optimized()
             };
@@ -478,7 +479,7 @@ mod tests {
             root.as_os_str().to_str().unwrap(),
         ]);
 
-        let config = args.load_config();
+        let config = args.load_config().unwrap();
 
         let etherscan = EtherscanVerificationProvider::default();
         let client = etherscan
@@ -505,7 +506,7 @@ mod tests {
             root.as_os_str().to_str().unwrap(),
         ]);
 
-        let config = args.load_config();
+        let config = args.load_config().unwrap();
 
         let etherscan = EtherscanVerificationProvider::default();
         let client = etherscan

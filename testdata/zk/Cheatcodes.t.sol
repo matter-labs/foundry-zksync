@@ -33,6 +33,16 @@ contract Mock {
     }
 }
 
+contract Reverter {
+    function revertWithMessage() public pure {
+        revert("test");
+    }
+
+    function nestedRevert(Reverter other) public pure {
+        other.revertWithMessage();
+    }
+}
+
 interface IMyProxyCaller {
     function transact(uint8 _data) external;
 }
@@ -204,6 +214,23 @@ contract ZkCheatcodesTest is DSTest {
         vm.expectEmit(true, true, true, true);
         emit EventFunction(emitter.FUNCTION_MESSAGE());
         emitter.functionEmit();
+    }
+
+    function testExpectRevert() public {
+        vm.expectRevert();
+        revert("test");
+    }
+
+    function testFailExpectRevertDeeperDepthsWithDefaultConfig() public {
+        Reverter reverter = new Reverter();
+        vm.expectRevert();
+        reverter.nestedRevert(reverter);
+    }
+
+    function testExpectRevertDeeperDepthsWithInternalRevertsEnabled() public {
+        Reverter reverter = new Reverter();
+        vm.expectRevert();
+        reverter.nestedRevert(reverter);
     }
 
     function testZkCheatcodesValueFunctionMockReturn() public {
