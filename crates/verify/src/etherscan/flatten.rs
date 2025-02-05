@@ -114,8 +114,6 @@ Diagnostics: {diags}",
 
         Ok(())
     }
-
-
 }
 
 /// Strips [BuildMetadata] from the [Version]
