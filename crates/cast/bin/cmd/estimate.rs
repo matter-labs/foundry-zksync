@@ -2,8 +2,6 @@ use crate::tx::{CastTxBuilder, SenderKind};
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockId;
-use alloy_zksync::network::transaction_request::TransactionRequest as ZkTransactionRequest;
-use cast::ZkTransactionOpts;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -13,6 +11,8 @@ use foundry_cli::{
 use foundry_common::ens::NameOrAddress;
 use foundry_config::Config;
 use std::str::FromStr;
+
+mod zksync;
 
 /// CLI arguments for `cast estimate`.
 #[derive(Debug, Parser)]
@@ -44,7 +44,11 @@ pub struct EstimateArgs {
 
     /// Zksync Transaction
     #[command(flatten)]
-    zksync: ZkTransactionOpts,
+    zk_tx: zksync::ZkTransactionOpts,
+
+    /// Force a zksync eip-712 transaction and apply CREATE overrides
+    #[arg(long = "zksync")]
+    zk_force: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -73,7 +77,9 @@ pub enum EstimateSubcommands {
 
 impl EstimateArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, mut tx, block, eth, command, zksync } = self;
+        let Self { to, mut sig, mut args, mut tx, block, eth, command, zk_tx, zk_force } = self;
+
+        let mut zk_code = Default::default();
 
         let config = Config::from(&eth);
         let provider = utils::get_provider(&config)?;
@@ -87,6 +93,12 @@ impl EstimateArgs {
             value,
         }) = command
         {
+            if zk_tx.has_zksync_args() || zk_force {
+                // NOTE(zk): `with_code_sig_and_args` decodes the code and appends it to the input
+                // we want the raw decoded constructor input from that function so we keep the code
+                // to encode the CONTRACT_CREATOR call later
+                zk_code = code.clone();
+            }
             sig = create_sig;
             args = create_args;
             if let Some(value) = value {
@@ -106,11 +118,8 @@ impl EstimateArgs {
             .build_raw(sender)
             .await?;
 
-        let gas = if zksync.has_zksync_args() {
-            let zk_provider = utils::get_provider_zksync(&config)?;
-            let mut zk_tx: ZkTransactionRequest = tx.inner.clone().into();
-            zksync.apply_to_tx(&mut zk_tx);
-            zk_provider.estimate_gas(&zk_tx).await?
+        let gas = if zk_tx.has_zksync_args() || zk_force {
+            zksync::estimate_gas(zk_tx, &config, tx, zk_code).await?
         } else {
             provider.estimate_gas(&tx).block(block.unwrap_or_default()).await?
         };
