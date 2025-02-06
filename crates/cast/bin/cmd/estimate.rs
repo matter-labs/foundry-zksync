@@ -83,7 +83,6 @@ impl EstimateArgs {
 
         let config = Config::from(&eth);
         let provider = utils::get_provider(&config)?;
-        //let provider = utils::get_provider_zksync(&config)?;
         let sender = SenderKind::from_wallet_opts(eth.wallet).await?;
 
         let code = if let Some(EstimateSubcommands::Create {
