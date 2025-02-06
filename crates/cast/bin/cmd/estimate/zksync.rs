@@ -27,10 +27,10 @@ pub struct ZkTransactionOpts {
     #[arg(long = "zk-factory-deps", value_parser = parse_hex_bytes, value_delimiter = ',')]
     pub factory_deps: Vec<Bytes>,
 
-    /// Custom signature for the ZKSync transaction
-    #[arg(long = "zk-custom-signature", value_parser = parse_hex_bytes)]
-    pub custom_signature: Option<Bytes>,
-
+    // TODO: fix custom signature serialization and then readd this field
+    // /// Custom signature for the ZKSync transaction
+    // #[arg(long = "zk-custom-signature", value_parser = parse_hex_bytes)]
+    // pub custom_signature: Option<Bytes>,
     /// Gas per pubdata for the ZKSync transaction
     #[arg(long = "zk-gas-per-pubdata")]
     pub gas_per_pubdata: Option<U256>,
@@ -42,10 +42,10 @@ fn parse_hex_bytes(s: &str) -> Result<Bytes, String> {
 
 impl ZkTransactionOpts {
     pub fn has_zksync_args(&self) -> bool {
-        self.paymaster_address.is_some() ||
-            !self.factory_deps.is_empty() ||
-            self.custom_signature.is_some() ||
-            self.gas_per_pubdata.is_some()
+        self.paymaster_address.is_some()
+            || !self.factory_deps.is_empty()
+            // TODO: readd this when fixing seraialization || self.custom_signature.is_some()
+            || self.gas_per_pubdata.is_some()
     }
 }
 
@@ -62,9 +62,10 @@ pub async fn estimate_gas(
         tx.set_gas_per_pubdata(gas_per_pubdata)
     }
 
-    if let Some(custom_signature) = &zk_tx.custom_signature {
-        tx.set_custom_signature(custom_signature.clone());
-    }
+    // TODO: Fix custom_signature serialization and then readd this field
+    // if let Some(custom_signature) = &zk_tx.custom_signature {
+    //     tx.set_custom_signature(custom_signature.clone());
+    // }
 
     if let (Some(paymaster), Some(paymaster_input)) =
         (zk_tx.paymaster_address, zk_tx.paymaster_input.clone())
