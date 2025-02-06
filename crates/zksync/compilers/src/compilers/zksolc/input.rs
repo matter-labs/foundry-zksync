@@ -1,6 +1,8 @@
 //! zksolc input
-use super::{settings::ZkSolcSettings, ZkSettings};
-use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
+use super::{
+    settings::{ZkSolcError, ZkSolcSettings, ZkSolcWarning},
+    ZkSettings,
+};
 use foundry_compilers::{
     artifacts::{Remapping, Source, Sources},
     compilers::{solc::SolcLanguage, CompilerInput},
@@ -92,10 +94,10 @@ pub struct ZkSolcInput {
     // as `settings`. For `zksolc` 1.5.7+, they are specified inside `settings`. Since we want to
     // support both options at the time, we duplicate fields from `settings` here.
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
-    pub suppressed_warnings: HashSet<WarningType>,
+    pub suppressed_warnings: HashSet<ZkSolcWarning>,
     /// suppressed errors
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
-    pub suppressed_errors: HashSet<ErrorType>,
+    pub suppressed_errors: HashSet<ZkSolcError>,
 }
 
 /// Default `language` field is set to `"Solidity"`.

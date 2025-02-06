@@ -1,4 +1,3 @@
-use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Severity},
     error::SolcError,
@@ -12,8 +11,8 @@ use foundry_zksync_compilers::{
         zksolc::{
             get_solc_version_info,
             settings::{
-                BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata,
-                ZkSolcSettings,
+                BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata, ZkSolcError,
+                ZkSolcSettings, ZkSolcWarning,
             },
             ZkSettings, ZkSolc, ZkSolcCompiler,
         },
@@ -74,10 +73,10 @@ pub struct ZkSyncConfig {
     pub optimizer_details: Option<OptimizerDetails>,
 
     // zksolc suppressed warnings.
-    pub suppressed_warnings: HashSet<WarningType>,
+    pub suppressed_warnings: HashSet<ZkSolcWarning>,
 
     // zksolc suppressed errors.
-    pub suppressed_errors: HashSet<ErrorType>,
+    pub suppressed_errors: HashSet<ZkSolcError>,
 }
 
 impl Default for ZkSyncConfig {

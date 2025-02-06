@@ -1,6 +1,5 @@
 //! zksolc settings
 use crate::artifacts::output_selection::OutputSelection as ZkOutputSelection;
-use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_compilers::{
     artifacts::{
         output_selection::OutputSelection, serde_helpers, EvmVersion, Libraries, Remapping,
@@ -29,6 +28,46 @@ pub enum Codegen {
     Yul,
     /// The EVM legacy assembly IR.
     EVMLA,
+}
+
+/// `zksolc` warnings that can be suppressed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum ZkSolcWarning {
+    /// The eponymous feature.
+    TxOrigin,
+    /// The eponymous feature.
+    AssemblyCreate,
+}
+
+impl FromStr for ZkSolcWarning {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "txorigin" => Ok(Self::TxOrigin),
+            s => Err(format!("Unknown zksolc warning: {s}")),
+        }
+    }
+}
+
+/// `zksolc` errors that can be suppressed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum ZkSolcError {
+    /// `sendtransfer` error: Using `send()` or `transfer()` methods on `address payable` instead
+    /// of `call()`.
+    SendTransfer,
+}
+impl FromStr for ZkSolcError {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "sendtransfer" => Ok(Self::SendTransfer),
+            s => Err(format!("Unknown zksolc error: {s}")),
+        }
+    }
 }
 
 /// zksolc standard json input settings. See:
@@ -85,10 +124,10 @@ pub struct ZkSettings {
     pub force_evmla: bool,
     /// Suppressed `zksolc` warnings.
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
-    pub suppressed_warnings: HashSet<WarningType>,
+    pub suppressed_warnings: HashSet<ZkSolcWarning>,
     /// Suppressed `zksolc` errors.
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
-    pub suppressed_errors: HashSet<ErrorType>,
+    pub suppressed_errors: HashSet<ZkSolcError>,
 }
 
 /// Analogous to SolcSettings for zksolc compiler
