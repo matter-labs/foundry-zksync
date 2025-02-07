@@ -13,7 +13,7 @@ use super::EtherscanVerificationProvider;
 ///
 /// Returns source, contract_name and the source [`CodeFormat`]
 pub trait EtherscanZksyncSourceProvider {
-    fn zk_source(
+    fn zksync_source(
         &self,
         _args: &VerifyArgs,
         _context: &ZkVerificationContext,
@@ -48,7 +48,7 @@ impl EtherscanVerificationProvider {
         let provider = self.source_provider(args);
         match &context {
             CompilerVerificationContext::Solc(context) => provider.source(args, context),
-            CompilerVerificationContext::ZkSolc(context) => provider.zk_source(args, context),
+            CompilerVerificationContext::ZkSolc(context) => provider.zksync_source(args, context),
         }
     }
 }

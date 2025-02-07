@@ -55,7 +55,7 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
 }
 
 impl EtherscanZksyncSourceProvider for EtherscanStandardJsonSource {
-    fn zk_source(
+    fn zksync_source(
         &self,
         _args: &VerifyArgs,
         context: &ZkVerificationContext,

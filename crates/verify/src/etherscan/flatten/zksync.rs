@@ -22,7 +22,7 @@ use crate::{
 use super::{strip_build_meta, EtherscanFlattenedSource};
 
 impl EtherscanZksyncSourceProvider for EtherscanFlattenedSource {
-    fn zk_source(
+    fn zksync_source(
         &self,
         args: &VerifyArgs,
         context: &ZkVerificationContext,
