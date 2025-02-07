@@ -23,7 +23,9 @@ pub trait EtherscanZksyncSourceProvider {
 }
 
 impl EtherscanVerificationProvider {
-    pub(super) fn populate_context_verify_args(
+    /// Populates the `verify_args` request with context-specific
+    /// information
+    pub(super) fn populate_verify_args_extras(
         &self,
         context: &CompilerVerificationContext,
         verify_args: &mut VerifyContract,
@@ -40,6 +42,7 @@ impl EtherscanVerificationProvider {
         }
     }
 
+    /// Dispatches the correct source request depending on the context
     pub fn dispatch_source_provider(
         &self,
         args: &VerifyArgs,

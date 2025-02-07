@@ -303,6 +303,8 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<VerifyContract> {
+        // NOTE(zk): will retrieve the zksync source set if this is a zksolc
+        // verification request
         let (source, contract_name, code_format) = self.dispatch_source_provider(args, context)?;
 
         let mut compiler_version = context.compiler_version().clone();
@@ -318,7 +320,9 @@ impl EtherscanVerificationProvider {
             VerifyContract::new(args.address, contract_name, source, compiler_version)
                 .constructor_arguments(constructor_args)
                 .code_format(code_format);
-        self.populate_context_verify_args(context, &mut verify_args);
+
+        // NOTE(zk): add zksunc-specific items to the request
+        self.populate_verify_args_extras(context, &mut verify_args);
 
         if args.via_ir {
             // we explicitly set this __undocumented__ argument to true if provided by the user,
