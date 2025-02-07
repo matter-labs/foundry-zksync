@@ -11,8 +11,7 @@ use foundry_common::{
     reports::{report_kind, ReportKind},
     TestFunctionExt,
 };
-use foundry_evm::traces::CallKind;
-use foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS;
+use foundry_evm::{constants::HARDHAT_CONSOLE_ADDRESS, traces::CallKind};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::BTreeMap, fmt::Display};

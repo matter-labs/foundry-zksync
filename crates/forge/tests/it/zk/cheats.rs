@@ -80,6 +80,29 @@ async fn test_zk_cheat_expect_emit_works() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_zk_cheat_expect_revert_works() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new("test(ExpectRevert$|FailExpectRevert)", "ZkCheatcodesTest", ".*");
+
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_cheat_expect_revert_works_with_internal_reverts() {
+    let mut runner = TEST_DATA_DEFAULT.runner_zksync();
+    let mut config = runner.config.as_ref().clone();
+    config.allow_internal_expect_revert = true;
+    runner.config = std::sync::Arc::new(config);
+    let filter = Filter::new(
+        "testExpectRevertDeeperDepthsWithInternalRevertsEnabled",
+        "ZkCheatcodesTest",
+        ".*",
+    );
+
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheat_expect_call_works() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testExpectCall", "ZkCheatcodesTest", ".*");
@@ -140,7 +163,12 @@ async fn test_zk_record_logs() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheatcodes_in_zkvm() {
-    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let mut runner = TEST_DATA_DEFAULT.runner_zksync();
+    let mut config = runner.config.as_ref().clone();
+    // This is now false by default so in order to expect a revert from an internal call, we need to
+    // set it to true https://github.com/foundry-rs/foundry/pull/9537
+    config.allow_internal_expect_revert = true;
+    runner.config = std::sync::Arc::new(config);
     let filter = Filter::new(".*", "ZkCheatcodesInZkVmTest", ".*");
 
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
@@ -158,6 +186,7 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
     setup_deploy_prj(&mut prj);
 
     cmd.forge_fuse();
+    // We added the optimizer flag which is now false by default so we need to set it to true
     run_zk_script_test(
         prj.root(),
         &mut cmd,
@@ -165,7 +194,7 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
         "DeployCounterWithBytecodeHash",
         Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts cyfrin/zksync-contracts"),
         2,
-        Some(&["-vvvvv", "--via-ir", "--system-mode", "true", "--broadcast"]),
+        Some(&["-vvvvv", "--via-ir", "--system-mode", "true", "--broadcast", "--optimize", "true"]),
     ).await;
 });
 

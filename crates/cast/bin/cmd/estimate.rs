@@ -6,10 +6,9 @@ use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
-    utils::{self, parse_ether_value},
+    utils::{self, parse_ether_value, LoadConfig},
 };
 use foundry_common::ens::NameOrAddress;
-use foundry_config::Config;
 use std::str::FromStr;
 
 mod zksync;
@@ -81,7 +80,7 @@ impl EstimateArgs {
 
         let mut zk_code = Default::default();
 
-        let config = Config::from(&eth);
+        let config = eth.load_config()?;
         let provider = utils::get_provider(&config)?;
         let sender = SenderKind::from_wallet_opts(eth.wallet).await?;
 

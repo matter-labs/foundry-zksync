@@ -338,7 +338,6 @@ impl SessionSource {
                         self.config.evm_opts.clone(),
                         None,
                         None,
-                        Some(self.solc.version.clone()),
                         strategy.runner.new_cheatcode_inspector_strategy(strategy.context.as_mut()),
                     )
                     .into(),
