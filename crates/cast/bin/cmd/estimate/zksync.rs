@@ -53,7 +53,7 @@ pub async fn estimate_gas(
     zk_tx: ZkTransactionOpts,
     config: &Config,
     evm_tx: WithOtherFields<TransactionRequest>,
-    zk_code: String,
+    zk_code: Option<String>,
 ) -> Result<u64> {
     let zk_provider = utils::get_provider_zksync(config)?;
     let is_create = evm_tx.to == Some(TxKind::Create);
@@ -75,7 +75,7 @@ pub async fn estimate_gas(
 
     if is_create {
         let evm_input: Vec<u8> = tx.input().cloned().map(|bytes| bytes.into()).unwrap_or_default();
-        let zk_code_decoded = hex::decode(zk_code)?;
+        let zk_code_decoded = hex::decode(zk_code.unwrap_or_default())?;
         // constructor input gets appended to the bytecode
         let zk_input = &evm_input[zk_code_decoded.len()..];
         tx = tx.with_create_params(

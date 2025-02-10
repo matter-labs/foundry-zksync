@@ -78,8 +78,6 @@ impl EstimateArgs {
     pub async fn run(self) -> Result<()> {
         let Self { to, mut sig, mut args, mut tx, block, eth, command, zk_tx, zk_force } = self;
 
-        let mut zk_code = Default::default();
-
         let config = eth.load_config()?;
         let provider = utils::get_provider(&config)?;
         let sender = SenderKind::from_wallet_opts(eth.wallet).await?;
@@ -91,12 +89,6 @@ impl EstimateArgs {
             value,
         }) = command
         {
-            if zk_tx.has_zksync_args() || zk_force {
-                // NOTE(zk): `with_code_sig_and_args` decodes the code and appends it to the input
-                // we want the raw decoded constructor input from that function so we keep the code
-                // to encode the CONTRACT_CREATOR call later
-                zk_code = code.clone();
-            }
             sig = create_sig;
             args = create_args;
             if let Some(value) = value {
@@ -111,13 +103,16 @@ impl EstimateArgs {
             .await?
             .with_to(to)
             .await?
-            .with_code_sig_and_args(code, sig, args)
+            // NOTE(zk): `with_code_sig_and_args` decodes the code and appends it to the input
+            // we want the raw decoded constructor input from that function so we keep the code
+            // to encode the CONTRACT_CREATOR call later
+            .with_code_sig_and_args(code.clone(), sig, args)
             .await?
             .build_raw(sender)
             .await?;
 
         let gas = if zk_tx.has_zksync_args() || zk_force {
-            zksync::estimate_gas(zk_tx, &config, tx, zk_code).await?
+            zksync::estimate_gas(zk_tx, &config, tx, code).await?
         } else {
             provider.estimate_gas(&tx).block(block.unwrap_or_default()).await?
         };
