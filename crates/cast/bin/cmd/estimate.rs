@@ -11,6 +11,8 @@ use foundry_cli::{
 use foundry_common::ens::NameOrAddress;
 use std::str::FromStr;
 
+mod zksync;
+
 /// CLI arguments for `cast estimate`.
 #[derive(Debug, Parser)]
 pub struct EstimateArgs {
@@ -38,6 +40,14 @@ pub struct EstimateArgs {
 
     #[command(flatten)]
     eth: EthereumOpts,
+
+    /// Zksync Transaction
+    #[command(flatten)]
+    zk_tx: zksync::ZkTransactionOpts,
+
+    /// Force a zksync eip-712 transaction and apply CREATE overrides
+    #[arg(long = "zksync")]
+    zk_force: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -66,7 +76,7 @@ pub enum EstimateSubcommands {
 
 impl EstimateArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, mut tx, block, eth, command } = self;
+        let Self { to, mut sig, mut args, mut tx, block, eth, command, zk_tx, zk_force } = self;
 
         let config = eth.load_config()?;
         let provider = utils::get_provider(&config)?;
@@ -93,12 +103,20 @@ impl EstimateArgs {
             .await?
             .with_to(to)
             .await?
-            .with_code_sig_and_args(code, sig, args)
+            // NOTE(zk): `with_code_sig_and_args` decodes the code and appends it to the input
+            // we want the raw decoded constructor input from that function so we keep the code
+            // to encode the CONTRACT_CREATOR call later
+            .with_code_sig_and_args(code.clone(), sig, args)
             .await?
             .build_raw(sender)
             .await?;
 
-        let gas = provider.estimate_gas(&tx).block(block.unwrap_or_default()).await?;
+        let gas = if zk_tx.has_zksync_args() || zk_force {
+            zksync::estimate_gas(zk_tx, &config, tx, code).await?
+        } else {
+            provider.estimate_gas(&tx).block(block.unwrap_or_default()).await?
+        };
+
         sh_println!("{gas}")?;
         Ok(())
     }

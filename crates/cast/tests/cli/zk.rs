@@ -59,6 +59,29 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
         .get_output()
         .stdout_lossy();
 
+    // Test cast estimate with paymaster params
+    let output = cmd
+        .cast_fuse()
+        .args([
+            "estimate",
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "increment()",
+            "--private-key",
+            &private_key,
+            "--rpc-url",
+            &url,
+            "--zk-paymaster-address",
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+            "--zk-paymaster-input",
+            "0x8c5a344500000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    let output: u32 = output.trim().parse().unwrap();
+    assert!(output > 0);
+
     // Interact with the counter using the paymaster
     cmd.cast_fuse().args([
         "send",
@@ -135,4 +158,53 @@ casttest!(test_zk_cast_without_paymaster, async |_prj, cmd| {
         .stdout_lossy();
 
     assert!(balance_after != balance_before);
+});
+
+// tests that `cast estimate --create` is working correctly.
+casttest!(test_zk_cast_estimate_contract_deploy_gas, async |_prj, cmd| {
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+
+    let addr = "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049";
+
+    let output = cmd
+        .args([
+            "estimate",
+            "--rpc-url",
+            &url,
+            "--from",
+            addr,
+            "--zksync",
+            "--create",
+            COUNTER_BYTECODE,
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    let output: u32 = output.trim().parse().unwrap();
+    assert!(output > 0);
+
+    // empty contract with constructor(uint256) function
+    let bytecode_with_constructor = "000000600310027000000010033001970000000100200190000000130000c13d0000008002000039000000400020043f000000040030008c000000330000413d000000000101043b0000001401100197000000150010009c000000330000c13d0000000001000416000000000001004b000000330000c13d000000000100041a000000800010043f00000016010000410000003d0001042e0000000002000416000000000002004b000000330000c13d0000001f0230003900000011022001970000008002200039000000400020043f0000001f0430018f00000012053001980000008002500039000000240000613d0000008006000039000000000701034f000000007807043c0000000006860436000000000026004b000000200000c13d000000000004004b000000310000613d000000000151034f0000000304400210000000000502043300000000054501cf000000000545022f000000000101043b0000010004400089000000000141022f00000000014101cf000000000151019f0000000000120435000000200030008c000000350000813d00000000010000190000003e00010430000000800100043d000000000010041b00000020010000390000010000100443000001200000044300000013010000410000003d0001042e0000003c000004320000003d0001042e0000003e00010430000000000000000000000000000000000000000000000000000000000000000000000000ffffffff00000000000000000000000000000000000000000000000000000001ffffffe000000000000000000000000000000000000000000000000000000000ffffffe00000000200000000000000000000000000000040000001000000000000000000ffffffff000000000000000000000000000000000000000000000000000000008381f58a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000800000000000000000";
+
+    let output = cmd
+        .cast_fuse()
+        .args([
+            "estimate",
+            "--rpc-url",
+            &url,
+            "--from",
+            addr,
+            "--zksync",
+            "--create",
+            bytecode_with_constructor,
+            "constructor(uint256)",
+            "1",
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+    let output: u32 = output.trim().parse().unwrap();
+    assert!(output > 0);
 });
