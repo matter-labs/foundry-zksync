@@ -26,6 +26,8 @@ use zksync_vm_interface::storage::{StoragePtr, WriteStorage};
 
 use crate::convert::{ConvertAddress, ConvertH256, ConvertU256};
 
+use super::tracers::cheatcode::{get_calldata, SELECTOR_EXECUTE_TRANSACTION};
+
 type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
 type CallStackEntry = vm_state::CallStackEntry<8, EncodingModeProduction>;
 type DecodedOpcode = ZkDecodedOpcode<8, EncodingModeProduction>;
@@ -112,6 +114,24 @@ impl CallActions {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq)]
+pub(crate) enum TxExecutionStatus {
+    #[default]
+    Pending,
+    Executing,
+    Finished,
+}
+
+#[derive(Debug, Default, Clone)]
+pub(crate) struct TxExecutionTracker {
+    depth: u64,
+    status: TxExecutionStatus,
+}
+
+impl TxExecutionTracker {
+    pub(crate) fn track_transaction(&self) {}
+}
+
 /// Tracks state of FarCalls to be able to return from them earlier.
 /// This effectively short-circuits the execution and ignores following opcodes.
 #[derive(Debug, Default, Clone)]
@@ -121,6 +141,7 @@ pub(crate) struct FarCallHandler {
     pub(crate) current_far_call: Option<FarCallOpcode>,
     pub(crate) immediate_return: Option<Vec<u8>>,
     call_actions: CallActions,
+    tx_execution: TxExecutionTracker,
 }
 
 impl FarCallHandler {
@@ -147,6 +168,80 @@ impl FarCallHandler {
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             self.call_actions.track();
         }
+    }
+
+    /// Tracks the call stack for the actual transaction execution via `executeTransaction`.
+    pub(crate) fn track_tx_execution<H: HistoryMode>(
+        &mut self,
+        state: &VmLocalStateData<'_>,
+        data: &AfterExecutionData,
+        memory: &SimpleMemory<H>,
+    ) -> Option<TxExecutionStatus> {
+        match data.opcode.variant.opcode {
+            Opcode::FarCall(_) => {
+                let current = state.vm_local_state.callstack.current;
+                match self.tx_execution.status {
+                    TxExecutionStatus::Pending => {
+                        let calldata = get_calldata(&state, memory);
+                        if calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION) {
+                            // println!(
+                            //     "{}CALL-BEGIN {} | {:?} {:?}",
+                            //     "\t".repeat(self.tx_execution.depth as usize),
+                            //     hex::encode(&calldata),
+                            //     current.msg_sender,
+                            //     current.code_address,
+                            // );
+                            self.tx_execution.status = TxExecutionStatus::Executing;
+                            self.tx_execution.depth = 1;
+
+                            return Some(TxExecutionStatus::Executing);
+                        }
+                    }
+                    TxExecutionStatus::Executing => {
+                        let calldata = get_calldata(&state, memory);
+                        // println!(
+                        //     "{}CALL {} | {:?} {:?}",
+                        //     "\t".repeat(self.tx_execution.depth as usize),
+                        //     hex::encode(&calldata),
+                        //     current.msg_sender,
+                        //     current.code_address,
+                        // );
+                        self.tx_execution.depth = self
+                            .tx_execution
+                            .depth
+                            .checked_add(1)
+                            .expect("overflow tracking tx execution depth");
+                    }
+                    TxExecutionStatus::Finished => (),
+                }
+            }
+            Opcode::Ret(_) => match self.tx_execution.status {
+                TxExecutionStatus::Executing => {
+                    let current = state.vm_local_state.callstack.current;
+                    self.tx_execution.depth = self
+                        .tx_execution
+                        .depth
+                        .checked_sub(1)
+                        .expect("underflow tracking tx execution depth");
+
+                    if self.tx_execution.depth == 0 {
+                        self.tx_execution.status = TxExecutionStatus::Finished;
+                        // println!("{}CALL-BEGIN-END", "\t".repeat(self.tx_execution.depth as usize));
+                        return Some(TxExecutionStatus::Finished);
+                    } else {
+                        // println!("{}END", "\t".repeat(self.tx_execution.depth as usize));
+                    }
+                }
+                TxExecutionStatus::Pending | TxExecutionStatus::Finished => (),
+            },
+            _ => (),
+        };
+
+        None
+    }
+
+    pub(crate) fn is_tx_executing(&self) -> bool {
+        matches!(self.tx_execution.status, TxExecutionStatus::Executing)
     }
 
     /// Attempts to return the preset data ignoring any following opcodes, if set.
@@ -207,6 +302,11 @@ impl FarCallHandler {
             // Just in case to avoid any gas costs related to memory
             state.local_state.callstack.current.heap_bound = u32::MAX;
         }
+    }
+
+    /// Returns any immediate [CallAction]s for the currently active FarCall.
+    pub(crate) fn immediate_actions(&mut self) -> &Vec<CallAction> {
+        &self.call_actions.immediate
     }
 
     /// Returns immediate [CallAction]s for the currently active FarCall.
@@ -470,4 +570,11 @@ pub(crate) fn parse<H: HistoryMode>(
     } else {
         ParsedFarCall::SimpleCall { to: current.code_address, value, calldata }
     }
+}
+
+pub(crate) fn get_msg_value_recipient(state: &VmLocalStateData<'_>) -> H160 {
+    let address = state.vm_local_state.registers[MSG_VALUE_SIMULATOR_DATA_ADDRESS_REG as usize]
+        .value
+        .to_h256();
+    address.to_h160()
 }

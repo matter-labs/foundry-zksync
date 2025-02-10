@@ -17,20 +17,29 @@ use zksync_multivm::{
     vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
     zk_evm_latest::{
         tracing::{AfterDecodingData, AfterExecutionData, BeforeExecutionData, VmLocalStateData},
-        zkevm_opcode_defs::{FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER},
+        zkevm_opcode_defs::{
+            FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
+            RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
+        },
     },
 };
 use zksync_types::{
-    ethabi, get_code_key, StorageValue, BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256,
-    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, SYSTEM_CONTEXT_ADDRESS, U256,
+    ethabi, get_code_key, get_nonce_key, utils::storage_key_for_eth_balance, StorageValue,
+    BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS, U256,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
-    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
+    cheatcodes::get_nonce,
+    compute_create2_address, compute_create_address,
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     hash_bytecode,
+    state::{parse_full_nonce, FullNonce},
     vm::{
-        farcall::{CallAction, CallDepth, FarCallHandler},
+        farcall::{self, CallAction, CallDepth, FarCallHandler, ParsedFarCall, TxExecutionStatus},
+        storage_recorder::{CallAddresses, CallType, StorageRecorder},
+        storage_view::StorageViewRecorder,
         ZkEnv,
     },
     ZkPaymasterData, EMPTY_CODE,
@@ -48,7 +57,7 @@ const SELECTOR_ACCOUNT_VERSION: [u8; 4] = hex!("bb0fd610");
 /// to account for transitive calls.
 ///
 /// executeTransaction(bytes32, bytes32, tuple)
-const SELECTOR_EXECUTE_TRANSACTION: [u8; 4] = hex!("df9c1589");
+pub(crate) const SELECTOR_EXECUTE_TRANSACTION: [u8; 4] = hex!("df9c1589");
 
 /// Selector for retrieving the current block number.
 /// This is used to override the current `block.number` to foundry test's context.
@@ -80,6 +89,11 @@ const SELECTOR_BLOCK_HASH: [u8; 4] = hex!("80b41246");
 ///
 /// Selector for `setImmutables(address, (uint256,bytes32)[])",
 const SELECTOR_IMMUTABLE_SIMULATOR_SET: [u8; 4] = hex!("ad7e232e");
+
+/// create(bytes32, bytes32, bytes)
+const SELECTOR_CONTRACT_DEPLOYER_CREATE: [u8; 4] = hex!("9c4d535b");
+/// create2(bytes32, bytes32, bytes)
+const SELECTOR_CONTRACT_DEPLOYER_CREATE2: [u8; 4] = hex!("3cda3351");
 
 /// Represents the context for [CheatcodeContext]
 #[derive(Debug, Default)]
@@ -151,6 +165,7 @@ pub struct CheatcodeTracer {
     farcall_handler: FarCallHandler,
     /// Immutables recorded via calls to ImmutableSimulator::setImmutables.
     recorded_immutables: HashMap<H160, HashMap<rU256, FixedBytes<32>>>,
+    count: u64,
 }
 
 impl CheatcodeTracer {
@@ -161,7 +176,14 @@ impl CheatcodeTracer {
         result: Arc<OnceCell<CheatcodeTracerResult>>,
         call_context: CallContext,
     ) -> Self {
-        CheatcodeTracer { mocked_calls, expected_calls, call_context, result, ..Default::default() }
+        CheatcodeTracer {
+            mocked_calls,
+            expected_calls,
+            call_context,
+            result,
+            count: 100,
+            ..Default::default()
+        }
     }
 
     /// Check if the given address's code is empty
@@ -192,7 +214,9 @@ impl CheatcodeTracer {
     }
 }
 
-impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for CheatcodeTracer {
+impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMemory<H>>
+    for CheatcodeTracer
+{
     fn before_decoding(&mut self, _state: VmLocalStateData<'_>, _memory: &SimpleMemory<H>) {}
 
     fn after_decoding(
@@ -206,10 +230,15 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
     fn before_execution(
         &mut self,
         _state: VmLocalStateData<'_>,
-        _data: BeforeExecutionData,
+        data: BeforeExecutionData,
         _memory: &SimpleMemory<H>,
-        _storage: StoragePtr<S>,
+        storage: StoragePtr<S>,
     ) {
+        if self.farcall_handler.is_tx_executing() {
+            if let Opcode::Ret(_) = data.opcode.variant.opcode {
+                storage.borrow_mut().record_call_end();
+            }
+        }
     }
 
     fn after_execution(
@@ -220,6 +249,165 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
         storage: StoragePtr<S>,
     ) {
         self.farcall_handler.track_call_actions(&state, &data);
+        let maybe_tx_status_changed =
+            self.farcall_handler.track_tx_execution(&state, &data, memory);
+
+        // Record account accesses
+        if let Some(status) = maybe_tx_status_changed {
+            match status {
+                TxExecutionStatus::Pending => (),
+                TxExecutionStatus::Executing => storage.borrow_mut().start_recording(),
+                TxExecutionStatus::Finished => storage.borrow_mut().stop_recording(),
+            }
+        }
+        if self.farcall_handler.is_tx_executing() {
+            if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+                let current = state.vm_local_state.callstack.current;
+                // Check if we have the msg.sender override correction scheduled and account for it
+                let msg_sender = self
+                    .farcall_handler
+                    .immediate_actions()
+                    .iter()
+                    .find_map(|action| match action {
+                        CallAction::SetMessageSender(address) => Some(*address),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| current.msg_sender.to_address());
+
+                match farcall::parse(&state, memory) {
+                    ParsedFarCall::ValueCall { value, calldata, recipient, .. } => {
+                        if recipient == CONTRACT_DEPLOYER_ADDRESS &&
+                            (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) ||
+                                calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
+                        {
+                            let mut params = ethabi::decode(
+                                &[
+                                    ethabi::ParamType::Uint(256),
+                                    ethabi::ParamType::Uint(256),
+                                    ethabi::ParamType::Bytes,
+                                ],
+                                &calldata[4..],
+                            )
+                            .expect("failed to decode transfer parameters");
+
+                            let salt = params
+                                .remove(0)
+                                .into_uint()
+                                .expect("must be valid uint256")
+                                .to_h256();
+                            let bytecode_hash = params
+                                .remove(0)
+                                .into_uint()
+                                .expect("must be valid uint256")
+                                .to_h256();
+                            let constructor_input =
+                                params.remove(0).into_bytes().expect("must be valid uint256");
+
+                            let address = if calldata
+                                .starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE)
+                            {
+                                // get nonce and calculate address
+                                let full_nonce = storage
+                                    .borrow_mut()
+                                    .read_value(&get_nonce_key(&msg_sender.to_h160()));
+                                let FullNonce { deploy_nonce, .. } =
+                                    parse_full_nonce(full_nonce.to_ru256());
+                                compute_create_address(msg_sender, deploy_nonce as u32)
+                            } else if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2) {
+                                compute_create2_address(
+                                    msg_sender,
+                                    bytecode_hash,
+                                    salt,
+                                    &constructor_input,
+                                )
+                            } else {
+                                unreachable!()
+                            };
+                            storage.borrow_mut().record_call_start(
+                                CallType::Create(bytecode_hash),
+                                msg_sender,
+                                address,
+                                constructor_input.to_vec(),
+                                value.to_ru256(),
+                            );
+                        } else {
+                            storage.borrow_mut().record_call_start(
+                                CallType::Call,
+                                msg_sender,
+                                recipient.to_address(),
+                                calldata,
+                                value.to_ru256(),
+                            );
+                        }
+                    }
+                    ParsedFarCall::SimpleCall { to, value, calldata } => {
+                        if to == CONTRACT_DEPLOYER_ADDRESS &&
+                            (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) ||
+                                calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
+                        {
+                            let mut params = ethabi::decode(
+                                &[
+                                    ethabi::ParamType::Uint(256),
+                                    ethabi::ParamType::Uint(256),
+                                    ethabi::ParamType::Bytes,
+                                ],
+                                &calldata[4..],
+                            )
+                            .expect("failed to decode transfer parameters");
+
+                            let salt = params
+                                .remove(0)
+                                .into_uint()
+                                .expect("must be valid uint256")
+                                .to_h256();
+                            let bytecode_hash = params
+                                .remove(0)
+                                .into_uint()
+                                .expect("must be valid uint256")
+                                .to_h256();
+                            let constructor_input =
+                                params.remove(0).into_bytes().expect("must be valid uint256");
+
+                            let address = if calldata
+                                .starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE)
+                            {
+                                // get nonce and calculate address
+                                let full_nonce = storage
+                                    .borrow_mut()
+                                    .read_value(&get_nonce_key(&msg_sender.to_h160()));
+                                let FullNonce { deploy_nonce, .. } =
+                                    parse_full_nonce(full_nonce.to_ru256());
+                                compute_create_address(msg_sender, deploy_nonce as u32)
+                            } else if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2) {
+                                compute_create2_address(
+                                    msg_sender,
+                                    bytecode_hash,
+                                    salt,
+                                    &constructor_input,
+                                )
+                            } else {
+                                unreachable!()
+                            };
+                            storage.borrow_mut().record_call_start(
+                                CallType::Create(bytecode_hash),
+                                msg_sender,
+                                address,
+                                constructor_input.to_vec(),
+                                value.to_ru256(),
+                            );
+                        } else {
+                            storage.borrow_mut().record_call_start(
+                                CallType::Call,
+                                msg_sender,
+                                to.to_address(),
+                                calldata,
+                                value.to_ru256(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         // Checks contract calls for expectCall cheatcode
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
@@ -472,7 +660,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
     }
 }
 
-impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
+impl<S: WriteStorage + StorageViewRecorder, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
     fn initialize_tracer(&mut self, _state: &mut ZkSyncVmState<S, H>) {}
 
     fn finish_cycle(
@@ -512,7 +700,10 @@ impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for CheatcodeTracer {
     }
 }
 
-fn get_calldata<H: HistoryMode>(state: &VmLocalStateData<'_>, memory: &SimpleMemory<H>) -> Vec<u8> {
+pub(crate) fn get_calldata<H: HistoryMode>(
+    state: &VmLocalStateData<'_>,
+    memory: &SimpleMemory<H>,
+) -> Vec<u8> {
     let ptr = state.vm_local_state.registers[CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER as usize];
     assert!(ptr.is_pointer);
     let fat_data_pointer = FatPointer::from_u256(ptr.value);

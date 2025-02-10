@@ -214,15 +214,15 @@ pub fn try_decode_create2(data: &[u8]) -> Result<(H256, H256, Vec<u8>)> {
 }
 
 /// Compute a CREATE address according to zksync
-pub fn compute_create_address(sender: Address, nonce: u64) -> Address {
-    get_create_zksync_address(sender.to_h160(), Nonce(nonce as u32)).to_address()
+pub fn compute_create_address(sender: Address, nonce: u32) -> Address {
+    get_create_zksync_address(sender.to_h160(), Nonce(nonce)).to_address()
 }
 
 /// Compute a CREATE2 address according to zksync
 pub fn compute_create2_address(
     sender: Address,
     bytecode_hash: H256,
-    salt: B256,
+    salt: H256,
     constructor_input: &[u8],
 ) -> Address {
     const CREATE2_PREFIX: &[u8] = b"zksyncCreate2";

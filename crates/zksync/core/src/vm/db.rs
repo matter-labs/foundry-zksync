@@ -23,16 +23,17 @@ use crate::{
     state::FullNonce,
 };
 
+use super::storage_recorder::{AccountAccess, AccountAccesses, CallAddresses, CallType, StorageRecorder};
+
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
 
 pub struct ZKVMData<'a, DB: Database> {
-    // pub db: &'a mut DB,
-    // pub journaled_state: &'a mut JournaledState,
     ecx: &'a mut InnerEvmContext<DB>,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: sHashMap<StorageKey, StorageValue>,
     pub accesses: Option<&'a mut RecordAccess>,
+    pub account_accesses: AccountAccesses,
 }
 
 impl<DB> Debug for ZKVMData<'_, DB>
@@ -75,7 +76,13 @@ where
         let empty_code = vec![0u8; 32];
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
-        Self { ecx, factory_deps, override_keys: Default::default(), accesses: None }
+        Self {
+            ecx,
+            factory_deps,
+            override_keys: Default::default(),
+            accesses: None,
+            account_accesses: Default::default(),
+        }
     }
 
     /// Create a new instance of [ZKEVMData] with system contracts.
@@ -117,7 +124,13 @@ where
         let empty_code_hash = hash_bytecode(&empty_code);
         factory_deps.insert(empty_code_hash, empty_code);
 
-        Self { ecx, factory_deps, override_keys, accesses: None }
+        Self {
+            ecx,
+            factory_deps,
+            override_keys,
+            accesses: None,
+            account_accesses: Default::default(),
+        }
     }
 
     /// Extends the currently known factory deps with the provided input
@@ -186,10 +199,56 @@ where
         self.ecx.sload(address, key).unwrap_or_default().data
     }
 
+    pub fn get_account_accesses(&mut self) -> Vec<AccountAccess> {
+        std::mem::take(&mut self.account_accesses).get_records()
+    }
+
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
         let addr = address.to_address();
         self.ecx.load_account(addr).expect("failed loading account");
         self.ecx.sload(addr, idx.to_ru256()).expect("failed sload").to_h256()
+    }
+}
+
+impl<DB> StorageRecorder for &mut ZKVMData<'_, DB>
+where
+    DB: Database,
+    <DB as Database>::Error: Debug,
+{
+    fn start_recording(&mut self) {
+        self.account_accesses.start_recording();
+    }
+
+    fn stop_recording(&mut self) {
+        self.account_accesses.stop_recording();
+    }
+
+    fn record_read(&mut self, key: &StorageKey, value: H256) {
+        self.account_accesses.record_read(key, value);
+    }
+
+    fn record_write(&mut self, key: &StorageKey, old_value: H256, new_value: H256) {
+        self.account_accesses.record_write(key, old_value, new_value);
+    }
+
+    fn record_call_start(
+        &mut self,
+        call_type: CallType,
+        accessor: Address,
+        account: Address,
+        balance: rU256,
+        data: Vec<u8>,
+        value: rU256,
+    ) {
+        self.account_accesses.record_call_start(call_type, accessor, account, balance, data, value);
+    }
+
+    fn record_call_end(&mut self, accessor: Address, account: Address, new_balance: rU256) {
+        self.account_accesses.record_call_end(accessor, account, new_balance);
+    }
+
+    fn pop_call_end_addresses(&mut self) -> CallAddresses {
+        self.account_accesses.pop_call_end_addresses()
     }
 }
 
@@ -202,7 +261,10 @@ where
         if let Some(access) = &mut self.accesses {
             access.reads.entry(key.address().to_address()).or_default().push(key.key().to_ru256());
         }
-        self.read_db(*key.address(), h256_to_u256(*key.key()))
+
+        let value = self.read_db(*key.address(), h256_to_u256(*key.key()));
+        self.record_read(&key, value);
+        value
     }
 
     fn is_write_initial(&mut self, _key: &StorageKey) -> bool {

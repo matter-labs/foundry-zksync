@@ -1,9 +1,15 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-use zksync_types::{StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256};
+use alloy_primitives::{Address, U256};
+use zksync_types::{
+    utils::storage_key_for_eth_balance, StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
+    H160, H256,
+};
 use zksync_vm_interface::storage::{ReadStorage, WriteStorage};
 
-use crate::convert::ConvertH160;
+use crate::convert::{ConvertAddress, ConvertH160, ConvertH256};
+
+use super::storage_recorder::{CallAddresses, CallType, StorageRecorder};
 
 /// `StorageView` is a buffer for `StorageLog`s between storage and transaction execution code.
 /// In order to commit transactions logs should be submitted to the underlying storage
@@ -118,7 +124,7 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     }
 }
 
-impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
+impl<S: ReadStorage + fmt::Debug + StorageRecorder> WriteStorage for StorageView<S> {
     fn read_storage_keys(&self) -> &HashMap<StorageKey, StorageValue> {
         &self.read_storage_keys
     }
@@ -134,6 +140,9 @@ impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
             key = ?key.key(),
             "write value",
         );
+
+        self.storage_handle.record_write(&key, original, value);
+
         self.modified_storage_keys.insert(key, value);
 
         original
@@ -148,11 +157,77 @@ impl<S: ReadStorage + fmt::Debug> WriteStorage for StorageView<S> {
     }
 }
 
+pub trait StorageViewRecorder {
+    fn start_recording(&mut self);
+    fn stop_recording(&mut self);
+    fn record_call_start(
+        &mut self,
+        call_type: CallType,
+        accessor: Address,
+        account: Address,
+        data: Vec<u8>,
+        value: U256,
+    );
+    fn record_call_end(&mut self);
+}
+
+impl<S: ReadStorage + fmt::Debug + StorageRecorder> StorageViewRecorder for StorageView<S> {
+    fn start_recording(&mut self) {
+        self.storage_handle.start_recording();
+    }
+
+    fn stop_recording(&mut self) {
+        self.storage_handle.stop_recording();
+    }
+
+    fn record_call_start(
+        &mut self,
+        call_type: CallType,
+        accessor: Address,
+        account: Address,
+        data: Vec<u8>,
+        value: U256,
+    ) {
+        let balance = self.read_value(&storage_key_for_eth_balance(&account.to_h160())).to_ru256();
+        self.storage_handle.record_call_start(call_type, accessor, account, balance, data, value);
+    }
+
+    fn record_call_end(&mut self) {
+        let CallAddresses { account, accessor } = self.storage_handle.pop_call_end_addresses();
+        let new_balance =
+            self.read_value(&storage_key_for_eth_balance(&account.to_h160())).to_ru256();
+        self.storage_handle.record_call_end(account, accessor, new_balance);
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use alloy_primitives::Address as rAddress;
     use zksync_types::{AccountTreeId, Address, H256};
     use zksync_vm_interface::storage::InMemoryStorage;
+
+    impl StorageRecorder for &InMemoryStorage {
+        fn start_recording(&mut self) {}
+        fn stop_recording(&mut self) {}
+        fn record_read(&mut self, _key: &StorageKey, _value: H256) {}
+        fn record_write(&mut self, _key: &StorageKey, _old_value: H256, _new_value: H256) {}
+        fn record_call_start(
+            &mut self,
+            _call_type: CallType,
+            _accessor: rAddress,
+            _account: rAddress,
+            _balance: U256,
+            _data: Vec<u8>,
+            _value: U256,
+        ) {
+        }
+        fn record_call_end(&mut self, _accessor: rAddress, _account: rAddress, _new_balance: U256) {
+        }
+        fn pop_call_end_addresses(&mut self) -> CallAddresses {
+            Default::default()
+        }
+    }
 
     #[test]
     fn test_storage_access() {

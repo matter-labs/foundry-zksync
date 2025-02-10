@@ -12,7 +12,8 @@ use foundry_cheatcodes::{
         CheatcodeInspectorStrategyRunner, EvmCheatcodeInspectorStrategyRunner,
     },
     Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Ecx, InnerEcx, Result, Vm,
+    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Ecx, InnerEcx, Result,
+    Vm::{self, AccountAccess, AccountAccessKind, StorageAccess},
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_evm::{
@@ -583,8 +584,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     }
                 }
 
-                // record immutable variables
                 if result.execution_result.is_success() {
+                    // record immutable variables
                     for (addr, imm_values) in result.recorded_immutables {
                         let addr = addr.to_address();
                         let keys = imm_values
@@ -600,6 +601,54 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                             addr,
                             keys,
                         );
+                    }
+
+                    // record storage accesses
+                    if let Some(recorded_account_diffs_stack) =
+                        state.recorded_account_diffs_stack.as_mut()
+                    {
+                        if let Some(last) = recorded_account_diffs_stack.last_mut() {
+                            let _ = last.pop(); // remove the pre-existing entry inserted on create start
+                            for record in result.account_accesses {
+                                let access = AccountAccess {
+                                    chainInfo: foundry_cheatcodes::Vm::ChainInfo {
+                                        forkId: ecx.db.active_fork_id().unwrap_or_default(),
+                                        chainId: U256::from(ecx.env.cfg.chain_id),
+                                    },
+                                    accessor: record.accessor,
+                                    account: record.account,
+                                    kind: match record.kind {
+                                        foundry_zksync_core::vm::AccountAccessKind::Call => {
+                                            AccountAccessKind::Call
+                                        }
+                                        foundry_zksync_core::vm::AccountAccessKind::Create => {
+                                            AccountAccessKind::Create
+                                        }
+                                    },
+                                    initialized: true,
+                                    oldBalance: record.old_balance,
+                                    newBalance: record.new_balance,
+                                    value: record.value,
+                                    data: record.data,
+                                    reverted: false,
+                                    deployedCode: Bytes::from(record.deployed_bytecode_hash.0),
+                                    storageAccesses: record
+                                        .storage_accesses
+                                        .into_iter()
+                                        .map(|record| StorageAccess {
+                                            account: record.account,
+                                            slot: record.slot.to_b256(),
+                                            isWrite: record.is_write,
+                                            previousValue: record.previous_value.to_b256(),
+                                            newValue: record.new_value.to_b256(),
+                                            reverted: false,
+                                        })
+                                        .collect(),
+                                    depth: record.depth,
+                                };
+                                last.push(access);
+                            }
+                        }
                     }
                 }
 
@@ -757,6 +806,56 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                                 &log,
                                 &mut Default::default(),
                             );
+                        }
+                    }
+                }
+
+                if result.execution_result.is_success() {
+                    // record storage accesses
+                    if let Some(recorded_account_diffs_stack) =
+                        state.recorded_account_diffs_stack.as_mut()
+                    {
+                        if let Some(last) = recorded_account_diffs_stack.last_mut() {
+                            let _ = last.pop(); // remove the pre-existing entry inserted on call start
+                            for record in result.account_accesses {
+                                let access = AccountAccess {
+                                    chainInfo: foundry_cheatcodes::Vm::ChainInfo {
+                                        forkId: ecx.db.active_fork_id().unwrap_or_default(),
+                                        chainId: U256::from(ecx.env.cfg.chain_id),
+                                    },
+                                    accessor: record.accessor,
+                                    account: record.account,
+                                    kind: match record.kind {
+                                        foundry_zksync_core::vm::AccountAccessKind::Call => {
+                                            AccountAccessKind::Call
+                                        }
+                                        foundry_zksync_core::vm::AccountAccessKind::Create => {
+                                            AccountAccessKind::Create
+                                        }
+                                    },
+                                    initialized: true,
+                                    oldBalance: record.old_balance,
+                                    newBalance: record.new_balance,
+                                    value: record.value,
+                                    data: record.data,
+                                    reverted: false,
+                                    deployedCode: Bytes::from(record.deployed_bytecode_hash.0),
+                                    storageAccesses: record
+                                        .storage_accesses
+                                        .into_iter()
+                                        .map(|record| StorageAccess {
+                                            account: record.account,
+                                            slot: record.slot.to_b256(),
+                                            isWrite: record.is_write,
+                                            previousValue: record.previous_value.to_b256(),
+                                            newValue: record.new_value.to_b256(),
+                                            reverted: false,
+                                        })
+                                        .collect(),
+                                    depth: record.depth,
+                                };
+                                last.push(access);
+                            }
                         }
                     }
                 }
