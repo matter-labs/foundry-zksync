@@ -1,20 +1,21 @@
 use crate::provider::VerificationContext;
 
 use alloy_json_abi::JsonAbi;
-use eyre::{OptionExt, Result};
+use eyre::{eyre, OptionExt, Result};
 use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
-    artifacts::{output_selection::OutputSelection, Source},
+    artifacts::{output_selection::OutputSelection, BytecodeObject, Source},
     compilers::CompilerSettings,
     resolver::parse::SolData,
     solc::{Solc, SolcCompiler},
-    Graph, Project,
+    Artifact, Graph, Project,
 };
 use foundry_config::Config;
 use foundry_zksync_compilers::compilers::{
     artifact_output::zk::ZkArtifactOutput,
     zksolc::{self, ZkSolc, ZkSolcCompiler},
 };
+use revm_primitives::Bytes;
 use semver::Version;
 use std::path::PathBuf;
 
@@ -158,18 +159,21 @@ impl CompilerVerificationContext {
             Self::ZkSolc(c) => &c.compiler_version.solc,
         }
     }
+
     pub fn get_target_abi(&self) -> Result<JsonAbi> {
         match self {
             Self::Solc(c) => c.get_target_abi(),
             Self::ZkSolc(c) => c.get_target_abi(),
         }
     }
+
     pub fn get_target_imports(&self) -> Result<Vec<PathBuf>> {
         match self {
             Self::Solc(c) => c.get_target_imports(),
             Self::ZkSolc(c) => c.get_target_imports(),
         }
     }
+
     pub fn get_target_metadata(&self) -> Result<serde_json::Value> {
         match self {
             Self::Solc(c) => {
@@ -177,6 +181,45 @@ impl CompilerVerificationContext {
                 Ok(serde_json::to_value(m)?)
             }
             Self::ZkSolc(c) => c.get_target_metadata(),
+        }
+    }
+
+    pub fn get_target_bytecode(&self) -> Result<Bytes> {
+        match self {
+            Self::Solc(context) => {
+                let output = context.project.compile_file(&context.target_path)?;
+                let artifact = output
+                    .find(&context.target_path, &context.target_name)
+                    .ok_or_eyre("Contract artifact wasn't found locally")?;
+
+                let bytecode = artifact
+                    .get_bytecode_object()
+                    .ok_or_eyre("Contract artifact does not contain bytecode")?;
+
+                match bytecode.as_ref() {
+                    BytecodeObject::Bytecode(bytes) => Ok(bytes.clone()),
+                    BytecodeObject::Unlinked(_) => Err(eyre!(
+                        "You have to provide correct libraries to use --guess-constructor-args"
+                    )),
+                }
+            }
+            Self::ZkSolc(context) => {
+                let output = context.project.compile_file(&context.target_path)?;
+                let artifact = output
+                    .find(&context.target_path, &context.target_name)
+                    .ok_or_eyre("Contract artifact wasn't found locally")?;
+
+                let bytecode = artifact
+                    .get_bytecode_object()
+                    .ok_or_eyre("Contract artifact does not contain bytecode")?;
+
+                match bytecode.as_ref() {
+                    BytecodeObject::Bytecode(bytes) => Ok(bytes.clone()),
+                    BytecodeObject::Unlinked(_) => Err(eyre!(
+                        "You have to provide correct libraries to use --guess-constructor-args"
+                    )),
+                }
+            }
         }
     }
 }

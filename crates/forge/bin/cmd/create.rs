@@ -11,7 +11,7 @@ use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
 use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
-use forge_verify::{zk_provider::CompilerVerificationContext, RetryArgs, VerifierArgs, VerifyArgs};
+use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs};
 use foundry_cli::{
     opts::{BuildOpts, EthereumOpts, EtherscanOpts, TransactionOpts},
     utils::{self, read_constructor_args_file, remove_contract, LoadConfig},
@@ -262,11 +262,7 @@ impl CreateArgs {
         verify.etherscan.key =
             config.get_etherscan_config_with_chain(Some(chain.into()))?.map(|c| c.key);
 
-        let context = if verify.zksync {
-            CompilerVerificationContext::ZkSolc(verify.zk_resolve_context().await?)
-        } else {
-            CompilerVerificationContext::Solc(verify.resolve_context().await?)
-        };
+        let context = verify.resolve_either_context().await?;
 
         verify.verification_provider()?.preflight_verify_check(verify, context).await?;
         Ok(())
