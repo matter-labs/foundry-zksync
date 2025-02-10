@@ -23,7 +23,9 @@ use crate::{
     state::FullNonce,
 };
 
-use super::storage_recorder::{AccountAccess, AccountAccesses, CallAddresses, CallType, StorageRecorder};
+use super::storage_recorder::{
+    AccountAccess, AccountAccesses, CallAddresses, CallType, StorageRecorder,
+};
 
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;

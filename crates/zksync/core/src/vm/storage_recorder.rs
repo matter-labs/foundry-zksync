@@ -237,7 +237,6 @@ impl AccountAccesses {
             println!("[StorageRecorder] CALL-END {record:?}");
         }
 
-
         if self.pending.is_empty() {
             // no more pending records, append everything recorded so far.
             self.records.push(record);

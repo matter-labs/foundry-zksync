@@ -184,13 +184,6 @@ impl FarCallHandler {
                     TxExecutionStatus::Pending => {
                         let calldata = get_calldata(&state, memory);
                         if calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION) {
-                            // println!(
-                            //     "{}CALL-BEGIN {} | {:?} {:?}",
-                            //     "\t".repeat(self.tx_execution.depth as usize),
-                            //     hex::encode(&calldata),
-                            //     current.msg_sender,
-                            //     current.code_address,
-                            // );
                             self.tx_execution.status = TxExecutionStatus::Executing;
                             self.tx_execution.depth = 1;
 
@@ -199,13 +192,6 @@ impl FarCallHandler {
                     }
                     TxExecutionStatus::Executing => {
                         let calldata = get_calldata(&state, memory);
-                        // println!(
-                        //     "{}CALL {} | {:?} {:?}",
-                        //     "\t".repeat(self.tx_execution.depth as usize),
-                        //     hex::encode(&calldata),
-                        //     current.msg_sender,
-                        //     current.code_address,
-                        // );
                         self.tx_execution.depth = self
                             .tx_execution
                             .depth
@@ -226,10 +212,7 @@ impl FarCallHandler {
 
                     if self.tx_execution.depth == 0 {
                         self.tx_execution.status = TxExecutionStatus::Finished;
-                        // println!("{}CALL-BEGIN-END", "\t".repeat(self.tx_execution.depth as usize));
                         return Some(TxExecutionStatus::Finished);
-                    } else {
-                        // println!("{}END", "\t".repeat(self.tx_execution.depth as usize));
                     }
                 }
                 TxExecutionStatus::Pending | TxExecutionStatus::Finished => (),
