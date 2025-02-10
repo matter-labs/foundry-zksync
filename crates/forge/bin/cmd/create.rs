@@ -121,91 +121,96 @@ impl CreateArgs {
 
         if self.build.compiler.zk.enabled() {
             return self.run_zksync(project).await;
-        }
-
-        let target_path = if let Some(ref mut path) = self.contract.path {
-            canonicalize(project.root().join(path))?
+            // NOTE(zk): we want the indent here so any change from
+            // upstream causes a conflict so we replay the changes to zk-specific code
         } else {
-            project.find_contract_path(&self.contract.name)?
-        };
+            let target_path = if let Some(ref mut path) = self.contract.path {
+                canonicalize(project.root().join(path))?
+            } else {
+                project.find_contract_path(&self.contract.name)?
+            };
 
-        let output = compile::compile_target(&target_path, &project, shell::is_json())?;
+            let output = compile::compile_target(&target_path, &project, shell::is_json())?;
 
-        let (abi, bin, id) = remove_contract(output, &target_path, &self.contract.name)?;
+            let (abi, bin, id) = remove_contract(output, &target_path, &self.contract.name)?;
 
-        let bin = match bin.object {
-            BytecodeObject::Bytecode(_) => bin.object,
-            _ => {
-                let link_refs = bin
-                    .link_references
-                    .iter()
-                    .flat_map(|(path, names)| {
-                        names.keys().map(move |name| format!("\t{name}: {path}"))
-                    })
-                    .collect::<Vec<String>>()
-                    .join("\n");
-                eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+            let bin = match bin.object {
+                BytecodeObject::Bytecode(_) => bin.object,
+                _ => {
+                    let link_refs = bin
+                        .link_references
+                        .iter()
+                        .flat_map(|(path, names)| {
+                            names.keys().map(move |name| format!("\t{name}: {path}"))
+                        })
+                        .collect::<Vec<String>>()
+                        .join("\n");
+                    eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                }
+            };
+
+            // Add arguments to constructor
+            let params = if let Some(constructor) = &abi.constructor {
+                let constructor_args = self
+                    .constructor_args_path
+                    .clone()
+                    .map(read_constructor_args_file)
+                    .transpose()?;
+                self.parse_constructor_args(
+                    constructor,
+                    constructor_args.as_deref().unwrap_or(&self.constructor_args),
+                )?
+            } else {
+                vec![]
+            };
+
+            let provider = utils::get_provider(&config)?;
+
+            // respect chain, if set explicitly via cmd args
+            let chain_id = if let Some(chain_id) = self.chain_id() {
+                chain_id
+            } else {
+                provider.get_chain_id().await?
+            };
+
+            // Whether to broadcast the transaction or not
+            let dry_run = !self.broadcast;
+
+            if self.unlocked {
+                // Deploy with unlocked account
+                let sender = self.eth.wallet.from.expect("required");
+                self.deploy(
+                    abi,
+                    bin,
+                    params,
+                    provider,
+                    chain_id,
+                    sender,
+                    config.transaction_timeout,
+                    id,
+                    dry_run,
+                )
+                .await
+            } else {
+                // Deploy with signer
+                let signer = self.eth.wallet.signer().await?;
+                let deployer = signer.address();
+                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
+                    .wallet(EthereumWallet::new(signer))
+                    .on_provider(provider);
+                self.deploy(
+                    abi,
+                    bin,
+                    params,
+                    provider,
+                    chain_id,
+                    deployer,
+                    config.transaction_timeout,
+                    id,
+                    dry_run,
+                )
+                .await
             }
-        };
-
-        // Add arguments to constructor
-        let params = if let Some(constructor) = &abi.constructor {
-            let constructor_args =
-                self.constructor_args_path.clone().map(read_constructor_args_file).transpose()?;
-            self.parse_constructor_args(
-                constructor,
-                constructor_args.as_deref().unwrap_or(&self.constructor_args),
-            )?
-        } else {
-            vec![]
-        };
-
-        let provider = utils::get_provider(&config)?;
-
-        // respect chain, if set explicitly via cmd args
-        let chain_id = if let Some(chain_id) = self.chain_id() {
-            chain_id
-        } else {
-            provider.get_chain_id().await?
-        };
-
-        // Whether to broadcast the transaction or not
-        let dry_run = !self.broadcast;
-
-        if self.unlocked {
-            // Deploy with unlocked account
-            let sender = self.eth.wallet.from.expect("required");
-            self.deploy(
-                abi,
-                bin,
-                params,
-                provider,
-                chain_id,
-                sender,
-                config.transaction_timeout,
-                id,
-                dry_run,
-            )
-            .await
-        } else {
-            // Deploy with signer
-            let signer = self.eth.wallet.signer().await?;
-            let deployer = signer.address();
-            let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                .wallet(EthereumWallet::new(signer))
-                .on_provider(provider);
-            self.deploy(
-                abi,
-                bin,
-                params,
-                provider,
-                chain_id,
-                deployer,
-                config.transaction_timeout,
-                id,
-                dry_run,
-            )
-            .await
         }
     }
 
