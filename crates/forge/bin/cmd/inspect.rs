@@ -1,6 +1,7 @@
 use alloy_primitives::{hex, keccak256, Address};
 use clap::Parser;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Table};
+use core::convert::Into;
 use eyre::{Context, Result};
 use forge::revm::primitives::Eof;
 use foundry_cli::opts::{BuildOpts, CompilerOpts};
@@ -16,7 +17,9 @@ use foundry_compilers::{
     info::ContractInfo,
     utils::canonicalize,
 };
+use foundry_config::{zksync::config_create_project, Config, SolcReq};
 use regex::Regex;
+use semver::Version;
 use std::{fmt, sync::LazyLock};
 
 /// CLI arguments for `forge inspect`.
@@ -71,12 +74,30 @@ impl InspectArgs {
         } else {
             project.find_contract_path(&contract.name)?
         };
-        let mut output = compiler.files([target_path.clone()]).compile(&project)?;
 
-        // Find the artifact
-        let artifact = output.remove(&target_path, &contract.name).ok_or_else(|| {
-            eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
-        })?;
+        let artifact = if modified_build_args.compiler.zk.enabled() {
+            let config = Config {
+                solc: Some(SolcReq::Version(Version::new(0, 8, 26))),
+                ..Default::default()
+            };
+            let project = config_create_project(&config, false, true).unwrap();
+            compiler
+                .files([target_path.clone()])
+                .zksync_compile(&project)?
+                .remove(&target_path, &contract.name)
+                .ok_or_else(|| {
+                    eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
+                })?
+                .into()
+        } else {
+            compiler
+                .files([target_path.clone()])
+                .compile(&project)?
+                .remove(&target_path, &contract.name)
+                .ok_or_else(|| {
+                    eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
+                })?
+        };
 
         // Match on ContractArtifactFields and pretty-print
         match field {
@@ -171,6 +192,17 @@ impl InspectArgs {
                 print_eof(artifact.bytecode)?;
             }
         };
+
+        if modified_build_args.compiler.zk.enabled() {
+            if !matches!(
+                field,
+                ContractArtifactField::Abi |
+                    ContractArtifactField::Bytecode |
+                    ContractArtifactField::DeployedBytecode
+            ) {
+                warn!(target: "forge", "ZKsync version of inspect does not support this field");
+            }
+        }
 
         Ok(())
     }
