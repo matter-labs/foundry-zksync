@@ -54,9 +54,10 @@ use crate::{
         },
     },
 };
-use foundry_evm_abi::{
-    patch_hh_console_selector, Console, HardhatConsole, HARDHAT_CONSOLE_ADDRESS,
-};
+
+use foundry_evm_abi::console::{self, ds::Console};
+
+use super::HARDHAT_CONSOLE_ADDRESS;
 
 /// Represents the result of execution a [`L2Tx`] on EraVM
 #[derive(Debug)]
@@ -742,13 +743,9 @@ impl ConsoleLogParser {
             return;
         }
 
-        let mut input = current_call.input.clone();
+        let input = current_call.input.clone();
 
-        // Patch the Hardhat-style selector (`uint` instead of `uint256`)
-        patch_hh_console_selector(&mut input);
-
-        // Decode the call
-        let Ok(call) = HardhatConsole::HardhatConsoleCalls::abi_decode(&input, false) else {
+        let Ok(call) = console::hh::ConsoleCalls::abi_decode(&input, false) else {
             return;
         };
 

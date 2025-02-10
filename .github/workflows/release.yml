@@ -158,6 +158,7 @@ jobs:
       # We diverge from upstream and build with cross as we're building static binaries
       - name: Build binaries
         env:
+          TAG_NAME: ${{ (env.IS_NIGHTLY == 'true' && 'nightly') || needs.prepare.outputs.tag_name }}
           SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
         shell: bash
         run: |

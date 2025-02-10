@@ -71,7 +71,7 @@ impl CreateArgs {
             project.find_contract_path(&self.contract.name)?
         };
 
-        let config = self.build.try_load_config_emit_warnings()?;
+        let config = self.build.load_config()?;
         let zk_project =
             foundry_config::zksync::config_create_project(&config, config.cache, false)?;
         let zk_compiler = ProjectCompiler::new().files([target_path.clone()]);
@@ -105,7 +105,7 @@ impl CreateArgs {
         };
 
         // Add arguments to constructor
-        let config = self.eth.try_load_config_emit_warnings()?;
+        let config = self.eth.load_config()?;
         let provider = utils::get_provider_zksync(&config)?;
         let params = match abi.constructor {
             Some(ref v) => {

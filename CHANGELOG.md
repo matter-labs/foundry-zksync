@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.8](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.7...foundry-zksync-v0.0.8) (2025-02-05)
+
+
+### Features
+
+* Improve display format ([#898](https://github.com/matter-labs/foundry-zksync/issues/898)) ([6af9b1a](https://github.com/matter-labs/foundry-zksync/commit/6af9b1af6c3da8396c951d3164887bd2af583faf))
+* Upstream 9f11e6df ([#899](https://github.com/matter-labs/foundry-zksync/issues/899)) ([e98c3fe](https://github.com/matter-labs/foundry-zksync/commit/e98c3fe12c02142af92a5a755013983842f6fac5))
+* Upstream 9f11e6df commits ([#900](https://github.com/matter-labs/foundry-zksync/issues/900)) ([13051f0](https://github.com/matter-labs/foundry-zksync/commit/13051f0ea45b2c7de3a0a2e56a0a4c08f6aaba5b))
+
+
+### Bug Fixes
+
+* use existing deployment nonce during storage migration ([#895](https://github.com/matter-labs/foundry-zksync/issues/895)) ([857d5d2](https://github.com/matter-labs/foundry-zksync/commit/857d5d252110dcbea3fe7731d3f38103c93a2dd7))
+
 ## [0.0.7](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.6...foundry-zksync-v0.0.7) (2025-01-31)
 
 

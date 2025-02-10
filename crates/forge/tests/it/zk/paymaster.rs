@@ -32,7 +32,15 @@ async fn test_zk_contract_paymaster() {
     prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol")).unwrap();
     prj.add_source("Paymaster.t.sol", include_str!("../../fixtures/zk/Paymaster.t.sol")).unwrap();
 
-    cmd.args(["test", "--zk-startup", "--via-ir", "--match-contract", "TestPaymasterFlow"]);
+    cmd.args([
+        "test",
+        "--zk-startup",
+        "--via-ir",
+        "--match-contract",
+        "TestPaymasterFlow",
+        "--optimize",
+        "true",
+    ]);
     assert!(cmd.assert_success().get_output().stdout_lossy().contains("Suite result: ok"));
 }
 
@@ -128,6 +136,7 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
 forgetest_async!(paymaster_script_test, |prj, cmd| {
     setup_deploy_prj(&mut prj);
     cmd.forge_fuse();
+    // We added the optimizer flag which is now false by default so we need to set it to true
     run_zk_script_test(
         prj.root(),
         &mut cmd,
@@ -135,7 +144,7 @@ forgetest_async!(paymaster_script_test, |prj, cmd| {
         "PaymasterScript",
         Some("OpenZeppelin/openzeppelin-contracts cyfrin/zksync-contracts"),
         3,
-        Some(&["-vvvvv", "--via-ir"]),
+        Some(&["-vvvvv", "--via-ir", "--optimize", "true"]),
     )
     .await;
 });
